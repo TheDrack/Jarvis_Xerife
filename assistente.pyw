@@ -128,26 +128,33 @@ def comandos (comando):
     elif 'estoque' in comando:
         falar(ConsultarEstoque())
     elif 'site' in comando:
-        abrirsite()
+        abrirsite(comando)
     else:
         falar('Não entendi')
         pedircomando()
 
-def abrirsite ():
-    url = escolhersite()
+def abrirsite (comando):
+    url = escolhersite(comando)
     wb.open(url)
 
-def escolhersite():
-    falar('Qual o site?')
-    site = Ligar_microfone()
+def escolhersite(comando):
+
+    site = comando
     planilhaDeSite = pd.read_excel(r"ServicoAutomatico\Lista de Sites.xlsx")
     out = planilhaDeSite.to_numpy().tolist()
     TuplaDeSITE = [tuple(elt) for elt in out]
     for SITE,URL in TuplaDeSITE:
         URL = str(URL)
         if SITE in site:       
-            mandar = URL
-    return(mandar)
+                mandar = URL
+    try:
+        return (mandar)
+
+    except UnboundLocalError:
+            falar('Qual o site?')
+            site = escolhersite(Ligar_microfone())
+
+
 
 
 def abrirgaveta ():
