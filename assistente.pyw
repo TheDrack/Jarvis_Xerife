@@ -1,3 +1,5 @@
+#-*- coding:utf-8 -*-
+from pynput.keyboard import Controller
 import pyautogui
 import time
 import speech_recognition as sr
@@ -17,7 +19,7 @@ def falar (fala):
     maquina.runAndWait()
 
 def digitar (texto):
-    pyautogui.write(texto)
+    Controller().type(texto)
 
 def aperta (botao):
     pyautogui.press(botao)
@@ -69,11 +71,6 @@ def Ligar_microfone ():
                     falar('cancelado ação')
                     restart()
 
-                elif 'voltar' in comando:
-                    pyautogui.hotkey('shift','tab')
-                    comando = comando.replace('voltar', '')
-                    return(comando)
-
                 elif 'fechar' in comando:
                     falar('fechando assistente, até mais...')
                     sys.exit()
@@ -87,6 +84,7 @@ def Ligar_microfone ():
 def pedircomando():
     falar('Diga um comando')
     ordem = Ligar_microfone()
+    ordem = ordem.replace('xerife ','')
     comandos(ordem)
 
 def comandos (comando):
@@ -129,9 +127,29 @@ def comandos (comando):
         falar(ConsultarEstoque())
     elif 'site' in comando:
         abrirsite(comando)
+    elif 'clicar em' in comando:
+        clicarNaNet(comando)
     else:
         falar('Não entendi')
         pedircomando()
+
+def clicarNaNet (comando):
+    falar('procurando')
+    comando = comando.replace('clicar em ', '')
+    pyautogui.hotkey('ctrl','f')
+    digitar(comando)
+    clicarNeste()
+
+def clicarNeste():
+    falar('clicar neste?')
+    resposta = Ligar_microfone()
+    if 'próximo' in resposta:
+        aperta('enter')
+        clicarNeste()
+    elif 'voltar' in resposta:
+        pyautogui.hotkey('shift','enter')
+    else :
+        pyautogui.hotkey('ctrl','enter')
 
 def abrirsite (comando):
     url = escolhersite(comando)
