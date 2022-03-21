@@ -235,14 +235,9 @@ def AnotacaoRequisicao():
     digitar('A/C ' + AC)
     aperta('enter')
 
-    
-def EscolherMaterialPrimeiro ():
+def Cod4rMaterial ():
     falar('Diga o material')
     Material = Ligar_microfone()
-    return (Material)
-
-def Cod4rMaterial ():
-    Material = EscolherMaterialPrimeiro()
     df = pd.read_excel(r"ServicoAutomatico\Lista de Materiais.xlsx")
     out = df.to_numpy().tolist()
     TuplaDeMateriais = [tuple(elt) for elt in out]
@@ -369,16 +364,15 @@ def AbrirAlmox ():
 
 def ConsultarEstoque():
     material = Cod4rMaterial()
-    df = pd.read_excel("./inventario.xls")
+    df = pd.read_excel(r"ServicoAutomatico/inventario.xls")
     out = df.to_numpy().tolist()
     TuplaDeMateriais = [tuple(elt) for elt in out]
-    for codigo,Material,Unid,Mov,Qntd, in TuplaDeMateriais:
-        codigo = str(codigo)
+    for codigo,Qntd, in TuplaDeMateriais:
+        codigo = str(codigo).replace('.','')
         if material in codigo:
-            Quantidade =  Qntd
-        else:
-            falar('Não foi encontrado')
-    return(Quantidade)
+            return(Qntd)
+
+    
 
 
 
