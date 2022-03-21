@@ -15,16 +15,13 @@ maquina = pyttsx3.init()
 
 
 def falar (fala):
-    fala = fala.replace('falar ','')
     maquina.say(fala)
     maquina.runAndWait()
 
 def digitar (texto):
-    texto = texto.replace('escreva ','')
     Controller().type(texto)
 
 def aperta (botao):
-    botao = botao.replace('aperte ','')
     pyautogui.press(botao)
 
 def restart():
@@ -50,7 +47,7 @@ def chamarAXerife ():
                     if comando == '':
                         pedircomando()
                     else:
-                        comando2(comando)
+                        comandos(comando)
                     pedircomando()
                 elif 'fechar' in comando:
                     falar('fechando assistente, até a próxima...')
@@ -88,54 +85,32 @@ def pedircomando():
     falar('Diga um comando')
     ordem = Ligar_microfone()
     ordem = ordem.replace('xerife ','')
-    comando2(ordem)
+    comandos(ordem)
 
-def comandos (comando):
-    
-    if 'requisição' in comando:
-        falar('Fazendo requisição')
-        FazerRequisicaoPT1()
-    elif 'sulfite' in comando:
-        falar('Preparando requisição de sulfite')
-        FazerRequisicaoSulfite()
-    elif 'planilha' in comando:
-        falar('Abrindo Planilha, espere para clicar no Ok')
-        AbrirPlanilha()
-    elif 'inventário' in comando:
-        falar('Atualizando planilha de inventario')
-        AtualizarInventario()
-    elif 'balancete' in comando:
-        falar('Abrindo lançamento de Balancete')
-        ImprimirBalancete()
-    elif 'almoxarifado' in comando:
-        falar('Abrindo Almoxarifado 4R')
-        AbrirAlmox()
-    elif 'digitar produto' in comando:
-        Cod4rMaterial()
-    elif 'digitar quantidade' in comando:
-        QuantMaterial()
-    elif 'gaveta' in comando:
-        abrirgaveta()
-    elif 'escreva' in comando:
-        comando = comando.replace('escreva ','')
-        digitar(comando)
-    elif 'aperte' in comando:
-        comando = comando.replace('aperte ','')
-        aperta(comando)
-    elif 'falar' in comando:
-        comando = comando.replace('falar ','')
-        falar(comando)
-    elif 'internet' in comando:
-        pyautogui.hotkey('ctrl','shift','c')
-    elif 'estoque' in comando:
-        falar(ConsultarEstoque())
-    elif 'site' in comando:
-        abrirsite(comando)
-    elif 'clicar em' in comando:
-        clicarNaNet(comando)
-    else:
-        falar('Não entendi')
-        pedircomando()
+def comandos(comando):
+    TuplaDeComandos =  {
+        ('sulfite',FazerRequisicaoSulfite),
+        ('requisição',FazerRequisicaoPT1),
+        ('sulfite',FazerRequisicaoSulfite),
+        ('planilha',AbrirPlanilha),
+        ('inventário',AtualizarInventario),
+        ('balancete',ImprimirBalancete),
+        ('almoxarifado',AbrirAlmox),
+        ('digitar produto',Cod4rMaterial),
+        ('digitar quantidade',QuantMaterial),
+        ('gaveta',abrirgaveta),
+        ('escreva',digitar),
+        ('aperte',aperta),
+        ('falar',falar),
+        ('internet', abrirInternet),
+        ('estoque',ConsultarEstoque),
+        ('site',abrirsite),
+        ('clicar em',clicarNaNet)}
+
+    for comandos,acao in TuplaDeComandos:
+        if comandos in comando:
+            comando = comando.replace(f'{comandos} ','')
+            acao(comando)
 
 def clicarNaNet (comando):
     falar('procurando')
@@ -179,18 +154,18 @@ def escolhersite(comando):
 
 
 
-def abrirgaveta ():
+def abrirgaveta (teste):
     pyautogui.hotkey('ctrl','shift','g')
 
-def FazerRequisicaoPT1 ():
+def FazerRequisicaoPT1 (teste):
     falar('Fazendo requisição')
     AbrirRequisicao()
     EscolherCentroDeCusto()
     descritivoRequisicao()
     AnotacaoRequisicao()
-    FazerRequisicaoPT2()
-def FazerRequisicaoPT2 ():
-    digitar(Cod4rMaterial())
+    FazerRequisicaoPT2(teste)
+def FazerRequisicaoPT2 (teste):
+    digitar(Cod4rMaterial(teste))
     QuantMaterial()
     AlgoMais()
 
@@ -240,7 +215,7 @@ def AnotacaoRequisicao():
     digitar('A/C ' + AC)
     aperta('enter')
 
-def Cod4rMaterial ():
+def Cod4rMaterial (teste):
     falar('Diga o material')
     Material = Ligar_microfone()
     df = pd.read_excel(r"ServicoAutomatico\Lista de Materiais.xlsx")
@@ -268,7 +243,7 @@ def AlgoMais():
     falar('Algo mais?')
     resposta = Ligar_microfone()
     if 'sim' in resposta:
-        FazerRequisicaoPT2()
+        FazerRequisicaoPT2(resposta)
     elif 'não'  in resposta:
         falar('Pronto')
         restart()
@@ -280,7 +255,7 @@ def prox ():
     digitar('1')
     aperta('enter')
 
-def FazerRequisicaoSulfite ():
+def FazerRequisicaoSulfite (teste):
     falar('Preparando requisição de sulfite')
     pyautogui.PAUSE = 0.4
     pyautogui.leftClick(660,1050)
@@ -289,13 +264,18 @@ def FazerRequisicaoSulfite ():
     pyautogui.doubleClick(100,175)
     aperta(['tab','tab','tab'])
     digitar('1')
-    aperta('enter',presses=6)
+    aperta('enter')
+    aperta('enter')
+    aperta('enter')
+    aperta('enter')
+    aperta('enter')
+    aperta('enter')
     digitar('0301603043')
     aperta('enter')
     digitar('0,5')
     pyautogui.alert('Automatização concluida, continue manualmente')
 
-def AtualizarInventario ():
+def AtualizarInventario (teste):
     falar('Atualizando planilha de inventario')
     pyautogui.PAUSE = 0.4
     pyautogui.leftClick(660,1050)
@@ -312,7 +292,11 @@ def AtualizarInventario ():
     pyautogui.alert('clique em Ok quando carregar a página de impressão, para evitar falhas com a velocidade do 4R')
     pyautogui.leftClick(20,30)
     aperta('home')
-    aperta('down',presses=5)
+    aperta('down')
+    aperta('down')
+    aperta('down')
+    aperta('down')
+    aperta('down')
     aperta('enter')
     aperta('enter')
     pyautogui.hotkey('shift','tab')
@@ -322,15 +306,18 @@ def AtualizarInventario ():
     aperta('a')
     time.sleep(1)
     aperta('enter')
-    aperta('tab', presses=3)
+    aperta('tab')
+    aperta('tab')
+    aperta('tab')
     digitar('Material 10\Rafael\Consumo.inventario\Dados\inventario.xls')
-    aperta('enter', presses=2)
+    aperta('enter')
+    aperta('enter')
     pyautogui.leftClick(2000,10)
     pyautogui.alert('Automatização concluida, continue manualmente')
 
 
 
-def ImprimirBalancete ():
+def ImprimirBalancete (teste):
     falar('Abrindo lançamento de Balancete')
     pyautogui.PAUSE = 0.4
     pyautogui.leftClick(660,1050)
@@ -345,7 +332,7 @@ def ImprimirBalancete ():
     pyautogui.leftClick(400,150)
     pyautogui.alert('Automatização concluida, continue manualmente')
 
-def AbrirPlanilha ():
+def AbrirPlanilha (teste):
     falar('Abrindo Planilha, espere para clicar no Ok')
     pyautogui.PAUSE = 0.4
     pyautogui.hotkey('ctrl', 'shift', 'i')
@@ -359,7 +346,7 @@ def AbrirPlanilha ():
     pyautogui.hotkey('win','left')
     pyautogui.alert('Automatização concluida, continue manualmente')
 
-def AbrirAlmox ():
+def AbrirAlmox (teste):
     falar('Abrindo Almoxarifado 4R')
     pyautogui.PAUSE = 0.8
     pyautogui.alert("O código vai começar. Não use nada do seu computador enquanto o código está rodando")
@@ -372,39 +359,20 @@ def AbrirAlmox ():
     aperta('enter')
     pyautogui.alert('Almoxarifado 4R Aberto, prossiga manualmente')
 
-def ConsultarEstoque():
-    material = Cod4rMaterial()
+def ConsultarEstoque(teste):
+    material = Cod4rMaterial(teste)
     df = pd.read_excel(r"ServicoAutomatico/inventario.xls")
     out = df.to_numpy().tolist()
     TuplaDeMateriais = [tuple(elt) for elt in out]
     for codigo,Qntd, in TuplaDeMateriais:
         codigo = str(codigo).replace('.','')
         if material in codigo:
+            falar(Qntd)
             return(Qntd)
 
-def comando2(comando):
-    TuplaDeComandos =  (('Requisição',FazerRequisicaoPT1()),
-    ('sulfite',FazerRequisicaoSulfite()),
-    ('requisição',FazerRequisicaoPT1()),
-    ('sulfite',FazerRequisicaoSulfite()),
-    ('planilha',AbrirPlanilha()),
-    ('inventário',AtualizarInventario()),
-    ('balancete',ImprimirBalancete()),
-    ('almoxarifado',AbrirAlmox()),
-    ('digitar produto',Cod4rMaterial()),
-    ('digitar quantidade',QuantMaterial()),
-    ('gaveta',abrirgaveta()),
-    ('escreva',digitar(comando)),
-    ('aperte',aperta(comando)),
-    ('falar',falar(comando)),
-    ('internet',pyautogui.hotkey('ctrl','shift','c')),
-    ('estoque',falar(ConsultarEstoque())),
-    ('site',abrirsite(comando)),
-    ('clicar em',clicarNaNet(comando)),)
+def abrirInternet (teste):
+    pyautogui.hotkey('ctrl','shift','c')
 
-    for comandos,acao in TuplaDeComandos:
-        if comandos in comando:
-            comando = comando.replace(f'{comandos} ','')
-            return(acao)
+
 
 chamarAXerife()
