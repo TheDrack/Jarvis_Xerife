@@ -15,13 +15,16 @@ maquina = pyttsx3.init()
 
 
 def falar (fala):
+    fala = fala.replace('falar ','')
     maquina.say(fala)
     maquina.runAndWait()
 
 def digitar (texto):
+    texto = texto.replace('escreva ','')
     Controller().type(texto)
 
 def aperta (botao):
+    botao = botao.replace('aperte ','')
     pyautogui.press(botao)
 
 def restart():
@@ -88,6 +91,7 @@ def pedircomando():
     comandos(ordem)
 
 def comandos (comando):
+    
     if 'requisição' in comando:
         falar('Fazendo requisição')
         FazerRequisicaoPT1()
@@ -179,6 +183,7 @@ def abrirgaveta ():
     pyautogui.hotkey('ctrl','shift','g')
 
 def FazerRequisicaoPT1 ():
+    falar('Fazendo requisição')
     AbrirRequisicao()
     EscolherCentroDeCusto()
     descritivoRequisicao()
@@ -276,6 +281,7 @@ def prox ():
     aperta('enter')
 
 def FazerRequisicaoSulfite ():
+    falar('Preparando requisição de sulfite')
     pyautogui.PAUSE = 0.4
     pyautogui.leftClick(660,1050)
     pyautogui.leftClick(200,50)
@@ -290,6 +296,7 @@ def FazerRequisicaoSulfite ():
     pyautogui.alert('Automatização concluida, continue manualmente')
 
 def AtualizarInventario ():
+    falar('Atualizando planilha de inventario')
     pyautogui.PAUSE = 0.4
     pyautogui.leftClick(660,1050)
     pyautogui.leftClick(200,50)
@@ -324,6 +331,7 @@ def AtualizarInventario ():
 
 
 def ImprimirBalancete ():
+    falar('Abrindo lançamento de Balancete')
     pyautogui.PAUSE = 0.4
     pyautogui.leftClick(660,1050)
     pyautogui.leftClick(200,50)
@@ -338,6 +346,7 @@ def ImprimirBalancete ():
     pyautogui.alert('Automatização concluida, continue manualmente')
 
 def AbrirPlanilha ():
+    falar('Abrindo Planilha, espere para clicar no Ok')
     pyautogui.PAUSE = 0.4
     pyautogui.hotkey('ctrl', 'shift', 'i')
     pyautogui.alert('ESPERE. Clique em Ok quando a planilha abrir para não dar erro')
@@ -351,6 +360,7 @@ def AbrirPlanilha ():
     pyautogui.alert('Automatização concluida, continue manualmente')
 
 def AbrirAlmox ():
+    falar('Abrindo Almoxarifado 4R')
     pyautogui.PAUSE = 0.8
     pyautogui.alert("O código vai começar. Não use nada do seu computador enquanto o código está rodando")
     pyautogui.hotkey('ctrl', 'shift', 'a')
@@ -372,8 +382,25 @@ def ConsultarEstoque():
         if material in codigo:
             return(Qntd)
 
-    
-
+def comando2(comando):
+    TuplaDeComandos =  (('Requisição',FazerRequisicaoPT1()),
+    ('sulfite',FazerRequisicaoSulfite()),
+    ('requisição',FazerRequisicaoPT1()),
+    ('sulfite',FazerRequisicaoSulfite()),
+    ('planilha',AbrirPlanilha()),
+    ('inventário',AtualizarInventario()),
+    ('balancete',ImprimirBalancete()),
+    ('almoxarifado',AbrirAlmox()),
+    ('digitar produto',Cod4rMaterial()),
+    ('digitar quantidade',QuantMaterial()),
+    ('gaveta',abrirgaveta()),
+    ('escreva',digitar(comando)),
+    ('aperte',aperta(comando)),
+    ('falar',falar(comando)),
+    ('internet',pyautogui.hotkey('ctrl','shift','c')),
+    ('estoque',falar(ConsultarEstoque())),
+    ('site',abrirsite(comando)),
+    ('clicar em',clicarNaNet(comando)),)
 
 
 chamarAXerife()
