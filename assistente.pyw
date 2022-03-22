@@ -112,6 +112,34 @@ def comandos(comando):
             comando = comando.replace(f'{comandos} ','')
             acao(comando)
 
+
+def localizanatela(imagem):
+    caminho = r'C:\Users\jesus.anhaia\OneDrive\Documentos\GitHub\ServicoAutomatico\imagens'
+    arquivo = imagem
+    k = 0
+    n = 7.5
+    os.chdir(caminho)
+
+    while True:
+        #Procura a imagem
+        local = pyautogui.locateCenterOnScreen(arquivo)
+
+        #Se imagem for localizada 
+        if local != None:
+            pyautogui.moveTo(local)
+            pyautogui.click()
+            print(f'Imagem {imagem} localizada na posição: {local}')
+            break
+
+        #Após n tentativas o programa encerra
+        if k >= n:
+            print(f'Imagem {imagem} não localizada')
+            break
+
+        #Aguarda um pouco para tentar novamente
+        time.sleep(0.25)
+        k += 1
+
 def clicarNaNet (comando):
     falar('procurando')
     comando = comando.replace('clicar em ', '')
@@ -174,8 +202,9 @@ def AbrirRequisicao ():
     falar('Irá inicializar uma requisição automatizada, não clique em nada')
     pyautogui.leftClick(200,1050)
     pyautogui.hotkey('win','up')
+    localizanatela('botaoFECHAR2.PNG')
+    localizanatela('botaoFECHAR.PNG')
     pyautogui.leftClick(200,50)
-    pyautogui.leftClick(770,90)
     pyautogui.doubleClick(100,175)
     pyautogui.PAUSE = 0.6
     aperta(['tab','tab','tab'])
@@ -289,8 +318,9 @@ def AtualizarInventario (teste):
     pyautogui.leftClick(585,480)
     pyautogui.leftClick(170,505)
     pyautogui.leftClick(170,600)
-    pyautogui.alert('clique em Ok quando carregar a página de impressão, para evitar falhas com a velocidade do 4R')
-    pyautogui.leftClick(20,30)
+    # pyautogui.alert('clique em Ok quando carregar a página de impressão, para evitar falhas com a velocidade do 4R')
+    # pyautogui.leftClick(20,30)
+    localizanatela('botaoPDF.PNG')
     aperta('home')
     aperta('down')
     aperta('down')
@@ -333,23 +363,22 @@ def ImprimirBalancete (teste):
     pyautogui.alert('Automatização concluida, continue manualmente')
 
 def AbrirPlanilha (teste):
-    falar('Abrindo Planilha, espere para clicar no Ok')
+    falar('Abrindo Planilha')
     pyautogui.PAUSE = 0.4
     pyautogui.hotkey('ctrl', 'shift', 'i')
-    pyautogui.alert('ESPERE. Clique em Ok quando a planilha abrir para não dar erro')
+    time.sleep(3)
+    localizanatela('botaoABRIRPLANILHA.PNG')
     aperta('enter')
     time.sleep(2)
     pyautogui.hotkey('win', 'right')
-    pyautogui.doubleClick(1500,270)
     pyautogui.hotkey('ctrl', 'b')
-    pyautogui.leftClick(660,1050)
+    localizanatela('botaoALMOX.PNG')
     pyautogui.hotkey('win','left')
     pyautogui.alert('Automatização concluida, continue manualmente')
 
 def AbrirAlmox (teste):
     falar('Abrindo Almoxarifado 4R')
     pyautogui.PAUSE = 0.8
-    pyautogui.alert("O código vai começar. Não use nada do seu computador enquanto o código está rodando")
     pyautogui.hotkey('ctrl', 'shift', 'a')
     time.sleep(10)
     digitar('jesus.anhaia')
@@ -372,7 +401,6 @@ def ConsultarEstoque(teste):
 
 def abrirInternet (teste):
     pyautogui.hotkey('ctrl','shift','c')
-
 
 
 chamarAXerife()
