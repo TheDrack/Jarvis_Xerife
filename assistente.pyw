@@ -402,5 +402,16 @@ def ConsultarEstoque(teste):
 def abrirInternet (teste):
     pyautogui.hotkey('ctrl','shift','c')
 
+#gerador de funções
+
+def EscreveDentroDosComandos (comando):
+    with open(r'python/assistente.pyw', 'a') as arquivo:
+    	arquivo.write(comando + "\n")
+def cabecalho (nomeFunction,valoresExternos):
+    EscreveDentroDosComandos(f'\ndef {nomeFunction} ({valoresExternos}):')
+
+def GeradorDeFunction (nomeFunction,valoresExternos,execucao):
+    cabecalho(nomeFunction,valoresExternos)
+    EscreveDentroDosComandos(f'\t{execucao}')
 
 chamarAXerife()
