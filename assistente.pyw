@@ -112,12 +112,12 @@ def comandos(comando):
             comando = comando.replace(f'{comandos} ','')
             acao(comando)
 
-
+tempoDeEspera = 7.5
 def localizanatela(imagem):
     caminho = r'C:\Users\jesus.anhaia\OneDrive\Documentos\GitHub\ServicoAutomatico\imagens'
     arquivo = imagem
     k = 0
-    n = 7.5
+    n = tempoDeEspera
     os.chdir(caminho)
 
     while True:
@@ -320,6 +320,7 @@ def AtualizarInventario (teste):
     pyautogui.leftClick(170,600)
     # pyautogui.alert('clique em Ok quando carregar a página de impressão, para evitar falhas com a velocidade do 4R')
     # pyautogui.leftClick(20,30)
+    tempoDeEspera = 10
     localizanatela('botaoPDF.PNG')
     aperta('home')
     aperta('down')
@@ -366,7 +367,7 @@ def AbrirPlanilha (teste):
     falar('Abrindo Planilha')
     pyautogui.PAUSE = 0.4
     pyautogui.hotkey('ctrl', 'shift', 'i')
-    time.sleep(3)
+    tempoDeEspera = 10
     localizanatela('botaoABRIRPLANILHA.PNG')
     aperta('enter')
     time.sleep(2)
