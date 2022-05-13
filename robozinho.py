@@ -50,12 +50,12 @@ def localizanatela(imagem):
         k += 1
 
 #---------------------------------------------------------------#
-#A partir daqui é os comandos de execução#
+#A partir daqui é a execução#
 
 pyautogui.PAUSE = 0.8
 time.sleep(2)
 
-pyautogui.hotkey('ctrl', 'shift', 'a')
+pyautogui.hotkey("ctrl","shift","a")
 falar("Abrindo 4R")
 time.sleep(2)
 if "sim" in localizanatela("login4R.png"):
@@ -84,5 +84,5 @@ else:
 
 time.sleep(1)
 pyautogui.hotkey('ctrl', 'tab')
-pyautogui.hotkey('ctrl', 'shift', 'j')
+os.startfile(r"C:\Users\jesus.anhaia\OneDrive\Documentos\GitHub\ServicoAutomatico\janelaAuto.pyw")
 
