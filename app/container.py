@@ -2,9 +2,11 @@
 """Dependency Injection Container - Wires together all components"""
 
 import logging
+import os
 from typing import Optional
 
 from app.adapters.edge import AutomationAdapter, CombinedVoiceProvider, WebAdapter
+from app.adapters.infrastructure import LLMCommandAdapter
 from app.application.ports import ActionProvider, VoiceProvider, WebProvider
 from app.application.services import AssistantService
 from app.domain.services import CommandInterpreter, IntentProcessor
@@ -25,6 +27,9 @@ class Container:
         web_provider: Optional[WebProvider] = None,
         wake_word: str = "xerife",
         language: str = "pt-BR",
+        use_llm: bool = False,
+        gemini_api_key: Optional[str] = None,
+        gemini_model: str = "gemini-1.5-flash",
     ):
         """
         Initialize the container
@@ -35,9 +40,15 @@ class Container:
             web_provider: Optional pre-configured web provider
             wake_word: Wake word for the assistant
             language: Language for voice recognition
+            use_llm: Whether to use LLM-based command interpretation (default: False)
+            gemini_api_key: Optional Gemini API key (defaults to GEMINI_API_KEY env var)
+            gemini_model: Gemini model name to use (default: gemini-1.5-flash)
         """
         self.wake_word = wake_word
         self.language = language
+        self.use_llm = use_llm
+        self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
+        self.gemini_model = gemini_model or os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
         # Create or use provided adapters
         self._voice_provider = voice_provider
@@ -46,6 +57,7 @@ class Container:
 
         # Domain services (always created fresh)
         self._command_interpreter: Optional[CommandInterpreter] = None
+        self._llm_command_adapter: Optional[LLMCommandAdapter] = None
         self._intent_processor: Optional[IntentProcessor] = None
 
         # Application service
@@ -85,7 +97,21 @@ class Container:
     def command_interpreter(self) -> CommandInterpreter:
         """Get or create command interpreter"""
         if self._command_interpreter is None:
-            self._command_interpreter = CommandInterpreter(wake_word=self.wake_word)
+            if self.use_llm:
+                # Use LLM-based adapter
+                logger.info("Using LLMCommandAdapter for command interpretation")
+                if self._llm_command_adapter is None:
+                    self._llm_command_adapter = LLMCommandAdapter(
+                        api_key=self.gemini_api_key,
+                        model_name=self.gemini_model,
+                        voice_provider=self.voice_provider,
+                        wake_word=self.wake_word,
+                    )
+                return self._llm_command_adapter
+            else:
+                # Use rule-based interpreter
+                logger.info("Using rule-based CommandInterpreter")
+                self._command_interpreter = CommandInterpreter(wake_word=self.wake_word)
         return self._command_interpreter
 
     @property
@@ -111,15 +137,20 @@ class Container:
         return self._assistant_service
 
 
-def create_edge_container(wake_word: str = "xerife", language: str = "pt-BR") -> Container:
+def create_edge_container(
+    wake_word: str = "xerife",
+    language: str = "pt-BR",
+    use_llm: bool = False,
+) -> Container:
     """
     Factory function to create a container with edge adapters
 
     Args:
         wake_word: Wake word for the assistant
         language: Language for voice recognition
+        use_llm: Whether to use LLM-based command interpretation (default: False)
 
     Returns:
         Configured container with edge adapters
     """
-    return Container(wake_word=wake_word, language=language)
+    return Container(wake_word=wake_word, language=language, use_llm=use_llm)
