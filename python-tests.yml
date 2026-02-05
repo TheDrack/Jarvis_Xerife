@@ -1,5 +1,31 @@
+name: Python Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        # Instalando um por um para isolar o erro se ele persistir
-        pip install pyttsx3 SpeechRecognition PyAutoGUI pynput pydantic pydantic-settings python-dotenv pandas openpyxl psutil pytest pytest-cov mock
+        pip install -r requirements.txt
+        # O GitHub Actions precisa de algumas libs extras para simular o ambiente de testes
+        pip install pytest pytest-cov mock
+
+    - name: Run Tests with Pytest
+      run: |
+        # Usamos o mock para evitar erros de falta de hardware de áudio no servidor
+        pytest --cov=app tests/ --junitxml=pytest.xml
