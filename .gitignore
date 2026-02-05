@@ -75,6 +75,7 @@ data/*.xls
 data/*.csv
 *.txt
 !requirements.txt
+!requirements/*.txt
 
 # Airflow
 airflow.cfg

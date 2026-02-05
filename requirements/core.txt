@@ -1,0 +1,7 @@
+# Core dependencies - cloud-ready, no hardware requirements
+# These dependencies can run in headless Linux environment
+
+# Configuration management
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
