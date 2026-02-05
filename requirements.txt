@@ -11,7 +11,6 @@ pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 
 # Web automation
-#
 
 # Data processing (kept for compatibility)
 pandas>=2.0.0
