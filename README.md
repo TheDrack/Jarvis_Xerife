@@ -1,4 +1,5 @@
 # Jarvis Voice Assistant
+![Python Tests](https://github.com/TheDrack/Python/actions/workflows/python-tests.yml/badge.svg)
 
 A professional, modular voice assistant built with Python, featuring voice recognition, text-to-speech, and system automation capabilities.
 
