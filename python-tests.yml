@@ -1,0 +1,5 @@
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Instalando um por um para isolar o erro se ele persistir
+        pip install pyttsx3 SpeechRecognition PyAutoGUI pynput pydantic pydantic-settings python-dotenv pandas openpyxl psutil pytest pytest-cov mock
