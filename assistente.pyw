@@ -9,6 +9,10 @@ import sys
 import pandas as pd
 import webbrowser as wb
 
+# Importar funções de automação de interface do módulo gui_commands
+from app.actions.gui_commands import digitar, aperta, localizanatela, clicarNaNet, clicarNeste
+from app.core.config import settings
+
 
 audio = sr.Recognizer()
 maquina = pyttsx3.init()
@@ -17,12 +21,6 @@ maquina = pyttsx3.init()
 def falar (fala):
     maquina.say(fala)
     maquina.runAndWait()
-
-def digitar (texto):
-    Controller().type(texto)
-
-def aperta (botao):
-    pyautogui.press(botao)
 
 def restart():
     python = sys.executable
@@ -111,52 +109,6 @@ def comandos(comando):
         if comandos in comando:
             comando = comando.replace(f'{comandos} ','')
             acao(comando)
-
-tempoDeEspera = 7.5
-def localizanatela(imagem):
-    caminho = r'C:\Users\jesus.anhaia\OneDrive\Documentos\GitHub\ServicoAutomatico\imagens'
-    arquivo = imagem
-    k = 0
-    n = tempoDeEspera
-    os.chdir(caminho)
-
-    while True:
-        #Procura a imagem
-        local = pyautogui.locateCenterOnScreen(arquivo)
-
-        #Se imagem for localizada 
-        if local != None:
-            pyautogui.moveTo(local)
-            print(f'Imagem {imagem} localizada na posição: {local}')
-            break
-
-        #Após n tentativas o programa encerra
-        if k >= n:
-            print(f'Imagem {imagem} não localizada')
-            break
-
-        #Aguarda um pouco para tentar novamente
-        time.sleep(0.25)
-        k += 1
-    return (local)
-
-def clicarNaNet (comando):
-    falar('procurando')
-    comando = comando.replace('clicar em ', '')
-    pyautogui.hotkey('ctrl','f')
-    digitar(comando)
-    clicarNeste()
-
-def clicarNeste():
-    falar('clicar neste?')
-    resposta = Ligar_microfone()
-    if 'próximo' in resposta:
-        aperta('enter')
-        clicarNeste()
-    elif 'voltar' in resposta:
-        pyautogui.hotkey('shift','enter')
-    else :
-        pyautogui.hotkey('ctrl','enter')
 
 def abrirsite (comando):
     url = escolhersite(comando)
@@ -320,8 +272,9 @@ def AtualizarInventario (teste):
     pyautogui.leftClick(170,600)
     # pyautogui.alert('clique em Ok quando carregar a página de impressão, para evitar falhas com a velocidade do 4R')
     # pyautogui.leftClick(20,30)
-    tempoDeEspera = 10
+    settings.set_tempo_espera_localizacao(10)
     pyautogui.click(localizanatela('botaoPDF.PNG'))
+    settings.set_tempo_espera_localizacao(7.5)  # Restaurar valor padrão
     aperta('home')
     aperta('down')
     aperta('down')
@@ -367,8 +320,9 @@ def AbrirPlanilha (teste):
     falar('Abrindo Planilha')
     pyautogui.PAUSE = 0.4
     pyautogui.hotkey('ctrl', 'shift', 'i')
-    tempoDeEspera = 10
+    settings.set_tempo_espera_localizacao(10)
     pyautogui.click(localizanatela('botaoABRIRPLANILHA.PNG'))
+    settings.set_tempo_espera_localizacao(7.5)  # Restaurar valor padrão
     aperta('enter')
     time.sleep(2)
     pyautogui.hotkey('win', 'right')
