@@ -1,4 +1,5 @@
 # Multi-stage build for Jarvis Voice Assistant
+# Stage 1: Builder for dependencies
 FROM python:3.11-slim as builder
 
 # Set working directory
@@ -12,13 +13,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Use edge requirements for full local deployment
+COPY requirements/edge.txt requirements/core.txt requirements/
+RUN pip install --no-cache-dir --user -r requirements/edge.txt
 
-# Final stage
-FROM python:3.11-slim
+# Stage 2: Edge Runtime (with hardware support)
+FROM python:3.11-slim as edge
 
-# Install runtime dependencies
+# Install runtime dependencies for audio and GUI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     portaudio19-dev \
     libportaudio2 \
@@ -42,5 +44,29 @@ ENV PYTHONUNBUFFERED=1
 # Create necessary directories
 RUN mkdir -p data logs
 
-# Run the application
+# Run the assistant
 CMD ["python", "main.py"]
+
+# Stage 3: Cloud Runtime (headless, no hardware dependencies)
+FROM python:3.11-slim as cloud
+
+WORKDIR /app
+
+# Install only core dependencies (no hardware)
+COPY requirements/core.txt requirements/
+RUN pip install --no-cache-dir -r requirements/core.txt
+
+# Copy application code (only domain, application, and infrastructure adapters)
+COPY app/domain/ ./app/domain/
+COPY app/application/ ./app/application/
+COPY app/adapters/infrastructure/ ./app/adapters/infrastructure/
+COPY app/core/config.py ./app/core/config.py
+COPY app/core/__init__.py ./app/core/__init__.py
+COPY app/container.py ./app/container.py
+
+ENV PYTHONUNBUFFERED=1
+RUN mkdir -p data logs
+
+# For cloud deployment, you would typically run an API server
+# CMD ["python", "-m", "app.api_server"]  # Future: FastAPI server
+CMD ["python", "-c", "print('Cloud mode - Please configure API server')"]
