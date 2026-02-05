@@ -20,10 +20,15 @@ class JarvisEngine:
         self.audio = sr.Recognizer()
         self.maquina = pyttsx3.init()
         self.logger = logging.getLogger(__name__)
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
+        
+        # Configure logging only if no handlers exist
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(
+                logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            )
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
     
     def falar(self, fala: str) -> None:
         """
@@ -48,15 +53,15 @@ class JarvisEngine:
             
             while True:
                 try:
-                    Audio = self.audio.listen(s)
-                    comando = self.audio.recognize_google(Audio, language='pt-BR', show_all=True)
+                    audio_data = self.audio.listen(s)
+                    comando = self.audio.recognize_google(audio_data, language='pt-BR', show_all=True)
                     
                     if comando != []:
-                        comando = self.audio.recognize_google(Audio, language='pt-BR')
+                        comando = self.audio.recognize_google(audio_data, language='pt-BR')
                         comando = comando.lower()
                         
                         if 'cancelar' in comando:
-                            self.falar('cancelado ação')
+                            self.falar('cancelada a ação')
                             self.logger.info("Action cancelled by user")
                             # Note: restart() functionality should be handled by caller
                             return None
@@ -93,11 +98,11 @@ class JarvisEngine:
             
             while True:
                 try:
-                    Audio = self.audio.listen(s)
-                    comando = self.audio.recognize_google(Audio, language='pt-BR', show_all=True)
+                    audio_data = self.audio.listen(s)
+                    comando = self.audio.recognize_google(audio_data, language='pt-BR', show_all=True)
                     
                     if comando != []:
-                        comando = self.audio.recognize_google(Audio, language='pt-BR')
+                        comando = self.audio.recognize_google(audio_data, language='pt-BR')
                         comando = comando.lower()
                         
                         if 'xerife' in comando:
