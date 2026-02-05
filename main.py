@@ -13,6 +13,11 @@ def exemplo_acao(parametro):
     print(f"Ação executada com parâmetro: {parametro}")
 
 
+def outra_acao(parametro):
+    """Outra ação de exemplo"""
+    print(f"Outra ação executada: {parametro}")
+
+
 def main():
     """
     Main function that initializes and starts the voice assistant
@@ -25,8 +30,9 @@ def main():
     processor = CommandProcessor()
     
     # Register example commands (can be extended with more commands)
+    # Note: These are demonstration commands - replace with actual functionality
     processor.register_command('teste', exemplo_acao)
-    processor.register_command('exemplo', exemplo_acao)
+    processor.register_command('exemplo', outra_acao)
     
     # Start the main loop
     try:

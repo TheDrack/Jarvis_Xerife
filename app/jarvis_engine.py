@@ -40,10 +40,14 @@ class JarvisEngine:
         Returns:
             str: Recognized text or empty string if recognition failed
         """
+        # Timeout values: 5 seconds to detect speech start, 10 seconds max phrase length
+        LISTEN_TIMEOUT = 5
+        PHRASE_TIME_LIMIT = 10
+        
         with sr.Microphone() as source:
             self.audio_recognizer.adjust_for_ambient_noise(source)
             try:
-                audio = self.audio_recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                audio = self.audio_recognizer.listen(source, timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT)
                 text = self.audio_recognizer.recognize_google(audio, language='pt-BR')
                 return text.lower()
             except sr.UnknownValueError:

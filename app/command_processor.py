@@ -2,6 +2,7 @@
 """
 CommandProcessor - Processes voice commands and routes them to appropriate actions
 """
+import re
 
 
 class CommandProcessor:
@@ -38,11 +39,13 @@ class CommandProcessor:
             
         command_text = command_text.lower().strip()
         
-        # Check each registered command
+        # Check each registered command using word boundary matching
         for keyword, action in self.commands.items():
-            if keyword in command_text:
+            # Use word boundaries to avoid partial matches (e.g., 'test' in 'latest')
+            pattern = r'\b' + re.escape(keyword) + r'\b'
+            if re.search(pattern, command_text):
                 # Remove the keyword and pass remaining text to action
-                remaining = command_text.replace(keyword, '').strip()
+                remaining = re.sub(pattern, '', command_text).strip()
                 try:
                     action(remaining)
                     return True
