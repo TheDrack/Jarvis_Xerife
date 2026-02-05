@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  jarvis-assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jarvis-assistant
+    environment:
+      - PYTHONUNBUFFERED=1
+      - APP_NAME=Jarvis Assistant
+      - LANGUAGE=pt-BR
+      - WAKE_WORD=xerife
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    # Note: For audio device access, you may need to add:
+    # devices:
+    #   - /dev/snd:/dev/snd
+    # privileged: true
+    restart: unless-stopped
+    networks:
+      - jarvis-network
+
+networks:
+  jarvis-network:
+    driver: bridge
