@@ -6,10 +6,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# Mock GUI-related modules for testing without display
+# Mock hardware-related modules for testing without hardware/display
+# This must happen before any imports of modules that depend on these
 sys.modules["pyautogui"] = MagicMock()
 sys.modules["pynput"] = MagicMock()
 sys.modules["pynput.keyboard"] = MagicMock()
+sys.modules["speech_recognition"] = MagicMock()
+sys.modules["pyttsx3"] = MagicMock()
 
 
 @pytest.fixture

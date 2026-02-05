@@ -4,7 +4,7 @@
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-import speech_recognition as sr
+
 
 from app.core.config import settings
 from app.core.engine import JarvisEngine
@@ -22,7 +22,8 @@ class TestJarvisEngine:
     def test_engine_initialization(self, engine):
         """Test that engine initializes correctly"""
         assert engine is not None
-        assert isinstance(engine.recognizer, sr.Recognizer)
+        # The recognizer is now a MagicMock from conftest.py
+        assert engine.recognizer is not None
         assert engine.is_running is False
 
     @patch("pyttsx3.init")
@@ -44,7 +45,7 @@ class TestJarvisEngine:
         engine = JarvisEngine()
 
         # Mock audio input - create an AudioSource-like object
-        mock_source = MagicMock(spec=sr.AudioSource)
+        mock_source = MagicMock()
         mock_microphone.return_value.__enter__.return_value = mock_source
 
         # Mock recognition
@@ -68,7 +69,7 @@ class TestJarvisEngine:
         """Test listen when no speech is detected"""
         engine = JarvisEngine()
 
-        mock_source = MagicMock(spec=sr.AudioSource)
+        mock_source = MagicMock()
         mock_microphone.return_value.__enter__.return_value = mock_source
 
         mock_audio = Mock()
@@ -97,7 +98,7 @@ class TestJarvisEngine:
         """Test get_command with cancel keyword"""
         engine = JarvisEngine()
 
-        mock_source = MagicMock(spec=sr.AudioSource)
+        mock_source = MagicMock()
         mock_microphone.return_value.__enter__.return_value = mock_source
 
         mock_audio = Mock()
