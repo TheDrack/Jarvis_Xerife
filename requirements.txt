@@ -1,10 +1,19 @@
 # Jarvis Assistant - Default Requirements
 # This includes edge dependencies for local development
-# For other deployment modes, see requirements/ directory:
-#   - requirements/core.txt       - Cloud-ready core only
-#   - requirements/edge.txt       - Local hardware dependencies
-#   - requirements/dev.txt        - Development and testing
-#   - requirements/prod-edge.txt  - Production edge deployment
-#   - requirements/prod-cloud.txt - Production cloud deployment
+# For modular requirements strategy, see requirements/README.md
 
--r requirements/edge.txt
+# Core dependencies
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# Edge dependencies (hardware support)
+pyttsx3>=2.90
+SpeechRecognition>=3.10.0
+PyAutoGUI>=0.9.54
+pynput>=1.7.6
+pyaudio>=0.2.13
+
+# Additional utilities
+pandas>=2.0.0
+openpyxl>=3.1.0
