@@ -88,7 +88,7 @@ def localizanatela(imagem):
         local = pyautogui.locateCenterOnScreen(arquivo)
 
         # Se imagem for localizada 
-        if local != None:
+        if local is not None:
             pyautogui.moveTo(local)
             print(f'Imagem {imagem} localizada na posição: {local}')
             break
