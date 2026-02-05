@@ -134,10 +134,14 @@ def FazerRequisicaoPT1(callback_digitar, callback_aperta, callback_falar, callba
     cc_input = callback_ligar_microfone()
     cc = EscolherCentroDeCusto(cc_input)
     
+    # Use the code if found, otherwise use the original input
     if cc:
         callback_digitar(cc)
-        callback_aperta('enter')
-        callback_aperta('enter')
+    else:
+        callback_digitar(cc_input)
+    
+    callback_aperta('enter')
+    callback_aperta('enter')
     
     # Descritivo
     callback_falar('Diga o descritivo')
@@ -180,20 +184,18 @@ def FazerRequisicaoPT2(callback_digitar, callback_aperta, callback_falar, callba
     callback_digitar(quantidade)
 
 
-def ConsultarEstoque(material_input, callback_falar):
+def ConsultarEstoque(material_code, callback_falar):
     """
     Consult stock for a material.
     Uses optimized pandas query.
     
     Args:
-        material_input: Material name or code
+        material_code: Material code (already processed)
         callback_falar: Function to speak the result
     
     Returns:
         Quantity in stock, or None if not found
     """
-    material = Cod4rMaterial(material_input)
-    
     # Load inventory data with cache
     df = _load_excel_with_cache('inventario')
     
@@ -201,8 +203,10 @@ def ConsultarEstoque(material_input, callback_falar):
     for row in df.itertuples(index=False):
         codigo = str(row[0]).replace('.', '')
         qntd = row[1]
-        if material in codigo:
-            callback_falar(str(qntd))
+        if material_code in codigo:
+            # Ensure qntd is properly formatted for speech
+            qntd_str = str(qntd) if qntd is not None else "0"
+            callback_falar(qntd_str)
             return qntd
     
     return None
