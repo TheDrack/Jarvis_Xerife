@@ -72,7 +72,7 @@ def Cod4rMaterial(teste):
     return '0000000'  # Placeholder
 
 
-def QuantMaterial():
+def QuantMaterial(parametro):
     """Input material quantity."""
     print('Processando quantidade de material')
     # Note: Full implementation would use speech recognition

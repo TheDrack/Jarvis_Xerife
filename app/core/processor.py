@@ -72,7 +72,8 @@ class CommandProcessor:
         for cmd_key, acao in self.comandos.items():
             if cmd_key in comando:
                 # Remove the command keyword from the string to get parameters
-                parametro = comando.replace(f'{cmd_key} ', '')
+                # Use replace with count=1 and strip to handle edge cases
+                parametro = comando.replace(cmd_key, '', 1).strip()
                 # Execute the action with the parameter
                 return acao(parametro)
         
