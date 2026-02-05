@@ -113,7 +113,7 @@ class TestJarvisEngine:
         result = engine.get_command()
 
         assert result is None
-        engine.speak.assert_called_with("Cancelado ação")
+        engine.speak.assert_called_with("Ação cancelada")
 
 
 class TestJarvisEngineIntegration:

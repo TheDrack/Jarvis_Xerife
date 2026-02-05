@@ -133,7 +133,7 @@ class JarvisEngine:
 
         if command:
             if "cancelar" in command:
-                self.speak("Cancelado ação")
+                self.speak("Ação cancelada")
                 return None
             elif "fechar" in command:
                 self.speak("Fechando assistente, até mais...")
