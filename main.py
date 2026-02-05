@@ -3,32 +3,14 @@
 """
 Jarvis Voice Assistant - Main Entry Point
 
-A modular voice assistant with support for:
-- Voice recognition and synthesis
-- System automation (PyAutoGUI/Keyboard)
-- Web navigation
-- Extensible command system
+A modular voice assistant with Hexagonal Architecture:
+- Clean separation between Domain, Application, and Adapters
+- Hardware-independent core logic (cloud-ready)
+- Dependency injection for all external dependencies
+- Support for Edge (local hardware) and Cloud deployments
 """
 
-from app.actions.system_commands import CommandProcessor, SystemCommands, WebNavigator
-from app.core.engine import JarvisEngine
-
-
-def main() -> None:
-    """Main entry point for Jarvis Assistant"""
-    # Initialize components
-    engine = JarvisEngine()
-    system_commands = SystemCommands()
-    web_navigator = WebNavigator(system_commands)
-    command_processor = CommandProcessor(system_commands, web_navigator)
-
-    # Start the assistant
-    try:
-        engine.wait_for_wake_word(command_processor.process)
-    except KeyboardInterrupt:
-        print("\nShutting down Jarvis Assistant...")
-        engine.stop()
-
+from app.bootstrap_edge import main
 
 if __name__ == "__main__":
     main()
