@@ -48,7 +48,7 @@ class Container:
         self.language = language
         self.use_llm = use_llm
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
-        self.gemini_model = gemini_model or os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        self.gemini_model = os.getenv("GEMINI_MODEL", gemini_model)
 
         # Create or use provided adapters
         self._voice_provider = voice_provider

@@ -113,19 +113,15 @@ class TestAgentService:
         """Test that function descriptions are in Portuguese"""
         functions = AgentService.get_function_declarations()
 
+        portuguese_found = False
         for func in functions:
             description = func["description"]
             # Check for Portuguese words
-            # At least one function should have Portuguese keywords
-            portuguese_found = any(
+            if any(
                 word in description.lower()
                 for word in ["digita", "texto", "teclado", "pressiona", "tecla", "abre", "navegador"]
-            )
-            if portuguese_found:
-                # If any Portuguese is found, that's good enough
-                assert True
-                return
+            ):
+                portuguese_found = True
+                break
 
-        # If we get here, no Portuguese was found in any description
-        # This is okay as long as the functions are properly defined
-        assert True
+        assert portuguese_found, "No Portuguese keywords found in any function descriptions"
