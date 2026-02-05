@@ -174,12 +174,16 @@ def abrirgaveta (teste):
     pyautogui.hotkey('ctrl','shift','g')
 
 def FazerRequisicaoPT1 (teste):
+    # Note: 'teste' parameter maintained for compatibility but not used
+    # Business logic now handles input directly via callbacks
     falar('Fazendo requisição')
     AbrirRequisicao()
     business_logic.FazerRequisicaoPT1(digitar, aperta, falar, Ligar_microfone)
     FazerRequisicaoPT2(teste)
 
 def FazerRequisicaoPT2 (teste):
+    # Note: 'teste' parameter maintained for compatibility but not used
+    # Business logic now handles input directly via callbacks
     business_logic.FazerRequisicaoPT2(digitar, aperta, falar, Ligar_microfone)
     AlgoMais()
 

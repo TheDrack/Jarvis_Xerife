@@ -41,7 +41,8 @@ def abrirsite(comando):
         comando: Voice command containing the site name
     """
     url = escolhersite(comando)
-    wb.open(url)
+    if url:
+        wb.open(url)
 
 
 def escolhersite(comando):
@@ -205,8 +206,10 @@ def ConsultarEstoque(material_code, callback_falar):
         qntd = row[1]
         if material_code in codigo:
             # Ensure qntd is properly formatted for speech
-            qntd_str = str(qntd) if qntd is not None else "0"
-            callback_falar(qntd_str)
-            return qntd
+            if qntd is not None:
+                qntd_str = str(qntd)
+                callback_falar(qntd_str)
+                return qntd
     
+    # Material not found in inventory
     return None
