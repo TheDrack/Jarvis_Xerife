@@ -6,8 +6,7 @@ import speech_recognition as sr
 import pyttsx3
 import os
 import sys
-import pandas as pd
-import webbrowser as wb
+from app.actions import business_logic
 
 
 audio = sr.Recognizer()
@@ -159,25 +158,14 @@ def clicarNeste():
         pyautogui.hotkey('ctrl','enter')
 
 def abrirsite (comando):
-    url = escolhersite(comando)
-    wb.open(url)
+    business_logic.abrirsite(comando)
 
 def escolhersite(comando):
-
-    site = comando
-    planilhaDeSite = pd.read_excel(r"ServicoAutomatico\Lista de Sites.xlsx")
-    out = planilhaDeSite.to_numpy().tolist()
-    TuplaDeSITE = [tuple(elt) for elt in out]
-    for SITE,URL in TuplaDeSITE:
-        URL = str(URL)
-        if SITE in site:       
-                mandar = URL
-    try:
-        return (mandar)
-
-    except UnboundLocalError:
-            falar('Qual o site?')
-            site = escolhersite(Ligar_microfone())
+    url = business_logic.escolhersite(comando)
+    if url is None:
+        falar('Qual o site?')
+        url = escolhersite(Ligar_microfone())
+    return url
 
 
 
@@ -188,13 +176,11 @@ def abrirgaveta (teste):
 def FazerRequisicaoPT1 (teste):
     falar('Fazendo requisição')
     AbrirRequisicao()
-    EscolherCentroDeCusto()
-    descritivoRequisicao()
-    AnotacaoRequisicao()
+    business_logic.FazerRequisicaoPT1(digitar, aperta, falar, Ligar_microfone)
     FazerRequisicaoPT2(teste)
+
 def FazerRequisicaoPT2 (teste):
-    digitar(Cod4rMaterial(teste))
-    QuantMaterial()
+    business_logic.FazerRequisicaoPT2(digitar, aperta, falar, Ligar_microfone)
     AlgoMais()
 
 def AbrirRequisicao ():
@@ -215,45 +201,18 @@ def AbrirRequisicao ():
 def EscolherCentroDeCusto ():
     falar('Qual centro de custo será o destinatário?')
     CC = Ligar_microfone()
-    df = pd.read_excel(r"ServicoAutomatico\Lista de CC.xlsx")
-    out = df.to_numpy().tolist()
-    TuplaDeCC = [tuple(elt) for elt in out]
-    for codigo,escrito in TuplaDeCC:
-        codigo = str(codigo)
-        if escrito in CC:       
-            CC = codigo
+    cc_code = business_logic.EscolherCentroDeCusto(CC)
+    if cc_code:
+        CC = cc_code
     digitar(CC)
     aperta('enter')
     aperta('enter')
 
 
-def descritivoRequisicao ():
-    falar('Diga o descritivo')
-    
-    desc = Ligar_microfone()
-    desc = desc.upper()
-    digitar(desc)
-    aperta('enter')
-
-
-def AnotacaoRequisicao():
-    falar('Está aos cuidados de qual solicitante?')
-    
-    AC = Ligar_microfone()
-    AC = AC.upper()
-    digitar('A/C ' + AC)
-    aperta('enter')
-
 def Cod4rMaterial (teste):
     falar('Diga o material')
     Material = Ligar_microfone()
-    df = pd.read_excel(r"ServicoAutomatico\Lista de Materiais.xlsx")
-    out = df.to_numpy().tolist()
-    TuplaDeMateriais = [tuple(elt) for elt in out]
-    for codigo,material in TuplaDeMateriais:
-        codigo = str(codigo)
-        if material in Material:
-            Material = '0'+ codigo
+    Material = business_logic.Cod4rMaterial(Material)
     return(Material)
 
 
@@ -391,14 +350,8 @@ def AbrirAlmox (teste):
 
 def ConsultarEstoque(teste):
     material = Cod4rMaterial(teste)
-    df = pd.read_excel(r"ServicoAutomatico/inventario.xls")
-    out = df.to_numpy().tolist()
-    TuplaDeMateriais = [tuple(elt) for elt in out]
-    for codigo,Qntd, in TuplaDeMateriais:
-        codigo = str(codigo).replace('.','')
-        if material in codigo:
-            falar(Qntd)
-            return(Qntd)
+    qntd = business_logic.ConsultarEstoque(material, falar)
+    return qntd
 
 def abrirInternet (teste):
     pyautogui.hotkey('ctrl','shift','c')
