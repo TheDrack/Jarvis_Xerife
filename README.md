@@ -26,7 +26,7 @@ Se você já tem Python instalado, pode usar em **3 passos simples**:
 
 ```bash
 # 1. Clone e configure o ambiente
-git clone <repository-url> && cd python
+git clone <https://github.com/TheDrack/python> && cd python
 python -m venv venv && source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # 2. Instale as dependências
