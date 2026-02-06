@@ -12,6 +12,10 @@ jobs:
   build-windows:
     runs-on: windows-latest
     
+    permissions:
+      contents: write  # Needed to upload release assets
+      actions: read    # Needed to read workflow artifacts
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
