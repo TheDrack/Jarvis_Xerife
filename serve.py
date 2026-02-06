@@ -85,7 +85,7 @@ def main() -> None:
     port = int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
 
     logger.info(f"Starting server on {host}:{port}")
-    logger.info("API Documentation available at http://localhost:8000/docs")
+    logger.info(f"API Documentation available at http://localhost:{port}/docs")
 
     # Start uvicorn server
     uvicorn.run(
