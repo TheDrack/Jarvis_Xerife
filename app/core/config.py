@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     app_name: str = "Jarvis Assistant"
     version: str = "1.0.0"
 
+    # User Settings
+    user_id: Optional[str] = None
+    assistant_name: Optional[str] = None
+
     # Voice Recognition Settings
     language: str = "pt-BR"
     wake_word: str = "xerife"
@@ -30,6 +34,10 @@ class Settings(BaseSettings):
     # PyAutoGUI Settings
     pyautogui_pause: float = 0.4
     search_timeout: float = 7.5
+
+    # LLM Settings
+    gemini_api_key: Optional[str] = None
+    gemini_model: str = "gemini-1.5-flash"
 
     # Security Settings
     secret_key: str = "your-secret-key-change-this-in-production-minimum-32-characters"

@@ -16,6 +16,7 @@ SpeechRecognition>=3.10.0
 PyAutoGUI>=0.9.54
 pynput>=1.7.6
 pyaudio>=0.2.13
+pyperclip>=1.8.2
 
 # Additional utilities
 pandas>=2.0.0

@@ -1,0 +1,71 @@
+name: Build and Release Jarvis Installer
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    permissions:
+      contents: write  # Needed to upload release assets
+      actions: read    # Needed to read workflow artifacts
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        
+        # Install dependencies in specific order to avoid conflicts
+        pip install bcrypt==4.0.1
+        pip install passlib[bcrypt]==1.7.4
+        
+        # Install core dependencies
+        pip install -r requirements.txt
+    
+    - name: Build executable with PyInstaller
+      run: |
+        python build_config.py
+    
+    - name: Verify build
+      run: |
+        if (Test-Path "dist\Jarvis_Installer.exe") {
+          Write-Host "✓ Executable built successfully"
+          $size = (Get-Item "dist\Jarvis_Installer.exe").Length / 1MB
+          Write-Host "✓ Size: $([math]::Round($size, 2)) MB"
+        } else {
+          Write-Host "✗ Executable not found"
+          exit 1
+        }
+      shell: pwsh
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Jarvis_Installer
+        path: dist/Jarvis_Installer.exe
+        retention-days: 30
+    
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/Jarvis_Installer.exe
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
