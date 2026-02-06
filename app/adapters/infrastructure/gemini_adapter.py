@@ -81,16 +81,12 @@ class LLMCommandAdapter:
         """
         # Run async interpretation in event loop
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # If loop is already running, create a new task
-                # Note: This won't work in nested event loops
-                logger.warning("Event loop already running, using sync fallback")
-                return self._interpret_sync(raw_input)
-            else:
-                return loop.run_until_complete(self.interpret_async(raw_input))
+            # If there's a running event loop, avoid nested loop issues
+            asyncio.get_running_loop()
+            logger.warning("Event loop already running, using sync fallback")
+            return self._interpret_sync(raw_input)
         except RuntimeError:
-            # No event loop, create one
+            # No running event loop in this thread; safe to create one
             return asyncio.run(self.interpret_async(raw_input))
 
     async def interpret_async(self, raw_input: str) -> Intent:
