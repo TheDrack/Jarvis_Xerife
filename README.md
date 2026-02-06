@@ -139,7 +139,7 @@ Um dos recursos mais legais do Jarvis é a **personalidade selecionável**! Dura
 
 A personalidade base é definida pelo sistema de IA (Gemini), que atua como um assistente focado em produtividade e automação. O comportamento padrão inclui:
 - Respostas concisas e eficientes
-- Foco em ações, não em explicações longas  
+- Foco em ações, não em explicações longas
 - Comunicação em português brasileiro
 - Tom profissional mas amigável
 
