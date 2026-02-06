@@ -120,12 +120,23 @@ This will:
 - Automatically configure the assistant to use PostgreSQL
 - Create a persistent volume for database data
 
-2. Stop the services:
+2. **Customize database credentials (optional)**:
+
+Create a `.env` file in the project root with your own credentials:
+```bash
+POSTGRES_USER=your_user
+POSTGRES_PASSWORD=your_secure_password
+POSTGRES_DB=your_database
+```
+
+The docker-compose.yml will automatically use these values.
+
+3. Stop the services:
 ```bash
 docker-compose down
 ```
 
-3. Stop and remove volumes (⚠️ this will delete all data):
+4. Stop and remove volumes (⚠️ this will delete all data):
 ```bash
 docker-compose down -v
 ```

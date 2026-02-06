@@ -3,9 +3,9 @@ services:
     image: postgres:15
     container_name: jarvis-postgres
     environment:
-      - POSTGRES_USER=jarvis
-      - POSTGRES_PASSWORD=jarvis_secure_password
-      - POSTGRES_DB=jarvis_db
+      - POSTGRES_USER=${POSTGRES_USER:-jarvis}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-jarvis_secure_password}
+      - POSTGRES_DB=${POSTGRES_DB:-jarvis_db}
     ports:
       - "5432:5432"
     volumes:
@@ -14,7 +14,7 @@ services:
       - jarvis-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jarvis"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-jarvis}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,7 +29,7 @@ services:
       - APP_NAME=Jarvis Assistant
       - LANGUAGE=pt-BR
       - WAKE_WORD=xerife
-      - DATABASE_URL=postgresql://jarvis:jarvis_secure_password@db:5432/jarvis_db
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-jarvis}:${POSTGRES_PASSWORD:-jarvis_secure_password}@db:5432/${POSTGRES_DB:-jarvis_db}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
