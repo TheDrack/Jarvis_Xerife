@@ -149,7 +149,8 @@ git push origin v1.0.0
 - **Trigger**: Push para `main` ou criação de tag `v*`
 - **Plataforma**: Windows (usando `windows-latest`)
 - **Artefato**: `Jarvis_Installer.exe` (pronto para distribuição)
-- **Retenção**: 90 dias para tags, 30 dias para pushes regulares
+- **Retenção de artefatos**: 30 dias (para pushes regulares)
+- **Releases permanentes**: Criadas automaticamente quando você publica uma tag `v*`
 
 > **💡 Dica**: Isso significa que você nunca precisa compilar manualmente para releases - apenas crie uma tag e o GitHub faz o resto!
 

@@ -48,7 +48,7 @@ Pronto! Seu assistente personalizado está configurado e pronto para uso. Veja a
 
 O arquivo `Jarvis_Installer.exe` é um **executável standalone completo** que inclui:
 
-- ✅ Python 3.11+ embedado
+- ✅ Python 3.11+ embarcado
 - ✅ Todas as bibliotecas necessárias (PyAutoGUI, pyttsx3, Google Gemini AI, etc.)
 - ✅ Setup Wizard interativo
 - ✅ Suporte completo a voz em português brasileiro
