@@ -85,3 +85,4 @@ logs/
 
 # Docker
 *.pid
+jarvis.db
