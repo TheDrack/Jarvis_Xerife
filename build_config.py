@@ -112,14 +112,28 @@ def create_spec_file():
 # PyInstaller spec file for creating a single executable (--onefile mode)
 # All binaries, data files, and dependencies are bundled into one executable
 
+from PyInstaller.utils.hooks import collect_all
+
 block_cipher = None
+
+# Collect all submodules and data files for packages that need special handling
+datas = {DATA_FILES}
+binaries = []
+hiddenimports = {HIDDEN_IMPORTS}
+
+# Use collect_all for packages that require all their submodules and data
+for package in ['pyautogui', 'pyperclip', 'google.generativeai', 'pyttsx3']:
+    package_datas, package_binaries, package_hiddenimports = collect_all(package)
+    datas += package_datas
+    binaries += package_binaries
+    hiddenimports += package_hiddenimports
 
 a = Analysis(
     ['{SCRIPT_PATH}'],
     pathex=[],
-    binaries=[],
-    datas={DATA_FILES},
-    hiddenimports={HIDDEN_IMPORTS},
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={{}},
     runtime_hooks=[],
@@ -128,13 +142,14 @@ a = Analysis(
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
-    collect_all=['pyautogui', 'pyperclip', 'google.generativeai', 'pyttsx3'],
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 # EXE with all components bundled (--onefile configuration)
 # This creates a single standalone executable with no external dependencies
+# By including all components (a.binaries, a.zipfiles, a.datas) in EXE and not
+# creating a COLLECT object, we get a one-file executable
 exe = EXE(
     pyz,
     a.scripts,
@@ -156,7 +171,6 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon={repr(ICON_PATH) if ICON_PATH else None},
-    onefile=True,
 )
 """
     
@@ -194,10 +208,12 @@ def build_executable():
     print("\nBuilding executable with PyInstaller...")
     print("This may take a few minutes...\n")
     
-    # Run PyInstaller with only --clean flag
+    # Run PyInstaller with --clean flag
     # All configuration is now in the spec file
+    # --noconfirm prevents prompts when overwriting existing output
     PyInstaller.__main__.run([
         '--clean',
+        '--noconfirm',
         str(spec_file),
     ])
     
