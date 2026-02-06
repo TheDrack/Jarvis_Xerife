@@ -30,6 +30,7 @@ python-multipart>=0.0.6
 # Security and Authentication
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+cryptography>=41.0.0
 
 # Database ORM
 sqlmodel>=0.0.14

@@ -1,10 +1,16 @@
 # -*- coding: utf-8 -*-
 """Configuration management for Jarvis Assistant using pydantic-settings"""
 
+import logging
 from pathlib import Path
 from typing import Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.core.encryption import decrypt_value, is_encrypted
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -52,6 +58,46 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
+
+    @field_validator('gemini_api_key', mode='before')
+    @classmethod
+    def decrypt_api_key(cls, v: Optional[str]) -> Optional[str]:
+        """Decrypt GEMINI_API_KEY if it's encrypted"""
+        if v and is_encrypted(v):
+            try:
+                decrypted = decrypt_value(v)
+                logger.info("Successfully decrypted GEMINI_API_KEY")
+                return decrypted
+            except Exception as e:
+                logger.error(f"Failed to decrypt GEMINI_API_KEY: {type(e).__name__}")
+                logger.error("The .env file may have been moved to a different machine.")
+                logger.error("Please run the setup wizard again to reconfigure.")
+                raise ValueError(
+                    "Failed to decrypt GEMINI_API_KEY. "
+                    "The .env file may have been moved to a different machine. "
+                    "Please run the setup wizard again."
+                ) from e
+        return v
+
+    @field_validator('database_url', mode='before')
+    @classmethod
+    def decrypt_database_url(cls, v: str) -> str:
+        """Decrypt DATABASE_URL if it's encrypted"""
+        if v and is_encrypted(v):
+            try:
+                decrypted = decrypt_value(v)
+                logger.info("Successfully decrypted DATABASE_URL")
+                return decrypted
+            except Exception as e:
+                logger.error(f"Failed to decrypt DATABASE_URL: {type(e).__name__}")
+                logger.error("The .env file may have been moved to a different machine.")
+                logger.error("Please run the setup wizard again to reconfigure.")
+                raise ValueError(
+                    "Failed to decrypt DATABASE_URL. "
+                    "The .env file may have been moved to a different machine. "
+                    "Please run the setup wizard again."
+                ) from e
+        return v
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

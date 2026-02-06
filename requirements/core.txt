@@ -9,6 +9,7 @@ python-dotenv>=1.0.0
 # Security and Authentication
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+cryptography>=41.0.0
 
 # API Server
 fastapi>=0.104.0

@@ -106,7 +106,7 @@ ASSISTANT_NAME=TestBot
             assert result is False
     
     def test_save_env_file_creates_file(self, tmp_path):
-        """Test that save_env_file creates a valid .env file"""
+        """Test that save_env_file creates a valid .env file with encrypted values"""
         assistant_name = "Jarvis"
         user_id = "user_123"
         api_key = "test_api_key_AIzaSy123"
@@ -132,8 +132,10 @@ DATABASE_URL=sqlite:///jarvis.db
         content = env_file.read_text()
         assert f"USER_ID={user_id}" in content
         assert f"ASSISTANT_NAME={assistant_name}" in content
-        assert f"GEMINI_API_KEY={api_key}" in content
-        assert f"DATABASE_URL={database_url}" in content
+        # API key and database URL should be encrypted (not plain text)
+        assert api_key not in content  # Plain text should NOT be in file
+        assert "GEMINI_API_KEY=ENCRYPTED:" in content  # Should be encrypted
+        assert "DATABASE_URL=ENCRYPTED:" in content  # Should be encrypted
     
     def test_save_env_file_without_example(self, tmp_path):
         """Test that save_env_file works even without .env.example"""
@@ -152,8 +154,10 @@ DATABASE_URL=sqlite:///jarvis.db
         content = env_file.read_text()
         assert f"USER_ID={user_id}" in content
         assert f"ASSISTANT_NAME={assistant_name}" in content
-        assert f"GEMINI_API_KEY={api_key}" in content
-        assert f"DATABASE_URL={database_url}" in content
+        # Verify values are encrypted
+        assert api_key not in content  # Plain text should NOT be in file
+        assert "GEMINI_API_KEY=ENCRYPTED:" in content
+        assert "DATABASE_URL=ENCRYPTED:" in content
     
     def test_validate_database_connection_sqlite(self):
         """Test database validation with SQLite (should always work)"""
