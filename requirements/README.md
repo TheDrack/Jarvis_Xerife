@@ -6,12 +6,14 @@ This directory contains separated dependency files for different deployment scen
 
 ### `core.txt` - Cloud-Ready Core
 Core dependencies with **no hardware requirements**:
-- Pydantic for configuration
-- Python standard library only
+- Pydantic and pydantic-settings for configuration
+- FastAPI and Uvicorn for REST API server
+- SQLModel and psycopg2-binary for database (PostgreSQL/SQLite)
+- python-jose and passlib for authentication and security
 - Can run in headless Linux environment
 - No display, audio, or input device dependencies
 
-**Use for**: Cloud deployment, CI/CD, core business logic development
+**Use for**: Cloud deployment, CI/CD, API servers, core business logic development
 
 ```bash
 pip install -r requirements/core.txt
@@ -24,6 +26,9 @@ Edge dependencies including hardware automation:
 - SpeechRecognition (voice input)
 - pyttsx3 (text-to-speech)
 - pynput (keyboard/mouse control)
+- pyaudio (audio input/output)
+- google-generativeai (LLM integration)
+- pandas and openpyxl (data processing utilities)
 
 **Requires**: Display server, audio drivers, input devices
 
@@ -36,9 +41,10 @@ pip install -r requirements/edge.txt
 ### `dev.txt` - Development Tools
 Development and testing dependencies:
 - Includes `core.txt`
-- pytest, pytest-cov, pytest-mock
-- mypy, black, flake8, isort
-- Code quality and testing tools
+- pytest, pytest-cov, pytest-mock, pytest-asyncio (testing framework)
+- mypy and types-requests (type checking)
+- black, flake8, isort (code formatting and linting)
+- ipython and ipdb (development tools)
 
 **Use for**: Development, testing, code quality checks
 
