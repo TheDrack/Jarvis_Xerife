@@ -45,3 +45,29 @@ class HistoryResponse(BaseModel):
 
     commands: List[CommandHistoryItem] = Field(..., description="List of recent commands")
     total: int = Field(..., description="Total number of commands in history")
+
+
+# Authentication Models
+
+
+class Token(BaseModel):
+    """OAuth2 token response"""
+
+    access_token: str = Field(..., description="JWT access token")
+    token_type: str = Field(..., description="Token type (bearer)")
+
+
+class TokenData(BaseModel):
+    """Data encoded in JWT token"""
+
+    username: Optional[str] = Field(None, description="Username from token")
+
+
+class User(BaseModel):
+    """User model"""
+
+    username: str = Field(..., description="Username")
+    email: Optional[str] = Field(None, description="User email")
+    full_name: Optional[str] = Field(None, description="User full name")
+    disabled: Optional[bool] = Field(None, description="Whether user is disabled")
+

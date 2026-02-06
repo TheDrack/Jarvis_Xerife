@@ -3,8 +3,9 @@
 
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from app.adapters.infrastructure.api_models import (
     CommandHistoryItem,
@@ -12,11 +13,59 @@ from app.adapters.infrastructure.api_models import (
     ExecuteResponse,
     HistoryResponse,
     StatusResponse,
+    Token,
+    TokenData,
+    User,
 )
+from app.adapters.infrastructure.auth_adapter import AuthAdapter
 from app.application.services import AssistantService
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# OAuth2 scheme for token authentication
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# Initialize authentication adapter
+auth_adapter = AuthAdapter()
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+    """
+    Dependency to get the current authenticated user from JWT token
+
+    Args:
+        token: JWT token from Authorization header
+
+    Returns:
+        Current user
+
+    Raises:
+        HTTPException: If token is invalid or user not found
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    payload = auth_adapter.verify_token(token)
+    if payload is None:
+        raise credentials_exception
+    
+    username: str = payload.get("sub")
+    if username is None:
+        raise credentials_exception
+    
+    # In production, fetch user from database
+    # For now, we'll construct user from token data
+    user = User(
+        username=username,
+        email=payload.get("email"),
+        full_name=payload.get("full_name"),
+    )
+    
+    return user
 
 
 def create_api_server(assistant_service: AssistantService) -> FastAPI:
@@ -35,19 +84,55 @@ def create_api_server(assistant_service: AssistantService) -> FastAPI:
         description="Headless control interface for the AI assistant",
     )
 
-    @app.post("/v1/execute", response_model=ExecuteResponse)
-    async def execute_command(request: ExecuteRequest) -> ExecuteResponse:
+    @app.post("/token", response_model=Token)
+    async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
         """
-        Execute a command and return the result
+        OAuth2 compatible token login endpoint
+
+        Args:
+            form_data: OAuth2 password request form with username and password
+
+        Returns:
+            Access token
+
+        Raises:
+            HTTPException: If authentication fails
+        """
+        user = auth_adapter.authenticate_user(form_data.username, form_data.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        access_token = auth_adapter.create_access_token(
+            data={
+                "sub": user["username"],
+                "email": user["email"],
+                "full_name": user["full_name"],
+            }
+        )
+        
+        return Token(access_token=access_token, token_type="bearer")
+
+    @app.post("/v1/execute", response_model=ExecuteResponse)
+    async def execute_command(
+        request: ExecuteRequest,
+        current_user: User = Depends(get_current_user),
+    ) -> ExecuteResponse:
+        """
+        Execute a command and return the result (Protected endpoint)
 
         Args:
             request: Command execution request
+            current_user: Current authenticated user
 
         Returns:
             Command execution response
         """
         try:
-            logger.info(f"Executing command via API: {request.command}")
+            logger.info(f"User '{current_user.username}' executing command via API: {request.command}")
             response = assistant_service.process_command(request.command)
 
             return ExecuteResponse(

@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     pyautogui_pause: float = 0.4
     search_timeout: float = 7.5
 
+    # Security Settings
+    secret_key: str = "your-secret-key-change-this-in-production-minimum-32-characters"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
