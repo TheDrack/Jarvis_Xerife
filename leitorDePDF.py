@@ -1,4 +1,4 @@
-﻿from pdfminer.high_level import extract_text
+from pdfminer.high_level import extract_text
 from pprint import pprint
 import re
 import sys
