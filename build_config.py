@@ -14,7 +14,12 @@ Or directly with PyInstaller:
 """
 
 import sys
+import io
 from pathlib import Path
+
+# Force Python to handle encoding errors gracefully
+if hasattr(sys.stdout, 'buffer') and sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 # PyInstaller configuration
 APP_NAME = "Jarvis_Installer"
@@ -153,7 +158,7 @@ exe = EXE(
     with open(spec_file, 'w', encoding='utf-8') as f:
         f.write(spec_content)
     
-    print(f"✓ Created spec file: {spec_file}")
+    print(f"[OK] Created spec file: {spec_file}")
     return spec_file
 
 
@@ -163,7 +168,7 @@ def build_executable():
     try:
         import PyInstaller.__main__
     except ImportError:
-        print("✗ PyInstaller not found. Installing...")
+        print("[X] PyInstaller not found. Installing...")
         import subprocess
         subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
         import PyInstaller.__main__
@@ -184,11 +189,11 @@ def build_executable():
     # Check if executable was created
     exe_path = DIST_DIR / f"{APP_NAME}.exe"
     if exe_path.exists():
-        print(f"\n✓ Build successful!")
-        print(f"✓ Executable created: {exe_path}")
-        print(f"✓ Size: {exe_path.stat().st_size / (1024*1024):.2f} MB")
+        print(f"\n[OK] Build successful!")
+        print(f"[OK] Executable created: {exe_path}")
+        print(f"[OK] Size: {exe_path.stat().st_size / (1024*1024):.2f} MB")
     else:
-        print(f"\n✗ Build failed - executable not found")
+        print(f"\n[X] Build failed - executable not found")
         sys.exit(1)
 
 
