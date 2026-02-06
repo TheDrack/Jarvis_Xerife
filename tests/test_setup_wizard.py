@@ -9,23 +9,26 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
+# CRITICAL: Mock pyperclip BEFORE any project imports to prevent ImportError
+# This must be at module level because pytest imports the module before fixtures run
+# The setup_wizard module imports pyperclip at the top level, so we must mock it early
+_original_pyperclip = sys.modules.get('pyperclip')
+if 'pyperclip' not in sys.modules:
+    sys.modules['pyperclip'] = Mock()
+
 
 @pytest.fixture(scope="module", autouse=True)
 def mock_pyperclip():
-    """Mock pyperclip module before importing setup_wizard to avoid import errors"""
-    # Store original module if it existed
-    original_pyperclip = sys.modules.get('pyperclip')
-    
-    # Install mock
-    mock_module = Mock()
-    sys.modules['pyperclip'] = mock_module
+    """Mock pyperclip module to avoid import errors in CI/CD environments without display"""
+    # Retrieve the mock that was installed at module level
+    mock_module = sys.modules['pyperclip']
     yield mock_module
     
-    # Cleanup - restore original module or remove mock
-    if original_pyperclip is not None:
-        sys.modules['pyperclip'] = original_pyperclip
-    elif 'pyperclip' in sys.modules:
-        del sys.modules['pyperclip']
+    # Cleanup: restore original state after all tests in module complete
+    if _original_pyperclip is not None:
+        sys.modules['pyperclip'] = _original_pyperclip
+    else:
+        sys.modules.pop('pyperclip', None)
 
 
 from app.adapters.infrastructure.setup_wizard import (
