@@ -53,7 +53,7 @@ class TestLLMCommandAdapter:
         """Test LLMCommandAdapter initialization from environment variable"""
         from app.adapters.infrastructure import LLMCommandAdapter
 
-        mock_genai_module, mock_model, mock_chat = mock_genai
+        mock_genai_module, _, _ = mock_genai
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "env_api_key"}):
             adapter = LLMCommandAdapter(wake_word="xerife")
