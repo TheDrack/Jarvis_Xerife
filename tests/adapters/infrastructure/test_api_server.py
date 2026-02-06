@@ -21,6 +21,8 @@ class TestAPIServer:
         service.wake_word = "xerife"
         service.is_running = False
         service._command_history = []
+        # Add interpreter mock for distributed mode
+        service.interpreter = Mock()
         return service
 
     @pytest.fixture
@@ -282,3 +284,71 @@ class TestAPIServer:
         response = test_client.get("/openapi.json")
         assert response.status_code == 200
         assert "openapi" in response.json()
+
+    def test_create_task_without_auth(self, client):
+        """Test task creation endpoint requires authentication"""
+        test_client, _ = client
+
+        response = test_client.post(
+            "/v1/task",
+            json={"command": "digite hello"},
+        )
+
+        assert response.status_code == 401
+
+    def test_create_task_success(self, client, auth_token):
+        """Test successful task creation for distributed mode"""
+        test_client, service = client
+
+        # Mock interpreter
+        from app.domain.models import CommandType, Intent
+        
+        mock_intent = Intent(
+            command_type=CommandType.TYPE_TEXT,
+            parameters={"text": "hello"},
+            raw_input="digite hello",
+        )
+        service.interpreter.interpret.return_value = mock_intent
+
+        response = test_client.post(
+            "/v1/task",
+            json={"command": "digite hello"},
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "task_id" in data
+        assert isinstance(data["task_id"], int)
+        assert data["status"] == "pending"
+        assert "Task created successfully" in data["message"]
+
+    def test_create_task_empty_command(self, client, auth_token):
+        """Test task creation with empty command"""
+        test_client, _ = client
+
+        response = test_client.post(
+            "/v1/task",
+            json={"command": ""},
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+
+        # Should fail validation (min_length=1)
+        assert response.status_code == 422
+
+    def test_create_task_exception(self, client, auth_token):
+        """Test task creation with exception"""
+        test_client, service = client
+
+        # Mock exception
+        service.interpreter.interpret.side_effect = Exception("Test error")
+
+        response = test_client.post(
+            "/v1/task",
+            json={"command": "test"},
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+
+        assert response.status_code == 500
+        assert "Internal server error" in response.json()["detail"]
+

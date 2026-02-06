@@ -204,3 +204,149 @@ class TestSQLiteHistoryAdapter:
         history = adapter.get_recent_history(limit=1)
         assert len(history) == 1
         assert history[0]["parameters"] == complex_params
+
+    def test_save_pending_command(self, adapter):
+        """Test saving a pending command for distributed mode"""
+        task_id = adapter.save_pending_command(
+            user_input="digite teste",
+            command_type="type_text",
+            parameters={"text": "teste"},
+        )
+
+        # Verify task ID was returned
+        assert task_id is not None
+        assert isinstance(task_id, int)
+
+        # Verify it was saved with pending status
+        history = adapter.get_recent_history(limit=1)
+        assert len(history) == 1
+        assert history[0]["user_input"] == "digite teste"
+        assert history[0]["command_type"] == "type_text"
+
+    def test_get_next_pending_command(self, adapter):
+        """Test getting the next pending command"""
+        # Save a pending command
+        task_id = adapter.save_pending_command(
+            user_input="comando pendente",
+            command_type="test_type",
+            parameters={"key": "value"},
+        )
+
+        # Get the next pending command
+        pending = adapter.get_next_pending_command()
+        assert pending is not None
+        assert pending["id"] == task_id
+        assert pending["user_input"] == "comando pendente"
+        assert pending["command_type"] == "test_type"
+        assert pending["parameters"] == {"key": "value"}
+
+    def test_get_next_pending_command_empty(self, adapter):
+        """Test getting pending command when none exist"""
+        pending = adapter.get_next_pending_command()
+        assert pending is None
+
+    def test_get_next_pending_command_oldest_first(self, adapter):
+        """Test that oldest pending command is returned first"""
+        # Save multiple pending commands
+        import time
+        
+        task_id_1 = adapter.save_pending_command(
+            user_input="comando 1",
+            command_type="test_type",
+            parameters={},
+        )
+        time.sleep(0.01)  # Ensure different timestamps
+        
+        task_id_2 = adapter.save_pending_command(
+            user_input="comando 2",
+            command_type="test_type",
+            parameters={},
+        )
+
+        # Get next pending - should be the oldest one
+        pending = adapter.get_next_pending_command()
+        assert pending is not None
+        assert pending["id"] == task_id_1
+        assert pending["user_input"] == "comando 1"
+
+    def test_update_command_status_to_completed(self, adapter):
+        """Test updating command status to completed"""
+        # Save a pending command
+        task_id = adapter.save_pending_command(
+            user_input="comando teste",
+            command_type="test_type",
+            parameters={},
+        )
+
+        # Update to completed
+        result = adapter.update_command_status(
+            command_id=task_id,
+            status="completed",
+            success=True,
+            response_text="Comando executado com sucesso",
+        )
+
+        assert result is True
+
+        # Verify the update
+        history = adapter.get_recent_history(limit=1)
+        assert len(history) == 1
+        # Note: get_recent_history doesn't return status/processed_at
+        # We could verify by directly querying if needed
+
+    def test_update_command_status_to_failed(self, adapter):
+        """Test updating command status to failed"""
+        # Save a pending command
+        task_id = adapter.save_pending_command(
+            user_input="comando teste",
+            command_type="test_type",
+            parameters={},
+        )
+
+        # Update to failed
+        result = adapter.update_command_status(
+            command_id=task_id,
+            status="failed",
+            success=False,
+            response_text="Erro ao executar comando",
+        )
+
+        assert result is True
+
+    def test_update_command_status_nonexistent(self, adapter):
+        """Test updating status of non-existent command"""
+        result = adapter.update_command_status(
+            command_id=99999,
+            status="completed",
+            success=True,
+            response_text="Test",
+        )
+
+        assert result is False
+
+    def test_pending_commands_not_returned_after_completion(self, adapter):
+        """Test that completed commands are not returned as pending"""
+        # Save a pending command
+        task_id = adapter.save_pending_command(
+            user_input="comando teste",
+            command_type="test_type",
+            parameters={},
+        )
+
+        # Verify it's pending
+        pending = adapter.get_next_pending_command()
+        assert pending is not None
+        assert pending["id"] == task_id
+
+        # Mark as completed
+        adapter.update_command_status(
+            command_id=task_id,
+            status="completed",
+            success=True,
+            response_text="Done",
+        )
+
+        # Verify it's no longer pending
+        pending = adapter.get_next_pending_command()
+        assert pending is None
+
