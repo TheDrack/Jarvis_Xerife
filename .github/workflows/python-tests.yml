@@ -20,16 +20,29 @@ jobs:
     - name: Install All Dependencies
       run: |
         python -m pip install --upgrade pip
-        # Adicionamos as bibliotecas de segurança e multipart exigidas pelo FastAPI
+        
+        # 1. Fix de Segurança: Ordem específica para evitar erro de backend do bcrypt
+        pip install bcrypt==4.0.1
+        pip install passlib[bcrypt]==1.7.4
+        
+        # 2. Infraestrutura Web e IA
         pip install fastapi uvicorn httpx pydantic pydantic-settings python-dotenv 
-        pip install google-generativeai python-jose[cryptography] passlib[bcrypt] 
-        pip install python-multipart bcrypt
+        pip install google-generativeai python-jose[cryptography] python-multipart
+        
+        # 3. Camada de Memória (Dados)
+        pip install sqlmodel
+        
+        # 4. Ferramentas de Teste
         pip install pytest pytest-cov mock
-        # Mantemos a instalação via requirements se existir
+        
+        # Mantemos a instalação via requirements se existir, mas com '|| true' para não travar o build
         if [ -d requirements ]; then pip install -r requirements/core.txt || true; fi
 
     - name: Run Tests
       run: |
+        # Define a raiz como caminho de importação do Python
         export PYTHONPATH=$PYTHONPATH:$(pwd)
-        # Rodamos o pytest focando em ignorar erros de hardware se houver
-        pytest --cov=app tests/
+        
+        # Executa os testes e gera o relatório de cobertura
+        # Ignora avisos de deprecation do passlib no log para clareza
+        pytest -W ignore::DeprecationWarning --cov=app tests/
