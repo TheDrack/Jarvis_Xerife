@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for Domain layer - Agent Service"""
 
-import pytest
-
 from app.domain.models import CommandType
 from app.domain.services import AgentService
 
