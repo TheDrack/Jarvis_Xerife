@@ -18,13 +18,16 @@ import webbrowser
 from pathlib import Path
 from typing import Optional, Tuple
 
-try:
-    import pyperclip
-    CLIPBOARD_AVAILABLE = True
-except ImportError:
-    CLIPBOARD_AVAILABLE = False
+import pyperclip
 
 from sqlmodel import Session, create_engine, text
+
+# Check if clipboard is available (may fail in headless environments)
+try:
+    pyperclip.paste()
+    CLIPBOARD_AVAILABLE = True
+except Exception:
+    CLIPBOARD_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 

@@ -12,6 +12,7 @@ pyaudio>=0.2.13
 # System Automation
 PyAutoGUI>=0.9.54
 pynput>=1.7.6
+pyperclip>=1.8.2
 
 # LLM Integration (optional)
 google-generativeai>=0.3.0
