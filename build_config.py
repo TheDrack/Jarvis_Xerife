@@ -112,14 +112,28 @@ def create_spec_file():
 # PyInstaller spec file for creating a single executable (--onefile mode)
 # All binaries, data files, and dependencies are bundled into one executable
 
+from PyInstaller.utils.hooks import collect_all
+
 block_cipher = None
+
+# Collect all submodules and data files for packages that need special handling
+datas = {DATA_FILES}
+binaries = []
+hiddenimports = {HIDDEN_IMPORTS}
+
+# Use collect_all for packages that require all their submodules and data
+for package in ['pyautogui', 'pyperclip', 'google.generativeai', 'pyttsx3']:
+    package_datas, package_binaries, package_hiddenimports = collect_all(package)
+    datas += package_datas
+    binaries += package_binaries
+    hiddenimports += package_hiddenimports
 
 a = Analysis(
     ['{SCRIPT_PATH}'],
     pathex=[],
-    binaries=[],
-    datas={DATA_FILES},
-    hiddenimports={HIDDEN_IMPORTS},
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={{}},
     runtime_hooks=[],
@@ -134,6 +148,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 # EXE with all components bundled (--onefile configuration)
 # This creates a single standalone executable with no external dependencies
+# By including all components (a.binaries, a.zipfiles, a.datas) in EXE and not
+# creating a COLLECT object, we get a one-file executable
 exe = EXE(
     pyz,
     a.scripts,
@@ -177,22 +193,28 @@ def build_executable():
         subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
         import PyInstaller.__main__
     
+    # Clean up old build artifacts
+    import shutil
+    if BUILD_DIR.exists():
+        print(f"[*] Removing old build directory: {BUILD_DIR}")
+        shutil.rmtree(BUILD_DIR)
+    if DIST_DIR.exists():
+        print(f"[*] Removing old dist directory: {DIST_DIR}")
+        shutil.rmtree(DIST_DIR)
+    
     # Create spec file
     spec_file = create_spec_file()
     
     print("\nBuilding executable with PyInstaller...")
     print("This may take a few minutes...\n")
     
-    # Run PyInstaller with --onefile and --collect-all for problematic packages
-    # --onefile: Creates a single executable file (also configured in spec file for clarity)
-    # --collect-all: Collects all submodules and data files for packages that PyInstaller may miss
+    # Run PyInstaller with --clean flag
+    # All configuration is now in the spec file
+    # --noconfirm prevents prompts when overwriting existing output
     PyInstaller.__main__.run([
-        str(spec_file),
         '--clean',
         '--noconfirm',
-        '--onefile',  # Explicitly ensure single file output (redundant with spec but explicit)
-        '--collect-all', 'pyttsx3',  # Collect all pyttsx3 submodules (drivers, etc.)
-        '--collect-all', 'google.generativeai',  # Collect all google-generativeai submodules
+        str(spec_file),
     ])
     
     # Check if executable was created
