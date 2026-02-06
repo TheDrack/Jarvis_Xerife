@@ -81,7 +81,7 @@ class TestLLMCommandAdapter:
         mock_chat.send_message = Mock(return_value=mock_response)
 
         adapter = LLMCommandAdapter(api_key="test_key", wake_word="xerife")
-        intent = adapter._interpret_sync("xerife escreva hello")
+        adapter._interpret_sync("xerife escreva hello")
 
         # Check that the message sent to the model doesn't include the wake word
         # The send_message should be called with "escreva hello"
