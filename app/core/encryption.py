@@ -71,11 +71,12 @@ def derive_key_from_hardware() -> bytes:
     salt = b"jarvis-hardware-encryption-v1"
     
     # Derive key using PBKDF2
+    # Using 600,000 iterations as recommended by OWASP (2023) for PBKDF2-HMAC-SHA256
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt,
-        iterations=100000,  # Standard recommendation
+        iterations=600000,  # OWASP 2023 recommendation
     )
     
     key = kdf.derive(hardware_id.encode('utf-8'))

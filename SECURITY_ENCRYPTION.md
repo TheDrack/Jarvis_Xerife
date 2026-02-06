@@ -25,7 +25,7 @@ This creates a fingerprint unique to each machine.
 ### 2. Key Derivation
 
 A cryptographic key is derived from the hardware ID using PBKDF2-HMAC-SHA256 with:
-- 100,000 iterations (industry standard)
+- 600,000 iterations (OWASP 2023 recommendation)
 - Fixed salt for deterministic key generation
 - 32-byte key length
 
@@ -183,7 +183,7 @@ python demo_encryption.py
 
 - **Key Derivation**: PBKDF2-HMAC-SHA256
 - **Encryption**: Fernet (AES-128 in CBC mode + HMAC-SHA256)
-- **Iterations**: 100,000 (PBKDF2)
+- **Iterations**: 600,000 (OWASP 2023 recommendation)
 - **Salt**: Fixed per application (`jarvis-hardware-encryption-v1`)
 - **Hardware ID**: MAC address + platform info
 

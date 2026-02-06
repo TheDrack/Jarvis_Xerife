@@ -69,7 +69,7 @@ class Settings(BaseSettings):
                 logger.info("Successfully decrypted GEMINI_API_KEY")
                 return decrypted
             except Exception as e:
-                logger.error(f"Failed to decrypt GEMINI_API_KEY: {e}")
+                logger.error(f"Failed to decrypt GEMINI_API_KEY: {type(e).__name__}")
                 logger.error("The .env file may have been moved to a different machine.")
                 logger.error("Please run the setup wizard again to reconfigure.")
                 raise ValueError(
@@ -89,7 +89,7 @@ class Settings(BaseSettings):
                 logger.info("Successfully decrypted DATABASE_URL")
                 return decrypted
             except Exception as e:
-                logger.error(f"Failed to decrypt DATABASE_URL: {e}")
+                logger.error(f"Failed to decrypt DATABASE_URL: {type(e).__name__}")
                 logger.error("The .env file may have been moved to a different machine.")
                 logger.error("Please run the setup wizard again to reconfigure.")
                 raise ValueError(

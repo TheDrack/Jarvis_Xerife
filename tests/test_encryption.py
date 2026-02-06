@@ -51,7 +51,7 @@ class TestEncryption:
 
     def test_encrypt_decrypt_long_value(self):
         """Test encryption/decryption with long values like database URLs"""
-        plaintext = "postgresql://postgres:5V*%kA5Q@WtAJMv@db.saibtpdehhprttqlgqdt.supabase.co:5432/postgres"
+        plaintext = "postgresql://user:test_password@db.example.com:5432/testdb"
         
         encrypted = encrypt_value(plaintext)
         decrypted = decrypt_value(encrypted)
