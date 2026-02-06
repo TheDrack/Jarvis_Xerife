@@ -24,3 +24,11 @@ openpyxl>=3.1.0
 # API server (for headless control)
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Security and Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Database ORM
+sqlmodel>=0.0.14
