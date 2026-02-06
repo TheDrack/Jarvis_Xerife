@@ -184,13 +184,13 @@ def build_executable():
     print("This may take a few minutes...\n")
     
     # Run PyInstaller with --onefile and --collect-all for problematic packages
-    # --onefile: Creates a single executable file (configured in spec file)
+    # --onefile: Creates a single executable file (also configured in spec file for clarity)
     # --collect-all: Collects all submodules and data files for packages that PyInstaller may miss
     PyInstaller.__main__.run([
         str(spec_file),
         '--clean',
         '--noconfirm',
-        '--onefile',  # Explicitly ensure single file output
+        '--onefile',  # Explicitly ensure single file output (redundant with spec but explicit)
         '--collect-all', 'pyttsx3',  # Collect all pyttsx3 submodules (drivers, etc.)
         '--collect-all', 'google.generativeai',  # Collect all google-generativeai submodules
     ])

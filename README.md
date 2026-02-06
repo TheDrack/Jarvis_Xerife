@@ -36,13 +36,15 @@ Pronto! Seu assistente personalizado está configurado e pronto para uso. Veja a
 **Quer usar o Jarvis sem instalar Python ou bibliotecas?** É simples:
 
 1. Acesse a aba [**Releases**](../../releases) deste repositório
-2. Baixe o arquivo executável mais recente (`.exe`)
+2. Baixe o arquivo executável mais recente para Windows (`.exe`)
 3. Dê dois cliques no arquivo baixado
 4. Siga as instruções na tela do assistente de instalação
 
 **Não é necessário instalar Python, pip ou qualquer biblioteca!** O executável já contém tudo que você precisa para começar a usar o Jarvis imediatamente.
 
 > **💡 Nota**: O executável foi criado com PyInstaller e inclui todas as dependências necessárias em um único arquivo. Basta baixar e executar!
+> 
+> **🖥️ Plataforma**: Atualmente disponível apenas para Windows. Para Linux/Mac, use a [instalação manual](#installation).
 
 ## 🏗️ Architecture
 
