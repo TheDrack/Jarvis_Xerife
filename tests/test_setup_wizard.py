@@ -2,11 +2,15 @@
 """Tests for Setup Wizard functionality"""
 
 import os
+import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+
+# Mock pyperclip before importing setup_wizard to avoid import errors
+sys.modules['pyperclip'] = Mock()
 
 from app.adapters.infrastructure.setup_wizard import (
     check_env_complete,
@@ -151,21 +155,23 @@ DATABASE_URL=sqlite:///jarvis.db
         assert result is False
     
     @patch('app.adapters.infrastructure.setup_wizard.webbrowser.open')
-    @patch('app.adapters.infrastructure.setup_wizard.pyperclip.paste')
     @patch('app.adapters.infrastructure.setup_wizard.input')
-    def test_get_api_key_with_clipboard_auto_capture(self, mock_input, mock_paste, mock_browser):
+    def test_get_api_key_with_clipboard_auto_capture(self, mock_input, mock_browser):
         """Test API key capture with automatic clipboard detection"""
-        from app.adapters.infrastructure.setup_wizard import get_api_key_with_clipboard
+        # Import and patch pyperclip at module level
+        import app.adapters.infrastructure.setup_wizard as wizard_module
         
-        # Simulate clipboard containing API key
-        mock_paste.side_effect = ["", "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"]
-        mock_input.side_effect = ["", "s"]  # Press enter to open browser, then confirm
-        
-        with patch('app.adapters.infrastructure.setup_wizard.CLIPBOARD_AVAILABLE', True):
-            result = get_api_key_with_clipboard()
-        
-        assert result == "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
-        assert mock_browser.called
+        with patch.object(wizard_module, 'pyperclip') as mock_pyperclip:
+            with patch.object(wizard_module, 'CLIPBOARD_AVAILABLE', True):
+                # Simulate clipboard containing API key
+                # First call returns empty string, second call returns the API key
+                mock_pyperclip.paste.side_effect = ["", "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"]
+                mock_input.side_effect = ["", "s"]  # Press enter to open browser, then confirm
+                
+                result = wizard_module.get_api_key_with_clipboard()
+                
+                assert result == "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
+                assert mock_browser.called
 
 
 if __name__ == "__main__":
