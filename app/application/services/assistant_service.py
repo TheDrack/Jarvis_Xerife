@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Deque, Dict, List, Optional
 
 from app.application.ports import ActionProvider, HistoryProvider, VoiceProvider, WebProvider
+from app.application.services.dependency_manager import DependencyManager
 from app.domain.models import CommandType, Response
 from app.domain.services import CommandInterpreter, IntentProcessor
 
@@ -27,6 +28,7 @@ class AssistantService:
         command_interpreter: CommandInterpreter,
         intent_processor: IntentProcessor,
         history_provider: Optional[HistoryProvider] = None,
+        dependency_manager: Optional[DependencyManager] = None,
         wake_word: str = "xerife",
     ):
         """
@@ -39,6 +41,7 @@ class AssistantService:
             command_interpreter: Domain service for command interpretation
             intent_processor: Domain service for intent processing
             history_provider: Optional history persistence adapter
+            dependency_manager: Optional dependency manager for on-demand package installation
             wake_word: Wake word for activation
         """
         self.voice = voice_provider
@@ -47,6 +50,7 @@ class AssistantService:
         self.interpreter = command_interpreter
         self.processor = intent_processor
         self.history = history_provider
+        self.dependency_manager = dependency_manager or DependencyManager()
         self.wake_word = wake_word
         self.is_running = False
         # Command history tracking (max 100 commands)
@@ -161,6 +165,17 @@ class AssistantService:
             Response object with execution result
         """
         try:
+            # Check for dependencies before executing complex commands
+            required_capability = self._get_required_capability(command_type, params)
+            if required_capability:
+                logger.info(f"Command requires capability: {required_capability}")
+                if not self.dependency_manager.ensure_capability(required_capability):
+                    return Response(
+                        success=False,
+                        message=f"Failed to ensure required capability: {required_capability}",
+                        error="MISSING_DEPENDENCY",
+                    )
+
             if command_type == CommandType.TYPE_TEXT:
                 text = params.get("text", "")
                 self.action.type_text(text)
@@ -248,3 +263,28 @@ class AssistantService:
                 success=response.success,
                 response_text=response.message,
             )
+
+    def _get_required_capability(self, command_type: CommandType, params: dict) -> Optional[str]:
+        """
+        Determine if a command requires a specific capability/library
+
+        Args:
+            command_type: Type of command to execute
+            params: Command parameters
+
+        Returns:
+            Name of required capability, or None if no special capability is needed
+
+        Note:
+            This is currently a placeholder that returns None for all commands.
+            In the future, this can be extended to check params for things like:
+            - "analyze data" -> "pandas"
+            - "web automation" -> "playwright"
+            - "image processing" -> "opencv"
+            
+            The infrastructure is in place to automatically install dependencies
+            when needed once specific command types require them.
+        """
+        # This can be extended based on command parameters or types
+        # For now, we return None for standard commands
+        return None

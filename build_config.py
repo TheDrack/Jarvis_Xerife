@@ -40,6 +40,13 @@ HIDDEN_IMPORTS = [
     'dotenv',
     'google.generativeai',
     
+    # Package management for on-demand installation
+    'ensurepip',
+    'setuptools',
+    'pip',
+    'pip._internal',
+    'pip._vendor',
+    
     # Database
     'sqlmodel',
     'sqlalchemy',

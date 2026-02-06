@@ -8,7 +8,7 @@ from typing import Optional
 from app.adapters.edge import AutomationAdapter, CombinedVoiceProvider, WebAdapter
 from app.adapters.infrastructure import LLMCommandAdapter, SQLiteHistoryAdapter
 from app.application.ports import ActionProvider, HistoryProvider, VoiceProvider, WebProvider
-from app.application.services import AssistantService
+from app.application.services import AssistantService, DependencyManager
 from app.core.config import settings
 from app.domain.services import CommandInterpreter, IntentProcessor
 
@@ -66,6 +66,7 @@ class Container:
         self._command_interpreter: Optional[CommandInterpreter] = None
         self._llm_command_adapter: Optional[LLMCommandAdapter] = None
         self._intent_processor: Optional[IntentProcessor] = None
+        self._dependency_manager: Optional[DependencyManager] = None
 
         # Application service
         self._assistant_service: Optional[AssistantService] = None
@@ -148,6 +149,14 @@ class Container:
         return self._intent_processor
 
     @property
+    def dependency_manager(self) -> DependencyManager:
+        """Get or create dependency manager"""
+        if self._dependency_manager is None:
+            logger.info("Creating DependencyManager")
+            self._dependency_manager = DependencyManager()
+        return self._dependency_manager
+
+    @property
     def assistant_service(self) -> AssistantService:
         """Get or create assistant service with all dependencies injected"""
         if self._assistant_service is None:
@@ -159,6 +168,7 @@ class Container:
                 command_interpreter=self.command_interpreter,
                 intent_processor=self.intent_processor,
                 history_provider=self.history_provider,
+                dependency_manager=self.dependency_manager,
                 wake_word=self.wake_word,
             )
         return self._assistant_service

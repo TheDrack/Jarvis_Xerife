@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from app.application.ports import ActionProvider, VoiceProvider, WebProvider
-from app.application.services import AssistantService
+from app.application.services import AssistantService, DependencyManager
 from app.domain.services import CommandInterpreter, IntentProcessor
 
 
@@ -161,3 +161,28 @@ class TestAssistantService:
         assert len(history) == 1
         assert history[0]["command"] == "invalid command"
         assert history[0]["success"] is False
+
+    def test_dependency_manager_auto_created(self, service):
+        """Test that dependency manager is auto-created if not provided"""
+        assert service.dependency_manager is not None
+        assert isinstance(service.dependency_manager, DependencyManager)
+
+    def test_dependency_manager_injection(self, mock_ports):
+        """Test that dependency manager can be injected"""
+        voice, action, web = mock_ports
+        mock_dep_manager = Mock(spec=DependencyManager)
+
+        interpreter = CommandInterpreter(wake_word="test")
+        processor = IntentProcessor()
+
+        service = AssistantService(
+            voice_provider=voice,
+            action_provider=action,
+            web_provider=web,
+            command_interpreter=interpreter,
+            intent_processor=processor,
+            dependency_manager=mock_dep_manager,
+            wake_word="test",
+        )
+
+        assert service.dependency_manager is mock_dep_manager
