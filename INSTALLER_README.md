@@ -221,7 +221,7 @@ Para desenvolvedores que desejam criar personalidades completamente customizadas
 
 1. **Edite o arquivo** `app/domain/services/agent_service.py`
 
-2. **Modifique o método** `get_system_instruction()` (linha ~112):
+2. **Modifique o método** `get_system_instruction()`:
 
 ```python
 @staticmethod

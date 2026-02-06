@@ -143,7 +143,7 @@ A personalidade base é definida pelo sistema de IA (Gemini), que atua como um a
 - Comunicação em português brasileiro
 - Tom profissional mas amigável
 
-> **📝 Nota**: A personalidade pode ser customizada editando o método `get_system_instruction()` em `app/domain/services/agent_service.py` para criar diferentes estilos de interação.
+> **📝 Nota**: Para customização avançada da personalidade com exemplos de código, veja a seção de [Personalidade do Assistente](INSTALLER_README.md#personalidade-do-assistente-) no INSTALLER_README.md.
 
 ### Instalação Manual (Avançada)
 
