@@ -109,6 +109,8 @@ def create_spec_file():
     """Create PyInstaller spec file"""
     
     spec_content = f"""# -*- mode: python ; coding: utf-8 -*-
+# PyInstaller spec file for creating a single executable (--onefile mode)
+# All binaries, data files, and dependencies are bundled into one executable
 
 block_cipher = None
 
@@ -130,6 +132,8 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# EXE with all components bundled (--onefile configuration)
+# This creates a single standalone executable with no external dependencies
 exe = EXE(
     pyz,
     a.scripts,
@@ -179,11 +183,16 @@ def build_executable():
     print("\nBuilding executable with PyInstaller...")
     print("This may take a few minutes...\n")
     
-    # Run PyInstaller
+    # Run PyInstaller with --onefile and --collect-all for problematic packages
+    # --onefile: Creates a single executable file (also configured in spec file for clarity)
+    # --collect-all: Collects all submodules and data files for packages that PyInstaller may miss
     PyInstaller.__main__.run([
         str(spec_file),
         '--clean',
         '--noconfirm',
+        '--onefile',  # Explicitly ensure single file output (redundant with spec but explicit)
+        '--collect-all', 'pyttsx3',  # Collect all pyttsx3 submodules (drivers, etc.)
+        '--collect-all', 'google.generativeai',  # Collect all google-generativeai submodules
     ])
     
     # Check if executable was created
