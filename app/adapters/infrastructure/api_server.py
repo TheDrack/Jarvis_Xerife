@@ -13,11 +13,13 @@ from app.adapters.infrastructure.api_models import (
     ExecuteResponse,
     HistoryResponse,
     StatusResponse,
+    TaskResponse,
     Token,
     TokenData,
     User,
 )
 from app.adapters.infrastructure.auth_adapter import AuthAdapter
+from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
 from app.application.services import AssistantService
 from app.core.config import settings
 
@@ -83,6 +85,9 @@ def create_api_server(assistant_service: AssistantService) -> FastAPI:
         version=settings.version,
         description="Headless control interface for the AI assistant",
     )
+    
+    # Initialize database adapter for distributed mode
+    db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
 
     @app.post("/token", response_model=Token)
     async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
@@ -143,6 +148,54 @@ def create_api_server(assistant_service: AssistantService) -> FastAPI:
             )
         except Exception as e:
             logger.error(f"Error executing command: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+    @app.post("/v1/task", response_model=TaskResponse)
+    async def create_task(
+        request: ExecuteRequest,
+        current_user: User = Depends(get_current_user),
+    ) -> TaskResponse:
+        """
+        Create a task for distributed execution (Protected endpoint)
+        
+        Saves the command to the database with 'pending' status.
+        The worker (worker_pc.py) will pick it up and execute it.
+
+        Args:
+            request: Command execution request
+            current_user: Current authenticated user
+
+        Returns:
+            Task creation response with task ID
+        """
+        try:
+            logger.info(f"User '{current_user.username}' creating task via API: {request.command}")
+            
+            # Interpret the command to get command_type and parameters
+            intent = assistant_service.interpreter.interpret(request.command)
+            
+            # Save as pending task in database
+            task_id = db_adapter.save_pending_command(
+                user_input=request.command,
+                command_type=intent.command_type.value,
+                parameters=intent.parameters,
+            )
+            
+            if task_id is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to create task in database"
+                )
+            
+            return TaskResponse(
+                task_id=task_id,
+                status="pending",
+                message=f"Task created successfully with ID {task_id}",
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error creating task: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
     @app.get("/v1/status", response_model=StatusResponse)

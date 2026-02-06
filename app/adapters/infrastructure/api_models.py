@@ -21,6 +21,14 @@ class ExecuteResponse(BaseModel):
     error: Optional[str] = Field(None, description="Error code if execution failed")
 
 
+class TaskResponse(BaseModel):
+    """Response model for task creation in distributed mode"""
+
+    task_id: int = Field(..., description="ID of the created task")
+    status: str = Field(..., description="Task status (pending, completed, failed)")
+    message: str = Field(..., description="Status message")
+
+
 class StatusResponse(BaseModel):
     """Response model for system status"""
 

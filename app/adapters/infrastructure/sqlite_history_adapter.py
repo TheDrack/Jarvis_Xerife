@@ -31,6 +31,8 @@ class Interaction(SQLModel, table=True):
     parameters: str = Field(default="{}", nullable=False)  # JSON string
     success: bool = Field(default=False, nullable=False)
     response_text: str = Field(default="", nullable=False)
+    status: str = Field(default="pending", nullable=False)  # pending, completed, failed
+    processed_at: Optional[datetime] = Field(default=None, nullable=True)
 
 
 class SQLiteHistoryAdapter(HistoryProvider):
@@ -178,3 +180,111 @@ class SQLiteHistoryAdapter(HistoryProvider):
                 logger.info("Cleared all command history")
         except Exception as e:
             logger.error(f"Error clearing history: {e}")
+
+    def save_pending_command(
+        self,
+        user_input: str,
+        command_type: str,
+        parameters: Dict[str, Any],
+    ) -> Optional[int]:
+        """
+        Save a command with pending status to the database
+        
+        Args:
+            user_input: Raw user input
+            command_type: Type of command to execute
+            parameters: Command parameters as dict
+            
+        Returns:
+            ID of the created interaction, or None if failed
+        """
+        try:
+            with Session(self.engine) as session:
+                interaction = Interaction(
+                    timestamp=datetime.now(),
+                    user_input=user_input,
+                    command_type=command_type,
+                    parameters=json.dumps(parameters),
+                    success=False,
+                    response_text="",
+                    status="pending",
+                    processed_at=None,
+                )
+                session.add(interaction)
+                session.commit()
+                session.refresh(interaction)
+                logger.info(f"Saved pending command with ID {interaction.id}: {user_input} -> {command_type}")
+                return interaction.id
+        except Exception as e:
+            logger.error(f"Error saving pending command: {e}")
+            return None
+
+    def get_next_pending_command(self) -> Optional[Dict[str, Any]]:
+        """
+        Get the oldest pending command from the database
+        
+        Returns:
+            Pending command dict or None if no pending commands
+        """
+        try:
+            with Session(self.engine) as session:
+                statement = (
+                    select(Interaction)
+                    .where(Interaction.status == "pending")
+                    .order_by(Interaction.timestamp.asc())
+                    .limit(1)
+                )
+                interaction = session.exec(statement).first()
+                
+                if interaction:
+                    return {
+                        "id": interaction.id,
+                        "timestamp": interaction.timestamp.isoformat(),
+                        "user_input": interaction.user_input,
+                        "command_type": interaction.command_type,
+                        "parameters": json.loads(interaction.parameters),
+                    }
+                return None
+        except Exception as e:
+            logger.error(f"Error getting next pending command: {e}")
+            return None
+
+    def update_command_status(
+        self,
+        command_id: int,
+        status: str,
+        success: bool,
+        response_text: str = "",
+    ) -> bool:
+        """
+        Update the status of a command after processing
+        
+        Args:
+            command_id: ID of the command to update
+            status: New status (completed or failed)
+            success: Whether the command succeeded
+            response_text: Response message
+            
+        Returns:
+            True if update succeeded, False otherwise
+        """
+        try:
+            with Session(self.engine) as session:
+                statement = select(Interaction).where(Interaction.id == command_id)
+                interaction = session.exec(statement).first()
+                
+                if interaction:
+                    interaction.status = status
+                    interaction.success = success
+                    interaction.response_text = response_text
+                    interaction.processed_at = datetime.now()
+                    session.add(interaction)
+                    session.commit()
+                    logger.info(f"Updated command {command_id} status to {status}")
+                    return True
+                else:
+                    logger.warning(f"Command {command_id} not found")
+                    return False
+        except Exception as e:
+            logger.error(f"Error updating command status: {e}")
+            return False

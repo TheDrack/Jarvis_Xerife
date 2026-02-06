@@ -63,10 +63,10 @@ COPY app/adapters/infrastructure/ ./app/adapters/infrastructure/
 COPY app/core/config.py ./app/core/config.py
 COPY app/core/__init__.py ./app/core/__init__.py
 COPY app/container.py ./app/container.py
+COPY serve.py ./serve.py
 
 ENV PYTHONUNBUFFERED=1
 RUN mkdir -p data logs
 
-# For cloud deployment, you would typically run an API server
-# CMD ["python", "-m", "app.api_server"]  # Future: FastAPI server
-CMD ["python", "-c", "print('Cloud mode - Please configure API server')"]
+# Start the API server with Uvicorn
+CMD ["python", "serve.py"]
