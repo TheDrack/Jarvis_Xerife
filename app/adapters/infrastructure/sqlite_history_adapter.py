@@ -152,7 +152,10 @@ class SQLiteHistoryAdapter(HistoryProvider):
         """Clear all command history"""
         try:
             with Session(self.engine) as session:
-                session.query(Interaction).delete()
+                statement = select(Interaction)
+                results = session.exec(statement)
+                for interaction in results:
+                    session.delete(interaction)
                 session.commit()
                 logger.info("Cleared all command history")
         except Exception as e:
