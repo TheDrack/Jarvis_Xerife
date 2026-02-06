@@ -35,6 +35,9 @@ jobs:
         # 4. Ferramentas de Teste
         pip install pytest pytest-cov mock
         
+        # 5. System Automation (needed for setup wizard)
+        pip install pyperclip==1.8.2
+        
         # Mantemos a instalação via requirements se existir, mas com '|| true' para não travar o build
         if [ -d requirements ]; then pip install -r requirements/core.txt || true; fi
 

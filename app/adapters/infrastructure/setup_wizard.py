@@ -18,16 +18,22 @@ import webbrowser
 from pathlib import Path
 from typing import Optional, Tuple
 
-import pyperclip
+# Resilient import: pyperclip may not be available in all environments
+try:
+    import pyperclip
+except ImportError:
+    pyperclip = None
 
 from sqlmodel import Session, create_engine, text
 
 # Check if clipboard is available (may fail in headless environments)
-try:
-    pyperclip.paste()
-    CLIPBOARD_AVAILABLE = True
-except Exception:
-    CLIPBOARD_AVAILABLE = False
+CLIPBOARD_AVAILABLE = False
+if pyperclip is not None:
+    try:
+        pyperclip.paste()
+        CLIPBOARD_AVAILABLE = True
+    except Exception:
+        CLIPBOARD_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
