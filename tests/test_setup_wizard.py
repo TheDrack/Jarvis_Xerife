@@ -178,21 +178,22 @@ DATABASE_URL=sqlite:///jarvis.db
     @patch('app.adapters.infrastructure.setup_wizard.input')
     def test_get_api_key_with_clipboard_auto_capture(self, mock_input, mock_browser):
         """Test API key capture with automatic clipboard detection"""
-        # Import and patch pyperclip at module level
-        import app.adapters.infrastructure.setup_wizard as wizard_module
+        # Mock the pyperclip module that gets imported inside the function
+        mock_pyperclip = Mock()
+        # Simulate clipboard behavior:
+        # First call (initial check): successful paste
+        # Second call (initial state): empty clipboard before user copies API key
+        # Third call (after user copies): API key is now in clipboard
+        mock_pyperclip.paste.side_effect = ["", "", "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"]
         
-        with patch.object(wizard_module, 'pyperclip') as mock_pyperclip:
-            with patch.object(wizard_module, 'CLIPBOARD_AVAILABLE', True):
-                # Simulate clipboard behavior:
-                # First call (initial state): empty clipboard before user copies API key
-                # Second call (after user copies): API key is now in clipboard
-                mock_pyperclip.paste.side_effect = ["", "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"]
-                mock_input.side_effect = ["", "s"]  # Press enter to open browser, then confirm
-                
-                result = wizard_module.get_api_key_with_clipboard()
-                
-                assert result == "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
-                assert mock_browser.called
+        with patch.dict('sys.modules', {'pyperclip': mock_pyperclip}):
+            mock_input.side_effect = ["", "s"]  # Press enter to open browser, then confirm
+            
+            from app.adapters.infrastructure.setup_wizard import get_api_key_with_clipboard
+            result = get_api_key_with_clipboard()
+            
+            assert result == "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
+            assert mock_browser.called
 
 
 if __name__ == "__main__":
