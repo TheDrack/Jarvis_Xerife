@@ -20,13 +20,16 @@ jobs:
     - name: Install All Dependencies
       run: |
         python -m pip install --upgrade pip
-        # Instalando TUDO explicitamente para garantir a coleta dos testes
-        pip install fastapi uvicorn httpx pydantic pydantic-settings python-dotenv google-generativeai pytest pytest-cov mock
-        # Se houver arquivos de requisitos, instala também
+        # Adicionamos as bibliotecas de segurança e multipart exigidas pelo FastAPI
+        pip install fastapi uvicorn httpx pydantic pydantic-settings python-dotenv 
+        pip install google-generativeai python-jose[cryptography] passlib[bcrypt] 
+        pip install python-multipart bcrypt
+        pip install pytest pytest-cov mock
+        # Mantemos a instalação via requirements se existir
         if [ -d requirements ]; then pip install -r requirements/core.txt || true; fi
 
     - name: Run Tests
       run: |
-        # Forçamos o PYTHONPATH para a raiz para evitar erros de import
         export PYTHONPATH=$PYTHONPATH:$(pwd)
+        # Rodamos o pytest focando em ignorar erros de hardware se houver
         pytest --cov=app tests/
