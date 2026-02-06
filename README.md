@@ -22,16 +22,21 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
 
 - **Voice Recognition**: Brazilian Portuguese (pt-BR) voice commands using Google Speech Recognition
 - **Text-to-Speech**: Natural voice synthesis with pyttsx3
-- **Smart Command Interpretation**: Supports both rule-based patterns and optional Gemini AI integration (see [LLM_INTEGRATION.md](LLM_INTEGRATION.md))
+- **Dual Command Interpretation**: 
+  - Rule-based pattern matching for fast, reliable command processing
+  - Gemini AI integration for natural language understanding (see [LLM_INTEGRATION.md](LLM_INTEGRATION.md))
 - **System Automation**: Interface control using PyAutoGUI and Keyboard
 - **Web Navigation**: Browser automation and URL handling
-- **Hexagonal Architecture**: Clean separation with Domain, Application, and Adapters layers
+- **REST API**: FastAPI-based headless control interface with authentication (see [API_README.md](API_README.md))
+- **Distributed Mode**: Cloud API with local workers for remote command execution (see [DISTRIBUTED_MODE.md](DISTRIBUTED_MODE.md))
+- **Hexagonal Architecture**: Clean separation with Domain, Application, and Adapters layers (see [ARCHITECTURE.md](ARCHITECTURE.md))
 - **Cloud Ready**: Core logic runs without hardware dependencies (97-100% domain test coverage)
 - **Dependency Injection**: All dependencies injected via container
-- **Docker Support**: Containerized deployment with Docker and Docker Compose
-- **Airflow Integration**: Example DAGs for scheduled automation tasks
+- **Docker Support**: Containerized deployment with Docker Compose and PostgreSQL
+- **Database Integration**: SQLModel with PostgreSQL and SQLite support
+- **Modular Requirements**: Separate dependency files for edge, cloud, and development scenarios
 - **Type Safety**: Full type hinting throughout the codebase
-- **Testing**: Comprehensive test suite with 60+ passing tests, including original domain tests and additional LLM integration tests (all green)
+- **Comprehensive Testing**: 60+ passing tests covering domain, application, and adapter layers
 
 ## Project Structure
 
@@ -83,12 +88,21 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install dependencies (Edge deployment with hardware support):
+3. Install dependencies:
+
+**Option A - Full Edge deployment (hardware support):**
 ```bash
 pip install -r requirements.txt
+# OR use modular requirements:
+pip install -r requirements/edge.txt
 ```
 
-> **Note**: The project documentation references modular requirements files (core.txt, edge.txt, dev.txt) for different deployment scenarios. See [requirements/README.md](requirements/README.md) for the planned dependency separation strategy.
+**Option B - Development (with testing tools):**
+```bash
+pip install -r requirements/dev.txt
+```
+
+> **Note**: The project now supports modular requirements files for different deployment scenarios. See [requirements/README.md](requirements/README.md) for details on core.txt, edge.txt, dev.txt, prod-edge.txt, and prod-cloud.txt.
 
 4. Run the assistant:
 ```bash
@@ -100,8 +114,12 @@ python main.py
 For cloud deployment without hardware dependencies:
 
 ```bash
-pip install -r requirements.txt
-# Note: Modular requirements files are planned for future releases
+# Install only core dependencies (cloud-ready, no hardware)
+pip install -r requirements/core.txt
+
+# Or for production cloud deployment
+pip install -r requirements/prod-cloud.txt
+
 # Then integrate with your API/cloud service
 ```
 
@@ -335,19 +353,21 @@ flake8 app/ tests/
 ## Deployment Scenarios
 
 ### 1. Edge Only (Local PC/Raspberry Pi)
-- Install full edge requirements
+- Install edge requirements: `pip install -r requirements/edge.txt`
 - Run `python main.py`
-- All processing happens locally
+- All processing happens locally with full hardware support
 
-### 2. Cloud Only (Future)
-- Install core requirements only
-- Expose via FastAPI
-- No hardware dependencies
+### 2. Cloud API (Headless)
+- Install core requirements: `pip install -r requirements/core.txt`
+- Expose via FastAPI: `python serve.py`
+- No hardware dependencies - perfect for cloud deployment
+- Access at `http://localhost:8000/docs`
 
 ### 3. Hybrid (Multiple Edges + Cloud)
-- Cloud: Process intents and decisions
-- Edge: Execute actions locally
-- Communication via WebSocket/gRPC (future)
+- Cloud: Runs API server for command orchestration
+- Edge: Executes actions locally via worker
+- Communication via PostgreSQL task queue (see [DISTRIBUTED_MODE.md](DISTRIBUTED_MODE.md))
+- Future: WebSocket/gRPC support for real-time communication
 
 ## License
 
@@ -355,13 +375,21 @@ This project is provided as-is for educational and personal use.
 
 ## Contributing
 
-Future enhancements planned:
-- FastAPI REST/WebSocket interface
-- Cloud voice adapters (AWS Polly, Google TTS)
-- LLM integration for natural language understanding
-- Multi-device orchestration
-- Natural language processing improvements
-- Multi-language support
+✅ **Implemented Features:**
+- FastAPI REST interface with authentication
+- Cloud deployment support (headless mode)
+- LLM integration with Gemini AI
+- Distributed mode with cloud API and local workers
+- Database integration (PostgreSQL/SQLite)
+- Comprehensive testing suite
+
+🔮 **Future Enhancements:**
+- WebSocket support for real-time communication
+- Cloud voice adapters (AWS Polly, Google Cloud TTS)
+- Multi-device orchestration improvements
+- Multi-language support beyond pt-BR
+- Event sourcing and command replay
+- Monitoring and metrics integration
 
 ## Troubleshooting
 
@@ -384,12 +412,23 @@ If you get import errors:
 
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Detailed hexagonal architecture documentation
+### Architecture & Design
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Detailed hexagonal architecture documentation (Portuguese)
 - [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md) - Complete refactoring summary with metrics and validation results
+
+### Integration Guides
+- [API_README.md](API_README.md) - REST API documentation and usage guide
+- [LLM_INTEGRATION.md](LLM_INTEGRATION.md) - Gemini AI integration guide
+- [DISTRIBUTED_MODE.md](DISTRIBUTED_MODE.md) - Cloud + local worker setup guide
+
+### Development
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
+- [EXTENSIBILITY.md](EXTENSIBILITY.md) - Guide for extending functionality
+- [requirements/README.md](requirements/README.md) - Modular requirements documentation
+
+### Project History
 - [CHANGELOG.md](CHANGELOG.md) - Version history
 - [MIGRATION.md](MIGRATION.md) - Migration guide from v0.1 to v1.0
-- [EXTENSIBILITY.md](EXTENSIBILITY.md) - Guide for extending functionality
 
 ## Support
 

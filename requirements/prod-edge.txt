@@ -1,0 +1,11 @@
+# Production Edge deployment
+# Full edge deployment with all features
+# Use for: Production edge devices
+
+-r edge.txt
+
+# Monitoring and logging (optional)
+# sentry-sdk>=1.32.0
+
+# Workflow automation (optional)
+# apache-airflow>=2.7.0

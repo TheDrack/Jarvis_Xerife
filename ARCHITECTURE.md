@@ -158,22 +158,28 @@ assistant.start()
 ## Separação de Dependências
 
 ### Core Dependencies (`requirements/core.txt`)
-- Python puro + Pydantic
+- Pydantic para configuração
+- FastAPI e Uvicorn para API server
+- SQLModel e psycopg2 para persistência
 - **Cloud-ready**: Roda em qualquer ambiente Linux headless
 - Sem dependências de hardware
 
 ### Edge Dependencies (`requirements/edge.txt`)
 - Inclui core.txt
 - Adiciona PyAutoGUI, SpeechRecognition, pyttsx3, pynput
+- Adiciona google-generativeai para integração LLM
 - **Requer**: Display server, audio drivers, input devices
 
 ### Dev Dependencies (`requirements/dev.txt`)
-- Ferramentas de desenvolvimento
-- pytest, mypy, black, flake8, isort
+- Inclui core.txt
+- Ferramentas de teste: pytest, pytest-cov, pytest-mock
+- Type checking: mypy
+- Code quality: black, flake8, isort
+- Development tools: ipython, ipdb
 
 ### Produção
-- `requirements/prod-edge.txt`: Edge completo + opcionais
-- `requirements/prod-cloud.txt`: Só core + API server (futuro)
+- `requirements/prod-edge.txt`: Edge completo + opcionais para monitoramento
+- `requirements/prod-cloud.txt`: Só core + API server para deployment headless
 
 ## Testabilidade
 
@@ -220,20 +226,25 @@ def test_process_command():
 
 ### 1. Edge Local (Desenvolvimento)
 ```bash
-# Instala todas as dependências de hardware
+# Opção A: Instala todas as dependências via requirements.txt principal
 pip install -r requirements.txt
+
+# Opção B: Usa requirements modulares
+pip install -r requirements/edge.txt
 
 # Executa com hardware local
 python main.py
 ```
 
-### 2. Cloud Headless (Futuro)
+### 2. Cloud Headless (API Server)
 ```bash
-# Instala apenas core
+# Instala apenas core (sem dependências de hardware)
 pip install -r requirements/core.txt
 
-# Executa sem hardware (API mode)
-python app/bootstrap_cloud.py
+# Executa servidor API sem hardware
+python serve.py
+
+# Acesse em http://localhost:8000/docs
 ```
 
 ### 3. Híbrido (Múltiplos Edges + Cloud Central)
@@ -281,13 +292,22 @@ Os DAGs do Airflow podem:
 - Não dependem de hardware
 - Podem rodar em workers distribuídos
 
+## Recursos Implementados
+
+✅ **Concluído:**
+1. **FastAPI Integration**: API REST funcional com autenticação (ver [API_README.md](API_README.md))
+2. **LLM Integration**: Integração com Gemini AI para interpretação de comandos (ver [LLM_INTEGRATION.md](LLM_INTEGRATION.md))
+3. **Database Integration**: SQLModel com suporte a PostgreSQL e SQLite
+4. **Distributed Mode**: Sistema com worker local e API na cloud (ver [DISTRIBUTED_MODE.md](DISTRIBUTED_MODE.md))
+5. **Modular Requirements**: Arquivos separados para diferentes cenários de deployment
+
 ## Próximos Passos
 
-1. **FastAPI Integration**: Expor AssistantService via REST/WebSocket
-2. **Cloud Adapters**: Implementar adapters para serviços cloud (AWS Polly, Google TTS, etc.)
-3. **LLM Integration**: Adicionar adapter para modelos de linguagem
-4. **Multi-device**: Protocolo de comunicação Edge ↔ Cloud
-5. **Event Sourcing**: Histórico de comandos e eventos
+1. **WebSocket Support**: Comunicação real-time para múltiplos edges
+2. **Cloud Adapters**: Implementar adapters para serviços cloud (AWS Polly, Google Cloud TTS)
+3. **Multi-device Orchestration**: Protocolo avançado de comunicação Edge ↔ Cloud
+4. **Event Sourcing**: Sistema completo de histórico e replay de eventos
+5. **Monitoring & Metrics**: Integração com Prometheus/Grafana
 
 ## Referências
 

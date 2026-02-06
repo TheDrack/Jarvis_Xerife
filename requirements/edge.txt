@@ -1,0 +1,21 @@
+# Edge dependencies - includes hardware automation support
+# Requires: Display server, audio drivers, input devices
+# Use for: Local development, edge devices with hardware
+
+-r core.txt
+
+# Voice Recognition and TTS
+pyttsx3>=2.90
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.13
+
+# System Automation
+PyAutoGUI>=0.9.54
+pynput>=1.7.6
+
+# LLM Integration (optional)
+google-generativeai>=0.3.0
+
+# Additional utilities
+pandas>=2.0.0
+openpyxl>=3.1.0

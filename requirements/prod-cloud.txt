@@ -1,0 +1,12 @@
+# Production Cloud deployment
+# Cloud deployment without hardware dependencies
+# Use for: Cloud/container deployments, headless APIs
+
+-r core.txt
+
+# Monitoring and logging (optional)
+# sentry-sdk>=1.32.0
+
+# Cloud SDK integrations (optional)
+# boto3>=1.28.0  # AWS
+# google-cloud-texttospeech>=2.14.0  # Google Cloud TTS
