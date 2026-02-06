@@ -15,8 +15,10 @@ The LLM integration maintains full compatibility with existing Intent/Command ar
 **AgentService** (`app/domain/services/agent_service.py`)
 - Pure domain logic defining available automation functions
 - Provides function schemas matching ActionProvider interface
-- Contains system prompt configuring the AI's "Xerife" personality
+- Contains system prompt configuring the AI's personality (customizable via `get_system_instruction()`)
 - Maps Gemini function responses to CommandType enum values
+
+> **🎭 Personalidade Customizável**: O comportamento do assistente é definido em `get_system_instruction()`. Você pode modificar este método para criar diferentes personalidades - desde assistentes formais e técnicos até versões mais casuais e divertidas. Veja [INSTALLER_README.md](INSTALLER_README.md) para exemplos de personalidades customizadas.
 
 **LLMCommandAdapter** (`app/adapters/infrastructure/gemini_adapter.py`)  
 - Infrastructure adapter implementing same interface as CommandInterpreter
@@ -33,6 +35,19 @@ The implementation preserves hexagonal architecture principles:
 - Existing IntentProcessor and AssistantService require no modifications
 
 ## Setup Instructions
+
+### Quick Setup (Recomendado)
+
+A maneira mais fácil de configurar a API do Gemini é através do **Setup Wizard interativo**:
+
+```bash
+python main.py  # Se o .env não existir, o wizard iniciará automaticamente
+```
+
+O wizard irá:
+- Abrir automaticamente o Google AI Studio no navegador
+- Detectar a chave API copiada via clipboard
+- Salvar de forma segura com criptografia baseada em hardware
 
 ### Prerequisites
 

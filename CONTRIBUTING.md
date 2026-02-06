@@ -32,6 +32,18 @@ pip install -r requirements.txt
 pip install -e .[dev]
 ```
 
+4. Configure the application:
+```bash
+# Opção A: Use o Setup Wizard interativo (recomendado)
+python main.py  # O wizard iniciará automaticamente se .env não existir
+
+# Opção B: Configuração manual
+cp .env.example .env
+# Edite .env e preencha: USER_ID, ASSISTANT_NAME, GEMINI_API_KEY, DATABASE_URL
+```
+
+> **💡 Dica**: O Setup Wizard facilita a configuração inicial do ambiente de desenvolvimento, incluindo captura automática da chave API do Gemini e validação da conexão com o banco de dados.
+
 ## Code Style
 
 This project follows strict code quality standards:
