@@ -123,10 +123,6 @@ class AuthAdapter(SecurityProvider):
         Returns:
             User data if authentication succeeds, None otherwise
         """
-        # Strip whitespace from username and password to avoid issues
-        username = username.strip() if username else ""
-        password = password.strip() if password else ""
-        
         user = FAKE_USERS_DB.get(username)
         if not user:
             logger.warning(f"Authentication failed: user '{username}' not found")
