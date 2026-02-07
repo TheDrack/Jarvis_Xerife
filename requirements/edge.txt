@@ -7,7 +7,6 @@
 # Voice Recognition and TTS
 pyttsx3>=2.90
 SpeechRecognition>=3.10.0
-pyaudio>=0.2.13
 
 # System Automation
 PyAutoGUI>=0.9.54

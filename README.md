@@ -514,16 +514,22 @@ This project is provided as-is for educational and personal use.
 
 ## Troubleshooting
 
-### Audio Issues
-If you encounter audio device errors:
+### Audio Issues (Optional for Cloud/API Mode)
+**Note:** Audio dependencies (pyaudio, pyttsx3) are **optional** for cloud/API deployments. The assistant can run in headless mode using only text-based API interactions.
+
+If you want to use voice features locally and encounter audio device errors:
 - Ensure microphone permissions are granted
-- Check PyAudio installation
-- On Linux, install: `sudo apt-get install portaudio19-dev`
+- Install system audio libraries:
+  - On Linux: `sudo apt-get install portaudio19-dev python3-pyaudio`
+  - On macOS: `brew install portaudio`
+  - On Windows: Install via pip (usually works without system deps)
+- Install Python audio packages: `pip install pyaudio pyttsx3`
 
 ### Docker Audio
 For audio in Docker containers:
 - Uncomment device mappings in docker-compose.yml
 - May require privileged mode for some systems
+- **Not required for API-only deployments**
 
 ### Import Errors
 If you get import errors:

@@ -4,8 +4,17 @@
 import sys
 from typing import Callable, Optional
 
-import pyttsx3
-import speech_recognition as sr
+try:
+    import pyttsx3
+    PYTTSX3_AVAILABLE = True
+except ImportError:
+    PYTTSX3_AVAILABLE = False
+
+try:
+    import speech_recognition as sr
+    SPEECH_RECOGNITION_AVAILABLE = True
+except ImportError:
+    SPEECH_RECOGNITION_AVAILABLE = False
 
 from app.core.config import settings
 
@@ -15,8 +24,20 @@ class JarvisEngine:
 
     def __init__(self) -> None:
         """Initialize the Jarvis voice engine"""
-        self.recognizer: sr.Recognizer = sr.Recognizer()
-        self.tts_engine: pyttsx3.Engine = pyttsx3.init()
+        if SPEECH_RECOGNITION_AVAILABLE:
+            self.recognizer: Optional[sr.Recognizer] = sr.Recognizer()
+        else:
+            self.recognizer = None
+
+        if PYTTSX3_AVAILABLE:
+            try:
+                self.tts_engine: Optional[pyttsx3.Engine] = pyttsx3.init()
+            except (RuntimeError, OSError) as e:
+                # pyttsx3 can fail if no audio drivers are available
+                self.tts_engine = None
+        else:
+            self.tts_engine = None
+
         self.is_running: bool = False
 
     def speak(self, text: str) -> None:
@@ -26,6 +47,10 @@ class JarvisEngine:
         Args:
             text: Text to be spoken
         """
+        if self.tts_engine is None:
+            print(f"[TTS]: {text}")
+            return
+
         self.tts_engine.say(text)
         self.tts_engine.runAndWait()
 
@@ -39,6 +64,10 @@ class JarvisEngine:
         Returns:
             Recognized text in lowercase, or None if recognition failed
         """
+        if self.recognizer is None or not SPEECH_RECOGNITION_AVAILABLE:
+            print("[Voice]: Voice recognition not available")
+            return None
+
         with sr.Microphone() as source:
             if settings.ambient_noise_adjustment:
                 self.recognizer.adjust_for_ambient_noise(source)
@@ -71,6 +100,10 @@ class JarvisEngine:
         Args:
             on_command: Callback function to process commands
         """
+        if self.recognizer is None or not SPEECH_RECOGNITION_AVAILABLE:
+            print("[Voice]: Voice recognition not available - cannot use wake word mode")
+            return
+
         self.is_running = True
         self.speak(f"Não tema, {settings.wake_word} chegou")
 
