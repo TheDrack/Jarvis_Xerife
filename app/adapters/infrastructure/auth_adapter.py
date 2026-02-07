@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Authentication Adapter - Implementation of SecurityProvider using JWT and bcrypt"""
 
-# Bcrypt compatibility hack for passlib
+# IMPORTANT: Bcrypt compatibility hack MUST be at the top before any other imports
 # Fix for: AttributeError: module 'bcrypt' has no attribute '__about__'
 import bcrypt
 if not hasattr(bcrypt, "__about__"):

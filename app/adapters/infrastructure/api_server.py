@@ -4,8 +4,9 @@
 import logging
 
 from fastapi import Depends, FastAPI, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.openapi.docs import get_swagger_ui_html
 
 from app.adapters.infrastructure.api_models import (
     CommandHistoryItem,
@@ -80,10 +81,24 @@ def create_api_server(assistant_service: AssistantService) -> FastAPI:
     Returns:
         Configured FastAPI application
     """
+    # Custom Swagger UI configuration for password visibility toggle
+    swagger_ui_parameters = {
+        "persistAuthorization": True,
+        "displayRequestDuration": True,
+        "filter": True,
+        "tryItOutEnabled": True,
+        # Add custom CSS/JS for password visibility toggle
+        "syntaxHighlight.theme": "monokai",
+    }
+    
+    # Disable default docs to use our custom endpoint
     app = FastAPI(
         title=settings.app_name + " API",
         version=settings.version,
         description="Headless control interface for the AI assistant",
+        swagger_ui_parameters=swagger_ui_parameters,
+        docs_url=None,  # Disable default docs
+        redoc_url=None,  # Disable redoc
     )
     
     # Initialize database adapter for distributed mode
@@ -259,5 +274,69 @@ def create_api_server(assistant_service: AssistantService) -> FastAPI:
             Simple health check response
         """
         return JSONResponse(content={"status": "healthy"})
+    
+    # Override the default Swagger UI to inject custom JavaScript for password visibility toggle
+    @app.get("/docs", include_in_schema=False)
+    async def custom_swagger_ui_html() -> HTMLResponse:
+        """Custom Swagger UI with password visibility toggle"""
+        swagger_ui_html = get_swagger_ui_html(
+            openapi_url=app.openapi_url,
+            title=app.title + " - Swagger UI",
+            oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
+            swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js",
+            swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css",
+            swagger_ui_parameters=swagger_ui_parameters,
+        )
+        
+        # Inject custom JavaScript for password visibility toggle
+        custom_js = """
+        <script>
+        window.addEventListener('load', function() {
+            // Wait for Swagger UI to load
+            setTimeout(function() {
+                // Find all password input fields and add toggle button
+                const observer = new MutationObserver(function(mutations) {
+                    document.querySelectorAll('input[type="password"]').forEach(function(input) {
+                        if (!input.hasAttribute('data-toggle-added')) {
+                            input.setAttribute('data-toggle-added', 'true');
+                            
+                            // Create toggle button
+                            const toggleBtn = document.createElement('button');
+                            toggleBtn.type = 'button';
+                            toggleBtn.innerHTML = '👁️';
+                            toggleBtn.style.cssText = 'margin-left: 5px; cursor: pointer; background: #f0f0f0; border: 1px solid #ccc; border-radius: 3px; padding: 2px 8px;';
+                            toggleBtn.title = 'Toggle password visibility';
+                            
+                            // Toggle functionality
+                            toggleBtn.onclick = function() {
+                                if (input.type === 'password') {
+                                    input.type = 'text';
+                                    toggleBtn.innerHTML = '🙈';
+                                } else {
+                                    input.type = 'password';
+                                    toggleBtn.innerHTML = '👁️';
+                                }
+                            };
+                            
+                            // Insert button after input
+                            input.parentNode.insertBefore(toggleBtn, input.nextSibling);
+                        }
+                    });
+                });
+                
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            }, 1000);
+        });
+        </script>
+        """
+        
+        # Get the HTML body and inject the custom script before closing body tag
+        html_content = swagger_ui_html.body.decode('utf-8')
+        html_content = html_content.replace('</body>', custom_js + '\n</body>')
+        
+        return HTMLResponse(content=html_content)
 
     return app
