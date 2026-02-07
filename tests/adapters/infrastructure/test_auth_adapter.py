@@ -3,15 +3,32 @@
 
 import pytest
 from jose import jwt
+from sqlmodel import SQLModel, create_engine
 
 from app.adapters.infrastructure.auth_adapter import AuthAdapter
+from app.adapters.infrastructure.database_models import User
 from app.core.config import settings
 
 
 @pytest.fixture
 def auth_adapter():
-    """Create an AuthAdapter instance for testing"""
-    return AuthAdapter()
+    """Create an AuthAdapter instance for testing with in-memory database"""
+    # Use in-memory SQLite database for testing
+    test_db_url = "sqlite:///:memory:"
+    adapter = AuthAdapter(database_url=test_db_url)
+    
+    # Create tables
+    SQLModel.metadata.create_all(adapter.engine)
+    
+    # Create a test admin user
+    adapter.create_user(
+        username="admin",
+        password="admin123",
+        email="admin@jarvis.local",
+        full_name="Administrator"
+    )
+    
+    return adapter
 
 
 class TestPasswordHashing:
