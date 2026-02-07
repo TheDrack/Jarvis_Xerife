@@ -23,7 +23,6 @@ setup(
         "SpeechRecognition>=3.10.0",
         "PyAutoGUI>=0.9.54",
         "pynput>=1.7.6",
-        "pyaudio>=0.2.13",
         "pydantic>=2.0.0",
         "pydantic-settings>=2.0.0",
         "python-dotenv>=1.0.0",
