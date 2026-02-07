@@ -28,15 +28,16 @@ class JarvisEngine:
             self.recognizer: Optional[sr.Recognizer] = sr.Recognizer()
         else:
             self.recognizer = None
-            
+
         if PYTTSX3_AVAILABLE:
             try:
                 self.tts_engine: Optional[pyttsx3.Engine] = pyttsx3.init()
-            except Exception:
+            except (RuntimeError, OSError) as e:
+                # pyttsx3 can fail if no audio drivers are available
                 self.tts_engine = None
         else:
             self.tts_engine = None
-            
+
         self.is_running: bool = False
 
     def speak(self, text: str) -> None:
@@ -49,7 +50,7 @@ class JarvisEngine:
         if self.tts_engine is None:
             print(f"[TTS]: {text}")
             return
-            
+
         self.tts_engine.say(text)
         self.tts_engine.runAndWait()
 
@@ -66,7 +67,7 @@ class JarvisEngine:
         if self.recognizer is None or not SPEECH_RECOGNITION_AVAILABLE:
             print("[Voice]: Voice recognition not available")
             return None
-            
+
         with sr.Microphone() as source:
             if settings.ambient_noise_adjustment:
                 self.recognizer.adjust_for_ambient_noise(source)
@@ -102,7 +103,7 @@ class JarvisEngine:
         if self.recognizer is None or not SPEECH_RECOGNITION_AVAILABLE:
             print("[Voice]: Voice recognition not available - cannot use wake word mode")
             return
-            
+
         self.is_running = True
         self.speak(f"Não tema, {settings.wake_word} chegou")
 
