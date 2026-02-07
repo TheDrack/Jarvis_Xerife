@@ -26,16 +26,20 @@ Edge dependencies including hardware automation:
 - SpeechRecognition (voice input)
 - pyttsx3 (text-to-speech)
 - pynput (keyboard/mouse control)
-- pyaudio (audio input/output)
 - google-generativeai (LLM integration)
 - pandas and openpyxl (data processing utilities)
 
-**Requires**: Display server, audio drivers, input devices
+**Note**: Audio dependencies (pyaudio, pyttsx3) are **optional**. The application automatically detects when audio libraries are unavailable and gracefully disables voice features.
+
+**Requires**: Display server, audio drivers (optional), input devices
 
 **Use for**: Local development, edge devices with hardware
 
 ```bash
 pip install -r requirements/edge.txt
+# Optional for audio support:
+# Linux: sudo apt-get install portaudio19-dev && pip install pyaudio
+# macOS: brew install portaudio && pip install pyaudio
 ```
 
 ### `dev.txt` - Development Tools
