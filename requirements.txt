@@ -1,8 +1,17 @@
-# Jarvis Assistant - Default Requirements
-# This includes edge dependencies for local development
+# Jarvis Assistant - Cloud/Lightweight Requirements
+# This is the lightweight cloud version without heavy hardware dependencies
 # For modular requirements strategy, see requirements/README.md
 
-# Core dependencies
+# For edge deployment with hardware support, use:
+#   pip install -r requirements/edge.txt
+#
+# For production edge deployment:
+#   pip install -r requirements/prod-edge.txt
+#
+# For production cloud deployment:
+#   pip install -r requirements/prod-cloud.txt
+
+# Core dependencies (cloud-ready, no hardware requirements)
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
@@ -10,27 +19,21 @@ python-dotenv>=1.0.0
 # LLM dependencies
 google-generativeai>=0.3.0
 
-# Edge dependencies (hardware support)
-pyttsx3>=2.90
-SpeechRecognition>=3.10.0
-PyAutoGUI>=0.9.54
-pynput>=1.7.6
-pyperclip>=1.8.2
-
-# Additional utilities
-pandas>=2.0.0
-openpyxl>=3.1.0
-
-# API server (for headless control)
+# API server
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 
 # Security and Authentication
-bcrypt==4.0.1
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 cryptography>=41.0.0
 
 # Database ORM
 sqlmodel>=0.0.14
+
+# NOTE: Heavy libraries removed for cloud deployment:
+# - pyttsx3, SpeechRecognition (voice/TTS - use edge.txt if needed)
+# - PyAutoGUI, pynput, pyperclip (hardware automation - use edge.txt if needed)
+# - pandas, openpyxl (data analysis - use edge.txt if needed)
+# All imports of these libraries in the code are optional with try/except blocks

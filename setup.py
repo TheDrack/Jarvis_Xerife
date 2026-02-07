@@ -19,17 +19,30 @@ setup(
     python_requires=">=3.9",
     packages=find_packages(exclude=["tests", "tests.*"]),
     install_requires=[
-        "pyttsx3>=2.90",
-        "SpeechRecognition>=3.10.0",
-        "PyAutoGUI>=0.9.54",
-        "pynput>=1.7.6",
+        # Core cloud-ready dependencies only
         "pydantic>=2.0.0",
         "pydantic-settings>=2.0.0",
         "python-dotenv>=1.0.0",
-        "pandas>=2.0.0",
-        "openpyxl>=3.1.0",
+        "google-generativeai>=0.3.0",
+        "fastapi>=0.104.0",
+        "uvicorn[standard]>=0.24.0",
+        "python-multipart>=0.0.6",
+        "python-jose[cryptography]>=3.3.0",
+        "passlib[bcrypt]>=1.7.4",
+        "cryptography>=41.0.0",
+        "sqlmodel>=0.0.14",
     ],
     extras_require={
+        "edge": [
+            # Hardware and automation dependencies for edge deployment
+            "pyttsx3>=2.90",
+            "SpeechRecognition>=3.10.0",
+            "PyAutoGUI>=0.9.54",
+            "pynput>=1.7.6",
+            "pyperclip>=1.8.2",
+            "pandas>=2.0.0",
+            "openpyxl>=3.1.0",
+        ],
         "dev": [
             "pytest>=7.4.0",
             "pytest-cov>=4.1.0",
