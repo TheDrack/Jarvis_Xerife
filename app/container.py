@@ -9,7 +9,7 @@ from typing import Optional
 from app.adapters.edge import AutomationAdapter, CombinedVoiceProvider, WebAdapter
 from app.adapters.infrastructure import DummyVoiceProvider, LLMCommandAdapter, SQLiteHistoryAdapter
 from app.application.ports import ActionProvider, HistoryProvider, VoiceProvider, WebProvider
-from app.application.services import AssistantService, DependencyManager
+from app.application.services import AssistantService, DependencyManager, ExtensionManager
 from app.core.config import settings
 from app.domain.services import CommandInterpreter, IntentProcessor
 
@@ -93,6 +93,7 @@ class Container:
         self._llm_command_adapter: Optional[LLMCommandAdapter] = None
         self._intent_processor: Optional[IntentProcessor] = None
         self._dependency_manager: Optional[DependencyManager] = None
+        self._extension_manager: Optional[ExtensionManager] = None
 
         # Application service
         self._assistant_service: Optional[AssistantService] = None
@@ -186,6 +187,14 @@ class Container:
             logger.info("Creating DependencyManager")
             self._dependency_manager = DependencyManager()
         return self._dependency_manager
+
+    @property
+    def extension_manager(self) -> ExtensionManager:
+        """Get or create extension manager"""
+        if self._extension_manager is None:
+            logger.info("Creating ExtensionManager")
+            self._extension_manager = ExtensionManager()
+        return self._extension_manager
 
     @property
     def assistant_service(self) -> AssistantService:

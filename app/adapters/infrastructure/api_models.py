@@ -79,3 +79,37 @@ class User(BaseModel):
     full_name: Optional[str] = Field(None, description="User full name")
     disabled: Optional[bool] = Field(None, description="Whether user is disabled")
 
+
+# Extension Manager Models
+
+
+class InstallPackageRequest(BaseModel):
+    """Request model for package installation"""
+
+    package_name: str = Field(..., description="Name of the package to install", min_length=1)
+
+
+class InstallPackageResponse(BaseModel):
+    """Response model for package installation"""
+
+    success: bool = Field(..., description="Whether the installation was successful or package already installed")
+    message: str = Field(..., description="Installation result message")
+    package_name: str = Field(..., description="Name of the package")
+    already_installed: bool = Field(False, description="Whether the package was already installed")
+
+
+class PackageStatusResponse(BaseModel):
+    """Response model for package installation status"""
+
+    package_name: str = Field(..., description="Name of the package")
+    installed: bool = Field(..., description="Whether the package is installed")
+
+
+class PrewarmResponse(BaseModel):
+    """Response model for pre-warming recommended libraries"""
+
+    message: str = Field(..., description="Pre-warming result message")
+    libraries: Dict[str, bool] = Field(..., description="Map of library names to installation success")
+    all_installed: bool = Field(..., description="Whether all recommended libraries were installed")
+
+

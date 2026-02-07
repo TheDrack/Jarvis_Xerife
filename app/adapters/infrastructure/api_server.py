@@ -3,7 +3,7 @@
 
 import logging
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -13,6 +13,10 @@ from app.adapters.infrastructure.api_models import (
     ExecuteRequest,
     ExecuteResponse,
     HistoryResponse,
+    InstallPackageRequest,
+    InstallPackageResponse,
+    PackageStatusResponse,
+    PrewarmResponse,
     StatusResponse,
     TaskResponse,
     Token,
@@ -21,7 +25,7 @@ from app.adapters.infrastructure.api_models import (
 )
 from app.adapters.infrastructure.auth_adapter import AuthAdapter
 from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
-from app.application.services import AssistantService
+from app.application.services import AssistantService, ExtensionManager
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -71,16 +75,21 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     return user
 
 
-def create_api_server(assistant_service: AssistantService) -> FastAPI:
+def create_api_server(assistant_service: AssistantService, extension_manager: ExtensionManager = None) -> FastAPI:
     """
     Create and configure the FastAPI application
 
     Args:
         assistant_service: Injected AssistantService instance
+        extension_manager: Optional ExtensionManager instance for package management
 
     Returns:
         Configured FastAPI application
     """
+    # Create ExtensionManager if not provided
+    if extension_manager is None:
+        extension_manager = ExtensionManager()
+    
     # Custom Swagger UI configuration for password visibility toggle
     swagger_ui_parameters = {
         "persistAuthorization": True,
@@ -274,6 +283,133 @@ def create_api_server(assistant_service: AssistantService) -> FastAPI:
             Simple health check response
         """
         return JSONResponse(content={"status": "healthy"})
+
+    # Extension Manager Endpoints
+
+    @app.post("/v1/extensions/install", response_model=InstallPackageResponse)
+    async def install_package(
+        request: InstallPackageRequest,
+        background_tasks: BackgroundTasks,
+        current_user: User = Depends(get_current_user),
+    ) -> InstallPackageResponse:
+        """
+        Install a package using uv (Protected endpoint)
+        
+        Installation happens in the background to avoid blocking.
+        Heavy libraries won't block Jarvis from responding to other requests.
+
+        Args:
+            request: Package installation request
+            background_tasks: FastAPI background tasks
+            current_user: Current authenticated user
+
+        Returns:
+            Package installation response
+        """
+        try:
+            package_name = request.package_name.lower()
+            logger.info(f"User '{current_user.username}' requesting package installation: {package_name}")
+
+            # Check if already installed (synchronous check)
+            if extension_manager.is_package_installed(package_name):
+                return InstallPackageResponse(
+                    success=True,
+                    message=f"Package '{package_name}' is already installed",
+                    package_name=package_name,
+                    already_installed=True,
+                )
+
+            # Install in background
+            background_tasks.add_task(extension_manager.install_package, package_name)
+            
+            return InstallPackageResponse(
+                success=True,
+                message=f"Installation of '{package_name}' started in background",
+                package_name=package_name,
+                already_installed=False,
+            )
+        except Exception as e:
+            logger.error(f"Error in package installation endpoint: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+    @app.get("/v1/extensions/status/{package_name}", response_model=PackageStatusResponse)
+    async def get_package_status(
+        package_name: str,
+        current_user: User = Depends(get_current_user),
+    ) -> PackageStatusResponse:
+        """
+        Check if a package is installed (Protected endpoint)
+
+        Args:
+            package_name: Name of the package to check
+            current_user: Current authenticated user
+
+        Returns:
+            Package installation status
+        """
+        try:
+            package_name = package_name.lower()
+            installed = extension_manager.is_package_installed(package_name)
+            
+            return PackageStatusResponse(
+                package_name=package_name,
+                installed=installed,
+            )
+        except Exception as e:
+            logger.error(f"Error checking package status: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+    @app.post("/v1/extensions/prewarm", response_model=PrewarmResponse)
+    async def prewarm_libraries(
+        background_tasks: BackgroundTasks,
+        current_user: User = Depends(get_current_user),
+    ) -> PrewarmResponse:
+        """
+        Pre-warm recommended libraries for data tasks (Protected endpoint)
+        
+        Installs pandas, numpy, and matplotlib if not already present.
+        Installation happens in background to avoid blocking.
+
+        Args:
+            background_tasks: FastAPI background tasks
+            current_user: Current authenticated user
+
+        Returns:
+            Pre-warming result
+        """
+        try:
+            logger.info(f"User '{current_user.username}' requesting pre-warming of recommended libraries")
+            
+            # Check which libraries need installation
+            missing_libs = [
+                lib for lib in extension_manager.RECOMMENDED_LIBRARIES
+                if not extension_manager.is_package_installed(lib)
+            ]
+            
+            if not missing_libs:
+                return PrewarmResponse(
+                    message="All recommended libraries are already installed",
+                    libraries={lib: True for lib in extension_manager.RECOMMENDED_LIBRARIES},
+                    all_installed=True,
+                )
+            
+            # Install missing libraries in background
+            background_tasks.add_task(extension_manager.ensure_recommended_libraries)
+            
+            # Return status showing which are installed and which will be
+            status = {
+                lib: extension_manager.is_package_installed(lib)
+                for lib in extension_manager.RECOMMENDED_LIBRARIES
+            }
+            
+            return PrewarmResponse(
+                message=f"Pre-warming started in background for: {', '.join(missing_libs)}",
+                libraries=status,
+                all_installed=False,
+            )
+        except Exception as e:
+            logger.error(f"Error in pre-warming endpoint: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     
     # Override the default Swagger UI to inject custom JavaScript for password visibility toggle
     @app.get("/docs", include_in_schema=False)

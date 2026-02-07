@@ -58,6 +58,9 @@ def main() -> None:
     # Get the assistant service
     assistant = container.assistant_service
 
+    # Get the extension manager
+    extension_manager = container.extension_manager
+
     # Check adapter availability (but don't fail - API can still work)
     try:
         if hasattr(assistant.voice, "is_available") and not assistant.voice.is_available():
@@ -77,7 +80,7 @@ def main() -> None:
         logger.warning(f"Could not check action availability: {e}")
 
     # Create FastAPI application
-    app = create_api_server(assistant)
+    app = create_api_server(assistant, extension_manager)
 
     # Get server configuration from environment
     # Render uses PORT, but support API_PORT for backward compatibility
