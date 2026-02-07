@@ -1,13 +1,18 @@
 import os
 import uvicorn
 from app.adapters.infrastructure.api_server import create_api_server
-from app.application.services import AssistantService
+# Importamos o cara que sabe montar o AssistantService
+from app.application.dependency_manager import DependencyManager 
 
 def start_cloud():
     """Inicializa o Jarvis em modo API para o Render/Nuvem"""
-    # Inicializa o serviço principal
-    assistant_service = AssistantService() 
-    # Cria o servidor usando a Factory que você já tem
+    
+    # 1. O DependencyManager monta todas as 5 dependências (voice, action, etc.)
+    # baseado nas configurações do seu settings/env
+    manager = DependencyManager()
+    assistant_service = manager.get_assistant_service()
+    
+    # 2. Agora o Factory recebe o serviço completo e feliz
     app = create_api_server(assistant_service)
     
     port = int(os.getenv("PORT", 8000))
@@ -15,10 +20,8 @@ def start_cloud():
     uvicorn.run(app, host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    # Se houver uma porta definida, estamos no Render (Cloud)
     if os.getenv("PORT"):
         start_cloud()
     else:
-        # Se não, roda o modo voz local que você já tinha
         from app.bootstrap_edge import main
         main()
