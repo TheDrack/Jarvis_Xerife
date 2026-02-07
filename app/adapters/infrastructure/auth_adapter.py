@@ -7,7 +7,9 @@ from typing import Optional
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlmodel import Session, create_engine, select
 
+from app.adapters.infrastructure.database_models import User
 from app.application.ports.security_provider import SecurityProvider
 from app.core.config import settings
 
@@ -16,27 +18,23 @@ logger = logging.getLogger(__name__)
 # Password hashing context using bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Mock user database - in production, this should be replaced with a real database
-# Password: "admin123" (pre-hashed)
-FAKE_USERS_DB = {
-    "admin": {
-        "username": "admin",
-        "full_name": "Administrator",
-        "email": "admin@jarvis.local",
-        "hashed_password": "$2b$12$MYFM.Syb6/1Mz8abGMtLoOb3nNpMq3NCl1/bcXsToqcO.eT77ajt6",
-        "disabled": False,
-    }
-}
-
 
 class AuthAdapter(SecurityProvider):
     """Authentication adapter implementing JWT and password hashing"""
 
-    def __init__(self):
-        """Initialize the authentication adapter"""
+    def __init__(self, database_url: Optional[str] = None):
+        """Initialize the authentication adapter
+        
+        Args:
+            database_url: Database connection URL. If None, uses settings.database_url
+        """
         self.secret_key = settings.secret_key
         self.algorithm = settings.algorithm
         self.access_token_expire_minutes = settings.access_token_expire_minutes
+        
+        # Initialize database connection
+        db_url = database_url or settings.database_url
+        self.engine = create_engine(db_url, echo=False)
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """
@@ -117,21 +115,114 @@ class AuthAdapter(SecurityProvider):
         Returns:
             User data if authentication succeeds, None otherwise
         """
-        user = FAKE_USERS_DB.get(username)
-        if not user:
-            logger.warning(f"Authentication failed: user '{username}' not found")
+        try:
+            with Session(self.engine) as session:
+                # Query user from database
+                statement = select(User).where(User.username == username)
+                user = session.exec(statement).first()
+                
+                if not user:
+                    logger.warning(f"Authentication failed: user '{username}' not found")
+                    return None
+                
+                if not self.verify_password(password, user.hashed_password):
+                    logger.warning(f"Authentication failed: invalid password for user '{username}'")
+                    return None
+                
+                if user.disabled:
+                    logger.warning(f"Authentication failed: user '{username}' is disabled")
+                    return None
+                
+                return {
+                    "username": user.username,
+                    "email": user.email,
+                    "full_name": user.full_name,
+                }
+        except Exception as e:
+            logger.error(f"Error authenticating user '{username}': {e}")
             return None
+    
+    def create_user(
+        self,
+        username: str,
+        password: str,
+        email: Optional[str] = None,
+        full_name: Optional[str] = None,
+        disabled: bool = False
+    ) -> Optional[User]:
+        """
+        Create a new user in the database
         
-        if not self.verify_password(password, user["hashed_password"]):
-            logger.warning(f"Authentication failed: invalid password for user '{username}'")
+        Args:
+            username: The username
+            password: The plain text password (will be hashed)
+            email: Optional email address
+            full_name: Optional full name
+            disabled: Whether the user is disabled
+            
+        Returns:
+            Created User object if successful, None otherwise
+        """
+        try:
+            with Session(self.engine) as session:
+                # Check if user already exists
+                statement = select(User).where(User.username == username)
+                existing_user = session.exec(statement).first()
+                
+                if existing_user:
+                    logger.warning(f"User '{username}' already exists")
+                    return None
+                
+                # Create new user
+                hashed_password = self.get_password_hash(password)
+                new_user = User(
+                    username=username,
+                    email=email,
+                    full_name=full_name,
+                    hashed_password=hashed_password,
+                    disabled=disabled
+                )
+                
+                session.add(new_user)
+                session.commit()
+                session.refresh(new_user)
+                
+                logger.info(f"Successfully created user '{username}'")
+                return new_user
+        except Exception as e:
+            logger.error(f"Error creating user '{username}': {e}")
             return None
-        
-        if user.get("disabled", False):
-            logger.warning(f"Authentication failed: user '{username}' is disabled")
-            return None
-        
-        return {
-            "username": user["username"],
-            "email": user["email"],
-            "full_name": user["full_name"],
-        }
+    
+    def ensure_default_admin(self) -> None:
+        """
+        Ensure that a default admin user exists in the database.
+        If no users exist, creates an admin user with username 'admin' and password 'admin123'
+        """
+        try:
+            with Session(self.engine) as session:
+                # Check if any users exist
+                statement = select(User)
+                users = session.exec(statement).all()
+                
+                if not users:
+                    logger.info("No users found in database. Creating default admin user...")
+                    
+                    # Create default admin user
+                    hashed_password = self.get_password_hash("admin123")
+                    admin_user = User(
+                        username="admin",
+                        email="admin@jarvis.local",
+                        full_name="Administrator",
+                        hashed_password=hashed_password,
+                        disabled=False
+                    )
+                    
+                    session.add(admin_user)
+                    session.commit()
+                    
+                    logger.info("✓ Default admin user created successfully (username: admin, password: admin123)")
+                else:
+                    logger.info(f"Database already has {len(users)} user(s)")
+        except Exception as e:
+            logger.error(f"Error ensuring default admin user: {e}")
+

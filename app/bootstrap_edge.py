@@ -4,6 +4,7 @@
 import logging
 import sys
 
+from app.adapters.infrastructure.database_init import initialize_database
 from app.adapters.infrastructure.setup_wizard import check_env_complete, run_setup_wizard
 from app.container import create_edge_container
 from app.core.config import settings
@@ -47,6 +48,14 @@ def main() -> None:
         logger.info("Setup completed successfully, starting assistant...")
     else:
         current_settings = settings
+    
+    # Initialize database and ensure default admin user exists
+    try:
+        logger.info("Initializing database...")
+        initialize_database()
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        # Continue anyway - database might not be required for edge mode
     
     logger.info("Starting Jarvis Assistant (Edge Mode)")
     logger.info(f"Wake word: {current_settings.wake_word}")

@@ -1,11 +1,15 @@
 import os
 import uvicorn
 from app.adapters.infrastructure.api_server import create_api_server
+from app.adapters.infrastructure.database_init import initialize_database
 from app.container import create_edge_container
 from app.core.config import settings
 
 def start_cloud():
     """Inicializa o Jarvis em modo API para o Render/Nuvem"""
+    
+    # Initialize database and ensure default admin user exists
+    initialize_database()
     
     # Usa o Container para instanciar o AssistantService com todas as dependências
     container = create_edge_container(
