@@ -27,6 +27,7 @@ jobs:
         python-version: "3.13"
     
     - name: Install dependencies
+      shell: bash
       run: |
         # Create virtual environment
         uv venv
@@ -41,6 +42,7 @@ jobs:
         uv pip install -r requirements.txt
     
     - name: Build executable with PyInstaller
+      shell: bash
       run: |
         # Activate virtual environment
         source .venv/Scripts/activate
