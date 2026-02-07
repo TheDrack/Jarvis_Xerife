@@ -95,8 +95,8 @@ class TestMainCloudMode:
     @patch('main.uvicorn.run')
     @patch('main.create_api_server')
     @patch('main.create_edge_container')
-    def test_start_cloud_passes_settings_to_container(self, mock_create_container, mock_create_api, mock_uvicorn):
-        """Test that start_cloud passes settings to container"""
+    def test_start_cloud_passes_wake_word_and_language_to_container(self, mock_create_container, mock_create_api, mock_uvicorn):
+        """Test that start_cloud passes wake_word and language settings to container"""
         # Setup mocks
         mock_container = Mock()
         mock_assistant = Mock()
