@@ -28,25 +28,23 @@ class TestJarvisEngine:
 
     def test_speak(self):
         """Test speak method"""
-        # Since pyttsx3 is already mocked in conftest.py, we need to configure it properly
-        from unittest.mock import Mock, MagicMock
-        import pyttsx3
+        # We need to patch at the module where it's used, not where it's defined
+        from unittest.mock import Mock, patch
         
-        # Create a mock engine
+        # Create a mock engine with say and runAndWait methods
         mock_engine = Mock()
-        mock_engine.say = Mock()
-        mock_engine.runAndWait = Mock()
         
-        # Configure the mocked pyttsx3.init to return our mock engine
-        pyttsx3.init = Mock(return_value=mock_engine)
-        
-        # Create engine and test speak
-        engine = JarvisEngine()
-        engine.speak("Olá")
-        
-        # Verify the calls
-        mock_engine.say.assert_called_once_with("Olá")
-        mock_engine.runAndWait.assert_called_once()
+        # Patch pyttsx3.init at the point where JarvisEngine imports and uses it
+        with patch("app.core.engine.pyttsx3.init", return_value=mock_engine):
+            # Create engine with the patched pyttsx3.init
+            engine = JarvisEngine()
+            
+            # Call speak
+            engine.speak("Olá")
+            
+            # Verify the calls
+            mock_engine.say.assert_called_once_with("Olá")
+            mock_engine.runAndWait.assert_called_once()
 
     @patch("speech_recognition.Microphone")
     @patch("pyttsx3.init")
