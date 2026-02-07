@@ -20,7 +20,7 @@ jobs:
 
     - name: Install All Dependencies
       run: |
-        # Criar ambiente virtual
+        # Create virtual environment
         uv venv
         
         # 1. Fix de Segurança: Ordem específica para evitar erro de backend do bcrypt
@@ -48,7 +48,7 @@ jobs:
         # Define a raiz como caminho de importação do Python
         export PYTHONPATH=$PYTHONPATH:$(pwd)
         
-        # Ativa o ambiente virtual e executa os testes
+        # Activate virtual environment and run tests
         source .venv/bin/activate
         
         # Executa os testes e gera o relatório de cobertura

@@ -28,7 +28,7 @@ jobs:
     
     - name: Install dependencies
       run: |
-        # Criar ambiente virtual
+        # Create virtual environment
         uv venv
         
         uv pip install pyinstaller
@@ -42,8 +42,8 @@ jobs:
     
     - name: Build executable with PyInstaller
       run: |
-        # Ativa o ambiente virtual
-        .venv\Scripts\Activate.ps1
+        # Activate virtual environment
+        source .venv/Scripts/activate
         
         python build_config.py
     
