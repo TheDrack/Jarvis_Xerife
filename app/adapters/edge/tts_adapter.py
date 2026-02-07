@@ -4,13 +4,6 @@
 import logging
 from typing import Optional
 
-try:
-    import pyttsx3
-
-    PYTTSX3_AVAILABLE = True
-except ImportError:
-    PYTTSX3_AVAILABLE = False
-
 from app.application.ports import VoiceProvider
 
 logger = logging.getLogger(__name__)
@@ -24,15 +17,21 @@ class TTSAdapter(VoiceProvider):
 
     def __init__(self):
         """Initialize TTS adapter"""
-        if not PYTTSX3_AVAILABLE:
-            logger.warning("pyttsx3 module not available")
-            self.engine = None
-        else:
+        # Lazy import of pyttsx3 to reduce startup memory usage
+        try:
+            import pyttsx3
+            self._pyttsx3 = pyttsx3
+            self._pyttsx3_available = True
             try:
                 self.engine = pyttsx3.init()
             except Exception as e:
                 logger.error(f"Failed to initialize pyttsx3: {e}")
                 self.engine = None
+        except ImportError:
+            logger.warning("pyttsx3 module not available")
+            self._pyttsx3 = None
+            self._pyttsx3_available = False
+            self.engine = None
 
     def speak(self, text: str) -> None:
         """
@@ -73,4 +72,4 @@ class TTSAdapter(VoiceProvider):
         Returns:
             True if TTS services are available
         """
-        return PYTTSX3_AVAILABLE and self.engine is not None
+        return self._pyttsx3_available and self.engine is not None

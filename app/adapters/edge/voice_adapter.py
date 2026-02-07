@@ -4,13 +4,6 @@
 import logging
 from typing import Optional
 
-try:
-    import speech_recognition as sr
-
-    SPEECH_RECOGNITION_AVAILABLE = True
-except ImportError:
-    SPEECH_RECOGNITION_AVAILABLE = False
-
 from app.application.ports import VoiceProvider
 
 logger = logging.getLogger(__name__)
@@ -34,11 +27,17 @@ class VoiceAdapter(VoiceProvider):
             language: Language code for recognition
             ambient_noise_adjustment: Whether to adjust for ambient noise
         """
-        if not SPEECH_RECOGNITION_AVAILABLE:
-            logger.warning("speech_recognition module not available")
-            self.recognizer = None
-        else:
+        # Lazy import of speech_recognition to reduce startup memory usage
+        try:
+            import speech_recognition as sr
+            self._sr = sr
+            self._speech_recognition_available = True
             self.recognizer = sr.Recognizer()
+        except ImportError:
+            logger.warning("speech_recognition module not available")
+            self._sr = None
+            self._speech_recognition_available = False
+            self.recognizer = None
 
         self.language = language
         self.ambient_noise_adjustment = ambient_noise_adjustment
@@ -68,7 +67,7 @@ class VoiceAdapter(VoiceProvider):
             return None
 
         try:
-            with sr.Microphone() as source:
+            with self._sr.Microphone() as source:
                 if self.ambient_noise_adjustment:
                     self.recognizer.adjust_for_ambient_noise(source)
 
@@ -85,11 +84,11 @@ class VoiceAdapter(VoiceProvider):
                     return command.lower()
                 return None
 
-        except sr.WaitTimeoutError:
+        except self._sr.WaitTimeoutError:
             return None
-        except sr.UnknownValueError:
+        except self._sr.UnknownValueError:
             return None
-        except sr.RequestError as e:
+        except self._sr.RequestError as e:
             logger.error(f"Could not request results from Google Speech Recognition: {e}")
             return None
         except Exception as e:
@@ -103,4 +102,4 @@ class VoiceAdapter(VoiceProvider):
         Returns:
             True if voice services are available
         """
-        return SPEECH_RECOGNITION_AVAILABLE and self.recognizer is not None
+        return self._speech_recognition_available and self.recognizer is not None

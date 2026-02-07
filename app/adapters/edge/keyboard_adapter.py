@@ -4,14 +4,6 @@
 import logging
 from typing import Optional
 
-try:
-    from pynput.keyboard import Controller
-
-    PYNPUT_AVAILABLE = True
-except ImportError:
-    PYNPUT_AVAILABLE = False
-    Controller = None
-
 from app.application.ports import ActionProvider
 
 logger = logging.getLogger(__name__)
@@ -25,10 +17,14 @@ class KeyboardAdapter(ActionProvider):
 
     def __init__(self):
         """Initialize keyboard adapter"""
-        if PYNPUT_AVAILABLE and Controller:
+        # Lazy import of pynput to reduce startup memory usage
+        try:
+            from pynput.keyboard import Controller
+            self._pynput_available = True
             self.keyboard = Controller()
-        else:
+        except ImportError:
             logger.warning("pynput.keyboard not available")
+            self._pynput_available = False
             self.keyboard = None
 
     def type_text(self, text: str) -> None:
@@ -109,4 +105,4 @@ class KeyboardAdapter(ActionProvider):
         Returns:
             True if keyboard services are available
         """
-        return PYNPUT_AVAILABLE and self.keyboard is not None
+        return self._pynput_available and self.keyboard is not None
