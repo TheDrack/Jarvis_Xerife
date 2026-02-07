@@ -21,24 +21,24 @@ jobs:
     - name: Install All Dependencies
       run: |
         # 1. Fix de Segurança: Ordem específica para evitar erro de backend do bcrypt
-        uv pip install --system bcrypt==4.0.1
-        uv pip install --system passlib[bcrypt]==1.7.4
+        uv pip install bcrypt==4.0.1
+        uv pip install passlib[bcrypt]==1.7.4
         
         # 2. Infraestrutura Web e IA
-        uv pip install --system fastapi uvicorn httpx pydantic pydantic-settings python-dotenv 
-        uv pip install --system google-generativeai python-jose[cryptography] python-multipart
+        uv pip install fastapi uvicorn httpx pydantic pydantic-settings python-dotenv 
+        uv pip install google-generativeai python-jose[cryptography] python-multipart
         
         # 3. Camada de Memória (Dados)
-        uv pip install --system sqlmodel
+        uv pip install sqlmodel
         
         # 4. Ferramentas de Teste
-        uv pip install --system pytest pytest-cov mock
+        uv pip install pytest pytest-cov mock
         
         # 5. System Automation (needed for setup wizard)
-        uv pip install --system pyperclip==1.8.2
+        uv pip install pyperclip==1.8.2
         
         # Mantemos a instalação via requirements se existir, mas com '|| true' para não travar o build
-        if [ -d requirements ]; then uv pip install --system -r requirements/core.txt || true; fi
+        if [ -d requirements ]; then uv pip install -r requirements/core.txt || true; fi
 
     - name: Run Tests
       run: |
