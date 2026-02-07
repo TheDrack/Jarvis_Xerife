@@ -29,10 +29,29 @@ class TestHeadlessEnvironment:
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
             assert _is_headless_environment() is True
 
-    def test_headless_detection_with_port(self):
-        """Test that cloud environment (Render) is detected as headless"""
-        with patch.dict(os.environ, {"PORT": "8000"}):
+    def test_headless_detection_with_render(self):
+        """Test that Render cloud environment is detected as headless"""
+        with patch.dict(os.environ, {"PORT": "8000", "RENDER": "true"}):
             assert _is_headless_environment() is True
+
+    def test_headless_detection_with_heroku(self):
+        """Test that Heroku cloud environment is detected as headless"""
+        with patch.dict(os.environ, {"PORT": "8000", "DYNO": "web.1"}):
+            assert _is_headless_environment() is True
+
+    def test_headless_detection_port_only_not_headless(self):
+        """Test that PORT alone (without cloud indicators) is not considered headless"""
+        # Clear all other environment variables that might trigger headless
+        with patch.dict(os.environ, {"PORT": "8000"}, clear=True):
+            # Remove pytest from modules temporarily
+            pytest_module = sys.modules.pop("pytest", None)
+            try:
+                # Should return False because PORT alone is not enough
+                assert _is_headless_environment() is False
+            finally:
+                # Restore pytest module
+                if pytest_module is not None:
+                    sys.modules["pytest"] = pytest_module
 
     def test_container_uses_dummy_provider_in_headless(self):
         """Test that container uses DummyVoiceProvider in headless environment"""

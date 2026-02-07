@@ -33,7 +33,9 @@ def _is_headless_environment() -> bool:
         return True
     
     # Check if running on cloud platform (Render, Heroku, etc.)
-    if os.getenv("PORT"):
+    # Render sets both PORT and RENDER environment variables
+    # Heroku sets both PORT and DYNO environment variables
+    if os.getenv("PORT") and (os.getenv("RENDER") or os.getenv("DYNO") or os.getenv("RENDER_SERVICE_NAME")):
         return True
     
     return False

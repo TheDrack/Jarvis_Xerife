@@ -28,9 +28,6 @@ class TestJarvisEngine:
 
     def test_speak(self):
         """Test speak method"""
-        # We need to patch at the module where it's used, not where it's defined
-        from unittest.mock import Mock, patch
-        
         # Create a mock engine with say and runAndWait methods
         mock_engine = Mock()
         
