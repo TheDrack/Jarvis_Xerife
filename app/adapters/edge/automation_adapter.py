@@ -5,13 +5,6 @@ import logging
 import time
 from typing import Optional
 
-try:
-    import pyautogui
-
-    PYAUTOGUI_AVAILABLE = True
-except ImportError:
-    PYAUTOGUI_AVAILABLE = False
-
 from app.application.ports import ActionProvider
 
 logger = logging.getLogger(__name__)
@@ -34,8 +27,15 @@ class AutomationAdapter(ActionProvider):
         self.pause = pause
         self.search_timeout = search_timeout
 
-        if PYAUTOGUI_AVAILABLE:
+        # Lazy import of pyautogui to reduce startup memory usage
+        try:
+            import pyautogui
+            self._pyautogui = pyautogui
+            self._pyautogui_available = True
             pyautogui.PAUSE = pause
+        except ImportError:
+            self._pyautogui = None
+            self._pyautogui_available = False
 
     def type_text(self, text: str) -> None:
         """
@@ -49,7 +49,7 @@ class AutomationAdapter(ActionProvider):
             return
 
         try:
-            pyautogui.write(text)
+            self._pyautogui.write(text)
         except Exception as e:
             logger.error(f"Error typing text: {e}")
 
@@ -65,7 +65,7 @@ class AutomationAdapter(ActionProvider):
             return
 
         try:
-            pyautogui.press(key)
+            self._pyautogui.press(key)
         except Exception as e:
             logger.error(f"Error pressing key: {e}")
 
@@ -91,7 +91,7 @@ class AutomationAdapter(ActionProvider):
             return
 
         try:
-            pyautogui.hotkey(*keys)
+            self._pyautogui.hotkey(*keys)
         except Exception as e:
             logger.error(f"Error pressing hotkey: {e}")
 
@@ -110,7 +110,7 @@ class AutomationAdapter(ActionProvider):
             return
 
         try:
-            pyautogui.click(x, y, button=button, clicks=clicks)
+            self._pyautogui.click(x, y, button=button, clicks=clicks)
         except Exception as e:
             logger.error(f"Error clicking: {e}")
 
@@ -137,9 +137,9 @@ class AutomationAdapter(ActionProvider):
 
         while attempts < max_attempts:
             try:
-                location = pyautogui.locateCenterOnScreen(image_path)
+                location = self._pyautogui.locateCenterOnScreen(image_path)
                 if location:
-                    pyautogui.moveTo(location)
+                    self._pyautogui.moveTo(location)
                     logger.info(f"Image {image_path} found at position: {location}")
                     return location
             except Exception as e:
@@ -158,4 +158,4 @@ class AutomationAdapter(ActionProvider):
         Returns:
             True if automation services are available
         """
-        return PYAUTOGUI_AVAILABLE
+        return self._pyautogui_available
