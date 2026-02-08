@@ -112,9 +112,9 @@ class AssistantService:
 
         # Handle unknown commands with conversational AI if available
         if intent.command_type == CommandType.UNKNOWN:
-            # Debug prints for fallback logic
-            print(f"DEBUG: Gemini Adapter status: {self.gemini_adapter is not None}")
-            print(f"DEBUG: Intent command type: {intent.command_type}")
+            # Log debug information
+            logger.debug(f"Gemini Adapter status: {self.gemini_adapter is not None}")
+            logger.debug(f"Intent command type: {intent.command_type}")
             
             # Check if interpreter has conversational capability (LLMCommandAdapter)
             if hasattr(self.interpreter, 'generate_conversational_response'):
@@ -124,7 +124,10 @@ class AssistantService:
                     if asyncio.iscoroutinefunction(self.interpreter.generate_conversational_response):
                         # The method is async, so we need to handle it properly
                         # This will be called from the async version of process_command
-                        raise RuntimeError("Async method called from sync context - use async_process_command instead")
+                        raise RuntimeError(
+                            "Cannot call async generate_conversational_response from sync context - "
+                            "use async_process_command instead"
+                        )
                     else:
                         conversational_response = self.interpreter.generate_conversational_response(user_input)
                     
@@ -190,9 +193,9 @@ class AssistantService:
 
         # Handle unknown commands with conversational AI if available
         if intent.command_type == CommandType.UNKNOWN:
-            # Debug prints for fallback logic
-            print(f"DEBUG: Gemini Adapter status: {self.gemini_adapter is not None}")
-            print(f"DEBUG: Intent command type: {intent.command_type}")
+            # Log debug information
+            logger.debug(f"Gemini Adapter status: {self.gemini_adapter is not None}")
+            logger.debug(f"Intent command type: {intent.command_type}")
             
             # Check if interpreter has conversational capability (LLMCommandAdapter)
             if hasattr(self.interpreter, 'generate_conversational_response'):
