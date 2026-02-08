@@ -246,3 +246,88 @@ print('done')
         assert result_dict["execution_time"] == 1.5
         assert result_dict["error"] is None
         assert result_dict["metadata"] == {"key": "value"}
+
+    def test_task_runner_with_sandbox_mode(self):
+        """Test TaskRunner initialization with sandbox mode"""
+        cache_dir = Path(tempfile.mkdtemp(prefix="test_sandbox_"))
+        runner = TaskRunner(
+            cache_dir=cache_dir,
+            use_venv=False,
+            sandbox_mode=True,
+        )
+        
+        assert runner.sandbox_mode is True
+        assert runner.sandbox_dir.exists()
+        assert "sandbox" in str(runner.sandbox_dir)
+
+    def test_task_runner_with_budget_cap(self):
+        """Test TaskRunner initialization with budget cap"""
+        cache_dir = Path(tempfile.mkdtemp(prefix="test_budget_"))
+        runner = TaskRunner(
+            cache_dir=cache_dir,
+            use_venv=False,
+            budget_cap_usd=50.0,
+        )
+        
+        assert runner.budget_cap_usd == 50.0
+        assert runner.total_cost_usd == 0.0
+        assert runner.is_within_budget() is True
+
+    def test_track_mission_cost(self):
+        """Test mission cost tracking"""
+        cache_dir = Path(tempfile.mkdtemp(prefix="test_cost_"))
+        runner = TaskRunner(cache_dir=cache_dir, use_venv=False, budget_cap_usd=10.0)
+        
+        # Track some costs
+        runner.track_mission_cost("mission_1", 2.5)
+        runner.track_mission_cost("mission_2", 3.0)
+        runner.track_mission_cost("mission_1", 1.5)  # Additional cost for mission_1
+        
+        # Check totals
+        assert runner.get_mission_cost("mission_1") == 4.0
+        assert runner.get_mission_cost("mission_2") == 3.0
+        assert runner.get_total_cost() == 7.0
+        assert runner.is_within_budget() is True
+
+    def test_budget_exceeded(self):
+        """Test budget cap enforcement"""
+        cache_dir = Path(tempfile.mkdtemp(prefix="test_budget_exceed_"))
+        runner = TaskRunner(cache_dir=cache_dir, use_venv=False, budget_cap_usd=5.0)
+        
+        # Track costs that exceed budget
+        runner.track_mission_cost("mission_1", 3.0)
+        runner.track_mission_cost("mission_2", 4.0)
+        
+        # Should exceed budget
+        assert runner.get_total_cost() == 7.0
+        assert runner.is_within_budget() is False
+
+    def test_budget_status(self):
+        """Test budget status reporting"""
+        cache_dir = Path(tempfile.mkdtemp(prefix="test_status_"))
+        runner = TaskRunner(cache_dir=cache_dir, use_venv=False, budget_cap_usd=100.0)
+        
+        runner.track_mission_cost("mission_1", 25.0)
+        runner.track_mission_cost("mission_2", 35.0)
+        
+        status = runner.get_budget_status()
+        
+        assert status["total_cost_usd"] == 60.0
+        assert status["budget_cap_usd"] == 100.0
+        assert status["remaining_usd"] == 40.0
+        assert status["within_budget"] is True
+        assert status["missions_tracked"] == 2
+
+    def test_budget_status_no_cap(self):
+        """Test budget status when no cap is set"""
+        cache_dir = Path(tempfile.mkdtemp(prefix="test_no_cap_"))
+        runner = TaskRunner(cache_dir=cache_dir, use_venv=False)
+        
+        runner.track_mission_cost("mission_1", 100.0)
+        
+        status = runner.get_budget_status()
+        
+        assert status["total_cost_usd"] == 100.0
+        assert status["budget_cap_usd"] is None
+        assert status["remaining_usd"] is None
+        assert status["within_budget"] is True

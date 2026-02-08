@@ -65,12 +65,21 @@ class TaskRunner:
     - Captures stdout/stderr from script execution
     - Supports environment persistence for repeated executions
     - Integrates with library cache to avoid repeated downloads
+    - Sandbox mode for safe execution of untrusted code
+    - Budget tracking for cost control
     """
     
     # Maximum length of stderr to include in error messages (prevents log bloat)
     MAX_ERROR_LENGTH = 200
     
-    def __init__(self, cache_dir: Optional[Path] = None, use_venv: bool = True, device_id: Optional[str] = None):
+    def __init__(
+        self,
+        cache_dir: Optional[Path] = None,
+        use_venv: bool = True,
+        device_id: Optional[str] = None,
+        sandbox_mode: bool = False,
+        budget_cap_usd: Optional[float] = None,
+    ):
         """
         Initialize the TaskRunner
         
@@ -78,9 +87,17 @@ class TaskRunner:
             cache_dir: Optional directory for caching libraries and environments
             use_venv: Whether to use virtual environments (default: True)
             device_id: Optional device identifier for logging context
+            sandbox_mode: Enable sandbox mode for safer code execution (default: False)
+            budget_cap_usd: Optional budget cap in USD for mission execution
         """
         self.use_venv = use_venv
         self.device_id = device_id or "unknown"
+        self.sandbox_mode = sandbox_mode
+        self.budget_cap_usd = budget_cap_usd
+        
+        # Budget tracking
+        self.total_cost_usd = 0.0
+        self.mission_costs = {}  # Track cost per mission_id
         
         # Setup cache directory
         if cache_dir:
@@ -88,8 +105,14 @@ class TaskRunner:
         else:
             self.cache_dir = Path(tempfile.gettempdir()) / "jarvis_task_cache"
         
+        # Setup sandbox directory if enabled
+        if self.sandbox_mode:
+            self.sandbox_dir = self.cache_dir / "sandbox"
+            self.sandbox_dir.mkdir(parents=True, exist_ok=True)
+        
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"TaskRunner initialized with cache directory: {self.cache_dir}")
+        logger.info(f"TaskRunner initialized with cache directory: {self.cache_dir}, "
+                   f"sandbox_mode={sandbox_mode}, budget_cap=${budget_cap_usd or 'unlimited'}")
     
     def execute_mission(self, mission: Mission, session_id: Optional[str] = None) -> MissionResult:
         """
@@ -445,3 +468,71 @@ class TaskRunner:
                         
         except Exception as e:
             logger.error(f"Error cleaning cache: {e}")
+    
+    def track_mission_cost(self, mission_id: str, cost_usd: float) -> None:
+        """
+        Track cost for a mission execution
+        
+        Args:
+            mission_id: Mission identifier
+            cost_usd: Cost in USD
+        """
+        if mission_id not in self.mission_costs:
+            self.mission_costs[mission_id] = 0.0
+        
+        self.mission_costs[mission_id] += cost_usd
+        self.total_cost_usd += cost_usd
+        
+        logger.info(f"Mission cost tracked: {mission_id}=${cost_usd:.4f}, "
+                   f"total=${self.total_cost_usd:.4f}")
+        
+        # Check budget cap
+        if self.budget_cap_usd and self.total_cost_usd > self.budget_cap_usd:
+            logger.warning(f"Budget cap exceeded: ${self.total_cost_usd:.2f} > ${self.budget_cap_usd:.2f}")
+    
+    def get_mission_cost(self, mission_id: str) -> float:
+        """
+        Get total cost for a specific mission
+        
+        Args:
+            mission_id: Mission identifier
+        
+        Returns:
+            Total cost in USD
+        """
+        return self.mission_costs.get(mission_id, 0.0)
+    
+    def get_total_cost(self) -> float:
+        """
+        Get total cost across all missions
+        
+        Returns:
+            Total cost in USD
+        """
+        return self.total_cost_usd
+    
+    def is_within_budget(self) -> bool:
+        """
+        Check if total cost is within budget cap
+        
+        Returns:
+            True if within budget or no cap set
+        """
+        if not self.budget_cap_usd:
+            return True
+        return self.total_cost_usd <= self.budget_cap_usd
+    
+    def get_budget_status(self) -> dict:
+        """
+        Get current budget status
+        
+        Returns:
+            Dictionary with budget information
+        """
+        return {
+            "total_cost_usd": self.total_cost_usd,
+            "budget_cap_usd": self.budget_cap_usd,
+            "remaining_usd": (self.budget_cap_usd - self.total_cost_usd) if self.budget_cap_usd else None,
+            "within_budget": self.is_within_budget(),
+            "missions_tracked": len(self.mission_costs),
+        }

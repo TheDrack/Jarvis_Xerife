@@ -114,6 +114,50 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
 - **Type Safety**: Full type hinting throughout the codebase
 - **Comprehensive Testing**: 60+ passing tests covering domain, application, and adapter layers
 
+### 🎯 Xerife Strategist - Sistema de Propostas Autônomas
+
+O **Xerife Strategist** é um módulo avançado que dá ao Jarvis a capacidade de propor e implementar melhorias de forma autônoma, mas sob rigoroso filtro de custo-benefício e segurança.
+
+**Características Principais:**
+- 📊 **Análise de Viabilidade (ROI)**: Matriz tridimensional de Custo/Impacto/Risco antes de qualquer implementação
+- 💰 **Budget Cap**: Teto de gastos por missão com rastreamento de custos de API e tokens
+- 🔒 **Sandbox Mode**: Execução segura de código gerado em ambiente isolado
+- 📝 **RFC Automático**: Geração de Request for Comments para propostas aprovadas
+- 🧠 **Monólogo Interno**: Decisões autônomas seguem filtros rigorosos (ROI mínimo, nível de risco)
+- 🛡️ **Travas de Segurança**: Rejeita automaticamente propostas com risco CRITICAL ou security concerns sem mitigação
+- 📈 **Análise de Logs**: Sugestões de refatoração preventiva baseadas em padrões de erro
+- 🎭 **Interface de Decisão**: Prompts formatados para aprovação do comandante antes da implementação
+
+**Exemplo de Uso:**
+
+```python
+from app.application.services.strategist_service import StrategistService
+from app.domain.models.viability import CostEstimate, ImpactEstimate, RiskEstimate, ImpactLevel, RiskLevel
+
+strategist = StrategistService(default_budget_cap=10.0, min_roi_threshold=0.5)
+
+matrix = strategist.generate_viability_matrix(
+    proposal_title="Adicionar Redis Cache",
+    proposal_description="Implementar cache distribuído para melhorar performance",
+    cost=CostEstimate(api_cost_usd=0.10, development_time_hours=3.0),
+    impact=ImpactEstimate(performance_gain_percent=35.0, user_utility_level=ImpactLevel.HIGH),
+    risk=RiskEstimate(risk_level=RiskLevel.MEDIUM, mitigation_strategy="Adicionar testes de regressão"),
+)
+
+if matrix.is_viable():
+    rfc_path = strategist.generate_rfc(matrix)
+    prompt = strategist.format_decision_prompt(matrix)
+    print(prompt)  # Pede aprovação ao comandante
+```
+
+**Demo Interativo:**
+```bash
+python demo_xerife_strategist.py
+```
+
+Para documentação completa, veja [docs/XERIFE_STRATEGIST.md](docs/XERIFE_STRATEGIST.md).
+
+
 ## Project Structure
 
 ```
