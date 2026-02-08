@@ -50,7 +50,7 @@ class CommandResult(SQLModel, table=True):
     __tablename__ = "command_results"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    command_id: int = Field(nullable=False, index=True)  # Reference to interaction/command, no FK constraint to avoid circular dependency
+    command_id: int = Field(nullable=False, index=True)  # References interactions.id (Interaction table in infrastructure layer). No FK constraint to avoid circular dependency between domain and infrastructure layers.
     executor_device_id: Optional[int] = Field(foreign_key="devices.id", nullable=True, index=True)
     result_data: str = Field(default="{}", nullable=False)  # JSON string for result data
     success: bool = Field(default=False, nullable=False)

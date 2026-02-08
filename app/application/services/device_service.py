@@ -391,7 +391,8 @@ class DeviceService:
                 reason = ""
                 
                 # Scenario 1: Source on mobile network (4G/5G), target on fixed network (WiFi/Ethernet)
-                if (source_device.network_type in ["4g", "5g"] and 
+                if (source_device.network_type and target_device.network_type and
+                    source_device.network_type in ["4g", "5g"] and 
                     target_device.network_type in ["wifi", "ethernet"]):
                     requires_confirmation = True
                     reason = (
