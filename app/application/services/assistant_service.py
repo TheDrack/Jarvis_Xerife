@@ -94,12 +94,13 @@ class AssistantService:
                 logger.error(f"Error in main loop: {e}")
                 continue
 
-    def process_command(self, user_input: str) -> Response:
+    def process_command(self, user_input: str, request_metadata: Optional[Dict[str, Any]] = None) -> Response:
         """
         Process a single command
 
         Args:
             user_input: Raw user input
+            request_metadata: Optional metadata containing source_device_id and network_id for context-aware routing
 
         Returns:
             Response object with execution result
@@ -146,12 +147,21 @@ class AssistantService:
         command = self.processor.create_command(intent)
 
         # Execute the command with device routing if applicable
-        response = self._execute_command(command.intent.command_type, command.intent.parameters)
+        response = self._execute_command(
+            command.intent.command_type,
+            command.intent.parameters,
+            request_metadata=request_metadata,
+        )
         # Add command metadata to response for history tracking
         if response.data is None:
             response.data = {}
         response.data["command_type"] = command.intent.command_type.value
         response.data["parameters"] = command.intent.parameters
+        
+        # Store request metadata in response for context tracking
+        if request_metadata:
+            response.data["request_metadata"] = request_metadata
+        
         self._add_to_history(user_input, response)
         return response
 
@@ -213,26 +223,61 @@ class AssistantService:
         self.voice.speak("Fechando assistente, até a próxima...")
         logger.info("Assistant stopped")
 
-    def _execute_command(self, command_type: CommandType, params: dict) -> Response:
+    def _execute_command(self, command_type: CommandType, params: dict, request_metadata: Optional[Dict[str, Any]] = None) -> Response:
         """
         Execute a command based on its type with device routing support
 
         Args:
             command_type: Type of command to execute
             params: Command parameters
+            request_metadata: Optional metadata for context-aware routing
 
         Returns:
             Response object with execution result
         """
         try:
+            # Extract metadata for routing
+            source_device_id = None
+            network_id = None
+            if request_metadata:
+                source_device_id = request_metadata.get("source_device_id")
+                network_id = request_metadata.get("network_id")
+            
             # Check if command requires a specific device capability
             required_capability = self._get_required_capability(command_type, params)
             
             # If a capability is required and device_service is available, route to device
             if required_capability and self.device_service:
-                target_device = self.device_service.find_device_by_capability(required_capability)
+                target_device = self.device_service.find_device_by_capability(
+                    required_capability,
+                    source_device_id=source_device_id,
+                    network_id=network_id,
+                )
+                
                 if target_device:
                     logger.info(f"Routing command to device: {target_device['name']} (ID: {target_device['id']})")
+                    
+                    # Validate routing for potential conflicts
+                    validation = self.device_service.validate_device_routing(
+                        source_device_id=source_device_id,
+                        target_device_id=target_device["id"],
+                    )
+                    
+                    # If confirmation is required, return a response asking the user
+                    if validation.get("requires_confirmation"):
+                        return Response(
+                            success=False,
+                            message=validation.get("reason", "Confirmação necessária"),
+                            data={
+                                "requires_confirmation": True,
+                                "target_device_id": target_device["id"],
+                                "target_device_name": target_device["name"],
+                                "source_device_id": source_device_id,
+                                "validation": validation,
+                            },
+                            error="CONFIRMATION_REQUIRED",
+                        )
+                    
                     # Add target_device_id to response for distributed execution
                     return Response(
                         success=True,
@@ -240,6 +285,7 @@ class AssistantService:
                         data={
                             "target_device_id": target_device["id"],
                             "target_device_name": target_device["name"],
+                            "target_device_network": target_device.get("network_id"),
                             "required_capability": required_capability,
                             "requires_device_execution": True,
                         }

@@ -11,6 +11,8 @@ from fastapi.openapi.docs import get_swagger_ui_html
 from app.adapters.infrastructure.api_models import (
     CapabilityModel,
     CommandHistoryItem,
+    CommandResultRequest,
+    CommandResultResponse,
     DeviceListResponse,
     DeviceRegistrationRequest,
     DeviceRegistrationResponse,
@@ -164,7 +166,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         Execute a command and return the result (Protected endpoint)
 
         Args:
-            request: Command execution request
+            request: Command execution request with optional metadata for context-aware routing
             current_user: Current authenticated user
 
         Returns:
@@ -172,7 +174,17 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         """
         try:
             logger.info(f"User '{current_user.username}' executing command via API: {request.command}")
-            response = assistant_service.process_command(request.command)
+            
+            # Convert metadata to dict if provided
+            metadata_dict = None
+            if request.metadata:
+                metadata_dict = {
+                    "source_device_id": request.metadata.source_device_id,
+                    "network_id": request.metadata.network_id,
+                    "network_type": request.metadata.network_type,
+                }
+            
+            response = assistant_service.process_command(request.command, request_metadata=metadata_dict)
 
             return ExecuteResponse(
                 success=response.success,
@@ -457,6 +469,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 name=request.name,
                 device_type=request.type,
                 capabilities=capabilities,
+                network_id=request.network_id,
+                network_type=request.network_type,
             )
             
             if device_id is None:
@@ -501,6 +515,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                         name=device["name"],
                         type=device["type"],
                         status=device["status"],
+                        network_id=device.get("network_id"),
+                        network_type=device.get("network_type"),
                         last_seen=device["last_seen"],
                         capabilities=[
                             CapabilityModel(
@@ -548,6 +564,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 name=device["name"],
                 type=device["type"],
                 status=device["status"],
+                network_id=device.get("network_id"),
+                network_type=device.get("network_type"),
                 last_seen=device["last_seen"],
                 capabilities=[
                     CapabilityModel(
@@ -600,6 +618,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 name=device["name"],
                 type=device["type"],
                 status=device["status"],
+                network_id=device.get("network_id"),
+                network_type=device.get("network_type"),
                 last_seen=device["last_seen"],
                 capabilities=[
                     CapabilityModel(
@@ -614,6 +634,81 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             raise
         except Exception as e:
             logger.error(f"Error updating device heartbeat: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+    # Command Result Endpoint
+    
+    @app.post("/v1/commands/{command_id}/result", response_model=CommandResultResponse)
+    async def submit_command_result(
+        command_id: int,
+        result: CommandResultRequest,
+        current_user: User = Depends(get_current_user),
+    ) -> CommandResultResponse:
+        """
+        Submit command execution result from a device (Protected endpoint)
+        
+        This implements the feedback loop where devices report back execution results
+        (e.g., photo link, music player status, etc.) which can be communicated back to the user.
+        
+        Args:
+            command_id: ID of the command that was executed
+            result: Result data from command execution
+            current_user: Current authenticated user
+        
+        Returns:
+            Confirmation of result submission
+        """
+        try:
+            import json
+            from app.domain.models.device import CommandResult
+            from sqlmodel import Session
+            
+            logger.info(
+                f"User '{current_user.username}' submitting result for command {command_id} "
+                f"from device {result.executor_device_id}"
+            )
+            
+            # Save the result to the database
+            with Session(db_adapter.engine) as session:
+                command_result = CommandResult(
+                    command_id=command_id,
+                    executor_device_id=result.executor_device_id,
+                    result_data=json.dumps(result.result_data),
+                    success=result.success,
+                    message=result.message or "",
+                )
+                session.add(command_result)
+                session.commit()
+                session.refresh(command_result)
+                
+                logger.info(f"Saved command result {command_result.id} for command {command_id}")
+            
+            # Update the command status if it exists in the interactions table
+            if result.success:
+                db_adapter.update_command_status(
+                    command_id=command_id,
+                    status="completed",
+                    success=True,
+                    response_text=result.message or "Command executed successfully on device",
+                )
+            else:
+                db_adapter.update_command_status(
+                    command_id=command_id,
+                    status="failed",
+                    success=False,
+                    response_text=result.message or "Command execution failed on device",
+                )
+            
+            return CommandResultResponse(
+                success=True,
+                command_id=command_id,
+                message=f"Result for command {command_id} saved successfully",
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error submitting command result: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     
     # Override the default Swagger UI to inject custom JavaScript for password visibility toggle
