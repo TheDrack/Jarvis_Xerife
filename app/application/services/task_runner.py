@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 from typing import Optional
 
@@ -65,6 +66,9 @@ class TaskRunner:
     - Supports environment persistence for repeated executions
     - Integrates with library cache to avoid repeated downloads
     """
+    
+    # Maximum length of stderr to include in error messages (prevents log bloat)
+    MAX_ERROR_LENGTH = 200
     
     def __init__(self, cache_dir: Optional[Path] = None, use_venv: bool = True, device_id: Optional[str] = None):
         """
@@ -164,7 +168,7 @@ class TaskRunner:
                             stderr=f"Failed to install dependency: {e.package}",
                             exit_code=1,
                             execution_time=execution_time,
-                            error=f"DEPENDENCY_FAILED: {e.package} - {e.stderr[:200]}",
+                            error=f"DEPENDENCY_FAILED: {e.package} - {e.stderr[:self.MAX_ERROR_LENGTH]}",
                         )
                 
                 # Get Python executable from venv
@@ -193,7 +197,7 @@ class TaskRunner:
                             stderr=f"Failed to install dependency: {e.package}",
                             exit_code=1,
                             execution_time=execution_time,
-                            error=f"DEPENDENCY_FAILED: {e.package} - {e.stderr[:200]}",
+                            error=f"DEPENDENCY_FAILED: {e.package} - {e.stderr[:self.MAX_ERROR_LENGTH]}",
                         )
             
             # Execute the script
@@ -225,7 +229,6 @@ class TaskRunner:
             return mission_result
             
         except Exception as e:
-            import traceback
             execution_time = time.time() - start_time
             tb = traceback.format_exc()
             log.error("mission_failed", 
