@@ -37,6 +37,10 @@ class GatewayLLMCommandAdapter:
         "Responda de forma conversacional em português brasileiro."
     )
     
+    # Default model for auto-fix recommendations
+    # Update this when new models are released
+    RECOMMENDED_GEMINI_MODEL = "gemini-2.0-flash-exp"
+    
     def __init__(
         self,
         groq_api_key: Optional[str] = None,
@@ -468,6 +472,8 @@ Se não for possível auto-correção, explique o motivo.
             plan["file_path"] = "app/adapters/infrastructure/gemini_adapter.py"
             
             # Read current file to create a fix
+            # Note: Assumes current working directory is the repository root
+            # This is true for GitHub Actions runners and typical deployment scenarios
             file_path = os.path.join(os.getcwd(), plan["file_path"])
             try:
                 with open(file_path, "r") as f:
@@ -476,14 +482,15 @@ Se não for possível auto-correção, explique o motivo.
                 # Simple fix: replace deprecated model name with word boundaries
                 # This ensures we don't replace parts of other strings
                 import re
+                new_model = self.RECOMMENDED_GEMINI_MODEL
                 fixed_code = re.sub(
                     r'\bmodel_name:\s*str\s*=\s*"gemini-flash-latest"',
-                    'model_name: str = "gemini-2.0-flash-exp"',
+                    f'model_name: str = "{new_model}"',
                     current_code
                 )
                 fixed_code = re.sub(
                     r'\bgemini_model:\s*str\s*=\s*"gemini-flash-latest"',
-                    'gemini_model: str = "gemini-2.0-flash-exp"',
+                    f'gemini_model: str = "{new_model}"',
                     fixed_code
                 )
                 
