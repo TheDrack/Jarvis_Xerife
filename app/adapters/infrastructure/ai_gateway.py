@@ -7,6 +7,7 @@ This gateway implements:
 - Automatic Fallback: Transparent migration from Groq to Gemini on rate limits
 """
 
+import asyncio
 import logging
 import os
 from enum import Enum
@@ -237,7 +238,7 @@ class AIGateway:
         
         raise ValueError("No LLM providers available")
     
-    def generate_completion(
+    async def generate_completion(
         self,
         messages: List[Dict[str, str]],
         functions: Optional[List[Any]] = None,
@@ -268,9 +269,9 @@ class AIGateway:
         
         try:
             if provider == LLMProvider.GROQ:
-                return self._generate_with_groq(messages, functions)
+                return await self._generate_with_groq(messages, functions)
             else:
-                return self._generate_with_gemini(messages, functions)
+                return await self._generate_with_gemini(messages, functions)
         except Exception as e:
             # Check if it's a model decommissioned error
             if self._is_model_decommissioned_error(e):
@@ -284,17 +285,17 @@ class AIGateway:
                 # Try to fallback to Gemini if available
                 if provider == LLMProvider.GROQ and self.gemini_client:
                     logger.warning("Tentando fallback para Gemini devido a modelo descomissionado")
-                    return self._handle_rate_limit_fallback(provider, messages, functions)
+                    return await self._handle_rate_limit_fallback(provider, messages, functions)
                 raise ValueError(error_msg) from e
             # Check if it's a rate limit error
             elif self._is_rate_limit_error(e):
                 logger.warning(f"Rate limit hit on {provider.value}, attempting fallback")
-                return self._handle_rate_limit_fallback(provider, messages, functions)
+                return await self._handle_rate_limit_fallback(provider, messages, functions)
             else:
                 logger.error(f"Error generating completion with {provider.value}: {e}")
                 raise
     
-    def _generate_with_groq(
+    async def _generate_with_groq(
         self,
         messages: List[Dict[str, str]],
         functions: Optional[List[Any]] = None,
@@ -328,8 +329,12 @@ class AIGateway:
                 request_params["tools"] = tools
                 request_params["tool_choice"] = "auto"
         
-        # Make the request
-        response = self.groq_client.chat.completions.create(**request_params)
+        # Make the request using run_in_executor to avoid blocking the event loop
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None, 
+            lambda: self.groq_client.chat.completions.create(**request_params)
+        )
         
         return {
             "provider": LLMProvider.GROQ.value,
@@ -337,7 +342,7 @@ class AIGateway:
             "model": self.groq_model,
         }
     
-    def _generate_with_gemini(
+    async def _generate_with_gemini(
         self,
         messages: List[Dict[str, str]],
         functions: Optional[List[Any]] = None,
@@ -379,11 +384,15 @@ class AIGateway:
             tools = [genai.types.Tool(function_declarations=functions)]
             config_params["tools"] = tools
         
-        # Make the request
-        response = self.gemini_client.models.generate_content(
-            model=self.gemini_model,
-            contents=content,
-            config=genai.types.GenerateContentConfig(**config_params) if config_params else None,
+        # Make the request using run_in_executor to avoid blocking the event loop
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: self.gemini_client.models.generate_content(
+                model=self.gemini_model,
+                contents=content,
+                config=genai.types.GenerateContentConfig(**config_params) if config_params else None,
+            )
         )
         
         return {
@@ -488,7 +497,7 @@ class AIGateway:
             for keyword in ["model_decommissioned", "decommissioned", "model has been deprecated"]
         )
     
-    def _handle_rate_limit_fallback(
+    async def _handle_rate_limit_fallback(
         self,
         failed_provider: LLMProvider,
         messages: List[Dict[str, str]],
@@ -509,13 +518,13 @@ class AIGateway:
         if failed_provider == LLMProvider.GROQ:
             if self.gemini_client:
                 logger.info("Groq rate limit reached, falling back to Gemini")
-                response = self._generate_with_gemini(messages, functions)
+                response = await self._generate_with_gemini(messages, functions)
                 response["fallback_from"] = LLMProvider.GROQ.value
                 return response
         elif failed_provider == LLMProvider.GEMINI:
             if self.groq_client:
                 logger.info("Gemini rate limit reached, falling back to Groq")
-                response = self._generate_with_groq(messages, functions)
+                response = await self._generate_with_groq(messages, functions)
                 response["fallback_from"] = LLMProvider.GEMINI.value
                 return response
         
