@@ -1,7 +1,18 @@
-# Jarvis Voice Assistant
+# Jarvis Voice Assistant - Orquestrador de Dispositivos Distribuído
 [![Python Tests](https://github.com/TheDrack/python/actions/workflows/python-tests.yml/badge.svg?branch=main)](https://github.com/TheDrack/python/actions/workflows/python-tests.yml)
 
 > **Note**: O badge de status do GitHub Actions só é visível para usuários autenticados com acesso a este repositório privado. Clique no badge para ver os resultados dos testes.
+
+## 🧠 Visão Geral
+
+**Jarvis evoluiu!** Não é apenas uma API ou assistente de voz - é um **cérebro na nuvem** que coordena múltiplos dispositivos ("Soldados") através de um sistema inteligente de **orquestração distribuída baseada em capacidades**.
+
+Imagine um xerife que gerencia uma cidade inteira de dispositivos - celulares, PCs, Raspberry Pi, dispositivos IoT - cada um com suas próprias habilidades. Jarvis identifica qual dispositivo está mais próximo e adequado para cada tarefa, considerando:
+- 🎯 **Localização física** (GPS)
+- 🌐 **Proximidade de rede** (mesmo WiFi/IP)
+- ⚡ **Capacidades disponíveis** (câmera, automação, controle IR, etc.)
+
+**Exemplo Real**: Você está viajando e diz "tire uma selfie" - Jarvis usa a câmera do seu celular atual, não o PC em casa. Mas quando diz "ligue a TV", ele roteia para o dispositivo IoT na mesma sala.
 
 A professional, modular voice assistant built with Python, featuring **Hexagonal Architecture** for clean separation between business logic and infrastructure.
 
@@ -69,24 +80,36 @@ This project follows **Hexagonal Architecture** (Ports and Adapters) pattern:
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
 
-## Features
+## ✨ Features Principais
 
+### 🎯 Orquestração Inteligente de Dispositivos
+- **Roteamento por Capacidades**: Jarvis sabe quais dispositivos podem fazer o quê (câmera, automação, controle IoT)
+- **Hierarquia de Proximidade**: Prioriza dispositivos usando 3 níveis:
+  1. ✅ **Mesmo Dispositivo** - Se o dispositivo de origem tem a capacidade
+  2. 🌐 **Mesma Rede/IP** - Dispositivos no mesmo WiFi ou IP público
+  3. 📍 **GPS Próximo** - Dispositivos fisicamente próximos (<1km, <50km)
+- **Conscientização Espacial**: O "Xerife" sempre considera sua localização física antes de agir
+- **Validação de Conflitos**: Pede confirmação ao rotear comandos para dispositivos distantes (>50km) ou em redes diferentes
+
+### 🤖 Inteligência Artificial
 - **🎭 Personalidade Selecionável**: Escolha o nome e customize o comportamento do seu assistente durante a instalação
 - **🚀 Setup Wizard Interativo**: Instalação guiada com captura automática de credenciais e validação
 - **Voice Recognition**: Brazilian Portuguese (pt-BR) voice commands using Google Speech Recognition
 - **Text-to-Speech**: Natural voice synthesis with pyttsx3
 - **Dual Command Interpretation**: 
   - Rule-based pattern matching for fast, reliable command processing
-  - Gemini AI integration for natural language understanding (see [LLM_INTEGRATION.md](LLM_INTEGRATION.md))
+  - Gemini AI integration with spatial awareness for natural language understanding (see [LLM_INTEGRATION.md](LLM_INTEGRATION.md))
 - **System Automation**: Interface control using PyAutoGUI and Keyboard
 - **Web Navigation**: Browser automation and URL handling
-- **REST API**: FastAPI-based headless control interface with authentication (see [API_README.md](API_README.md))
-- **Distributed Mode**: Cloud API with local workers for remote command execution (see [DISTRIBUTED_MODE.md](DISTRIBUTED_MODE.md))
+
+### 🏗️ Arquitetura & Deployment
+- **REST API**: FastAPI-based headless control interface with authentication and device management (see [API_README.md](API_README.md))
+- **Distributed Mode**: Cloud brain orchestrates local "soldiers" (devices) via capabilities (see [DISTRIBUTED_MODE.md](DISTRIBUTED_MODE.md))
 - **Hexagonal Architecture**: Clean separation with Domain, Application, and Adapters layers (see [ARCHITECTURE.md](ARCHITECTURE.md))
 - **Cloud Ready**: Core logic runs without hardware dependencies (97-100% domain test coverage)
 - **Dependency Injection**: All dependencies injected via container
 - **Docker Support**: Containerized deployment with Docker Compose and PostgreSQL
-- **Database Integration**: SQLModel with PostgreSQL and SQLite support
+- **Database Integration**: SQLModel with PostgreSQL and SQLite support for device registry and history
 - **Modular Requirements**: Separate dependency files for edge, cloud, and development scenarios
 - **Type Safety**: Full type hinting throughout the codebase
 - **Comprehensive Testing**: 60+ passing tests covering domain, application, and adapter layers
@@ -536,6 +559,65 @@ If you get import errors:
 - Make sure you're in the virtual environment
 - Install correct requirements file for your deployment
 - Check Python version (3.11+ recommended)
+
+## 📚 Quick Reference: Distributed Orchestration
+
+### Device Registration (for "Soldiers")
+
+```bash
+# 1. Get authentication token
+curl -X POST "http://localhost:8000/token" \
+  -d "username=admin&password=admin"
+
+# 2. Register your device
+curl -X POST "http://localhost:8000/v1/devices/register" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "MyPhone",
+    "type": "mobile",
+    "capabilities": [
+      {"name": "camera", "description": "12MP camera"},
+      {"name": "type_text", "description": "Virtual keyboard"}
+    ],
+    "network_id": "Home-WiFi",
+    "network_type": "wifi",
+    "lat": -23.5505,
+    "lon": -46.6333
+  }'
+
+# 3. Send heartbeat every 30-60 seconds
+curl -X PUT "http://localhost:8000/v1/devices/{device_id}/heartbeat" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"status": "online"}'
+```
+
+### Sending Commands with Context
+
+```bash
+# Command will be routed intelligently based on capabilities and location
+curl -X POST "http://localhost:8000/v1/execute" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "command": "tire uma selfie",
+    "metadata": {
+      "source_device_id": 42,
+      "network_id": "Home-WiFi"
+    }
+  }'
+```
+
+### Device Routing Hierarchy
+
+```
+🎯 Jarvis chooses device using this priority:
+  100 → Same Device (if has capability)
+   80 → Same Network (WiFi SSID or public IP)
+   70 → Very Close (<1km GPS distance)
+   40 → Same City (<50km GPS distance)
+   10 → Other online devices (asks confirmation)
+```
 
 ## Documentation
 
