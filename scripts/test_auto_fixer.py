@@ -27,13 +27,13 @@ if __name__ == "__main__":
     main()
 """
 
-TEST_ERROR_MESSAGE = """Error in File "data/test_error.py", line 3, in calculate_sum
+TEST_ERROR_MESSAGE = """Error in File "data/test_error.py", line 5, in calculate_sum
     result = a + b
              ^
-NoneType: 'NoneType' object is not iterable
+NoneType: 'NoneType' object has no attribute '__iter__'
 
 The function calculate_sum returns None because there is no return statement.
-This causes an error when trying to use the result.
+This causes an error when trying to use the result in line 8.
 """
 
 

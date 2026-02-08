@@ -73,6 +73,8 @@ python scripts/auto_fixer_logic.py
 
 3. **Python Dependencies:**
    ```bash
+   # Install AI libraries
+   # Note: Install with 'pip install google-genai', import as 'from google import genai'
    pip install groq google-genai
    ```
 

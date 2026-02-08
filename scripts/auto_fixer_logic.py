@@ -224,6 +224,7 @@ Return ONLY the corrected code, nothing else."""
             return None
         
         try:
+            # Note: Install with 'pip install google-genai', import as 'from google import genai'
             from google import genai
             
             client = genai.Client(api_key=self.gemini_api_key)
@@ -390,7 +391,7 @@ Return ONLY the corrected code, nothing else."""
             )
             
             if result.returncode == 0:
-                logger.info(f"✓ Committed changes: {commit_message.split(chr(10))[0]}")
+                logger.info(f"✓ Committed changes: {commit_message.split('\n')[0]}")
                 return True
             else:
                 logger.error(f"Failed to commit: {result.stderr}")
