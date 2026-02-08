@@ -31,7 +31,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install httpx openai 
+          pip install httpx openai groq 
 
       - name: Run Auto-Fix Script
         env:
