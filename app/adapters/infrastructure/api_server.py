@@ -30,6 +30,11 @@ from app.adapters.infrastructure.api_models import (
     CommandResultResponse,
     DeviceStatusUpdate,
     CapabilityModel,
+    ThoughtLogRequest,
+    ThoughtLogResponse,
+    ThoughtLogListResponse,
+    GitHubWorkerRequest,
+    GitHubWorkerResponse,
 )
 from app.adapters.infrastructure.auth_adapter import AuthAdapter
 from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
@@ -984,5 +989,277 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         except Exception as e:
             logger.error(f"Error starting automation recording: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Recording failed: {str(e)}")
+    
+    # Self-Healing Orchestrator Endpoints
+    
+    # Initialize ThoughtLog service
+    from app.application.services.thought_log_service import ThoughtLogService
+    thought_log_service = ThoughtLogService(engine=db_adapter.engine)
+    
+    @app.post("/v1/thoughts", response_model=api_models.ThoughtLogResponse)
+    async def create_thought_log(
+        request: api_models.ThoughtLogRequest,
+        current_user: User = Depends(get_current_user),
+    ) -> api_models.ThoughtLogResponse:
+        """
+        Create a thought log entry (Protected endpoint)
+        
+        Args:
+            request: Thought log creation request
+            current_user: Current authenticated user
+            
+        Returns:
+            Created thought log
+        """
+        try:
+            from app.domain.models.thought_log import InteractionStatus
+            
+            logger.info(f"User '{current_user.username}' creating thought log for mission {request.mission_id}")
+            
+            thought = thought_log_service.create_thought(
+                mission_id=request.mission_id,
+                session_id=request.session_id,
+                thought_process=request.thought_process,
+                problem_description=request.problem_description,
+                solution_attempt=request.solution_attempt,
+                status=InteractionStatus(request.status),
+                success=request.success,
+                error_message=request.error_message,
+                context_data=request.context_data,
+            )
+            
+            if thought:
+                return api_models.ThoughtLogResponse(
+                    id=thought.id,
+                    mission_id=thought.mission_id,
+                    session_id=thought.session_id,
+                    status=thought.status,
+                    thought_process=thought.thought_process,
+                    problem_description=thought.problem_description,
+                    solution_attempt=thought.solution_attempt,
+                    success=thought.success,
+                    error_message=thought.error_message,
+                    retry_count=thought.retry_count,
+                    requires_human=thought.requires_human,
+                    escalation_reason=thought.escalation_reason,
+                    created_at=thought.created_at.isoformat(),
+                )
+            else:
+                raise HTTPException(status_code=500, detail="Failed to create thought log")
+                
+        except Exception as e:
+            logger.error(f"Error creating thought log: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to create thought log: {str(e)}")
+    
+    @app.get("/v1/thoughts/mission/{mission_id}", response_model=api_models.ThoughtLogListResponse)
+    async def get_mission_thoughts(
+        mission_id: str,
+        current_user: User = Depends(get_current_user),
+    ) -> api_models.ThoughtLogListResponse:
+        """
+        Get all thought logs for a specific mission (Protected endpoint)
+        
+        Args:
+            mission_id: Mission identifier
+            current_user: Current authenticated user
+            
+        Returns:
+            List of thought logs
+        """
+        try:
+            logger.info(f"User '{current_user.username}' fetching thoughts for mission {mission_id}")
+            
+            thoughts = thought_log_service.get_mission_thoughts(mission_id)
+            
+            thought_responses = [
+                api_models.ThoughtLogResponse(
+                    id=t.id,
+                    mission_id=t.mission_id,
+                    session_id=t.session_id,
+                    status=t.status,
+                    thought_process=t.thought_process,
+                    problem_description=t.problem_description,
+                    solution_attempt=t.solution_attempt,
+                    success=t.success,
+                    error_message=t.error_message,
+                    retry_count=t.retry_count,
+                    requires_human=t.requires_human,
+                    escalation_reason=t.escalation_reason,
+                    created_at=t.created_at.isoformat(),
+                )
+                for t in thoughts
+            ]
+            
+            return api_models.ThoughtLogListResponse(
+                logs=thought_responses,
+                total=len(thought_responses),
+            )
+            
+        except Exception as e:
+            logger.error(f"Error fetching mission thoughts: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to fetch thoughts: {str(e)}")
+    
+    @app.get("/v1/thoughts/escalations", response_model=api_models.ThoughtLogListResponse)
+    async def get_pending_escalations(
+        current_user: User = Depends(get_current_user),
+    ) -> api_models.ThoughtLogListResponse:
+        """
+        Get all missions requiring human intervention (Protected endpoint)
+        
+        Args:
+            current_user: Current authenticated user
+            
+        Returns:
+            List of escalated thought logs
+        """
+        try:
+            logger.info(f"User '{current_user.username}' fetching pending escalations")
+            
+            escalations = thought_log_service.get_pending_escalations()
+            
+            thought_responses = [
+                api_models.ThoughtLogResponse(
+                    id=t.id,
+                    mission_id=t.mission_id,
+                    session_id=t.session_id,
+                    status=t.status,
+                    thought_process=t.thought_process,
+                    problem_description=t.problem_description,
+                    solution_attempt=t.solution_attempt,
+                    success=t.success,
+                    error_message=t.error_message,
+                    retry_count=t.retry_count,
+                    requires_human=t.requires_human,
+                    escalation_reason=t.escalation_reason,
+                    created_at=t.created_at.isoformat(),
+                )
+                for t in escalations
+            ]
+            
+            return api_models.ThoughtLogListResponse(
+                logs=thought_responses,
+                total=len(thought_responses),
+            )
+            
+        except Exception as e:
+            logger.error(f"Error fetching escalations: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to fetch escalations: {str(e)}")
+    
+    @app.get("/v1/thoughts/mission/{mission_id}/consolidated")
+    async def get_consolidated_log(
+        mission_id: str,
+        current_user: User = Depends(get_current_user),
+    ) -> dict:
+        """
+        Get consolidated log for a mission (Protected endpoint)
+        
+        Args:
+            mission_id: Mission identifier
+            current_user: Current authenticated user
+            
+        Returns:
+            Consolidated log as text
+        """
+        try:
+            logger.info(f"User '{current_user.username}' fetching consolidated log for mission {mission_id}")
+            
+            consolidated = thought_log_service.generate_consolidated_log(mission_id)
+            
+            return {
+                "mission_id": mission_id,
+                "consolidated_log": consolidated,
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating consolidated log: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to generate log: {str(e)}")
+    
+    # GitHub Worker Endpoints
+    
+    from app.application.services.github_worker import GitHubWorker
+    github_worker = GitHubWorker()
+    
+    @app.post("/v1/github/worker", response_model=api_models.GitHubWorkerResponse)
+    async def github_worker_operation(
+        request: api_models.GitHubWorkerRequest,
+        current_user: User = Depends(get_current_user),
+    ) -> api_models.GitHubWorkerResponse:
+        """
+        Execute GitHub worker operations (Protected endpoint)
+        
+        Args:
+            request: GitHub worker request
+            current_user: Current authenticated user
+            
+        Returns:
+            Operation result
+        """
+        try:
+            logger.info(f"User '{current_user.username}' executing GitHub operation: {request.operation}")
+            
+            if request.operation == "create_branch":
+                if not request.branch_name:
+                    raise HTTPException(status_code=400, detail="branch_name is required")
+                
+                result = github_worker.create_feature_branch(request.branch_name)
+                
+            elif request.operation == "submit_pr":
+                if not request.pr_title:
+                    raise HTTPException(status_code=400, detail="pr_title is required")
+                
+                result = github_worker.submit_pull_request(
+                    title=request.pr_title,
+                    body=request.pr_body or "",
+                )
+                
+            elif request.operation == "fetch_ci_status":
+                result = github_worker.fetch_ci_status(run_id=request.run_id)
+                
+            else:
+                raise HTTPException(status_code=400, detail=f"Unknown operation: {request.operation}")
+            
+            return api_models.GitHubWorkerResponse(
+                success=result.get("success", False),
+                message=result.get("message", ""),
+                data=result,
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error executing GitHub operation: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"GitHub operation failed: {str(e)}")
+    
+    @app.post("/v1/github/ci-heal/{run_id}")
+    async def auto_heal_ci_failure(
+        run_id: int,
+        mission_id: str,
+        current_user: User = Depends(get_current_user),
+    ) -> dict:
+        """
+        Automatically attempt to heal a CI failure (Protected endpoint)
+        
+        Args:
+            run_id: Failed workflow run ID
+            mission_id: Mission identifier for tracking
+            current_user: Current authenticated user
+            
+        Returns:
+            Healing attempt result
+        """
+        try:
+            logger.info(f"User '{current_user.username}' initiating auto-heal for CI run {run_id}")
+            
+            result = github_worker.auto_heal_ci_failure(
+                run_id=run_id,
+                mission_id=mission_id,
+                thought_log_service=thought_log_service,
+            )
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error in auto-heal: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Auto-heal failed: {str(e)}")
 
     return app

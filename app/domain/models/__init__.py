@@ -4,6 +4,7 @@
 from .command import Command, CommandType, Intent, Response
 from .device import Capability, CommandResult, Device
 from .mission import Mission, MissionResult
+from .thought_log import InteractionStatus, ThoughtLog
 
 __all__ = [
     "Command",
@@ -15,4 +16,6 @@ __all__ = [
     "CommandResult",
     "Mission",
     "MissionResult",
+    "ThoughtLog",
+    "InteractionStatus",
 ]

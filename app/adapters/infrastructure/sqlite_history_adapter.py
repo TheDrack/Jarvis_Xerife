@@ -14,6 +14,7 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 from app.application.ports.history_provider import HistoryProvider
 from app.domain.models.device import Capability, Device
+from app.domain.models.thought_log import ThoughtLog
 
 logger = logging.getLogger(__name__)
 

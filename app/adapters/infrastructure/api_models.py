@@ -21,6 +21,15 @@ class ExecuteRequest(BaseModel):
     metadata: Optional[RequestMetadata] = Field(None, description="Context metadata for intelligent routing")
 
 
+class ExecutionPayload(BaseModel):
+    """Execution payload containing code and execution configuration"""
+
+    code: str = Field(..., description="Python code to execute", min_length=1)
+    dependencies: List[str] = Field(default_factory=list, description="List of Python package dependencies")
+    keep_alive: bool = Field(False, description="Whether to persist the environment after execution")
+    browser_required: bool = Field(False, description="Whether browser interaction is needed")
+
+
 class ExecuteResponse(BaseModel):
     """Response model for command execution"""
 
@@ -28,6 +37,11 @@ class ExecuteResponse(BaseModel):
     message: str = Field(..., description="Result message")
     data: Optional[Dict[str, Any]] = Field(None, description="Optional response data")
     error: Optional[str] = Field(None, description="Error code if execution failed")
+    
+    # Self-Healing Orchestrator fields
+    is_internal: bool = Field(False, description="Whether this is internal thought or user response")
+    thought_process: Optional[str] = Field(None, description="Technical reasoning (for INTERNAL_MONOLOGUE)")
+    execution_payload: Optional[ExecutionPayload] = Field(None, description="Code execution payload")
 
 
 class TaskResponse(BaseModel):
@@ -263,3 +277,63 @@ class BrowserControlResponse(BaseModel):
     is_running: bool = Field(..., description="Whether browser is currently running")
     cdp_url: Optional[str] = Field(None, description="CDP URL for connecting to browser")
     message: str = Field(..., description="Status message")
+
+
+# ThoughtLog and Self-Healing Models
+
+
+class ThoughtLogRequest(BaseModel):
+    """Request model for creating a thought log entry"""
+
+    mission_id: str = Field(..., description="Unique mission identifier", min_length=1)
+    session_id: str = Field(..., description="Session identifier for grouping thoughts", min_length=1)
+    status: str = Field(..., description="Interaction status: user_interaction or internal_monologue")
+    thought_process: str = Field(..., description="Technical reasoning", min_length=1)
+    problem_description: str = Field(default="", description="What problem is being solved")
+    solution_attempt: str = Field(default="", description="What solution was tried")
+    success: bool = Field(default=False, description="Did this attempt succeed")
+    error_message: str = Field(default="", description="Error if failed")
+    context_data: Dict[str, Any] = Field(default_factory=dict, description="Additional context")
+
+
+class ThoughtLogResponse(BaseModel):
+    """Response model for thought log entry"""
+
+    id: int = Field(..., description="Thought log ID")
+    mission_id: str = Field(..., description="Mission identifier")
+    session_id: str = Field(..., description="Session identifier")
+    status: str = Field(..., description="Interaction status")
+    thought_process: str = Field(..., description="Technical reasoning")
+    problem_description: str = Field(..., description="Problem description")
+    solution_attempt: str = Field(..., description="Solution attempt")
+    success: bool = Field(..., description="Success flag")
+    error_message: str = Field(..., description="Error message")
+    retry_count: int = Field(..., description="Number of retries")
+    requires_human: bool = Field(..., description="Whether human intervention is needed")
+    escalation_reason: str = Field(..., description="Reason for escalation")
+    created_at: str = Field(..., description="ISO timestamp")
+
+
+class ThoughtLogListResponse(BaseModel):
+    """Response model for listing thought logs"""
+
+    logs: List[ThoughtLogResponse] = Field(..., description="List of thought logs")
+    total: int = Field(..., description="Total number of logs")
+
+
+class GitHubWorkerRequest(BaseModel):
+    """Request model for GitHub worker operations"""
+
+    operation: str = Field(..., description="Operation: create_branch, submit_pr, fetch_ci_status")
+    branch_name: Optional[str] = Field(None, description="Branch name for create_branch")
+    pr_title: Optional[str] = Field(None, description="PR title for submit_pr")
+    pr_body: Optional[str] = Field(None, description="PR body for submit_pr")
+    run_id: Optional[int] = Field(None, description="Run ID for fetch_ci_status")
+
+
+class GitHubWorkerResponse(BaseModel):
+    """Response model for GitHub worker operations"""
+
+    success: bool = Field(..., description="Whether operation succeeded")
+    message: str = Field(..., description="Result message")
+    data: Optional[Dict[str, Any]] = Field(None, description="Operation-specific data")
