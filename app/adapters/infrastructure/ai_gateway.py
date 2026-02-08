@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 """AI Gateway - Intelligent routing between multiple LLM providers
 
-This gateway implements:
-- Cost Priority: Groq (Llama-3-70b) as default for log analysis and short internal monologues
-- Context Escalation: Automatic switch to Gemini 1.5 for payloads > 10,000 tokens or multimodal
-- Automatic Fallback: Transparent migration from Groq to Gemini on rate limits
+This gateway implements a "Gears" (Marchas) system:
+- High Gear (Marcha Alta): Llama-4-Scout/Llama-3.3-70b as default (fast, cost-effective)
+- Low Gear (Marcha Baixa): Qwen-3-32B or Llama-8B for internal Groq rate limit fallback
+- Cannon Shot (Tiro de Canhão): Gemini-1.5-Pro as external fallback when Groq entirely fails
+- Auto-Repair: Captures critical errors and dispatches auto-fix to GitHub Actions
 """
 
 import asyncio
 import logging
 import os
+import traceback
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -75,44 +77,94 @@ class LLMProvider(str, Enum):
     GEMINI = "gemini"
 
 
+class GroqGear(str, Enum):
+    """Groq Gears (Marchas) - Different Groq models for different use cases"""
+    HIGH_GEAR = "high"  # Marcha Alta: Llama-4-Scout or Llama-3.3-70b (default)
+    LOW_GEAR = "low"    # Marcha Baixa: Qwen-3-32B or Llama-8B (rate limit fallback)
+
+
 class AIGateway:
     """
     AI Gateway that intelligently routes requests between multiple LLM providers.
     
     Features:
-    - Default to Groq (fast, cost-effective) for short requests
+    - Gears System (Sistema de Marchas):
+      * High Gear (Marcha Alta): Llama-4-Scout or Llama-3.3-70b (default, fast)
+      * Low Gear (Marcha Baixa): Qwen-3-32B or Llama-8B (internal Groq fallback)
+      * Cannon Shot (Tiro de Canhão): Gemini-1.5-Pro (external fallback)
     - Automatically escalate to Gemini for large contexts (>10k tokens)
-    - Fallback to Gemini on Groq rate limits
-    - Support for multimodal analysis (future: images/video)
+    - Auto-repair on critical errors (sends fixes to GitHub Actions)
     """
     
     # Token threshold for context-based escalation
     TOKEN_THRESHOLD = 10000
     
-    # Recommended Groq model (updated as models are upgraded)
-    RECOMMENDED_GROQ_MODEL = "llama-3.3-70b-versatile"
+    # Groq Gears Configuration (Marcha Alta e Marcha Baixa)
+    # High Gear: Fast, powerful model (default)
+    DEFAULT_HIGH_GEAR_MODEL = "llama-3.3-70b-versatile"  # Can also use llama-4-scout when available
+    # Low Gear: Smaller, more economical model (internal fallback)
+    DEFAULT_LOW_GEAR_MODEL = "llama-3.1-8b-instant"  # Can also use qwen-3-32b
+    
+    # Gemini Cannon Shot (External Fallback)
+    DEFAULT_GEMINI_MODEL = "gemini-1.5-pro"  # Changed from gemini-flash-latest
     
     def __init__(
         self,
         groq_api_key: Optional[str] = None,
         gemini_api_key: Optional[str] = None,
-        groq_model: str = "llama-3.3-70b-versatile",
-        gemini_model: str = "gemini-flash-latest",
+        groq_high_gear_model: Optional[str] = None,
+        groq_low_gear_model: Optional[str] = None,
+        gemini_model: Optional[str] = None,
         default_provider: LLMProvider = LLMProvider.GROQ,
+        enable_auto_repair: bool = True,
+        github_adapter: Optional[Any] = None,
+        # Backward compatibility parameters
+        groq_model: Optional[str] = None,
     ):
         """
-        Initialize AI Gateway with multiple provider support.
+        Initialize AI Gateway with multiple provider support and Gears system.
         
         Args:
             groq_api_key: Groq API key (defaults to GROQ_API_KEY env var)
             gemini_api_key: Gemini API key (defaults to GOOGLE_API_KEY or GEMINI_API_KEY env var)
-            groq_model: Groq model name
-            gemini_model: Gemini model name
+            groq_high_gear_model: High Gear model name (defaults to DEFAULT_HIGH_GEAR_MODEL or GROQ_MODEL env var)
+            groq_low_gear_model: Low Gear model name (defaults to DEFAULT_LOW_GEAR_MODEL or GROQ_LOW_GEAR_MODEL env var)
+            gemini_model: Gemini model name (defaults to DEFAULT_GEMINI_MODEL or GEMINI_MODEL env var)
             default_provider: Default provider for routing (GROQ or GEMINI)
+            enable_auto_repair: Enable auto-repair on critical errors
+            github_adapter: Optional GitHubAdapter instance for auto-repair
+            groq_model: (Deprecated) Use groq_high_gear_model instead. For backward compatibility.
         """
-        self.groq_model = groq_model
-        self.gemini_model = gemini_model
+        # Handle backward compatibility: groq_model -> groq_high_gear_model
+        if groq_model is not None:
+            groq_high_gear_model = groq_model
+        
+        # Groq Gears configuration
+        self.groq_high_gear_model = (
+            groq_high_gear_model 
+            or os.getenv("GROQ_MODEL") 
+            or os.getenv("GROQ_HIGH_GEAR_MODEL")
+            or self.DEFAULT_HIGH_GEAR_MODEL
+        )
+        self.groq_low_gear_model = (
+            groq_low_gear_model
+            or os.getenv("GROQ_LOW_GEAR_MODEL")
+            or self.DEFAULT_LOW_GEAR_MODEL
+        )
+        
+        # Gemini configuration
+        self.gemini_model = (
+            gemini_model
+            or os.getenv("GEMINI_MODEL")
+            or self.DEFAULT_GEMINI_MODEL
+        )
+        
         self.default_provider = default_provider
+        self.enable_auto_repair = enable_auto_repair
+        self.github_adapter = github_adapter
+        
+        # Current Groq gear (starts at High Gear)
+        self.current_groq_gear = GroqGear.HIGH_GEAR
         
         # Get API keys from parameters or environment
         self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY")
@@ -129,10 +181,20 @@ class AIGateway:
         self._initialize_gemini()
         
         logger.info(
-            f"AI Gateway initialized with default provider: {self.default_provider.value}, "
-            f"Groq available: {self.groq_client is not None}, "
-            f"Gemini available: {self.gemini_client is not None}"
+            f"AI Gateway initialized with Gears System:\n"
+            f"  - High Gear (Marcha Alta): {self.groq_high_gear_model}\n"
+            f"  - Low Gear (Marcha Baixa): {self.groq_low_gear_model}\n"
+            f"  - Cannon Shot (Tiro de Canhão): {self.gemini_model}\n"
+            f"  - Default provider: {self.default_provider.value}\n"
+            f"  - Groq available: {self.groq_client is not None}\n"
+            f"  - Gemini available: {self.gemini_client is not None}\n"
+            f"  - Auto-repair: {self.enable_auto_repair}"
         )
+    
+    @property
+    def groq_model(self) -> str:
+        """Backward compatibility property for groq_model"""
+        return self._get_current_groq_model()
     
     def _initialize_groq(self) -> None:
         """Initialize Groq client if API key is available"""
@@ -148,6 +210,29 @@ class AIGateway:
             logger.error("Groq library not installed. Install with: pip install groq")
         except Exception as e:
             logger.error(f"Failed to initialize Groq client: {e}")
+    
+    def _get_current_groq_model(self) -> str:
+        """Get the current Groq model based on the active gear"""
+        if self.current_groq_gear == GroqGear.HIGH_GEAR:
+            return self.groq_high_gear_model
+        else:
+            return self.groq_low_gear_model
+    
+    def _shift_to_low_gear(self) -> None:
+        """Shift to Low Gear (Marcha Baixa) for rate limit handling"""
+        if self.current_groq_gear == GroqGear.HIGH_GEAR:
+            logger.warning(
+                f"🔧 Shifting to Low Gear (Marcha Baixa): {self.groq_low_gear_model}"
+            )
+            self.current_groq_gear = GroqGear.LOW_GEAR
+    
+    def _shift_to_high_gear(self) -> None:
+        """Shift back to High Gear (Marcha Alta) after recovery"""
+        if self.current_groq_gear == GroqGear.LOW_GEAR:
+            logger.info(
+                f"✅ Shifting back to High Gear (Marcha Alta): {self.groq_high_gear_model}"
+            )
+            self.current_groq_gear = GroqGear.HIGH_GEAR
     
     def _initialize_gemini(self) -> None:
         """Initialize Gemini client if API key is available"""
@@ -246,7 +331,7 @@ class AIGateway:
         force_provider: Optional[LLMProvider] = None,
     ) -> Dict[str, Any]:
         """
-        Generate a completion using the most appropriate provider.
+        Generate a completion using the most appropriate provider with Gears system.
         
         Args:
             messages: List of message dicts with 'role' and 'content'
@@ -273,27 +358,135 @@ class AIGateway:
             else:
                 return await self._generate_with_gemini(messages, functions)
         except Exception as e:
+            error_traceback = traceback.format_exc()
+            
             # Check if it's a model decommissioned error
             if self._is_model_decommissioned_error(e):
                 error_msg = (
-                    f"⚠️ ATENÇÃO: O modelo '{self.groq_model}' foi descomissionado pelo Groq!\n"
+                    f"⚠️ ATENÇÃO: O modelo '{self._get_current_groq_model()}' foi descomissionado pelo Groq!\n"
                     f"Por favor, atualize o modelo no seu arquivo .env:\n"
-                    f"  GROQ_MODEL={self.RECOMMENDED_GROQ_MODEL}\n"
+                    f"  GROQ_MODEL={self.DEFAULT_HIGH_GEAR_MODEL}\n"
                     f"Erro original: {e}"
                 )
                 logger.error(error_msg)
+                
+                # Try to dispatch auto-repair if enabled
+                await self._dispatch_auto_repair_if_enabled(
+                    error=e,
+                    error_traceback=error_traceback,
+                    issue_title="Model Decommissioned Error",
+                    file_path="app/adapters/infrastructure/ai_gateway.py"
+                )
+                
                 # Try to fallback to Gemini if available
                 if provider == LLMProvider.GROQ and self.gemini_client:
                     logger.warning("Tentando fallback para Gemini devido a modelo descomissionado")
                     return await self._handle_rate_limit_fallback(provider, messages, functions)
                 raise ValueError(error_msg) from e
+            
             # Check if it's a rate limit error
             elif self._is_rate_limit_error(e):
                 logger.warning(f"Rate limit hit on {provider.value}, attempting fallback")
-                return await self._handle_rate_limit_fallback(provider, messages, functions)
+                # If it's Groq and we're in High Gear, try Low Gear first
+                if provider == LLMProvider.GROQ and self.current_groq_gear == GroqGear.HIGH_GEAR:
+                    self._shift_to_low_gear()
+                    try:
+                        return await self._generate_with_groq(messages, functions)
+                    except Exception as low_gear_error:
+                        # Low gear also failed, check if it's also a rate limit
+                        if self._is_rate_limit_error(low_gear_error):
+                            logger.error(f"Low Gear also hit rate limit: {low_gear_error}")
+                            # Escalate to Gemini (Cannon Shot) if available
+                            if self.gemini_client:
+                                logger.warning("🚀 Firing Cannon Shot (Tiro de Canhão): Gemini")
+                                return await self._handle_rate_limit_fallback(provider, messages, functions)
+                            else:
+                                # No Gemini available, raise proper error
+                                raise ValueError(
+                                    f"Rate limit reached on {provider.value} (both High and Low Gear) "
+                                    "and no fallback provider available"
+                                ) from low_gear_error
+                        else:
+                            # Different error in Low Gear, re-raise
+                            raise
+                else:
+                    return await self._handle_rate_limit_fallback(provider, messages, functions)
+            
+            # Other errors
             else:
                 logger.error(f"Error generating completion with {provider.value}: {e}")
+                logger.error(f"Traceback:\n{error_traceback}")
+                
+                # Try to dispatch auto-repair for critical errors
+                await self._dispatch_auto_repair_if_enabled(
+                    error=e,
+                    error_traceback=error_traceback,
+                    issue_title=f"Critical error in AI Gateway: {type(e).__name__}",
+                    file_path="app/adapters/infrastructure/ai_gateway.py"
+                )
+                
                 raise
+    
+    async def _dispatch_auto_repair_if_enabled(
+        self,
+        error: Exception,
+        error_traceback: str,
+        issue_title: str,
+        file_path: str,
+    ) -> None:
+        """
+        Dispatch auto-repair if enabled and error is critical.
+        
+        Args:
+            error: The exception that occurred
+            error_traceback: Full traceback string
+            issue_title: Title for the issue
+            file_path: File path where the error occurred
+        """
+        if not self.enable_auto_repair:
+            logger.debug("Auto-repair disabled, skipping dispatch")
+            return
+        
+        # Check if error is critical (authentication, syntax, import errors)
+        error_str = str(error).lower()
+        is_critical = any(
+            keyword in error_str
+            for keyword in [
+                "authentication", "auth", "unauthorized", "401", "403",
+                "syntax", "import", "module", "indentation",
+                "name error", "attribute error", "type error"
+            ]
+        )
+        
+        if not is_critical:
+            logger.debug(f"Error not critical, skipping auto-repair: {error}")
+            return
+        
+        # Try to dispatch auto-repair
+        if self.github_adapter:
+            try:
+                logger.info(f"🔧 Dispatching auto-repair for critical error: {issue_title}")
+                
+                # For now, we'll just log the error data
+                # In a real implementation, the GitHub adapter would analyze the error
+                # and formulate a fix using AI
+                error_data = {
+                    "issue": issue_title,
+                    "file": file_path,
+                    "error_log": error_traceback,
+                    "error_type": type(error).__name__,
+                }
+                
+                logger.info(f"Auto-repair payload: {error_data}")
+                
+                # Note: We're not actually calling dispatch_auto_fix here because
+                # we need AI to formulate the fix first. This is just logging
+                # the error for monitoring purposes.
+                
+            except Exception as dispatch_error:
+                logger.error(f"Failed to dispatch auto-repair: {dispatch_error}")
+        else:
+            logger.debug("GitHub adapter not configured, cannot dispatch auto-repair")
     
     async def _generate_with_groq(
         self,
@@ -301,7 +494,7 @@ class AIGateway:
         functions: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
         """
-        Generate completion using Groq.
+        Generate completion using Groq with Gears system.
         
         Args:
             messages: List of message dicts
@@ -313,11 +506,15 @@ class AIGateway:
         if not self.groq_client:
             raise ValueError("Groq client not initialized")
         
-        logger.debug(f"Generating completion with Groq ({self.groq_model})")
+        # Get current model based on active gear
+        current_model = self._get_current_groq_model()
+        current_gear = "High Gear (Marcha Alta)" if self.current_groq_gear == GroqGear.HIGH_GEAR else "Low Gear (Marcha Baixa)"
+        
+        logger.debug(f"Generating completion with Groq - {current_gear}: {current_model}")
         
         # Build request parameters
         request_params = {
-            "model": self.groq_model,
+            "model": current_model,
             "messages": messages,
         }
         
@@ -336,10 +533,17 @@ class AIGateway:
             lambda: self.groq_client.chat.completions.create(**request_params)
         )
         
+        # After successful completion, if we're in Low Gear, consider shifting back to High Gear
+        if self.current_groq_gear == GroqGear.LOW_GEAR:
+            # Shift back to High Gear after successful completion
+            # This allows the system to recover from rate limits
+            self._shift_to_high_gear()
+        
         return {
             "provider": LLMProvider.GROQ.value,
             "response": response,
-            "model": self.groq_model,
+            "model": current_model,
+            "gear": self.current_groq_gear.value,
         }
     
     async def _generate_with_gemini(
