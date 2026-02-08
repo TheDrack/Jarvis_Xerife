@@ -37,7 +37,7 @@ class GatewayLLMCommandAdapter:
         self,
         groq_api_key: Optional[str] = None,
         gemini_api_key: Optional[str] = None,
-        groq_model: str = "llama-3.1-70b-versatile",
+        groq_model: str = "llama-3.3-70b-versatile",
         gemini_model: str = "gemini-flash-latest",
         voice_provider: Optional[VoiceProvider] = None,
         wake_word: str = "xerife",

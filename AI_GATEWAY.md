@@ -66,7 +66,7 @@ Add the following to your `.env` file:
 ```bash
 # Groq Configuration
 GROQ_API_KEY=your_groq_api_key_here
-GROQ_MODEL=llama-3.1-70b-versatile
+GROQ_MODEL=llama-3.3-70b-versatile
 
 # Gemini Configuration
 GOOGLE_API_KEY=your_gemini_api_key_here

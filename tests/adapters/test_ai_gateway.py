@@ -192,6 +192,28 @@ class TestAIGateway:
         # Non-rate-limit error
         other_error = Exception("Internal server error")
         assert not gateway._is_rate_limit_error(other_error)
+    
+    def test_is_model_decommissioned_error(self):
+        """Test detection of model decommissioned errors"""
+        gateway = AIGateway(
+            groq_api_key="test_key",
+            gemini_api_key="test_key",
+        )
+        
+        # Test various model decommissioned error messages
+        decommissioned_errors = [
+            Exception("model_decommissioned"),
+            Exception("The model has been decommissioned"),
+            Exception("Model has been deprecated and is no longer available"),
+        ]
+        
+        for error in decommissioned_errors:
+            assert gateway._is_model_decommissioned_error(error)
+        
+        # Non-decommissioned error
+        other_error = Exception("Internal server error")
+        assert not gateway._is_model_decommissioned_error(other_error)
+
 
     def test_generate_with_groq(self, mock_groq_client):
         """Test generating completion with Groq"""
@@ -329,3 +351,47 @@ class TestAIGatewayFallback:
         
         with pytest.raises(ValueError, match="no fallback provider available"):
             gateway.generate_completion(messages)
+    
+    def test_model_decommissioned_error_with_fallback(self, gateway_with_mocks):
+        """Test that model decommissioned error triggers fallback to Gemini"""
+        gateway = gateway_with_mocks
+        
+        # Make Groq raise a model decommissioned error
+        gateway.groq_client.chat.completions.create.side_effect = Exception(
+            "model_decommissioned: The model llama-3.1-70b-versatile has been decommissioned"
+        )
+        
+        messages = [{"role": "user", "content": "Test message"}]
+        
+        result = gateway.generate_completion(messages)
+        
+        # Should have fallen back to Gemini
+        assert result["provider"] == LLMProvider.GEMINI.value
+        assert "fallback_from" in result
+        assert result["fallback_from"] == LLMProvider.GROQ.value
+    
+    def test_model_decommissioned_error_without_fallback_raises_error(self):
+        """Test that model decommissioned error without fallback raises informative error"""
+        gateway = AIGateway(
+            groq_api_key="test_groq_key",
+            gemini_api_key=None,  # No Gemini available for fallback
+            groq_model="llama-3.1-70b-versatile",
+        )
+        
+        # Mock Groq to raise model decommissioned error
+        gateway.groq_client = Mock()
+        gateway.groq_client.chat.completions.create.side_effect = Exception(
+            "model_decommissioned: Model has been deprecated"
+        )
+        
+        messages = [{"role": "user", "content": "Test"}]
+        
+        with pytest.raises(ValueError) as exc_info:
+            gateway.generate_completion(messages)
+        
+        # Check that the error message contains helpful information
+        error_message = str(exc_info.value)
+        assert "llama-3.1-70b-versatile" in error_message
+        assert "descomissionado" in error_message
+        assert ".env" in error_message
+        assert "llama-3.3-70b-versatile" in error_message

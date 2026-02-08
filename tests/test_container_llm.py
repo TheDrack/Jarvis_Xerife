@@ -57,7 +57,7 @@ class TestContainerLLMInitialization:
             mock_settings.gemini_api_key = "settings-api-key"
             mock_settings.gemini_model = "gemini-flash-latest"
             mock_settings.groq_api_key = None
-            mock_settings.groq_model = "llama-3.1-70b-versatile"
+            mock_settings.groq_model = "llama-3.3-70b-versatile"
             
             container = create_edge_container(use_llm=False)
             
@@ -71,7 +71,7 @@ class TestContainerLLMInitialization:
             mock_settings.gemini_api_key = None
             mock_settings.gemini_model = "gemini-flash-latest"
             mock_settings.groq_api_key = None
-            mock_settings.groq_model = "llama-3.1-70b-versatile"
+            mock_settings.groq_model = "llama-3.3-70b-versatile"
             
             container = create_edge_container(use_llm=False)
             

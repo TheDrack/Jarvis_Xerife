@@ -88,11 +88,14 @@ class AIGateway:
     # Token threshold for context-based escalation
     TOKEN_THRESHOLD = 10000
     
+    # Recommended Groq model (updated as models are upgraded)
+    RECOMMENDED_GROQ_MODEL = "llama-3.3-70b-versatile"
+    
     def __init__(
         self,
         groq_api_key: Optional[str] = None,
         gemini_api_key: Optional[str] = None,
-        groq_model: str = "llama-3.1-70b-versatile",
+        groq_model: str = "llama-3.3-70b-versatile",
         gemini_model: str = "gemini-flash-latest",
         default_provider: LLMProvider = LLMProvider.GROQ,
     ):
@@ -269,8 +272,22 @@ class AIGateway:
             else:
                 return self._generate_with_gemini(messages, functions)
         except Exception as e:
+            # Check if it's a model decommissioned error
+            if self._is_model_decommissioned_error(e):
+                error_msg = (
+                    f"⚠️ ATENÇÃO: O modelo '{self.groq_model}' foi descomissionado pelo Groq!\n"
+                    f"Por favor, atualize o modelo no seu arquivo .env:\n"
+                    f"  GROQ_MODEL={self.RECOMMENDED_GROQ_MODEL}\n"
+                    f"Erro original: {e}"
+                )
+                logger.error(error_msg)
+                # Try to fallback to Gemini if available
+                if provider == LLMProvider.GROQ and self.gemini_client:
+                    logger.warning("Tentando fallback para Gemini devido a modelo descomissionado")
+                    return self._handle_rate_limit_fallback(provider, messages, functions)
+                raise ValueError(error_msg) from e
             # Check if it's a rate limit error
-            if self._is_rate_limit_error(e):
+            elif self._is_rate_limit_error(e):
                 logger.warning(f"Rate limit hit on {provider.value}, attempting fallback")
                 return self._handle_rate_limit_fallback(provider, messages, functions)
             else:
@@ -453,6 +470,22 @@ class AIGateway:
         return any(
             keyword in error_str
             for keyword in ["rate limit", "quota", "too many requests", "429"]
+        )
+    
+    def _is_model_decommissioned_error(self, error: Exception) -> bool:
+        """
+        Check if an error is a model decommissioned error.
+        
+        Args:
+            error: Exception to check
+            
+        Returns:
+            True if it's a model decommissioned error
+        """
+        error_str = str(error).lower()
+        return any(
+            keyword in error_str
+            for keyword in ["model_decommissioned", "decommissioned", "model has been deprecated"]
         )
     
     def _handle_rate_limit_fallback(

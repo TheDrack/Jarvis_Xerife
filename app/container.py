@@ -67,7 +67,7 @@ class Container:
         gemini_api_key: Optional[str] = None,
         gemini_model: str = "gemini-flash-latest",
         groq_api_key: Optional[str] = None,
-        groq_model: str = "llama-3.1-70b-versatile",
+        groq_model: str = "llama-3.3-70b-versatile",
         use_ai_gateway: bool = True,
         db_path: str = "jarvis.db",
     ):
@@ -85,7 +85,7 @@ class Container:
             gemini_api_key: Optional Gemini API key (defaults to GEMINI_API_KEY env var)
             gemini_model: Gemini model name to use (default: gemini-flash-latest)
             groq_api_key: Optional Groq API key (defaults to GROQ_API_KEY env var)
-            groq_model: Groq model name to use (default: llama-3.1-70b-versatile)
+            groq_model: Groq model name to use (default: llama-3.3-70b-versatile)
             use_ai_gateway: Whether to use AI Gateway for intelligent provider routing (default: True)
             db_path: Path to SQLite database file (default: jarvis.db)
         """
@@ -96,7 +96,7 @@ class Container:
         self.gemini_api_key = self.gemini_api_key or render_key
         self.gemini_model = gemini_model or os.getenv("GEMINI_MODEL", "gemini-flash-latest")
         self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY")
-        self.groq_model = groq_model or os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
+        self.groq_model = groq_model or os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
         self.use_ai_gateway = use_ai_gateway and GatewayLLMCommandAdapter is not None
         self.db_path = db_path
         
