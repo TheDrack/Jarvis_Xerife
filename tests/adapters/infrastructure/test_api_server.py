@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for API Server"""
 
-from unittest.mock import Mock, ANY
+from unittest.mock import Mock, AsyncMock, ANY
 
 import pytest
 from fastapi.testclient import TestClient
@@ -115,12 +115,12 @@ class TestAPIServer:
         """Test successful command execution with authentication"""
         test_client, service = client
 
-        # Mock successful response
-        service.process_command.return_value = Response(
+        # Mock successful response using AsyncMock for async_process_command
+        service.async_process_command = AsyncMock(return_value=Response(
             success=True,
             message="Command executed",
             data={"result": "ok"},
-        )
+        ))
 
         response = test_client.post(
             "/v1/execute",
@@ -133,18 +133,18 @@ class TestAPIServer:
         assert data["success"] is True
         assert data["message"] == "Command executed"
         assert data["data"] == {"result": "ok"}
-        service.process_command.assert_called_once_with("escreva hello", request_metadata=ANY)
+        service.async_process_command.assert_called_once_with("escreva hello", request_metadata=ANY)
 
     def test_execute_command_failure(self, client, auth_token):
         """Test failed command execution"""
         test_client, service = client
 
-        # Mock failed response
-        service.process_command.return_value = Response(
+        # Mock failed response using AsyncMock for async_process_command
+        service.async_process_command = AsyncMock(return_value=Response(
             success=False,
             message="Invalid command",
             error="UNKNOWN_COMMAND",
-        )
+        ))
 
         response = test_client.post(
             "/v1/execute",
@@ -175,8 +175,8 @@ class TestAPIServer:
         """Test command execution with exception"""
         test_client, service = client
 
-        # Mock exception
-        service.process_command.side_effect = Exception("Test error")
+        # Mock exception using AsyncMock for async_process_command
+        service.async_process_command = AsyncMock(side_effect=Exception("Test error"))
 
         response = test_client.post(
             "/v1/execute",
