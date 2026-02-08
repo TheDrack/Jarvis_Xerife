@@ -7,11 +7,13 @@ between multiple LLM providers through the AI Gateway.
 
 import asyncio
 import logging
+import os
 import time
 from typing import Optional
 
 from app.adapters.infrastructure.ai_gateway import AIGateway, LLMProvider
 from app.adapters.infrastructure.gemini_adapter import LLMCommandAdapter
+from app.adapters.infrastructure.github_adapter import GitHubAdapter
 from app.application.ports import VoiceProvider
 from app.domain.models import CommandType, Intent
 
@@ -83,6 +85,14 @@ class GatewayLLMCommandAdapter:
         except Exception as e:
             logger.warning(f"Failed to initialize Gemini fallback adapter: {e}")
             self.gemini_adapter = None
+        
+        # Initialize GitHub adapter for self-healing
+        try:
+            self.github_adapter = GitHubAdapter()
+            logger.info("GitHub adapter initialized for self-healing")
+        except Exception as e:
+            logger.warning(f"Failed to initialize GitHub adapter: {e}. Self-healing disabled.")
+            self.github_adapter = None
         
         logger.info("Gateway LLM Command Adapter initialized with AI Gateway")
     
@@ -213,6 +223,10 @@ class GatewayLLMCommandAdapter:
             
         except Exception as e:
             logger.error(f"Error generating conversational response: {e}", exc_info=True)
+            
+            # Check if this is a critical error that requires self-healing
+            await self._handle_critical_error(e, user_input)
+            
             return "Desculpe, ocorreu um erro. Pode tentar novamente?"
     
     def _extract_response_text(self, result: dict) -> Optional[str]:
@@ -275,3 +289,209 @@ class GatewayLLMCommandAdapter:
         except Exception as e:
             logger.warning(f"Error building context message: {e}")
             return ""
+    
+    async def _handle_critical_error(self, error: Exception, user_input: str) -> None:
+        """
+        Handle critical errors by triggering self-healing mechanism.
+        
+        Detects specific critical errors (model decommissioned, test failures, etc.)
+        and triggers the auto-fix workflow via GitHub Actions.
+        
+        Args:
+            error: The exception that occurred
+            user_input: The user input that caused the error
+        """
+        if not self.github_adapter:
+            logger.info("GitHub adapter not available, skipping self-healing")
+            return
+        
+        error_str = str(error).lower()
+        error_type = type(error).__name__
+        
+        # Check for critical error patterns
+        is_critical = any([
+            "model_decommissioned" in error_str,
+            "model has been decommissioned" in error_str,
+            "model not found" in error_str,
+            "test fail" in error_str,
+            "quota" in error_str and "exceeded" in error_str,
+            "rate limit" in error_str and "groq" not in error_str,  # Groq rate limits are handled by gateway
+            "authentication failed" in error_str,
+            "api key" in error_str and "invalid" in error_str,
+        ])
+        
+        if not is_critical:
+            logger.debug(f"Error is not critical, skipping self-healing: {error_type}")
+            return
+        
+        logger.warning(f"🔧 Critical error detected: {error_type} - {error}")
+        
+        try:
+            # Formulate a correction plan using Gemini
+            fix_plan = await self._formulate_correction_plan(error, user_input)
+            
+            if fix_plan:
+                # Dispatch auto-fix via GitHub
+                logger.info(f"Dispatching auto-fix for critical error: {error_type}")
+                result = await self.github_adapter.dispatch_auto_fix(fix_plan)
+                
+                if result.get("success"):
+                    logger.info(f"✅ Auto-fix dispatched successfully: {result.get('workflow_url')}")
+                else:
+                    logger.error(f"❌ Failed to dispatch auto-fix: {result.get('error')}")
+            else:
+                logger.warning("Could not formulate a correction plan")
+        
+        except Exception as heal_error:
+            logger.error(f"Error in self-healing process: {heal_error}", exc_info=True)
+    
+    async def _formulate_correction_plan(
+        self, 
+        error: Exception, 
+        user_input: str
+    ) -> Optional[dict]:
+        """
+        Use Gemini to formulate a correction plan for the detected error.
+        
+        Args:
+            error: The exception that occurred
+            user_input: The user input that caused the error
+        
+        Returns:
+            Dictionary with fix plan (issue_title, file_path, fix_code, test_command)
+            or None if unable to formulate a plan
+        """
+        if not self.gemini_adapter:
+            logger.warning("Gemini adapter not available for correction planning")
+            return None
+        
+        try:
+            # Build diagnostic message
+            error_type = type(error).__name__
+            error_msg = str(error)
+            
+            diagnostic_prompt = f"""
+ERRO CRÍTICO DETECTADO EM PRODUÇÃO
+
+Tipo de Erro: {error_type}
+Mensagem: {error_msg}
+Input do Usuário: {user_input}
+
+Contexto: O Jarvis está rodando no Render e detectou este erro crítico.
+
+TAREFA: Analise o erro e determine se é possível formular uma correção automática.
+
+Para erros relacionados a:
+1. Model decommissioned/deprecated: Sugerir atualização do modelo
+2. API key invalid: Indicar necessidade de configuração manual
+3. Rate limits permanentes: Sugerir mudança de provider
+4. Test failures: Analisar causa e propor correção
+
+Responda em formato estruturado:
+- É possível auto-correção? (sim/não)
+- Arquivo afetado: (caminho completo do arquivo)
+- Título da issue: (descrição breve)
+- Comando de teste: (comando pytest específico ou vazio)
+- Descrição técnica: (explicação do problema e solução)
+
+Se não for possível auto-correção, explique o motivo.
+"""
+            
+            # Get response from Gemini
+            messages = [
+                {"role": "user", "content": diagnostic_prompt}
+            ]
+            
+            result = await self.gateway.generate_completion(
+                messages=messages,
+                functions=None,
+                multimodal=False,
+            )
+            
+            response_text = self._extract_response_text(result)
+            
+            if not response_text:
+                logger.warning("No response from Gemini for correction planning")
+                return None
+            
+            logger.info(f"Gemini analysis: {response_text}")
+            
+            # Parse the response to extract auto-fix information
+            # For now, we'll use a simple heuristic approach
+            # In a production system, you'd want more sophisticated parsing
+            
+            if "não" in response_text.lower() and "possível" in response_text.lower():
+                logger.info("Gemini determined auto-fix is not possible")
+                return None
+            
+            # Extract file path and create a basic fix plan
+            # This is a simplified version - in production, you'd parse the response more carefully
+            fix_plan = self._parse_fix_plan_from_response(response_text, error)
+            
+            return fix_plan
+        
+        except Exception as e:
+            logger.error(f"Error formulating correction plan: {e}", exc_info=True)
+            return None
+    
+    def _parse_fix_plan_from_response(
+        self, 
+        response: str, 
+        error: Exception
+    ) -> Optional[dict]:
+        """
+        Parse Gemini's response to extract fix plan details.
+        
+        Args:
+            response: Gemini's text response
+            error: The original error
+        
+        Returns:
+            Dictionary with fix plan or None
+        """
+        # This is a simplified parser - in production, you'd use more sophisticated NLP
+        # or ask Gemini to return JSON
+        
+        error_str = str(error).lower()
+        
+        # Default plan structure
+        plan = {
+            "issue_title": f"Auto-fix: {type(error).__name__}",
+            "file_path": "",
+            "fix_code": "",
+            "test_command": "pytest -W ignore::DeprecationWarning tests/"
+        }
+        
+        # Detect model decommissioned errors
+        if "model_decommissioned" in error_str or "model has been decommissioned" in error_str:
+            plan["issue_title"] = "Fix model_decommissioned error"
+            plan["file_path"] = "app/adapters/infrastructure/gemini_adapter.py"
+            
+            # Read current file to create a fix
+            file_path = "/home/runner/work/python/python/" + plan["file_path"]
+            try:
+                with open(file_path, "r") as f:
+                    current_code = f.read()
+                
+                # Simple fix: replace deprecated model name
+                fixed_code = current_code.replace(
+                    'model_name: str = "gemini-flash-latest"',
+                    'model_name: str = "gemini-2.0-flash-exp"'
+                )
+                fixed_code = fixed_code.replace(
+                    'gemini_model: str = "gemini-flash-latest"',
+                    'gemini_model: str = "gemini-2.0-flash-exp"'
+                )
+                
+                plan["fix_code"] = fixed_code
+                plan["test_command"] = "pytest tests/adapters/ -k gemini -v"
+                
+                return plan
+            except Exception as e:
+                logger.error(f"Error reading file for fix: {e}")
+                return None
+        
+        # For other errors, we need more information from the response
+        # This is where you'd implement more sophisticated parsing
+        logger.info("Error type not yet supported for automatic fixing")
+        return None
