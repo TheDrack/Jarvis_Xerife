@@ -35,5 +35,5 @@ class Capability(SQLModel, table=True):
     device_id: int = Field(foreign_key="devices.id", nullable=False, index=True)
     name: str = Field(nullable=False, index=True)  # e.g., 'camera', 'bluetooth_scan', 'local_http_request'
     description: str = Field(default="", nullable=False)
-    metadata: str = Field(default="{}", nullable=False)  # JSON string for technical details
+    meta_data: str = Field(default="{}", nullable=False)  # JSON string for technical details
     created_at: datetime = Field(default_factory=datetime.now, nullable=False)

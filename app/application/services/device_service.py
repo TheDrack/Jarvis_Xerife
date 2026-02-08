@@ -164,7 +164,7 @@ class DeviceService:
                         {
                             "name": cap.name,
                             "description": cap.description,
-                            "metadata": json.loads(cap.metadata),
+                            "metadata": json.loads(cap.meta_data),
                         }
                         for cap in capabilities
                     ],
@@ -208,7 +208,7 @@ class DeviceService:
                             {
                                 "name": cap.name,
                                 "description": cap.description,
-                                "metadata": json.loads(cap.metadata),
+                                "metadata": json.loads(cap.meta_data),
                             }
                             for cap in capabilities
                         ],
@@ -261,7 +261,7 @@ class DeviceService:
                                 {
                                     "name": cap.name,
                                     "description": cap.description,
-                                    "metadata": json.loads(cap.metadata),
+                                    "metadata": json.loads(cap.meta_data),
                                 }
                                 for cap in all_caps
                             ],
