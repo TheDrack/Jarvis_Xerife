@@ -1,0 +1,86 @@
+name: Auto-Heal CI Failures
+
+# This workflow automatically attempts to fix CI/CD failures using AI
+# When a CI workflow fails, this workflow:
+# 1. Downloads the failure logs
+# 2. Uses Groq/Gemini AI to analyze and generate fixes
+# 3. Creates a Pull Request with the proposed fix
+
+on:
+  workflow_run:
+    workflows: ["CI", "Tests"]  # Add names of workflows to monitor
+    types:
+      - completed
+
+jobs:
+  auto-heal:
+    # Only run if the workflow failed
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for proper branch operations
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'  # Minimum Python 3.10+
+      
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install groq google-genai
+      
+      - name: Get workflow logs
+        id: get-logs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the logs from the failed workflow
+          echo "Fetching logs for workflow run ${{ github.event.workflow_run.id }}..."
+          
+          # Download logs using GitHub CLI
+          LOGS=$(gh run view ${{ github.event.workflow_run.id }} --log 2>&1 || echo "Failed to retrieve logs")
+          
+          # Save to output (handle multiline)
+          echo "logs<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOGS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Also show preview
+          echo "Log preview (first 500 chars):"
+          echo "$LOGS" | head -c 500
+      
+      - name: Run auto-fixer
+        env:
+          # Pass the logs as the issue body
+          ISSUE_BODY: ${{ steps.get-logs.outputs.logs }}
+          ISSUE_ID: ${{ github.event.workflow_run.id }}
+          
+          # AI API keys (configure these in repository secrets)
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          
+          # Optional: specify models
+          GROQ_MODEL: llama-3.3-70b-versatile
+          GEMINI_MODEL: gemini-1.5-flash
+          
+          # GitHub token for creating PR
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Running auto-fixer..."
+          python scripts/auto_fixer_logic.py
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "⚠️ Auto-fixer failed to create a fix"
+          echo "Manual intervention may be required"
+          echo "Check the logs above for details"
