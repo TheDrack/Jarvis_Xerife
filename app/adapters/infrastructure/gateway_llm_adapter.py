@@ -27,6 +27,12 @@ class GatewayLLMCommandAdapter:
     - Maintains backward compatibility with LLMCommandAdapter interface
     """
     
+    # Default system instruction for conversational responses
+    DEFAULT_SYSTEM_INSTRUCTION = (
+        "Você é um assistente virtual amigável e prestativo. "
+        "Responda de forma conversacional em português brasileiro."
+    )
+    
     def __init__(
         self,
         groq_api_key: Optional[str] = None,
@@ -167,8 +173,7 @@ class GatewayLLMCommandAdapter:
             # Add system instruction
             messages.append({
                 "role": "system",
-                "content": "Você é um assistente virtual amigável e prestativo. "
-                          "Responda de forma conversacional em português brasileiro."
+                "content": self.DEFAULT_SYSTEM_INSTRUCTION
             })
             
             # Add context if available

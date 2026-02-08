@@ -16,6 +16,23 @@ import tiktoken
 
 logger = logging.getLogger(__name__)
 
+# Module-level tokenizer cache to avoid repeated initialization
+_TOKENIZER_CACHE = None
+
+
+def _get_tokenizer():
+    """Get or create tokenizer with caching"""
+    global _TOKENIZER_CACHE
+    if _TOKENIZER_CACHE is None:
+        try:
+            # Using cl100k_base encoding (GPT-4, GPT-3.5-turbo)
+            # This is a good approximation for most modern LLMs
+            _TOKENIZER_CACHE = tiktoken.get_encoding("cl100k_base")
+        except Exception as e:
+            logger.warning(f"Failed to initialize tokenizer: {e}. Token counting will be approximate.")
+            _TOKENIZER_CACHE = False  # Use False to indicate initialization was attempted but failed
+    return _TOKENIZER_CACHE if _TOKENIZER_CACHE else None
+
 
 class LLMProvider(str, Enum):
     """Available LLM providers"""
@@ -63,14 +80,8 @@ class AIGateway:
         self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY")
         self.gemini_api_key = gemini_api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         
-        # Initialize tokenizer for token counting
-        try:
-            # Using cl100k_base encoding (GPT-4, GPT-3.5-turbo)
-            # This is a good approximation for most modern LLMs
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
-        except Exception as e:
-            logger.warning(f"Failed to initialize tokenizer: {e}. Token counting will be approximate.")
-            self.tokenizer = None
+        # Initialize tokenizer for token counting (use cached tokenizer)
+        self.tokenizer = _get_tokenizer()
         
         # Initialize providers
         self.groq_client = None

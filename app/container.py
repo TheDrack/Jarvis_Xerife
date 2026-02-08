@@ -100,10 +100,11 @@ class Container:
         self.use_ai_gateway = use_ai_gateway and GatewayLLMCommandAdapter is not None
         self.db_path = db_path
         
-        # Debug logging for API keys
-        print(f"DEBUG: Valor de self.gemini_api_key: {self.gemini_api_key[:5]}***" if self.gemini_api_key else "DEBUG: self.gemini_api_key está VAZIO")
-        print(f"DEBUG: Valor de self.groq_api_key: {self.groq_api_key[:5]}***" if self.groq_api_key else "DEBUG: self.groq_api_key está VAZIO")
-        print(f"DEBUG: AI Gateway enabled: {self.use_ai_gateway}")
+        # Debug logging for API keys (only show presence, not content)
+        if self.gemini_api_key:
+            logger.debug("Gemini API key configured")
+        if self.groq_api_key:
+            logger.debug("Groq API key configured")
         
         # Log API key detection during boot
         if self.gemini_api_key:

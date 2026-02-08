@@ -26,9 +26,18 @@ def demo_token_counting():
     print("DEMO 1: Token Counting")
     print("="*80)
     
+    # Check if API keys are available
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    
+    if not groq_key and not gemini_key:
+        print("\n⚠ WARNING: No API keys found in environment")
+        print("Set GROQ_API_KEY and/or GEMINI_API_KEY to enable API clients")
+        print("Demo will continue with token counting only...\n")
+    
     gateway = AIGateway(
-        groq_api_key=os.getenv("GROQ_API_KEY", "demo_key"),
-        gemini_api_key=os.getenv("GEMINI_API_KEY", "demo_key"),
+        groq_api_key=groq_key,
+        gemini_api_key=gemini_key,
     )
     
     # Short text
@@ -61,9 +70,12 @@ def demo_provider_selection():
     print("DEMO 2: Provider Selection Based on Payload Size")
     print("="*80)
     
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    
     gateway = AIGateway(
-        groq_api_key=os.getenv("GROQ_API_KEY", "demo_key"),
-        gemini_api_key=os.getenv("GEMINI_API_KEY", "demo_key"),
+        groq_api_key=groq_key,
+        gemini_api_key=gemini_key,
     )
     
     # Simulate available clients
@@ -135,9 +147,12 @@ def demo_scenarios():
     print("DEMO 4: Real-World Scenarios")
     print("="*80)
     
+    groq_key = os.getenv("GROQ_API_KEY")
+    gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    
     gateway = AIGateway(
-        groq_api_key=os.getenv("GROQ_API_KEY", "demo_key"),
-        gemini_api_key=os.getenv("GEMINI_API_KEY", "demo_key"),
+        groq_api_key=groq_key,
+        gemini_api_key=gemini_key,
     )
     gateway.groq_client = "GROQ_CLIENT"
     gateway.gemini_client = "GEMINI_CLIENT"
