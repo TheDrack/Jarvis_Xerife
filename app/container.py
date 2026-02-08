@@ -77,10 +77,19 @@ class Container:
         """
         self.wake_word = wake_word
         self.language = language
-        self.use_llm = use_llm
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
         self.gemini_model = gemini_model or os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
         self.db_path = db_path
+        
+        # Log API key detection during boot
+        if self.gemini_api_key:
+            logger.info("✓ Chave de API do Gemini detectada pelo sistema de configurações")
+        else:
+            logger.warning("⚠ Chave de API do Gemini NÃO detectada - adaptador de IA não será criado")
+        
+        # Use LLM if API key is available (unless explicitly disabled)
+        # This ensures the adapter is created when an API key exists
+        self.use_llm = use_llm or bool(self.gemini_api_key)
 
         # Create or use provided adapters
         self._voice_provider = voice_provider
@@ -206,10 +215,17 @@ class Container:
             gemini_adapter = None
             if self.use_llm and self._llm_command_adapter is not None:
                 gemini_adapter = self._llm_command_adapter
+                logger.info("✓ Adaptador de IA Gemini será injetado no AssistantService")
             elif self.use_llm:
                 # Trigger creation of LLM adapter by accessing command_interpreter
                 _ = self.command_interpreter
                 gemini_adapter = self._llm_command_adapter
+                if gemini_adapter:
+                    logger.info("✓ Adaptador de IA Gemini criado e será injetado no AssistantService")
+                else:
+                    logger.error("✗ Falha ao criar adaptador de IA Gemini")
+            else:
+                logger.warning("⚠ AssistantService será criado SEM adaptador de IA (use_llm=False ou API key não disponível)")
             
             self._assistant_service = AssistantService(
                 voice_provider=self.voice_provider,
@@ -237,8 +253,16 @@ def create_edge_container(
         wake_word: Wake word for the assistant
         language: Language for voice recognition
         use_llm: Whether to use LLM-based command interpretation (default: False)
+                 Note: LLM will be auto-enabled if API key is available in settings,
+                 regardless of this parameter value
 
     Returns:
         Configured container with edge adapters
     """
-    return Container(wake_word=wake_word, language=language, use_llm=use_llm)
+    return Container(
+        wake_word=wake_word,
+        language=language,
+        use_llm=use_llm,
+        gemini_api_key=settings.gemini_api_key,
+        gemini_model=settings.gemini_model,
+    )

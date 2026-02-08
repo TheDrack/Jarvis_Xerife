@@ -8,6 +8,7 @@ def start_cloud():
     """Inicializa o Jarvis em modo API para o Render/Nuvem"""
     
     # Usa o Container para instanciar o AssistantService com todas as dependências
+    # Note: create_edge_container will auto-enable LLM if API key is available
     container = create_edge_container(
         wake_word=settings.wake_word,
         language=settings.language,
