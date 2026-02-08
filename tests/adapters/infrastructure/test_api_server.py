@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for API Server"""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, ANY
 
 import pytest
 from fastapi.testclient import TestClient
@@ -133,7 +133,7 @@ class TestAPIServer:
         assert data["success"] is True
         assert data["message"] == "Command executed"
         assert data["data"] == {"result": "ok"}
-        service.process_command.assert_called_once_with("escreva hello")
+        service.process_command.assert_called_once_with("escreva hello", request_metadata=ANY)
 
     def test_execute_command_failure(self, client, auth_token):
         """Test failed command execution"""
