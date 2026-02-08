@@ -471,6 +471,9 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 capabilities=capabilities,
                 network_id=request.network_id,
                 network_type=request.network_type,
+                lat=request.lat,
+                lon=request.lon,
+                last_ip=request.last_ip,
             )
             
             if device_id is None:
@@ -517,6 +520,9 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                         status=device["status"],
                         network_id=device.get("network_id"),
                         network_type=device.get("network_type"),
+                        lat=device.get("lat"),
+                        lon=device.get("lon"),
+                        last_ip=device.get("last_ip"),
                         last_seen=device["last_seen"],
                         capabilities=[
                             CapabilityModel(
@@ -566,6 +572,9 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 status=device["status"],
                 network_id=device.get("network_id"),
                 network_type=device.get("network_type"),
+                lat=device.get("lat"),
+                lon=device.get("lon"),
+                last_ip=device.get("last_ip"),
                 last_seen=device["last_seen"],
                 capabilities=[
                     CapabilityModel(
@@ -602,7 +611,13 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             Updated device information
         """
         try:
-            success = device_service.update_device_status(device_id, status_update.status)
+            success = device_service.update_device_status(
+                device_id, 
+                status_update.status,
+                lat=status_update.lat,
+                lon=status_update.lon,
+                last_ip=status_update.last_ip,
+            )
             
             if not success:
                 raise HTTPException(
@@ -620,6 +635,9 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 status=device["status"],
                 network_id=device.get("network_id"),
                 network_type=device.get("network_type"),
+                lat=device.get("lat"),
+                lon=device.get("lon"),
+                last_ip=device.get("last_ip"),
                 last_seen=device["last_seen"],
                 capabilities=[
                     CapabilityModel(

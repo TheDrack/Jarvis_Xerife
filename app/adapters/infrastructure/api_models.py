@@ -141,6 +141,9 @@ class DeviceRegistrationRequest(BaseModel):
     capabilities: List[CapabilityModel] = Field(default_factory=list, description="List of device capabilities")
     network_id: Optional[str] = Field(None, description="Network identifier (SSID or public IP)")
     network_type: Optional[str] = Field(None, description="Network type (wifi, 4g, 5g, ethernet)")
+    lat: Optional[float] = Field(None, description="Latitude coordinate")
+    lon: Optional[float] = Field(None, description="Longitude coordinate")
+    last_ip: Optional[str] = Field(None, description="Last known IP address")
 
 
 class DeviceRegistrationResponse(BaseModel):
@@ -155,6 +158,9 @@ class DeviceStatusUpdate(BaseModel):
     """Model for updating device status"""
 
     status: str = Field(..., description="Device status (online/offline)")
+    lat: Optional[float] = Field(None, description="Current latitude coordinate")
+    lon: Optional[float] = Field(None, description="Current longitude coordinate")
+    last_ip: Optional[str] = Field(None, description="Current IP address")
 
 
 class DeviceResponse(BaseModel):
@@ -166,6 +172,9 @@ class DeviceResponse(BaseModel):
     status: str = Field(..., description="Device status")
     network_id: Optional[str] = Field(None, description="Network identifier (SSID or public IP)")
     network_type: Optional[str] = Field(None, description="Network type (wifi, 4g, 5g, ethernet)")
+    lat: Optional[float] = Field(None, description="Latitude coordinate")
+    lon: Optional[float] = Field(None, description="Longitude coordinate")
+    last_ip: Optional[str] = Field(None, description="Last known IP address")
     last_seen: str = Field(..., description="Last seen timestamp (ISO format)")
     capabilities: List[CapabilityModel] = Field(default_factory=list, description="Device capabilities")
 

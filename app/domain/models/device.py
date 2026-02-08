@@ -21,6 +21,9 @@ class Device(SQLModel, table=True):
     status: str = Field(default="offline", nullable=False)  # online, offline
     network_id: Optional[str] = Field(default=None, nullable=True)  # SSID or public IP for proximity routing
     network_type: Optional[str] = Field(default=None, nullable=True)  # wifi, 4g, 5g, ethernet
+    lat: Optional[float] = Field(default=None, nullable=True)  # Latitude for geolocation
+    lon: Optional[float] = Field(default=None, nullable=True)  # Longitude for geolocation
+    last_ip: Optional[str] = Field(default=None, nullable=True)  # Last known IP address
     last_seen: datetime = Field(default_factory=datetime.now, nullable=False)
     created_at: datetime = Field(default_factory=datetime.now, nullable=False)
 
