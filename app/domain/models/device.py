@@ -19,6 +19,8 @@ class Device(SQLModel, table=True):
     name: str = Field(nullable=False, index=True)
     type: str = Field(nullable=False)  # mobile, desktop, cloud, iot
     status: str = Field(default="offline", nullable=False)  # online, offline
+    network_id: Optional[str] = Field(default=None, nullable=True)  # SSID or public IP for proximity routing
+    network_type: Optional[str] = Field(default=None, nullable=True)  # wifi, 4g, 5g, ethernet
     last_seen: datetime = Field(default_factory=datetime.now, nullable=False)
     created_at: datetime = Field(default_factory=datetime.now, nullable=False)
 
@@ -36,4 +38,21 @@ class Capability(SQLModel, table=True):
     name: str = Field(nullable=False, index=True)  # e.g., 'camera', 'bluetooth_scan', 'local_http_request'
     description: str = Field(default="", nullable=False)
     meta_data: str = Field(default="{}", nullable=False)  # JSON string for technical details
+    created_at: datetime = Field(default_factory=datetime.now, nullable=False)
+
+
+class CommandResult(SQLModel, table=True):
+    """
+    SQLModel table for storing command execution results from devices.
+    This enables the feedback loop for distributed command execution.
+    """
+
+    __tablename__ = "command_results"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    command_id: int = Field(nullable=False, index=True)  # References interactions.id (Interaction table in infrastructure layer). No FK constraint to avoid circular dependency between domain and infrastructure layers.
+    executor_device_id: Optional[int] = Field(foreign_key="devices.id", nullable=True, index=True)
+    result_data: str = Field(default="{}", nullable=False)  # JSON string for result data
+    success: bool = Field(default=False, nullable=False)
+    message: str = Field(default="", nullable=False)
     created_at: datetime = Field(default_factory=datetime.now, nullable=False)

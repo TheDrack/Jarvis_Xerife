@@ -33,6 +33,8 @@ class DeviceService:
         name: str,
         device_type: str,
         capabilities: List[Dict[str, Any]],
+        network_id: Optional[str] = None,
+        network_type: Optional[str] = None,
     ) -> Optional[int]:
         """
         Register a new device or update an existing one
@@ -41,6 +43,8 @@ class DeviceService:
             name: Device name
             device_type: Device type (mobile, desktop, cloud, iot)
             capabilities: List of capability dictionaries
+            network_id: Optional network identifier (SSID or public IP)
+            network_type: Optional network type (wifi, 4g, 5g, ethernet)
 
         Returns:
             Device ID if successful, None otherwise
@@ -55,6 +59,8 @@ class DeviceService:
                     # Update existing device
                     existing_device.type = device_type
                     existing_device.status = "online"
+                    existing_device.network_id = network_id
+                    existing_device.network_type = network_type
                     existing_device.last_seen = datetime.now()
                     session.add(existing_device)
                     session.commit()
@@ -67,6 +73,8 @@ class DeviceService:
                         name=name,
                         type=device_type,
                         status="online",
+                        network_id=network_id,
+                        network_type=network_type,
                         last_seen=datetime.now(),
                     )
                     session.add(device)
@@ -159,6 +167,8 @@ class DeviceService:
                     "name": device.name,
                     "type": device.type,
                     "status": device.status,
+                    "network_id": device.network_id,
+                    "network_type": device.network_type,
                     "last_seen": device.last_seen.isoformat(),
                     "capabilities": [
                         {
@@ -203,6 +213,8 @@ class DeviceService:
                         "name": device.name,
                         "type": device.type,
                         "status": device.status,
+                        "network_id": device.network_id,
+                        "network_type": device.network_type,
                         "last_seen": device.last_seen.isoformat(),
                         "capabilities": [
                             {
@@ -220,23 +232,37 @@ class DeviceService:
             logger.error(f"Error listing devices: {e}")
             return []
 
-    def find_device_by_capability(self, capability_name: str) -> Optional[Dict[str, Any]]:
+    def find_device_by_capability(
+        self,
+        capability_name: str,
+        source_device_id: Optional[int] = None,
+        network_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
         """
-        Find an online device that has a specific capability
+        Find an online device that has a specific capability using intelligent routing.
+        
+        Priority hierarchy:
+        1. Source device itself (if it has the capability)
+        2. Devices on the same network (proximity)
+        3. Other online devices (fallback)
 
         Args:
             capability_name: Name of the required capability
+            source_device_id: ID of the device that originated the command
+            network_id: Network identifier (SSID or public IP) for proximity routing
 
         Returns:
             Device dict with the capability or None if not found
         """
         try:
             with Session(self.engine) as session:
-                # Find capabilities with the given name
+                # Find all capabilities with the given name
                 cap_statement = select(Capability).where(Capability.name == capability_name)
                 capabilities = session.exec(cap_statement).all()
 
-                # Filter to find devices that are online
+                # Build list of candidate devices with priority scoring
+                candidates = []
+                
                 for capability in capabilities:
                     device_statement = select(Device).where(
                         Device.id == capability.device_id,
@@ -245,30 +271,169 @@ class DeviceService:
                     device = session.exec(device_statement).first()
 
                     if device:
+                        # Calculate priority score
+                        priority = 0
+                        
+                        # Priority 1: Source device (highest priority)
+                        if source_device_id and device.id == source_device_id:
+                            priority = 100
+                            logger.info(f"Source device {device.id} ({device.name}) has capability '{capability_name}'")
+                        # Priority 2: Same network (medium priority)
+                        elif network_id and device.network_id == network_id:
+                            priority = 50
+                            logger.info(f"Device {device.id} ({device.name}) on same network '{network_id}' has capability '{capability_name}'")
+                        # Priority 3: Other online devices (fallback)
+                        else:
+                            priority = 10
+                            logger.debug(f"Device {device.id} ({device.name}) available as fallback for capability '{capability_name}'")
+                        
                         # Get all capabilities for this device
                         all_caps_statement = select(Capability).where(
                             Capability.device_id == device.id
                         )
                         all_caps = session.exec(all_caps_statement).all()
 
-                        return {
-                            "id": device.id,
-                            "name": device.name,
-                            "type": device.type,
-                            "status": device.status,
-                            "last_seen": device.last_seen.isoformat(),
-                            "capabilities": [
-                                {
-                                    "name": cap.name,
-                                    "description": cap.description,
-                                    "metadata": json.loads(cap.meta_data),
-                                }
-                                for cap in all_caps
-                            ],
-                        }
+                        candidates.append({
+                            "priority": priority,
+                            "device": {
+                                "id": device.id,
+                                "name": device.name,
+                                "type": device.type,
+                                "status": device.status,
+                                "network_id": device.network_id,
+                                "network_type": device.network_type,
+                                "last_seen": device.last_seen.isoformat(),
+                                "capabilities": [
+                                    {
+                                        "name": cap.name,
+                                        "description": cap.description,
+                                        "metadata": json.loads(cap.meta_data),
+                                    }
+                                    for cap in all_caps
+                                ],
+                            }
+                        })
+
+                # Sort by priority (highest first) and return the best match
+                if candidates:
+                    candidates.sort(key=lambda x: x["priority"], reverse=True)
+                    selected = candidates[0]
+                    logger.info(
+                        f"Selected device {selected['device']['id']} ({selected['device']['name']}) "
+                        f"with priority {selected['priority']} for capability '{capability_name}'"
+                    )
+                    return selected["device"]
 
                 return None
 
         except Exception as e:
             logger.error(f"Error finding device by capability: {e}")
             return None
+
+    def validate_device_routing(
+        self,
+        source_device_id: Optional[int],
+        target_device_id: int,
+    ) -> Dict[str, Any]:
+        """
+        Validate if routing from source to target device requires user confirmation.
+        
+        This implements the security and conflict resolution logic:
+        - If source is on mobile network (4G/5G) and target is on home network, ask for confirmation
+        - If devices are on different networks, flag for potential security concern
+        
+        Args:
+            source_device_id: ID of the device that originated the command
+            target_device_id: ID of the device that will execute the command
+            
+        Returns:
+            Dict with validation result:
+            - requires_confirmation: bool
+            - reason: str (explanation)
+            - source_device: dict
+            - target_device: dict
+        """
+        try:
+            with Session(self.engine) as session:
+                # Get source device if provided
+                source_device = None
+                if source_device_id:
+                    source_statement = select(Device).where(Device.id == source_device_id)
+                    source_device = session.exec(source_statement).first()
+                
+                # Get target device
+                target_statement = select(Device).where(Device.id == target_device_id)
+                target_device = session.exec(target_statement).first()
+                
+                if not target_device:
+                    return {
+                        "requires_confirmation": False,
+                        "reason": "Target device not found",
+                        "source_device": None,
+                        "target_device": None,
+                    }
+                
+                # If no source device, no conflict possible
+                if not source_device:
+                    return {
+                        "requires_confirmation": False,
+                        "reason": "No source device specified",
+                        "source_device": None,
+                        "target_device": {
+                            "id": target_device.id,
+                            "name": target_device.name,
+                            "network_type": target_device.network_type,
+                        },
+                    }
+                
+                # Check for cross-network routing scenarios
+                requires_confirmation = False
+                reason = ""
+                
+                # Scenario 1: Source on mobile network (4G/5G), target on fixed network (WiFi/Ethernet)
+                if (source_device.network_type and target_device.network_type and
+                    source_device.network_type in ["4g", "5g"] and 
+                    target_device.network_type in ["wifi", "ethernet"]):
+                    requires_confirmation = True
+                    reason = (
+                        f"Você está no {source_device.network_type.upper()} "
+                        f"({source_device.name}) mas o dispositivo de destino "
+                        f"({target_device.name}) está na rede doméstica. "
+                        "Deseja executar mesmo assim?"
+                    )
+                
+                # Scenario 2: Different networks entirely
+                elif (source_device.network_id and target_device.network_id and
+                      source_device.network_id != target_device.network_id):
+                    requires_confirmation = True
+                    reason = (
+                        f"Você está em uma rede diferente ({source_device.network_id}) "
+                        f"do dispositivo de destino ({target_device.network_id}). "
+                        "Deseja executar mesmo assim?"
+                    )
+                
+                return {
+                    "requires_confirmation": requires_confirmation,
+                    "reason": reason,
+                    "source_device": {
+                        "id": source_device.id,
+                        "name": source_device.name,
+                        "network_type": source_device.network_type,
+                        "network_id": source_device.network_id,
+                    },
+                    "target_device": {
+                        "id": target_device.id,
+                        "name": target_device.name,
+                        "network_type": target_device.network_type,
+                        "network_id": target_device.network_id,
+                    },
+                }
+                
+        except Exception as e:
+            logger.error(f"Error validating device routing: {e}")
+            return {
+                "requires_confirmation": False,
+                "reason": f"Error during validation: {str(e)}",
+                "source_device": None,
+                "target_device": None,
+            }

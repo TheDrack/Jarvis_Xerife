@@ -6,10 +6,19 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
+class RequestMetadata(BaseModel):
+    """Metadata about the request context for location-aware routing"""
+
+    source_device_id: Optional[int] = Field(None, description="ID of the device that sent the command")
+    network_id: Optional[str] = Field(None, description="Network identifier (SSID or public IP)")
+    network_type: Optional[str] = Field(None, description="Network type (wifi, 4g, 5g, ethernet)")
+
+
 class ExecuteRequest(BaseModel):
     """Request model for command execution"""
 
     command: str = Field(..., description="Command to execute", min_length=1)
+    metadata: Optional[RequestMetadata] = Field(None, description="Context metadata for intelligent routing")
 
 
 class ExecuteResponse(BaseModel):
@@ -130,6 +139,8 @@ class DeviceRegistrationRequest(BaseModel):
     name: str = Field(..., description="Device name", min_length=1)
     type: str = Field(..., description="Device type (mobile, desktop, cloud, iot)")
     capabilities: List[CapabilityModel] = Field(default_factory=list, description="List of device capabilities")
+    network_id: Optional[str] = Field(None, description="Network identifier (SSID or public IP)")
+    network_type: Optional[str] = Field(None, description="Network type (wifi, 4g, 5g, ethernet)")
 
 
 class DeviceRegistrationResponse(BaseModel):
@@ -153,6 +164,8 @@ class DeviceResponse(BaseModel):
     name: str = Field(..., description="Device name")
     type: str = Field(..., description="Device type")
     status: str = Field(..., description="Device status")
+    network_id: Optional[str] = Field(None, description="Network identifier (SSID or public IP)")
+    network_type: Optional[str] = Field(None, description="Network type (wifi, 4g, 5g, ethernet)")
     last_seen: str = Field(..., description="Last seen timestamp (ISO format)")
     capabilities: List[CapabilityModel] = Field(default_factory=list, description="Device capabilities")
 
@@ -162,3 +175,23 @@ class DeviceListResponse(BaseModel):
 
     devices: List[DeviceResponse] = Field(..., description="List of registered devices")
     total: int = Field(..., description="Total number of devices")
+
+
+# Command Result Models
+
+
+class CommandResultRequest(BaseModel):
+    """Request model for submitting command execution results"""
+
+    result_data: Dict[str, Any] = Field(..., description="Result data from command execution")
+    success: bool = Field(..., description="Whether the command executed successfully")
+    message: Optional[str] = Field(None, description="Result message or error description")
+    executor_device_id: Optional[int] = Field(None, description="ID of the device that executed the command")
+
+
+class CommandResultResponse(BaseModel):
+    """Response model for command result submission"""
+
+    success: bool = Field(..., description="Whether the result was saved successfully")
+    command_id: int = Field(..., description="ID of the command")
+    message: str = Field(..., description="Confirmation message")

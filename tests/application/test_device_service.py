@@ -222,3 +222,210 @@ def test_update_nonexistent_device_status(device_service):
     """Test updating status of a device that doesn't exist"""
     success = device_service.update_device_status(999, "online")
     assert success is False
+
+
+# Context and Proximity Routing Tests
+
+
+def test_register_device_with_network_info(device_service):
+    """Test registering a device with network information"""
+    device_id = device_service.register_device(
+        name="Test Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        network_id="HomeWiFi-5GHz",
+        network_type="wifi",
+    )
+    
+    assert device_id is not None
+    
+    device = device_service.get_device(device_id)
+    assert device is not None
+    assert device["network_id"] == "HomeWiFi-5GHz"
+    assert device["network_type"] == "wifi"
+
+
+def test_find_device_priority_source_device(device_service):
+    """Test that source device gets highest priority when it has the capability"""
+    # Register source device with camera
+    source_id = device_service.register_device(
+        name="Source Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        network_id="4G-Network",
+        network_type="4g",
+    )
+    
+    # Register another device with camera on WiFi
+    device_service.register_device(
+        name="Home Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        network_id="HomeWiFi",
+        network_type="wifi",
+    )
+    
+    # Find device with source_device_id specified
+    device = device_service.find_device_by_capability(
+        "camera",
+        source_device_id=source_id,
+    )
+    
+    # Should return the source device (highest priority)
+    assert device is not None
+    assert device["id"] == source_id
+    assert device["name"] == "Source Phone"
+
+
+def test_find_device_priority_same_network(device_service):
+    """Test that devices on the same network get medium priority"""
+    # Register source device without camera
+    source_id = device_service.register_device(
+        name="Source Device",
+        device_type="desktop",
+        capabilities=[{"name": "display", "description": "Display", "metadata": {}}],
+        network_id="HomeWiFi",
+        network_type="wifi",
+    )
+    
+    # Register device with camera on same network
+    same_network_id = device_service.register_device(
+        name="Same Network Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        network_id="HomeWiFi",
+        network_type="wifi",
+    )
+    
+    # Register device with camera on different network
+    device_service.register_device(
+        name="Different Network Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        network_id="OfficeWiFi",
+        network_type="wifi",
+    )
+    
+    # Find device with source info but source doesn't have capability
+    device = device_service.find_device_by_capability(
+        "camera",
+        source_device_id=source_id,
+        network_id="HomeWiFi",
+    )
+    
+    # Should return the device on the same network (medium priority)
+    assert device is not None
+    assert device["id"] == same_network_id
+    assert device["name"] == "Same Network Phone"
+
+
+def test_find_device_priority_fallback(device_service):
+    """Test fallback to any online device when no priority matches"""
+    # Register device with camera on different network
+    fallback_id = device_service.register_device(
+        name="Fallback Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        network_id="OfficeWiFi",
+        network_type="wifi",
+    )
+    
+    # Find device with different network context
+    device = device_service.find_device_by_capability(
+        "camera",
+        network_id="HomeWiFi",
+    )
+    
+    # Should still return the device as fallback
+    assert device is not None
+    assert device["id"] == fallback_id
+    assert device["name"] == "Fallback Phone"
+
+
+def test_validate_device_routing_same_network(device_service):
+    """Test routing validation when devices are on the same network"""
+    source_id = device_service.register_device(
+        name="Source",
+        device_type="mobile",
+        capabilities=[],
+        network_id="HomeWiFi",
+        network_type="wifi",
+    )
+    
+    target_id = device_service.register_device(
+        name="Target",
+        device_type="desktop",
+        capabilities=[],
+        network_id="HomeWiFi",
+        network_type="wifi",
+    )
+    
+    validation = device_service.validate_device_routing(source_id, target_id)
+    
+    assert validation["requires_confirmation"] is False
+    assert validation["source_device"] is not None
+    assert validation["target_device"] is not None
+
+
+def test_validate_device_routing_4g_to_wifi_conflict(device_service):
+    """Test routing validation when source is on 4G and target is on WiFi"""
+    source_id = device_service.register_device(
+        name="Mobile",
+        device_type="mobile",
+        capabilities=[],
+        network_id="4G-Network",
+        network_type="4g",
+    )
+    
+    target_id = device_service.register_device(
+        name="Home PC",
+        device_type="desktop",
+        capabilities=[],
+        network_id="HomeWiFi",
+        network_type="wifi",
+    )
+    
+    validation = device_service.validate_device_routing(source_id, target_id)
+    
+    assert validation["requires_confirmation"] is True
+    assert "4G" in validation["reason"]
+    assert "rede doméstica" in validation["reason"].lower()
+
+
+def test_validate_device_routing_different_networks(device_service):
+    """Test routing validation when devices are on different networks"""
+    source_id = device_service.register_device(
+        name="Office Device",
+        device_type="desktop",
+        capabilities=[],
+        network_id="OfficeWiFi",
+        network_type="wifi",
+    )
+    
+    target_id = device_service.register_device(
+        name="Home Device",
+        device_type="desktop",
+        capabilities=[],
+        network_id="HomeWiFi",
+        network_type="wifi",
+    )
+    
+    validation = device_service.validate_device_routing(source_id, target_id)
+    
+    assert validation["requires_confirmation"] is True
+    assert "rede diferente" in validation["reason"].lower()
+
+
+def test_validate_device_routing_no_source(device_service):
+    """Test routing validation when no source device is provided"""
+    target_id = device_service.register_device(
+        name="Target",
+        device_type="desktop",
+        capabilities=[],
+    )
+    
+    validation = device_service.validate_device_routing(None, target_id)
+    
+    assert validation["requires_confirmation"] is False
+    assert validation["source_device"] is None
+    assert validation["target_device"] is not None
