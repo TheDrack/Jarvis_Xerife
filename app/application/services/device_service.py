@@ -3,6 +3,7 @@
 
 import json
 import logging
+import math
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -28,6 +29,39 @@ class DeviceService:
         """
         self.engine = engine
 
+    @staticmethod
+    def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        """
+        Calculate distance between two geographic coordinates using Haversine formula.
+        
+        Args:
+            lat1: Latitude of first point
+            lon1: Longitude of first point
+            lat2: Latitude of second point
+            lon2: Longitude of second point
+            
+        Returns:
+            Distance in kilometers
+        """
+        # Earth's radius in kilometers
+        R = 6371.0
+        
+        # Convert degrees to radians
+        lat1_rad = math.radians(lat1)
+        lon1_rad = math.radians(lon1)
+        lat2_rad = math.radians(lat2)
+        lon2_rad = math.radians(lon2)
+        
+        # Haversine formula
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+        
+        a = math.sin(dlat / 2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        
+        distance = R * c
+        return distance
+
     def register_device(
         self,
         name: str,
@@ -35,6 +69,9 @@ class DeviceService:
         capabilities: List[Dict[str, Any]],
         network_id: Optional[str] = None,
         network_type: Optional[str] = None,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+        last_ip: Optional[str] = None,
     ) -> Optional[int]:
         """
         Register a new device or update an existing one
@@ -45,6 +82,9 @@ class DeviceService:
             capabilities: List of capability dictionaries
             network_id: Optional network identifier (SSID or public IP)
             network_type: Optional network type (wifi, 4g, 5g, ethernet)
+            lat: Optional latitude coordinate
+            lon: Optional longitude coordinate
+            last_ip: Optional last known IP address
 
         Returns:
             Device ID if successful, None otherwise
@@ -61,6 +101,9 @@ class DeviceService:
                     existing_device.status = "online"
                     existing_device.network_id = network_id
                     existing_device.network_type = network_type
+                    existing_device.lat = lat
+                    existing_device.lon = lon
+                    existing_device.last_ip = last_ip
                     existing_device.last_seen = datetime.now()
                     session.add(existing_device)
                     session.commit()
@@ -75,6 +118,9 @@ class DeviceService:
                         status="online",
                         network_id=network_id,
                         network_type=network_type,
+                        lat=lat,
+                        lon=lon,
+                        last_ip=last_ip,
                         last_seen=datetime.now(),
                     )
                     session.add(device)
@@ -109,13 +155,23 @@ class DeviceService:
             logger.error(f"Error registering device: {e}")
             return None
 
-    def update_device_status(self, device_id: int, status: str) -> bool:
+    def update_device_status(
+        self, 
+        device_id: int, 
+        status: str,
+        lat: Optional[float] = None,
+        lon: Optional[float] = None,
+        last_ip: Optional[str] = None,
+    ) -> bool:
         """
         Update device status and last_seen timestamp
 
         Args:
             device_id: ID of the device
             status: New status (online/offline)
+            lat: Optional latitude coordinate
+            lon: Optional longitude coordinate
+            last_ip: Optional last known IP address
 
         Returns:
             True if successful, False otherwise
@@ -128,6 +184,12 @@ class DeviceService:
                 if device:
                     device.status = status
                     device.last_seen = datetime.now()
+                    if lat is not None:
+                        device.lat = lat
+                    if lon is not None:
+                        device.lon = lon
+                    if last_ip is not None:
+                        device.last_ip = last_ip
                     session.add(device)
                     session.commit()
                     logger.info(f"Updated device {device_id} status to {status}")
@@ -169,6 +231,9 @@ class DeviceService:
                     "status": device.status,
                     "network_id": device.network_id,
                     "network_type": device.network_type,
+                    "lat": device.lat,
+                    "lon": device.lon,
+                    "last_ip": device.last_ip,
                     "last_seen": device.last_seen.isoformat(),
                     "capabilities": [
                         {
@@ -215,6 +280,9 @@ class DeviceService:
                         "status": device.status,
                         "network_id": device.network_id,
                         "network_type": device.network_type,
+                        "lat": device.lat,
+                        "lon": device.lon,
+                        "last_ip": device.last_ip,
                         "last_seen": device.last_seen.isoformat(),
                         "capabilities": [
                             {
@@ -237,6 +305,8 @@ class DeviceService:
         capability_name: str,
         source_device_id: Optional[int] = None,
         network_id: Optional[str] = None,
+        source_lat: Optional[float] = None,
+        source_lon: Optional[float] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Find an online device that has a specific capability using intelligent routing.
@@ -244,12 +314,16 @@ class DeviceService:
         Priority hierarchy:
         1. Source device itself (if it has the capability)
         2. Devices on the same network (proximity)
-        3. Other online devices (fallback)
+        3. Devices within 1km radius (very close geographically)
+        4. Devices within 50km radius (same city)
+        5. Other online devices (fallback)
 
         Args:
             capability_name: Name of the required capability
             source_device_id: ID of the device that originated the command
             network_id: Network identifier (SSID or public IP) for proximity routing
+            source_lat: Source device latitude for geolocation routing
+            source_lon: Source device longitude for geolocation routing
 
         Returns:
             Device dict with the capability or None if not found
@@ -273,16 +347,30 @@ class DeviceService:
                     if device:
                         # Calculate priority score
                         priority = 0
+                        distance = None
                         
                         # Priority 1: Source device (highest priority)
                         if source_device_id and device.id == source_device_id:
                             priority = 100
                             logger.info(f"Source device {device.id} ({device.name}) has capability '{capability_name}'")
-                        # Priority 2: Same network (medium priority)
+                        # Priority 2: Same network (high priority)
                         elif network_id and device.network_id == network_id:
-                            priority = 50
+                            priority = 80
                             logger.info(f"Device {device.id} ({device.name}) on same network '{network_id}' has capability '{capability_name}'")
-                        # Priority 3: Other online devices (fallback)
+                        # Priority 3: Very close geographically (within 1km)
+                        elif (source_lat is not None and source_lon is not None and 
+                              device.lat is not None and device.lon is not None):
+                            distance = self.calculate_distance(source_lat, source_lon, device.lat, device.lon)
+                            if distance < 1.0:  # Within 1km
+                                priority = 70
+                                logger.info(f"Device {device.id} ({device.name}) is very close ({distance:.2f}km) for capability '{capability_name}'")
+                            elif distance < 50.0:  # Within 50km (same city)
+                                priority = 40
+                                logger.info(f"Device {device.id} ({device.name}) is nearby ({distance:.2f}km) for capability '{capability_name}'")
+                            else:
+                                priority = 10
+                                logger.debug(f"Device {device.id} ({device.name}) is far ({distance:.2f}km) for capability '{capability_name}'")
+                        # Priority 4: Other online devices (fallback)
                         else:
                             priority = 10
                             logger.debug(f"Device {device.id} ({device.name}) available as fallback for capability '{capability_name}'")
@@ -295,6 +383,7 @@ class DeviceService:
 
                         candidates.append({
                             "priority": priority,
+                            "distance": distance,
                             "device": {
                                 "id": device.id,
                                 "name": device.name,
@@ -302,6 +391,9 @@ class DeviceService:
                                 "status": device.status,
                                 "network_id": device.network_id,
                                 "network_type": device.network_type,
+                                "lat": device.lat,
+                                "lon": device.lon,
+                                "last_ip": device.last_ip,
                                 "last_seen": device.last_seen.isoformat(),
                                 "capabilities": [
                                     {
@@ -390,7 +482,46 @@ class DeviceService:
                 requires_confirmation = False
                 reason = ""
                 
-                # Scenario 1: Source on mobile network (4G/5G), target on fixed network (WiFi/Ethernet)
+                # Calculate distance if both devices have coordinates
+                distance = None
+                if (source_device.lat is not None and source_device.lon is not None and
+                    target_device.lat is not None and target_device.lon is not None):
+                    distance = self.calculate_distance(
+                        source_device.lat, source_device.lon,
+                        target_device.lat, target_device.lon
+                    )
+                    
+                    # Scenario 1: Devices are in different cities (>50km apart)
+                    if distance > 50.0:
+                        requires_confirmation = True
+                        reason = (
+                            f"O dispositivo de destino ({target_device.name}) está "
+                            f"a {distance:.1f}km de distância. "
+                            "Deseja executar a ação remotamente?"
+                        )
+                        return {
+                            "requires_confirmation": requires_confirmation,
+                            "reason": reason,
+                            "distance": distance,
+                            "source_device": {
+                                "id": source_device.id,
+                                "name": source_device.name,
+                                "network_type": source_device.network_type,
+                                "network_id": source_device.network_id,
+                                "lat": source_device.lat,
+                                "lon": source_device.lon,
+                            },
+                            "target_device": {
+                                "id": target_device.id,
+                                "name": target_device.name,
+                                "network_type": target_device.network_type,
+                                "network_id": target_device.network_id,
+                                "lat": target_device.lat,
+                                "lon": target_device.lon,
+                            },
+                        }
+                
+                # Scenario 2: Source on mobile network (4G/5G), target on fixed network (WiFi/Ethernet)
                 if (source_device.network_type and target_device.network_type and
                     source_device.network_type in ["4g", "5g"] and 
                     target_device.network_type in ["wifi", "ethernet"]):
@@ -402,7 +533,7 @@ class DeviceService:
                         "Deseja executar mesmo assim?"
                     )
                 
-                # Scenario 2: Different networks entirely
+                # Scenario 3: Different networks entirely
                 elif (source_device.network_id and target_device.network_id and
                       source_device.network_id != target_device.network_id):
                     requires_confirmation = True
@@ -415,17 +546,22 @@ class DeviceService:
                 return {
                     "requires_confirmation": requires_confirmation,
                     "reason": reason,
+                    "distance": distance,
                     "source_device": {
                         "id": source_device.id,
                         "name": source_device.name,
                         "network_type": source_device.network_type,
                         "network_id": source_device.network_id,
+                        "lat": source_device.lat,
+                        "lon": source_device.lon,
                     },
                     "target_device": {
                         "id": target_device.id,
                         "name": target_device.name,
                         "network_type": target_device.network_type,
                         "network_id": target_device.network_id,
+                        "lat": target_device.lat,
+                        "lon": target_device.lon,
                     },
                 }
                 

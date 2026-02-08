@@ -200,3 +200,81 @@ def test_get_nonexistent_device(test_client):
     response = test_client.get("/v1/devices/999", headers=headers)
     
     assert response.status_code == 404
+
+
+def test_register_device_with_geolocation(test_client):
+    """Test device registration with GPS coordinates"""
+    token = get_auth_token(test_client)
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    response = test_client.post(
+        "/v1/devices/register",
+        json={
+            "name": "GPS Phone",
+            "type": "mobile",
+            "capabilities": [
+                {
+                    "name": "camera",
+                    "description": "Camera access",
+                    "metadata": {"resolution": "4K"}
+                }
+            ],
+            "lat": -23.5505,
+            "lon": -46.6333,
+            "last_ip": "192.168.1.100"
+        },
+        headers=headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "device_id" in data
+    
+    # Verify the device has location data
+    device_id = data["device_id"]
+    device_response = test_client.get(f"/v1/devices/{device_id}", headers=headers)
+    device_data = device_response.json()
+    
+    assert device_data["lat"] == -23.5505
+    assert device_data["lon"] == -46.6333
+    assert device_data["last_ip"] == "192.168.1.100"
+
+
+def test_device_heartbeat_with_location(test_client):
+    """Test device heartbeat endpoint with location update"""
+    token = get_auth_token(test_client)
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Register a device
+    reg_response = test_client.post(
+        "/v1/devices/register",
+        json={
+            "name": "Mobile Device",
+            "type": "mobile",
+            "capabilities": [],
+            "lat": -23.5505,
+            "lon": -46.6333,
+        },
+        headers=headers
+    )
+    device_id = reg_response.json()["device_id"]
+    
+    # Update status with new location
+    response = test_client.put(
+        f"/v1/devices/{device_id}/heartbeat",
+        json={
+            "status": "online",
+            "lat": -22.9068,
+            "lon": -43.1729,
+            "last_ip": "192.168.2.50"
+        },
+        headers=headers
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "online"
+    assert data["lat"] == -22.9068
+    assert data["lon"] == -43.1729
+    assert data["last_ip"] == "192.168.2.50"

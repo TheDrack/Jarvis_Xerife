@@ -429,3 +429,195 @@ def test_validate_device_routing_no_source(device_service):
     assert validation["requires_confirmation"] is False
     assert validation["source_device"] is None
     assert validation["target_device"] is not None
+
+
+# Geolocation Tests
+
+
+def test_calculate_distance(device_service):
+    """Test distance calculation using Haversine formula"""
+    # São Paulo to Rio de Janeiro (approximately 360km)
+    sp_lat, sp_lon = -23.5505, -46.6333
+    rj_lat, rj_lon = -22.9068, -43.1729
+    
+    distance = device_service.calculate_distance(sp_lat, sp_lon, rj_lat, rj_lon)
+    
+    # Should be approximately 360km
+    assert 350 < distance < 370
+
+
+def test_register_device_with_geolocation(device_service):
+    """Test registering a device with GPS coordinates"""
+    device_id = device_service.register_device(
+        name="Mobile Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        lat=-23.5505,
+        lon=-46.6333,
+        last_ip="192.168.1.100",
+    )
+    
+    device = device_service.get_device(device_id)
+    assert device is not None
+    assert device["lat"] == -23.5505
+    assert device["lon"] == -46.6333
+    assert device["last_ip"] == "192.168.1.100"
+
+
+def test_update_device_status_with_location(device_service):
+    """Test updating device status with location data"""
+    device_id = device_service.register_device(
+        name="Test Device",
+        device_type="mobile",
+        capabilities=[],
+        lat=-23.5505,
+        lon=-46.6333,
+    )
+    
+    # Update with new location
+    success = device_service.update_device_status(
+        device_id,
+        "online",
+        lat=-22.9068,
+        lon=-43.1729,
+        last_ip="192.168.2.50",
+    )
+    
+    assert success is True
+    
+    device = device_service.get_device(device_id)
+    assert device["lat"] == -22.9068
+    assert device["lon"] == -43.1729
+    assert device["last_ip"] == "192.168.2.50"
+
+
+def test_find_device_priority_geolocation_very_close(device_service):
+    """Test that very close devices (<1km) get high priority"""
+    # Register source device
+    source_id = device_service.register_device(
+        name="Source",
+        device_type="desktop",
+        capabilities=[{"name": "display", "description": "Display", "metadata": {}}],
+        lat=-23.5505,
+        lon=-46.6333,
+    )
+    
+    # Register very close device with camera (0.5km away)
+    close_id = device_service.register_device(
+        name="Close Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        lat=-23.5550,
+        lon=-46.6333,
+    )
+    
+    # Register far device with camera (in another city)
+    device_service.register_device(
+        name="Far Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        lat=-22.9068,
+        lon=-43.1729,
+    )
+    
+    # Find device with source location
+    device = device_service.find_device_by_capability(
+        "camera",
+        source_device_id=source_id,
+        source_lat=-23.5505,
+        source_lon=-46.6333,
+    )
+    
+    # Should return the very close device
+    assert device is not None
+    assert device["id"] == close_id
+    assert device["name"] == "Close Phone"
+
+
+def test_find_device_priority_geolocation_same_city(device_service):
+    """Test that devices in same city (<50km) get medium priority"""
+    # Register far device with camera (no proximity)
+    far_id = device_service.register_device(
+        name="Far Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        lat=-22.9068,
+        lon=-43.1729,
+    )
+    
+    # Register same-city device with camera (30km away)
+    same_city_id = device_service.register_device(
+        name="Same City Phone",
+        device_type="mobile",
+        capabilities=[{"name": "camera", "description": "Camera", "metadata": {}}],
+        lat=-23.6505,
+        lon=-46.6333,
+    )
+    
+    # Find device with source location
+    device = device_service.find_device_by_capability(
+        "camera",
+        source_lat=-23.5505,
+        source_lon=-46.6333,
+    )
+    
+    # Should return the same-city device (closer)
+    assert device is not None
+    assert device["id"] == same_city_id
+    assert device["name"] == "Same City Phone"
+
+
+def test_validate_device_routing_far_distance(device_service):
+    """Test routing validation when devices are in different cities (>50km)"""
+    # São Paulo
+    source_id = device_service.register_device(
+        name="SP Phone",
+        device_type="mobile",
+        capabilities=[],
+        lat=-23.5505,
+        lon=-46.6333,
+    )
+    
+    # Rio de Janeiro (approximately 360km from São Paulo)
+    target_id = device_service.register_device(
+        name="RJ Desktop",
+        device_type="desktop",
+        capabilities=[],
+        lat=-22.9068,
+        lon=-43.1729,
+    )
+    
+    validation = device_service.validate_device_routing(source_id, target_id)
+    
+    assert validation["requires_confirmation"] is True
+    assert "km" in validation["reason"]
+    assert "distância" in validation["reason"]
+    assert validation["distance"] is not None
+    assert validation["distance"] > 50
+
+
+def test_validate_device_routing_same_location(device_service):
+    """Test routing validation when devices are very close"""
+    # Two devices in the same location
+    source_id = device_service.register_device(
+        name="Phone 1",
+        device_type="mobile",
+        capabilities=[],
+        lat=-23.5505,
+        lon=-46.6333,
+    )
+    
+    target_id = device_service.register_device(
+        name="Phone 2",
+        device_type="mobile",
+        capabilities=[],
+        lat=-23.5505,
+        lon=-46.6333,
+    )
+    
+    validation = device_service.validate_device_routing(source_id, target_id)
+    
+    # Should not require confirmation (same location)
+    assert validation["requires_confirmation"] is False
+    assert validation["distance"] is not None
+    assert validation["distance"] < 1
