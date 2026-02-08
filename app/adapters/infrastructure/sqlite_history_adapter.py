@@ -65,12 +65,10 @@ class SQLiteHistoryAdapter(HistoryProvider):
                 database_url = database_url.replace("postgres://", "postgresql://", 1)
                 logger.info("Converted postgres:// URL to postgresql:// for SQLAlchemy compatibility")
             
-            # Use psycopg2 driver explicitly for PostgreSQL
-            if database_url.startswith("postgresql://"):
-                # Check if driver is not already specified
-                if "+psycopg2" not in database_url and "+asyncpg" not in database_url:
-                    database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
-                    logger.info("Using postgresql+psycopg2:// driver for PostgreSQL")
+            # Use psycopg2 driver explicitly for PostgreSQL if no driver is specified
+            if database_url.startswith("postgresql://") and "+" not in database_url.split("://")[0]:
+                database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+                logger.info("Using postgresql+psycopg2:// driver for PostgreSQL")
             
             self.database_url = database_url
             db_type = database_url.split(':')[0].split('+')[0]  # Extract base type (postgresql, mysql, etc.)
