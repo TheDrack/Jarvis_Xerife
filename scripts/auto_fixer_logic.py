@@ -9,17 +9,31 @@ and automatically creates pull requests with the corrections.
 
 Features:
 1. Reads error from ISSUE_BODY environment variable
-2. Extracts affected file path from the error message
-3. Sends error and file code to Groq/Gemini API
-4. Receives corrected code from AI
-5. Applies the fix locally
-6. Creates a Git branch fix/issue-{ID}
-7. Commits the changes
-8. Opens a Pull Request using GitHub CLI (gh pr create)
+2. Extracts affected file path from the error message or detects common files
+3. Handles both code bug fixes and documentation updates
+4. Sends error/request and file code to Groq/Gemini API
+5. Receives corrected/updated content from AI
+6. Applies the fix locally
+7. Creates a Git branch fix/issue-{ID}
+8. Commits the changes
+9. Opens a Pull Request using GitHub CLI (gh pr create)
+
+Key Capabilities:
+- File Flexibility: If no file path in traceback, searches for common files
+  (README.md, requirements.txt, etc.) in issue body with case-insensitive matching
+- API Validation: Clear error messages when GROQ_API_KEY or GOOGLE_API_KEY missing
+- Context Handling: Detects documentation requests (e.g., "add a section") and
+  provides current file content to AI instead of treating it as a bug
 
 Usage:
+    # For bug fixes:
     export ISSUE_BODY="Error: NameError in file app/main.py line 42..."
     export ISSUE_ID="123"
+    python scripts/auto_fixer_logic.py
+    
+    # For documentation updates:
+    export ISSUE_BODY="Please add a section about installation to README.md"
+    export ISSUE_ID="124"
     python scripts/auto_fixer_logic.py
 """
 
@@ -66,7 +80,12 @@ class AutoFixer:
         self.gemini_api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         
         if not self.groq_api_key and not self.gemini_api_key:
-            logger.warning("No API keys found. Set GROQ_API_KEY or GOOGLE_API_KEY/GEMINI_API_KEY")
+            logger.error("❌ CRITICAL: No AI API keys found!")
+            logger.error("   The auto-fixer cannot proceed without AI capabilities.")
+            logger.error("   Please set one of the following environment variables:")
+            logger.error("   - GROQ_API_KEY: For Groq API access")
+            logger.error("   - GOOGLE_API_KEY or GEMINI_API_KEY: For Gemini API access")
+            logger.error("   Without an API key, the auto-fixer cannot generate fixes.")
         
         # Validate gh CLI is available
         self._check_gh_cli()
@@ -95,6 +114,88 @@ class AutoFixer:
             logger.error(f"Error checking gh CLI: {e}")
             return False
     
+    def is_documentation_request(self, issue_body: str) -> bool:
+        """
+        Detect if the issue is requesting a documentation update
+        
+        Args:
+            issue_body: The issue body text
+            
+        Returns:
+            True if this appears to be a documentation request, False otherwise
+        """
+        # Keywords that suggest documentation updates
+        doc_keywords = [
+            'adicionar uma seção',  # add a section (Portuguese)
+            'adicionar seção',
+            'add a section',
+            'add section',
+            'update readme',
+            'atualizar readme',
+            'update documentation',
+            'atualizar documentação',
+            'add to readme',
+            'adicionar ao readme',
+            'create section',
+            'criar seção',
+            'documentation',
+            'documentação',
+        ]
+        
+        issue_lower = issue_body.lower()
+        
+        for keyword in doc_keywords:
+            if keyword in issue_lower:
+                logger.info(f"Detected documentation request: '{keyword}' found in issue")
+                return True
+        
+        return False
+    
+    def extract_common_filename(self, issue_body: str) -> Optional[str]:
+        """
+        Extract common file names from issue body when no traceback is found
+        
+        Args:
+            issue_body: The issue body text
+            
+        Returns:
+            File path if a common file is mentioned, None otherwise
+        """
+        # Common files to look for (case-insensitive)
+        common_files = {
+            'readme': 'README.md',
+            'readme.md': 'README.md',
+            'requirements': 'requirements.txt',
+            'requirements.txt': 'requirements.txt',
+            'setup.py': 'setup.py',
+            'setup': 'setup.py',
+            'dockerfile': 'Dockerfile',
+            'docker-compose': 'docker-compose.yml',
+            'docker-compose.yml': 'docker-compose.yml',
+            'makefile': 'Makefile',
+            '.gitignore': '.gitignore',
+            'gitignore': '.gitignore',
+            'license': 'LICENSE',
+            'license.md': 'LICENSE',
+            'contributing': 'CONTRIBUTING.md',
+            'contributing.md': 'CONTRIBUTING.md',
+        }
+        
+        # Convert issue body to lowercase for case-insensitive matching
+        issue_lower = issue_body.lower()
+        
+        # Look for common file mentions
+        for key, actual_filename in common_files.items():
+            # Check if the file is mentioned in the issue
+            if key in issue_lower:
+                # Verify the file exists in the repository
+                full_path = self.repo_path / actual_filename
+                if full_path.exists():
+                    logger.info(f"Found common file mentioned: {key} → {actual_filename}")
+                    return actual_filename
+        
+        return None
+    
     def extract_file_from_error(self, error_message: str) -> Optional[str]:
         """
         Extract the affected file path from an error message
@@ -119,10 +220,10 @@ class AutoFixer:
             match = re.search(pattern, error_message)
             if match:
                 file_path = match.group(1)
-                logger.info(f"Extracted file path: {file_path}")
+                logger.info(f"Extracted file path from traceback: {file_path}")
                 return file_path
         
-        logger.warning("Could not extract file path from error message")
+        logger.warning("Could not extract file path from traceback")
         return None
     
     def read_file_content(self, file_path: str) -> Optional[str]:
@@ -150,19 +251,21 @@ class AutoFixer:
             logger.error(f"Error reading file {file_path}: {e}")
             return None
     
-    def call_groq_api(self, error_message: str, code: str) -> Optional[str]:
+    def call_groq_api(self, error_message: str, code: str, is_doc_request: bool = False) -> Optional[str]:
         """
         Call Groq API to get fixed code
         
         Args:
-            error_message: The error message
-            code: The current code with the error
+            error_message: The error message or user request
+            code: The current code with the error or current file content
+            is_doc_request: Whether this is a documentation update request
             
         Returns:
             Fixed code or None if API call fails
         """
         if not self.groq_api_key:
-            logger.warning("GROQ_API_KEY not set, skipping Groq API")
+            logger.error("❌ GROQ_API_KEY not set. Cannot proceed without AI API access.")
+            logger.error("   Set GROQ_API_KEY environment variable to use Groq API.")
             return None
         
         try:
@@ -170,7 +273,20 @@ class AutoFixer:
             
             client = groq.Groq(api_key=self.groq_api_key)
             
-            prompt = f"""You are a code fixing assistant. Analyze the following error and code, then return ONLY the corrected code without any explanations, comments, or markdown formatting.
+            if is_doc_request:
+                # Documentation update request
+                prompt = f"""You are a documentation assistant. The user has requested an update to a documentation file.
+
+USER REQUEST:
+{error_message}
+
+CURRENT FILE CONTENT:
+{code}
+
+Please update the file according to the user's request. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
+            else:
+                # Code bug fix request
+                prompt = f"""You are a code fixing assistant. Analyze the following error and code, then return ONLY the corrected code without any explanations, comments, or markdown formatting.
 
 ERROR:
 {error_message}
@@ -183,7 +299,7 @@ Return ONLY the corrected code, nothing else."""
             response = client.chat.completions.create(
                 model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
                 messages=[
-                    {"role": "system", "content": "You are a code fixing assistant. Return only corrected code without explanations."},
+                    {"role": "system", "content": "You are a helpful assistant. Return only the requested content without explanations."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
@@ -198,7 +314,7 @@ Return ONLY the corrected code, nothing else."""
                 # Remove first and last line (```language and ```)
                 fixed_code = "\n".join(lines[1:-1])
             
-            logger.info(f"✓ Received fixed code from Groq ({len(fixed_code)} chars)")
+            logger.info(f"✓ Received updated content from Groq ({len(fixed_code)} chars)")
             return fixed_code
             
         except ImportError:
@@ -208,19 +324,21 @@ Return ONLY the corrected code, nothing else."""
             logger.error(f"Error calling Groq API: {e}")
             return None
     
-    def call_gemini_api(self, error_message: str, code: str) -> Optional[str]:
+    def call_gemini_api(self, error_message: str, code: str, is_doc_request: bool = False) -> Optional[str]:
         """
         Call Gemini API to get fixed code
         
         Args:
-            error_message: The error message
-            code: The current code with the error
+            error_message: The error message or user request
+            code: The current code with the error or current file content
+            is_doc_request: Whether this is a documentation update request
             
         Returns:
             Fixed code or None if API call fails
         """
         if not self.gemini_api_key:
-            logger.warning("GOOGLE_API_KEY/GEMINI_API_KEY not set, skipping Gemini API")
+            logger.error("❌ GOOGLE_API_KEY/GEMINI_API_KEY not set. Cannot proceed without AI API access.")
+            logger.error("   Set GOOGLE_API_KEY or GEMINI_API_KEY environment variable to use Gemini API.")
             return None
         
         try:
@@ -229,7 +347,20 @@ Return ONLY the corrected code, nothing else."""
             
             client = genai.Client(api_key=self.gemini_api_key)
             
-            prompt = f"""You are a code fixing assistant. Analyze the following error and code, then return ONLY the corrected code without any explanations, comments, or markdown formatting.
+            if is_doc_request:
+                # Documentation update request
+                prompt = f"""You are a documentation assistant. The user has requested an update to a documentation file.
+
+USER REQUEST:
+{error_message}
+
+CURRENT FILE CONTENT:
+{code}
+
+Please update the file according to the user's request. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
+            else:
+                # Code bug fix request
+                prompt = f"""You are a code fixing assistant. Analyze the following error and code, then return ONLY the corrected code without any explanations, comments, or markdown formatting.
 
 ERROR:
 {error_message}
@@ -252,7 +383,7 @@ Return ONLY the corrected code, nothing else."""
                 # Remove first and last line (```language and ```)
                 fixed_code = "\n".join(lines[1:-1])
             
-            logger.info(f"✓ Received fixed code from Gemini ({len(fixed_code)} chars)")
+            logger.info(f"✓ Received updated content from Gemini ({len(fixed_code)} chars)")
             return fixed_code
             
         except ImportError:
@@ -262,26 +393,27 @@ Return ONLY the corrected code, nothing else."""
             logger.error(f"Error calling Gemini API: {e}")
             return None
     
-    def get_fixed_code(self, error_message: str, code: str) -> Optional[str]:
+    def get_fixed_code(self, error_message: str, code: str, is_doc_request: bool = False) -> Optional[str]:
         """
         Get fixed code using available AI APIs (tries Groq first, then Gemini)
         
         Args:
-            error_message: The error message
-            code: The current code with the error
+            error_message: The error message or user request
+            code: The current code with the error or current file content
+            is_doc_request: Whether this is a documentation update request
             
         Returns:
             Fixed code or None if all APIs fail
         """
         # Try Groq first
-        fixed_code = self.call_groq_api(error_message, code)
+        fixed_code = self.call_groq_api(error_message, code, is_doc_request)
         
         if fixed_code:
             return fixed_code
         
         # Fallback to Gemini
         logger.info("Falling back to Gemini API...")
-        fixed_code = self.call_gemini_api(error_message, code)
+        fixed_code = self.call_gemini_api(error_message, code, is_doc_request)
         
         return fixed_code
     
@@ -517,53 +649,85 @@ _Generated by Jarvis Self-Healing Orchestrator_
         logger.info(f"\n📋 Issue ID: {issue_id}")
         logger.info(f"📋 Issue Body:\n{issue_body[:200]}...")
         
-        # 2. Extract affected file from error
+        # Check if we have API keys
+        if not self.groq_api_key and not self.gemini_api_key:
+            logger.error("\n❌ CRITICAL ERROR: No AI API keys available!")
+            logger.error("Cannot proceed without AI capabilities (the 'brain' of the auto-fixer).")
+            logger.error("Please configure at least one of the following:")
+            logger.error("  - GROQ_API_KEY for Groq API")
+            logger.error("  - GOOGLE_API_KEY or GEMINI_API_KEY for Gemini API")
+            return 1
+        
+        # 2. Detect if this is a documentation request
+        is_doc_request = self.is_documentation_request(issue_body)
+        
+        if is_doc_request:
+            logger.info("\n📚 Detected documentation update request")
+        else:
+            logger.info("\n🐛 Detected bug fix request")
+        
+        # 3. Extract affected file from error or find common file
         file_path = self.extract_file_from_error(issue_body)
         
         if not file_path:
-            logger.error("Could not extract file path from error message")
+            logger.info("No file path found in traceback, searching for common files...")
+            file_path = self.extract_common_filename(issue_body)
+        
+        if not file_path:
+            logger.error("Could not extract or identify target file from issue")
+            logger.error("Please ensure the issue mentions a file path or common filename")
             return 1
         
-        # 3. Read current file content
+        logger.info(f"\n🎯 Target file: {file_path}")
+        
+        # 4. Read current file content
         current_code = self.read_file_content(file_path)
         
         if not current_code:
             logger.error(f"Could not read file: {file_path}")
             return 1
         
-        # 4. Get fixed code from AI
-        logger.info(f"\n🤖 Requesting fix from AI...")
-        fixed_code = self.get_fixed_code(issue_body, current_code)
+        # 5. Get fixed code from AI
+        if is_doc_request:
+            logger.info(f"\n🤖 Requesting documentation update from AI...")
+        else:
+            logger.info(f"\n🤖 Requesting bug fix from AI...")
+        
+        fixed_code = self.get_fixed_code(issue_body, current_code, is_doc_request)
         
         if not fixed_code:
-            logger.error("Failed to get fixed code from AI")
+            logger.error("Failed to get updated content from AI")
+            logger.error("Possible reasons:")
+            logger.error("  - API key is invalid or expired")
+            logger.error("  - API service is unavailable")
+            logger.error("  - Network connectivity issues")
             return 1
         
-        # 5. Apply the fix
-        logger.info(f"\n📝 Applying fix to {file_path}...")
+        # 6. Apply the fix
+        logger.info(f"\n📝 Applying changes to {file_path}...")
         if not self.apply_fix(file_path, fixed_code):
-            logger.error("Failed to apply fix")
+            logger.error("Failed to apply changes")
             return 1
         
-        # 6. Create Git branch
+        # 7. Create Git branch
         logger.info(f"\n🌿 Creating branch fix/issue-{issue_id}...")
         if not self.create_branch(issue_id):
             logger.error("Failed to create branch")
             return 1
         
-        # 7. Commit changes
+        # 8. Commit changes
         logger.info(f"\n💾 Committing changes...")
         if not self.commit_changes(file_path, issue_id):
             logger.error("Failed to commit changes")
             return 1
         
-        # 8. Push branch
+        # 9. Push branch
         logger.info(f"\n⬆️  Pushing branch to remote...")
         if not self.push_branch(issue_id):
             logger.error("Failed to push branch")
             return 1
         
-        # 9. Create pull request
+        # 10. Create pull request
         logger.info(f"\n🔀 Creating pull request...")
         if not self.create_pull_request(issue_id, issue_body, file_path):
             logger.error("Failed to create pull request")
