@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for AI Gateway Gears System"""
 
+import os
 from unittest.mock import Mock, patch, AsyncMock
 import pytest
 
@@ -345,7 +346,3 @@ class TestEnvironmentVariableConfiguration:
             assert gateway.groq_high_gear_model == AIGateway.DEFAULT_HIGH_GEAR_MODEL
             assert gateway.groq_low_gear_model == AIGateway.DEFAULT_LOW_GEAR_MODEL
             assert gateway.gemini_model == AIGateway.DEFAULT_GEMINI_MODEL
-
-
-# Import os at module level for patching
-import os

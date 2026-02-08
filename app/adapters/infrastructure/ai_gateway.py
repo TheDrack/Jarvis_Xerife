@@ -100,10 +100,12 @@ class AIGateway:
     TOKEN_THRESHOLD = 10000
     
     # Groq Gears Configuration (Marcha Alta e Marcha Baixa)
-    # High Gear: Fast, powerful model (default)
-    DEFAULT_HIGH_GEAR_MODEL = "llama-3.3-70b-versatile"  # Can also use llama-4-scout when available
-    # Low Gear: Smaller, more economical model (internal fallback)
-    DEFAULT_LOW_GEAR_MODEL = "llama-3.1-8b-instant"  # Can also use qwen-3-32b
+    # High Gear: Fast, powerful model (default - currently llama-3.3-70b-versatile)
+    # Future alternatives: llama-4-scout when available
+    DEFAULT_HIGH_GEAR_MODEL = "llama-3.3-70b-versatile"
+    # Low Gear: Smaller, more economical model (internal fallback - currently llama-3.1-8b-instant)
+    # Future alternatives: qwen-3-32b
+    DEFAULT_LOW_GEAR_MODEL = "llama-3.1-8b-instant"
     
     # Gemini Cannon Shot (External Fallback)
     DEFAULT_GEMINI_MODEL = "gemini-1.5-pro"  # Changed from gemini-flash-latest
