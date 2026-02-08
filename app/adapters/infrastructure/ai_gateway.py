@@ -1,0 +1,453 @@
+# -*- coding: utf-8 -*-
+"""AI Gateway - Intelligent routing between multiple LLM providers
+
+This gateway implements:
+- Cost Priority: Groq (Llama-3-70b) as default for log analysis and short internal monologues
+- Context Escalation: Automatic switch to Gemini 1.5 for payloads > 10,000 tokens or multimodal
+- Automatic Fallback: Transparent migration from Groq to Gemini on rate limits
+"""
+
+import logging
+import os
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import tiktoken
+
+logger = logging.getLogger(__name__)
+
+
+class LLMProvider(str, Enum):
+    """Available LLM providers"""
+    GROQ = "groq"
+    GEMINI = "gemini"
+
+
+class AIGateway:
+    """
+    AI Gateway that intelligently routes requests between multiple LLM providers.
+    
+    Features:
+    - Default to Groq (fast, cost-effective) for short requests
+    - Automatically escalate to Gemini for large contexts (>10k tokens)
+    - Fallback to Gemini on Groq rate limits
+    - Support for multimodal analysis (future: images/video)
+    """
+    
+    # Token threshold for context-based escalation
+    TOKEN_THRESHOLD = 10000
+    
+    def __init__(
+        self,
+        groq_api_key: Optional[str] = None,
+        gemini_api_key: Optional[str] = None,
+        groq_model: str = "llama-3.1-70b-versatile",
+        gemini_model: str = "gemini-flash-latest",
+        default_provider: LLMProvider = LLMProvider.GROQ,
+    ):
+        """
+        Initialize AI Gateway with multiple provider support.
+        
+        Args:
+            groq_api_key: Groq API key (defaults to GROQ_API_KEY env var)
+            gemini_api_key: Gemini API key (defaults to GOOGLE_API_KEY or GEMINI_API_KEY env var)
+            groq_model: Groq model name
+            gemini_model: Gemini model name
+            default_provider: Default provider for routing (GROQ or GEMINI)
+        """
+        self.groq_model = groq_model
+        self.gemini_model = gemini_model
+        self.default_provider = default_provider
+        
+        # Get API keys from parameters or environment
+        self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY")
+        self.gemini_api_key = gemini_api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        
+        # Initialize tokenizer for token counting
+        try:
+            # Using cl100k_base encoding (GPT-4, GPT-3.5-turbo)
+            # This is a good approximation for most modern LLMs
+            self.tokenizer = tiktoken.get_encoding("cl100k_base")
+        except Exception as e:
+            logger.warning(f"Failed to initialize tokenizer: {e}. Token counting will be approximate.")
+            self.tokenizer = None
+        
+        # Initialize providers
+        self.groq_client = None
+        self.gemini_client = None
+        
+        self._initialize_groq()
+        self._initialize_gemini()
+        
+        logger.info(
+            f"AI Gateway initialized with default provider: {self.default_provider.value}, "
+            f"Groq available: {self.groq_client is not None}, "
+            f"Gemini available: {self.gemini_client is not None}"
+        )
+    
+    def _initialize_groq(self) -> None:
+        """Initialize Groq client if API key is available"""
+        if not self.groq_api_key:
+            logger.warning("Groq API key not provided. Groq provider will be unavailable.")
+            return
+        
+        try:
+            from groq import Groq
+            self.groq_client = Groq(api_key=self.groq_api_key)
+            logger.info("Groq client initialized successfully")
+        except ImportError:
+            logger.error("Groq library not installed. Install with: pip install groq")
+        except Exception as e:
+            logger.error(f"Failed to initialize Groq client: {e}")
+    
+    def _initialize_gemini(self) -> None:
+        """Initialize Gemini client if API key is available"""
+        if not self.gemini_api_key:
+            logger.warning("Gemini API key not provided. Gemini provider will be unavailable.")
+            return
+        
+        try:
+            from google import genai
+            self.gemini_client = genai.Client(api_key=self.gemini_api_key)
+            logger.info("Gemini client initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize Gemini client: {e}")
+    
+    def count_tokens(self, text: str) -> int:
+        """
+        Count tokens in the given text.
+        
+        Args:
+            text: Text to count tokens for
+            
+        Returns:
+            Approximate token count
+        """
+        if self.tokenizer:
+            try:
+                return len(self.tokenizer.encode(text))
+            except Exception as e:
+                logger.warning(f"Error counting tokens: {e}. Using character approximation.")
+        
+        # Fallback: rough approximation (1 token ≈ 4 characters)
+        return len(text) // 4
+    
+    def select_provider(
+        self,
+        payload: str,
+        multimodal: bool = False,
+        force_provider: Optional[LLMProvider] = None,
+    ) -> LLMProvider:
+        """
+        Select the best provider based on payload characteristics.
+        
+        Args:
+            payload: The text payload to be processed
+            multimodal: Whether the request requires multimodal analysis
+            force_provider: Force a specific provider (overrides automatic selection)
+            
+        Returns:
+            Selected LLM provider
+        """
+        # If provider is forced, use it (if available)
+        if force_provider:
+            if force_provider == LLMProvider.GROQ and self.groq_client:
+                return LLMProvider.GROQ
+            elif force_provider == LLMProvider.GEMINI and self.gemini_client:
+                return LLMProvider.GEMINI
+            logger.warning(f"Forced provider {force_provider} not available, using auto-selection")
+        
+        # Multimodal always goes to Gemini (Groq doesn't support it yet)
+        if multimodal:
+            if self.gemini_client:
+                logger.info("Multimodal request detected, routing to Gemini")
+                return LLMProvider.GEMINI
+            else:
+                logger.error("Multimodal requested but Gemini not available")
+                raise ValueError("Multimodal analysis requires Gemini, but it's not available")
+        
+        # Count tokens in payload
+        token_count = self.count_tokens(payload)
+        logger.debug(f"Payload token count: {token_count}")
+        
+        # If payload exceeds threshold, escalate to Gemini
+        if token_count > self.TOKEN_THRESHOLD:
+            if self.gemini_client:
+                logger.info(
+                    f"Payload exceeds {self.TOKEN_THRESHOLD} tokens ({token_count}), "
+                    "escalating to Gemini"
+                )
+                return LLMProvider.GEMINI
+            else:
+                logger.warning(
+                    f"Payload exceeds threshold but Gemini not available, using Groq"
+                )
+        
+        # Default to Groq for cost-effectiveness (if available)
+        if self.groq_client:
+            logger.debug("Using Groq as default provider")
+            return LLMProvider.GROQ
+        
+        # Fallback to Gemini if Groq not available
+        if self.gemini_client:
+            logger.debug("Groq not available, falling back to Gemini")
+            return LLMProvider.GEMINI
+        
+        raise ValueError("No LLM providers available")
+    
+    def generate_completion(
+        self,
+        messages: List[Dict[str, str]],
+        functions: Optional[List[Any]] = None,
+        multimodal: bool = False,
+        force_provider: Optional[LLMProvider] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate a completion using the most appropriate provider.
+        
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            functions: Optional function declarations for function calling
+            multimodal: Whether the request requires multimodal analysis
+            force_provider: Force a specific provider
+            
+        Returns:
+            Response dict with 'provider', 'response', and other metadata
+        """
+        # Combine all message content for token counting
+        payload = "\n".join([msg.get("content", "") for msg in messages if msg.get("content")])
+        
+        # Select provider
+        provider = self.select_provider(
+            payload=payload,
+            multimodal=multimodal,
+            force_provider=force_provider,
+        )
+        
+        try:
+            if provider == LLMProvider.GROQ:
+                return self._generate_with_groq(messages, functions)
+            else:
+                return self._generate_with_gemini(messages, functions)
+        except Exception as e:
+            # Check if it's a rate limit error
+            if self._is_rate_limit_error(e):
+                logger.warning(f"Rate limit hit on {provider.value}, attempting fallback")
+                return self._handle_rate_limit_fallback(provider, messages, functions)
+            else:
+                logger.error(f"Error generating completion with {provider.value}: {e}")
+                raise
+    
+    def _generate_with_groq(
+        self,
+        messages: List[Dict[str, str]],
+        functions: Optional[List[Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate completion using Groq.
+        
+        Args:
+            messages: List of message dicts
+            functions: Optional function declarations
+            
+        Returns:
+            Response dict
+        """
+        if not self.groq_client:
+            raise ValueError("Groq client not initialized")
+        
+        logger.debug(f"Generating completion with Groq ({self.groq_model})")
+        
+        # Build request parameters
+        request_params = {
+            "model": self.groq_model,
+            "messages": messages,
+        }
+        
+        # Add tools if functions are provided
+        if functions:
+            # Convert function declarations to Groq's tool format
+            tools = self._convert_functions_to_groq_tools(functions)
+            if tools:
+                request_params["tools"] = tools
+                request_params["tool_choice"] = "auto"
+        
+        # Make the request
+        response = self.groq_client.chat.completions.create(**request_params)
+        
+        return {
+            "provider": LLMProvider.GROQ.value,
+            "response": response,
+            "model": self.groq_model,
+        }
+    
+    def _generate_with_gemini(
+        self,
+        messages: List[Dict[str, str]],
+        functions: Optional[List[Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Generate completion using Gemini.
+        
+        Args:
+            messages: List of message dicts
+            functions: Optional function declarations
+            
+        Returns:
+            Response dict
+        """
+        if not self.gemini_client:
+            raise ValueError("Gemini client not initialized")
+        
+        logger.debug(f"Generating completion with Gemini ({self.gemini_model})")
+        
+        from google import genai
+        
+        # Convert messages to Gemini format (combine into single content)
+        content = "\n".join([msg.get("content", "") for msg in messages if msg.get("content")])
+        
+        # Extract system instruction if present
+        system_instruction = None
+        for msg in messages:
+            if msg.get("role") == "system":
+                system_instruction = msg.get("content")
+                break
+        
+        # Build config
+        config_params = {}
+        if system_instruction:
+            config_params["system_instruction"] = system_instruction
+        
+        # Add tools if functions are provided
+        if functions:
+            tools = [genai.types.Tool(function_declarations=functions)]
+            config_params["tools"] = tools
+        
+        # Make the request
+        response = self.gemini_client.models.generate_content(
+            model=self.gemini_model,
+            contents=content,
+            config=genai.types.GenerateContentConfig(**config_params) if config_params else None,
+        )
+        
+        return {
+            "provider": LLMProvider.GEMINI.value,
+            "response": response,
+            "model": self.gemini_model,
+        }
+    
+    def _convert_functions_to_groq_tools(self, functions: List[Any]) -> List[Dict[str, Any]]:
+        """
+        Convert Gemini function declarations to Groq's tool format.
+        
+        Args:
+            functions: List of function declarations
+            
+        Returns:
+            List of tool dicts for Groq
+        """
+        tools = []
+        for func in functions:
+            # Convert Gemini function declaration to OpenAI-compatible format
+            tool = {
+                "type": "function",
+                "function": {
+                    "name": func.name,
+                    "description": func.description,
+                }
+            }
+            
+            # Add parameters if present
+            if hasattr(func, "parameters") and func.parameters:
+                tool["function"]["parameters"] = self._convert_gemini_schema_to_openai(
+                    func.parameters
+                )
+            
+            tools.append(tool)
+        
+        return tools
+    
+    def _convert_gemini_schema_to_openai(self, schema: Any) -> Dict[str, Any]:
+        """
+        Convert Gemini schema to OpenAI-compatible schema.
+        
+        Args:
+            schema: Gemini schema object
+            
+        Returns:
+            OpenAI-compatible schema dict
+        """
+        # Extract properties from Gemini schema
+        result = {
+            "type": "object",
+            "properties": {},
+        }
+        
+        if hasattr(schema, "properties"):
+            for prop_name, prop_value in schema.properties.items():
+                prop_dict = {
+                    "type": getattr(prop_value, "type", "string"),
+                }
+                
+                if hasattr(prop_value, "description"):
+                    prop_dict["description"] = prop_value.description
+                
+                result["properties"][prop_name] = prop_dict
+        
+        # Add required fields
+        if hasattr(schema, "required"):
+            result["required"] = list(schema.required)
+        
+        return result
+    
+    def _is_rate_limit_error(self, error: Exception) -> bool:
+        """
+        Check if an error is a rate limit error.
+        
+        Args:
+            error: Exception to check
+            
+        Returns:
+            True if it's a rate limit error
+        """
+        error_str = str(error).lower()
+        return any(
+            keyword in error_str
+            for keyword in ["rate limit", "quota", "too many requests", "429"]
+        )
+    
+    def _handle_rate_limit_fallback(
+        self,
+        failed_provider: LLMProvider,
+        messages: List[Dict[str, str]],
+        functions: Optional[List[Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Handle rate limit by falling back to alternative provider.
+        
+        Args:
+            failed_provider: Provider that hit rate limit
+            messages: Original messages
+            functions: Optional function declarations
+            
+        Returns:
+            Response from fallback provider
+        """
+        # Determine fallback provider
+        if failed_provider == LLMProvider.GROQ:
+            if self.gemini_client:
+                logger.info("Groq rate limit reached, falling back to Gemini")
+                response = self._generate_with_gemini(messages, functions)
+                response["fallback_from"] = LLMProvider.GROQ.value
+                return response
+        elif failed_provider == LLMProvider.GEMINI:
+            if self.groq_client:
+                logger.info("Gemini rate limit reached, falling back to Groq")
+                response = self._generate_with_groq(messages, functions)
+                response["fallback_from"] = LLMProvider.GEMINI.value
+                return response
+        
+        # No fallback available
+        raise ValueError(
+            f"Rate limit reached on {failed_provider.value} and no fallback provider available"
+        )

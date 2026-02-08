@@ -18,6 +18,8 @@ python-dotenv>=1.0.0
 
 # LLM dependencies
 google-genai
+groq>=0.4.0
+tiktoken>=0.5.0
 
 # API server
 fastapi>=0.104.0

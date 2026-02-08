@@ -8,6 +8,10 @@ from typing import Optional
 
 from app.adapters.edge import AutomationAdapter, CombinedVoiceProvider, WebAdapter
 from app.adapters.infrastructure import DummyVoiceProvider, LLMCommandAdapter, SQLiteHistoryAdapter
+try:
+    from app.adapters.infrastructure import GatewayLLMCommandAdapter
+except ImportError:
+    GatewayLLMCommandAdapter = None
 from app.application.ports import ActionProvider, HistoryProvider, VoiceProvider, WebProvider
 from app.application.services import AssistantService, DependencyManager, ExtensionManager
 from app.core.config import settings
@@ -62,6 +66,9 @@ class Container:
         use_llm: bool = False,
         gemini_api_key: Optional[str] = None,
         gemini_model: str = "gemini-flash-latest",
+        groq_api_key: Optional[str] = None,
+        groq_model: str = "llama-3.1-70b-versatile",
+        use_ai_gateway: bool = True,
         db_path: str = "jarvis.db",
     ):
         """
@@ -77,6 +84,9 @@ class Container:
             use_llm: Whether to use LLM-based command interpretation (default: False)
             gemini_api_key: Optional Gemini API key (defaults to GEMINI_API_KEY env var)
             gemini_model: Gemini model name to use (default: gemini-flash-latest)
+            groq_api_key: Optional Groq API key (defaults to GROQ_API_KEY env var)
+            groq_model: Groq model name to use (default: llama-3.1-70b-versatile)
+            use_ai_gateway: Whether to use AI Gateway for intelligent provider routing (default: True)
             db_path: Path to SQLite database file (default: jarvis.db)
         """
         self.wake_word = wake_word
@@ -85,20 +95,30 @@ class Container:
         # Force the value from direct OS reading
         self.gemini_api_key = self.gemini_api_key or render_key
         self.gemini_model = gemini_model or os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+        self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY")
+        self.groq_model = groq_model or os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
+        self.use_ai_gateway = use_ai_gateway and GatewayLLMCommandAdapter is not None
         self.db_path = db_path
         
-        # Debug logging for gemini_api_key
+        # Debug logging for API keys
         print(f"DEBUG: Valor de self.gemini_api_key: {self.gemini_api_key[:5]}***" if self.gemini_api_key else "DEBUG: self.gemini_api_key está VAZIO")
+        print(f"DEBUG: Valor de self.groq_api_key: {self.groq_api_key[:5]}***" if self.groq_api_key else "DEBUG: self.groq_api_key está VAZIO")
+        print(f"DEBUG: AI Gateway enabled: {self.use_ai_gateway}")
         
         # Log API key detection during boot
         if self.gemini_api_key:
             logger.info("✓ Chave de API do Gemini detectada pelo sistema de configurações")
         else:
-            logger.warning("⚠ Chave de API do Gemini NÃO detectada - adaptador de IA não será criado")
+            logger.warning("⚠ Chave de API do Gemini NÃO detectada")
         
-        # Use LLM if API key is available (unless explicitly disabled)
+        if self.groq_api_key:
+            logger.info("✓ Chave de API do Groq detectada pelo sistema de configurações")
+        else:
+            logger.warning("⚠ Chave de API do Groq NÃO detectada")
+        
+        # Use LLM if any API key is available (unless explicitly disabled)
         # This ensures the adapter is created when an API key exists
-        self.use_llm = use_llm or bool(self.gemini_api_key)
+        self.use_llm = use_llm or bool(self.gemini_api_key or self.groq_api_key)
 
         # Create or use provided adapters
         self._voice_provider = voice_provider
@@ -173,7 +193,27 @@ class Container:
     def command_interpreter(self) -> CommandInterpreter:
         """Get or create command interpreter"""
         if self._command_interpreter is None:
-            # Always try to create LLMCommandAdapter first if we have an API key
+            # Try to create AI Gateway adapter first if enabled and we have API keys
+            if self.use_ai_gateway and (self.gemini_api_key or self.groq_api_key):
+                logger.info("Tentando criar GatewayLLMCommandAdapter com AI Gateway")
+                try:
+                    self._llm_command_adapter = GatewayLLMCommandAdapter(
+                        groq_api_key=self.groq_api_key,
+                        gemini_api_key=self.gemini_api_key,
+                        groq_model=self.groq_model,
+                        gemini_model=self.gemini_model,
+                        voice_provider=self.voice_provider,
+                        wake_word=self.wake_word,
+                        history_provider=self.history_provider,
+                    )
+                    logger.info("✓ GatewayLLMCommandAdapter criado com sucesso")
+                    return self._llm_command_adapter
+                except Exception as e:
+                    logger.error(f"✗ ERRO ao criar GatewayLLMCommandAdapter: {type(e).__name__}: {str(e)}")
+                    print(f"ERRO DETALHADO ao criar GatewayLLMCommandAdapter: {type(e).__name__}: {str(e)}")
+                    # Fall through to try basic LLM adapter
+            
+            # Fallback to basic LLM adapter if we have Gemini API key
             if self.gemini_api_key:
                 logger.info("Tentando criar LLMCommandAdapter para interpretação de comandos")
                 try:
@@ -188,7 +228,7 @@ class Container:
                     return self._llm_command_adapter
                 except Exception as e:
                     logger.error(f"✗ ERRO ao criar LLMCommandAdapter: {type(e).__name__}: {str(e)}")
-                    print(f"ERRO DETALHADO ao criar GeminiAdapter: {type(e).__name__}: {str(e)}")
+                    print(f"ERRO DETALHADO ao criar LLMCommandAdapter: {type(e).__name__}: {str(e)}")
                     # Fall through to create rule-based interpreter
             
             # Use rule-based interpreter as fallback
@@ -225,23 +265,23 @@ class Container:
         if self._assistant_service is None:
             logger.info("Creating AssistantService with injected dependencies")
             
-            # Determine if we have a gemini_adapter - force creation if we have API key
+            # Determine if we have a gemini_adapter - force creation if we have API keys
             gemini_adapter = None
-            if self.gemini_api_key:
-                # If we have an API key, force creation of LLM adapter
+            if self.gemini_api_key or self.groq_api_key:
+                # If we have any API key, force creation of LLM adapter
                 if self._llm_command_adapter is not None:
                     gemini_adapter = self._llm_command_adapter
-                    logger.info("✓ Adaptador de IA Gemini será injetado no AssistantService")
+                    logger.info("✓ Adaptador de IA será injetado no AssistantService")
                 else:
                     # Trigger creation of LLM adapter by accessing command_interpreter
                     _ = self.command_interpreter
                     gemini_adapter = self._llm_command_adapter
                     if gemini_adapter:
-                        logger.info("✓ Adaptador de IA Gemini criado e será injetado no AssistantService")
+                        logger.info("✓ Adaptador de IA criado e será injetado no AssistantService")
                     else:
-                        logger.error("✗ Falha ao criar adaptador de IA Gemini")
+                        logger.error("✗ Falha ao criar adaptador de IA")
             else:
-                logger.warning("⚠ AssistantService será criado SEM adaptador de IA (API key não disponível)")
+                logger.warning("⚠ AssistantService será criado SEM adaptador de IA (API keys não disponíveis)")
             
             self._assistant_service = AssistantService(
                 voice_provider=self.voice_provider,
@@ -261,6 +301,7 @@ def create_edge_container(
     wake_word: str = "xerife",
     language: str = "pt-BR",
     use_llm: bool = False,
+    use_ai_gateway: bool = True,
 ) -> Container:
     """
     Factory function to create a container with edge adapters
@@ -271,6 +312,7 @@ def create_edge_container(
         use_llm: Whether to use LLM-based command interpretation (default: False)
                  Note: LLM will be auto-enabled if API key is available in settings,
                  regardless of this parameter value
+        use_ai_gateway: Whether to use AI Gateway for intelligent provider routing (default: True)
 
     Returns:
         Configured container with edge adapters
@@ -281,4 +323,7 @@ def create_edge_container(
         use_llm=use_llm,
         gemini_api_key=settings.gemini_api_key,
         gemini_model=settings.gemini_model,
+        groq_api_key=settings.groq_api_key,
+        groq_model=settings.groq_model,
+        use_ai_gateway=use_ai_gateway,
     )
