@@ -30,13 +30,16 @@ jobs:
         uv pip install fastapi uvicorn httpx pydantic pydantic-settings python-dotenv 
         uv pip install google-generativeai python-jose[cryptography] python-multipart
         
-        # 3. Camada de Memória (Dados)
+        # 3. LLM dependencies (explicit installation for CI)
+        uv pip install tiktoken groq
+        
+        # 4. Camada de Memória (Dados)
         uv pip install sqlmodel
         
-        # 4. Ferramentas de Teste
+        # 5. Ferramentas de Teste
         uv pip install pytest pytest-cov mock
         
-        # 5. System Automation (needed for setup wizard)
+        # 6. System Automation (needed for setup wizard)
         uv pip install pyperclip==1.8.2
         
         # Mantemos a instalação via requirements se existir, mas com '|| true' para não travar o build

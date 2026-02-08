@@ -12,7 +12,13 @@ import os
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-import tiktoken
+# Try to import tiktoken, but don't fail if it's not available
+try:
+    import tiktoken
+    HAS_TIKTOKEN = True
+except ImportError:
+    tiktoken = None
+    HAS_TIKTOKEN = False
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +29,9 @@ _TOKENIZER_CACHE = None
 def _get_tokenizer():
     """Get or create tokenizer with caching"""
     global _TOKENIZER_CACHE
+    if not HAS_TIKTOKEN:
+        return None
+    
     if _TOKENIZER_CACHE is None:
         try:
             # Using cl100k_base encoding (GPT-4, GPT-3.5-turbo)
@@ -32,6 +41,31 @@ def _get_tokenizer():
             logger.warning(f"Failed to initialize tokenizer: {e}. Token counting will be approximate.")
             _TOKENIZER_CACHE = False  # Use False to indicate initialization was attempted but failed
     return _TOKENIZER_CACHE if _TOKENIZER_CACHE else None
+
+
+def count_tokens(text: str) -> int:
+    """
+    Count tokens in the given text.
+    
+    Uses tiktoken if available, otherwise falls back to character-based approximation
+    using a 1:4 ratio (1 token ≈ 4 characters).
+    
+    Args:
+        text: Text to count tokens for
+        
+    Returns:
+        Approximate token count
+    """
+    if HAS_TIKTOKEN:
+        tokenizer = _get_tokenizer()
+        if tokenizer:
+            try:
+                return len(tokenizer.encode(text))
+            except Exception as e:
+                logger.warning(f"Error counting tokens: {e}. Using character approximation.")
+    
+    # Fallback: rough approximation (1 token ≈ 4 characters)
+    return len(text) // 4
 
 
 class LLMProvider(str, Enum):
@@ -134,14 +168,8 @@ class AIGateway:
         Returns:
             Approximate token count
         """
-        if self.tokenizer:
-            try:
-                return len(self.tokenizer.encode(text))
-            except Exception as e:
-                logger.warning(f"Error counting tokens: {e}. Using character approximation.")
-        
-        # Fallback: rough approximation (1 token ≈ 4 characters)
-        return len(text) // 4
+        # Delegate to module-level function
+        return count_tokens(text)
     
     def select_provider(
         self,
