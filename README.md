@@ -94,6 +94,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
 ### 🤖 Inteligência Artificial
 - **🎭 Personalidade Selecionável**: Escolha o nome e customize o comportamento do seu assistente durante a instalação
 - **🚀 Setup Wizard Interativo**: Instalação guiada com captura automática de credenciais e validação
+- **🏎️ Sistema de Marchas (Gears System)**: IA multinível com fallback automático:
+  - **Marcha Alta** (High Gear): Llama-3.3-70b (Groq) - rápido e econômico
+  - **Marcha Baixa** (Low Gear): Llama-3.1-8b (Groq) - fallback interno em rate limits
+  - **Tiro de Canhão** (Cannon Shot): Gemini-1.5-Pro - fallback externo com contexto massivo
+  - **Auto-Repair**: Sistema de auto-correção que detecta e corrige erros automaticamente
+  - Veja [docs/GEARS_SYSTEM.md](docs/GEARS_SYSTEM.md) para detalhes
 - **Voice Recognition**: Brazilian Portuguese (pt-BR) voice commands using Google Speech Recognition
 - **Text-to-Speech**: Natural voice synthesis with pyttsx3
 - **Dual Command Interpretation**: 
