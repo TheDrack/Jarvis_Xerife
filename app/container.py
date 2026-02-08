@@ -253,22 +253,16 @@ def create_edge_container(
         wake_word: Wake word for the assistant
         language: Language for voice recognition
         use_llm: Whether to use LLM-based command interpretation (default: False)
-                 If False but API key is available in settings, LLM will still be enabled
+                 Note: LLM will be auto-enabled if API key is available in settings,
+                 regardless of this parameter value
 
     Returns:
         Configured container with edge adapters
     """
-    # Enable LLM if API key is available in settings (unless explicitly disabled by caller)
-    # This ensures the adapter is created when an API key exists
-    gemini_api_key = settings.gemini_api_key
-    if gemini_api_key and not use_llm:
-        logger.info("Gemini API key encontrada nas configurações - habilitando LLM automaticamente")
-        use_llm = True
-    
     return Container(
         wake_word=wake_word,
         language=language,
         use_llm=use_llm,
-        gemini_api_key=gemini_api_key,
+        gemini_api_key=settings.gemini_api_key,
         gemini_model=settings.gemini_model,
     )

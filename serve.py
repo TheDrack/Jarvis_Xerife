@@ -47,8 +47,8 @@ def main() -> None:
         logger.info("Running in headless mode (no DISPLAY set)")
 
     # Create container with edge adapters
-    # Note: use_llm can be controlled via environment variable
-    # If USE_LLM is not set but API key is available, it will be auto-enabled
+    # Note: USE_LLM environment variable is optional
+    # If not set, LLM will be auto-enabled when API key is available
     use_llm = os.getenv("USE_LLM", "").lower() in ("true", "1", "yes")
     if not use_llm and settings.gemini_api_key:
         logger.info("USE_LLM not set but API key available - LLM will be auto-enabled")
