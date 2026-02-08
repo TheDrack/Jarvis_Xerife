@@ -1,18 +1,58 @@
 # -*- coding: utf-8 -*-
 """TaskRunner - Ephemeral script execution service for distributed workers"""
 
+import json
 import logging
 import os
 import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from pathlib import Path
 from typing import Optional
 
 from app.domain.models.mission import Mission, MissionResult
 
 logger = logging.getLogger(__name__)
+
+
+class StructuredLogger:
+    """Wrapper for structured logging with context"""
+    
+    def __init__(self, logger_instance, **context):
+        self.logger = logger_instance
+        self.context = context
+    
+    def _log(self, level, msg, **extra):
+        """Log with structured context"""
+        log_data = {**self.context, **extra, "message": msg}
+        self.logger.log(level, json.dumps(log_data))
+    
+    def info(self, msg, **extra):
+        self._log(logging.INFO, msg, **extra)
+    
+    def error(self, msg, **extra):
+        self._log(logging.ERROR, msg, **extra)
+    
+    def warning(self, msg, **extra):
+        self._log(logging.WARNING, msg, **extra)
+    
+    def debug(self, msg, **extra):
+        self._log(logging.DEBUG, msg, **extra)
+
+
+class DependencyInstallationError(Exception):
+    """Exception raised when a dependency fails to install"""
+    
+    def __init__(self, package: str, stderr: str, timeout: bool = False):
+        self.package = package
+        self.stderr = stderr
+        self.timeout = timeout
+        message = f"Failed to install package '{package}'"
+        if timeout:
+            message += " (timeout)"
+        super().__init__(message)
 
 
 class TaskRunner:
@@ -27,15 +67,20 @@ class TaskRunner:
     - Integrates with library cache to avoid repeated downloads
     """
     
-    def __init__(self, cache_dir: Optional[Path] = None, use_venv: bool = True):
+    # Maximum length of stderr to include in error messages (prevents log bloat)
+    MAX_ERROR_LENGTH = 200
+    
+    def __init__(self, cache_dir: Optional[Path] = None, use_venv: bool = True, device_id: Optional[str] = None):
         """
         Initialize the TaskRunner
         
         Args:
             cache_dir: Optional directory for caching libraries and environments
             use_venv: Whether to use virtual environments (default: True)
+            device_id: Optional device identifier for logging context
         """
         self.use_venv = use_venv
+        self.device_id = device_id or "unknown"
         
         # Setup cache directory
         if cache_dir:
@@ -46,22 +91,33 @@ class TaskRunner:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"TaskRunner initialized with cache directory: {self.cache_dir}")
     
-    def execute_mission(self, mission: Mission) -> MissionResult:
+    def execute_mission(self, mission: Mission, session_id: Optional[str] = None) -> MissionResult:
         """
         Execute a mission with the provided code and dependencies
         
         Args:
             mission: Mission object containing code and configuration
+            session_id: Optional session identifier for tracking
             
         Returns:
             MissionResult with execution outcome
         """
         start_time = time.time()
         mission_id = mission.mission_id
+        session_id = session_id or "default"
         
-        logger.info(f"Starting mission execution: {mission_id}")
-        logger.debug(f"Mission details - Requirements: {mission.requirements}, "
-                    f"Browser: {mission.browser_interaction}, Keep-alive: {mission.keep_alive}")
+        # Create structured logger with context
+        log = StructuredLogger(
+            logger,
+            mission_id=mission_id,
+            device_id=self.device_id,
+            session_id=session_id
+        )
+        
+        log.info("mission_started", 
+                requirements=mission.requirements,
+                browser_interaction=mission.browser_interaction,
+                keep_alive=mission.keep_alive)
         
         # Create temporary script file
         script_file = None
@@ -74,7 +130,7 @@ class TaskRunner:
             
             # Write script to file
             script_file.write_text(mission.code)
-            logger.debug(f"Script written to: {script_file}")
+            log.debug("script_written", script_path=str(script_file))
             
             # Setup environment
             if self.use_venv:
@@ -87,15 +143,33 @@ class TaskRunner:
                 
                 # Create venv if it doesn't exist
                 if not venv_path.exists():
-                    logger.info(f"Creating virtual environment at: {venv_path}")
+                    log.info("venv_creating", venv_path=str(venv_path))
                     self._create_venv(venv_path)
                 else:
-                    logger.info(f"Using existing virtual environment: {venv_path}")
+                    log.info("venv_reusing", venv_path=str(venv_path))
                 
-                # Install dependencies if any
+                # Install dependencies if any - with graceful failure handling
                 if mission.requirements:
-                    logger.info(f"Installing {len(mission.requirements)} dependencies")
-                    self._install_dependencies(venv_path, mission.requirements)
+                    log.info("dependencies_installing", count=len(mission.requirements))
+                    try:
+                        self._install_dependencies(venv_path, mission.requirements, log)
+                    except DependencyInstallationError as e:
+                        # Graceful failure: Log structured error and return friendly message
+                        log.error("dependency_installation_failed",
+                                error=str(e),
+                                failed_package=e.package,
+                                stderr=e.stderr)
+                        
+                        execution_time = time.time() - start_time
+                        return MissionResult(
+                            mission_id=mission_id,
+                            success=False,
+                            stdout="",
+                            stderr=f"Failed to install dependency: {e.package}",
+                            exit_code=1,
+                            execution_time=execution_time,
+                            error=f"DEPENDENCY_FAILED: {e.package} - {e.stderr[:self.MAX_ERROR_LENGTH]}",
+                        )
                 
                 # Get Python executable from venv
                 python_exe = self._get_python_executable(venv_path)
@@ -105,16 +179,36 @@ class TaskRunner:
                 
                 # Install dependencies to user site-packages if needed
                 if mission.requirements:
-                    logger.info(f"Installing {len(mission.requirements)} dependencies to user site")
-                    self._install_dependencies_system(mission.requirements)
+                    log.info("dependencies_installing_system", count=len(mission.requirements))
+                    try:
+                        self._install_dependencies_system(mission.requirements, log)
+                    except DependencyInstallationError as e:
+                        # Graceful failure for system installation too
+                        log.error("dependency_installation_failed",
+                                error=str(e),
+                                failed_package=e.package,
+                                stderr=e.stderr)
+                        
+                        execution_time = time.time() - start_time
+                        return MissionResult(
+                            mission_id=mission_id,
+                            success=False,
+                            stdout="",
+                            stderr=f"Failed to install dependency: {e.package}",
+                            exit_code=1,
+                            execution_time=execution_time,
+                            error=f"DEPENDENCY_FAILED: {e.package} - {e.stderr[:self.MAX_ERROR_LENGTH]}",
+                        )
             
             # Execute the script
-            logger.info(f"Executing script with Python: {python_exe}")
+            log.info("script_executing", python_exe=python_exe, timeout=mission.timeout)
             result = self._execute_script(python_exe, script_file, mission.timeout)
             
             execution_time = time.time() - start_time
-            logger.info(f"Mission {mission_id} completed in {execution_time:.2f}s "
-                       f"with exit code {result['exit_code']}")
+            log.info("mission_completed", 
+                    execution_time=execution_time,
+                    exit_code=result['exit_code'],
+                    success=result["exit_code"] == 0)
             
             # Create result
             mission_result = MissionResult(
@@ -136,7 +230,12 @@ class TaskRunner:
             
         except Exception as e:
             execution_time = time.time() - start_time
-            logger.error(f"Mission {mission_id} failed: {e}", exc_info=True)
+            tb = traceback.format_exc()
+            log.error("mission_failed", 
+                     error=str(e),
+                     error_type=type(e).__name__,
+                     traceback=tb,
+                     execution_time=execution_time)
             
             return MissionResult(
                 mission_id=mission_id,
@@ -187,13 +286,23 @@ class TaskRunner:
         
         return str(python_exe)
     
-    def _install_dependencies(self, venv_path: Path, requirements: list) -> None:
-        """Install dependencies in the virtual environment"""
+    def _install_dependencies(self, venv_path: Path, requirements: list, log: StructuredLogger) -> None:
+        """
+        Install dependencies in the virtual environment with graceful failure handling
+        
+        Args:
+            venv_path: Path to virtual environment
+            requirements: List of package requirements
+            log: Structured logger instance
+            
+        Raises:
+            DependencyInstallationError: If installation fails or times out
+        """
         python_exe = self._get_python_executable(venv_path)
         
         for requirement in requirements:
             try:
-                logger.debug(f"Installing: {requirement}")
+                log.debug("dependency_installing", package=requirement)
                 result = subprocess.run(
                     [python_exe, "-m", "pip", "install", "--quiet", requirement],
                     capture_output=True,
@@ -202,22 +311,41 @@ class TaskRunner:
                 )
                 
                 if result.returncode != 0:
-                    logger.warning(f"Failed to install {requirement}: {result.stderr}")
+                    log.warning("dependency_install_failed", 
+                              package=requirement,
+                              stderr=result.stderr,
+                              returncode=result.returncode)
+                    raise DependencyInstallationError(requirement, result.stderr)
                 else:
-                    logger.debug(f"Successfully installed: {requirement}")
+                    log.debug("dependency_installed", package=requirement)
                     
             except subprocess.TimeoutExpired:
-                logger.error(f"Timeout installing {requirement}")
+                log.error("dependency_install_timeout", package=requirement)
+                raise DependencyInstallationError(requirement, "Installation timeout after 5 minutes", timeout=True)
+            except DependencyInstallationError:
+                # Re-raise our custom exception
                 raise
             except Exception as e:
-                logger.error(f"Error installing {requirement}: {e}")
-                raise
+                log.error("dependency_install_error", 
+                         package=requirement,
+                         error=str(e),
+                         error_type=type(e).__name__)
+                raise DependencyInstallationError(requirement, str(e))
     
-    def _install_dependencies_system(self, requirements: list) -> None:
-        """Install dependencies to system/user site-packages"""
+    def _install_dependencies_system(self, requirements: list, log: StructuredLogger) -> None:
+        """
+        Install dependencies to system/user site-packages with graceful failure handling
+        
+        Args:
+            requirements: List of package requirements
+            log: Structured logger instance
+            
+        Raises:
+            DependencyInstallationError: If installation fails or times out
+        """
         for requirement in requirements:
             try:
-                logger.debug(f"Installing to user site: {requirement}")
+                log.debug("dependency_installing_system", package=requirement)
                 result = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "--user", "--quiet", requirement],
                     capture_output=True,
@@ -226,13 +354,26 @@ class TaskRunner:
                 )
                 
                 if result.returncode != 0:
-                    logger.warning(f"Failed to install {requirement}: {result.stderr}")
+                    log.warning("dependency_install_failed",
+                              package=requirement,
+                              stderr=result.stderr,
+                              returncode=result.returncode)
+                    raise DependencyInstallationError(requirement, result.stderr)
                 else:
-                    logger.debug(f"Successfully installed: {requirement}")
+                    log.debug("dependency_installed_system", package=requirement)
                     
-            except Exception as e:
-                logger.error(f"Error installing {requirement}: {e}")
+            except subprocess.TimeoutExpired:
+                log.error("dependency_install_timeout", package=requirement)
+                raise DependencyInstallationError(requirement, "Installation timeout after 5 minutes", timeout=True)
+            except DependencyInstallationError:
+                # Re-raise our custom exception
                 raise
+            except Exception as e:
+                log.error("dependency_install_error",
+                         package=requirement,
+                         error=str(e),
+                         error_type=type(e).__name__)
+                raise DependencyInstallationError(requirement, str(e))
     
     def _execute_script(self, python_exe: str, script_file: Path, timeout: int) -> dict:
         """
