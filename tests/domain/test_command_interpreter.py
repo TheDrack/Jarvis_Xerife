@@ -102,6 +102,8 @@ class TestCommandInterpreter:
 
         assert intent.command_type == CommandType.REPORT_ISSUE
         assert intent.parameters["issue_description"] == "que o botão X está quebrado"
+        # Verify original casing is preserved
+        assert "X" in intent.parameters["issue_description"]
         assert "context" in intent.parameters
 
     def test_interpret_issue_command(self, interpreter):

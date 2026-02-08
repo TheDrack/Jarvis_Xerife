@@ -341,5 +341,6 @@ class GitHubAdapter:
             logger.error(error_msg, exc_info=True)
             return {"success": False, "error": error_msg}
         finally:
-            # Always close client after request to avoid connection issues
+            # TODO: Consider reusing client for better performance with connection pooling
+            # Currently closing after each request to avoid connection issues
             await self.close()

@@ -51,12 +51,11 @@ class CommandInterpreter:
         if self.wake_word in command:
             command = command.replace(self.wake_word, "").strip()
             # Also remove from raw_input to preserve casing
-            raw_input_no_wake = raw_input.lower().replace(self.wake_word, "").strip()
-            # Find the position in the original raw_input
-            for i in range(len(raw_input)):
-                if raw_input[i:].lower().strip().startswith(raw_input_no_wake):
-                    raw_input = raw_input[i:].strip()
-                    break
+            raw_input_lower = raw_input.lower()
+            wake_pos = raw_input_lower.find(self.wake_word)
+            if wake_pos != -1:
+                # Extract everything after the wake word
+                raw_input = raw_input[wake_pos + len(self.wake_word):].strip()
 
         # Parse command
         for pattern, command_type in self._command_patterns.items():

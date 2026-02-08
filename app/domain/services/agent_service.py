@@ -132,7 +132,7 @@ class AgentService:
         Returns:
             System instruction text
         """
-        return """Jarvis - Engenheiro de Campo. Direto, técnico, zero fluff.
+        return """Xerife - Engenheiro de Campo. Direto, técnico, zero fluff.
 
 PROIBIDO:
 - Frases genéricas ("Como um assistente virtual...")

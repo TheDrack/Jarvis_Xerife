@@ -239,7 +239,7 @@ class AssistantService:
         command = self.processor.create_command(intent)
 
         # Execute the command with device routing if applicable
-        response = self._execute_command(
+        response = await self._execute_command_async(
             command.intent.command_type,
             command.intent.parameters,
             request_metadata=request_metadata,
@@ -431,66 +431,8 @@ class AssistantService:
                 return Response(success=True, message=message)
 
             elif command_type == CommandType.REPORT_ISSUE:
-                # Handle issue reporting
-                if not self.github_adapter:
-                    return Response(
-                        success=False,
-                        message="GitHub adapter não configurado",
-                        error="GITHUB_NOT_CONFIGURED",
-                    )
-                
-                issue_description = params.get("issue_description", "")
-                if not issue_description:
-                    return Response(
-                        success=False,
-                        message="Descrição da issue é obrigatória",
-                        error="MISSING_DESCRIPTION",
-                    )
-                
-                # Get the most recent error log from history
-                error_log = self._get_recent_error_log()
-                
-                # Get system information
-                system_info = self._get_system_info()
-                
-                # Create the issue asynchronously
-                try:
-                    # Run async create_issue in event loop
-                    result = asyncio.run(
-                        self.github_adapter.create_issue(
-                            title=issue_description,
-                            description=issue_description,
-                            error_log=error_log,
-                            system_info=system_info,
-                        )
-                    )
-                    
-                    if result.get("success"):
-                        issue_number = result.get("issue_number")
-                        # Field Engineer style: concise, direct response
-                        message = f"Issue #{issue_number} aberta no GitHub. O auto-reparo está em standby."
-                        return Response(
-                            success=True,
-                            message=message,
-                            data={
-                                "issue_number": issue_number,
-                                "issue_url": result.get("issue_url"),
-                            }
-                        )
-                    else:
-                        error = result.get("error", "Erro desconhecido")
-                        return Response(
-                            success=False,
-                            message=f"Falha ao criar issue: {error}",
-                            error="GITHUB_API_ERROR",
-                        )
-                except Exception as e:
-                    logger.error(f"Error creating GitHub issue: {e}")
-                    return Response(
-                        success=False,
-                        message=f"Erro ao criar issue: {str(e)}",
-                        error="EXECUTION_ERROR",
-                    )
+                # Handle issue reporting - delegate to async helper
+                return self._handle_report_issue_sync(params)
 
             else:
                 return Response(
@@ -556,6 +498,26 @@ class AssistantService:
                 response_text=response.message,
             )
 
+    async def _execute_command_async(self, command_type: CommandType, params: dict, request_metadata: Optional[Dict[str, Any]] = None) -> Response:
+        """
+        Execute a command asynchronously based on its type with device routing support
+
+        Args:
+            command_type: Type of command to execute
+            params: Command parameters
+            request_metadata: Optional metadata for context-aware routing
+
+        Returns:
+            Response object with execution result
+        """
+        # For REPORT_ISSUE, use async handler
+        if command_type == CommandType.REPORT_ISSUE:
+            return await self._handle_report_issue_async(params)
+        
+        # For all other commands, delegate to sync version
+        # (they don't have async operations)
+        return self._execute_command(command_type, params, request_metadata)
+
     def _get_required_capability(self, command_type: CommandType, params: dict) -> Optional[str]:
         """
         Determine if a command requires a specific capability/library
@@ -616,3 +578,151 @@ class AssistantService:
         except Exception as e:
             logger.warning(f"Error retrieving system info: {e}")
             return {"error": str(e)}
+    
+    def _handle_report_issue_sync(self, params: dict) -> Response:
+        """
+        Synchronously handle report issue command.
+        
+        Args:
+            params: Command parameters
+            
+        Returns:
+            Response object
+        """
+        if not self.github_adapter:
+            return Response(
+                success=False,
+                message="GitHub adapter não configurado",
+                error="GITHUB_NOT_CONFIGURED",
+            )
+        
+        issue_description = params.get("issue_description", "")
+        if not issue_description:
+            return Response(
+                success=False,
+                message="Descrição da issue é obrigatória",
+                error="MISSING_DESCRIPTION",
+            )
+        
+        # Get the most recent error log from history
+        error_log = self._get_recent_error_log()
+        
+        # Get system information
+        system_info = self._get_system_info()
+        
+        # Create the issue asynchronously
+        try:
+            # Check if we're already in an async context
+            try:
+                asyncio.get_running_loop()
+                # We're in an async context - can't use asyncio.run()
+                # Return a message indicating async execution is needed
+                return Response(
+                    success=False,
+                    message="Operação assíncrona requerida - use async_process_command",
+                    error="ASYNC_REQUIRED",
+                )
+            except RuntimeError:
+                # No running loop - safe to use asyncio.run()
+                result = asyncio.run(
+                    self.github_adapter.create_issue(
+                        title=issue_description,
+                        description=issue_description,
+                        error_log=error_log,
+                        system_info=system_info,
+                    )
+                )
+            
+            if result.get("success"):
+                issue_number = result.get("issue_number")
+                # Field Engineer style: concise, direct response
+                message = f"Issue #{issue_number} aberta no GitHub. O auto-reparo está em standby."
+                return Response(
+                    success=True,
+                    message=message,
+                    data={
+                        "issue_number": issue_number,
+                        "issue_url": result.get("issue_url"),
+                    }
+                )
+            else:
+                error = result.get("error", "Erro desconhecido")
+                return Response(
+                    success=False,
+                    message=f"Falha ao criar issue: {error}",
+                    error="GITHUB_API_ERROR",
+                )
+        except Exception as e:
+            logger.error(f"Error creating GitHub issue: {e}")
+            return Response(
+                success=False,
+                message=f"Erro ao criar issue: {str(e)}",
+                error="EXECUTION_ERROR",
+            )
+    
+    async def _handle_report_issue_async(self, params: dict) -> Response:
+        """
+        Asynchronously handle report issue command.
+        
+        Args:
+            params: Command parameters
+            
+        Returns:
+            Response object
+        """
+        if not self.github_adapter:
+            return Response(
+                success=False,
+                message="GitHub adapter não configurado",
+                error="GITHUB_NOT_CONFIGURED",
+            )
+        
+        issue_description = params.get("issue_description", "")
+        if not issue_description:
+            return Response(
+                success=False,
+                message="Descrição da issue é obrigatória",
+                error="MISSING_DESCRIPTION",
+            )
+        
+        # Get the most recent error log from history
+        error_log = self._get_recent_error_log()
+        
+        # Get system information
+        system_info = self._get_system_info()
+        
+        # Create the issue asynchronously
+        try:
+            result = await self.github_adapter.create_issue(
+                title=issue_description,
+                description=issue_description,
+                error_log=error_log,
+                system_info=system_info,
+            )
+            
+            if result.get("success"):
+                issue_number = result.get("issue_number")
+                # Field Engineer style: concise, direct response
+                message = f"Issue #{issue_number} aberta no GitHub. O auto-reparo está em standby."
+                return Response(
+                    success=True,
+                    message=message,
+                    data={
+                        "issue_number": issue_number,
+                        "issue_url": result.get("issue_url"),
+                    }
+                )
+            else:
+                error = result.get("error", "Erro desconhecido")
+                return Response(
+                    success=False,
+                    message=f"Falha ao criar issue: {error}",
+                    error="GITHUB_API_ERROR",
+                )
+        except Exception as e:
+            logger.error(f"Error creating GitHub issue: {e}")
+            return Response(
+                success=False,
+                message=f"Erro ao criar issue: {str(e)}",
+                error="EXECUTION_ERROR",
+            )
