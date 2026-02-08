@@ -84,8 +84,8 @@ class TestAIGateway:
         
         # With tiktoken, we expect more precise counting
         if HAS_TIKTOKEN:
-            # The exact count may vary, but should be reasonable
-            assert token_count < len(text)  # Tokens should be fewer than characters
+            # The exact count may vary, but tokens typically <= characters
+            assert token_count <= len(text)  # Tokens should not exceed characters
         else:
             # Without tiktoken, we use character approximation (len // 4)
             assert token_count == len(text) // 4

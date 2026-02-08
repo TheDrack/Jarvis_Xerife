@@ -47,7 +47,8 @@ def count_tokens(text: str) -> int:
     """
     Count tokens in the given text.
     
-    Uses tiktoken if available, otherwise falls back to character-based approximation.
+    Uses tiktoken if available, otherwise falls back to character-based approximation
+    using a 1:4 ratio (1 token ≈ 4 characters).
     
     Args:
         text: Text to count tokens for
