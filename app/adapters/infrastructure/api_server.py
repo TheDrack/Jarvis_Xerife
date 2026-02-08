@@ -8,27 +8,9 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.openapi.docs import get_swagger_ui_html
 
+from app.adapters.infrastructure import api_models
 from app.adapters.infrastructure.api_models import (
-    CapabilityModel,
-    CommandHistoryItem,
-    CommandResultRequest,
-    CommandResultResponse,
-    DeviceListResponse,
-    DeviceRegistrationRequest,
-    DeviceRegistrationResponse,
-    DeviceResponse,
-    DeviceStatusUpdate,
-    ExecuteRequest,
-    ExecuteResponse,
-    HistoryResponse,
-    InstallPackageRequest,
-    InstallPackageResponse,
-    PackageStatusResponse,
-    PrewarmResponse,
-    StatusResponse,
-    TaskResponse,
     Token,
-    TokenData,
     User,
 )
 from app.adapters.infrastructure.auth_adapter import AuthAdapter
@@ -792,5 +774,197 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         html_content = html_content.replace('</body>', custom_js + '\n</body>')
         
         return HTMLResponse(content=html_content)
+
+    # Mission Execution Endpoints
+    
+    @app.post("/v1/missions/execute", response_model=api_models.MissionResponse)
+    async def execute_mission(
+        request: api_models.MissionRequest,
+        background_tasks: BackgroundTasks,
+        current_user: User = Depends(get_current_user),
+    ) -> api_models.MissionResponse:
+        """
+        Execute a serverless task mission on the Worker (Protected endpoint)
+        
+        This endpoint allows executing arbitrary Python code with dependencies
+        in an isolated environment on the target device.
+        
+        Args:
+            request: Mission execution request
+            background_tasks: FastAPI background tasks
+            current_user: Current authenticated user
+            
+        Returns:
+            Mission execution result
+        """
+        try:
+            from app.domain.models.mission import Mission
+            from app.application.services.task_runner import TaskRunner
+            
+            logger.info(f"User '{current_user.username}' executing mission: {request.mission_id}")
+            
+            # Create Mission object
+            mission = Mission(
+                mission_id=request.mission_id,
+                code=request.code,
+                requirements=request.requirements,
+                browser_interaction=request.browser_interaction,
+                keep_alive=request.keep_alive,
+                target_device_id=request.target_device_id,
+                timeout=request.timeout,
+                metadata=request.metadata,
+            )
+            
+            # Initialize TaskRunner
+            task_runner = TaskRunner()
+            
+            # Execute mission
+            result = task_runner.execute_mission(mission)
+            
+            return api_models.MissionResponse(
+                mission_id=result.mission_id,
+                success=result.success,
+                stdout=result.stdout,
+                stderr=result.stderr,
+                exit_code=result.exit_code,
+                execution_time=result.execution_time,
+                error=result.error,
+                metadata=result.metadata,
+            )
+            
+        except Exception as e:
+            logger.error(f"Error executing mission: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Mission execution failed: {str(e)}")
+    
+    @app.post("/v1/browser/control", response_model=api_models.BrowserControlResponse)
+    async def control_browser(
+        request: api_models.BrowserControlRequest,
+        current_user: User = Depends(get_current_user),
+    ) -> api_models.BrowserControlResponse:
+        """
+        Control the persistent browser instance (Protected endpoint)
+        
+        Operations:
+        - start: Start the browser with CDP enabled
+        - stop: Stop the browser
+        - status: Get current browser status
+        
+        Args:
+            request: Browser control request
+            current_user: Current authenticated user
+            
+        Returns:
+            Browser control result
+        """
+        try:
+            from app.application.services.browser_manager import PersistentBrowserManager
+            
+            logger.info(f"User '{current_user.username}' performing browser operation: {request.operation}")
+            
+            # Initialize browser manager (singleton pattern would be better in production)
+            browser_manager = PersistentBrowserManager()
+            
+            if request.operation == "start":
+                cdp_url = browser_manager.start_browser(port=request.port)
+                if cdp_url:
+                    return api_models.BrowserControlResponse(
+                        success=True,
+                        is_running=True,
+                        cdp_url=cdp_url,
+                        message="Browser started successfully",
+                    )
+                else:
+                    return api_models.BrowserControlResponse(
+                        success=False,
+                        is_running=False,
+                        cdp_url=None,
+                        message="Failed to start browser",
+                    )
+            
+            elif request.operation == "stop":
+                success = browser_manager.stop_browser()
+                return api_models.BrowserControlResponse(
+                    success=success,
+                    is_running=browser_manager.is_running(),
+                    cdp_url=None,
+                    message="Browser stopped" if success else "Failed to stop browser",
+                )
+            
+            elif request.operation == "status":
+                is_running = browser_manager.is_running()
+                cdp_url = browser_manager.get_cdp_url() if is_running else None
+                return api_models.BrowserControlResponse(
+                    success=True,
+                    is_running=is_running,
+                    cdp_url=cdp_url,
+                    message="Browser is running" if is_running else "Browser is not running",
+                )
+            
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid operation: {request.operation}. Must be 'start', 'stop', or 'status'",
+                )
+        
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error controlling browser: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Browser control failed: {str(e)}")
+    
+    @app.post("/v1/browser/record", response_model=api_models.RecordAutomationResponse)
+    async def record_automation(
+        request: api_models.RecordAutomationRequest,
+        background_tasks: BackgroundTasks,
+        current_user: User = Depends(get_current_user),
+    ) -> api_models.RecordAutomationResponse:
+        """
+        Start recording browser automation with Playwright codegen (Protected endpoint)
+        
+        This starts the Playwright codegen tool which allows users to interact with
+        a browser and automatically generates Python code for those interactions.
+        The generated code can be stored as a new "Skill" in the database.
+        
+        Args:
+            request: Recording request with optional output file
+            background_tasks: FastAPI background tasks
+            current_user: Current authenticated user
+            
+        Returns:
+            Recording start response
+        """
+        try:
+            from app.application.services.browser_manager import PersistentBrowserManager
+            from pathlib import Path
+            
+            logger.info(f"User '{current_user.username}' starting automation recording")
+            
+            # Initialize browser manager
+            browser_manager = PersistentBrowserManager()
+            
+            # Determine output file
+            output_file = None
+            if request.output_file:
+                output_file = Path(request.output_file)
+            
+            # Start recording
+            output_path = browser_manager.record_automation(output_file=output_file)
+            
+            if output_path:
+                return api_models.RecordAutomationResponse(
+                    success=True,
+                    output_file=output_path,
+                    message="Recording started. Close the browser when done to save the generated code.",
+                )
+            else:
+                return api_models.RecordAutomationResponse(
+                    success=False,
+                    output_file=None,
+                    message="Failed to start recording. Make sure Playwright is installed.",
+                )
+        
+        except Exception as e:
+            logger.error(f"Error starting automation recording: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Recording failed: {str(e)}")
 
     return app
