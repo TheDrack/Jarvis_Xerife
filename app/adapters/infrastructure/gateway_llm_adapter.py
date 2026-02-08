@@ -468,19 +468,23 @@ Se não for possível auto-correção, explique o motivo.
             plan["file_path"] = "app/adapters/infrastructure/gemini_adapter.py"
             
             # Read current file to create a fix
-            file_path = "/home/runner/work/python/python/" + plan["file_path"]
+            file_path = os.path.join(os.getcwd(), plan["file_path"])
             try:
                 with open(file_path, "r") as f:
                     current_code = f.read()
                 
-                # Simple fix: replace deprecated model name
-                fixed_code = current_code.replace(
-                    'model_name: str = "gemini-flash-latest"',
-                    'model_name: str = "gemini-2.0-flash-exp"'
+                # Simple fix: replace deprecated model name with word boundaries
+                # This ensures we don't replace parts of other strings
+                import re
+                fixed_code = re.sub(
+                    r'\bmodel_name:\s*str\s*=\s*"gemini-flash-latest"',
+                    'model_name: str = "gemini-2.0-flash-exp"',
+                    current_code
                 )
-                fixed_code = fixed_code.replace(
-                    'gemini_model: str = "gemini-flash-latest"',
-                    'gemini_model: str = "gemini-2.0-flash-exp"'
+                fixed_code = re.sub(
+                    r'\bgemini_model:\s*str\s*=\s*"gemini-flash-latest"',
+                    'gemini_model: str = "gemini-2.0-flash-exp"',
+                    fixed_code
                 )
                 
                 plan["fix_code"] = fixed_code

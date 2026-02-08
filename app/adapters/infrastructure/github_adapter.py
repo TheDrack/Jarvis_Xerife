@@ -105,6 +105,15 @@ class GitHubAdapter:
             await self._client.aclose()
             self._client = None
     
+    async def __aenter__(self):
+        """Async context manager entry."""
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.close()
+        return False
+    
     async def dispatch_auto_fix(self, issue_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Dispatch an auto-fix event to trigger the GitHub Actions workflow.
@@ -200,6 +209,9 @@ class GitHubAdapter:
             error_msg = f"Error dispatching auto-fix: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return {"success": False, "error": error_msg}
+        finally:
+            # Always close client after dispatch to avoid connection issues
+            await self.close()
     
     async def get_workflow_runs(self, workflow_name: str = "jarvis_code_fixer.yml") -> Dict[str, Any]:
         """
@@ -233,21 +245,3 @@ class GitHubAdapter:
         
         except Exception as e:
             return {"success": False, "error": str(e)}
-    
-    def __del__(self):
-        """Cleanup on deletion."""
-        # Note: Can't use await in __del__, so we just close synchronously if needed
-        if self._client and not self._client.is_closed:
-            try:
-                # Try to close synchronously
-                import asyncio
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If loop is running, schedule cleanup
-                    loop.create_task(self.close())
-                else:
-                    # If no loop, close synchronously (will show deprecation warning)
-                    loop.run_until_complete(self.close())
-            except Exception:
-                # Ignore cleanup errors in destructor
-                pass
