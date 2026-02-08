@@ -189,7 +189,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                     "network_type": request.metadata.network_type,
                 }
             
-            response = assistant_service.process_command(request.command, request_metadata=metadata_dict)
+            # Use async_process_command for proper async handling
+            response = await assistant_service.async_process_command(request.command, request_metadata=metadata_dict)
 
             return ExecuteResponse(
                 success=response.success,

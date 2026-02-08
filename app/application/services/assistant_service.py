@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Assistant Service - Main use case orchestrator"""
 
+import asyncio
 import logging
 from collections import deque
 from datetime import datetime
@@ -111,15 +112,101 @@ class AssistantService:
 
         # Handle unknown commands with conversational AI if available
         if intent.command_type == CommandType.UNKNOWN:
-            # Debug prints for fallback logic
-            print(f"DEBUG: Gemini Adapter status: {self.gemini_adapter is not None}")
-            print(f"DEBUG: Intent command type: {intent.command_type}")
+            # Log debug information
+            logger.debug(f"Gemini Adapter status: {self.gemini_adapter is not None}")
+            logger.debug(f"Intent command type: {intent.command_type}")
             
             # Check if interpreter has conversational capability (LLMCommandAdapter)
             if hasattr(self.interpreter, 'generate_conversational_response'):
                 logger.info("Unknown command detected, using conversational AI")
                 try:
-                    conversational_response = self.interpreter.generate_conversational_response(user_input)
+                    # Check if we're in an async context and the method is async
+                    if asyncio.iscoroutinefunction(self.interpreter.generate_conversational_response):
+                        # The method is async, so we need to handle it properly
+                        # This will be called from the async version of process_command
+                        raise RuntimeError(
+                            "Cannot call async generate_conversational_response from sync context - "
+                            "use async_process_command instead"
+                        )
+                    else:
+                        conversational_response = self.interpreter.generate_conversational_response(user_input)
+                    
+                    response = Response(
+                        success=True,
+                        message=conversational_response,
+                        data={
+                            "command_type": CommandType.CHAT.value,
+                            "parameters": {"user_input": user_input},
+                        }
+                    )
+                    self._add_to_history(user_input, response)
+                    return response
+                except Exception as e:
+                    logger.error(f"Error generating conversational response: {e}")
+                    # Fall through to validation error
+            
+            # Fallback to validation error if no conversational AI or error occurred
+            return self._handle_validation_error(user_input, intent)
+
+        # Validate the intent
+        validation = self.processor.validate_intent(intent)
+        if not validation.success:
+            logger.warning(f"Invalid intent: {validation.message}")
+            return self._handle_validation_error(user_input, intent, validation)
+
+        # Create command
+        command = self.processor.create_command(intent)
+
+        # Execute the command with device routing if applicable
+        response = self._execute_command(
+            command.intent.command_type,
+            command.intent.parameters,
+            request_metadata=request_metadata,
+        )
+        # Add command metadata to response for history tracking
+        if response.data is None:
+            response.data = {}
+        response.data["command_type"] = command.intent.command_type.value
+        response.data["parameters"] = command.intent.parameters
+        
+        # Store request metadata in response for context tracking
+        if request_metadata:
+            response.data["request_metadata"] = request_metadata
+        
+        self._add_to_history(user_input, response)
+        return response
+
+    async def async_process_command(self, user_input: str, request_metadata: Optional[Dict[str, Any]] = None) -> Response:
+        """
+        Process a single command asynchronously (for async contexts like FastAPI routes).
+
+        Args:
+            user_input: Raw user input
+            request_metadata: Optional metadata containing source_device_id and network_id for context-aware routing
+
+        Returns:
+            Response object with execution result
+        """
+        # Interpret the command
+        intent = self.interpreter.interpret(user_input)
+        logger.info(f"Interpreted intent: {intent.command_type} with params: {intent.parameters}")
+
+        # Handle unknown commands with conversational AI if available
+        if intent.command_type == CommandType.UNKNOWN:
+            # Log debug information
+            logger.debug(f"Gemini Adapter status: {self.gemini_adapter is not None}")
+            logger.debug(f"Intent command type: {intent.command_type}")
+            
+            # Check if interpreter has conversational capability (LLMCommandAdapter)
+            if hasattr(self.interpreter, 'generate_conversational_response'):
+                logger.info("Unknown command detected, using conversational AI")
+                try:
+                    # Check if the method is async and call it accordingly
+                    if asyncio.iscoroutinefunction(self.interpreter.generate_conversational_response):
+                        conversational_response = await self.interpreter.generate_conversational_response(user_input)
+                    else:
+                        conversational_response = self.interpreter.generate_conversational_response(user_input)
+                    
                     response = Response(
                         success=True,
                         message=conversational_response,

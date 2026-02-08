@@ -215,7 +215,8 @@ class TestAIGateway:
         assert not gateway._is_model_decommissioned_error(other_error)
 
 
-    def test_generate_with_groq(self, mock_groq_client):
+    @pytest.mark.asyncio
+    async def test_generate_with_groq(self, mock_groq_client):
         """Test generating completion with Groq"""
         # Create gateway without initialization to avoid import issues
         gateway = AIGateway(
@@ -230,7 +231,7 @@ class TestAIGateway:
             {"role": "user", "content": "Hello, how are you?"}
         ]
         
-        result = gateway._generate_with_groq(messages)
+        result = await gateway._generate_with_groq(messages)
         
         assert result["provider"] == LLMProvider.GROQ.value
         assert "response" in result
@@ -295,7 +296,8 @@ class TestAIGatewayFallback:
         
         return gateway
 
-    def test_fallback_from_groq_to_gemini_on_rate_limit(self, gateway_with_mocks):
+    @pytest.mark.asyncio
+    async def test_fallback_from_groq_to_gemini_on_rate_limit(self, gateway_with_mocks):
         """Test that Groq rate limit triggers fallback to Gemini"""
         gateway = gateway_with_mocks
         
@@ -306,14 +308,15 @@ class TestAIGatewayFallback:
         
         messages = [{"role": "user", "content": "Test message"}]
         
-        result = gateway.generate_completion(messages)
+        result = await gateway.generate_completion(messages)
         
         # Should have fallen back to Gemini
         assert result["provider"] == LLMProvider.GEMINI.value
         assert "fallback_from" in result
         assert result["fallback_from"] == LLMProvider.GROQ.value
 
-    def test_fallback_from_gemini_to_groq_on_rate_limit(self, gateway_with_mocks):
+    @pytest.mark.asyncio
+    async def test_fallback_from_gemini_to_groq_on_rate_limit(self, gateway_with_mocks):
         """Test that Gemini rate limit triggers fallback to Groq"""
         gateway = gateway_with_mocks
         
@@ -327,14 +330,15 @@ class TestAIGatewayFallback:
         large_payload = "word " * 10000  # Approximately 50k characters = 12.5k tokens
         messages = [{"role": "user", "content": large_payload}]
         
-        result = gateway.generate_completion(messages)
+        result = await gateway.generate_completion(messages)
         
         # Should have fallen back to Groq
         assert result["provider"] == LLMProvider.GROQ.value
         assert "fallback_from" in result
         assert result["fallback_from"] == LLMProvider.GEMINI.value
 
-    def test_no_fallback_available_raises_error(self):
+    @pytest.mark.asyncio
+    async def test_no_fallback_available_raises_error(self):
         """Test that error is raised when no fallback is available"""
         gateway = AIGateway(
             groq_api_key="test_groq_key",
@@ -350,9 +354,10 @@ class TestAIGatewayFallback:
         messages = [{"role": "user", "content": "Test"}]
         
         with pytest.raises(ValueError, match="no fallback provider available"):
-            gateway.generate_completion(messages)
+            await gateway.generate_completion(messages)
     
-    def test_model_decommissioned_error_with_fallback(self, gateway_with_mocks):
+    @pytest.mark.asyncio
+    async def test_model_decommissioned_error_with_fallback(self, gateway_with_mocks):
         """Test that model decommissioned error triggers fallback to Gemini"""
         gateway = gateway_with_mocks
         
@@ -363,14 +368,15 @@ class TestAIGatewayFallback:
         
         messages = [{"role": "user", "content": "Test message"}]
         
-        result = gateway.generate_completion(messages)
+        result = await gateway.generate_completion(messages)
         
         # Should have fallen back to Gemini
         assert result["provider"] == LLMProvider.GEMINI.value
         assert "fallback_from" in result
         assert result["fallback_from"] == LLMProvider.GROQ.value
     
-    def test_model_decommissioned_error_without_fallback_raises_error(self):
+    @pytest.mark.asyncio
+    async def test_model_decommissioned_error_without_fallback_raises_error(self):
         """Test that model decommissioned error without fallback raises informative error"""
         gateway = AIGateway(
             groq_api_key="test_groq_key",
@@ -387,7 +393,7 @@ class TestAIGatewayFallback:
         messages = [{"role": "user", "content": "Test"}]
         
         with pytest.raises(ValueError) as exc_info:
-            gateway.generate_completion(messages)
+            await gateway.generate_completion(messages)
         
         # Check that the error message contains helpful information
         error_message = str(exc_info.value)
