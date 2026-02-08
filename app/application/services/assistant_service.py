@@ -31,6 +31,7 @@ class AssistantService:
         dependency_manager: Optional[DependencyManager] = None,
         wake_word: str = "xerife",
         gemini_adapter: Optional[Any] = None,
+        device_service: Optional[Any] = None,
     ):
         """
         Initialize the assistant service with injected dependencies
@@ -45,6 +46,7 @@ class AssistantService:
             dependency_manager: Optional dependency manager for on-demand package installation
             wake_word: Wake word for activation
             gemini_adapter: Optional Gemini adapter for conversational AI
+            device_service: Optional device service for distributed orchestration
         """
         self.voice = voice_provider
         self.action = action_provider
@@ -55,6 +57,7 @@ class AssistantService:
         self.dependency_manager = dependency_manager or DependencyManager()
         self.wake_word = wake_word
         self.gemini_adapter = gemini_adapter
+        self.device_service = device_service
         self.is_running = False
         # Command history tracking (max 100 commands)
         self._command_history: Deque[Dict[str, Any]] = deque(maxlen=100)
@@ -142,7 +145,7 @@ class AssistantService:
         # Create command
         command = self.processor.create_command(intent)
 
-        # Execute the command
+        # Execute the command with device routing if applicable
         response = self._execute_command(command.intent.command_type, command.intent.parameters)
         # Add command metadata to response for history tracking
         if response.data is None:
@@ -212,7 +215,7 @@ class AssistantService:
 
     def _execute_command(self, command_type: CommandType, params: dict) -> Response:
         """
-        Execute a command based on its type
+        Execute a command based on its type with device routing support
 
         Args:
             command_type: Type of command to execute
@@ -222,8 +225,34 @@ class AssistantService:
             Response object with execution result
         """
         try:
-            # Check for dependencies before executing complex commands
+            # Check if command requires a specific device capability
             required_capability = self._get_required_capability(command_type, params)
+            
+            # If a capability is required and device_service is available, route to device
+            if required_capability and self.device_service:
+                target_device = self.device_service.find_device_by_capability(required_capability)
+                if target_device:
+                    logger.info(f"Routing command to device: {target_device['name']} (ID: {target_device['id']})")
+                    # Add target_device_id to response for distributed execution
+                    return Response(
+                        success=True,
+                        message=f"Command routed to device: {target_device['name']}",
+                        data={
+                            "target_device_id": target_device["id"],
+                            "target_device_name": target_device["name"],
+                            "required_capability": required_capability,
+                            "requires_device_execution": True,
+                        }
+                    )
+                else:
+                    logger.warning(f"No online device found with capability: {required_capability}")
+                    return Response(
+                        success=False,
+                        message=f"No device available with capability: {required_capability}",
+                        error="NO_DEVICE_AVAILABLE",
+                    )
+            
+            # Standard capability check for local execution
             if required_capability:
                 logger.info(f"Command requires capability: {required_capability}")
                 if not self.dependency_manager.ensure_capability(required_capability):

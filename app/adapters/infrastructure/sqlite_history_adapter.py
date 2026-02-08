@@ -13,6 +13,7 @@ from sqlalchemy import func, delete
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 from app.application.ports.history_provider import HistoryProvider
+from app.domain.models.device import Capability, Device
 
 logger = logging.getLogger(__name__)
 

@@ -113,3 +113,52 @@ class PrewarmResponse(BaseModel):
     all_installed: bool = Field(..., description="Whether all recommended libraries were installed")
 
 
+# Device Management Models
+
+
+class CapabilityModel(BaseModel):
+    """Model for device capability"""
+
+    name: str = Field(..., description="Capability name (e.g., 'camera', 'bluetooth_scan')")
+    description: str = Field(default="", description="Capability description")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Technical details as JSON")
+
+
+class DeviceRegistrationRequest(BaseModel):
+    """Request model for device registration"""
+
+    name: str = Field(..., description="Device name", min_length=1)
+    type: str = Field(..., description="Device type (mobile, desktop, cloud, iot)")
+    capabilities: List[CapabilityModel] = Field(default_factory=list, description="List of device capabilities")
+
+
+class DeviceRegistrationResponse(BaseModel):
+    """Response model for device registration"""
+
+    success: bool = Field(..., description="Whether registration was successful")
+    device_id: int = Field(..., description="Assigned device ID")
+    message: str = Field(..., description="Registration result message")
+
+
+class DeviceStatusUpdate(BaseModel):
+    """Model for updating device status"""
+
+    status: str = Field(..., description="Device status (online/offline)")
+
+
+class DeviceResponse(BaseModel):
+    """Response model for device information"""
+
+    id: int = Field(..., description="Device ID")
+    name: str = Field(..., description="Device name")
+    type: str = Field(..., description="Device type")
+    status: str = Field(..., description="Device status")
+    last_seen: str = Field(..., description="Last seen timestamp (ISO format)")
+    capabilities: List[CapabilityModel] = Field(default_factory=list, description="Device capabilities")
+
+
+class DeviceListResponse(BaseModel):
+    """Response model for listing devices"""
+
+    devices: List[DeviceResponse] = Field(..., description="List of registered devices")
+    total: int = Field(..., description="Total number of devices")

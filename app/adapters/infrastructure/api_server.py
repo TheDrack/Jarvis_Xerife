@@ -9,7 +9,13 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.openapi.docs import get_swagger_ui_html
 
 from app.adapters.infrastructure.api_models import (
+    CapabilityModel,
     CommandHistoryItem,
+    DeviceListResponse,
+    DeviceRegistrationRequest,
+    DeviceRegistrationResponse,
+    DeviceResponse,
+    DeviceStatusUpdate,
     ExecuteRequest,
     ExecuteResponse,
     HistoryResponse,
@@ -26,6 +32,7 @@ from app.adapters.infrastructure.api_models import (
 from app.adapters.infrastructure.auth_adapter import AuthAdapter
 from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
 from app.application.services import AssistantService, ExtensionManager
+from app.application.services.device_service import DeviceService
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -112,6 +119,9 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
     
     # Initialize database adapter for distributed mode
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
+    
+    # Initialize device service for distributed orchestration
+    device_service = DeviceService(engine=db_adapter.engine)
 
     @app.post("/token", response_model=Token)
     async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
@@ -409,6 +419,201 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             )
         except Exception as e:
             logger.error(f"Error in pre-warming endpoint: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+    # Device Management Endpoints
+    
+    @app.post("/v1/devices/register", response_model=DeviceRegistrationResponse)
+    async def register_device(
+        request: DeviceRegistrationRequest,
+        current_user: User = Depends(get_current_user),
+    ) -> DeviceRegistrationResponse:
+        """
+        Register a new device or update an existing one (Protected endpoint)
+        
+        Devices can announce their capabilities to Jarvis, allowing distributed orchestration.
+        
+        Args:
+            request: Device registration request with name, type, and capabilities
+            current_user: Current authenticated user
+        
+        Returns:
+            Device registration response with assigned device ID
+        """
+        try:
+            logger.info(f"User '{current_user.username}' registering device: {request.name}")
+            
+            # Convert capabilities to dict format
+            capabilities = [
+                {
+                    "name": cap.name,
+                    "description": cap.description,
+                    "metadata": cap.metadata,
+                }
+                for cap in request.capabilities
+            ]
+            
+            device_id = device_service.register_device(
+                name=request.name,
+                device_type=request.type,
+                capabilities=capabilities,
+            )
+            
+            if device_id is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to register device"
+                )
+            
+            return DeviceRegistrationResponse(
+                success=True,
+                device_id=device_id,
+                message=f"Device '{request.name}' registered successfully with ID {device_id}",
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error registering device: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+    @app.get("/v1/devices", response_model=DeviceListResponse)
+    async def list_devices(
+        status: str = None,
+        current_user: User = Depends(get_current_user),
+    ) -> DeviceListResponse:
+        """
+        List all registered devices (Protected endpoint)
+        
+        Args:
+            status: Optional status filter (online/offline)
+            current_user: Current authenticated user
+        
+        Returns:
+            List of registered devices with their capabilities
+        """
+        try:
+            devices = device_service.list_devices(status_filter=status)
+            
+            return DeviceListResponse(
+                devices=[
+                    DeviceResponse(
+                        id=device["id"],
+                        name=device["name"],
+                        type=device["type"],
+                        status=device["status"],
+                        last_seen=device["last_seen"],
+                        capabilities=[
+                            CapabilityModel(
+                                name=cap["name"],
+                                description=cap["description"],
+                                metadata=cap["metadata"],
+                            )
+                            for cap in device["capabilities"]
+                        ],
+                    )
+                    for device in devices
+                ],
+                total=len(devices),
+            )
+        except Exception as e:
+            logger.error(f"Error listing devices: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+    @app.get("/v1/devices/{device_id}", response_model=DeviceResponse)
+    async def get_device(
+        device_id: int,
+        current_user: User = Depends(get_current_user),
+    ) -> DeviceResponse:
+        """
+        Get details of a specific device (Protected endpoint)
+        
+        Args:
+            device_id: ID of the device
+            current_user: Current authenticated user
+        
+        Returns:
+            Device information with capabilities
+        """
+        try:
+            device = device_service.get_device(device_id)
+            
+            if device is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Device {device_id} not found"
+                )
+            
+            return DeviceResponse(
+                id=device["id"],
+                name=device["name"],
+                type=device["type"],
+                status=device["status"],
+                last_seen=device["last_seen"],
+                capabilities=[
+                    CapabilityModel(
+                        name=cap["name"],
+                        description=cap["description"],
+                        metadata=cap["metadata"],
+                    )
+                    for cap in device["capabilities"]
+                ],
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting device: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+    
+    @app.put("/v1/devices/{device_id}/heartbeat", response_model=DeviceResponse)
+    async def device_heartbeat(
+        device_id: int,
+        status_update: DeviceStatusUpdate,
+        current_user: User = Depends(get_current_user),
+    ) -> DeviceResponse:
+        """
+        Update device status and last_seen timestamp (Protected endpoint)
+        
+        Devices should call this periodically to indicate they are still online.
+        
+        Args:
+            device_id: ID of the device
+            status_update: Status update (online/offline)
+            current_user: Current authenticated user
+        
+        Returns:
+            Updated device information
+        """
+        try:
+            success = device_service.update_device_status(device_id, status_update.status)
+            
+            if not success:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Device {device_id} not found"
+                )
+            
+            # Get updated device info
+            device = device_service.get_device(device_id)
+            
+            return DeviceResponse(
+                id=device["id"],
+                name=device["name"],
+                type=device["type"],
+                status=device["status"],
+                last_seen=device["last_seen"],
+                capabilities=[
+                    CapabilityModel(
+                        name=cap["name"],
+                        description=cap["description"],
+                        metadata=cap["metadata"],
+                    )
+                    for cap in device["capabilities"]
+                ],
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error updating device heartbeat: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
     
     # Override the default Swagger UI to inject custom JavaScript for password visibility toggle
