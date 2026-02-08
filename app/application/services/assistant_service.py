@@ -3,6 +3,8 @@
 
 import asyncio
 import logging
+import platform
+import sys
 from collections import deque
 from datetime import datetime
 from typing import Any, Deque, Dict, List, Optional
@@ -33,6 +35,7 @@ class AssistantService:
         wake_word: str = "xerife",
         gemini_adapter: Optional[Any] = None,
         device_service: Optional[Any] = None,
+        github_adapter: Optional[Any] = None,
     ):
         """
         Initialize the assistant service with injected dependencies
@@ -48,6 +51,7 @@ class AssistantService:
             wake_word: Wake word for activation
             gemini_adapter: Optional Gemini adapter for conversational AI
             device_service: Optional device service for distributed orchestration
+            github_adapter: Optional GitHub adapter for issue reporting
         """
         self.voice = voice_provider
         self.action = action_provider
@@ -59,6 +63,7 @@ class AssistantService:
         self.wake_word = wake_word
         self.gemini_adapter = gemini_adapter
         self.device_service = device_service
+        self.github_adapter = github_adapter
         self.is_running = False
         # Command history tracking (max 100 commands)
         self._command_history: Deque[Dict[str, Any]] = deque(maxlen=100)
@@ -425,6 +430,68 @@ class AssistantService:
                 message = params.get("response", "")
                 return Response(success=True, message=message)
 
+            elif command_type == CommandType.REPORT_ISSUE:
+                # Handle issue reporting
+                if not self.github_adapter:
+                    return Response(
+                        success=False,
+                        message="GitHub adapter não configurado",
+                        error="GITHUB_NOT_CONFIGURED",
+                    )
+                
+                issue_description = params.get("issue_description", "")
+                if not issue_description:
+                    return Response(
+                        success=False,
+                        message="Descrição da issue é obrigatória",
+                        error="MISSING_DESCRIPTION",
+                    )
+                
+                # Get the most recent error log from history
+                error_log = self._get_recent_error_log()
+                
+                # Get system information
+                system_info = self._get_system_info()
+                
+                # Create the issue asynchronously
+                try:
+                    # Run async create_issue in event loop
+                    result = asyncio.run(
+                        self.github_adapter.create_issue(
+                            title=issue_description,
+                            description=issue_description,
+                            error_log=error_log,
+                            system_info=system_info,
+                        )
+                    )
+                    
+                    if result.get("success"):
+                        issue_number = result.get("issue_number")
+                        # Field Engineer style: concise, direct response
+                        message = f"Issue #{issue_number} aberta no GitHub. O auto-reparo está em standby."
+                        return Response(
+                            success=True,
+                            message=message,
+                            data={
+                                "issue_number": issue_number,
+                                "issue_url": result.get("issue_url"),
+                            }
+                        )
+                    else:
+                        error = result.get("error", "Erro desconhecido")
+                        return Response(
+                            success=False,
+                            message=f"Falha ao criar issue: {error}",
+                            error="GITHUB_API_ERROR",
+                        )
+                except Exception as e:
+                    logger.error(f"Error creating GitHub issue: {e}")
+                    return Response(
+                        success=False,
+                        message=f"Erro ao criar issue: {str(e)}",
+                        error="EXECUTION_ERROR",
+                    )
+
             else:
                 return Response(
                     success=False,
@@ -513,3 +580,39 @@ class AssistantService:
         # This can be extended based on command parameters or types
         # For now, we return None for standard commands
         return None
+    
+    def _get_recent_error_log(self) -> Optional[str]:
+        """
+        Get the most recent error log from command history.
+        
+        Returns:
+            Error message from the most recent failed command, or None
+        """
+        try:
+            # Search through command history for the most recent error
+            for item in reversed(list(self._command_history)):
+                if not item.get("success", True):
+                    error_msg = item.get("message", "")
+                    if error_msg:
+                        return error_msg
+            return None
+        except Exception as e:
+            logger.warning(f"Error retrieving error log: {e}")
+            return None
+    
+    def _get_system_info(self) -> Dict[str, Any]:
+        """
+        Get system information for issue reporting.
+        
+        Returns:
+            Dictionary with system information
+        """
+        try:
+            return {
+                "platform": platform.platform(),
+                "python_version": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+                "architecture": platform.machine(),
+            }
+        except Exception as e:
+            logger.warning(f"Error retrieving system info: {e}")
+            return {"error": str(e)}

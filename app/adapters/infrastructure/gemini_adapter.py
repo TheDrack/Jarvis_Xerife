@@ -331,6 +331,12 @@ class LLMCommandAdapter:
         elif command_type == CommandType.SEARCH_ON_PAGE:
             return {"search_text": function_args.get("search_text", "")}
 
+        elif command_type == CommandType.REPORT_ISSUE:
+            return {
+                "issue_description": function_args.get("issue_description", ""),
+                "context": function_args.get("context", ""),
+            }
+
         return function_args
 
     def _ask_for_clarification(self, clarification_text: str) -> None:

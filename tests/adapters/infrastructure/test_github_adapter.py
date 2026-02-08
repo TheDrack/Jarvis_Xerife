@@ -253,3 +253,109 @@ class TestGitHubAdapter:
             # Verify test_command is empty string in payload
             payload = mock_client.post.call_args[1]["json"]
             assert payload["client_payload"]["test_command"] == ""
+
+    @pytest.mark.anyio
+    async def test_create_issue_success(self, adapter):
+        """Test successful issue creation"""
+        # Mock httpx response
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {
+            "number": 42,
+            "html_url": "https://github.com/test-owner/test-repo/issues/42"
+        }
+        
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.is_closed = False
+        
+        with patch.object(adapter, '_ensure_client', return_value=mock_client):
+            result = await adapter.create_issue(
+                title="Botão X está quebrado",
+                description="O botão X não responde quando clicado",
+                error_log="ValueError: Invalid button state",
+                system_info={"version": "1.0.0", "platform": "Linux"}
+            )
+            
+            assert result["success"] is True
+            assert result["issue_number"] == 42
+            assert "github.com" in result["issue_url"]
+            
+            # Verify the request was made with correct payload
+            mock_client.post.assert_called_once()
+            call_args = mock_client.post.call_args
+            
+            # Check URL
+            assert "/repos/test-owner/test-repo/issues" in call_args[0][0]
+            
+            # Check payload
+            payload = call_args[1]["json"]
+            assert payload["title"] == "Botão X está quebrado"
+            assert "O botão X não responde quando clicado" in payload["body"]
+            assert "ValueError: Invalid button state" in payload["body"]
+            assert "version" in payload["body"]
+            assert "jarvis-auto-report" in payload["labels"]
+
+    @pytest.mark.anyio
+    async def test_create_issue_without_token(self):
+        """Test issue creation without token"""
+        with patch.dict(os.environ, {}, clear=True):
+            adapter = GitHubAdapter()
+            
+            result = await adapter.create_issue(
+                title="Test issue",
+                description="Test description"
+            )
+            
+            assert result["success"] is False
+            assert "GITHUB_TOKEN not configured" in result["error"]
+
+    @pytest.mark.anyio
+    async def test_create_issue_api_error(self, adapter):
+        """Test issue creation with API error"""
+        # Mock httpx response with error
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.text = "Forbidden"
+        
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.is_closed = False
+        
+        with patch.object(adapter, '_ensure_client', return_value=mock_client):
+            result = await adapter.create_issue(
+                title="Test issue",
+                description="Test description"
+            )
+            
+            assert result["success"] is False
+            assert "403" in result["error"]
+
+    @pytest.mark.anyio
+    async def test_create_issue_without_optional_params(self, adapter):
+        """Test issue creation without optional parameters"""
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {
+            "number": 43,
+            "html_url": "https://github.com/test-owner/test-repo/issues/43"
+        }
+        
+        mock_client = AsyncMock()
+        mock_client.post = AsyncMock(return_value=mock_response)
+        mock_client.is_closed = False
+        
+        with patch.object(adapter, '_ensure_client', return_value=mock_client):
+            result = await adapter.create_issue(
+                title="Simple issue",
+                description="Simple description"
+            )
+            
+            assert result["success"] is True
+            assert result["issue_number"] == 43
+            
+            # Verify body doesn't contain error log or system info sections
+            payload = mock_client.post.call_args[1]["json"]
+            assert "## Erro" not in payload["body"]
+            assert "## Informações do Sistema" not in payload["body"]
+            assert "Simple description" in payload["body"]

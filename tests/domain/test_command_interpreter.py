@@ -95,3 +95,18 @@ class TestCommandInterpreter:
 
         assert intent1.command_type == intent2.command_type
         assert intent1.parameters == intent2.parameters
+
+    def test_interpret_report_issue_command(self, interpreter):
+        """Test interpretation of report issue command"""
+        intent = interpreter.interpret("reporte que o botão X está quebrado")
+
+        assert intent.command_type == CommandType.REPORT_ISSUE
+        assert intent.parameters["issue_description"] == "que o botão X está quebrado"
+        assert "context" in intent.parameters
+
+    def test_interpret_issue_command(self, interpreter):
+        """Test interpretation of issue command"""
+        intent = interpreter.interpret("issue sobre a lentidão no Groq")
+
+        assert intent.command_type == CommandType.REPORT_ISSUE
+        assert intent.parameters["issue_description"] == "sobre a lentidão no Groq"

@@ -245,3 +245,101 @@ class GitHubAdapter:
         
         except Exception as e:
             return {"success": False, "error": str(e)}
+    
+    async def create_issue(
+        self,
+        title: str,
+        description: str,
+        error_log: Optional[str] = None,
+        system_info: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a new GitHub issue.
+        
+        Args:
+            title: Title of the issue
+            description: Description/body of the issue
+            error_log: Optional error log to include
+            system_info: Optional system information to include
+        
+        Returns:
+            Dictionary with 'success' boolean, 'issue_number' if successful, and optional 'error' message
+        
+        Example:
+            >>> adapter = GitHubAdapter()
+            >>> result = await adapter.create_issue(
+            ...     title="Botão X está quebrado",
+            ...     description="O botão X não responde quando clicado",
+            ...     error_log="ValueError: Invalid button state",
+            ...     system_info={"version": "1.0.0", "platform": "Linux"}
+            ... )
+        """
+        if not self.token:
+            error_msg = "GITHUB_TOKEN not configured. Cannot create issue."
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+        
+        try:
+            # Build issue body
+            body_parts = [description]
+            
+            if error_log:
+                body_parts.append("\n## Erro")
+                body_parts.append(f"```\n{error_log}\n```")
+            
+            if system_info:
+                body_parts.append("\n## Informações do Sistema")
+                for key, value in system_info.items():
+                    body_parts.append(f"- **{key}**: {value}")
+            
+            # Add auto-generated footer
+            body_parts.append("\n---\n*Issue criada automaticamente pelo Jarvis*")
+            
+            body = "\n".join(body_parts)
+            
+            # Prepare payload
+            payload = {
+                "title": title,
+                "body": body,
+                "labels": ["jarvis-auto-report"],
+            }
+            
+            # Create issue URL
+            url = (
+                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
+                f"/issues"
+            )
+            
+            logger.info(
+                f"Creating issue '{title}' in {self.repo_owner}/{self.repo_name}"
+            )
+            
+            # Send request
+            client = await self._ensure_client()
+            response = await client.post(url, json=payload)
+            
+            # Check response
+            if response.status_code == 201:
+                issue_data = response.json()
+                issue_number = issue_data.get("number")
+                logger.info(f"✅ Issue #{issue_number} created successfully")
+                return {
+                    "success": True,
+                    "issue_number": issue_number,
+                    "issue_url": issue_data.get("html_url"),
+                }
+            else:
+                error_msg = (
+                    f"GitHub API returned status {response.status_code}: "
+                    f"{response.text}"
+                )
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+        
+        except Exception as e:
+            error_msg = f"Error creating issue: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return {"success": False, "error": error_msg}
+        finally:
+            # Always close client after request to avoid connection issues
+            await self.close()
