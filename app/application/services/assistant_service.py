@@ -30,6 +30,7 @@ class AssistantService:
         history_provider: Optional[HistoryProvider] = None,
         dependency_manager: Optional[DependencyManager] = None,
         wake_word: str = "xerife",
+        gemini_adapter: Optional[Any] = None,
     ):
         """
         Initialize the assistant service with injected dependencies
@@ -43,6 +44,7 @@ class AssistantService:
             history_provider: Optional history persistence adapter
             dependency_manager: Optional dependency manager for on-demand package installation
             wake_word: Wake word for activation
+            gemini_adapter: Optional Gemini adapter for conversational AI
         """
         self.voice = voice_provider
         self.action = action_provider
@@ -52,9 +54,14 @@ class AssistantService:
         self.history = history_provider
         self.dependency_manager = dependency_manager or DependencyManager()
         self.wake_word = wake_word
+        self.gemini_adapter = gemini_adapter
         self.is_running = False
         # Command history tracking (max 100 commands)
         self._command_history: Deque[Dict[str, Any]] = deque(maxlen=100)
+        
+        # Log error if assistant is started without AI adapter
+        if self.gemini_adapter is None:
+            logger.error("ERRO: Assistente iniciado sem adaptador de IA")
 
     def start(self) -> None:
         """Start the assistant and listen for commands"""
@@ -100,6 +107,10 @@ class AssistantService:
 
         # Handle unknown commands with conversational AI if available
         if intent.command_type == CommandType.UNKNOWN:
+            # Debug prints for fallback logic
+            print(f"DEBUG: Gemini Adapter status: {self.gemini_adapter is not None}")
+            print(f"DEBUG: Intent command type: {intent.command_type}")
+            
             # Check if interpreter has conversational capability (LLMCommandAdapter)
             if hasattr(self.interpreter, 'generate_conversational_response'):
                 logger.info("Unknown command detected, using conversational AI")
