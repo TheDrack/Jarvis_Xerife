@@ -8,7 +8,7 @@ from typing import Any, Deque, Dict, List, Optional
 
 from app.application.ports import ActionProvider, HistoryProvider, VoiceProvider, WebProvider
 from app.application.services.dependency_manager import DependencyManager
-from app.domain.models import CommandType, Response
+from app.domain.models import CommandType, Intent, Response
 from app.domain.services import CommandInterpreter, IntentProcessor
 
 logger = logging.getLogger(__name__)
@@ -120,25 +120,13 @@ class AssistantService:
                     # Fall through to validation error
             
             # Fallback to validation error if no conversational AI or error occurred
-            validation = self.processor.validate_intent(intent)
-            if validation.data is None:
-                validation.data = {}
-            validation.data["command_type"] = intent.command_type.value
-            validation.data["parameters"] = intent.parameters
-            self._add_to_history(user_input, validation)
-            return validation
+            return self._handle_validation_error(user_input, intent)
 
         # Validate the intent
         validation = self.processor.validate_intent(intent)
         if not validation.success:
             logger.warning(f"Invalid intent: {validation.message}")
-            # Add command metadata even for failed validations
-            if validation.data is None:
-                validation.data = {}
-            validation.data["command_type"] = intent.command_type.value
-            validation.data["parameters"] = intent.parameters
-            self._add_to_history(user_input, validation)
-            return validation
+            return self._handle_validation_error(user_input, intent, validation)
 
         # Create command
         command = self.processor.create_command(intent)
@@ -152,6 +140,31 @@ class AssistantService:
         response.data["parameters"] = command.intent.parameters
         self._add_to_history(user_input, response)
         return response
+
+    def _handle_validation_error(
+        self, user_input: str, intent: Intent, validation: Optional[Response] = None
+    ) -> Response:
+        """
+        Handle validation errors by adding metadata and recording to history
+
+        Args:
+            user_input: Original user input
+            intent: The intent that failed validation
+            validation: Optional validation response from processor
+
+        Returns:
+            Response object with validation error
+        """
+        if validation is None:
+            validation = self.processor.validate_intent(intent)
+        
+        # Add command metadata for failed validations
+        if validation.data is None:
+            validation.data = {}
+        validation.data["command_type"] = intent.command_type.value
+        validation.data["parameters"] = intent.parameters
+        self._add_to_history(user_input, validation)
+        return validation
 
     def _handle_wake_word(self, user_input: str) -> None:
         """

@@ -207,7 +207,7 @@ class TestAssistantServiceWithLLM:
         mock_interpreter = Mock()
         
         # Make it return an UNKNOWN intent by default
-        def interpret_side_effect(text):
+        def create_unknown_intent(text):
             return Intent(
                 command_type=CommandType.UNKNOWN,
                 parameters={"raw_command": text},
@@ -215,7 +215,7 @@ class TestAssistantServiceWithLLM:
                 confidence=0.5,
             )
         
-        mock_interpreter.interpret = Mock(side_effect=interpret_side_effect)
+        mock_interpreter.interpret = Mock(side_effect=create_unknown_intent)
         mock_interpreter.is_exit_command = Mock(return_value=False)
         
         # Add conversational capability
