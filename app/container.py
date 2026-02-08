@@ -201,6 +201,16 @@ class Container:
         """Get or create assistant service with all dependencies injected"""
         if self._assistant_service is None:
             logger.info("Creating AssistantService with injected dependencies")
+            
+            # Determine if we have a gemini_adapter
+            gemini_adapter = None
+            if self.use_llm and self._llm_command_adapter is not None:
+                gemini_adapter = self._llm_command_adapter
+            elif self.use_llm:
+                # Trigger creation of LLM adapter by accessing command_interpreter
+                _ = self.command_interpreter
+                gemini_adapter = self._llm_command_adapter
+            
             self._assistant_service = AssistantService(
                 voice_provider=self.voice_provider,
                 action_provider=self.action_provider,
@@ -210,6 +220,7 @@ class Container:
                 history_provider=self.history_provider,
                 dependency_manager=self.dependency_manager,
                 wake_word=self.wake_word,
+                gemini_adapter=gemini_adapter,
             )
         return self._assistant_service
 
