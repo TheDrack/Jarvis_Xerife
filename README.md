@@ -560,6 +560,65 @@ If you get import errors:
 - Install correct requirements file for your deployment
 - Check Python version (3.11+ recommended)
 
+## 📚 Quick Reference: Distributed Orchestration
+
+### Device Registration (for "Soldiers")
+
+```bash
+# 1. Get authentication token
+curl -X POST "http://localhost:8000/token" \
+  -d "username=admin&password=admin"
+
+# 2. Register your device
+curl -X POST "http://localhost:8000/v1/devices/register" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "MyPhone",
+    "type": "mobile",
+    "capabilities": [
+      {"name": "camera", "description": "12MP camera"},
+      {"name": "type_text", "description": "Virtual keyboard"}
+    ],
+    "network_id": "Home-WiFi",
+    "network_type": "wifi",
+    "lat": -23.5505,
+    "lon": -46.6333
+  }'
+
+# 3. Send heartbeat every 30-60 seconds
+curl -X PUT "http://localhost:8000/v1/devices/{device_id}/heartbeat" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"status": "online"}'
+```
+
+### Sending Commands with Context
+
+```bash
+# Command will be routed intelligently based on capabilities and location
+curl -X POST "http://localhost:8000/v1/execute" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "command": "tire uma selfie",
+    "metadata": {
+      "source_device_id": 42,
+      "network_id": "Home-WiFi"
+    }
+  }'
+```
+
+### Device Routing Hierarchy
+
+```
+🎯 Jarvis chooses device using this priority:
+  100 → Same Device (if has capability)
+   80 → Same Network (WiFi SSID or public IP)
+   70 → Very Close (<1km GPS distance)
+   40 → Same City (<50km GPS distance)
+   10 → Other online devices (asks confirmation)
+```
+
 ## Documentation
 
 ### Architecture & Design
