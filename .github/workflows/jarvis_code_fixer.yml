@@ -33,3 +33,13 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: python scripts/auto_fixer_logic.py
+
+      - name: Report Failure to Jarvis
+        if: failure() # Só executa se qualquer passo anterior falhar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "🔴 Falha Crítica no Auto-Fixer: Workflow Failed" \
+            --body "O workflow de auto-reparo falhou ao processar a Issue #${{ github.event.issue.number }}. Verifique os logs do GitHub Actions." \
+            --label "bug,jarvis-auto-report"
