@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """ThoughtLog model for storing internal reasoning and self-healing cycles"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
@@ -41,7 +41,7 @@ class ThoughtLog(SQLModel, table=True):
     
     # Metadata
     context_data: str = Field(default="{}", nullable=False)  # JSON string for additional context (logs, stack traces, etc.)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Auto-healing tracking
     requires_human: bool = Field(default=False, nullable=False)  # Escalated to human after 3 failures

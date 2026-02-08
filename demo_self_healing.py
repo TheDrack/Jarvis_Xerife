@@ -305,7 +305,7 @@ def main():
     print("\n" + "="*60)
     print("  JARVIS SELF-HEALING ORCHESTRATOR DEMO")
     print("="*60)
-    print("\nDemonstrando a arquitetura de auto-evolução do Jarvis")
+    print("\nDemonstrating Jarvis's self-evolution architecture")
     
     # Run demos
     demo_thought_log_service()
