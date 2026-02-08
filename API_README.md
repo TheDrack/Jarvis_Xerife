@@ -312,3 +312,82 @@ flake8 serve.py app/adapters/infrastructure/api_*.py --max-line-length=100
 # Type check
 mypy serve.py app/adapters/infrastructure/api_*.py
 ```
+
+## Mission Execution Endpoints
+
+The Task Executor provides serverless function execution capabilities for distributed Workers. See [TASK_EXECUTOR.md](TASK_EXECUTOR.md) for comprehensive documentation.
+
+### Execute Mission
+
+Execute a Python script on a Worker device with automatic dependency management.
+
+**Endpoint:** `POST /v1/missions/execute`
+
+**Authentication:** Required (Bearer token)
+
+**Request Body:**
+
+```json
+{
+  "mission_id": "mission_001",
+  "code": "import requests\nresponse = requests.get('https://api.github.com')\nprint(response.status_code)",
+  "requirements": ["requests"],
+  "browser_interaction": false,
+  "keep_alive": false,
+  "target_device_id": 123,
+  "timeout": 300,
+  "metadata": {}
+}
+```
+
+**Response:**
+
+```json
+{
+  "mission_id": "mission_001",
+  "success": true,
+  "stdout": "200\n",
+  "stderr": "",
+  "exit_code": 0,
+  "execution_time": 1.234,
+  "error": null,
+  "metadata": {}
+}
+```
+
+### Control Browser
+
+Control the persistent Playwright browser instance.
+
+**Endpoint:** `POST /v1/browser/control`
+
+**Authentication:** Required (Bearer token)
+
+**Request Body:**
+
+```json
+{
+  "operation": "start",
+  "port": 9222
+}
+```
+
+**Operations:** `start`, `stop`, `status`
+
+### Record Automation
+
+Start recording browser automation with Playwright codegen.
+
+**Endpoint:** `POST /v1/browser/record`
+
+**Authentication:** Required (Bearer token)
+
+**Request Body:**
+
+```json
+{
+  "output_file": "/path/to/save/skill.py"
+}
+```
+
+For detailed examples and advanced usage, see [TASK_EXECUTOR.md](TASK_EXECUTOR.md).

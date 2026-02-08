@@ -204,3 +204,62 @@ class CommandResultResponse(BaseModel):
     success: bool = Field(..., description="Whether the result was saved successfully")
     command_id: int = Field(..., description="ID of the command")
     message: str = Field(..., description="Confirmation message")
+
+
+# Mission Executor Models
+
+
+class MissionRequest(BaseModel):
+    """Request model for mission execution"""
+
+    mission_id: str = Field(..., description="Unique mission identifier", min_length=1)
+    code: str = Field(..., description="Python script to execute", min_length=1)
+    requirements: List[str] = Field(default_factory=list, description="List of Python package dependencies")
+    browser_interaction: bool = Field(False, description="Whether the mission requires Playwright browser")
+    keep_alive: bool = Field(False, description="Whether to persist the environment after execution")
+    target_device_id: Optional[int] = Field(None, description="Optional target device ID for routing")
+    timeout: int = Field(300, description="Maximum execution time in seconds", ge=1, le=3600)
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional mission metadata")
+
+
+class MissionResponse(BaseModel):
+    """Response model for mission execution result"""
+
+    mission_id: str = Field(..., description="ID of the executed mission")
+    success: bool = Field(..., description="Whether execution was successful")
+    stdout: str = Field("", description="Captured standard output")
+    stderr: str = Field("", description="Captured standard error")
+    exit_code: int = Field(0, description="Exit code of the script")
+    execution_time: float = Field(0.0, description="Time taken to execute in seconds")
+    error: Optional[str] = Field(None, description="Error message if execution failed")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional execution metadata")
+
+
+class RecordAutomationRequest(BaseModel):
+    """Request model for starting automation recording"""
+
+    output_file: Optional[str] = Field(None, description="Optional path to save the generated code")
+
+
+class RecordAutomationResponse(BaseModel):
+    """Response model for automation recording"""
+
+    success: bool = Field(..., description="Whether recording started successfully")
+    output_file: Optional[str] = Field(None, description="Path where the code will be saved")
+    message: str = Field(..., description="Status message")
+
+
+class BrowserControlRequest(BaseModel):
+    """Request model for browser control operations"""
+
+    operation: str = Field(..., description="Operation to perform: start, stop, status")
+    port: int = Field(9222, description="CDP port for browser connection", ge=1024, le=65535)
+
+
+class BrowserControlResponse(BaseModel):
+    """Response model for browser control"""
+
+    success: bool = Field(..., description="Whether operation was successful")
+    is_running: bool = Field(..., description="Whether browser is currently running")
+    cdp_url: Optional[str] = Field(None, description="CDP URL for connecting to browser")
+    message: str = Field(..., description="Status message")
