@@ -215,7 +215,7 @@ class TestAIGateway:
         assert not gateway._is_model_decommissioned_error(other_error)
 
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_generate_with_groq(self, mock_groq_client):
         """Test generating completion with Groq"""
         # Create gateway without initialization to avoid import issues
@@ -296,7 +296,7 @@ class TestAIGatewayFallback:
         
         return gateway
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_fallback_from_groq_to_gemini_on_rate_limit(self, gateway_with_mocks):
         """Test that Groq rate limit triggers fallback to Gemini"""
         gateway = gateway_with_mocks
@@ -315,7 +315,7 @@ class TestAIGatewayFallback:
         assert "fallback_from" in result
         assert result["fallback_from"] == LLMProvider.GROQ.value
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_fallback_from_gemini_to_groq_on_rate_limit(self, gateway_with_mocks):
         """Test that Gemini rate limit triggers fallback to Groq"""
         gateway = gateway_with_mocks
@@ -337,7 +337,7 @@ class TestAIGatewayFallback:
         assert "fallback_from" in result
         assert result["fallback_from"] == LLMProvider.GEMINI.value
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_no_fallback_available_raises_error(self):
         """Test that error is raised when no fallback is available"""
         gateway = AIGateway(
@@ -356,7 +356,7 @@ class TestAIGatewayFallback:
         with pytest.raises(ValueError, match="no fallback provider available"):
             await gateway.generate_completion(messages)
     
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_model_decommissioned_error_with_fallback(self, gateway_with_mocks):
         """Test that model decommissioned error triggers fallback to Gemini"""
         gateway = gateway_with_mocks
@@ -375,7 +375,7 @@ class TestAIGatewayFallback:
         assert "fallback_from" in result
         assert result["fallback_from"] == LLMProvider.GROQ.value
     
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_model_decommissioned_error_without_fallback_raises_error(self):
         """Test that model decommissioned error without fallback raises informative error"""
         gateway = AIGateway(
