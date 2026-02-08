@@ -391,7 +391,8 @@ Return ONLY the corrected code, nothing else."""
             )
             
             if result.returncode == 0:
-                logger.info(f"✓ Committed changes: {commit_message.split('\n')[0]}")
+                first_line = commit_message.splitlines()[0]
+                logger.info(f"✓ Committed changes: {first_line}")
                 return True
             else:
                 logger.error(f"Failed to commit: {result.stderr}")
