@@ -5,6 +5,13 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+# Check if tiktoken is available for tests
+try:
+    import tiktoken
+    HAS_TIKTOKEN = True
+except ImportError:
+    HAS_TIKTOKEN = False
+
 from app.adapters.infrastructure.ai_gateway import AIGateway, LLMProvider
 
 
@@ -74,6 +81,14 @@ class TestAIGateway:
         longer_text = text * 100
         longer_count = gateway.count_tokens(longer_text)
         assert longer_count > token_count
+        
+        # With tiktoken, we expect more precise counting
+        if HAS_TIKTOKEN:
+            # The exact count may vary, but should be reasonable
+            assert token_count < len(text)  # Tokens should be fewer than characters
+        else:
+            # Without tiktoken, we use character approximation (len // 4)
+            assert token_count == len(text) // 4
 
     def test_select_provider_default_groq(self):
         """Test that short payloads default to Groq"""
