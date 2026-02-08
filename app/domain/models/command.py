@@ -14,6 +14,7 @@ class CommandType(Enum):
     OPEN_BROWSER = "open_browser"
     OPEN_URL = "open_url"
     SEARCH_ON_PAGE = "search_on_page"
+    CHAT = "chat"
     UNKNOWN = "unknown"
 
 

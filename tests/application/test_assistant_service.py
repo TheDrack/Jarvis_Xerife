@@ -186,3 +186,125 @@ class TestAssistantService:
         )
 
         assert service.dependency_manager is mock_dep_manager
+
+
+class TestAssistantServiceWithLLM:
+    """Test cases for AssistantService with LLM-based conversational responses"""
+
+    @pytest.fixture
+    def mock_ports(self):
+        """Create mocked ports"""
+        voice = Mock(spec=VoiceProvider)
+        action = Mock(spec=ActionProvider)
+        web = Mock(spec=WebProvider)
+        return voice, action, web
+
+    @pytest.fixture
+    def mock_llm_interpreter(self):
+        """Create a mock LLM interpreter with conversational capability"""
+        from app.domain.models import CommandType, Intent
+        
+        mock_interpreter = Mock()
+        
+        # Make it return an UNKNOWN intent by default
+        def create_unknown_intent(text):
+            return Intent(
+                command_type=CommandType.UNKNOWN,
+                parameters={"raw_command": text},
+                raw_input=text,
+                confidence=0.5,
+            )
+        
+        mock_interpreter.interpret = Mock(side_effect=create_unknown_intent)
+        mock_interpreter.is_exit_command = Mock(return_value=False)
+        
+        # Add conversational capability
+        mock_interpreter.generate_conversational_response = Mock(
+            return_value="Olá! Como posso ajudar você hoje?"
+        )
+        
+        return mock_interpreter
+
+    @pytest.fixture
+    def service_with_llm(self, mock_ports, mock_llm_interpreter):
+        """Create AssistantService with mocked LLM interpreter"""
+        from app.domain.services import IntentProcessor
+        
+        voice, action, web = mock_ports
+
+        processor = IntentProcessor()
+
+        return AssistantService(
+            voice_provider=voice,
+            action_provider=action,
+            web_provider=web,
+            command_interpreter=mock_llm_interpreter,
+            intent_processor=processor,
+            wake_word="test",
+        )
+
+    def test_unknown_command_with_llm_generates_conversation(
+        self, service_with_llm, mock_llm_interpreter
+    ):
+        """Test that unknown commands use LLM to generate conversational responses"""
+        response = service_with_llm.process_command("olá, como você está?")
+
+        # Should have called the conversational response generator
+        mock_llm_interpreter.generate_conversational_response.assert_called_once()
+        
+        # Should return success with CHAT command type
+        assert response.success is True
+        assert response.data["command_type"] == "chat"
+        assert response.message == "Olá! Como posso ajudar você hoje?"
+
+    def test_unknown_command_without_llm_returns_error(self, service_with_llm):
+        """Test that unknown commands without LLM capability return error"""
+        from app.domain.services import CommandInterpreter, IntentProcessor
+        from unittest.mock import Mock
+        
+        # Create service with regular interpreter (no LLM)
+        voice = Mock()
+        action = Mock()
+        web = Mock()
+        interpreter = CommandInterpreter(wake_word="test")
+        processor = IntentProcessor()
+        
+        service = AssistantService(
+            voice_provider=voice,
+            action_provider=action,
+            web_provider=web,
+            command_interpreter=interpreter,
+            intent_processor=processor,
+            wake_word="test",
+        )
+        
+        response = service.process_command("comando desconhecido")
+        
+        # Should return error for unknown command
+        assert response.success is False
+        assert response.error == "UNKNOWN_COMMAND"
+
+    def test_conversational_response_error_handling(
+        self, service_with_llm, mock_llm_interpreter
+    ):
+        """Test that errors in conversational response generation are handled gracefully"""
+        # Make the conversational response generator raise an exception
+        mock_llm_interpreter.generate_conversational_response.side_effect = Exception(
+            "API Error"
+        )
+        
+        response = service_with_llm.process_command("olá")
+        
+        # Should fall back to error response
+        assert response.success is False
+        assert response.error == "UNKNOWN_COMMAND"
+
+    def test_chat_response_added_to_history(self, service_with_llm):
+        """Test that conversational responses are added to history"""
+        service_with_llm.process_command("oi, tudo bem?")
+        
+        history = service_with_llm.get_command_history(limit=1)
+        
+        assert len(history) == 1
+        assert history[0]["command"] == "oi, tudo bem?"
+        assert history[0]["success"] is True

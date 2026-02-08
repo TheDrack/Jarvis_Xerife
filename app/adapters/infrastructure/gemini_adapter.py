@@ -46,10 +46,11 @@ class LLMCommandAdapter:
         self.model_name = model_name
 
         # Get API key from parameter or environment
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        # Support both GOOGLE_API_KEY and GEMINI_API_KEY for compatibility
+        self.api_key = api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not self.api_key:
             raise ValueError(
-                "GEMINI_API_KEY must be provided or set in environment variables"
+                "GOOGLE_API_KEY or GEMINI_API_KEY must be provided or set in environment variables"
             )
 
         # Configure Gemini
@@ -383,3 +384,42 @@ class LLMCommandAdapter:
         except Exception as e:
             logger.warning(f"Error building context message: {e}")
             return ""
+
+    def generate_conversational_response(self, user_input: str) -> str:
+        """
+        Generate a conversational response for unknown commands or greetings.
+        
+        Args:
+            user_input: User's input text
+            
+        Returns:
+            Generated conversational response from the LLM
+        """
+        try:
+            # Normalize input
+            command = user_input.lower().strip()
+            
+            # Remove wake word if present
+            if self.wake_word in command:
+                command = command.replace(self.wake_word, "").strip()
+            
+            if not command:
+                return "Olá! Como posso ajudar?"
+            
+            # Create a conversational prompt
+            prompt = f"Responda de forma amigável e conversacional em português brasileiro: {command}"
+            
+            # Send to Gemini
+            response = self.chat.send_message(prompt)
+            
+            # Extract text response
+            if response.candidates and response.candidates[0].content.parts:
+                part = response.candidates[0].content.parts[0]
+                if hasattr(part, "text") and part.text:
+                    return part.text.strip()
+            
+            return "Desculpe, não entendi. Pode repetir?"
+            
+        except Exception as e:
+            logger.error(f"Error generating conversational response: {e}")
+            return "Desculpe, ocorreu um erro. Pode tentar novamente?"

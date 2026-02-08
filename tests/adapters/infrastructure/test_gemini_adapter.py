@@ -59,15 +59,39 @@ class TestLLMCommandAdapter:
             adapter = LLMCommandAdapter(wake_word="xerife")
             assert adapter.api_key == "env_api_key"
 
+    def test_initialization_from_google_api_key_env(self, mock_genai):
+        """Test LLMCommandAdapter initialization from GOOGLE_API_KEY environment variable"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, _, _ = mock_genai
+
+        with patch.dict(os.environ, {"GOOGLE_API_KEY": "google_env_api_key"}, clear=True):
+            adapter = LLMCommandAdapter(wake_word="xerife")
+            assert adapter.api_key == "google_env_api_key"
+
+    def test_initialization_prefers_google_api_key_over_gemini(self, mock_genai):
+        """Test that GOOGLE_API_KEY takes precedence over GEMINI_API_KEY"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, _, _ = mock_genai
+
+        with patch.dict(
+            os.environ,
+            {"GOOGLE_API_KEY": "google_key", "GEMINI_API_KEY": "gemini_key"},
+        ):
+            adapter = LLMCommandAdapter(wake_word="xerife")
+            assert adapter.api_key == "google_key"
+
     def test_initialization_without_api_key_raises_error(self, mock_genai):
         """Test that initialization without API key raises ValueError"""
         from app.adapters.infrastructure import LLMCommandAdapter
 
         with patch.dict(os.environ, {}, clear=True):
-            # Clear GEMINI_API_KEY from environment
+            # Clear both GEMINI_API_KEY and GOOGLE_API_KEY from environment
             os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("GOOGLE_API_KEY", None)
 
-            with pytest.raises(ValueError, match="GEMINI_API_KEY"):
+            with pytest.raises(ValueError, match="GOOGLE_API_KEY or GEMINI_API_KEY"):
                 LLMCommandAdapter(wake_word="xerife")
 
     def test_remove_wake_word(self, mock_genai):
@@ -317,3 +341,84 @@ class TestLLMCommandAdapter:
         mock_response.candidates = [mock_candidate]
 
         return mock_response
+
+    def test_generate_conversational_response(self, mock_genai, mock_voice_provider):
+        """Test generating conversational responses for greetings/unknown commands"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, mock_model, mock_chat = mock_genai
+
+        # Mock the response with conversational text
+        mock_response = self._create_mock_text_response(
+            "Olá! Como posso ajudar você hoje?"
+        )
+        mock_chat.send_message = Mock(return_value=mock_response)
+
+        adapter = LLMCommandAdapter(
+            api_key="test_key",
+            voice_provider=mock_voice_provider,
+            wake_word="xerife",
+        )
+        response = adapter.generate_conversational_response("olá")
+
+        assert response == "Olá! Como posso ajudar você hoje?"
+        mock_chat.send_message.assert_called_once()
+
+    def test_generate_conversational_response_removes_wake_word(
+        self, mock_genai, mock_voice_provider
+    ):
+        """Test that conversational response removes wake word from input"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, mock_model, mock_chat = mock_genai
+
+        # Mock the response
+        mock_response = self._create_mock_text_response("Oi! Tudo bem?")
+        mock_chat.send_message = Mock(return_value=mock_response)
+
+        adapter = LLMCommandAdapter(
+            api_key="test_key",
+            voice_provider=mock_voice_provider,
+            wake_word="xerife",
+        )
+        response = adapter.generate_conversational_response("xerife olá")
+
+        assert response == "Oi! Tudo bem?"
+        # Check that wake word was removed from the prompt
+        call_args = mock_chat.send_message.call_args[0][0]
+        assert "xerife" not in call_args.lower()
+
+    def test_generate_conversational_response_empty_input(
+        self, mock_genai, mock_voice_provider
+    ):
+        """Test conversational response with empty input"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        adapter = LLMCommandAdapter(
+            api_key="test_key",
+            voice_provider=mock_voice_provider,
+            wake_word="xerife",
+        )
+        response = adapter.generate_conversational_response("")
+
+        assert response == "Olá! Como posso ajudar?"
+
+    def test_generate_conversational_response_error_handling(
+        self, mock_genai, mock_voice_provider
+    ):
+        """Test error handling in conversational response generation"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, mock_model, mock_chat = mock_genai
+
+        # Mock an exception
+        mock_chat.send_message = Mock(side_effect=Exception("API Error"))
+
+        adapter = LLMCommandAdapter(
+            api_key="test_key",
+            voice_provider=mock_voice_provider,
+            wake_word="xerife",
+        )
+        response = adapter.generate_conversational_response("olá")
+
+        assert "Desculpe, ocorreu um erro" in response
