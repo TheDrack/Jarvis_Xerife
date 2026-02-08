@@ -6,9 +6,11 @@ between multiple LLM providers through the AI Gateway.
 """
 
 import asyncio
+import json
 import logging
 import os
 import time
+import traceback
 from typing import Optional
 
 from app.adapters.infrastructure.ai_gateway import AIGateway, LLMProvider
@@ -50,6 +52,7 @@ class GatewayLLMCommandAdapter:
         voice_provider: Optional[VoiceProvider] = None,
         wake_word: str = "xerife",
         history_provider: Optional["HistoryProvider"] = None,
+        use_llm: bool = True,
     ):
         """
         Initialize the Gateway LLM Command Adapter.
@@ -62,10 +65,15 @@ class GatewayLLMCommandAdapter:
             voice_provider: Optional voice provider for clarifications
             wake_word: The wake word to filter out from commands
             history_provider: Optional history provider for context
+            use_llm: Whether to use LLM for error analysis and auto-repair (default: True)
         """
         self.wake_word = wake_word
         self.voice_provider = voice_provider
         self.history_provider = history_provider
+        self.use_llm = use_llm
+        
+        # Track errors locally to prevent infinite loops
+        self._error_log_file = "/tmp/jarvis_auto_repair_errors.log"
         
         # Initialize AI Gateway
         self.gateway = AIGateway(
@@ -226,7 +234,22 @@ class GatewayLLMCommandAdapter:
             return response_text if response_text else "Desculpe, não entendi. Pode repetir?"
             
         except Exception as e:
-            logger.error(f"Error generating conversational response: {e}", exc_info=True)
+            # Capture full error traceback
+            error_traceback = traceback.format_exc()
+            logger.error(f"Error generating conversational response: {e}")
+            logger.error(f"Full traceback:\n{error_traceback}")
+            
+            # Log error locally to prevent infinite loop
+            self._log_error_locally(error_traceback)
+            
+            # If use_llm is enabled, attempt auto-repair
+            if self.use_llm:
+                try:
+                    await self._attempt_auto_repair(error_traceback, user_input)
+                except Exception as repair_error:
+                    logger.error(f"Error during auto-repair attempt: {repair_error}", exc_info=True)
+                    # Log this too to prevent loops
+                    self._log_error_locally(f"Auto-repair failed: {traceback.format_exc()}")
             
             # Check if this is a critical error that requires self-healing
             await self._handle_critical_error(e, user_input)
@@ -293,6 +316,134 @@ class GatewayLLMCommandAdapter:
         except Exception as e:
             logger.warning(f"Error building context message: {e}")
             return ""
+    
+    def _log_error_locally(self, error_message: str) -> None:
+        """
+        Log error locally to prevent infinite loop of repair attempts.
+        
+        Args:
+            error_message: The error message to log
+        """
+        try:
+            with open(self._error_log_file, "a") as f:
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                f.write(f"[{timestamp}] {error_message}\n")
+                f.write("-" * 80 + "\n")
+            logger.info(f"Error logged locally to {self._error_log_file}")
+        except Exception as e:
+            logger.error(f"Failed to log error locally: {e}")
+    
+    async def _attempt_auto_repair(self, error_traceback: str, user_input: str) -> None:
+        """
+        Attempt to auto-repair the error by sending it to Gemini for analysis.
+        
+        This method sends the error traceback to Gemini with instructions to:
+        1. Analyze the error
+        2. Identify the file causing the error
+        3. Generate a JSON with file_path, original_code, and fix_code
+        
+        Args:
+            error_traceback: Full error traceback from traceback.format_exc()
+            user_input: The user input that caused the error
+        """
+        if not self.github_adapter:
+            logger.info("GitHub adapter not available, skipping auto-repair")
+            return
+        
+        if not self.gemini_adapter:
+            logger.warning("Gemini adapter not available for auto-repair analysis")
+            return
+        
+        try:
+            logger.info("🔧 Attempting auto-repair via Gemini analysis...")
+            
+            # Build the instruction for Gemini
+            instruction = f"""Analise este erro de sistema, identifique o arquivo causador e gere um JSON com: file_path, original_code e fix_code.
+
+ERRO DO SISTEMA:
+{error_traceback}
+
+INPUT DO USUÁRIO:
+{user_input}
+
+INSTRUÇÕES:
+1. Analise o traceback completo para identificar o arquivo causador do erro
+2. Identifique o código original que está causando o erro
+3. Gere uma correção apropriada para o código
+4. Retorne APENAS um JSON válido no seguinte formato (sem markdown, sem texto adicional):
+{{
+  "file_path": "caminho/completo/do/arquivo.py",
+  "original_code": "código original com erro",
+  "fix_code": "código corrigido"
+}}
+
+IMPORTANTE: Retorne APENAS o JSON, sem texto antes ou depois."""
+            
+            # Send to Gemini
+            messages = [{"role": "user", "content": instruction}]
+            
+            result = await self.gateway.generate_completion(
+                messages=messages,
+                functions=None,
+                multimodal=False,
+            )
+            
+            response_text = self._extract_response_text(result)
+            
+            if not response_text:
+                logger.warning("No response from Gemini for auto-repair analysis")
+                return
+            
+            logger.info(f"Gemini auto-repair analysis received: {response_text[:200]}...")
+            
+            # Parse JSON response
+            try:
+                # Clean up the response to extract JSON
+                json_text = response_text.strip()
+                # Remove markdown code blocks if present
+                if json_text.startswith("```"):
+                    json_text = json_text.split("```")[1]
+                    if json_text.startswith("json"):
+                        json_text = json_text[4:]
+                    json_text = json_text.strip()
+                
+                repair_data = json.loads(json_text)
+                
+                # Validate required fields
+                required_fields = ["file_path", "original_code", "fix_code"]
+                if not all(field in repair_data for field in required_fields):
+                    logger.error(f"Invalid JSON response from Gemini: missing fields. Got: {repair_data.keys()}")
+                    return
+                
+                # Prepare data for GitHub dispatch
+                issue_data = {
+                    "issue_title": f"Auto-fix: Error in {repair_data['file_path']}",
+                    "file_path": repair_data['file_path'],
+                    "fix_code": repair_data['fix_code'],
+                    "test_command": "pytest -W ignore::DeprecationWarning tests/"
+                }
+                
+                # Attempt to dispatch to GitHub
+                logger.info(f"Dispatching auto-fix to GitHub for {repair_data['file_path']}")
+                result = await self.github_adapter.dispatch_auto_fix(issue_data)
+                
+                if result.get("success"):
+                    logger.info(f"✅ Auto-fix dispatched successfully: {result.get('workflow_url')}")
+                else:
+                    # Log failure locally but don't raise exception
+                    error_msg = f"Failed to dispatch auto-fix to GitHub: {result.get('error')}"
+                    logger.error(error_msg)
+                    self._log_error_locally(error_msg)
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON from Gemini response: {e}")
+                logger.error(f"Response was: {response_text}")
+                self._log_error_locally(f"JSON parse error: {e}\nResponse: {response_text}")
+            
+        except Exception as e:
+            error_msg = f"Error in auto-repair attempt: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            self._log_error_locally(error_msg)
     
     async def _handle_critical_error(self, error: Exception, user_input: str) -> None:
         """

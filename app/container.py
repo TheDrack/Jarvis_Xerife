@@ -206,6 +206,7 @@ class Container:
                         voice_provider=self.voice_provider,
                         wake_word=self.wake_word,
                         history_provider=self.history_provider,
+                        use_llm=self.use_llm,
                     )
                     logger.info("✓ GatewayLLMCommandAdapter criado com sucesso")
                     return self._llm_command_adapter
