@@ -59,8 +59,21 @@ class SQLiteHistoryAdapter(HistoryProvider):
         """
         # Determine which database to use
         if database_url:
+            # Normalize PostgreSQL URL for compatibility
+            # Heroku/Render often provide postgres:// but SQLAlchemy expects postgresql://
+            if database_url.startswith("postgres://"):
+                database_url = database_url.replace("postgres://", "postgresql://", 1)
+                logger.info("Converted postgres:// URL to postgresql:// for SQLAlchemy compatibility")
+            
+            # Use psycopg2 driver explicitly for PostgreSQL
+            if database_url.startswith("postgresql://"):
+                # Check if driver is not already specified
+                if "+psycopg2" not in database_url and "+asyncpg" not in database_url:
+                    database_url = database_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+                    logger.info("Using postgresql+psycopg2:// driver for PostgreSQL")
+            
             self.database_url = database_url
-            db_type = database_url.split(':')[0]
+            db_type = database_url.split(':')[0].split('+')[0]  # Extract base type (postgresql, mysql, etc.)
             logger.info(f"Using {db_type} database from DATABASE_URL")
         else:
             self.database_url = f"sqlite:///{db_path}"

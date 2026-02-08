@@ -32,6 +32,7 @@ cryptography>=41.0.0
 
 # Database ORM
 sqlmodel>=0.0.14
+psycopg2-binary>=2.9.0  # PostgreSQL driver for production deployments
 
 # NOTE: Heavy libraries removed for cloud deployment:
 # - pyttsx3, SpeechRecognition (voice/TTS - use edge.txt if needed)
