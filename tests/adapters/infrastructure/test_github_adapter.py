@@ -68,7 +68,7 @@ class TestGitHubAdapter:
             assert "Authorization" not in headers
             assert headers["Accept"] == "application/vnd.github+json"
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_dispatch_auto_fix_success(self, adapter):
         """Test successful auto-fix dispatch"""
         # Mock httpx response
@@ -111,7 +111,7 @@ class TestGitHubAdapter:
             decoded_fix = base64.b64decode(encoded_fix).decode("utf-8")
             assert decoded_fix == "print('fixed')"
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_dispatch_auto_fix_without_token(self):
         """Test auto-fix dispatch without token"""
         with patch.dict(os.environ, {}, clear=True):
@@ -128,7 +128,7 @@ class TestGitHubAdapter:
             assert result["success"] is False
             assert "GITHUB_TOKEN not configured" in result["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_dispatch_auto_fix_missing_fields(self, adapter):
         """Test auto-fix dispatch with missing required fields"""
         # Missing file_path
@@ -142,7 +142,7 @@ class TestGitHubAdapter:
         assert result["success"] is False
         assert "Missing required field" in result["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_dispatch_auto_fix_api_error(self, adapter):
         """Test auto-fix dispatch with API error"""
         # Mock httpx response with error
@@ -167,7 +167,7 @@ class TestGitHubAdapter:
             assert "401" in result["error"]
             assert "Unauthorized" in result["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_dispatch_auto_fix_exception(self, adapter):
         """Test auto-fix dispatch with exception"""
         mock_client = AsyncMock()
@@ -186,7 +186,7 @@ class TestGitHubAdapter:
             assert result["success"] is False
             assert "Network error" in result["error"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_get_workflow_runs_success(self, adapter):
         """Test getting workflow runs"""
         mock_response = MagicMock()
@@ -207,7 +207,7 @@ class TestGitHubAdapter:
             assert "data" in result
             assert result["data"]["total_count"] == 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_ensure_client_creates_client(self, adapter):
         """Test that _ensure_client creates a new client"""
         assert adapter._client is None
@@ -217,7 +217,7 @@ class TestGitHubAdapter:
         assert client is not None
         assert adapter._client is client
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_close_client(self, adapter):
         """Test closing the HTTP client"""
         # Create a client first
@@ -228,7 +228,7 @@ class TestGitHubAdapter:
         await adapter.close()
         assert adapter._client is None
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_dispatch_with_optional_test_command(self, adapter):
         """Test dispatch with optional test_command"""
         mock_response = MagicMock()

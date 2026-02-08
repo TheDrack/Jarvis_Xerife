@@ -31,7 +31,7 @@ class TestGatewayLLMAdapterSelfHealing:
                 adapter.github_adapter = mock_github_adapter
                 return adapter
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_handle_critical_error_model_decommissioned(self, gateway_adapter, mock_github_adapter):
         """Test handling of model_decommissioned error"""
         error = Exception("model has been decommissioned")
@@ -53,7 +53,7 @@ class TestGatewayLLMAdapterSelfHealing:
             # Verify dispatch_auto_fix was called
             mock_github_adapter.dispatch_auto_fix.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_handle_critical_error_rate_limit(self, gateway_adapter, mock_github_adapter):
         """Test handling of rate limit error"""
         error = Exception("rate limit exceeded")
@@ -75,7 +75,7 @@ class TestGatewayLLMAdapterSelfHealing:
             # Verify dispatch_auto_fix was called
             mock_github_adapter.dispatch_auto_fix.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_handle_critical_error_non_critical(self, gateway_adapter, mock_github_adapter):
         """Test that non-critical errors don't trigger self-healing"""
         error = Exception("regular error")
@@ -86,7 +86,7 @@ class TestGatewayLLMAdapterSelfHealing:
         # Verify dispatch_auto_fix was NOT called
         mock_github_adapter.dispatch_auto_fix.assert_not_called()
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_handle_critical_error_no_github_adapter(self, gateway_adapter):
         """Test handling when GitHub adapter is not available"""
         gateway_adapter.github_adapter = None
@@ -97,7 +97,7 @@ class TestGatewayLLMAdapterSelfHealing:
         # Should not raise exception even without github_adapter
         await gateway_adapter._handle_critical_error(error, user_input)
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_formulate_correction_plan_model_decommissioned(self, gateway_adapter):
         """Test correction plan formulation for model decommissioned error"""
         error = Exception("model has been decommissioned")
@@ -129,7 +129,7 @@ class TestGatewayLLMAdapterSelfHealing:
                 assert "gemini_adapter.py" in plan["file_path"]
                 assert plan["fix_code"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_formulate_correction_plan_no_gemini_adapter(self, gateway_adapter):
         """Test correction plan formulation without Gemini adapter"""
         gateway_adapter.gemini_adapter = None
@@ -142,7 +142,7 @@ class TestGatewayLLMAdapterSelfHealing:
         # Should return None when Gemini adapter is not available
         assert plan is None
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_parse_fix_plan_model_decommissioned(self, gateway_adapter):
         """Test parsing fix plan for model decommissioned error"""
         error = Exception("model has been decommissioned")
@@ -157,7 +157,7 @@ class TestGatewayLLMAdapterSelfHealing:
             assert plan is not None
             assert "gemini-2.0-flash-exp" in plan["fix_code"]
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_parse_fix_plan_unsupported_error(self, gateway_adapter):
         """Test parsing fix plan for unsupported error type"""
         error = Exception("some unknown error")
@@ -168,7 +168,7 @@ class TestGatewayLLMAdapterSelfHealing:
         # Should return None for unsupported error types
         assert plan is None
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_critical_error_in_generate_response(self, gateway_adapter, mock_github_adapter):
         """Test that critical errors in generate_conversational_response trigger self-healing"""
         # Mock the gateway to raise a critical error
@@ -196,7 +196,7 @@ class TestGatewayLLMAdapterSelfHealing:
                 # Should have triggered self-healing
                 mock_github_adapter.dispatch_auto_fix.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_dispatch_failure_logged(self, gateway_adapter, mock_github_adapter):
         """Test that dispatch failures are properly logged"""
         # Make dispatch fail

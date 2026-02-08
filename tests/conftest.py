@@ -23,6 +23,12 @@ sys.modules["google.ai.generativelanguage"] = MagicMock()
 
 
 @pytest.fixture
+def anyio_backend():
+    """Configure the backend for anyio tests"""
+    return 'asyncio'
+
+
+@pytest.fixture
 def mock_engine():
     """Mock JarvisEngine for testing"""
     from unittest.mock import Mock, patch
