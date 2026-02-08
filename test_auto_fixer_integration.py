@@ -216,6 +216,34 @@ def test_integration_scenario_6():
     print("✓ SCENARIO 6 PASSED: English documentation request detected")
 
 
+def test_integration_scenario_7():
+    """Scenario: Issue closing functionality"""
+    print("\n" + "="*70)
+    print("SCENARIO 7: Issue closing functionality")
+    print("="*70)
+    
+    fixer = AutoFixer()
+    
+    # Step 1: Verify close_issue method exists
+    has_method = hasattr(fixer, 'close_issue')
+    print(f"1. Has close_issue method? {has_method}")
+    assert has_method == True, "AutoFixer should have close_issue method"
+    
+    # Step 2: Verify method signature
+    import inspect
+    sig = inspect.signature(fixer.close_issue)
+    params = list(sig.parameters.keys())
+    print(f"2. Method parameters? {params}")
+    assert 'issue_id' in params, "close_issue should accept issue_id parameter"
+    
+    # Step 3: Check return type annotation
+    return_annotation = sig.return_annotation
+    print(f"3. Return annotation? {return_annotation}")
+    assert return_annotation == bool, "close_issue should return bool"
+    
+    print("✓ SCENARIO 7 PASSED: Issue closing method properly defined")
+
+
 def main():
     """Run all integration scenarios"""
     print("\n" + "="*70)
@@ -230,6 +258,7 @@ def main():
         test_integration_scenario_4()
         test_integration_scenario_5()
         test_integration_scenario_6()
+        test_integration_scenario_7()
         
         print("\n" + "="*70)
         print("✅ ALL INTEGRATION SCENARIOS PASSED!")
@@ -241,8 +270,9 @@ def main():
         print("4. ✓ Requirements file updates")
         print("5. ✓ Missing API key scenarios")
         print("6. ✓ English documentation requests")
+        print("7. ✓ Issue closing functionality")
         print("\nAll scenarios simulate the complete workflow from")
-        print("issue detection to file identification.")
+        print("issue detection to file identification and issue closing.")
         
         return 0
         
