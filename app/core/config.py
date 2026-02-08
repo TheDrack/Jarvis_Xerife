@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # LLM Settings
     gemini_api_key: Optional[str] = None
-    gemini_model: str = "gemini-pro"
+    gemini_model: str = "gemini-1.5-flash"
 
     # Security Settings
     secret_key: str = "your-secret-key-change-this-in-production-minimum-32-characters"

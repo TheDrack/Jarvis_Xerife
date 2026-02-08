@@ -3,7 +3,7 @@
 
 Note: This adapter uses google.generativeai library (version 0.3.0+).
 The library internally uses the Google AI Generative Language API.
-Default model is 'gemini-pro' for stability and wide availability.
+Default model is 'gemini-1.5-flash' for stability and wide availability.
 """
 
 import asyncio
@@ -30,7 +30,7 @@ class LLMCommandAdapter:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model_name: str = "gemini-pro",
+        model_name: str = "gemini-1.5-flash",
         voice_provider: Optional[VoiceProvider] = None,
         wake_word: str = "xerife",
         history_provider: Optional["HistoryProvider"] = None,
@@ -58,8 +58,8 @@ class LLMCommandAdapter:
                 "GOOGLE_API_KEY or GEMINI_API_KEY must be provided or set in environment variables"
             )
 
-        # Configure Gemini
-        genai.configure(api_key=self.api_key)
+        # Configure Gemini with REST transport to avoid gRPC issues
+        genai.configure(api_key=self.api_key, transport='rest')
 
         # Get function declarations from AgentService
         self.functions = AgentService.get_function_declarations()

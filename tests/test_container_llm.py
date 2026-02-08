@@ -55,7 +55,7 @@ class TestContainerLLMInitialization:
         # Mock settings to have an API key
         with patch("app.container.settings") as mock_settings:
             mock_settings.gemini_api_key = "settings-api-key"
-            mock_settings.gemini_model = "gemini-pro"
+            mock_settings.gemini_model = "gemini-1.5-flash"
             
             container = create_edge_container(use_llm=False)
             
@@ -67,7 +67,7 @@ class TestContainerLLMInitialization:
         """Test that create_edge_container doesn't enable LLM without API key"""
         with patch("app.container.settings") as mock_settings:
             mock_settings.gemini_api_key = None
-            mock_settings.gemini_model = "gemini-pro"
+            mock_settings.gemini_model = "gemini-1.5-flash"
             
             container = create_edge_container(use_llm=False)
             

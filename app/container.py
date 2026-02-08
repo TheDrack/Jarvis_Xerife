@@ -61,7 +61,7 @@ class Container:
         language: str = "pt-BR",
         use_llm: bool = False,
         gemini_api_key: Optional[str] = None,
-        gemini_model: str = "gemini-pro",
+        gemini_model: str = "gemini-1.5-flash",
         db_path: str = "jarvis.db",
     ):
         """
@@ -76,7 +76,7 @@ class Container:
             language: Language for voice recognition
             use_llm: Whether to use LLM-based command interpretation (default: False)
             gemini_api_key: Optional Gemini API key (defaults to GEMINI_API_KEY env var)
-            gemini_model: Gemini model name to use (default: gemini-pro)
+            gemini_model: Gemini model name to use (default: gemini-1.5-flash)
             db_path: Path to SQLite database file (default: jarvis.db)
         """
         self.wake_word = wake_word
@@ -84,7 +84,7 @@ class Container:
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
         # Force the value from direct OS reading
         self.gemini_api_key = self.gemini_api_key or render_key
-        self.gemini_model = gemini_model or os.getenv("GEMINI_MODEL", "gemini-pro")
+        self.gemini_model = gemini_model or os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
         self.db_path = db_path
         
         # Debug logging for gemini_api_key

@@ -46,8 +46,8 @@ class TestLLMCommandAdapter:
 
         assert adapter.api_key == "test_api_key"
         assert adapter.wake_word == "xerife"
-        assert adapter.model_name == "gemini-pro"
-        mock_genai_module.configure.assert_called_once_with(api_key="test_api_key")
+        assert adapter.model_name == "gemini-1.5-flash"
+        mock_genai_module.configure.assert_called_once_with(api_key="test_api_key", transport='rest')
 
     def test_initialization_from_env(self, mock_genai):
         """Test LLMCommandAdapter initialization from environment variable"""
