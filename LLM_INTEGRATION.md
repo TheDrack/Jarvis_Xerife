@@ -22,7 +22,7 @@ The LLM integration maintains full compatibility with existing Intent/Command ar
 
 **LLMCommandAdapter** (`app/adapters/infrastructure/gemini_adapter.py`)  
 - Infrastructure adapter implementing same interface as CommandInterpreter
-- Manages Gemini API communication with async support
+- Manages Gemini API communication with async support using the new `google-genai` library
 - Converts function call responses into Intent objects
 - Handles uncertainty by invoking VoiceProvider for clarification
 
@@ -51,9 +51,9 @@ O wizard irá:
 
 ### Prerequisites
 
-Install Gemini SDK:
+Install the new Gemini SDK:
 ```bash
-pip install google-generativeai>=0.3.0
+pip install google-genai
 ```
 
 ### API Credentials
@@ -61,15 +61,17 @@ pip install google-generativeai>=0.3.0
 Obtain a Gemini API key from Google AI Studio, then configure via environment:
 
 ```bash
-export GEMINI_API_KEY="your-actual-key-here"
-export GEMINI_MODEL="gemini-pro"  # optional, this is default
+export GOOGLE_API_KEY="your-actual-key-here"
+export GEMINI_MODEL="gemini-2.0-flash"  # optional, this is default
 ```
 
 Or add to `.env` file (recommended for local development):
 ```env
-GEMINI_API_KEY=your-actual-key-here
-GEMINI_MODEL=gemini-pro
+GOOGLE_API_KEY=your-actual-key-here
+GEMINI_MODEL=gemini-2.0-flash
 ```
+
+**Note:** The adapter supports both `GOOGLE_API_KEY` and `GEMINI_API_KEY` environment variables for backward compatibility. `GOOGLE_API_KEY` takes precedence if both are set.
 
 ### Activation
 
@@ -96,7 +98,7 @@ service.start()
 1. User speaks: "xerife, write my name"
 2. VoiceProvider transcribes to text
 3. LLMCommandAdapter receives raw input
-4. Wake word removed, text sent to Gemini
+4. Wake word removed, text sent to Gemini using new `client.models.generate_content` API
 5. Gemini analyzes against available function schemas
 6. Gemini invokes `type_text` function with appropriate argument
 7. Adapter converts function call to Intent(TYPE_TEXT, {"text": "my name"})
@@ -226,21 +228,30 @@ Example adding a screenshot function:
 
 ## Troubleshooting
 
-### "GEMINI_API_KEY not found"
+### "GEMINI_API_KEY not found" or "GOOGLE_API_KEY not found"
 Ensure environment variable is set before importing Container.
 
-### "ModuleNotFoundError: google.generativeai"
-Install SDK: `pip install google-generativeai`
+### "ModuleNotFoundError: google.genai"
+Install SDK: `pip install google-genai`
+
+### "Failed to initialize Gemini client"
+- Verify your API key is correct and valid
+- Check that you have internet connectivity
+- Ensure you're not hitting rate limits
 
 ### Slow responses
 - Check network connectivity
 - Verify API quota hasn't been exceeded
-- Consider upgrading to gemini-1.5-pro for faster processing
+- Consider using gemini-2.0-flash for improved performance
+- gemini-1.5-flash is also available as a more stable alternative
 
 ### Incorrect function calls
 - Review AgentService system instruction
 - Adjust function descriptions for clarity
 - Add examples to system prompt
+
+### 404 Errors
+The new `google-genai` library resolves 404 errors that were occurring with the older `google-generativeai` library when using certain API endpoints or configurations.
 
 ## Migration Path
 
