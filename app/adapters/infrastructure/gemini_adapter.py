@@ -9,8 +9,10 @@ Default model is 'gemini-flash-latest' for improved performance.
 import asyncio
 import logging
 import os
+from datetime import datetime
 from typing import Optional
 
+import httpx
 from google import genai
 
 from app.application.ports import VoiceProvider
@@ -52,7 +54,9 @@ class LLMCommandAdapter:
 
         # Get API key from parameter or environment
         # Support both GOOGLE_API_KEY and GEMINI_API_KEY for compatibility
-        self.api_key = api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        self.api_key = (
+            api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        )
         if not self.api_key:
             raise ValueError(
                 "GOOGLE_API_KEY or GEMINI_API_KEY must be provided or set in environment variables"
@@ -123,7 +127,9 @@ class LLMCommandAdapter:
         try:
             # Add context from recent history if available
             context_message = self._build_context_message()
-            full_message = f"{context_message}\n\n{command}" if context_message else command
+            full_message = (
+                f"{context_message}\n\n{command}" if context_message else command
+            )
 
             # Build tools for function calling
             tools = [genai.types.Tool(function_declarations=self.functions)]
@@ -136,7 +142,7 @@ class LLMCommandAdapter:
                 config=genai.types.GenerateContentConfig(
                     system_instruction=self.system_instruction,
                     tools=tools,
-                )
+                ),
             )
 
             # Check if the model used a function call
@@ -174,7 +180,33 @@ class LLMCommandAdapter:
             )
 
         except Exception as e:
-            logger.error(f"Error during LLM interpretation: {e}", exc_info=True)
+            # Check if this is a 503 error from Google Gemini API
+            error_str = str(e)
+            is_503_error = False
+
+            # Check for 503 status code or UNAVAILABLE in the error message
+            if "503" in error_str or "UNAVAILABLE" in error_str.upper():
+                is_503_error = True
+
+            if is_503_error:
+                # Log as INFRA_FAILURE
+                logger.error(
+                    f"INFRA_FAILURE: Gemini API returned 503 (UNAVAILABLE) - {error_str}",
+                    exc_info=True,
+                )
+
+                # Create GitHub issue asynchronously
+                try:
+                    await self._create_github_issue_for_infra_failure(
+                        e, f"Gemini API Error: {error_str}\nCommand: {command}"
+                    )
+                except Exception as issue_error:
+                    logger.error(
+                        f"Failed to create GitHub issue for 503 error: {issue_error}"
+                    )
+            else:
+                logger.error(f"Error during LLM interpretation: {e}", exc_info=True)
+
             return Intent(
                 command_type=CommandType.UNKNOWN,
                 parameters={"raw_command": command, "error": str(e)},
@@ -210,7 +242,9 @@ class LLMCommandAdapter:
         try:
             # Add context from recent history if available
             context_message = self._build_context_message()
-            full_message = f"{context_message}\n\n{command}" if context_message else command
+            full_message = (
+                f"{context_message}\n\n{command}" if context_message else command
+            )
 
             # Build tools for function calling
             tools = [genai.types.Tool(function_declarations=self.functions)]
@@ -222,7 +256,7 @@ class LLMCommandAdapter:
                 config=genai.types.GenerateContentConfig(
                     system_instruction=self.system_instruction,
                     tools=tools,
-                )
+                ),
             )
 
             # Check if the model used a function call
@@ -260,7 +294,33 @@ class LLMCommandAdapter:
             )
 
         except Exception as e:
-            logger.error(f"Error during LLM interpretation: {e}", exc_info=True)
+            # Check if this is a 503 error from Google Gemini API
+            error_str = str(e)
+            is_503_error = False
+
+            # Check for 503 status code or UNAVAILABLE in the error message
+            if "503" in error_str or "UNAVAILABLE" in error_str.upper():
+                is_503_error = True
+
+            if is_503_error:
+                # Log as INFRA_FAILURE
+                logger.error(
+                    f"INFRA_FAILURE: Gemini API returned 503 (UNAVAILABLE) - {error_str}",
+                    exc_info=True,
+                )
+
+                # Create GitHub issue synchronously
+                try:
+                    self._create_github_issue_for_infra_failure_sync(
+                        e, f"Gemini API Error: {error_str}\nCommand: {command}"
+                    )
+                except Exception as issue_error:
+                    logger.error(
+                        f"Failed to create GitHub issue for 503 error: {issue_error}"
+                    )
+            else:
+                logger.error(f"Error during LLM interpretation: {e}", exc_info=True)
+
             return Intent(
                 command_type=CommandType.UNKNOWN,
                 parameters={"raw_command": command, "error": str(e)},
@@ -268,9 +328,7 @@ class LLMCommandAdapter:
                 confidence=0.0,
             )
 
-    def _convert_function_call_to_intent(
-        self, function_call, raw_input: str
-    ) -> Intent:
+    def _convert_function_call_to_intent(self, function_call, raw_input: str) -> Intent:
         """
         Convert a Gemini function call to an Intent object.
 
@@ -412,39 +470,223 @@ class LLMCommandAdapter:
             logger.warning(f"Error building context message: {e}")
             return ""
 
+    async def _create_github_issue_for_infra_failure(
+        self, error: Exception, error_details: str
+    ) -> None:
+        """
+        Create a GitHub Issue for infrastructure failures (503 errors).
+
+        Args:
+            error: The exception that was caught
+            error_details: Detailed error message
+        """
+        try:
+            # Get GitHub token from environment
+            github_token = os.getenv("GITHUB_TOKEN")
+            if not github_token:
+                logger.warning(
+                    "GITHUB_TOKEN not available, cannot create issue for infrastructure failure"
+                )
+                return
+
+            # Get repository information from environment
+            github_repo = os.getenv("GITHUB_REPOSITORY", "")
+            if not github_repo or "/" not in github_repo:
+                logger.warning(
+                    "GITHUB_REPOSITORY not available, cannot create issue for infrastructure failure"
+                )
+                return
+
+            repo_owner, repo_name = github_repo.split("/", 1)
+
+            # Prepare issue data
+            timestamp = datetime.now().isoformat()
+            title = "🔴 [NEEDS_HUMAN] Falha Crítica de Infraestrutura: Gemini 503"
+            body = f"""## Falha de Infraestrutura Detectada
+
+**Timestamp:** {timestamp}
+**Erro:** Gemini API retornou status 503 (UNAVAILABLE)
+
+### ⚠️ AVISO IMPORTANTE
+
+**O sistema de auto-reparo NÃO deve intervir em erros de demanda da API.**
+
+Este é um erro de infraestrutura externa (Google Gemini API) e requer análise humana.
+
+### Detalhes do Erro
+
+```
+{error_details}
+```
+
+### Ação Necessária
+
+- Verificar status da API do Google Gemini
+- Verificar limites de rate-limiting
+- Verificar configuração da API key
+- Aguardar restauração do serviço se for problema temporário
+
+---
+*Issue criada automaticamente pelo sistema de monitoramento de infraestrutura*
+"""
+
+            # Create the issue using httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues",
+                    headers={
+                        "Accept": "application/vnd.github+json",
+                        "Authorization": f"Bearer {github_token}",
+                        "X-GitHub-Api-Version": "2022-11-28",
+                    },
+                    json={
+                        "title": title,
+                        "body": body,
+                        "labels": ["bug", "infrastructure"],
+                    },
+                    timeout=30.0,
+                )
+
+                if response.status_code == 201:
+                    logger.info(
+                        f"Successfully created GitHub issue for infrastructure failure: {response.json().get('html_url')}"
+                    )
+                else:
+                    logger.error(
+                        f"Failed to create GitHub issue: {response.status_code} - {response.text}"
+                    )
+
+        except Exception as e:
+            logger.error(
+                f"Error creating GitHub issue for infrastructure failure: {e}",
+                exc_info=True,
+            )
+
+    def _create_github_issue_for_infra_failure_sync(
+        self, error: Exception, error_details: str
+    ) -> None:
+        """
+        Synchronous version: Create a GitHub Issue for infrastructure failures (503 errors).
+
+        Args:
+            error: The exception that was caught
+            error_details: Detailed error message
+        """
+        try:
+            # Get GitHub token from environment
+            github_token = os.getenv("GITHUB_TOKEN")
+            if not github_token:
+                logger.warning(
+                    "GITHUB_TOKEN not available, cannot create issue for infrastructure failure"
+                )
+                return
+
+            # Get repository information from environment
+            github_repo = os.getenv("GITHUB_REPOSITORY", "")
+            if not github_repo or "/" not in github_repo:
+                logger.warning(
+                    "GITHUB_REPOSITORY not available, cannot create issue for infrastructure failure"
+                )
+                return
+
+            repo_owner, repo_name = github_repo.split("/", 1)
+
+            # Prepare issue data
+            timestamp = datetime.now().isoformat()
+            title = "🔴 [NEEDS_HUMAN] Falha Crítica de Infraestrutura: Gemini 503"
+            body = f"""## Falha de Infraestrutura Detectada
+
+**Timestamp:** {timestamp}
+**Erro:** Gemini API retornou status 503 (UNAVAILABLE)
+
+### ⚠️ AVISO IMPORTANTE
+
+**O sistema de auto-reparo NÃO deve intervir em erros de demanda da API.**
+
+Este é um erro de infraestrutura externa (Google Gemini API) e requer análise humana.
+
+### Detalhes do Erro
+
+```
+{error_details}
+```
+
+### Ação Necessária
+
+- Verificar status da API do Google Gemini
+- Verificar limites de rate-limiting
+- Verificar configuração da API key
+- Aguardar restauração do serviço se for problema temporário
+
+---
+*Issue criada automaticamente pelo sistema de monitoramento de infraestrutura*
+"""
+
+            # Create the issue using httpx (synchronous)
+            with httpx.Client() as client:
+                response = client.post(
+                    f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues",
+                    headers={
+                        "Accept": "application/vnd.github+json",
+                        "Authorization": f"Bearer {github_token}",
+                        "X-GitHub-Api-Version": "2022-11-28",
+                    },
+                    json={
+                        "title": title,
+                        "body": body,
+                        "labels": ["bug", "infrastructure"],
+                    },
+                    timeout=30.0,
+                )
+
+                if response.status_code == 201:
+                    logger.info(
+                        f"Successfully created GitHub issue for infrastructure failure: {response.json().get('html_url')}"
+                    )
+                else:
+                    logger.error(
+                        f"Failed to create GitHub issue: {response.status_code} - {response.text}"
+                    )
+
+        except Exception as e:
+            logger.error(
+                f"Error creating GitHub issue for infrastructure failure: {e}",
+                exc_info=True,
+            )
+
     def generate_conversational_response(self, user_input: str) -> str:
         """
         Generate a conversational response for unknown commands or greetings.
-        
+
         Args:
             user_input: User's input text
-            
+
         Returns:
             Generated conversational response from the LLM
         """
         try:
             # Normalize input
             command = user_input.lower().strip()
-            
+
             # Remove wake word if present
             if self.wake_word in command:
                 command = command.replace(self.wake_word, "").strip()
-            
+
             if not command:
                 return "Olá! Como posso ajudar?"
-            
+
             # Create a conversational prompt
             prompt = f"Responda de forma amigável e conversacional em português brasileiro: {command}"
-            
+
             # Send to Gemini using the new client API
             response = self.client.models.generate_content(
                 model=self.model_name,
                 contents=prompt,
                 config=genai.types.GenerateContentConfig(
                     system_instruction=self.system_instruction,
-                )
+                ),
             )
-            
+
             # Extract text response
             if response.candidates and len(response.candidates) > 0:
                 candidate = response.candidates[0]
@@ -452,9 +694,11 @@ class LLMCommandAdapter:
                     for part in candidate.content.parts:
                         if hasattr(part, "text") and part.text:
                             return part.text.strip()
-            
+
             return "Desculpe, não entendi. Pode repetir?"
-            
+
         except Exception as e:
-            logger.error(f"Error generating conversational response: {e}", exc_info=True)
+            logger.error(
+                f"Error generating conversational response: {e}", exc_info=True
+            )
             return "Desculpe, ocorreu um erro. Pode tentar novamente?"

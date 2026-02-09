@@ -19,13 +19,13 @@ class TestLLMCommandAdapter:
             # Mock the Client class
             mock_client = Mock()
             mock.Client = Mock(return_value=mock_client)
-            
+
             # Mock the types module
             mock_types = Mock()
             mock.types = mock_types
             mock_types.Tool = Mock()
             mock_types.GenerateContentConfig = Mock()
-            
+
             # Mock the client's models.generate_content method
             mock_client.models = Mock()
             mock_client.models.generate_content = Mock()
@@ -68,7 +68,9 @@ class TestLLMCommandAdapter:
 
         mock_genai_module, _ = mock_genai
 
-        with patch.dict(os.environ, {"GOOGLE_API_KEY": "google_env_api_key"}, clear=True):
+        with patch.dict(
+            os.environ, {"GOOGLE_API_KEY": "google_env_api_key"}, clear=True
+        ):
             adapter = LLMCommandAdapter(wake_word="xerife")
             assert adapter.api_key == "google_env_api_key"
 
@@ -104,7 +106,9 @@ class TestLLMCommandAdapter:
         mock_genai_module, mock_client = mock_genai
 
         # Mock the response with a function call
-        mock_response = self._create_mock_function_response("type_text", {"text": "hello"})
+        mock_response = self._create_mock_function_response(
+            "type_text", {"text": "hello"}
+        )
         mock_client.models.generate_content = Mock(return_value=mock_response)
 
         adapter = LLMCommandAdapter(api_key="test_key", wake_word="xerife")
@@ -114,7 +118,7 @@ class TestLLMCommandAdapter:
         # The generate_content should be called with "escreva hello"
         mock_client.models.generate_content.assert_called_once()
         call_args = mock_client.models.generate_content.call_args
-        contents_arg = call_args[1].get('contents') if call_args[1] else call_args[0][1]
+        contents_arg = call_args[1].get("contents") if call_args[1] else call_args[0][1]
         assert "xerife" not in contents_arg.lower()
         assert "escreva" in contents_arg.lower()
 
@@ -125,7 +129,9 @@ class TestLLMCommandAdapter:
         mock_genai_module, mock_client = mock_genai
 
         # Mock the response
-        mock_response = self._create_mock_function_response("type_text", {"text": "hello world"})
+        mock_response = self._create_mock_function_response(
+            "type_text", {"text": "hello world"}
+        )
         mock_client.models.generate_content = Mock(return_value=mock_response)
 
         adapter = LLMCommandAdapter(
@@ -146,7 +152,9 @@ class TestLLMCommandAdapter:
         mock_genai_module, mock_client = mock_genai
 
         # Mock the response
-        mock_response = self._create_mock_function_response("press_key", {"key": "enter"})
+        mock_response = self._create_mock_function_response(
+            "press_key", {"key": "enter"}
+        )
         mock_client.models.generate_content = Mock(return_value=mock_response)
 
         adapter = LLMCommandAdapter(
@@ -188,7 +196,9 @@ class TestLLMCommandAdapter:
         mock_genai_module, mock_client = mock_genai
 
         # Mock the response
-        mock_response = self._create_mock_function_response("open_url", {"url": "google.com"})
+        mock_response = self._create_mock_function_response(
+            "open_url", {"url": "google.com"}
+        )
         mock_client.models.generate_content = Mock(return_value=mock_response)
 
         adapter = LLMCommandAdapter(
@@ -202,7 +212,9 @@ class TestLLMCommandAdapter:
         assert intent.parameters["url"] == "https://google.com"
         assert intent.confidence == 0.9
 
-    def test_convert_function_call_search_on_page(self, mock_genai, mock_voice_provider):
+    def test_convert_function_call_search_on_page(
+        self, mock_genai, mock_voice_provider
+    ):
         """Test conversion of search_on_page function call to Intent"""
         from app.adapters.infrastructure import LLMCommandAdapter
 
@@ -232,7 +244,9 @@ class TestLLMCommandAdapter:
         mock_genai_module, mock_client = mock_genai
 
         # Mock the response with text (clarification)
-        mock_response = self._create_mock_text_response("O que você gostaria que eu fizesse?")
+        mock_response = self._create_mock_text_response(
+            "O que você gostaria que eu fizesse?"
+        )
         mock_client.models.generate_content = Mock(return_value=mock_response)
 
         adapter = LLMCommandAdapter(
@@ -245,7 +259,9 @@ class TestLLMCommandAdapter:
         assert intent.command_type == CommandType.UNKNOWN
         assert "clarification" in intent.parameters
         assert intent.confidence == 0.3
-        mock_voice_provider.speak.assert_called_once_with("O que você gostaria que eu fizesse?")
+        mock_voice_provider.speak.assert_called_once_with(
+            "O que você gostaria que eu fizesse?"
+        )
 
     def test_unknown_command(self, mock_genai, mock_voice_provider):
         """Test handling of unknown commands"""
@@ -390,7 +406,7 @@ class TestLLMCommandAdapter:
         assert response == "Oi! Tudo bem?"
         # Check that wake word was removed from the prompt
         call_args = mock_client.models.generate_content.call_args
-        contents_arg = call_args[1].get('contents') if call_args[1] else call_args[0][1]
+        contents_arg = call_args[1].get("contents") if call_args[1] else call_args[0][1]
         assert "xerife" not in contents_arg.lower()
 
     def test_generate_conversational_response_empty_input(
@@ -427,3 +443,120 @@ class TestLLMCommandAdapter:
         response = adapter.generate_conversational_response("olá")
 
         assert "Desculpe, ocorreu um erro" in response
+
+    def test_503_error_handling_async(self, mock_genai, mock_voice_provider):
+        """Test 503 error handling in async interpretation"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, mock_client = mock_genai
+
+        # Mock a 503 error
+        mock_client.models.generate_content = Mock(
+            side_effect=Exception("503 Service Unavailable")
+        )
+
+        adapter = LLMCommandAdapter(
+            api_key="test_key",
+            voice_provider=mock_voice_provider,
+            wake_word="xerife",
+        )
+
+        # Mock the GitHub issue creation to avoid actual API calls
+        with patch.object(
+            adapter, "_create_github_issue_for_infra_failure_sync"
+        ) as mock_create_issue:
+            intent = adapter._interpret_sync("escreva teste")
+
+            # Verify the error was logged as INFRA_FAILURE and GitHub issue was created
+            mock_create_issue.assert_called_once()
+            assert intent.command_type == CommandType.UNKNOWN
+            assert "error" in intent.parameters
+            assert "503" in intent.parameters["error"]
+
+    def test_503_error_with_unavailable_in_message(
+        self, mock_genai, mock_voice_provider
+    ):
+        """Test 503 error handling when error message contains UNAVAILABLE"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, mock_client = mock_genai
+
+        # Mock an error with UNAVAILABLE in the message
+        mock_client.models.generate_content = Mock(
+            side_effect=Exception("Request failed: UNAVAILABLE")
+        )
+
+        adapter = LLMCommandAdapter(
+            api_key="test_key",
+            voice_provider=mock_voice_provider,
+            wake_word="xerife",
+        )
+
+        # Mock the GitHub issue creation
+        with patch.object(
+            adapter, "_create_github_issue_for_infra_failure_sync"
+        ) as mock_create_issue:
+            intent = adapter._interpret_sync("escreva teste")
+
+            # Verify GitHub issue was created for UNAVAILABLE error
+            mock_create_issue.assert_called_once()
+            assert intent.command_type == CommandType.UNKNOWN
+
+    def test_non_503_error_not_triggering_issue(self, mock_genai, mock_voice_provider):
+        """Test that non-503 errors don't trigger GitHub issue creation"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, mock_client = mock_genai
+
+        # Mock a non-503 error
+        mock_client.models.generate_content = Mock(
+            side_effect=Exception("Generic API Error")
+        )
+
+        adapter = LLMCommandAdapter(
+            api_key="test_key",
+            voice_provider=mock_voice_provider,
+            wake_word="xerife",
+        )
+
+        # Mock the GitHub issue creation
+        with patch.object(
+            adapter, "_create_github_issue_for_infra_failure_sync"
+        ) as mock_create_issue:
+            intent = adapter._interpret_sync("escreva teste")
+
+            # Verify GitHub issue was NOT created for non-503 error
+            mock_create_issue.assert_not_called()
+            assert intent.command_type == CommandType.UNKNOWN
+
+    def test_github_issue_creation_without_token(self, mock_genai):
+        """Test GitHub issue creation when GITHUB_TOKEN is not available"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, mock_client = mock_genai
+
+        adapter = LLMCommandAdapter(api_key="test_key", wake_word="xerife")
+
+        # Clear GITHUB_TOKEN from environment
+        with patch.dict(os.environ, {}, clear=True):
+            # Should not raise an error, just log a warning
+            adapter._create_github_issue_for_infra_failure_sync(
+                Exception("503 error"), "Test error details"
+            )
+            # No assertion needed, just verify it doesn't crash
+
+    def test_github_issue_creation_without_repository(self, mock_genai):
+        """Test GitHub issue creation when GITHUB_REPOSITORY is not available"""
+        from app.adapters.infrastructure import LLMCommandAdapter
+
+        mock_genai_module, mock_client = mock_genai
+
+        adapter = LLMCommandAdapter(api_key="test_key", wake_word="xerife")
+
+        # Set GITHUB_TOKEN but clear GITHUB_REPOSITORY
+        with patch.dict(os.environ, {"GITHUB_TOKEN": "test_token"}, clear=True):
+            # Should not raise an error, just log a warning
+            adapter._create_github_issue_for_infra_failure_sync(
+                Exception("503 error"), "Test error details"
+            )
+            # No assertion needed, just verify it doesn't crash
