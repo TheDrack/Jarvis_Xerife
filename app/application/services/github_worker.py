@@ -384,13 +384,7 @@ class GitHubWorker:
     ) -> Dict[str, Any]:
         """
         Automatically attempt to heal a CI failure.
-        
-        NOTE: This is a legacy method stub. The actual auto-healing implementation
-        is in scripts/auto_fixer_logic.py, which is called by the GitHub Actions
-        workflow (.github/workflows/jarvis_code_fixer.yml).
-        
-        For new integrations, use the GitHubAdapter.dispatch_auto_fix() method instead,
-        which properly handles source detection and identifier routing.
+        This is the core self-healing loop.
         
         Args:
             run_id: Failed workflow run ID
@@ -400,10 +394,6 @@ class GitHubWorker:
         Returns:
             Result dictionary with healing attempt status
         """
-        logger.warning(
-            "GitHubWorker.auto_heal_ci_failure() is deprecated. "
-            "Use scripts/auto_fixer_logic.py or GitHubAdapter.dispatch_auto_fix() instead."
-        )
         
         try:
             # 1. Download logs
@@ -425,19 +415,20 @@ class GitHubWorker:
                 session_id=f"ci_heal_{run_id}",
                 thought_process=f"Analyzing CI failure for run {run_id}",
                 problem_description=f"CI workflow run {run_id} failed",
-                solution_attempt="DEPRECATED: This method is a stub. Use scripts/auto_fixer_logic.py instead.",
+                solution_attempt="Downloading and analyzing logs",
                 status=InteractionStatus.INTERNAL_MONOLOGUE,
                 success=False,
                 error_message=f"CI logs:\n{logs[:500]}...",  # First 500 chars
                 context_data={"run_id": run_id, "logs_preview": logs[:1000]},
             )
             
-            return {
-                "success": False,
-                "message": "This method is deprecated. Use scripts/auto_fixer_logic.py or dispatch_auto_fix() instead.",
-                "logs_preview": logs[:500],
-                "logs_analyzed": len(logs),  # For backward compatibility with tests
-            }
+            # 3. Check if we should escalate to human
+            if thought_log_service.check_requires_human(mission_id):
+                consolidated_log = thought_log_service.generate_consolidated_log(mission_id)
+                return {
+                    "success": False,
+                    "requires_human": True,
+                    "message": "Auto-correction failed 3 times. Escalating to Commander.",
             
         except Exception as e:
             logger.error(f"Error in auto-heal: {e}")
