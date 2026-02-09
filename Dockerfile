@@ -52,11 +52,25 @@ FROM python:3.11-slim as cloud
 
 WORKDIR /app
 
-# Install only core dependencies (no hardware)
+# Install uv for faster dependency installation
+RUN pip install --no-cache-dir uv
+
+# Copy requirements first for better layer caching
+# This layer will be cached unless requirements change
 COPY requirements/core.txt requirements/
-RUN pip install --no-cache-dir -r requirements/core.txt
+
+# Install dependencies using uv (much faster than pip)
+# Using --system flag to install in system Python (no venv needed in container)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -r requirements/core.txt
+
+# Install LLM dependencies separately
+# This allows caching of core deps even if LLM deps change
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system google-generativeai groq tiktoken
 
 # Copy application code (only domain, application, and infrastructure adapters)
+# These layers change more frequently, so they come after dependencies
 COPY app/domain/ ./app/domain/
 COPY app/application/ ./app/application/
 COPY app/adapters/infrastructure/ ./app/adapters/infrastructure/
@@ -66,7 +80,14 @@ COPY app/container.py ./app/container.py
 COPY serve.py ./serve.py
 
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Create necessary directories
 RUN mkdir -p data logs
+
+# Health check to verify the service is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/health').read()" || exit 1
 
 # Start the API server with Uvicorn
 CMD ["python", "serve.py"]

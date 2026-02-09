@@ -1,0 +1,75 @@
+# Render Blueprint Configuration
+# For more information: https://render.com/docs/blueprint-spec
+
+services:
+  # Main API Service
+  - type: web
+    name: jarvis-api
+    env: python
+    region: oregon
+    plan: free  # Change to 'starter' or higher for production
+    buildCommand: |
+      # Install uv for faster dependency management
+      pip install uv
+      
+      # Install dependencies with uv (much faster than pip)
+      # Using cache mount will speed up subsequent builds
+      uv pip install --system -r requirements/prod-cloud.txt
+      
+      # Install LLM dependencies
+      uv pip install google-generativeai groq tiktoken
+    startCommand: python serve.py
+    
+    # Auto-deploy from main branch
+    branch: main
+    
+    # Health check configuration
+    healthCheckPath: /health
+    
+    # Environment variables
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: APP_NAME
+        value: Jarvis Assistant
+      - key: LANGUAGE
+        value: pt-BR
+      - key: WAKE_WORD
+        value: jarvis
+      
+      # Database URL (connects to PostgreSQL service below)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: jarvis-db
+          property: connectionString
+      
+      # API Keys (set these in Render Dashboard)
+      - key: GEMINI_API_KEY
+        sync: false  # Allows manual override in dashboard
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true  # Auto-generate secure secret
+      
+      # Optional configs
+      - key: USE_LLM
+        value: true
+      - key: API_HOST
+        value: 0.0.0.0
+    
+    # Disk for persistent storage
+    disk:
+      name: jarvis-data
+      mountPath: /app/data
+      sizeGB: 1
+
+# Database service
+databases:
+  - name: jarvis-db
+    databaseName: jarvis
+    plan: free  # Change to 'starter' or higher for production
+    region: oregon
+    # PostgreSQL 15
+    ipAllowList: []  # Empty means accessible from all Render services

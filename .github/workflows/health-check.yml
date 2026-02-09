@@ -1,0 +1,154 @@
+name: Health Check Monitor
+
+# Monitor deployed service health
+# This workflow checks if the deployment on Render is healthy and responding correctly
+
+on:
+  # Run on every push to main (after deployment)
+  push:
+    branches: [ main ]
+  
+  # Run on schedule (every 30 minutes)
+  schedule:
+    - cron: '*/30 * * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      url:
+        description: 'Health check URL (leave empty to use default)'
+        required: false
+        default: ''
+
+jobs:
+  health-check:
+    name: Check Deployment Health
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Determine health check URL
+        id: url
+        run: |
+          if [ -n "${{ github.event.inputs.url }}" ]; then
+            echo "HEALTH_URL=${{ github.event.inputs.url }}" >> $GITHUB_OUTPUT
+          elif [ -n "${{ secrets.RENDER_HEALTH_URL }}" ]; then
+            echo "HEALTH_URL=${{ secrets.RENDER_HEALTH_URL }}" >> $GITHUB_OUTPUT
+          else
+            # Default URL - update this with your actual Render URL
+            echo "HEALTH_URL=https://jarvis-api.onrender.com/health" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Wait for deployment (if triggered by push)
+        if: github.event_name == 'push'
+        run: |
+          echo "Waiting 60 seconds for Render to deploy changes..."
+          sleep 60
+      
+      - name: Perform health check
+        id: health
+        run: |
+          echo "Checking health at: ${{ steps.url.outputs.HEALTH_URL }}"
+          
+          # Attempt health check with retries
+          MAX_RETRIES=5
+          RETRY_DELAY=10
+          
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i/$MAX_RETRIES..."
+            
+            # Perform health check
+            HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" "${{ steps.url.outputs.HEALTH_URL }}" || echo "000")
+            
+            echo "HTTP Status Code: $HTTP_CODE"
+            
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Health check passed!"
+              cat response.json | jq '.' || cat response.json
+              echo "SUCCESS=true" >> $GITHUB_OUTPUT
+              exit 0
+            else
+              echo "❌ Health check failed with status $HTTP_CODE"
+              cat response.json 2>/dev/null || echo "No response body"
+              
+              if [ $i -lt $MAX_RETRIES ]; then
+                echo "Retrying in ${RETRY_DELAY} seconds..."
+                sleep $RETRY_DELAY
+              fi
+            fi
+          done
+          
+          echo "SUCCESS=false" >> $GITHUB_OUTPUT
+          echo "::error::Health check failed after $MAX_RETRIES attempts"
+          exit 1
+      
+      - name: Parse health check response
+        if: steps.health.outputs.SUCCESS == 'true'
+        run: |
+          echo "## Health Check Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Status**: Healthy" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Extract and display key metrics from health check
+          if [ -f response.json ]; then
+            echo "### Service Details" >> $GITHUB_STEP_SUMMARY
+            echo '```json' >> $GITHUB_STEP_SUMMARY
+            cat response.json | jq '.' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+      
+      - name: Validate health check details
+        if: steps.health.outputs.SUCCESS == 'true'
+        run: |
+          # Validate that critical checks passed
+          if [ -f response.json ]; then
+            API_STATUS=$(cat response.json | jq -r '.checks.api.status // "unknown"')
+            ASSISTANT_STATUS=$(cat response.json | jq -r '.checks.assistant.status // "unknown"')
+            
+            echo "API Status: $API_STATUS"
+            echo "Assistant Status: $ASSISTANT_STATUS"
+            
+            if [ "$API_STATUS" != "ok" ]; then
+              echo "::warning::API service check did not pass"
+            fi
+            
+            if [ "$ASSISTANT_STATUS" = "error" ]; then
+              echo "::warning::Assistant service has errors"
+            fi
+          fi
+      
+      - name: Create issue on failure
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Deployment Health Check Failed',
+              body: `## Health Check Failure
+              
+              The scheduled health check failed at ${new Date().toISOString()}.
+              
+              **URL**: ${{ steps.url.outputs.HEALTH_URL }}
+              **Workflow**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+              
+              Please investigate the deployment status on Render.
+              
+              ---
+              This issue was automatically created by the Health Check Monitor workflow.`,
+              labels: ['deployment', 'monitoring', 'automated']
+            });
+            
+            console.log(`Created issue #${issue.data.number}`);
+      
+      - name: Upload health check response
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: health-check-response
+          path: response.json
+          retention-days: 7

@@ -31,10 +31,16 @@ ENV/
 .coverage
 htmlcov/
 .mypy_cache
+tests/
+pytest.ini
+mypy.ini
 
 # Documentation
 *.md
 !README.md
+
+# GitHub
+.github/
 
 # Development
 .env
