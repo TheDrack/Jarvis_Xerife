@@ -38,7 +38,18 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-json-report
+          # Install test dependencies
+          pip install pytest pytest-json-report pytest-cov
+          # Install project dependencies if they exist
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt || echo "Some dependencies failed, continuing..."
+          fi
+          if [ -f "requirements/core.txt" ]; then
+            pip install -r requirements/core.txt || echo "Some core dependencies failed, continuing..."
+          fi
+          if [ -f "requirements/dev.txt" ]; then
+            pip install -r requirements/dev.txt || echo "Some dev dependencies failed, continuing..."
+          fi
 
       - name: Run Pytest (The Judge)
         id: tester
@@ -53,7 +64,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_BODY: ${{ github.event.issue.body || 'Test failures detected' }}
+          ISSUE_BODY: ${{ github.event_name == 'issues' && github.event.issue.body || '' }}
           ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
         run: |
           # Install GitHub CLI Copilot extension
@@ -91,17 +102,17 @@ jobs:
             TITLE="🔧 Auto-Repair Needs Review: Maximum Attempts Reached"
             STATUS="⚠️ Revisão Necessária"
             REASON="O sistema atingiu o limite máximo de 3 tentativas de auto-reparo."
-            LABEL="review-needed,auto-repair-failed"
+            LABEL="bug"
           elif [[ "$FINAL_STATE" == "NEEDS_HUMAN" ]]; then
             TITLE="🔍 Auto-Repair Needs Review: Human Intervention Required"
             STATUS="⚠️ Revisão Necessária"
             REASON="Erro de infraestrutura ou erro não identificado detectado."
-            LABEL="review-needed,infrastructure"
+            LABEL="bug"
           else
             TITLE="🔍 Auto-Repair Needs Review: Workflow Issue"
             STATUS="⚠️ Revisão Necessária"
             REASON="Falha inesperada no workflow de auto-reparo."
-            LABEL="review-needed,workflow-issue"
+            LABEL="bug"
           fi
           
           # Build detailed review body

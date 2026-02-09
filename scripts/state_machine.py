@@ -28,7 +28,7 @@ Repair Cycle:
 """
 
 from enum import Enum
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Any
 import logging
 import re
 
@@ -112,6 +112,10 @@ class SelfHealingStateMachine:
         """
         # Combine error message and traceback for analysis
         full_error = f"{error_message}\n{traceback or ''}"
+        
+        # Reset state-specific fields before classification
+        self.failure_reason = None
+        self.error_type = None
         
         # Check for auto-fixable errors
         for error_type in self.AUTO_FIXABLE_ERRORS:

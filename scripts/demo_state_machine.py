@@ -12,14 +12,13 @@ This script simulates the complete workflow:
 This is a demonstration script, not a pytest test.
 """
 
-import json
 import sys
 from pathlib import Path
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'scripts'))
 
-from state_machine import SelfHealingStateMachine, State, FailureReason
+from state_machine import SelfHealingStateMachine, State
 
 
 def demo_auto_fixable_error():
