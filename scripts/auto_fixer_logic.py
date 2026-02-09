@@ -266,18 +266,35 @@ class AutoFixer:
         Returns:
             File path suggestion if keywords match, None otherwise
         """
+        # Convert issue body to lowercase for case-insensitive matching
+        issue_lower = issue_body.lower()
+        
+        # First, check for specific phrase combinations for better context awareness
+        # This handles cases where multiple keywords are present and we need to prioritize
+        
+        # Check for issue creation/formatting context
+        if ('issue' in issue_lower or 'issues' in issue_lower) and \
+           any(word in issue_lower for word in ['escrita', 'format', 'estrutura', 'criação', 'creation', 'writing']):
+            logger.info("Detected issue creation/formatting context")
+            file_path = 'app/adapters/infrastructure/github_adapter.py'
+            if (self.repo_path / file_path).exists():
+                logger.info(f"Suggesting file for issue formatting: {file_path}")
+                return file_path
+        
         # Keyword to file mapping
         # Note: This mapping can be extended with more keywords and files as needed
         keyword_suggestions = {
+            # GitHub Actions and workflow keywords - high priority
+            'github actions': ['.github/workflows/jarvis_code_fixer.yml', '.github/workflows/auto-heal.yml'],
+            'workflow': ['.github/workflows/jarvis_code_fixer.yml', '.github/workflows/auto-heal.yml'],
+            # Issue-related keywords
+            'issue': ['app/adapters/infrastructure/github_adapter.py', 'scripts/auto_fixer_logic.py'],
+            'issues': ['app/adapters/infrastructure/github_adapter.py', 'scripts/auto_fixer_logic.py'],
             # Self-healing and auto-fixer keywords (English and Portuguese)
             'self-healing': ['scripts/auto_fixer_logic.py', 'app/adapters/infrastructure/github_adapter.py', '.github/workflows/jarvis_code_fixer.yml'],
             'self healing': ['scripts/auto_fixer_logic.py', 'app/adapters/infrastructure/github_adapter.py', '.github/workflows/jarvis_code_fixer.yml'],
             'auto-fixer': ['scripts/auto_fixer_logic.py', '.github/workflows/jarvis_code_fixer.yml'],
             'auto fixer': ['scripts/auto_fixer_logic.py', '.github/workflows/jarvis_code_fixer.yml'],
-            'github actions': ['.github/workflows/jarvis_code_fixer.yml', '.github/workflows/auto-heal.yml'],
-            'workflow': ['.github/workflows/jarvis_code_fixer.yml', '.github/workflows/auto-heal.yml'],
-            'issue': ['app/adapters/infrastructure/github_adapter.py', 'scripts/auto_fixer_logic.py'],
-            'issues': ['app/adapters/infrastructure/github_adapter.py', 'scripts/auto_fixer_logic.py'],
             'jarvis': ['app/application/services/assistant_service.py', 'app/adapters/infrastructure/github_adapter.py'],
             # API and interface keywords (English and Portuguese)
             'api': ['app/adapters/infrastructure/api_server.py', 'app/adapters/infrastructure/api_models.py', 'app/main.py', 'main.py'],
@@ -293,9 +310,6 @@ class AutoFixer:
             'documentação': ['README.md', 'docs/README.md'],  # Portuguese
             'readme': ['README.md'],
         }
-        
-        # Convert issue body to lowercase for case-insensitive matching
-        issue_lower = issue_body.lower()
         
         # Search for keywords and suggest files
         for keyword, file_suggestions in keyword_suggestions.items():
