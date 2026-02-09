@@ -32,8 +32,10 @@ This document summarizes the improvements made to the repository in response to 
 - `app/adapters/infrastructure/api_models.py`
 - `app/adapters/infrastructure/api_server.py`
 - `scripts/auto_fixer_logic.py`
-- `.github/workflows/auto-heal.yml`
+- `.github/workflows/ci-failure-to-issue.yml`
 - `.github/workflows/jarvis_code_fixer.yml`
+
+**Note**: The `auto-heal.yml` workflow was later removed to eliminate redundancy.
 
 **Impact**:
 - GitHub-sourced errors bypass Jarvis identifier and go directly to AI

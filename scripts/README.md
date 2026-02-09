@@ -114,7 +114,15 @@ The test will:
 
 You can integrate the auto-fixer with GitHub Actions to automatically fix failing CI/CD builds.
 
-**Example workflow (`.github/workflows/auto-heal.yml`):**
+**Active workflow (`.github/workflows/ci-failure-to-issue.yml`):**
+
+The repository uses a two-step approach for CI auto-healing:
+1. `ci-failure-to-issue.yml` - Creates GitHub issues from CI failures
+2. `jarvis_code_fixer.yml` - Automatically fixes issues labeled with `auto-code`
+
+This approach provides better visibility and audit trails. See the actual workflow files in `.github/workflows/` for implementation details.
+
+**Example minimal workflow for custom CI auto-healing:**
 
 ```yaml
 name: Auto-Heal CI Failures

@@ -17,8 +17,8 @@ The workflows automatically install the `github/gh-copilot` extension - no manua
 ### 2. Enable Workflows
 
 Workflows are already configured and active! They will trigger automatically when:
-- A test workflow fails (auto-heal.yml)
-- An issue is created with label `auto-code` (jarvis_code_fixer.yml)
+- A test workflow fails (ci-failure-to-issue.yml creates an issue)
+- An issue is created with label `auto-code` (jarvis_code_fixer.yml fixes it)
 
 ### 3. Test the System
 
@@ -127,7 +127,7 @@ Check for empty strings and invalid email formats
 
 ### Monitor Additional Workflows
 
-Edit `.github/workflows/auto-heal.yml`:
+Edit `.github/workflows/ci-failure-to-issue.yml`:
 
 ```yaml
 on:

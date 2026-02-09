@@ -117,14 +117,6 @@ When your CI/CD pipeline fails:
 3. `jarvis_code_fixer.yml` triggers and fixes the issue
 4. PR is created with the fix
 
-### Method 3: Direct CI Auto-Heal
-
-When `Python Tests` workflow fails:
-1. `auto-heal.yml` triggers directly (no issue created)
-2. Downloads error logs (truncated to 5000 chars)
-3. Uses Copilot to analyze and fix
-4. Creates PR with the fix
-
 ## GitHub Copilot CLI Commands
 
 ### Installing the Extension (Automatic)
@@ -284,7 +276,7 @@ MAX_LOG_SIZE = 5000  # Change this value (default: 5000)
 
 ### Monitoring Additional Workflows
 
-Edit `.github/workflows/auto-heal.yml`:
+Edit `.github/workflows/ci-failure-to-issue.yml`:
 ```yaml
 on:
   workflow_run:

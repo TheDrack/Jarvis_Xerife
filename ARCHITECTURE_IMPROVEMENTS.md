@@ -174,15 +174,18 @@ class GitHubAdapter:
 
 ## 5. Workflow Integration Improvements ✅ DOCUMENTED
 
-### Auto-Heal Workflow
-- **File**: `.github/workflows/auto-heal.yml`
-- **Status**: Updated with clear comments about direct GitHub → AI integration
-- **Documentation**: Added explanation that Jarvis identifier is bypassed
+### CI Failure to Issue Workflow
+- **File**: `.github/workflows/ci-failure-to-issue.yml`
+- **Status**: Active workflow for converting CI failures to trackable issues
+- **Documentation**: Creates issues with auto-code label for automatic fixing
 
 ### Self-Healing Workshop
 - **File**: `.github/workflows/jarvis_code_fixer.yml`
-- **Status**: Updated with documentation about bypass logic
-- **Documentation**: Clarified when identifier is used vs bypassed
+- **Status**: Active workflow that fixes issues labeled with auto-code
+- **Documentation**: Uses GitHub Copilot CLI for intelligent code fixes
+
+### Note
+- The `auto-heal.yml` workflow was removed to eliminate redundancy and simplify the auto-healing system
 
 ---
 
