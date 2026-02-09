@@ -264,12 +264,13 @@ class AutoFixer:
         # Note: This mapping can be extended with more keywords and files as needed
         keyword_suggestions = {
             # API and interface keywords (English and Portuguese)
-            'interface': ['app/adapters/infrastructure/api_server.py', 'app/adapters/infrastructure/api_models.py', 'app/main.py', 'main.py'],
             'api': ['app/adapters/infrastructure/api_server.py', 'app/adapters/infrastructure/api_models.py', 'app/main.py', 'main.py'],
             'payload': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py'],
             'mensagem': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py'],  # Portuguese for 'message'
             'envio': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py'],  # Portuguese for 'send/sending'
             'json': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py'],
+            # Interface keyword - prioritizes API files when combined with API-related terms
+            'interface': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py', 'app/main.py', 'main.py'],
             'frontend': ['app/main.py', 'main.py', 'README.md'],
             # Documentation keywords
             'documentation': ['README.md', 'docs/README.md'],
@@ -535,14 +536,6 @@ Return ONLY the corrected code, nothing else."""
         # Fallback to Gemini
         logger.info("Falling back to Gemini API...")
         fixed_code = self.call_gemini_api(error_message, code, is_doc_request, is_feature)
-        
-        return fixed_code
-        if fixed_code:
-            return fixed_code
-        
-        # Fallback to Gemini
-        logger.info("Falling back to Gemini API...")
-        fixed_code = self.call_gemini_api(error_message, code, is_doc_request)
         
         return fixed_code
     
