@@ -8,7 +8,7 @@ name: Auto-Heal CI Failures
 
 on:
   workflow_run:
-    workflows: ["CI", "Tests"]  # Add names of workflows to monitor
+    workflows: ["Python Tests"]  # Monitor Python Tests workflow for failures
     types:
       - completed
 
@@ -36,7 +36,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install httpx openai groq
+          pip install httpx openai groq google-genai
       
       - name: Get workflow logs
         id: get-logs
