@@ -150,6 +150,64 @@ def test_file_extraction_fallback():
     print("\n✅ All file extraction fallback tests passed!")
 
 
+def test_keyword_based_file_suggestion():
+    """Test keyword-based file suggestion feature"""
+    print("\n" + "="*60)
+    print("TEST 4: Keyword-Based File Suggestion")
+    print("="*60)
+    
+    fixer = AutoFixer()
+    
+    # Test case 1: 'interface' keyword
+    issue_body = "I need to improve the interface of the application"
+    result = fixer.suggest_file_by_keywords(issue_body)
+    print(f"\n1. Test 'interface' keyword:")
+    print(f"   Issue: {issue_body}")
+    print(f"   Result: {result}")
+    # Should suggest app/main.py or main.py depending on what exists
+    assert result is not None, "Should suggest a file for 'interface' keyword"
+    assert result in ["app/main.py", "main.py"], f"Expected app/main.py or main.py, got '{result}'"
+    print(f"   ✓ PASS - Suggested: {result}")
+    
+    # Test case 2: 'api' keyword
+    issue_body = "The api endpoint is not working properly"
+    result = fixer.suggest_file_by_keywords(issue_body)
+    print(f"\n2. Test 'api' keyword:")
+    print(f"   Issue: {issue_body}")
+    print(f"   Result: {result}")
+    assert result is not None, "Should suggest a file for 'api' keyword"
+    print(f"   ✓ PASS - Suggested: {result}")
+    
+    # Test case 3: 'frontend' keyword
+    issue_body = "Need to update the frontend components"
+    result = fixer.suggest_file_by_keywords(issue_body)
+    print(f"\n3. Test 'frontend' keyword:")
+    print(f"   Issue: {issue_body}")
+    print(f"   Result: {result}")
+    assert result is not None, "Should suggest a file for 'frontend' keyword"
+    print(f"   ✓ PASS - Suggested: {result}")
+    
+    # Test case 4: No keywords
+    issue_body = "There is a bug somewhere"
+    result = fixer.suggest_file_by_keywords(issue_body)
+    print(f"\n4. Test no keywords:")
+    print(f"   Issue: {issue_body}")
+    print(f"   Result: {result}")
+    assert result is None, f"Expected None, got '{result}'"
+    print("   ✓ PASS - No suggestion (expected)")
+    
+    # Test case 5: Mixed case keywords
+    issue_body = "The API Interface needs improvements"
+    result = fixer.suggest_file_by_keywords(issue_body)
+    print(f"\n5. Test mixed case 'API Interface':")
+    print(f"   Issue: {issue_body}")
+    print(f"   Result: {result}")
+    assert result is not None, "Should suggest a file for 'api' keyword (case insensitive)"
+    print(f"   ✓ PASS - Suggested: {result}")
+    
+    print("\n✅ All keyword-based file suggestion tests passed!")
+
+
 def test_api_key_validation():
     """Test API key validation and error messages"""
     print("\n" + "="*60)
@@ -207,6 +265,7 @@ def main():
         test_common_filename_detection()
         test_documentation_request_detection()
         test_file_extraction_fallback()
+        test_keyword_based_file_suggestion()
         test_api_key_validation()
         
         print("\n" + "="*70)
@@ -216,9 +275,11 @@ def main():
         print("1. ✓ File Flexibility - Common filename detection works")
         print("2. ✓ API Validation - Clear error messages for missing keys")
         print("3. ✓ Context Handling - Documentation request detection works")
+        print("4. ✓ Keyword Suggestions - File suggestions based on keywords")
         print("\nThe auto-fixer can now:")
         print("- Handle documentation updates (not just bug fixes)")
         print("- Find files mentioned in issues (not just in tracebacks)")
+        print("- Suggest files based on keywords (interface, api, frontend)")
         print("- Provide clear feedback when API keys are missing")
         
         return 0
