@@ -92,31 +92,7 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
 - Automatic log truncation (prevents terminal overflow)
 - Issue duplicate detection (prevents spam)
 
-### 2. Auto-Heal CI Failures (`auto-heal.yml`)
-
-**Trigger:** When the "Python Tests" workflow completes with a failure
-
-**Process:**
-1. Detects when Python Tests workflow fails
-2. Downloads the error logs from the failed workflow (truncated to 5000 chars)
-3. Checks infinite loop prevention
-4. Installs GitHub Copilot CLI extension automatically
-5. Passes logs to auto-fixer script as if they were an issue
-6. Auto-fixer uses GitHub Copilot CLI to analyze logs
-7. Generates and applies fix
-8. Creates a Pull Request with the fix
-
-**Configuration Required:**
-- GitHub Copilot subscription (or trial) ✅
-- Workflow permissions: `contents: write`, `pull-requests: write` ✅
-- **No external API keys needed!** 🎉
-
-**Security Features:**
-- Log size limit (5000 characters max)
-- Infinite loop prevention (max 3 attempts)
-- `if: failure()` condition ensures only actual failures trigger
-
-### 3. CI Failure to Issue (`ci-failure-to-issue.yml`)
+### 2. CI Failure to Issue (`ci-failure-to-issue.yml`)
 
 **Trigger:** When the "Python Tests" workflow completes with a failure
 
@@ -127,7 +103,45 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
    - Workflow name and run ID
    - Branch and commit SHA
    - Error logs (truncated to 5000 chars)
-   - Automatic `auto-code` label (changed from `jarvis-auto-report`)
+   - Automatic `auto-code` label
+4. This issue then triggers the Jarvis Self-Healing Workshop (workflow #1)
+
+**Configuration Required:**
+- Workflow permissions: `contents: read`, `issues: write` ✅
+
+**Smart Features:**
+- Checks for duplicate issues (same workflow, same branch)
+- If duplicate exists, adds a comment instead of creating new issue
+- Includes direct link to failed workflow run
+- Log truncation prevents overwhelming the issue body
+
+## CI Failure Auto-Healing Flow
+
+When a CI workflow fails, the system follows this path:
+1. **Python Tests fail** → triggers `ci-failure-to-issue.yml`
+2. **Issue created** with `auto-code` label → triggers `jarvis_code_fixer.yml`
+3. **Auto-fix applied** → Pull Request created
+4. **Original issue closed** → Clean resolution
+
+This approach provides full visibility and traceability through GitHub Issues.
+
+### 3. (Removed) Auto-Heal CI Failures
+
+**Note:** The `auto-heal.yml` workflow has been removed to simplify the auto-healing system.
+Previously, it attempted to fix CI failures directly without creating issues, which was redundant
+with the ci-failure-to-issue → jarvis_code_fixer flow. The issue-based approach provides better
+visibility and audit trails.
+
+**Trigger:** When the "Python Tests" workflow completes with a failure
+
+**Process:**
+1. Detects when Python Tests workflow fails
+2. Extracts error logs from the failed run (truncated to 5000 chars)
+3. Creates a GitHub Issue with:
+   - Workflow name and run ID
+   - Branch and commit SHA
+   - Error logs (truncated to 5000 chars)
+   - Automatic `auto-code` label
 4. This issue then triggers the Jarvis Self-Healing Workshop
 
 **Smart Features:**
@@ -351,7 +365,7 @@ The auto-fixer script supports these environment variables:
 
 ### Workflow Customization
 
-You can customize which workflows to monitor in `auto-heal.yml`:
+You can customize which workflows to monitor in `ci-failure-to-issue.yml`:
 
 ```yaml
 on:

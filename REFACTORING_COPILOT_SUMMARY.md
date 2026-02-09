@@ -73,9 +73,11 @@ def _truncate_log(self, log_text: str, max_size: int = MAX_LOG_SIZE) -> str:
 
 ### 2. Workflow Updates
 
-#### A. `auto-heal.yml` - CI Failure Auto-Healing
+#### A. `auto-heal.yml` - CI Failure Auto-Healing (Later Removed)
 
-**Key Changes:**
+**Note:** This workflow was subsequently removed to eliminate redundancy with the `ci-failure-to-issue.yml` + `jarvis_code_fixer.yml` flow.
+
+**Historical Key Changes:**
 - ✅ Removed Python dependency installations (`groq`, `google-genai`)
 - ✅ Added GitHub Copilot CLI extension installation
 - ✅ Implemented log truncation (5000 chars)

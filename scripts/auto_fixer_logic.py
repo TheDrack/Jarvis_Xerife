@@ -378,8 +378,8 @@ class AutoFixer:
         # Note: This mapping can be extended with more keywords and files as needed
         keyword_suggestions = {
             # GitHub Actions and workflow keywords - high priority
-            'github actions': ['.github/workflows/jarvis_code_fixer.yml', '.github/workflows/auto-heal.yml'],
-            'workflow': ['.github/workflows/jarvis_code_fixer.yml', '.github/workflows/auto-heal.yml'],
+            'github actions': ['.github/workflows/jarvis_code_fixer.yml', '.github/workflows/ci-failure-to-issue.yml'],
+            'workflow': ['.github/workflows/jarvis_code_fixer.yml', '.github/workflows/ci-failure-to-issue.yml'],
             # Issue-related keywords
             'issue': ['app/adapters/infrastructure/github_adapter.py', 'scripts/auto_fixer_logic.py'],
             'issues': ['app/adapters/infrastructure/github_adapter.py', 'scripts/auto_fixer_logic.py'],

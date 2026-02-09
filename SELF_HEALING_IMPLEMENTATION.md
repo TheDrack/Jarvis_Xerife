@@ -40,15 +40,7 @@ When GitHub Actions workflows fail, the system:
   - Runs auto-fixer script
   - Reports failures
 
-#### `auto-heal.yml` (Activated)
-- **Purpose:** Auto-heal CI failures
-- **Trigger:** When Python Tests workflow fails
-- **Actions:**
-  - Downloads failure logs
-  - Passes logs to auto-fixer as if they were an issue
-  - Creates PR with fix
-
-#### `ci-failure-to-issue.yml` (New)
+#### `ci-failure-to-issue.yml` (Active)
 - **Purpose:** Convert CI failures to issues
 - **Trigger:** When Python Tests workflow fails
 - **Actions:**
@@ -235,10 +227,9 @@ The implementation meets all requirements from the problem statement:
 
 | File | Status | Purpose |
 |------|--------|---------|
-| `.github/workflows/auto-heal.yml` | Activated | Auto-heal CI failures |
-| `.github/workflows/ci-failure-to-issue.yml` | Created | Convert CI failures to issues |
-| `.github/workflows/jarvis_code_fixer.yml` | Enhanced | Added google-genai dependency |
-| `scripts/auto_fixer_logic.py` | Enhanced | Support ISSUE_NUMBER and ISSUE_ID |
+| `.github/workflows/ci-failure-to-issue.yml` | Active | Convert CI failures to issues |
+| `.github/workflows/jarvis_code_fixer.yml` | Active | Auto-fix issues with auto-code label |
+| `scripts/auto_fixer_logic.py` | Active | Core auto-fixer logic using GitHub Copilot CLI |
 | `JARVIS_SELF_HEALING_GUIDE.md` | Created | Comprehensive documentation |
 | `SELF_HEALING_QUICK_START.md` | Created | Quick reference guide |
 | `README.md` | Updated | Added self-healing feature section |
