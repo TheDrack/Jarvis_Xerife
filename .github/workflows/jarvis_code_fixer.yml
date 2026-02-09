@@ -11,6 +11,8 @@ on:
   pull_request:
   issues:
     types: [opened, edited]
+  repository_dispatch:
+    types: [jarvis_order, auto_fix]
 
 permissions:
   contents: write
@@ -19,8 +21,15 @@ permissions:
 
 jobs:
   healing_engine:
-    # Trigger on 'auto-code' or 'jarvis-auto-report' labels for backward compatibility
-    if: github.event_name == 'pull_request' || contains(github.event.issue.labels.*.name, 'auto-code') || contains(github.event.issue.labels.*.name, 'jarvis-auto-report')
+    # Trigger on:
+    # - Pull requests (for testing PRs)
+    # - Issues with 'auto-code' or 'jarvis-auto-report' labels
+    # - Repository dispatch events from Jarvis API ('jarvis_order' or 'auto_fix')
+    if: |
+      github.event_name == 'pull_request' ||
+      contains(github.event.issue.labels.*.name, 'auto-code') ||
+      contains(github.event.issue.labels.*.name, 'jarvis-auto-report') ||
+      github.event_name == 'repository_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -56,6 +65,55 @@ jobs:
             pip install -r requirements/dev.txt || echo "Some dev dependencies failed, continuing..."
           fi
 
+      - name: Handle Repository Dispatch (Jarvis API)
+        id: handle_dispatch
+        if: github.event_name == 'repository_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Extract payload from repository_dispatch event
+          INTENT="${{ github.event.client_payload.intent }}"
+          INSTRUCTION="${{ github.event.client_payload.instruction }}"
+          CONTEXT="${{ github.event.client_payload.context }}"
+          TRIGGERED_BY="${{ github.event.client_payload.triggered_by }}"
+          
+          echo "Processing Jarvis API request:"
+          echo "Intent: $INTENT"
+          echo "Instruction: $INSTRUCTION"
+          echo "Triggered by: $TRIGGERED_BY"
+          
+          # Build issue body from payload
+          ISSUE_TITLE="🤖 Jarvis Request: $INTENT"
+          ISSUE_BODY="## Solicitação do Jarvis
+          
+          **Tipo:** $INTENT
+          **Solicitado por:** $TRIGGERED_BY
+          
+          ### Instrução
+          $INSTRUCTION
+          
+          ### Contexto
+          ${CONTEXT:-Nenhum contexto adicional fornecido}
+          
+          ---
+          *Requisição criada automaticamente pela API do Jarvis*"
+          
+          # Create issue with auto-code label to trigger self-healing
+          gh issue create \
+            --title "$ISSUE_TITLE" \
+            --body "$ISSUE_BODY" \
+            --label "auto-code" \
+            --label "jarvis-api" > issue_url.txt
+          
+          # Extract issue number from URL
+          ISSUE_URL=$(cat issue_url.txt)
+          ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oP '/issues/\K\d+')
+          
+          echo "Created issue #$ISSUE_NUMBER"
+          echo "DISPATCH_ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
+          echo "DISPATCH_ISSUE_BODY=$ISSUE_BODY" >> $GITHUB_ENV
+
       - name: Run Pytest (The Judge)
         id: tester
         run: |
@@ -64,13 +122,13 @@ jobs:
 
       - name: Self-Healing Logic
         id: healing_engine
-        if: env.TESTS_FAILED == 'true'
+        if: env.TESTS_FAILED == 'true' || github.event_name == 'repository_dispatch'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_BODY: ${{ github.event_name == 'issues' && github.event.issue.body || '' }}
-          ISSUE_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          ISSUE_BODY: ${{ github.event_name == 'repository_dispatch' && env.DISPATCH_ISSUE_BODY || (github.event_name == 'issues' && github.event.issue.body || '') }}
+          ISSUE_NUMBER: ${{ github.event_name == 'repository_dispatch' && env.DISPATCH_ISSUE_NUMBER || (github.event.issue.number || github.event.pull_request.number) }}
         run: |
           # Install GitHub CLI Copilot extension
           gh --version
@@ -97,12 +155,13 @@ jobs:
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           FINAL_STATE="${{ steps.healing_engine.outputs.final_state }}"
           ERROR_DETAILS="${{ steps.healing_engine.outputs.error_details }}"
           ATTEMPTED_FIXES="${{ steps.healing_engine.outputs.attempted_fixes }}"
           
-          # Only create issue if we actually have a failure state
+          # Only request review if we actually have a failure state
           if [[ -z "$FINAL_STATE" ]] || [[ "$FINAL_STATE" == "SUCCESS" ]]; then
             echo "No human review needed - workflow succeeded or state not set"
             exit 0
@@ -196,8 +255,14 @@ jobs:
           *Requisição de revisão criada automaticamente pelo Self-Healing State Machine*
           *Este não é um erro - é uma solicitação de revisão humana para casos complexos*"
           
-          # Create issue using only 'bug' label to avoid label not found errors
-          gh issue create \
-            --title "$TITLE" \
-            --body "$REVIEW_BODY" \
-            --label "bug"
+          # Instead of creating a new issue, comment on the original issue
+          # This avoids creating duplicate issues and keeps all context in one place
+          ISSUE_NUMBER="${{ github.event_name == 'repository_dispatch' && env.DISPATCH_ISSUE_NUMBER || (github.event.issue.number || '') }}"
+          
+          if [[ -n "$ISSUE_NUMBER" ]]; then
+            echo "Adding review request as comment to issue #$ISSUE_NUMBER"
+            gh issue comment "$ISSUE_NUMBER" --body "$REVIEW_BODY"
+          else
+            echo "No issue number available, logging review request to workflow output"
+            echo "$REVIEW_BODY"
+          fi
