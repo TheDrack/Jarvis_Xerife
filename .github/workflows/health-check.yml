@@ -153,7 +153,7 @@ jobs:
       
       - name: Upload health check response
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: health-check-response
           path: response.json
