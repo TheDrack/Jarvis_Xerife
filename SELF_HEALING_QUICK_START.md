@@ -1,31 +1,28 @@
 # Jarvis Self-Healing Quick Reference
 
-## 🚀 Quick Setup (5 minutes)
+## 🚀 Quick Setup (2 minutes)
 
-### 1. Configure API Keys (Required)
+### 1. Prerequisites (Automatically Configured)
 
-Add to GitHub repository **Settings → Secrets and variables → Actions**:
+The self-healing system now uses **GitHub Copilot CLI** - no external API keys needed!
 
-```
-GROQ_API_KEY = your_groq_api_key_here
-```
+**Requirements:**
+- GitHub repository with Actions enabled
+- GitHub Copilot subscription (or trial)
+- Workflows have `contents: write` and `pull-requests: write` permissions ✅
 
-Optional (fallback):
-```
-GOOGLE_API_KEY = your_google_api_key_here
-```
-
-**Get API Keys:**
-- Groq: https://console.groq.com/
-- Google: https://aistudio.google.com/apikey
+**GitHub Copilot CLI Extension:**
+The workflows automatically install the `github/gh-copilot` extension - no manual setup required!
 
 ### 2. Enable Workflows
 
-Workflows are already configured and active! They will trigger automatically.
+Workflows are already configured and active! They will trigger automatically when:
+- A test workflow fails (auto-heal.yml)
+- An issue is created with label `auto-code` (jarvis_code_fixer.yml)
 
 ### 3. Test the System
 
-Create an issue with the label `jarvis-auto-report`:
+Create an issue with the label `auto-code`:
 
 ```
 Title: Test Auto-Fix
@@ -35,7 +32,7 @@ Error in app/main.py line 10:
 NameError: name 'undefined_var' is not defined
 ```
 
-Watch Jarvis create a PR automatically! 🎉
+Watch Jarvis create a PR automatically using GitHub Copilot! 🎉
 
 ---
 
@@ -44,14 +41,19 @@ Watch Jarvis create a PR automatically! 🎉
 ### Scenario 1: Manual Issue Report
 
 ```
-User creates issue → Jarvis detects → Analyzes with AI → Creates PR → Closes issue
+User creates issue with 'auto-code' label → Copilot analyzes → Creates PR → Closes issue
 ```
 
 ### Scenario 2: CI Failure (Automatic)
 
 ```
-CI fails → Issue created → Jarvis triggered → Analyzes → Creates PR → Closes issue
+CI fails → Issue created with 'auto-code' label → Copilot analyzes → Creates PR → Closes issue
 ```
+
+### 🔒 Infinite Loop Prevention
+
+The system tracks healing attempts and stops after **3 attempts** per issue to prevent infinite loops.
+Tracking is stored in `.github/healing_attempts.json` (automatically managed).
 
 ---
 
@@ -61,7 +63,7 @@ CI fails → Issue created → Jarvis triggered → Analyzes → Creates PR → 
 
 ```markdown
 Title: Fix authentication error
-Label: jarvis-auto-report
+Label: auto-code
 
 Error in app/auth.py line 25:
 TypeError: 'NoneType' object is not subscriptable
@@ -70,31 +72,31 @@ File "app/auth.py", line 25
   return user['id']
 ```
 
-**Result:** Jarvis adds null check and creates PR
+**Result:** Copilot adds null check and creates PR
 
 ### Example 2: Documentation Update
 
 ```markdown
 Title: Add installation guide
-Label: jarvis-auto-report
+Label: auto-code
 
 Please add a section about installation to README.md
 Include pip install instructions and Python version requirements
 ```
 
-**Result:** Jarvis generates installation section and creates PR
+**Result:** Copilot generates installation section and creates PR
 
 ### Example 3: Feature Request
 
 ```markdown
 Title: Add user validation
-Label: jarvis-auto-report
+Label: auto-code
 
 Please implement user input validation in app/forms.py
 Check for empty strings and invalid email formats
 ```
 
-**Result:** Jarvis implements validation logic and creates PR
+**Result:** Copilot implements validation logic and creates PR
 
 ---
 
@@ -114,9 +116,10 @@ Check for empty strings and invalid email formats
 | Problem | Solution |
 |---------|----------|
 | "Could not extract file" | Include file path in issue body |
-| "No API keys found" | Check GROQ_API_KEY secret is set |
+| "Copilot extension not installed" | Workflow auto-installs it - check logs for errors |
 | "Failed to create PR" | Check workflow has write permissions |
-| Workflow not triggering | Ensure `jarvis-auto-report` label is added |
+| Workflow not triggering | Ensure `auto-code` label is added |
+| "Maximum healing attempts reached" | System prevented infinite loop - manual fix needed |
 
 ---
 
@@ -134,22 +137,30 @@ on:
       - completed
 ```
 
-### Change AI Model
+### Change Issue Label
 
-Set environment variables in workflow:
+Edit `.github/workflows/jarvis_code_fixer.yml`:
 
 ```yaml
-env:
-  GROQ_MODEL: llama-3.3-70b-versatile
-  GEMINI_MODEL: gemini-1.5-flash
+if: contains(github.event.issue.labels.*.name, 'your-custom-label')
 ```
 
-### Disable Auto-Close of Issues
+### Adjust Maximum Healing Attempts
 
-Edit `scripts/auto_fixer_logic.py`, comment out:
+Edit `scripts/auto_fixer_logic.py`:
 
 ```python
-# self.close_issue(issue_id)
+# Maximum number of auto-healing attempts to prevent infinite loops
+MAX_HEALING_ATTEMPTS = 3  # Change this value
+```
+
+### Adjust Log Size Limit
+
+Edit `scripts/auto_fixer_logic.py`:
+
+```python
+# Maximum log size to prevent terminal overflow (5000 characters)
+MAX_LOG_SIZE = 5000  # Change this value
 ```
 
 ---
@@ -162,12 +173,15 @@ Edit `scripts/auto_fixer_logic.py`, comment out:
 - Modify configuration files
 - Implement simple features
 - Fix CI/CD failures
+- **NEW:** Automatic infinite loop prevention
+- **NEW:** Log truncation for large error outputs
 
 ❌ **Not Suitable For:**
 - Complex architectural changes
 - Multi-file refactoring
 - Database migrations
 - Security vulnerabilities (requires manual review)
+- Issues exceeding 3 auto-fix attempts (manual intervention required)
 
 ---
 
@@ -175,7 +189,7 @@ Edit `scripts/auto_fixer_logic.py`, comment out:
 
 1. **Review Documentation:** [JARVIS_SELF_HEALING_GUIDE.md](JARVIS_SELF_HEALING_GUIDE.md)
 2. **Check Workflow Logs:** Actions → Select workflow → View logs
-3. **Create Issue:** Use title "Help with Self-Healing" (without `jarvis-auto-report` label)
+3. **Create Issue:** Use title "Help with Self-Healing" (without `auto-code` label)
 
 ---
 
@@ -183,9 +197,11 @@ Edit `scripts/auto_fixer_logic.py`, comment out:
 
 1. ✅ **Always review** PRs before merging
 2. ✅ **Include file paths** in error reports
-3. ✅ **Use clear error messages** for better AI analysis
+3. ✅ **Use clear error messages** for better Copilot analysis
 4. ✅ **Test in non-production** branches first
-5. ✅ **Monitor API costs** if using paid tiers
+5. ✅ **Monitor healing attempts** - system stops after 3 tries
+6. ✅ **Keep logs concise** - system truncates to 5000 chars
+7. ✅ **Use 'auto-code' label** for issues you want auto-fixed
 
 ---
 
@@ -196,6 +212,17 @@ Track your auto-fix success:
 - Time saved on bug fixes
 - PR creation rate
 - Merge rate of auto-generated PRs
+- Infinite loop prevention triggers (indicates complex issues)
+
+---
+
+## 🔐 Security Features
+
+- **Infinite Loop Prevention:** Maximum 3 attempts per issue
+- **Log Truncation:** Prevents terminal overflow with large logs (5000 char limit)
+- **Duplicate Issue Detection:** Prevents creating duplicate issues for same failure
+- **Permissions Control:** Workflows use least-privilege permissions
+- **Native GitHub Integration:** No external API keys required
 
 ---
 

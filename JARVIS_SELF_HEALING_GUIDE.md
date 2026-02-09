@@ -2,10 +2,17 @@
 
 ## Overview
 
-The Jarvis Self-Healing System is an automated issue resolution framework that uses AI (LLMs) to detect, analyze, and fix errors in your repository. It operates on two main triggers:
+The Jarvis Self-Healing System is an automated issue resolution framework that uses **GitHub Copilot CLI** (native GitHub integration) to detect, analyze, and fix errors in your repository. It operates on two main triggers:
 
-1. **Issue-based Resolution**: When GitHub Issues are created with error reports
+1. **Issue-based Resolution**: When GitHub Issues are created with `auto-code` label
 2. **CI/CD Failure Resolution**: When GitHub Actions workflows fail
+
+**Key Features:**
+- 🤖 Native GitHub Copilot CLI integration (no external API keys needed)
+- 🔒 Infinite loop prevention (maximum 3 attempts per issue)
+- 📊 Log truncation for terminal overflow protection (5000 char limit)
+- 🔄 Automatic PR creation with detailed context
+- 🎯 Smart file detection from error messages or keywords
 
 ## Architecture
 
@@ -16,7 +23,7 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
 │  ┌──────────────┐         ┌──────────────┐                │
 │  │ GitHub       │         │ GitHub       │                │
 │  │ Issues       │         │ Actions      │                │
-│  │              │         │ (CI/CD)      │                │
+│  │ (auto-code)  │         │ (CI/CD)      │                │
 │  └──────┬───────┘         └──────┬───────┘                │
 │         │                        │                         │
 │         │ Issue Created          │ Workflow Failed         │
@@ -44,9 +51,10 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
 │                   ▼                                        │
 │        ┌────────────────────┐                             │
 │        │ Auto-Fixer Logic   │                             │
-│        │ (AI-Powered)       │                             │
-│        │  • Groq API        │                             │
-│        │  • Gemini API      │                             │
+│        │ (GitHub Copilot)   │                             │
+│        │  • gh copilot      │                             │
+│        │  • explain/suggest │                             │
+│        │  • Loop prevention │                             │
 │        └────────┬───────────┘                             │
 │                 │                                          │
 │                 ▼                                          │
@@ -61,19 +69,28 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
 
 ### 1. Jarvis Self-Healing Workshop (`jarvis_code_fixer.yml`)
 
-**Trigger:** When a GitHub Issue is created with the label `jarvis-auto-report`
+**Trigger:** When a GitHub Issue is created with the label `auto-code` or `jarvis-auto-report` (backward compatibility)
 
 **Process:**
-1. Detects new issues with the `jarvis-auto-report` label
-2. Reads the issue body containing error information
-3. Passes the error to the auto-fixer script
-4. Auto-fixer uses LLM to analyze and generate fix
-5. Creates a Pull Request with the proposed fix
-6. Closes the original issue
+1. Detects new issues with the `auto-code` label
+2. Checks infinite loop prevention (max 3 attempts per issue)
+3. Reads the issue body containing error information
+4. Installs GitHub Copilot CLI extension automatically
+5. Passes the error to the auto-fixer script
+6. Auto-fixer uses `gh copilot explain` and `gh copilot suggest` to analyze and generate fix
+7. Truncates logs if needed (max 5000 characters)
+8. Creates a Pull Request with the proposed fix
+9. Closes the original issue
 
 **Configuration Required:**
-- `GROQ_API_KEY` secret (for Groq LLM API)
-- `GOOGLE_API_KEY` secret (for Google Gemini API, optional fallback)
+- GitHub Copilot subscription (or trial) ✅
+- Workflow permissions: `contents: write`, `pull-requests: write`, `issues: write` ✅
+- **No external API keys needed!** 🎉
+
+**Security Features:**
+- Maximum 3 healing attempts per issue (prevents infinite loops)
+- Automatic log truncation (prevents terminal overflow)
+- Issue duplicate detection (prevents spam)
 
 ### 2. Auto-Heal CI Failures (`auto-heal.yml`)
 
@@ -81,15 +98,23 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
 
 **Process:**
 1. Detects when Python Tests workflow fails
-2. Downloads the error logs from the failed workflow
-3. Passes logs to auto-fixer script as if they were an issue
-4. Auto-fixer analyzes logs using LLM
-5. Generates and applies fix
-6. Creates a Pull Request with the fix
+2. Downloads the error logs from the failed workflow (truncated to 5000 chars)
+3. Checks infinite loop prevention
+4. Installs GitHub Copilot CLI extension automatically
+5. Passes logs to auto-fixer script as if they were an issue
+6. Auto-fixer uses GitHub Copilot CLI to analyze logs
+7. Generates and applies fix
+8. Creates a Pull Request with the fix
 
 **Configuration Required:**
-- `GROQ_API_KEY` secret (for Groq LLM API)
-- `GOOGLE_API_KEY` secret (for Google Gemini API, optional fallback)
+- GitHub Copilot subscription (or trial) ✅
+- Workflow permissions: `contents: write`, `pull-requests: write` ✅
+- **No external API keys needed!** 🎉
+
+**Security Features:**
+- Log size limit (5000 characters max)
+- Infinite loop prevention (max 3 attempts)
+- `if: failure()` condition ensures only actual failures trigger
 
 ### 3. CI Failure to Issue (`ci-failure-to-issue.yml`)
 
@@ -97,18 +122,19 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
 
 **Process:**
 1. Detects when Python Tests workflow fails
-2. Extracts error logs from the failed run
+2. Extracts error logs from the failed run (truncated to 5000 chars)
 3. Creates a GitHub Issue with:
    - Workflow name and run ID
    - Branch and commit SHA
-   - Error logs
-   - Automatic `jarvis-auto-report` label
+   - Error logs (truncated to 5000 chars)
+   - Automatic `auto-code` label (changed from `jarvis-auto-report`)
 4. This issue then triggers the Jarvis Self-Healing Workshop
 
 **Smart Features:**
 - Checks for duplicate issues (same workflow, same branch)
 - If duplicate exists, adds a comment instead of creating new issue
 - Includes direct link to failed workflow run
+- Log truncation prevents overwhelming the issue body
 
 ## Auto-Fixer Logic (`scripts/auto_fixer_logic.py`)
 
@@ -126,12 +152,19 @@ The core intelligence of the self-healing system.
    - **Documentation Request**: Updates documentation files
    - **Feature Request**: Implements new functionality
 
-3. **AI-Powered Analysis**
-   - Uses Groq API (llama-3.3-70b-versatile) as primary LLM
-   - Falls back to Google Gemini (gemini-1.5-flash) if Groq unavailable
-   - Generates contextual prompts based on error type
+3. **GitHub Copilot CLI Integration**
+   - Uses `gh copilot explain` to understand errors
+   - Uses `gh copilot suggest` to generate fixes
+   - Native GitHub ecosystem integration (no external APIs)
+   - Automatic extension installation in workflows
 
-4. **Git Operations**
+4. **Security & Resilience**
+   - **Infinite Loop Prevention**: Tracks attempts in `.github/healing_attempts.json`
+   - **Maximum 3 attempts** per issue
+   - **Log Truncation**: Limits logs to 5000 characters to prevent terminal overflow
+   - **Duplicate Prevention**: Avoids creating duplicate issues/PRs
+
+5. **Git Operations**
    - Creates feature branch: `fix/issue-{ID}`
    - Commits changes with descriptive message
    - Pushes to remote repository
@@ -145,32 +178,54 @@ The core intelligence of the self-healing system.
 - **Configuration** (`.txt`, `.yml`, `.yaml`, `.json`)
 - **Any text-based file**
 
-### LLM Prompt Generation
+### GitHub Copilot CLI Integration
 
-The system generates specialized prompts based on the request type:
+The system uses GitHub Copilot CLI commands for AI-powered analysis:
 
-**For Bug Fixes:**
-```
-You are a code fixing assistant. Analyze the following error and code, 
-then return ONLY the corrected code without any explanations.
-
-ERROR: {error_message}
-CURRENT CODE: {code}
-
-Return ONLY the corrected code, nothing else.
+**For Error Explanation:**
+```bash
+gh copilot explain "<error message>"
 ```
 
-**For Documentation Updates:**
+**For Code Suggestions:**
+```bash
+gh copilot suggest -t shell "<prompt describing the fix needed>"
 ```
-You are a documentation assistant. The user has requested an update 
-to a documentation file.
 
-USER REQUEST: {request}
-CURRENT FILE CONTENT: {content}
+The system automatically:
+- Installs the `github/gh-copilot` extension in workflows
+- Truncates input to prevent terminal overflow (5000 char max)
+- Parses Copilot output to extract code fixes
+- Handles both code blocks and plain text responses
 
-Please update the file according to the user's request. Return ONLY 
-the complete updated file content.
-```
+### Infinite Loop Prevention
+
+To prevent continuous failing workflows, the system:
+
+1. **Tracks Attempts**: Stores healing attempts in `.github/healing_attempts.json`
+   ```json
+   {
+     "123": 1,  // Issue #123 has been attempted once
+     "124": 3   // Issue #124 has reached maximum attempts
+   }
+   ```
+
+2. **Enforces Limit**: Maximum 3 attempts per issue
+   - Attempt 1: Initial auto-fix
+   - Attempt 2: If first fix fails
+   - Attempt 3: Final attempt
+   - After 3: Manual intervention required
+
+3. **Clear Messaging**: When limit is reached:
+   ```
+   ⚠️ Maximum healing attempts (3) reached for issue #124.
+   Stopping to prevent infinite loop.
+   Manual intervention required.
+   ```
+
+### Log Truncation
+
+Large error logs are automatically truncated:
 
 **For Feature Requests:**
 ```
