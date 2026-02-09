@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Fire Test - Validate Jarvis Auto-Repair System
+"""Fire Test Script - Validate Jarvis Auto-Repair System
 
-This script tests the auto-repair functionality by:
+This is a STANDALONE SCRIPT (not a pytest test file) that tests the auto-repair
+functionality by:
 1. Intentionally creating an error (import or syntax error)
 2. Capturing the error with traceback
 3. Sending the error to GitHub Actions via GitHubAdapter.dispatch_auto_fix()
 4. Validating that the workflow is triggered
 
+Note: This script uses asyncio and should be run directly, not via pytest.
+
 Usage:
-    python test_auto_repair.py --error-type [import|syntax|missing-comma]
+    python tests/test_auto_repair.py --error-type [import|syntax|missing-comma]
 """
 
 import argparse
@@ -32,9 +35,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def test_import_error():
-    """Test auto-repair with an import error"""
-    logger.info("🔥 Testing auto-repair with import error...")
+async def simulate_import_error():
+    """Simulate auto-repair with an import error"""
+    logger.info("🔥 Simulating auto-repair with import error...")
     
     try:
         # This will intentionally fail
@@ -49,9 +52,9 @@ async def test_import_error():
         }
 
 
-async def test_syntax_error():
-    """Test auto-repair with a syntax error simulation"""
-    logger.info("🔥 Testing auto-repair with syntax error simulation...")
+async def simulate_syntax_error():
+    """Simulate auto-repair with a syntax error"""
+    logger.info("🔥 Simulating auto-repair with syntax error...")
     
     # Create a temporary file with syntax error
     temp_file = Path("/tmp/test_syntax_error.py")
@@ -75,9 +78,9 @@ async def test_syntax_error():
             temp_file.unlink()
 
 
-async def test_missing_comma():
-    """Test auto-repair with a missing comma simulation"""
-    logger.info("🔥 Testing auto-repair with missing comma simulation...")
+async def simulate_missing_comma():
+    """Simulate auto-repair with a missing comma"""
+    logger.info("🔥 Simulating auto-repair with missing comma...")
     
     # Create a temporary file with missing comma
     temp_file = Path("/tmp/test_missing_comma.py")
@@ -174,16 +177,16 @@ async def main():
     
     if args.error_type == "all":
         error_tests = [
-            ("import", test_import_error),
-            ("syntax", test_syntax_error),
-            ("missing-comma", test_missing_comma),
+            ("import", simulate_import_error),
+            ("syntax", simulate_syntax_error),
+            ("missing-comma", simulate_missing_comma),
         ]
     elif args.error_type == "import":
-        error_tests = [("import", test_import_error)]
+        error_tests = [("import", simulate_import_error)]
     elif args.error_type == "syntax":
-        error_tests = [("syntax", test_syntax_error)]
+        error_tests = [("syntax", simulate_syntax_error)]
     elif args.error_type == "missing-comma":
-        error_tests = [("missing-comma", test_missing_comma)]
+        error_tests = [("missing-comma", simulate_missing_comma)]
     
     for test_name, test_func in error_tests:
         logger.info(f"\n{'=' * 60}")
