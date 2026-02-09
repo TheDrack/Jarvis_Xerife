@@ -436,6 +436,7 @@ class GitHubWorker:
                 "success": False,
                 "message": "This method is deprecated. Use scripts/auto_fixer_logic.py or dispatch_auto_fix() instead.",
                 "logs_preview": logs[:500],
+                "logs_analyzed": len(logs),  # For backward compatibility with tests
             }
             
         except Exception as e:
