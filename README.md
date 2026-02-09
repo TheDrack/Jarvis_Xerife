@@ -168,8 +168,14 @@ if matrix.is_viable():
 ```
 
 **Demo Interativo:**
+
+Para testar o sistema de orquestração espacial do Xerife, veja os exemplos em:
+- `app/application/services/strategist_service.py` - Implementação do Xerife
+- `tests/application/test_strategist_service.py` - Testes automatizados
+
+Ou execute a aplicação principal:
 ```bash
-python demo_xerife_strategist.py
+python main.py
 ```
 
 Para documentação completa, veja [docs/XERIFE_STRATEGIST.md](docs/XERIFE_STRATEGIST.md).
