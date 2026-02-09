@@ -376,6 +376,35 @@ docker run -it jarvis-assistant
 
 **Note**: When running with Docker Compose, the application uses PostgreSQL. For local development without Docker, SQLite is used by default.
 
+### Render Deployment (Cloud)
+
+For production cloud deployment with optimized caching and monitoring:
+
+1. **Quick Deploy with Blueprint** (Recommended):
+   - Fork this repository to your GitHub account
+   - Go to [Render Dashboard](https://render.com/) → "New" → "Blueprint"
+   - Connect your GitHub repository
+   - Render will automatically read `render.yaml` and deploy the application
+   - Set required environment variables (API keys) in the dashboard
+
+2. **Features**:
+   - ✅ Automatic PostgreSQL database provisioning
+   - ✅ Optimized dependency caching with `uv` (10-100x faster than pip)
+   - ✅ Docker BuildKit cache mounts for faster rebuilds
+   - ✅ Comprehensive health check endpoint (`/health`)
+   - ✅ GitHub Actions monitoring workflow
+
+3. **Performance**:
+   - First build: ~5-10 minutes
+   - Subsequent builds (with cache): ~2-3 minutes
+   - Code-only changes: ~1-2 minutes
+
+📖 **See [DEPLOYMENT.md](DEPLOYMENT.md) for complete deployment guide**, including:
+- Detailed configuration steps
+- Caching strategy explanation
+- Health monitoring setup
+- Troubleshooting guide
+
 ## Configuration
 
 O Setup Wizard configura automaticamente todas as opções necessárias. Para configuração manual ou ajustes, o gerenciamento de configuração é feito via `app/core/config.py` usando pydantic-settings. Você pode customizar as configurações:
