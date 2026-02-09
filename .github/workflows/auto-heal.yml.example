@@ -33,10 +33,10 @@ jobs:
         with:
           python-version: '3.11'  # Minimum Python 3.10+
       
-      - name: Install Python dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install groq google-genai
+          pip install httpx openai groq
       
       - name: Get workflow logs
         id: get-logs
