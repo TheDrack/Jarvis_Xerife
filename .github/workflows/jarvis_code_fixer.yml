@@ -95,4 +95,4 @@ jobs:
           gh issue create \
             --title "🔴 Falha no Auto-Fixer: Issue #${{ github.event.issue.number }}" \
             --body "$ISSUE_BODY" \
-            --label "bug,manual-intervention-required"
+            --label "bug"
