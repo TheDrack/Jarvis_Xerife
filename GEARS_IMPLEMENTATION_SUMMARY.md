@@ -60,8 +60,8 @@ Capacidades de auto-correção automática:
 - ✅ `tests/adapters/test_ai_gateway.py` - 17 testes existentes (todos passando)
 
 ### Ferramentas e Demos
-- ✅ Testes integrados no diretório `tests/` para validar auto-reparo
-- ✅ Implementação principal em `app/adapters/infrastructure/gateway_llm_adapter.py`
+- ✅ `test_auto_repair.py` - Fire test para validar auto-reparo
+- ✅ `demo_gears_system.py` - Demo interativo do sistema
 
 ### Documentação
 - ✅ `docs/GEARS_SYSTEM.md` - Documentação completa do sistema
@@ -198,15 +198,24 @@ response = await gateway.generate_completion([
 
 ## 🔍 Validação
 
-### Testes Automatizados
-
-Os testes do sistema podem ser executados com:
+### Fire Test Executado
 ```bash
-pytest tests/adapters/test_ai_gateway.py -v
+python test_auto_repair.py --error-type import
 ```
 
-Resultado dos testes:
-- ✅ Todas as funcionalidades testadas
+Resultado:
+- ✅ Erro capturado com sucesso
+- ✅ Traceback completo obtido
+- ✅ Payload JSON formatado corretamente
+- ✅ Sistema pronto para dispatch (requer GITHUB_TOKEN)
+
+### Demo Executado
+```bash
+python demo_gears_system.py
+```
+
+Resultado:
+- ✅ Todas as demos executadas com sucesso
 - ✅ Gears shifting funcionando
 - ✅ Provider selection correto
 - ✅ Backward compatibility verificada

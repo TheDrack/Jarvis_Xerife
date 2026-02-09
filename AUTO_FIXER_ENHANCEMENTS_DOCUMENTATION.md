@@ -176,7 +176,7 @@ python scripts/auto_fixer_logic.py
 
 ## Testing
 
-A comprehensive test suite was created that validates:
+A comprehensive test suite was created in `test_auto_fixer_enhancements.py` that validates:
 
 1. **Common Filename Detection**
    - Lowercase 'readme.md' → README.md ✓
@@ -223,7 +223,8 @@ The changes were scanned with CodeQL and **no security alerts** were found.
 ## Files Changed
 
 1. `scripts/auto_fixer_logic.py` - Main implementation
-2. Test suite in `tests/` directory
+2. `test_auto_fixer_enhancements.py` - Test suite
+3. `DEMO_AUTO_FIXER_ENHANCEMENTS.py` - Demo script
 
 ## Future Enhancements
 

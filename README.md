@@ -115,12 +115,18 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
   - Cria Pull Requests automaticamente com as correções propostas
   - Suporta correção de bugs, atualização de documentação e implementação de features
 - **🔄 Auto-Heal CI Failures**: Monitora workflows do GitHub Actions e auto-corrige falhas
+- **⚡ Direct GitHub Integration**: Requests from GitHub Actions/Issues bypass Jarvis identifier and go directly to AI
+  - GitHub-sourced errors are processed immediately without intent identification overhead
+  - User API requests still use full Jarvis intent identification
+  - Optimized workflow for automated fixes
 - **📊 Detecção Inteligente**: Extrai caminhos de arquivos de tracebacks Python e identifica arquivos comuns
 - **🎯 Prevenção de Duplicatas**: Verifica issues existentes antes de criar novas
 - **📚 Documentação Completa**: Veja [JARVIS_SELF_HEALING_GUIDE.md](JARVIS_SELF_HEALING_GUIDE.md) para setup e uso
 
 ### 🏗️ Arquitetura & Deployment
 - **REST API**: FastAPI-based headless control interface with authentication and device management (see [API_README.md](API_README.md))
+  - **Request Source Routing**: Intelligent routing based on request origin (GitHub vs User)
+  - **Bypass Logic**: GitHub Actions/Issues bypass Jarvis identifier for direct AI processing
 - **Distributed Mode**: Cloud brain orchestrates local "soldiers" (devices) via capabilities (see [DISTRIBUTED_MODE.md](DISTRIBUTED_MODE.md))
 - **Hexagonal Architecture**: Clean separation with Domain, Application, and Adapters layers (see [ARCHITECTURE.md](ARCHITECTURE.md))
 - **Cloud Ready**: Core logic runs without hardware dependencies (97-100% domain test coverage)
@@ -168,14 +174,8 @@ if matrix.is_viable():
 ```
 
 **Demo Interativo:**
-
-Para testar o sistema de orquestração espacial do Xerife, veja os exemplos em:
-- `app/application/services/strategist_service.py` - Implementação do Xerife
-- `tests/application/test_strategist_service.py` - Testes automatizados
-
-Ou execute a aplicação principal:
 ```bash
-python main.py
+python docs/examples/demo_xerife_strategist.py
 ```
 
 Para documentação completa, veja [docs/XERIFE_STRATEGIST.md](docs/XERIFE_STRATEGIST.md).
@@ -199,6 +199,9 @@ Para documentação completa, veja [docs/XERIFE_STRATEGIST.md](docs/XERIFE_STRAT
 │   ├── bootstrap_edge.py    # Bootstrap for Edge deployment
 │   ├── core/                # Legacy core (deprecated, kept for compatibility)
 │   └── actions/             # Legacy actions (deprecated)
+├── docs/
+│   └── examples/            # Demo scripts and examples
+├── scripts/                 # Utility scripts and tools
 ├── requirements/
 │   ├── core.txt             # Core dependencies (cloud-ready, no hardware)
 │   ├── edge.txt             # Edge dependencies (PyAutoGUI, speech, etc.)
@@ -690,6 +693,7 @@ curl -X POST "http://localhost:8000/v1/execute" \
 
 ### Architecture & Design
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Detailed hexagonal architecture documentation (Portuguese)
+- [ARCHITECTURE_IMPROVEMENTS.md](ARCHITECTURE_IMPROVEMENTS.md) - Architecture improvements and recommendations
 - [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md) - Complete refactoring summary with metrics and validation results
 
 ### Integration Guides
@@ -701,6 +705,7 @@ curl -X POST "http://localhost:8000/v1/execute" \
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
 - [EXTENSIBILITY.md](EXTENSIBILITY.md) - Guide for extending functionality
 - [requirements/README.md](requirements/README.md) - Modular requirements documentation
+- [docs/examples/](docs/examples/) - Demo scripts and usage examples
 
 ### Project History
 - [CHANGELOG.md](CHANGELOG.md) - Version history
