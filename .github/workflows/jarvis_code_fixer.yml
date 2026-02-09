@@ -12,6 +12,11 @@ on:
   issues:
     types: [opened, edited]
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
 jobs:
   healing_engine:
     # Trigger on 'auto-code' or 'jarvis-auto-report' labels for backward compatibility
@@ -89,7 +94,7 @@ jobs:
           fi
 
       - name: Request Human Review
-        if: failure() || steps.healing_engine.outputs.final_state == 'NEEDS_HUMAN' || steps.healing_engine.outputs.final_state == 'FAILED_LIMIT'
+        if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -97,22 +102,25 @@ jobs:
           ERROR_DETAILS="${{ steps.healing_engine.outputs.error_details }}"
           ATTEMPTED_FIXES="${{ steps.healing_engine.outputs.attempted_fixes }}"
           
+          # Only create issue if we actually have a failure state
+          if [[ -z "$FINAL_STATE" ]] || [[ "$FINAL_STATE" == "SUCCESS" ]]; then
+            echo "No human review needed - workflow succeeded or state not set"
+            exit 0
+          fi
+          
           # Create detailed review request based on state
           if [[ "$FINAL_STATE" == "FAILED_LIMIT" ]]; then
             TITLE="🔧 Auto-Repair Needs Review: Maximum Attempts Reached"
             STATUS="⚠️ Revisão Necessária"
             REASON="O sistema atingiu o limite máximo de 3 tentativas de auto-reparo."
-            LABEL="bug"
           elif [[ "$FINAL_STATE" == "NEEDS_HUMAN" ]]; then
             TITLE="🔍 Auto-Repair Needs Review: Human Intervention Required"
             STATUS="⚠️ Revisão Necessária"
             REASON="Erro de infraestrutura ou erro não identificado detectado."
-            LABEL="bug"
           else
             TITLE="🔍 Auto-Repair Needs Review: Workflow Issue"
             STATUS="⚠️ Revisão Necessária"
             REASON="Falha inesperada no workflow de auto-reparo."
-            LABEL="bug"
           fi
           
           # Build detailed review body
@@ -188,8 +196,8 @@ jobs:
           *Requisição de revisão criada automaticamente pelo Self-Healing State Machine*
           *Este não é um erro - é uma solicitação de revisão humana para casos complexos*"
           
-          # Create issue as review request (not as error)
+          # Create issue using only 'bug' label to avoid label not found errors
           gh issue create \
             --title "$TITLE" \
             --body "$REVIEW_BODY" \
-            --label "$LABEL"
+            --label "bug"

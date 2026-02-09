@@ -19,3 +19,6 @@ python-multipart>=0.0.6
 # Database ORM
 sqlmodel>=0.0.14
 psycopg2-binary>=2.9.9
+
+# HTTP Client
+httpx>=0.24.0
