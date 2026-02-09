@@ -71,6 +71,12 @@ logger = logging.getLogger(__name__)
 
 # Maximum log size to prevent terminal overflow (5000 characters)
 MAX_LOG_SIZE = 5000
+# Maximum prompt size for code suggestions (allows more context)
+MAX_PROMPT_SIZE = MAX_LOG_SIZE * 2  # 10000 characters
+# Maximum size for error message in fix prompts
+MAX_ERROR_SIZE_IN_FIX = 1000  # Keep error concise in fix prompts
+# Minimum valid code length for sanity check
+MIN_VALID_CODE_LENGTH = 50  # Code should be at least 50 chars to be valid
 # Maximum number of auto-healing attempts to prevent infinite loops
 MAX_HEALING_ATTEMPTS = 3
 
@@ -86,6 +92,9 @@ class AutoFixer:
     
     Uses GitHub Copilot CLI to analyze errors and generate code fixes.
     """
+    
+    # Prefixes that Copilot might use in output (may need updates based on CLI changes)
+    COPILOT_OUTPUT_PREFIXES = ["Suggestion:", "Here's the fix:", "Fixed code:", "Solution:"]
     
     def __init__(self, repo_path: Optional[str] = None):
         """
@@ -522,17 +531,19 @@ class AutoFixer:
             Suggested code from Copilot or None if call fails
         """
         try:
-            # Truncate prompt to prevent terminal overflow
-            truncated_prompt = self._truncate_log(prompt, max_size=MAX_LOG_SIZE * 2)
+            # Truncate prompt to prevent terminal overflow (allows more context than logs)
+            truncated_prompt = self._truncate_log(prompt, max_size=MAX_PROMPT_SIZE)
             
             # Use gh copilot suggest command with shell target for general suggestions
+            # Note: Empty input string is provided via stdin, but actual behavior depends on
+            # gh copilot implementation. May require user interaction in some cases.
             result = subprocess.run(
                 ["gh", "copilot", "suggest", "-t", "shell", truncated_prompt],
                 capture_output=True,
                 text=True,
                 timeout=60,
                 cwd=self.repo_path,
-                input="",  # Auto-accept the first suggestion
+                input="",  # Attempt to auto-accept, but may not work in all cases
             )
             
             if result.returncode == 0:
@@ -615,7 +626,7 @@ Please provide the complete corrected file content that fixes this error."""
                 
                 fix_prompt = f"""Fix this code error:
 
-Error: {self._truncate_log(error_message, 1000)}
+Error: {self._truncate_log(error_message, MAX_ERROR_SIZE_IN_FIX)}
 
 File: {file_path}
 
@@ -644,18 +655,20 @@ Show me the corrected version of this file: {temp_code_file}"""
                         return fixed_code
                     else:
                         # If no code blocks, try to use the entire output
-                        # but clean it up first
+                        # but clean it up first by removing common Copilot output prefixes
                         logger.warning("No code blocks found in Copilot output, using full output")
-                        # Remove common prefixes/suffixes from suggestions
                         cleaned_output = output
-                        for prefix in ["Suggestion:", "Here's the fix:", "Fixed code:"]:
+                        
+                        # Remove common prefixes from suggestions (may need updates based on CLI changes)
+                        for prefix in self.COPILOT_OUTPUT_PREFIXES:
                             if prefix in cleaned_output:
                                 cleaned_output = cleaned_output.split(prefix, 1)[1].strip()
                         
-                        if len(cleaned_output) > 50:  # Sanity check
+                        # Sanity check: code should be reasonably long
+                        if len(cleaned_output) > MIN_VALID_CODE_LENGTH:
                             return cleaned_output
                         else:
-                            logger.error("Copilot output too short or invalid")
+                            logger.error(f"Copilot output too short ({len(cleaned_output)} chars, min {MIN_VALID_CODE_LENGTH})")
                             return None
                 else:
                     logger.error(f"GitHub Copilot suggest for fix failed: {result.stderr}")
