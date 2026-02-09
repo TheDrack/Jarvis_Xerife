@@ -165,6 +165,46 @@ class AutoFixer:
         
         return False
     
+    def is_feature_request(self, issue_body: str) -> bool:
+        """
+        Detect if the issue is requesting a new feature
+        
+        Args:
+            issue_body: The issue body text
+            
+        Returns:
+            True if this appears to be a feature request, False otherwise
+        """
+        # Keywords that suggest feature requests (English and Portuguese)
+        feature_keywords = [
+            'implementar',  # implement (Portuguese)
+            'implement',
+            'adicionar',  # add (Portuguese)
+            'add',
+            'criar',  # create (Portuguese)
+            'create',
+            'new feature',
+            'nova funcionalidade',
+            'feature request',
+            'solicitação de recurso',
+            'enhance',
+            'melhorar',  # improve (Portuguese)
+            'improvement',
+            'melhoria',  # improvement (Portuguese)
+            'facilitar',  # facilitate/make easier (Portuguese)
+            'facilitate',
+        ]
+        
+        issue_lower = issue_body.lower()
+        
+        # Check if any feature keyword is present
+        for keyword in feature_keywords:
+            if keyword in issue_lower:
+                logger.info(f"Detected feature request: '{keyword}' found in issue")
+                return True
+        
+        return False
+    
     def extract_common_filename(self, issue_body: str) -> Optional[str]:
         """
         Extract common file names from issue body when no traceback is found
@@ -223,9 +263,18 @@ class AutoFixer:
         # Keyword to file mapping
         # Note: This mapping can be extended with more keywords and files as needed
         keyword_suggestions = {
-            'interface': ['app/main.py', 'main.py'],
-            'api': ['app/adapters/infrastructure/api_server.py', 'app/main.py', 'main.py'],
+            # API and interface keywords (English and Portuguese)
+            'interface': ['app/adapters/infrastructure/api_server.py', 'app/adapters/infrastructure/api_models.py', 'app/main.py', 'main.py'],
+            'api': ['app/adapters/infrastructure/api_server.py', 'app/adapters/infrastructure/api_models.py', 'app/main.py', 'main.py'],
+            'payload': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py'],
+            'mensagem': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py'],  # Portuguese for 'message'
+            'envio': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py'],  # Portuguese for 'send/sending'
+            'json': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py'],
             'frontend': ['app/main.py', 'main.py', 'README.md'],
+            # Documentation keywords
+            'documentation': ['README.md', 'docs/README.md'],
+            'documentação': ['README.md', 'docs/README.md'],  # Portuguese
+            'readme': ['README.md'],
         }
         
         # Convert issue body to lowercase for case-insensitive matching
@@ -300,7 +349,7 @@ class AutoFixer:
             logger.error(f"Error reading file {file_path}: {e}")
             return None
     
-    def call_groq_api(self, error_message: str, code: str, is_doc_request: bool = False) -> Optional[str]:
+    def call_groq_api(self, error_message: str, code: str, is_doc_request: bool = False, is_feature: bool = False) -> Optional[str]:
         """
         Call Groq API to get fixed code
         
@@ -308,6 +357,7 @@ class AutoFixer:
             error_message: The error message or user request
             code: The current code with the error or current file content
             is_doc_request: Whether this is a documentation update request
+            is_feature: Whether this is a feature request
             
         Returns:
             Fixed code or None if API call fails
@@ -332,6 +382,17 @@ CURRENT FILE CONTENT:
 {code}
 
 Please update the file according to the user's request. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
+            elif is_feature:
+                # Feature request - implement new functionality
+                prompt = f"""You are a senior software developer. The user has requested a new feature or enhancement.
+
+FEATURE REQUEST:
+{error_message}
+
+CURRENT FILE CONTENT:
+{code}
+
+Please implement the requested feature by modifying the existing code. Make minimal, focused changes that add the requested functionality while preserving all existing features. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
             else:
                 # Code bug fix request
                 prompt = f"""You are a code fixing assistant. Analyze the following error and code, then return ONLY the corrected code without any explanations, comments, or markdown formatting.
@@ -372,7 +433,7 @@ Return ONLY the corrected code, nothing else."""
             logger.error(f"Error calling Groq API: {e}")
             return None
     
-    def call_gemini_api(self, error_message: str, code: str, is_doc_request: bool = False) -> Optional[str]:
+    def call_gemini_api(self, error_message: str, code: str, is_doc_request: bool = False, is_feature: bool = False) -> Optional[str]:
         """
         Call Gemini API to get fixed code
         
@@ -380,6 +441,7 @@ Return ONLY the corrected code, nothing else."""
             error_message: The error message or user request
             code: The current code with the error or current file content
             is_doc_request: Whether this is a documentation update request
+            is_feature: Whether this is a feature request
             
         Returns:
             Fixed code or None if API call fails
@@ -405,6 +467,17 @@ CURRENT FILE CONTENT:
 {code}
 
 Please update the file according to the user's request. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
+            elif is_feature:
+                # Feature request - implement new functionality
+                prompt = f"""You are a senior software developer. The user has requested a new feature or enhancement.
+
+FEATURE REQUEST:
+{error_message}
+
+CURRENT FILE CONTENT:
+{code}
+
+Please implement the requested feature by modifying the existing code. Make minimal, focused changes that add the requested functionality while preserving all existing features. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
             else:
                 # Code bug fix request
                 prompt = f"""You are a code fixing assistant. Analyze the following error and code, then return ONLY the corrected code without any explanations, comments, or markdown formatting.
@@ -440,7 +513,7 @@ Return ONLY the corrected code, nothing else."""
             logger.error(f"Error calling Gemini API: {e}")
             return None
     
-    def get_fixed_code(self, error_message: str, code: str, is_doc_request: bool = False) -> Optional[str]:
+    def get_fixed_code(self, error_message: str, code: str, is_doc_request: bool = False, is_feature: bool = False) -> Optional[str]:
         """
         Get fixed code using available AI APIs (tries Groq first, then Gemini)
         
@@ -448,13 +521,22 @@ Return ONLY the corrected code, nothing else."""
             error_message: The error message or user request
             code: The current code with the error or current file content
             is_doc_request: Whether this is a documentation update request
+            is_feature: Whether this is a feature request
             
         Returns:
             Fixed code or None if all APIs fail
         """
         # Try Groq first
-        fixed_code = self.call_groq_api(error_message, code, is_doc_request)
+        fixed_code = self.call_groq_api(error_message, code, is_doc_request, is_feature)
         
+        if fixed_code:
+            return fixed_code
+        
+        # Fallback to Gemini
+        logger.info("Falling back to Gemini API...")
+        fixed_code = self.call_gemini_api(error_message, code, is_doc_request, is_feature)
+        
+        return fixed_code
         if fixed_code:
             return fixed_code
         
@@ -735,11 +817,14 @@ _Generated by Jarvis Self-Healing Orchestrator_
             logger.error("="*60)
             return 1
         
-        # 2. Detect if this is a documentation request
+        # 2. Detect if this is a documentation request or feature request
         is_doc_request = self.is_documentation_request(issue_body)
+        is_feature = self.is_feature_request(issue_body)
         
         if is_doc_request:
             logger.info("\n📚 Detected documentation update request")
+        elif is_feature:
+            logger.info("\n✨ Detected feature request")
         else:
             logger.info("\n🐛 Detected bug fix request")
         
@@ -772,10 +857,12 @@ _Generated by Jarvis Self-Healing Orchestrator_
         # 5. Get fixed code from AI
         if is_doc_request:
             logger.info(f"\n🤖 Requesting documentation update from AI...")
+        elif is_feature:
+            logger.info(f"\n🤖 Requesting feature implementation from AI...")
         else:
             logger.info(f"\n🤖 Requesting bug fix from AI...")
         
-        fixed_code = self.get_fixed_code(issue_body, current_code, is_doc_request)
+        fixed_code = self.get_fixed_code(issue_body, current_code, is_doc_request, is_feature)
         
         if not fixed_code:
             logger.error("Failed to get updated content from AI")
