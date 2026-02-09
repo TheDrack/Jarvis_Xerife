@@ -1,9 +1,10 @@
 name: Jarvis Self-Healing Workshop 🔧
 
-# DIRECT GITHUB ISSUES → AI INTEGRATION (Bypasses Jarvis Identifier)
-# When issues are created with 'jarvis-auto-report' label, they are processed
-# directly by the AI without going through Jarvis intent identification.
-# User requests through Jarvis API still require intent identification.
+# DIRECT GITHUB ISSUES → GITHUB COPILOT INTEGRATION
+# When issues are created with 'auto-code' or 'jarvis-auto-report' label,
+# they are processed using GitHub Copilot CLI for native ecosystem integration.
+#
+# Security: Includes infinite loop prevention with maximum retry limits
 
 on:
   issues:
@@ -11,7 +12,8 @@ on:
 
 jobs:
   auto_fix:
-    if: contains(github.event.issue.labels.*.name, 'jarvis-auto-report')
+    # Trigger on both 'auto-code' (new label from requirements) and 'jarvis-auto-report' (backward compatibility)
+    if: contains(github.event.issue.labels.*.name, 'auto-code') || contains(github.event.issue.labels.*.name, 'jarvis-auto-report')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -34,14 +36,29 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Dependencies
+      - name: Install GitHub CLI and Copilot extension
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          pip install httpx openai groq google-genai 
+          # GitHub CLI is pre-installed on ubuntu-latest runners
+          # Verify gh is installed
+          gh --version
+          
+          # Install GitHub Copilot CLI extension
+          echo "Installing GitHub Copilot CLI extension..."
+          gh extension install github/gh-copilot || echo "Copilot extension already installed"
+          
+          # Verify Copilot extension is installed
+          gh copilot --version || {
+            echo "Failed to install GitHub Copilot CLI extension"
+            echo "This might be due to permissions or network issues"
+            exit 1
+          }
 
-      - name: Run Auto-Fix Script
+      - name: Run Auto-Fix Script with GitHub Copilot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }} 
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: python scripts/auto_fixer_logic.py
@@ -57,11 +74,14 @@ jobs:
           Verifique os logs em: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
           ## Possíveis Causas
-          1. **Arquivo não identificado**: A issue pode não mencionar o arquivo específico a ser modificado.
+          1. **Limite de tentativas excedido**: O sistema pode ter atingido o limite máximo de 3 tentativas de auto-reparo para evitar loops infinitos.
+             - Solução: Revise as tentativas anteriores e faça a correção manualmente
+          2. **GitHub Copilot CLI não disponível**: A extensão do Copilot pode não estar instalada ou autenticada.
+             - Solução: Verifique os logs do workflow para detalhes
+          3. **Arquivo não identificado**: A issue pode não mencionar o arquivo específico a ser modificado.
              - Solução: Inclua o caminho do arquivo na descrição (ex: \`scripts/auto_fixer_logic.py\`)
-          2. **Falta de contexto**: A descrição pode ser muito vaga.
+          4. **Falta de contexto**: A descrição pode ser muito vaga.
              - Solução: Seja específico sobre o que precisa ser alterado
-          3. **Problema de API**: As chaves de API podem estar expiradas ou os serviços indisponíveis.
 
           ## Como Ajudar o Auto-Reparo
           Para que o auto-reparo funcione melhor, inclua na issue:
@@ -73,6 +93,6 @@ jobs:
           *Issue criada automaticamente pelo sistema de auto-reparo*"
           
           gh issue create \
-            --title "🔴 Falha Crítica no Auto-Fixer: Workflow Failed" \
+            --title "🔴 Falha no Auto-Fixer: Issue #${{ github.event.issue.number }}" \
             --body "$ISSUE_BODY" \
-            --label "bug,jarvis-auto-report"
+            --label "bug,manual-intervention-required"

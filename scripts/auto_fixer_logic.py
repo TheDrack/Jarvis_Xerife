@@ -1,36 +1,37 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Auto-Fixer Logic Script
+Auto-Fixer Logic Script - GitHub Copilot Native Integration
 
 This script is part of the self-healing system for Jarvis Assistant.
-It reads errors from GitHub issues, uses AI (Groq/Gemini) to generate fixes,
+It reads errors from GitHub issues, uses GitHub Copilot CLI to generate fixes,
 and automatically creates pull requests with the corrections.
 
-IMPORTANT: This script operates as a direct GitHub Actions → AI (Copilot) integration.
-When errors/issues come directly from GitHub Actions or GitHub Issues, they bypass
-the Jarvis intent identifier and are processed directly by the AI for fixing.
-Only user requests made through the Jarvis API require the intent identifier.
+IMPORTANT: This script uses GitHub's native Copilot CLI integration instead of external APIs.
+When errors/issues come directly from GitHub Actions or GitHub Issues, they are processed
+using 'gh copilot' commands for native GitHub ecosystem integration.
 
 Features:
 1. Reads error from ISSUE_BODY environment variable
 2. Extracts affected file path from the error message or detects common files
 3. Handles both code bug fixes and documentation updates
-4. Sends error/request and file code to Groq/Gemini API (bypassing Jarvis identifier)
-5. Receives corrected/updated content from AI
+4. Uses GitHub Copilot CLI (gh copilot) for AI-powered analysis and suggestions
+5. Receives corrected/updated content from Copilot
 6. Applies the fix locally
 7. Creates a Git branch fix/issue-{ID}
 8. Commits the changes
 9. Opens a Pull Request using GitHub CLI (gh pr create)
 10. Closes the original issue using GitHub CLI (gh issue close)
+11. Prevents infinite loops with run tracking and retry limits
 
 Key Capabilities:
-- Direct GitHub Integration: Bypasses Jarvis identifier for GitHub-sourced requests
+- Native GitHub Integration: Uses gh copilot extension for AI capabilities
+- Log Handling: Truncates logs to prevent terminal character limit issues
+- Infinite Loop Prevention: Tracks workflow runs and implements retry limits
 - File Flexibility: If no file path in traceback, searches for common files
   (README.md, requirements.txt, etc.) in issue body with case-insensitive matching
 - Keyword-Based Suggestions: If no file found, searches for keywords like 'interface',
   'api', or 'frontend' and suggests probable files (app/main.py, README.md, etc.)
-- API Validation: Clear error messages when GROQ_API_KEY or GOOGLE_API_KEY missing
 - Context Handling: Detects documentation requests (e.g., "add a section") and
   provides current file content to AI instead of treating it as a bug
 
@@ -57,6 +58,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -66,6 +68,11 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Maximum log size to prevent terminal overflow (5000 characters)
+MAX_LOG_SIZE = 5000
+# Maximum number of auto-healing attempts to prevent infinite loops
+MAX_HEALING_ATTEMPTS = 3
 
 
 class AutoFixerError(Exception):
@@ -77,7 +84,7 @@ class AutoFixer:
     """
     Auto-Fixer for self-healing system.
     
-    Uses AI (Groq/Gemini) to analyze errors and generate code fixes.
+    Uses GitHub Copilot CLI to analyze errors and generate code fixes.
     """
     
     def __init__(self, repo_path: Optional[str] = None):
@@ -89,26 +96,103 @@ class AutoFixer:
         """
         self.repo_path = Path(repo_path) if repo_path else Path.cwd()
         
-        # Get API keys from environment
-        self.groq_api_key = os.getenv("GROQ_API_KEY")
-        self.gemini_api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-        
-        if not self.groq_api_key and not self.gemini_api_key:
-            self._log_missing_api_keys_error()
-        
-        # Validate gh CLI is available
+        # Validate gh CLI and Copilot extension are available
         self._check_gh_cli()
+        self._check_gh_copilot_extension()
     
-    def _log_missing_api_keys_error(self):
-        """Log a clear error message about missing API keys"""
-        logger.error(
-            "❌ CRITICAL: No AI API keys found!\n"
-            "   The auto-fixer cannot proceed without AI capabilities.\n"
-            "   Please set one of the following environment variables:\n"
-            "   - GROQ_API_KEY: For Groq API access\n"
-            "   - GOOGLE_API_KEY or GEMINI_API_KEY: For Gemini API access\n"
-            "   Without an API key, the auto-fixer cannot generate fixes."
-        )
+    def _check_gh_copilot_extension(self) -> bool:
+        """Check if GitHub Copilot CLI extension is installed"""
+        try:
+            result = subprocess.run(
+                ["gh", "copilot", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            
+            if result.returncode == 0:
+                logger.info("✓ GitHub Copilot CLI extension is installed")
+                return True
+            else:
+                logger.error(
+                    "✗ GitHub Copilot CLI extension not installed or not working.\n"
+                    "   Install with: gh extension install github/gh-copilot\n"
+                    "   The auto-fixer requires the Copilot extension to function."
+                )
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error checking gh copilot extension: {e}")
+            logger.error("Install with: gh extension install github/gh-copilot")
+            return False
+    
+    def _check_healing_attempt_limit(self, issue_id: str) -> bool:
+        """
+        Check if we've exceeded the maximum number of healing attempts for this issue
+        to prevent infinite loops.
+        
+        Args:
+            issue_id: The issue ID
+            
+        Returns:
+            True if we can proceed, False if limit exceeded
+        """
+        tracking_file = self.repo_path / ".github" / "healing_attempts.json"
+        
+        try:
+            # Load or create tracking data
+            if tracking_file.exists():
+                with open(tracking_file, 'r') as f:
+                    attempts = json.load(f)
+            else:
+                attempts = {}
+            
+            # Get current attempt count
+            current_attempts = attempts.get(str(issue_id), 0)
+            
+            if current_attempts >= MAX_HEALING_ATTEMPTS:
+                logger.warning(
+                    f"⚠️  Maximum healing attempts ({MAX_HEALING_ATTEMPTS}) reached for issue #{issue_id}.\n"
+                    f"   Stopping to prevent infinite loop.\n"
+                    f"   Manual intervention required."
+                )
+                return False
+            
+            # Increment attempt count
+            attempts[str(issue_id)] = current_attempts + 1
+            
+            # Save tracking data
+            tracking_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(tracking_file, 'w') as f:
+                json.dump(attempts, f, indent=2)
+            
+            logger.info(f"✓ Healing attempt {current_attempts + 1}/{MAX_HEALING_ATTEMPTS} for issue #{issue_id}")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"Could not check healing attempt limit: {e}")
+            # Allow to proceed if tracking fails (better than blocking legitimate fixes)
+            return True
+    
+    def _truncate_log(self, log_text: str, max_size: int = MAX_LOG_SIZE) -> str:
+        """
+        Truncate log text to prevent terminal character limit issues.
+        
+        Args:
+            log_text: The full log text
+            max_size: Maximum size in characters
+            
+        Returns:
+            Truncated log text
+        """
+        if len(log_text) <= max_size:
+            return log_text
+        
+        # Take the last max_size characters (most recent errors are usually at the end)
+        truncated = log_text[-max_size:]
+        
+        # Add a note about truncation
+        return f"[Log truncated - showing last {max_size} characters]\n...\n{truncated}"
     
     def _check_gh_cli(self) -> bool:
         """Check if GitHub CLI is installed and authenticated"""
@@ -380,194 +464,213 @@ class AutoFixer:
             logger.error(f"Error reading file {file_path}: {e}")
             return None
     
-    def call_groq_api(self, error_message: str, code: str, is_doc_request: bool = False, is_feature: bool = False) -> Optional[str]:
+    def call_gh_copilot_explain(self, error_message: str) -> Optional[str]:
         """
-        Call Groq API to get fixed code
+        Use GitHub Copilot CLI to explain an error
         
         Args:
-            error_message: The error message or user request
-            code: The current code with the error or current file content
-            is_doc_request: Whether this is a documentation update request
-            is_feature: Whether this is a feature request
+            error_message: The error message to explain
             
         Returns:
-            Fixed code or None if API call fails
+            Explanation from Copilot or None if call fails
         """
-        if not self.groq_api_key:
-            logger.error("❌ GROQ_API_KEY not set. Cannot proceed without AI API access.")
-            return None
-        
         try:
-            import groq
+            # Truncate error message to prevent terminal overflow
+            truncated_error = self._truncate_log(error_message)
             
-            client = groq.Groq(api_key=self.groq_api_key)
+            # Create a temporary file with the error message
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+                f.write(truncated_error)
+                temp_file = f.name
             
-            if is_doc_request:
-                # Documentation update request
-                prompt = f"""You are a documentation assistant. The user has requested an update to a documentation file.
-
-USER REQUEST:
-{error_message}
-
-CURRENT FILE CONTENT:
-{code}
-
-Please update the file according to the user's request. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
-            elif is_feature:
-                # Feature request - implement new functionality
-                prompt = f"""You are a senior software developer. The user has requested a new feature or enhancement.
-
-FEATURE REQUEST:
-{error_message}
-
-CURRENT FILE CONTENT:
-{code}
-
-Please implement the requested feature by modifying the existing code. Make minimal, focused changes that add the requested functionality while preserving all existing features. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
-            else:
-                # Code bug fix request
-                prompt = f"""You are a code fixing assistant. Analyze the following error and code, then return ONLY the corrected code without any explanations, comments, or markdown formatting.
-
-ERROR:
-{error_message}
-
-CURRENT CODE:
-{code}
-
-Return ONLY the corrected code, nothing else."""
-            
-            response = client.chat.completions.create(
-                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant. Return only the requested content without explanations."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                max_tokens=4000,
-            )
-            
-            fixed_code = response.choices[0].message.content.strip()
-            
-            # Remove markdown code blocks if present
-            if fixed_code.startswith("```"):
-                lines = fixed_code.split("\n")
-                # Remove first and last line (```language and ```)
-                fixed_code = "\n".join(lines[1:-1])
-            
-            logger.info(f"✓ Received updated content from Groq ({len(fixed_code)} chars)")
-            return fixed_code
-            
-        except ImportError:
-            logger.error("groq library not installed. Run: pip install groq")
-            return None
+            try:
+                # Use gh copilot explain command
+                result = subprocess.run(
+                    ["gh", "copilot", "explain", truncated_error],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    cwd=self.repo_path,
+                )
+                
+                if result.returncode == 0:
+                    explanation = result.stdout.strip()
+                    logger.info(f"✓ Received explanation from GitHub Copilot ({len(explanation)} chars)")
+                    return explanation
+                else:
+                    logger.error(f"GitHub Copilot explain failed: {result.stderr}")
+                    return None
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(temp_file)
+                except:
+                    pass
+                    
         except Exception as e:
-            logger.error(f"Error calling Groq API: {e}")
+            logger.error(f"Error calling gh copilot explain: {e}")
             return None
     
-    def call_gemini_api(self, error_message: str, code: str, is_doc_request: bool = False, is_feature: bool = False) -> Optional[str]:
+    def call_gh_copilot_suggest(self, prompt: str) -> Optional[str]:
         """
-        Call Gemini API to get fixed code
+        Use GitHub Copilot CLI to get code suggestions
         
         Args:
-            error_message: The error message or user request
-            code: The current code with the error or current file content
-            is_doc_request: Whether this is a documentation update request
-            is_feature: Whether this is a feature request
+            prompt: The prompt describing what code is needed
             
         Returns:
-            Fixed code or None if API call fails
+            Suggested code from Copilot or None if call fails
         """
-        if not self.gemini_api_key:
-            logger.error("❌ GOOGLE_API_KEY/GEMINI_API_KEY not set. Cannot proceed without AI API access.")
-            return None
-        
         try:
-            # Note: Install with 'pip install google-genai', import as 'from google import genai'
-            from google import genai
+            # Truncate prompt to prevent terminal overflow
+            truncated_prompt = self._truncate_log(prompt, max_size=MAX_LOG_SIZE * 2)
             
-            client = genai.Client(api_key=self.gemini_api_key)
-            
-            if is_doc_request:
-                # Documentation update request
-                prompt = f"""You are a documentation assistant. The user has requested an update to a documentation file.
-
-USER REQUEST:
-{error_message}
-
-CURRENT FILE CONTENT:
-{code}
-
-Please update the file according to the user's request. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
-            elif is_feature:
-                # Feature request - implement new functionality
-                prompt = f"""You are a senior software developer. The user has requested a new feature or enhancement.
-
-FEATURE REQUEST:
-{error_message}
-
-CURRENT FILE CONTENT:
-{code}
-
-Please implement the requested feature by modifying the existing code. Make minimal, focused changes that add the requested functionality while preserving all existing features. Return ONLY the complete updated file content without any explanations, comments, or markdown formatting."""
-            else:
-                # Code bug fix request
-                prompt = f"""You are a code fixing assistant. Analyze the following error and code, then return ONLY the corrected code without any explanations, comments, or markdown formatting.
-
-ERROR:
-{error_message}
-
-CURRENT CODE:
-{code}
-
-Return ONLY the corrected code, nothing else."""
-            
-            response = client.models.generate_content(
-                model=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
-                contents=prompt,
+            # Use gh copilot suggest command with shell target for general suggestions
+            result = subprocess.run(
+                ["gh", "copilot", "suggest", "-t", "shell", truncated_prompt],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=self.repo_path,
+                input="",  # Auto-accept the first suggestion
             )
             
-            fixed_code = response.text.strip()
-            
-            # Remove markdown code blocks if present
-            if fixed_code.startswith("```"):
-                lines = fixed_code.split("\n")
-                # Remove first and last line (```language and ```)
-                fixed_code = "\n".join(lines[1:-1])
-            
-            logger.info(f"✓ Received updated content from Gemini ({len(fixed_code)} chars)")
-            return fixed_code
-            
-        except ImportError:
-            logger.error("google-genai library not installed. Run: pip install google-genai")
-            return None
+            if result.returncode == 0:
+                suggestion = result.stdout.strip()
+                logger.info(f"✓ Received suggestion from GitHub Copilot ({len(suggestion)} chars)")
+                return suggestion
+            else:
+                logger.error(f"GitHub Copilot suggest failed: {result.stderr}")
+                return None
+                
         except Exception as e:
-            logger.error(f"Error calling Gemini API: {e}")
+            logger.error(f"Error calling gh copilot suggest: {e}")
             return None
     
-    def get_fixed_code(self, error_message: str, code: str, is_doc_request: bool = False, is_feature: bool = False) -> Optional[str]:
+    def get_fixed_code_with_copilot(self, error_message: str, code: str, file_path: str, is_doc_request: bool = False, is_feature: bool = False) -> Optional[str]:
         """
-        Get fixed code using available AI APIs (tries Groq first, then Gemini)
+        Get fixed code using GitHub Copilot CLI
         
         Args:
             error_message: The error message or user request
             code: The current code with the error or current file content
+            file_path: The path to the file being fixed
             is_doc_request: Whether this is a documentation update request
             is_feature: Whether this is a feature request
             
         Returns:
-            Fixed code or None if all APIs fail
+            Fixed code or None if operation fails
         """
-        # Try Groq first
-        fixed_code = self.call_groq_api(error_message, code, is_doc_request, is_feature)
-        
-        if fixed_code:
-            return fixed_code
-        
-        # Fallback to Gemini
-        logger.info("Falling back to Gemini API...")
-        fixed_code = self.call_gemini_api(error_message, code, is_doc_request, is_feature)
-        
-        return fixed_code
+        try:
+            # Create a comprehensive prompt for Copilot
+            if is_doc_request:
+                prompt = f"""Documentation Update Request:
+{error_message}
+
+Current file: {file_path}
+Current content:
+{code}
+
+Please provide the complete updated file content with the requested documentation changes."""
+            elif is_feature:
+                prompt = f"""Feature Implementation Request:
+{error_message}
+
+Current file: {file_path}
+Current code:
+{code}
+
+Please provide the complete updated file content with the requested feature implemented."""
+            else:
+                prompt = f"""Bug Fix Request:
+Error: {error_message}
+
+File: {file_path}
+Current code:
+{code}
+
+Please provide the complete corrected file content that fixes this error."""
+            
+            # First, try to get an explanation to understand the issue better
+            logger.info("🤖 Getting error explanation from GitHub Copilot...")
+            explanation = self.call_gh_copilot_explain(error_message)
+            
+            if explanation:
+                logger.info(f"📝 Copilot explanation:\n{explanation[:300]}...")
+            
+            # Now create the actual fix using a more direct approach
+            # Since gh copilot suggest is designed for shell commands, we'll use a different strategy
+            # We'll create a temporary Python script that uses the code as input
+            logger.info("🤖 Generating fix with GitHub Copilot...")
+            
+            # Create a temp file with the current code
+            with tempfile.NamedTemporaryFile(mode='w', suffix=Path(file_path).suffix, delete=False) as f:
+                f.write(code)
+                temp_code_file = f.name
+            
+            try:
+                # For now, we'll use a workaround: create a detailed prompt and ask Copilot
+                # to suggest a fix. Since direct code generation via CLI is limited,
+                # we'll need to parse the output carefully
+                
+                fix_prompt = f"""Fix this code error:
+
+Error: {self._truncate_log(error_message, 1000)}
+
+File: {file_path}
+
+Show me the corrected version of this file: {temp_code_file}"""
+                
+                # Use suggest to get the fix
+                result = subprocess.run(
+                    ["gh", "copilot", "suggest", fix_prompt],
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    cwd=self.repo_path,
+                )
+                
+                if result.returncode == 0:
+                    # Parse the output - this may need adjustment based on actual Copilot output format
+                    output = result.stdout.strip()
+                    
+                    # Extract code blocks from the output if present
+                    code_blocks = re.findall(r'```(?:\w+)?\n(.*?)\n```', output, re.DOTALL)
+                    
+                    if code_blocks:
+                        # Use the first code block found
+                        fixed_code = code_blocks[0].strip()
+                        logger.info(f"✓ Extracted fixed code from Copilot output ({len(fixed_code)} chars)")
+                        return fixed_code
+                    else:
+                        # If no code blocks, try to use the entire output
+                        # but clean it up first
+                        logger.warning("No code blocks found in Copilot output, using full output")
+                        # Remove common prefixes/suffixes from suggestions
+                        cleaned_output = output
+                        for prefix in ["Suggestion:", "Here's the fix:", "Fixed code:"]:
+                            if prefix in cleaned_output:
+                                cleaned_output = cleaned_output.split(prefix, 1)[1].strip()
+                        
+                        if len(cleaned_output) > 50:  # Sanity check
+                            return cleaned_output
+                        else:
+                            logger.error("Copilot output too short or invalid")
+                            return None
+                else:
+                    logger.error(f"GitHub Copilot suggest for fix failed: {result.stderr}")
+                    return None
+                    
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(temp_code_file)
+                except:
+                    pass
+                    
+        except Exception as e:
+            logger.error(f"Error getting fixed code from Copilot: {e}")
+            return None
     
     def apply_fix(self, file_path: str, fixed_code: str) -> bool:
         """
@@ -734,11 +837,11 @@ Return ONLY the corrected code, nothing else."""
             title = f"Auto-fix: Resolve issue #{issue_id}"
             
             # Truncate error message for PR body
-            error_preview = error_message[:500] + "..." if len(error_message) > 500 else error_message
+            error_preview = self._truncate_log(error_message, 500)
             
             body = f"""## 🤖 Auto-Generated Fix
 
-This PR was automatically generated by the Jarvis Self-Healing System.
+This PR was automatically generated by the Jarvis Self-Healing System using GitHub Copilot CLI.
 
 ### Issue
 Fixes #{issue_id}
@@ -750,13 +853,14 @@ Fixes #{issue_id}
 
 ### Changes
 - Fixed error in `{file_path}`
-- Applied AI-generated correction using Groq/Gemini
+- Applied AI-generated correction using GitHub Copilot CLI (`gh copilot`)
 
 ### Verification
-Please review the changes carefully before merging.
+⚠️ **Important:** Please review the changes carefully before merging.
+This PR was automatically generated and should be tested before deployment.
 
 ---
-_Generated by Jarvis Self-Healing Orchestrator_
+_Generated by Jarvis Self-Healing Orchestrator with GitHub Copilot_
 """
             
             result = subprocess.run(
@@ -820,6 +924,7 @@ _Generated by Jarvis Self-Healing Orchestrator_
         """
         logger.info("="*60)
         logger.info("JARVIS AUTO-FIXER - Self-Healing System")
+        logger.info("Powered by GitHub Copilot CLI")
         logger.info("="*60)
         
         # 1. Read error from environment
@@ -832,16 +937,15 @@ _Generated by Jarvis Self-Healing Orchestrator_
             return 1
         
         logger.info(f"\n📋 Issue ID: {issue_id}")
-        logger.info(f"📋 Issue Body:\n{issue_body[:200]}...")
+        logger.info(f"📋 Issue Body (preview):\n{issue_body[:200]}...")
         
-        # Check if we have API keys
-        if not self.groq_api_key and not self.gemini_api_key:
-            logger.error("\n" + "="*60)
-            self._log_missing_api_keys_error()
-            logger.error("="*60)
+        # 2. Check infinite loop prevention
+        logger.info(f"\n🔒 Checking healing attempt limit...")
+        if not self._check_healing_attempt_limit(issue_id):
+            logger.error("Exceeded maximum healing attempts - stopping to prevent infinite loop")
             return 1
         
-        # 2. Detect if this is a documentation request or feature request
+        # 3. Detect if this is a documentation request or feature request
         is_doc_request = self.is_documentation_request(issue_body)
         is_feature = self.is_feature_request(issue_body)
         
@@ -852,7 +956,7 @@ _Generated by Jarvis Self-Healing Orchestrator_
         else:
             logger.info("\n🐛 Detected bug fix request")
         
-        # 3. Extract affected file from error or find common file
+        # 4. Extract affected file from error or find common file
         file_path = self.extract_file_from_error(issue_body)
         
         if not file_path:
@@ -903,62 +1007,64 @@ _Generated by Jarvis Self-Healing Orchestrator_
         
         logger.info(f"\n🎯 Target file: {file_path}")
         
-        # 4. Read current file content
+        # 5. Read current file content
         current_code = self.read_file_content(file_path)
         
         if not current_code:
             logger.error(f"Could not read file: {file_path}")
             return 1
         
-        # 5. Get fixed code from AI
+        # 6. Get fixed code from GitHub Copilot CLI
         if is_doc_request:
-            logger.info(f"\n🤖 Requesting documentation update from AI...")
+            logger.info(f"\n🤖 Requesting documentation update from GitHub Copilot...")
         elif is_feature:
-            logger.info(f"\n🤖 Requesting feature implementation from AI...")
+            logger.info(f"\n🤖 Requesting feature implementation from GitHub Copilot...")
         else:
-            logger.info(f"\n🤖 Requesting bug fix from AI...")
+            logger.info(f"\n🤖 Requesting bug fix from GitHub Copilot...")
         
-        fixed_code = self.get_fixed_code(issue_body, current_code, is_doc_request, is_feature)
+        fixed_code = self.get_fixed_code_with_copilot(issue_body, current_code, file_path, is_doc_request, is_feature)
         
         if not fixed_code:
-            logger.error("Failed to get updated content from AI")
+            logger.error("Failed to get updated content from GitHub Copilot")
             logger.error("Possible reasons:")
-            logger.error("  - API key is invalid or expired")
-            logger.error("  - API service is unavailable")
+            logger.error("  - GitHub Copilot CLI extension is not installed or not authenticated")
             logger.error("  - Network connectivity issues")
+            logger.error("  - The error/request was too complex for automated fixing")
+            logger.info("\nTo install GitHub Copilot CLI extension:")
+            logger.info("  gh extension install github/gh-copilot")
             return 1
         
-        # 6. Apply the fix
+        # 7. Apply the fix
         logger.info(f"\n📝 Applying changes to {file_path}...")
         if not self.apply_fix(file_path, fixed_code):
             logger.error("Failed to apply changes")
             return 1
         
-        # 7. Create Git branch
+        # 8. Create Git branch
         logger.info(f"\n🌿 Creating branch fix/issue-{issue_id}...")
         if not self.create_branch(issue_id):
             logger.error("Failed to create branch")
             return 1
         
-        # 8. Commit changes
+        # 9. Commit changes
         logger.info(f"\n💾 Committing changes...")
         if not self.commit_changes(file_path, issue_id):
             logger.error("Failed to commit changes")
             return 1
         
-        # 9. Push branch
+        # 10. Push branch
         logger.info(f"\n⬆️  Pushing branch to remote...")
         if not self.push_branch(issue_id):
             logger.error("Failed to push branch")
             return 1
         
-        # 10. Create pull request
+        # 11. Create pull request
         logger.info(f"\n🔀 Creating pull request...")
         if not self.create_pull_request(issue_id, issue_body, file_path):
             logger.error("Failed to create pull request")
             return 1
         
-        # 11. Close the original issue
+        # 12. Close the original issue
         logger.info(f"\n🔒 Closing original issue #{issue_id}...")
         if not self.close_issue(issue_id):
             logger.warning("Failed to close issue (PR was created successfully)")

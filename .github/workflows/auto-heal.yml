@@ -1,15 +1,15 @@
 name: Auto-Heal CI Failures
 
-# This workflow automatically attempts to fix CI/CD failures using AI
-# DIRECT GITHUB ACTIONS → AI INTEGRATION (Bypasses Jarvis Identifier)
+# This workflow automatically attempts to fix CI/CD failures using GitHub Copilot CLI
+# DIRECT GITHUB ACTIONS → GITHUB COPILOT INTEGRATION
 # 
 # When a CI workflow fails, this workflow:
 # 1. Downloads the failure logs
-# 2. Sends logs directly to Groq/Gemini AI (no Jarvis identifier needed)
-# 3. Uses AI to analyze and generate fixes
+# 2. Sends logs to GitHub Copilot CLI for analysis (gh copilot explain)
+# 3. Uses Copilot to generate fixes (gh copilot suggest)
 # 4. Creates a Pull Request with the proposed fix
 #
-# Note: User requests through Jarvis API still require intent identification
+# Security: Includes infinite loop prevention to avoid continuous failing workflows
 
 on:
   workflow_run:
@@ -26,6 +26,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: read
     
     steps:
       - name: Checkout code
@@ -38,10 +39,24 @@ jobs:
         with:
           python-version: '3.11'  # Minimum Python 3.10+
       
-      - name: Install Dependencies
+      - name: Install GitHub CLI and Copilot extension
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python -m pip install --upgrade pip
-          pip install httpx openai groq google-genai
+          # GitHub CLI is pre-installed on ubuntu-latest runners
+          # Verify gh is installed
+          gh --version
+          
+          # Install GitHub Copilot CLI extension
+          echo "Installing GitHub Copilot CLI extension..."
+          gh extension install github/gh-copilot || echo "Copilot extension already installed"
+          
+          # Verify Copilot extension is installed
+          gh copilot --version || {
+            echo "Failed to install GitHub Copilot CLI extension"
+            echo "This might be due to permissions or network issues"
+            exit 1
+          }
       
       - name: Get workflow logs
         id: get-logs
@@ -51,36 +66,33 @@ jobs:
           # Get the logs from the failed workflow
           echo "Fetching logs for workflow run ${{ github.event.workflow_run.id }}..."
           
-          # Download logs using GitHub CLI
+          # Download logs using GitHub CLI and limit to last 5000 characters
+          # to prevent terminal overflow
           LOGS=$(gh run view ${{ github.event.workflow_run.id }} --log 2>&1 || echo "Failed to retrieve logs")
+          
+          # Truncate to last 5000 characters (most recent errors)
+          LOGS_TRUNCATED=$(echo "$LOGS" | tail -c 5000)
           
           # Save to output (handle multiline)
           echo "logs<<EOF" >> $GITHUB_OUTPUT
-          echo "$LOGS" >> $GITHUB_OUTPUT
+          echo "$LOGS_TRUNCATED" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           
           # Also show preview
           echo "Log preview (first 500 chars):"
-          echo "$LOGS" | head -c 500
+          echo "$LOGS_TRUNCATED" | head -c 500
       
-      - name: Run auto-fixer
+      - name: Run auto-fixer with GitHub Copilot
         env:
           # Pass the logs as the issue body
           ISSUE_BODY: ${{ steps.get-logs.outputs.logs }}
           ISSUE_ID: ${{ github.event.workflow_run.id }}
           
-          # AI API keys (configure these in repository secrets)
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          
-          # Optional: specify models
-          GROQ_MODEL: llama-3.3-70b-versatile
-          GEMINI_MODEL: gemini-1.5-flash
-          
-          # GitHub token for creating PR
+          # GitHub token for creating PR and using Copilot
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Running auto-fixer..."
+          echo "Running auto-fixer with GitHub Copilot CLI..."
           python scripts/auto_fixer_logic.py
       
       - name: Notify on failure
@@ -89,3 +101,9 @@ jobs:
           echo "⚠️ Auto-fixer failed to create a fix"
           echo "Manual intervention may be required"
           echo "Check the logs above for details"
+          echo ""
+          echo "Common reasons for failure:"
+          echo "  - GitHub Copilot CLI extension not properly installed"
+          echo "  - Exceeded maximum auto-healing attempts (prevents infinite loops)"
+          echo "  - Unable to identify the file to fix"
+          echo "  - Complex error requiring manual intervention"
