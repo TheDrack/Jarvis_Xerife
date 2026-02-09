@@ -2,17 +2,19 @@
 
 ## Overview
 
-The Jarvis Self-Healing System is an automated issue resolution framework that uses **GitHub Copilot CLI** (native GitHub integration) to detect, analyze, and fix errors in your repository. It operates on two main triggers:
+The Jarvis Self-Healing System is an automated issue resolution framework that uses **GitHub Copilot CLI** (native GitHub integration) to detect, analyze, and fix errors in your repository. It operates on three main triggers:
 
-1. **Issue-based Resolution**: When GitHub Issues are created with `auto-code` label
-2. **CI/CD Failure Resolution**: When GitHub Actions workflows fail
+1. **Jarvis API Integration**: When Jarvis sends requests via the API (`/v1/jarvis/dispatch`)
+2. **Issue-based Resolution**: When GitHub Issues are created with `auto-code` label
+3. **CI/CD Failure Resolution**: When GitHub Actions workflows fail
 
 **Key Features:**
 - 🤖 Native GitHub Copilot CLI integration (no external API keys needed)
 - 🔒 Infinite loop prevention (maximum 3 attempts per issue)
 - 📊 Log truncation for terminal overflow protection (5000 char limit)
-- 🔄 Automatic PR creation with detailed context
+- 🔄 Automatic PR creation with detailed context (NOT issues!)
 - 🎯 Smart file detection from error messages or keywords
+- 🌐 REST API integration for external systems like Jarvis
 
 ## Architecture
 
@@ -20,48 +22,40 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
 ┌─────────────────────────────────────────────────────────────┐
 │                   GitHub Repository                         │
 │                                                             │
-│  ┌──────────────┐         ┌──────────────┐                │
-│  │ GitHub       │         │ GitHub       │                │
-│  │ Issues       │         │ Actions      │                │
-│  │ (auto-code)  │         │ (CI/CD)      │                │
-│  └──────┬───────┘         └──────┬───────┘                │
-│         │                        │                         │
-│         │ Issue Created          │ Workflow Failed         │
-│         │                        │                         │
-│         ▼                        ▼                         │
-│  ┌──────────────────────────────────────────┐             │
-│  │   Jarvis Self-Healing Workshop           │             │
-│  │   (jarvis_code_fixer.yml)                │             │
-│  └──────────────┬───────────────────────────┘             │
-│                 │                                          │
-│                 │                                          │
-│         ┌───────┴────────┐                                │
-│         │                │                                 │
-│         ▼                ▼                                 │
-│  ┌─────────────┐  ┌─────────────┐                        │
-│  │ Auto-Heal   │  │ CI Failure  │                        │
-│  │ Workflow    │  │ to Issue    │                        │
-│  │ (CI Fixes)  │  │ (Monitor)   │                        │
-│  └─────┬───────┘  └─────┬───────┘                        │
-│        │                 │                                 │
-│        │                 └─────────┐                       │
-│        │                           │                       │
-│        └──────────┬────────────────┘                       │
-│                   │                                        │
-│                   ▼                                        │
-│        ┌────────────────────┐                             │
-│        │ Auto-Fixer Logic   │                             │
-│        │ (GitHub Copilot)   │                             │
-│        │  • gh copilot      │                             │
-│        │  • explain/suggest │                             │
-│        │  • Loop prevention │                             │
-│        └────────┬───────────┘                             │
-│                 │                                          │
-│                 ▼                                          │
-│        ┌────────────────────┐                             │
-│        │ Pull Request       │                             │
-│        │ Created            │                             │
-│        └────────────────────┘                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │ Jarvis API   │  │ GitHub       │  │ GitHub       │     │
+│  │ (REST)       │  │ Issues       │  │ Actions      │     │
+│  │              │  │ (auto-code)  │  │ (CI/CD)      │     │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
+│         │                 │                 │              │
+│         │ repository_     │ Issue Created   │ Workflow     │
+│         │ dispatch        │                 │ Failed       │
+│         │                 │                 │              │
+│         └────────┬────────┴─────────────────┘              │
+│                  │                                         │
+│                  ▼                                         │
+│       ┌────────────────────────┐                          │
+│       │ Jarvis Self-Healing    │                          │
+│       │ Workshop               │                          │
+│       │ (jarvis_code_fixer.yml)│                          │
+│       └──────────┬─────────────┘                          │
+│                  │                                         │
+│                  │ Creates Issue (if API)                  │
+│                  │ Then processes                          │
+│                  ▼                                         │
+│       ┌────────────────────┐                              │
+│       │ Auto-Fixer Logic   │                              │
+│       │ (GitHub Copilot)   │                              │
+│       │  • gh copilot      │                              │
+│       │  • explain/suggest │                              │
+│       │  • Loop prevention │                              │
+│       └──────────┬─────────┘                              │
+│                  │                                         │
+│                  ▼                                         │
+│       ┌────────────────────┐                              │
+│       │ Pull Request       │ ← Always creates PR          │
+│       │ Created            │   (NEVER creates issue!)     │
+│       └────────────────────┘                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -69,9 +63,21 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
 
 ### 1. Jarvis Self-Healing Workshop (`jarvis_code_fixer.yml`)
 
-**Trigger:** When a GitHub Issue is created with the label `auto-code` or `jarvis-auto-report` (backward compatibility)
+**Triggers:**
+- GitHub Issues with label `auto-code` or `jarvis-auto-report`
+- Repository Dispatch events (`jarvis_order` or `auto_fix`) from Jarvis API
+- Pull Request events (for testing)
 
-**Process:**
+**Process for API Requests:**
+1. Receives `repository_dispatch` event from Jarvis API
+2. Extracts payload (intent, instruction, context, triggered_by)
+3. Creates a GitHub Issue with `auto-code` and `jarvis-api` labels
+4. Skips pytest (not needed for API requests)
+5. Runs auto-fixer in standard mode
+6. Auto-fixer creates a Pull Request with the fix
+7. If auto-fixer fails, adds a comment to the issue (NOT a new issue!)
+
+**Process for Issues:**
 1. Detects new issues with the `auto-code` label
 2. Checks infinite loop prevention (max 3 attempts per issue)
 3. Reads the issue body containing error information
@@ -91,6 +97,7 @@ The Jarvis Self-Healing System is an automated issue resolution framework that u
 - Maximum 3 healing attempts per issue (prevents infinite loops)
 - Automatic log truncation (prevents terminal overflow)
 - Issue duplicate detection (prevents spam)
+- Comments on issues instead of creating new ones (prevents issue spam)
 
 ### 2. CI Failure to Issue (`ci-failure-to-issue.yml`)
 
@@ -274,6 +281,33 @@ All workflows are already configured and will activate automatically when:
 
 ### 3. Test the System
 
+#### Test with Jarvis API
+
+The recommended way to trigger auto-fixes is through the Jarvis API:
+
+1. Make a POST request to `/v1/jarvis/dispatch`:
+```bash
+curl -X POST "https://your-api-url/v1/jarvis/dispatch" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "intent": "Fix authentication bug",
+    "instruction": "Fix the NoneType error in app/auth.py line 15",
+    "context": "Users cannot log in, getting NoneType error when accessing user object"
+  }'
+```
+
+2. The API will trigger a `repository_dispatch` event
+3. The workflow will create an issue with `auto-code` and `jarvis-api` labels
+4. The auto-fixer will process the request and create a Pull Request
+5. Monitor the workflow run in the Actions tab
+
+**What happens:**
+- ✅ Issue created automatically with context
+- ✅ Pull Request created with the fix
+- ✅ Original issue closed when PR is created
+- ✅ If auto-fix fails, comment added to issue (NOT a new issue)
+
 #### Test with a Manual Issue
 
 1. Create a new issue with this content:
@@ -286,7 +320,7 @@ File "app/main.py", line 42, in process_user
 NameError: name 'user_id' is not defined
 ```
 
-2. Add the label: `jarvis-auto-report`
+2. Add the label: `jarvis-auto-report` or `auto-code`
 
 3. Watch the Jarvis Self-Healing Workshop workflow run
 
@@ -303,7 +337,27 @@ NameError: name 'user_id' is not defined
 
 ## Usage Examples
 
-### Example 1: Bug Fix from Issue
+### Example 1: Bug Fix from Jarvis API
+
+**API Request:**
+```json
+POST /v1/jarvis/dispatch
+{
+  "intent": "Fix authentication bug",
+  "instruction": "Fix the NoneType error in app/auth.py line 15",
+  "context": "Users cannot log in due to NoneType error"
+}
+```
+
+**Result:**
+- Issue #123 created automatically with `auto-code` and `jarvis-api` labels
+- Auto-fixer identifies `app/auth.py`
+- GitHub Copilot analyzes and adds null check
+- **Pull Request #124 created** with the fix (NOT another issue!)
+- Issue #123 closed with comment linking to PR
+- If auto-fix fails, comment added to issue #123 (NOT a new issue!)
+
+### Example 2: Bug Fix from Issue
 
 **Issue Created:**
 ```
@@ -320,10 +374,10 @@ TypeError: 'NoneType' object is not subscriptable
 **Result:**
 - Auto-fixer identifies `app/auth.py`
 - LLM analyzes and adds null check
-- PR created with fix
+- **Pull Request created** with fix
 - Issue closed automatically
 
-### Example 2: Documentation Update
+### Example 3: Documentation Update
 
 **Issue Created:**
 ```
@@ -336,17 +390,17 @@ Include pip install instructions and Python version requirements
 **Result:**
 - Auto-fixer identifies README.md
 - LLM generates installation section
-- PR created with updated README
+- **Pull Request created** with updated README
 - Issue closed automatically
 
-### Example 3: CI Failure Auto-Healing
+### Example 4: CI Failure Auto-Healing
 
 **Scenario:**
 - Python Tests workflow fails with import error
 - CI Failure to Issue creates issue with logs
 - Auto-fixer identifies missing package
 - Updates requirements.txt
-- PR created with fix
+- **Pull Request created** with fix
 
 ## Configuration Options
 
