@@ -420,7 +420,8 @@ IMPORTANTE: Retorne APENAS o JSON, sem texto antes ou depois."""
                     "issue_title": f"Auto-fix: Error in {repair_data['file_path']}",
                     "file_path": repair_data['file_path'],
                     "fix_code": repair_data['fix_code'],
-                    "test_command": "pytest -W ignore::DeprecationWarning tests/"
+                    "test_command": "pytest -W ignore::DeprecationWarning tests/",
+                    "source": "jarvis_user",  # Coming from Jarvis application, not GitHub Actions
                 }
                 
                 # Attempt to dispatch to GitHub
@@ -614,7 +615,8 @@ Se não for possível auto-correção, explique o motivo.
             "issue_title": f"Auto-fix: {type(error).__name__}",
             "file_path": "",
             "fix_code": "",
-            "test_command": "pytest -W ignore::DeprecationWarning tests/"
+            "test_command": "pytest -W ignore::DeprecationWarning tests/",
+            "source": "jarvis_user",  # Coming from Jarvis application, not GitHub Actions
         }
         
         # Detect model decommissioned errors

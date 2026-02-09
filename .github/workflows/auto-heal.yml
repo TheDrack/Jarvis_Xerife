@@ -74,6 +74,9 @@ jobs:
           
           # GitHub token for creating PR
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          # Source: GitHub Actions (skip Jarvis identifiers)
+          AUTO_FIXER_SOURCE: github_actions
         run: |
           echo "Running auto-fixer..."
           python scripts/auto_fixer_logic.py

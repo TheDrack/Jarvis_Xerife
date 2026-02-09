@@ -39,6 +39,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }} 
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
+          AUTO_FIXER_SOURCE: github_actions
         run: python scripts/auto_fixer_logic.py
 
       - name: Report Failure to Jarvis

@@ -127,17 +127,30 @@ class GitHubAdapter:
                 - file_path (str): Path to the file to fix
                 - fix_code (str): The corrected code content
                 - test_command (str, optional): Command to run tests
+                - source (str, optional): Source of request ("jarvis_user" or "github_actions")
+                - mission_id (str, optional): Jarvis mission identifier (only when source="jarvis_user")
+                - session_id (str, optional): Jarvis session identifier (only when source="jarvis_user")
         
         Returns:
             Dictionary with 'success' boolean and optional 'error' message
         
         Example:
+            >>> # From GitHub Actions (no identifiers needed)
             >>> adapter = GitHubAdapter()
             >>> result = await adapter.dispatch_auto_fix({
             ...     "issue_title": "Fix model_decommissioned error",
             ...     "file_path": "app/adapters/infrastructure/gemini_adapter.py",
             ...     "fix_code": "# Fixed code content here",
-            ...     "test_command": "pytest tests/test_gemini.py"
+            ...     "source": "github_actions"
+            ... })
+            >>> # From Jarvis user request (with identifiers)
+            >>> result = await adapter.dispatch_auto_fix({
+            ...     "issue_title": "Fix model_decommissioned error",
+            ...     "file_path": "app/adapters/infrastructure/gemini_adapter.py",
+            ...     "fix_code": "# Fixed code content here",
+            ...     "source": "jarvis_user",
+            ...     "mission_id": "mission_123",
+            ...     "session_id": "session_456"
             ... })
         """
         if not self.token:
@@ -158,6 +171,9 @@ class GitHubAdapter:
             fix_code = issue_data["fix_code"]
             encoded_fix = base64.b64encode(fix_code.encode("utf-8")).decode("ascii")
             
+            # Get source and identifiers (if present)
+            source = issue_data.get("source", "github_actions")
+            
             # Prepare payload
             payload = {
                 "event_type": "auto_fix",
@@ -166,8 +182,20 @@ class GitHubAdapter:
                     "file_path": issue_data["file_path"],
                     "fix_code": encoded_fix,
                     "test_command": issue_data.get("test_command", ""),
+                    "source": source,
                 }
             }
+            
+            # Only include Jarvis identifiers when request comes from user via Jarvis
+            if source == "jarvis_user":
+                payload["client_payload"]["mission_id"] = issue_data.get("mission_id")
+                payload["client_payload"]["session_id"] = issue_data.get("session_id")
+                logger.info(
+                    f"Dispatching auto-fix from Jarvis user with mission_id={issue_data.get('mission_id')}"
+                )
+            else:
+                logger.info("Dispatching auto-fix from GitHub Actions (no identifiers)")
+
             
             # Dispatch URL
             url = (
@@ -252,6 +280,9 @@ class GitHubAdapter:
         description: str,
         error_log: Optional[str] = None,
         system_info: Optional[Dict[str, Any]] = None,
+        source: str = "github_actions",
+        mission_id: Optional[str] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create a new GitHub issue.
@@ -261,17 +292,28 @@ class GitHubAdapter:
             description: Description/body of the issue
             error_log: Optional error log to include
             system_info: Optional system information to include
+            source: Source of request ("jarvis_user" or "github_actions")
+            mission_id: Optional Jarvis mission identifier (only when source="jarvis_user")
+            session_id: Optional Jarvis session identifier (only when source="jarvis_user")
         
         Returns:
             Dictionary with 'success' boolean, 'issue_number' if successful, and optional 'error' message
         
         Example:
+            >>> # From GitHub Actions
             >>> adapter = GitHubAdapter()
+            >>> result = await adapter.create_issue(
+            ...     title="CI Failure: Python Tests failed",
+            ...     description="Test suite failed on main branch",
+            ...     source="github_actions"
+            ... )
+            >>> # From Jarvis user
             >>> result = await adapter.create_issue(
             ...     title="Botão X está quebrado",
             ...     description="O botão X não responde quando clicado",
-            ...     error_log="ValueError: Invalid button state",
-            ...     system_info={"version": "1.0.0", "platform": "Linux"}
+            ...     source="jarvis_user",
+            ...     mission_id="mission_123",
+            ...     session_id="session_456"
             ... )
         """
         if not self.token:
@@ -291,6 +333,17 @@ class GitHubAdapter:
                 body_parts.append("\n## Informações do Sistema")
                 for key, value in system_info.items():
                     body_parts.append(f"- **{key}**: {value}")
+            
+            # Add source and identifier information
+            body_parts.append("\n## Origem da Solicitação")
+            if source == "jarvis_user" and (mission_id or session_id):
+                body_parts.append(f"- **Fonte**: Solicitação do usuário via Jarvis")
+                if mission_id:
+                    body_parts.append(f"- **Mission ID**: {mission_id}")
+                if session_id:
+                    body_parts.append(f"- **Session ID**: {session_id}")
+            else:
+                body_parts.append(f"- **Fonte**: GitHub Actions (automático)")
             
             # Add auto-generated footer
             body_parts.append("\n---\n*Issue criada automaticamente pelo Jarvis*")
