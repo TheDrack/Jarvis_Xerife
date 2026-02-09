@@ -10,8 +10,9 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scripts'))
-from auto_fixer_logic import AutoFixer
+# Add repository root to path to import from scripts/
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from scripts.auto_fixer_logic import AutoFixer
 
 
 def test_integration_scenario_1():

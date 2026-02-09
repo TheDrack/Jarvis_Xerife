@@ -11,9 +11,11 @@ Tests the new features added:
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scripts'))
 
-from auto_fixer_logic import AutoFixer
+# Add repository root to path to import from scripts/
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from scripts.auto_fixer_logic import AutoFixer
 
 
 def test_common_filename_detection():

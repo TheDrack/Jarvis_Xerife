@@ -20,8 +20,8 @@ import sys
 import traceback
 from pathlib import Path
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add project root to path (repository root, not tests directory)
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.adapters.infrastructure.github_adapter import GitHubAdapter
 
