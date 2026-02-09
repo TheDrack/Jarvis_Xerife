@@ -28,7 +28,7 @@ Repair Cycle:
 """
 
 from enum import Enum
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 import logging
 import re
 
@@ -180,7 +180,7 @@ class SelfHealingStateMachine:
         
         return self.state
     
-    def get_status(self) -> Dict[str, any]:
+    def get_status(self) -> Dict[str, Any]:
         """
         Get current status of the state machine.
         

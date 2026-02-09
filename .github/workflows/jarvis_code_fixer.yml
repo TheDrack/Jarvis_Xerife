@@ -71,7 +71,7 @@ jobs:
         if: always()
         run: |
           echo "Estado Final: ${{ steps.healing_engine.outputs.final_state }}"
-          # Se o estado for NEEDS_HUMAN ou FAILED_LIMIT, o job deve falhar para avisar o dono
+          # If the state is NEEDS_HUMAN or FAILED_LIMIT, the job should fail to notify the owner
           if [[ "${{ steps.healing_engine.outputs.final_state }}" == "NEEDS_HUMAN" ]] || [[ "${{ steps.healing_engine.outputs.final_state }}" == "FAILED_LIMIT" ]]; then
             echo "⚠️ Human intervention required"
             exit 1
@@ -85,13 +85,13 @@ jobs:
           FINAL_STATE="${{ steps.healing_engine.outputs.final_state }}"
           
           if [[ "$FINAL_STATE" == "FAILED_LIMIT" ]]; then
-            TITLE="🔴 Auto-Repair Failed: Limite de Tentativas Atingido"
+            TITLE="🔴 Auto-Repair Failed: Maximum Attempts Reached"
             REASON="O sistema atingiu o limite máximo de 3 tentativas de auto-reparo."
           elif [[ "$FINAL_STATE" == "NEEDS_HUMAN" ]]; then
-            TITLE="⚠️ Auto-Repair Needs Human: Intervenção Necessária"
+            TITLE="⚠️ Auto-Repair Needs Human Intervention"
             REASON="Erro de infraestrutura ou erro não identificado detectado."
           else
-            TITLE="🔴 Falha no Auto-Fixer"
+            TITLE="🔴 Auto-Fixer Workflow Failed"
             REASON="Falha inesperada no workflow de auto-reparo."
           fi
           
