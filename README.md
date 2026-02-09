@@ -108,6 +108,17 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture documentation.
 - **System Automation**: Interface control using PyAutoGUI and Keyboard
 - **Web Navigation**: Browser automation and URL handling
 
+### 🔧 Jarvis Self-Healing Workshop (Novo!)
+- **🤖 Resolução Automática de Issues**: Sistema completo de auto-correção usando LLMs
+  - Detecta automaticamente quando Issues são criadas ou workflows CI/CD falham
+  - Usa IA (Groq/Gemini) para analisar erros e gerar correções
+  - Cria Pull Requests automaticamente com as correções propostas
+  - Suporta correção de bugs, atualização de documentação e implementação de features
+- **🔄 Auto-Heal CI Failures**: Monitora workflows do GitHub Actions e auto-corrige falhas
+- **📊 Detecção Inteligente**: Extrai caminhos de arquivos de tracebacks Python e identifica arquivos comuns
+- **🎯 Prevenção de Duplicatas**: Verifica issues existentes antes de criar novas
+- **📚 Documentação Completa**: Veja [JARVIS_SELF_HEALING_GUIDE.md](JARVIS_SELF_HEALING_GUIDE.md) para setup e uso
+
 ### 🏗️ Arquitetura & Deployment
 - **REST API**: FastAPI-based headless control interface with authentication and device management (see [API_README.md](API_README.md))
 - **Distributed Mode**: Cloud brain orchestrates local "soldiers" (devices) via capabilities (see [DISTRIBUTED_MODE.md](DISTRIBUTED_MODE.md))
