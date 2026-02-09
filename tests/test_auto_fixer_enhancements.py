@@ -211,50 +211,36 @@ def test_keyword_based_file_suggestion():
 
 
 def test_api_key_validation():
-    """Test API key validation and error messages"""
+    """Test GitHub Copilot CLI integration"""
     print("\n" + "="*60)
-    print("TEST 4: API Key Validation")
+    print("TEST 4: GitHub Copilot CLI Integration")
     print("="*60)
     
-    # Save original environment
-    original_groq = os.environ.get("GROQ_API_KEY")
-    original_google = os.environ.get("GOOGLE_API_KEY")
-    original_gemini = os.environ.get("GEMINI_API_KEY")
+    print("\n1. Test initialization with GitHub Copilot CLI:")
+    print("   (No API keys needed - uses gh copilot)")
+    fixer = AutoFixer()
     
-    try:
-        # Remove all API keys
-        for key in ["GROQ_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"]:
-            if key in os.environ:
-                del os.environ[key]
-        
-        print("\n1. Test initialization without API keys:")
-        print("   (Should show clear error message)")
-        fixer = AutoFixer()
-        
-        assert fixer.groq_api_key is None, "GROQ_API_KEY should be None"
-        assert fixer.gemini_api_key is None, "GEMINI_API_KEY should be None"
-        print("   ✓ Correctly detected missing API keys")
-        
-        # Test that the error is clear when trying to use the API
-        print("\n2. Test API call without keys:")
-        result = fixer.call_groq_api("test error", "test code")
-        assert result is None, "Should return None without API key"
-        print("   ✓ Correctly returned None for Groq API")
-        
-        result = fixer.call_gemini_api("test error", "test code")
-        assert result is None, "Should return None without API key"
-        print("   ✓ Correctly returned None for Gemini API")
-        
-    finally:
-        # Restore original environment
-        if original_groq:
-            os.environ["GROQ_API_KEY"] = original_groq
-        if original_google:
-            os.environ["GOOGLE_API_KEY"] = original_google
-        if original_gemini:
-            os.environ["GEMINI_API_KEY"] = original_gemini
+    # Verify that the fixer has the necessary methods for GitHub Copilot
+    assert hasattr(fixer, '_check_gh_copilot_extension'), "Should have _check_gh_copilot_extension method"
+    assert hasattr(fixer, 'call_gh_copilot_explain'), "Should have call_gh_copilot_explain method"
+    assert hasattr(fixer, 'call_gh_copilot_suggest'), "Should have call_gh_copilot_suggest method"
+    print("   ✓ AutoFixer has GitHub Copilot CLI methods")
     
-    print("\n✅ All API key validation tests passed!")
+    # Test that log truncation works
+    print("\n2. Test log truncation:")
+    long_log = "x" * 10000
+    truncated = fixer._truncate_log(long_log, max_size=5000)
+    # Truncation adds a header, so the result might be slightly longer than max_size
+    assert len(truncated) <= 5100, f"Log should be truncated to ~5000 chars, got {len(truncated)}"
+    assert "[Log truncated" in truncated or len(long_log) <= 5000, "Should have truncation notice or be short"
+    print(f"   ✓ Log correctly truncated from {len(long_log)} to {len(truncated)} chars")
+    
+    # Test healing attempt limit check
+    print("\n3. Test infinite loop prevention:")
+    assert hasattr(fixer, '_check_healing_attempt_limit'), "Should have healing attempt limit check"
+    print("   ✓ Infinite loop prevention mechanism exists")
+    
+    print("\n✅ All GitHub Copilot CLI integration tests passed!")
 
 
 def main():
@@ -275,14 +261,15 @@ def main():
         print("="*70)
         print("\nThe following enhancements have been validated:")
         print("1. ✓ File Flexibility - Common filename detection works")
-        print("2. ✓ API Validation - Clear error messages for missing keys")
+        print("2. ✓ GitHub Copilot CLI Integration - Native GitHub integration")
         print("3. ✓ Context Handling - Documentation request detection works")
         print("4. ✓ Keyword Suggestions - File suggestions based on keywords")
         print("\nThe auto-fixer can now:")
         print("- Handle documentation updates (not just bug fixes)")
         print("- Find files mentioned in issues (not just in tracebacks)")
         print("- Suggest files based on keywords (interface, api, frontend)")
-        print("- Provide clear feedback when API keys are missing")
+        print("- Use GitHub Copilot CLI for native GitHub integration")
+        print("- Prevent infinite loops with attempt tracking")
         
         return 0
         

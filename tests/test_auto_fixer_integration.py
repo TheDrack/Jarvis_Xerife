@@ -150,43 +150,35 @@ def test_integration_scenario_4():
 
 
 def test_integration_scenario_5():
-    """Scenario: Missing API keys"""
+    """Scenario: GitHub Copilot CLI integration"""
     print("\n" + "="*70)
-    print("SCENARIO 5: Missing API keys (error handling)")
+    print("SCENARIO 5: GitHub Copilot CLI integration")
     print("="*70)
     
-    # Save and remove API keys
-    saved_keys = {}
-    for key in ["GROQ_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"]:
-        saved_keys[key] = os.environ.get(key)
-        if key in os.environ:
-            del os.environ[key]
+    fixer = AutoFixer()
     
-    try:
-        fixer = AutoFixer()
-        
-        # Step 1: Check that keys are not set
-        print(f"1. GROQ key set? {fixer.groq_api_key is not None}")
-        print(f"2. Gemini key set? {fixer.gemini_api_key is not None}")
-        assert fixer.groq_api_key is None, "GROQ key should be None"
-        assert fixer.gemini_api_key is None, "Gemini key should be None"
-        
-        # Step 2: Try to call API (should fail gracefully)
-        result = fixer.call_groq_api("test", "test code")
-        print(f"3. Groq API result (without key)? {result}")
-        assert result is None, "Should return None without key"
-        
-        result = fixer.call_gemini_api("test", "test code")
-        print(f"4. Gemini API result (without key)? {result}")
-        assert result is None, "Should return None without key"
-        
-        print("✓ SCENARIO 5 PASSED: Missing API keys handled gracefully")
-        
-    finally:
-        # Restore API keys
-        for key, value in saved_keys.items():
-            if value is not None:
-                os.environ[key] = value
+    # Step 1: Check that GitHub Copilot CLI methods exist
+    print(f"1. Has gh copilot explain method? {hasattr(fixer, 'call_gh_copilot_explain')}")
+    print(f"2. Has gh copilot suggest method? {hasattr(fixer, 'call_gh_copilot_suggest')}")
+    assert hasattr(fixer, 'call_gh_copilot_explain'), "Should have call_gh_copilot_explain"
+    assert hasattr(fixer, 'call_gh_copilot_suggest'), "Should have call_gh_copilot_suggest"
+    
+    # Step 2: Check infinite loop prevention
+    print(f"3. Has healing attempt limit check? {hasattr(fixer, '_check_healing_attempt_limit')}")
+    assert hasattr(fixer, '_check_healing_attempt_limit'), "Should have healing attempt limit"
+    
+    # Step 3: Check log truncation
+    print(f"4. Has log truncation method? {hasattr(fixer, '_truncate_log')}")
+    assert hasattr(fixer, '_truncate_log'), "Should have log truncation"
+    
+    # Test log truncation
+    long_text = "x" * 10000
+    truncated = fixer._truncate_log(long_text, 5000)
+    print(f"5. Log truncation works? {len(truncated) <= 5100}")
+    # Truncation adds a header, so allow slightly more than 5000
+    assert len(truncated) <= 5100, f"Truncated log should be ~5000 chars, got {len(truncated)}"
+    
+    print("✓ SCENARIO 5 PASSED: GitHub Copilot CLI integration ready")
 
 
 def test_integration_scenario_6():
@@ -269,11 +261,12 @@ def main():
         print("2. ✓ Portuguese documentation requests")
         print("3. ✓ Traditional bug fixes with tracebacks")
         print("4. ✓ Requirements file updates")
-        print("5. ✓ Missing API key scenarios")
+        print("5. ✓ GitHub Copilot CLI integration with loop prevention")
         print("6. ✓ English documentation requests")
         print("7. ✓ Issue closing functionality")
         print("\nAll scenarios simulate the complete workflow from")
         print("issue detection to file identification and issue closing.")
+        print("The system now uses GitHub Copilot CLI for native integration.")
         
         return 0
         
