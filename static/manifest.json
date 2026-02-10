@@ -1,7 +1,7 @@
 {
-  "name": "JARVIS - Just A Rather Very Intelligent System",
-  "short_name": "JARVIS",
-  "description": "AI Assistant Command Interface",
+  "name": "J.A.R.V.I.S. Strategic HUD - Just A Rather Very Intelligent System",
+  "short_name": "J.A.R.V.I.S. Strategic HUD",
+  "description": "AI Assistant Strategic Command Interface",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0e27",

@@ -35,6 +35,12 @@ class CapabilityManager:
     
     This class implements the "How" layer - the intelligence that allows
     JARVIS to understand its own capabilities and guide its evolution.
+    
+    IMPORTANT PROTOCOL CHANGE:
+    - It is STRICTLY PROHIBITED to create GitHub Issues for test errors or capability gaps
+    - Instead, use report_capability_gap_via_pr() which creates a Pull Request
+    - Flow: Detect Gap -> Create Branch -> Open PR with autonomous_instruction.json
+    - The PR triggers the Jarvis Autonomous State Machine for automatic implementation
     """
     
     def __init__(self, engine: Engine):
@@ -446,3 +452,92 @@ class CapabilityManager:
         if len(self._capability_detectors) > 0:
             return "partial"
         return "nonexistent"
+    
+    async def report_capability_gap_via_pr(
+        self,
+        capability_id: int,
+        github_adapter = None
+    ) -> Dict[str, Any]:
+        """
+        Report a capability gap by creating a Pull Request instead of an Issue.
+        
+        This is the new protocol - when a test failure or capability gap is detected,
+        we create a PR with autonomous_instruction.json that triggers the Jarvis
+        Autonomous State Machine workflow.
+        
+        Flow:
+        1. Detect Gap -> Generate Blueprint
+        2. Create Branch (auto-fix/capability-{id}-{timestamp})
+        3. Create autonomous_instruction.json with capability details
+        4. Open Pull Request with Copilot Workspace fallback link
+        
+        Args:
+            capability_id: ID of the capability with a gap
+            github_adapter: Optional GitHubAdapter instance. If not provided, will create one.
+        
+        Returns:
+            Dictionary with 'success' boolean and PR details or error message
+        
+        Example:
+            >>> manager = CapabilityManager(engine)
+            >>> result = await manager.report_capability_gap_via_pr(capability_id=42)
+        """
+        # Get capability details
+        with Session(self.engine) as session:
+            capability = session.get(JarvisCapability, capability_id)
+            if not capability:
+                return {"success": False, "error": f"Capability {capability_id} not found"}
+            
+            # Generate blueprint for the capability
+            blueprint = self._generate_blueprint(capability)
+        
+        # Lazy import to avoid circular dependency
+        if github_adapter is None:
+            from app.adapters.infrastructure.github_adapter import GitHubAdapter
+            github_adapter = GitHubAdapter()
+        
+        # Prepare structured description for autonomous_instruction.json
+        description = f"""# Capability Gap Detected
+
+**Capability ID**: {capability.id}
+**Capability Name**: {capability.capability_name}
+**Chapter**: {capability.chapter}
+**Current Status**: {capability.status}
+
+## Blueprint for Implementation
+
+{blueprint.get('blueprint', 'No blueprint available')}
+
+## Technical Requirements
+
+### Libraries Needed
+{chr(10).join(f"- {lib}" for lib in blueprint.get('libraries', [])) or '- None'}
+
+### APIs Required
+{chr(10).join(f"- {api}" for api in blueprint.get('apis', [])) or '- None'}
+
+### Environment Variables
+{chr(10).join(f"- {env}" for env in blueprint.get('env_vars', [])) or '- None'}
+
+### Permissions
+{chr(10).join(f"- {perm}" for perm in blueprint.get('permissions', [])) or '- None'}
+
+## Requirements Summary
+{chr(10).join(f"- {req}" for req in blueprint.get('requirements', [])) or '- None'}
+
+---
+**Note**: This is an automated capability gap report. The system has detected that this capability is not yet implemented and requires attention.
+"""
+        
+        # Use report_for_auto_correction to create the PR
+        title = f"Implement Capability: {capability.capability_name}"
+        
+        logger.info(f"Creating PR for capability gap: {capability.capability_name}")
+        
+        result = await github_adapter.report_for_auto_correction(
+            title=title,
+            description=description,
+            improvement_context=f"Capability {capability.id} needs implementation to advance JARVIS evolution."
+        )
+        
+        return result
