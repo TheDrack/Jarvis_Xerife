@@ -1507,6 +1507,9 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             
             # Use async_process_command for proper async handling
             response = await assistant_service.async_process_command(request.command, request_metadata=metadata_dict)
+            
+            # Log the response for debugging (helps identify if responses are generated but not shown in HUD)
+            logger.info(f"Generated response for user '{current_user.username}': success={response.success}, message_length={len(response.message) if response.message else 0}")
 
             return ExecuteResponse(
                 success=response.success,
@@ -1548,6 +1551,9 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             
             # Process the message using the assistant service
             response = await assistant_service.async_process_command(request.text)
+            
+            # Log the response for debugging (helps identify if responses are generated but not shown in HUD)
+            logger.info(f"Generated response for user '{current_user.username}': success={response.success}, message_length={len(response.message) if response.message else 0}")
 
             return MessageResponse(
                 success=response.success,
@@ -1558,7 +1564,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             logger.error(f"Error processing message: {e}", exc_info=True)
             return MessageResponse(
                 success=False,
-                response="",
+                response="Erro ao processar mensagem. Tente novamente.",
                 error=f"Internal server error: {str(e)}"
             )
 
@@ -2625,15 +2631,30 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         """
         Trigger a repository_dispatch event for Jarvis Self-Healing (Protected endpoint)
         
+        **IMPORTANTE: Use este endpoint para correções/criações de código automáticas.**
+        
+        Este endpoint envia prompts para GitHub Agents (via repository_dispatch),
+        que executam correções/criações de código automaticamente.
+        
+        NÃO confundir com criação de Issues (que é para rastreamento manual).
+        
         This endpoint allows Jarvis to trigger GitHub Actions workflows for code creation
         or fixes. The workflow will use GitHub Copilot to apply changes and run tests.
         
         Args:
-            request: Jarvis dispatch request with intent and instruction
+            request: Jarvis dispatch request with intent ('create' or 'fix') and instruction
             current_user: Current authenticated user
             
         Returns:
             Dispatch result with workflow URL
+            
+        Example:
+            POST /v1/jarvis/dispatch
+            {
+                "intent": "fix",
+                "instruction": "Fix the TypeError in user_service.py line 42",
+                "context": "The error occurs when calling get_user with invalid ID"
+            }
         """
         try:
             logger.info(

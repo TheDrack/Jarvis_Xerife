@@ -88,7 +88,7 @@ class AgentService:
             },
             {
                 "name": "report_issue",
-                "description": "Reporta um problema ou cria uma issue no GitHub. Use quando o usuário pedir para reportar, criar issue ou relatar um bug.",
+                "description": "Cria uma Issue no GitHub para rastreamento manual de problemas. IMPORTANTE: Use APENAS para reportar bugs/problemas que precisam de atenção humana. Para correções de código automáticas, o sistema deve usar o endpoint /v1/jarvis/dispatch que envia para GitHub Agents, NÃO este comando.",
                 "parameters": {
                     "type": "object",
                     "properties": {

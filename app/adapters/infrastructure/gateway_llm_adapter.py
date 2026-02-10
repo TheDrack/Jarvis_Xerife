@@ -6,6 +6,7 @@ between multiple LLM providers through the AI Gateway.
 """
 
 import asyncio
+import functools
 import json
 import logging
 import os
@@ -18,6 +19,7 @@ from app.adapters.infrastructure.gemini_adapter import LLMCommandAdapter
 from app.adapters.infrastructure.github_adapter import GitHubAdapter
 from app.application.ports import VoiceProvider
 from app.domain.models import CommandType, Intent
+from app.domain.services.agent_service import AgentService
 
 logger = logging.getLogger(__name__)
 
@@ -33,11 +35,16 @@ class GatewayLLMCommandAdapter:
     - Maintains backward compatibility with LLMCommandAdapter interface
     """
     
-    # Default system instruction for conversational responses
-    DEFAULT_SYSTEM_INSTRUCTION = (
-        "Você é um assistente virtual amigável e prestativo. "
-        "Responda de forma conversacional em português brasileiro."
-    )
+    # System instruction for conversational responses - uses Xerife personality from AgentService
+    # Using functools.lru_cache for thread-safe initialization
+    # Note: The cache is intentionally global (staticmethod) because the system instruction
+    # is configuration-based and does not change during runtime. This provides better
+    # performance by sharing the same instruction across all instances.
+    @staticmethod
+    @functools.lru_cache(maxsize=1)
+    def get_system_instruction() -> str:
+        """Get the system instruction (thread-safe, cached globally)."""
+        return AgentService.get_system_instruction()
     
     # Default model for auto-fix recommendations
     # Update this when new models are released
@@ -197,10 +204,10 @@ class GatewayLLMCommandAdapter:
             # Prepare messages for AI Gateway
             messages = []
             
-            # Add system instruction
+            # Add system instruction - use Xerife personality from AgentService
             messages.append({
                 "role": "system",
-                "content": self.DEFAULT_SYSTEM_INSTRUCTION
+                "content": self.get_system_instruction()
             })
             
             # Add context if available
