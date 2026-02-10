@@ -18,6 +18,28 @@ A professional, modular voice assistant built with Python, featuring **Hexagonal
 
 > **✨ Latest Update**: Successfully refactored to Hexagonal Architecture with 39 passing tests, 97-100% domain coverage, and full cloud-ready deployment support. See [REFACTORING_SUMMARY.md](REFACTORING_SUMMARY.md) for complete details.
 
+## 🌐 Web Interface
+
+Jarvis now features a **Stark Industries-themed web interface** for remote control and voice commands!
+
+### Features
+- 🔐 **Secure Authentication**: Login with OAuth2 JWT tokens
+- 🎤 **Voice Input**: Speech-to-text using Web Speech API (Portuguese BR)
+- 💻 **Command Terminal**: Execute commands directly from your browser
+- ⚡ **Real-time Feedback**: Instant response display
+- 🔒 **Auto-Logout**: Automatic session management (30min inactivity)
+
+### Screenshots
+
+#### Login Screen
+![J.A.R.V.I.S. Login](https://github.com/user-attachments/assets/59f612f3-b6c7-4cce-8a0d-020cec716dac)
+
+#### Main Command Interface with Voice Control
+![J.A.R.V.I.S. Interface](https://github.com/user-attachments/assets/312ea9ad-8b84-4cbc-84fd-06d69e06c35c)
+
+### Quick Access
+Simply navigate to `http://localhost:8000` (or your server URL) when running the API server. Default credentials: `admin` / `admin123`
+
 ## 🚀 Quick Start
 
 ### Instalação Instantânea (Recomendada) ⚡

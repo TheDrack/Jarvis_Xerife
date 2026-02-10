@@ -6,6 +6,42 @@ This document describes how to use the FastAPI-based headless control interface 
 
 The API server provides a RESTful interface to control the assistant in headless mode (without a monitor). It's designed to run on servers, containers, or any environment where GUI interaction is not available.
 
+## 🌐 Web Interface
+
+In addition to the REST API, Jarvis provides a **Stark Industries-themed web interface** accessible at the root endpoint (`/`).
+
+### Features
+- 🔐 **Secure Login**: OAuth2 JWT authentication
+- 🎤 **Voice Commands**: Built-in speech-to-text (Portuguese BR)
+- 💻 **Terminal Interface**: Execute commands with real-time feedback
+- ⚡ **Activity Monitoring**: Auto-logout after 30 minutes of inactivity
+- 🎨 **Stark Industries Theme**: Glowing cyan UI with dark gradients
+
+### Screenshots
+
+#### Login Screen
+![J.A.R.V.I.S. Login](https://github.com/user-attachments/assets/59f612f3-b6c7-4cce-8a0d-020cec716dac)
+
+#### Main Interface with Voice Input
+![J.A.R.V.I.S. Interface](https://github.com/user-attachments/assets/312ea9ad-8b84-4cbc-84fd-06d69e06c35c)
+
+### Accessing the Interface
+
+1. Start the API server: `python serve.py`
+2. Navigate to `http://localhost:8000` in your browser
+3. Login with default credentials: `admin` / `admin123`
+4. Use text commands or click the microphone button 🎤 for voice input
+
+### Voice Recognition
+
+The voice input feature uses the browser's Web Speech API and supports:
+- Portuguese Brazilian (`pt-BR`) language
+- Real-time speech-to-text conversion
+- Visual feedback during recording
+- Automatic text insertion into command input
+
+**Note**: Voice recognition requires HTTPS in production or localhost for development. Some browsers may not support this feature.
+
 ## Quick Start
 
 ### Installation
