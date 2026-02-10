@@ -2,7 +2,21 @@
 
 ## Overview
 
-The **Local Bridge** is a WebSocket-based connection that allows JARVIS (running in the cloud/Render) to delegate GUI tasks to your local PC. This enables JARVIS to perform actions that require direct hardware access, like PyAutoGUI operations.
+The **Local Bridge** is a WebSocket-based connection that allows JARVIS (running in the cloud/Render) to delegate GUI tasks to your local PC or mobile device. This enables JARVIS to perform actions that require direct hardware access, like PyAutoGUI operations, or mobile-specific features like camera access and sensors.
+
+## 🆕 New Features
+
+- **Mobile Edge Node Support** - Support for mobile devices with sensor-focused tasks
+- **Security Layer** - API key verification for command authentication (Meta 59-60)
+- **Telemetry System** - Battery and GPS tracking for mobile devices (Meta 37-38)
+- **Evolution Tracking** - Real-time display of JARVIS self-improvement progress
+- **Battery-Saving Mode** - Automatic power-saving suggestions when battery < 15% (Meta 91)
+
+## Quick Links
+
+- **Desktop Setup**: See [LOCAL_SETUP.md](LOCAL_SETUP.md) for detailed setup instructions
+- **Mobile Features**: See [MOBILE_BRIDGE.md](MOBILE_BRIDGE.md) for mobile-specific features
+- **Local Agent Script**: Use `jarvis_local_agent.py` to connect your PC to JARVIS
 
 ## Architecture
 
