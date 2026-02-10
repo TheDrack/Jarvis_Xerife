@@ -41,6 +41,28 @@ class TestAPIServer:
         )
         return response.json()["access_token"]
 
+    def test_root_get(self, client):
+        """Test root GET endpoint returns HTML interface"""
+        test_client, service = client
+        
+        response = test_client.get("/")
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        # Verify it contains key elements of the Stark Industries interface
+        assert "J.A.R.V.I.S." in response.text
+        assert "/v1/message" in response.text
+        assert "<!DOCTYPE html>" in response.text
+    
+    def test_root_head(self, client):
+        """Test root HEAD endpoint for monitoring"""
+        test_client, service = client
+        
+        response = test_client.head("/")
+
+        assert response.status_code == 200
+        # HEAD requests should work for health checks
+    
     def test_health_check(self, client):
         """Test health check endpoint"""
         test_client, service = client

@@ -163,6 +163,331 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
     # Initialize device service for distributed orchestration
     device_service = DeviceService(engine=db_adapter.engine)
 
+    @app.get("/", response_class=HTMLResponse)
+    async def root():
+        """
+        Root endpoint - Stark Industries command interface
+        Serves the main HTML UI for interacting with Jarvis
+        """
+        html_content = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S. Command Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #00d4ff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+        
+        .header {
+            background: rgba(0, 20, 40, 0.8);
+            border-bottom: 2px solid #00d4ff;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #00d4ff, 0 0 20px #00d4ff;
+            letter-spacing: 5px;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes glow {
+            from { text-shadow: 0 0 10px #00d4ff, 0 0 20px #00d4ff; }
+            to { text-shadow: 0 0 20px #00d4ff, 0 0 30px #00d4ff, 0 0 40px #00d4ff; }
+        }
+        
+        .status {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 5px 15px;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+        
+        .container {
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .terminal {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            overflow-y: auto;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+            min-height: 400px;
+        }
+        
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 3px solid #00d4ff;
+            background: rgba(0, 212, 255, 0.05);
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .message.user {
+            border-left-color: #00ff88;
+            background: rgba(0, 255, 136, 0.05);
+        }
+        
+        .message.system {
+            border-left-color: #ff9500;
+            background: rgba(255, 149, 0, 0.05);
+        }
+        
+        .message-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-size: 0.8em;
+            letter-spacing: 2px;
+        }
+        
+        .input-area {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #commandInput {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00d4ff;
+            border-radius: 5px;
+            padding: 15px;
+            color: #00d4ff;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            outline: none;
+            transition: all 0.3s;
+        }
+        
+        #commandInput:focus {
+            border-color: #00ff88;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+        }
+        
+        #sendButton {
+            background: linear-gradient(135deg, #00d4ff 0%, #0088cc 100%);
+            border: none;
+            border-radius: 5px;
+            padding: 15px 30px;
+            color: #0a0e27;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.3s;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
+        
+        #sendButton:hover {
+            background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.5);
+            transform: translateY(-2px);
+        }
+        
+        #sendButton:active {
+            transform: translateY(0);
+        }
+        
+        #sendButton:disabled {
+            background: #333;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 10px;
+            color: #00d4ff;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 212, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #00d4ff;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>J.A.R.V.I.S.</h1>
+        <div class="status">● SYSTEM ONLINE</div>
+    </div>
+    
+    <div class="container">
+        <div class="terminal" id="terminal">
+            <div class="message system">
+                <div class="message-label">System</div>
+                <div>J.A.R.V.I.S. Command Interface initialized. Ready for input.</div>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <span style="margin-left: 10px;">Processing...</span>
+        </div>
+        
+        <div class="input-area">
+            <input 
+                type="text" 
+                id="commandInput" 
+                placeholder="Enter command..."
+                autocomplete="off"
+            />
+            <button id="sendButton">Execute</button>
+        </div>
+    </div>
+    
+    <script>
+        const terminal = document.getElementById('terminal');
+        const commandInput = document.getElementById('commandInput');
+        const sendButton = document.getElementById('sendButton');
+        const loading = document.getElementById('loading');
+        
+        function addMessage(text, type = 'system') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const label = document.createElement('div');
+            label.className = 'message-label';
+            label.textContent = type === 'user' ? 'User' : type === 'system' ? 'System' : 'J.A.R.V.I.S.';
+            
+            const content = document.createElement('div');
+            content.textContent = text;
+            
+            messageDiv.appendChild(label);
+            messageDiv.appendChild(content);
+            terminal.appendChild(messageDiv);
+            
+            // Auto-scroll to bottom
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        async function sendCommand() {
+            const command = commandInput.value.trim();
+            if (!command) return;
+            
+            // Add user message
+            addMessage(command, 'user');
+            
+            // Clear input
+            commandInput.value = '';
+            
+            // Disable button and show loading
+            sendButton.disabled = true;
+            loading.classList.add('active');
+            
+            try {
+                const response = await fetch('/v1/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: command,
+                        source: 'web_ui'
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Add response
+                if (data.response) {
+                    addMessage(data.response, 'system');
+                } else if (data.message) {
+                    addMessage(data.message, 'system');
+                } else {
+                    addMessage('Command executed successfully', 'system');
+                }
+            } catch (error) {
+                addMessage(`Error: ${error.message}`, 'system');
+                console.error('Error:', error);
+            } finally {
+                // Re-enable button and hide loading
+                sendButton.disabled = false;
+                loading.classList.remove('active');
+                commandInput.focus();
+            }
+        }
+        
+        // Send on button click
+        sendButton.addEventListener('click', sendCommand);
+        
+        // Send on Enter key
+        commandInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendCommand();
+            }
+        });
+        
+        // Focus input on load
+        commandInput.focus();
+    </script>
+</body>
+</html>
+        """
+        return HTMLResponse(content=html_content)
+    
+    @app.head("/")
+    async def root_head():
+        """
+        HEAD endpoint for health checks
+        Used by monitoring services and browsers to verify server status
+        """
+        return JSONResponse(content={"status": "online"})
+
     @app.post("/token", response_model=Token)
     async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
         """
