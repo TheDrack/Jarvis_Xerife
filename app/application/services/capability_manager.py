@@ -501,11 +501,11 @@ class CapabilityManager:
             github_adapter = GitHubAdapter()
         
         # Prepare structured description for autonomous_instruction.json
-        libs = chr(10).join(f"- {lib}" for lib in blueprint.get('libraries', [])) or '- None'
-        apis = chr(10).join(f"- {api}" for api in blueprint.get('apis', [])) or '- None'
-        envs = chr(10).join(f"- {env}" for env in blueprint.get('env_vars', [])) or '- None'
-        perms = chr(10).join(f"- {perm}" for perm in blueprint.get('permissions', [])) or '- None'
-        reqs = chr(10).join(f"- {req}" for req in blueprint.get('requirements', [])) or '- None'
+        libs = '\n'.join(f"- {lib}" for lib in blueprint.get('libraries', [])) or '- None'
+        apis = '\n'.join(f"- {api}" for api in blueprint.get('apis', [])) or '- None'
+        envs = '\n'.join(f"- {env}" for env in blueprint.get('env_vars', [])) or '- None'
+        perms = '\n'.join(f"- {perm}" for perm in blueprint.get('permissions', [])) or '- None'
+        reqs = '\n'.join(f"- {req}" for req in blueprint.get('requirements', [])) or '- None'
 
         description = f"""# Capability Gap Detected
 

@@ -91,7 +91,8 @@ self.addEventListener('fetch', (event) => {
             }
             
             // If not in cache and offline, return a basic offline response for HTML requests
-            if (event.request.headers.get('accept').includes('text/html')) {
+            const acceptHeader = event.request.headers.get('accept');
+            if (acceptHeader && acceptHeader.includes('text/html')) {
               return new Response(
                 '<h1>Offline</h1><p>J.A.R.V.I.S. Strategic HUD is offline. Please check your connection.</p>',
                 { headers: { 'Content-Type': 'text/html' } }
