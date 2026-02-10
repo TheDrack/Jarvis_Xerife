@@ -1156,18 +1156,26 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         // Mobile Edge Node Telemetry System
         // ============================================
         
+        // Configuration constants
+        const BATTERY_LOW_THRESHOLD = 15; // Percentage - triggers power-saving mode
+        const TELEMETRY_INTERVAL_MS = 30000; // 30 seconds
+        const GPS_CACHE_MAX_AGE_MS = 300000; // 5 minutes
+        
         let batteryLevel = 100;
         let batteryCharging = false;
         let currentLocation = null;
         let deviceType = detectDeviceType();
         let telemetryInterval = null;
         
-        // Detect device type
+        // Detect device type using user agent
+        // Maps various mobile/tablet user agents to device categories
         function detectDeviceType() {
             const ua = navigator.userAgent.toLowerCase();
+            // Tablet detection: iPads, Android tablets, Surface tablets, etc.
             if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
                 return 'Tablet';
             }
+            // Mobile detection: smartphones, feature phones
             if (/mobile|iphone|ipod|android|blackberry|opera mini|opera mobi|skyfire|maemo|windows phone|palm|iemobile|symbian|symbianos|fennec/i.test(ua)) {
                 return 'Mobile';
             }
@@ -1193,8 +1201,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                         
                         batteryValue.textContent = `${batteryLevel}% ${batteryCharging ? '⚡' : ''}`;
                         
-                        // Low battery warning
-                        if (batteryLevel < 15 && !batteryCharging) {
+                        // Low battery warning (uses BATTERY_LOW_THRESHOLD constant)
+                        if (batteryLevel < BATTERY_LOW_THRESHOLD && !batteryCharging) {
                             batteryTelemetry.classList.add('battery-low');
                             checkBatteryEmergency();
                         } else {
@@ -1238,9 +1246,9 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                         document.getElementById('locationValue').textContent = 'Denied';
                     },
                     {
-                        enableHighAccuracy: false,
+                        enableHighAccuracy: false, // Disabled for battery saving on mobile devices
                         timeout: 10000,
-                        maximumAge: 300000 // 5 minutes cache
+                        maximumAge: GPS_CACHE_MAX_AGE_MS
                     }
                 );
                 
@@ -1283,7 +1291,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         
         // Battery Emergency - Suggest power saving
         async function checkBatteryEmergency() {
-            if (batteryLevel < 15 && !batteryCharging) {
+            if (batteryLevel < BATTERY_LOW_THRESHOLD && !batteryCharging) {
                 const message = `⚠️ ALERTA: Bateria baixa (${batteryLevel}%). Sugerindo modo de economia de energia.`;
                 addMessage(message, 'system');
                 
@@ -1352,11 +1360,11 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             initBatteryMonitoring();
             initGeolocation();
             
-            // Send telemetry every 30 seconds
+            // Send telemetry at configured interval (TELEMETRY_INTERVAL_MS)
             telemetryInterval = setInterval(() => {
                 sendTelemetry();
                 updateEvolutionStatus();
-            }, 30000);
+            }, TELEMETRY_INTERVAL_MS);
             
             // Initial evolution status
             updateEvolutionStatus();
@@ -2984,6 +2992,10 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
     
     # Mobile Edge Node Telemetry Endpoints
     
+    # Configuration constants
+    BATTERY_LOW_THRESHOLD = 15  # Percentage - triggers power-saving suggestions
+    PLUGINS_DYNAMIC_DIR = "app/plugins/dynamic"  # Directory for dynamically created plugins
+    
     @app.post("/v1/telemetry")
     async def receive_telemetry(
         telemetry_data: Dict[str, Any],
@@ -3014,7 +3026,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             battery_level = telemetry_data["battery"].get("level", 100)
             battery_charging = telemetry_data["battery"].get("charging", False)
             
-            if battery_level < 15 and not battery_charging:
+            if battery_level < BATTERY_LOW_THRESHOLD and not battery_charging:
                 response["suggestions"] = [
                     "Bateria crítica detectada. Sugerindo desativar funções pesadas da HUD.",
                     "Reduzir frequência de telemetria para economizar bateria.",
@@ -3050,8 +3062,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             # Get next evolution step
             next_step = capability_manager.get_next_evolution_step()
             
-            # Count dynamic plugins
-            plugins_dir = Path("app/plugins/dynamic")
+            # Count dynamic plugins using the configured path
+            plugins_dir = Path(PLUGINS_DYNAMIC_DIR)
             plugin_count = 0
             if plugins_dir.exists():
                 plugin_count = len([f for f in plugins_dir.glob("*.py") if f.is_file()])

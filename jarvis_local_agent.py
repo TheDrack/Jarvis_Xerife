@@ -85,7 +85,12 @@ class JarvisLocalAgent:
         Args:
             jarvis_url: WebSocket URL for JARVIS (e.g., ws://localhost:8000/v1/local-bridge)
             device_id: Unique identifier for this device
-            api_key: API key for command verification
+            api_key: API key for command verification (must not be empty)
+            
+        Note:
+            The main() function validates that api_key is not empty before
+            creating the agent instance. An empty api_key will cause the
+            program to exit with an error message.
         """
         self.jarvis_url = f"{jarvis_url}?device_id={device_id}"
         self.device_id = device_id
