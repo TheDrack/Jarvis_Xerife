@@ -187,6 +187,12 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
+    <!-- Security Meta Tags -->
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="robots" content="noindex, nofollow">
+    
     <!-- PWA Manifest -->
     <link rel="manifest" href="/static/manifest.json">
     
@@ -194,13 +200,13 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="JARVIS">
+    <meta name="apple-mobile-web-app-title" content="J.A.R.V.I.S. Strategic HUD">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     
     <!-- Theme Color -->
     <meta name="theme-color" content="#00d4ff">
     
-    <title>J.A.R.V.I.S. Command Interface</title>
+    <title>J.A.R.V.I.S. Strategic HUD</title>
     <style>
         * {
             margin: 0;
@@ -770,11 +776,11 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             <form id="loginForm">
                 <div class="form-group">
                     <label for="username">USERNAME</label>
-                    <input type="text" id="username" name="username" required autocomplete="username">
+                    <input type="text" id="username" name="username" required autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="password">PASSWORD</label>
-                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                    <input type="password" id="password" name="password" required autocomplete="off">
                     <button type="button" class="password-toggle" id="passwordToggle" title="Show/Hide Password">👁️</button>
                 </div>
                 <button type="submit" class="login-btn">AUTHENTICATE</button>
