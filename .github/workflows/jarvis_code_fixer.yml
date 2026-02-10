@@ -217,35 +217,51 @@ jobs:
           
           # Create detailed review request based on state
           if [[ "$FINAL_STATE" == "FAILED_LIMIT" ]]; then
-            TITLE="🔧 Auto-Repair Needs Review: Maximum Attempts Reached"
-            STATUS="⚠️ Revisão Necessária"
+            TITLE="🔧 INTERVENÇÃO HUMANA: Limite de Tentativas Atingido"
+            STATUS="🚨 INTERVENÇÃO HUMANA NECESSÁRIA"
             REASON="O sistema atingiu o limite máximo de 3 tentativas de auto-reparo."
           elif [[ "$FINAL_STATE" == "NEEDS_HUMAN" ]]; then
-            TITLE="🔍 Auto-Repair Needs Review: Human Intervention Required"
-            STATUS="⚠️ Revisão Necessária"
+            TITLE="🔍 INTERVENÇÃO HUMANA: Erro Requer Análise Manual"
+            STATUS="🚨 INTERVENÇÃO HUMANA NECESSÁRIA"
             REASON="Erro de infraestrutura ou erro não identificado detectado."
           else
-            TITLE="🔍 Auto-Repair Needs Review: Workflow Issue"
-            STATUS="⚠️ Revisão Necessária"
+            TITLE="🔍 INTERVENÇÃO HUMANA: Falha no Workflow"
+            STATUS="🚨 INTERVENÇÃO HUMANA NECESSÁRIA"
             REASON="Falha inesperada no workflow de auto-reparo."
           fi
           
           # Build detailed review body
-          REVIEW_BODY="## $STATUS - Auto-Repair Review Request
+          REVIEW_BODY="# 🚨 INTERVENÇÃO HUMANA NECESSÁRIA
+          
+          ## $STATUS - Auto-Repair Review Request
 
           **Estado Final:** \`$FINAL_STATE\`
           **Motivo:** $REASON
 
-          ### 📊 Informações do Erro
-
-          **Detalhes do Erro:**
+          ### 📊 Erro Identificado
+          
+          **Tipo de Erro:** Ver detalhes abaixo
+          
+          **Detalhes Completos:**
           \`\`\`
           ${ERROR_DETAILS:-"Nenhum detalhe de erro disponível"}
           \`\`\`
-
-          ### 🔧 Tentativas de Correção
-
+          
+          ### 🧪 Testes Falhados
+          
+          Ver pytest report nos artefatos do workflow ou nos logs acima.
+          
+          ### 🔧 Correções Tentadas Automaticamente
+          
           ${ATTEMPTED_FIXES:-"Nenhuma tentativa de correção foi registrada"}
+          
+          ### 💡 Possível Correção Sugerida
+          
+          Baseado nas tentativas automáticas acima, considere:
+          1. Revisar os logs de erro para identificar o padrão de falha
+          2. Analisar as correções já tentadas para entender o que não funcionou
+          3. Aplicar correção manual no arquivo afetado
+          4. Executar testes localmente antes de commit
 
           ### 📋 Análise da Situação
 
