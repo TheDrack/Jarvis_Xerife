@@ -246,6 +246,196 @@ class GitHubAdapter:
         except Exception as e:
             return {"success": False, "error": str(e)}
     
+    async def report_for_auto_correction(
+        self,
+        title: str,
+        description: str,
+        error_log: Optional[str] = None,
+        improvement_context: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Report an error or improvement request for autonomous correction.
+        
+        Instead of creating an issue, this method:
+        1. Creates a new branch with prefix 'auto-fix/'
+        2. Creates autonomous_instruction.json at repo root with the error/improvement description
+        3. Commits and pushes the changes
+        4. Opens a Pull Request to main branch
+        5. The PR triggers the Jarvis Autonomous State Machine workflow
+        
+        Args:
+            title: Title of the correction/improvement request
+            description: Description of the error or improvement needed
+            error_log: Optional error log to include
+            improvement_context: Optional context about the improvement
+        
+        Returns:
+            Dictionary with 'success' boolean, 'pr_number' and 'pr_url' if successful, and optional 'error' message
+        
+        Example:
+            >>> adapter = GitHubAdapter()
+            >>> result = await adapter.report_for_auto_correction(
+            ...     title="Fix HUD text duplication",
+            ...     description="Duplicate text appears in the HUD display",
+            ...     error_log="DuplicateTextError: Text rendered twice"
+            ... )
+        """
+        if not self.token:
+            error_msg = "GITHUB_TOKEN not configured. Cannot create auto-fix PR."
+            logger.error(error_msg)
+            return {"success": False, "error": error_msg}
+        
+        try:
+            import json
+            from datetime import datetime
+            
+            # Generate unique branch name with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+            branch_name = f"auto-fix/{timestamp}"
+            
+            # Prepare autonomous_instruction.json content
+            instruction_data = {
+                "title": title,
+                "description": description,
+                "error_log": error_log,
+                "improvement_context": improvement_context,
+                "created_at": datetime.now().isoformat(),
+                "triggered_by": "jarvis_self_correction",
+            }
+            
+            instruction_content = json.dumps(instruction_data, indent=2, ensure_ascii=False)
+            
+            # Get the default branch SHA to create new branch from
+            default_branch = "main"
+            ref_url = (
+                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
+                f"/git/ref/heads/{default_branch}"
+            )
+            
+            client = await self._ensure_client()
+            ref_response = await client.get(ref_url)
+            
+            if ref_response.status_code != 200:
+                error_msg = f"Failed to get {default_branch} branch reference: {ref_response.text}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+            
+            base_sha = ref_response.json()["object"]["sha"]
+            
+            # Create new branch
+            create_ref_url = (
+                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
+                f"/git/refs"
+            )
+            
+            create_ref_payload = {
+                "ref": f"refs/heads/{branch_name}",
+                "sha": base_sha,
+            }
+            
+            create_ref_response = await client.post(create_ref_url, json=create_ref_payload)
+            
+            if create_ref_response.status_code != 201:
+                error_msg = f"Failed to create branch: {create_ref_response.text}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+            
+            logger.info(f"Created branch: {branch_name}")
+            
+            # Create/update autonomous_instruction.json file
+            file_path = "autonomous_instruction.json"
+            file_url = (
+                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
+                f"/contents/{file_path}"
+            )
+            
+            # Encode content as base64
+            import base64
+            encoded_content = base64.b64encode(instruction_content.encode("utf-8")).decode("ascii")
+            
+            file_payload = {
+                "message": f"Add autonomous instruction: {title}",
+                "content": encoded_content,
+                "branch": branch_name,
+            }
+            
+            file_response = await client.put(file_url, json=file_payload)
+            
+            if file_response.status_code not in [201, 200]:
+                error_msg = f"Failed to create file: {file_response.text}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+            
+            logger.info(f"Created {file_path} in branch {branch_name}")
+            
+            # Create Pull Request with keyword to trigger Jarvis Autonomous State Machine
+            pr_body = f"""## 🤖 Jarvis Autonomous State Machine - Auto-Correction Request
+
+### Descrição
+{description}
+"""
+            
+            if error_log:
+                pr_body += f"""
+### Erro
+```
+{error_log}
+```
+"""
+            
+            if improvement_context:
+                pr_body += f"""
+### Contexto da Melhoria
+{improvement_context}
+"""
+            
+            pr_body += f"""
+### Instrução Autônoma
+O arquivo `autonomous_instruction.json` foi criado na raiz do repositório com os detalhes completos da correção/melhoria solicitada.
+
+---
+*Pull Request criada automaticamente pelo protocolo de auto-correção do Jarvis*
+*Esta PR dispara o workflow Jarvis Autonomous State Machine para correção autônoma*
+"""
+            
+            pr_url = (
+                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
+                f"/pulls"
+            )
+            
+            pr_payload = {
+                "title": f"🤖 Auto-fix: {title}",
+                "body": pr_body,
+                "head": branch_name,
+                "base": default_branch,
+            }
+            
+            pr_response = await client.post(pr_url, json=pr_payload)
+            
+            if pr_response.status_code == 201:
+                pr_data = pr_response.json()
+                pr_number = pr_data.get("number")
+                pr_html_url = pr_data.get("html_url")
+                logger.info(f"✅ Pull Request #{pr_number} created successfully: {pr_html_url}")
+                return {
+                    "success": True,
+                    "pr_number": pr_number,
+                    "pr_url": pr_html_url,
+                    "branch": branch_name,
+                    "message": "Auto-correction PR created - Jarvis Autonomous State Machine will process it",
+                }
+            else:
+                error_msg = f"Failed to create PR: {pr_response.status_code} - {pr_response.text}"
+                logger.error(error_msg)
+                return {"success": False, "error": error_msg}
+        
+        except Exception as e:
+            error_msg = f"Error in report_for_auto_correction: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return {"success": False, "error": error_msg}
+        finally:
+            await self.close()
+
     async def create_issue(
         self,
         title: str,
@@ -255,6 +445,10 @@ class GitHubAdapter:
     ) -> Dict[str, Any]:
         """
         Create a new GitHub issue.
+        
+        NOTE: For self-correction scenarios, prefer using report_for_auto_correction()
+        which creates a PR and triggers the Jarvis Autonomous State Machine workflow
+        instead of creating an issue.
         
         Args:
             title: Title of the issue

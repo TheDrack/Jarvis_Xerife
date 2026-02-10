@@ -359,3 +359,226 @@ class TestGitHubAdapter:
             assert "## Erro" not in payload["body"]
             assert "## Informações do Sistema" not in payload["body"]
             assert "Simple description" in payload["body"]
+
+    @pytest.mark.anyio
+    async def test_report_for_auto_correction_success(self, adapter):
+        """Test successful auto-correction PR creation"""
+        # Mock responses for the API calls
+        # 1. Get main branch reference
+        mock_ref_response = MagicMock()
+        mock_ref_response.status_code = 200
+        mock_ref_response.json.return_value = {
+            "object": {"sha": "abc123"}
+        }
+        
+        # 2. Create branch
+        mock_create_ref_response = MagicMock()
+        mock_create_ref_response.status_code = 201
+        
+        # 3. Create file
+        mock_file_response = MagicMock()
+        mock_file_response.status_code = 201
+        
+        # 4. Create PR
+        mock_pr_response = MagicMock()
+        mock_pr_response.status_code = 201
+        mock_pr_response.json.return_value = {
+            "number": 123,
+            "html_url": "https://github.com/test-owner/test-repo/pull/123"
+        }
+        
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_ref_response)
+        mock_client.post = AsyncMock(side_effect=[
+            mock_create_ref_response,
+            mock_pr_response
+        ])
+        mock_client.put = AsyncMock(return_value=mock_file_response)
+        mock_client.is_closed = False
+        
+        with patch.object(adapter, '_ensure_client', return_value=mock_client):
+            result = await adapter.report_for_auto_correction(
+                title="Fix HUD text duplication",
+                description="Duplicate text appears in the HUD display",
+                error_log="DuplicateTextError: Text rendered twice",
+                improvement_context="Ensure text is only rendered once per frame"
+            )
+            
+            assert result["success"] is True
+            assert result["pr_number"] == 123
+            assert "github.com" in result["pr_url"]
+            assert "branch" in result
+            assert result["branch"].startswith("auto-fix/")
+            
+            # Verify get request for main branch reference
+            mock_client.get.assert_called_once()
+            get_call_args = mock_client.get.call_args[0][0]
+            assert "/git/ref/heads/main" in get_call_args
+            
+            # Verify branch creation (first post call)
+            first_post_call = mock_client.post.call_args_list[0]
+            branch_payload = first_post_call[1]["json"]
+            assert branch_payload["ref"].startswith("refs/heads/auto-fix/")
+            assert branch_payload["sha"] == "abc123"
+            
+            # Verify file creation
+            mock_client.put.assert_called_once()
+            put_call_args = mock_client.put.call_args
+            assert "autonomous_instruction.json" in put_call_args[0][0]
+            file_payload = put_call_args[1]["json"]
+            assert "message" in file_payload
+            assert "content" in file_payload  # base64 encoded
+            assert "branch" in file_payload
+            
+            # Decode and verify file content
+            import base64
+            import json
+            decoded_content = base64.b64decode(file_payload["content"]).decode("utf-8")
+            instruction_data = json.loads(decoded_content)
+            assert instruction_data["title"] == "Fix HUD text duplication"
+            assert instruction_data["description"] == "Duplicate text appears in the HUD display"
+            assert instruction_data["error_log"] == "DuplicateTextError: Text rendered twice"
+            assert instruction_data["improvement_context"] == "Ensure text is only rendered once per frame"
+            assert "created_at" in instruction_data
+            assert instruction_data["triggered_by"] == "jarvis_self_correction"
+            
+            # Verify PR creation (second post call)
+            second_post_call = mock_client.post.call_args_list[1]
+            pr_payload = second_post_call[1]["json"]
+            assert pr_payload["title"] == "🤖 Auto-fix: Fix HUD text duplication"
+            assert "Jarvis Autonomous State Machine" in pr_payload["body"]
+            assert "autonomous_instruction.json" in pr_payload["body"]
+            assert pr_payload["base"] == "main"
+            assert pr_payload["head"].startswith("auto-fix/")
+
+    @pytest.mark.anyio
+    async def test_report_for_auto_correction_without_token(self):
+        """Test auto-correction report without token"""
+        with patch.dict(os.environ, {}, clear=True):
+            adapter = GitHubAdapter()
+            
+            result = await adapter.report_for_auto_correction(
+                title="Fix something",
+                description="Something needs fixing"
+            )
+            
+            assert result["success"] is False
+            assert "GITHUB_TOKEN not configured" in result["error"]
+
+    @pytest.mark.anyio
+    async def test_report_for_auto_correction_branch_creation_fails(self, adapter):
+        """Test auto-correction when branch creation fails"""
+        # Mock successful ref get but failed branch creation
+        mock_ref_response = MagicMock()
+        mock_ref_response.status_code = 200
+        mock_ref_response.json.return_value = {
+            "object": {"sha": "abc123"}
+        }
+        
+        mock_create_ref_response = MagicMock()
+        mock_create_ref_response.status_code = 422
+        mock_create_ref_response.text = "Branch already exists"
+        
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_ref_response)
+        mock_client.post = AsyncMock(return_value=mock_create_ref_response)
+        mock_client.is_closed = False
+        
+        with patch.object(adapter, '_ensure_client', return_value=mock_client):
+            result = await adapter.report_for_auto_correction(
+                title="Fix something",
+                description="Something needs fixing"
+            )
+            
+            assert result["success"] is False
+            assert "Failed to create branch" in result["error"]
+
+    @pytest.mark.anyio
+    async def test_report_for_auto_correction_pr_creation_fails(self, adapter):
+        """Test auto-correction when PR creation fails"""
+        # Mock successful operations up to PR creation
+        mock_ref_response = MagicMock()
+        mock_ref_response.status_code = 200
+        mock_ref_response.json.return_value = {
+            "object": {"sha": "abc123"}
+        }
+        
+        mock_create_ref_response = MagicMock()
+        mock_create_ref_response.status_code = 201
+        
+        mock_file_response = MagicMock()
+        mock_file_response.status_code = 201
+        
+        mock_pr_response = MagicMock()
+        mock_pr_response.status_code = 422
+        mock_pr_response.text = "Validation failed"
+        
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_ref_response)
+        mock_client.post = AsyncMock(side_effect=[
+            mock_create_ref_response,
+            mock_pr_response
+        ])
+        mock_client.put = AsyncMock(return_value=mock_file_response)
+        mock_client.is_closed = False
+        
+        with patch.object(adapter, '_ensure_client', return_value=mock_client):
+            result = await adapter.report_for_auto_correction(
+                title="Fix something",
+                description="Something needs fixing"
+            )
+            
+            assert result["success"] is False
+            assert "Failed to create PR" in result["error"]
+
+    @pytest.mark.anyio
+    async def test_report_for_auto_correction_minimal_params(self, adapter):
+        """Test auto-correction with only required parameters"""
+        # Mock successful responses
+        mock_ref_response = MagicMock()
+        mock_ref_response.status_code = 200
+        mock_ref_response.json.return_value = {
+            "object": {"sha": "def456"}
+        }
+        
+        mock_create_ref_response = MagicMock()
+        mock_create_ref_response.status_code = 201
+        
+        mock_file_response = MagicMock()
+        mock_file_response.status_code = 201
+        
+        mock_pr_response = MagicMock()
+        mock_pr_response.status_code = 201
+        mock_pr_response.json.return_value = {
+            "number": 456,
+            "html_url": "https://github.com/test-owner/test-repo/pull/456"
+        }
+        
+        mock_client = AsyncMock()
+        mock_client.get = AsyncMock(return_value=mock_ref_response)
+        mock_client.post = AsyncMock(side_effect=[
+            mock_create_ref_response,
+            mock_pr_response
+        ])
+        mock_client.put = AsyncMock(return_value=mock_file_response)
+        mock_client.is_closed = False
+        
+        with patch.object(adapter, '_ensure_client', return_value=mock_client):
+            result = await adapter.report_for_auto_correction(
+                title="Simple fix",
+                description="Simple description"
+            )
+            
+            assert result["success"] is True
+            assert result["pr_number"] == 456
+            
+            # Verify file content has None for optional fields
+            put_call_args = mock_client.put.call_args
+            file_payload = put_call_args[1]["json"]
+            
+            import base64
+            import json
+            decoded_content = base64.b64decode(file_payload["content"]).decode("utf-8")
+            instruction_data = json.loads(decoded_content)
+            assert instruction_data["error_log"] is None
+            assert instruction_data["improvement_context"] is None
