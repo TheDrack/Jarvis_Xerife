@@ -114,16 +114,31 @@ jobs:
           echo "DISPATCH_ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
           echo "DISPATCH_ISSUE_BODY=$ISSUE_BODY" >> $GITHUB_ENV
 
+      - name: Check for Auto-Fix PR
+        id: check_auto_fix
+        if: github.event_name == 'pull_request'
+        run: |
+          # Check if this is an auto-fix PR by looking for autonomous_instruction.json
+          if [ -f "autonomous_instruction.json" ]; then
+            echo "AUTO_FIX_PR=true" >> $GITHUB_ENV
+            echo "Auto-fix PR detected - autonomous_instruction.json found"
+            # Don't print full file contents to avoid exposing secrets in logs
+            echo "File size: $(wc -c < autonomous_instruction.json) bytes"
+          else
+            echo "AUTO_FIX_PR=false" >> $GITHUB_ENV
+            echo "Regular PR - no autonomous_instruction.json"
+          fi
+
       - name: Run Pytest (The Judge)
         id: tester
-        if: github.event_name != 'repository_dispatch'
+        if: github.event_name != 'repository_dispatch' && env.AUTO_FIX_PR != 'true'
         run: |
           pytest --json-report --json-report-file=report.json || echo "TESTS_FAILED=true" >> $GITHUB_ENV
         continue-on-error: true
 
       - name: Self-Healing Logic
         id: healing_engine
-        if: env.TESTS_FAILED == 'true' || github.event_name == 'repository_dispatch'
+        if: env.TESTS_FAILED == 'true' || github.event_name == 'repository_dispatch' || env.AUTO_FIX_PR == 'true'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -139,8 +154,34 @@ jobs:
           git config --global user.name "Jarvis-Auto-Fixer"
           git config --global user.email "jarvis@bot.com"
           
-          # Run auto-fixer (use standard mode for repository_dispatch, state machine mode for tests)
-          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+          # Run auto-fixer based on context
+          if [[ "${{ env.AUTO_FIX_PR }}" == "true" ]]; then
+            echo "Running in auto-fix PR mode with autonomous_instruction.json"
+            # Read the autonomous instruction file and set ISSUE_BODY env var
+            if [ -f "autonomous_instruction.json" ]; then
+              TITLE=$(cat autonomous_instruction.json | jq -r '.title // "Auto-fix"')
+              DESCRIPTION=$(cat autonomous_instruction.json | jq -r '.description // ""')
+              ERROR_LOG=$(cat autonomous_instruction.json | jq -r '.error_log // ""')
+              CONTEXT=$(cat autonomous_instruction.json | jq -r '.improvement_context // ""')
+              
+              # Compose ISSUE_BODY from autonomous instruction (don't echo full logs to avoid exposing secrets)
+              echo "Processing auto-fix request: $TITLE"
+              
+              # Build ISSUE_BODY for the auto-fixer script to consume
+              ISSUE_BODY="## $TITLE"$'\n\n'"$DESCRIPTION"
+              if [ -n "$ERROR_LOG" ]; then
+                ISSUE_BODY+=$'\n\n'"### Error Log"$'\n'"$ERROR_LOG"
+              fi
+              if [ -n "$CONTEXT" ]; then
+                ISSUE_BODY+=$'\n\n'"### Context"$'\n'"$CONTEXT"
+              fi
+              
+              export ISSUE_BODY
+              
+              # Run auto-fixer in standard mode (it will read ISSUE_BODY from env)
+              python scripts/auto_fixer_logic.py
+            fi
+          elif [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
             echo "Running in standard mode (no pytest report)"
             python scripts/auto_fixer_logic.py
           else
