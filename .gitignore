@@ -91,3 +91,4 @@ jarvis.db
 
 # Self-healing tracking (to prevent infinite loops)
 .github/healing_attempts.json
+jarvis_test.db

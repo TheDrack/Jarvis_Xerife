@@ -291,6 +291,10 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             letter-spacing: 1px;
         }
         
+        .form-group {
+            position: relative;
+        }
+        
         .form-group input {
             width: 100%;
             background: rgba(0, 0, 0, 0.6);
@@ -307,6 +311,23 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         .form-group input:focus {
             border-color: #00ff88;
             box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 38px;
+            background: transparent;
+            border: none;
+            color: #00d4ff;
+            cursor: pointer;
+            font-size: 1.2em;
+            padding: 0;
+            transition: all 0.3s;
+        }
+        
+        .password-toggle:hover {
+            color: #00ff88;
         }
         
         .login-btn {
@@ -482,6 +503,76 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             display: block;
         }
         
+        .reactor {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(0, 212, 255, 0.3);
+            border-radius: 50%;
+            position: relative;
+            animation: reactor-pulse 1.5s ease-in-out infinite;
+        }
+        
+        .reactor::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: #00d4ff;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #00d4ff, 0 0 40px #00d4ff;
+            animation: reactor-core 1.5s ease-in-out infinite;
+        }
+        
+        .reactor::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            border: 2px solid rgba(0, 212, 255, 0.2);
+            border-radius: 50%;
+            animation: reactor-ring 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes reactor-pulse {
+            0%, 100% {
+                border-color: rgba(0, 212, 255, 0.3);
+                box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+            }
+            50% {
+                border-color: rgba(0, 212, 255, 0.8);
+                box-shadow: 0 0 30px rgba(0, 212, 255, 0.6), 0 0 50px rgba(0, 212, 255, 0.4);
+            }
+        }
+        
+        @keyframes reactor-core {
+            0%, 100% {
+                opacity: 0.7;
+                box-shadow: 0 0 20px #00d4ff;
+            }
+            50% {
+                opacity: 1;
+                box-shadow: 0 0 40px #00d4ff, 0 0 60px #00d4ff, 0 0 80px #00d4ff;
+            }
+        }
+        
+        @keyframes reactor-ring {
+            0%, 100% {
+                opacity: 0.3;
+                transform: translate(-50%, -50%) scale(1);
+            }
+            50% {
+                opacity: 0.6;
+                transform: translate(-50%, -50%) scale(1.1);
+            }
+        }
+        
         .spinner {
             display: inline-block;
             width: 20px;
@@ -499,6 +590,80 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         .hidden {
             display: none !important;
         }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+                letter-spacing: 3px;
+            }
+            
+            .user-info {
+                position: static;
+                margin-top: 10px;
+                text-align: center;
+            }
+            
+            .modal-content {
+                padding: 30px 20px;
+                max-width: 90%;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+            
+            .terminal {
+                min-height: 300px;
+                padding: 15px;
+            }
+            
+            .input-area {
+                flex-direction: row;
+                flex-wrap: nowrap;
+                gap: 5px;
+            }
+            
+            #commandInput {
+                font-size: 0.9em;
+                padding: 12px;
+            }
+            
+            #voiceButton {
+                padding: 12px 15px;
+                font-size: 1em;
+                min-width: 50px;
+            }
+            
+            #sendButton {
+                padding: 12px 20px;
+                font-size: 0.9em;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.5em;
+                letter-spacing: 2px;
+            }
+            
+            .header {
+                padding: 15px 10px;
+            }
+            
+            .modal-content h2 {
+                font-size: 1.3em;
+            }
+            
+            .form-group input {
+                font-size: 0.95em;
+            }
+            
+            .message {
+                padding: 8px;
+                font-size: 0.9em;
+            }
+        }
     </style>
 </head>
 <body>
@@ -514,6 +679,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 <div class="form-group">
                     <label for="password">PASSWORD</label>
                     <input type="password" id="password" name="password" required autocomplete="current-password">
+                    <button type="button" class="password-toggle" id="passwordToggle" title="Show/Hide Password">👁️</button>
                 </div>
                 <button type="submit" class="login-btn">AUTHENTICATE</button>
                 <div id="loginError" class="error-message"></div>
@@ -541,8 +707,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             </div>
             
             <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <span style="margin-left: 10px;">Processing...</span>
+                <div class="reactor"></div>
+                <div style="margin-top: 10px;">Processing...</div>
             </div>
             
             <div class="input-area">
@@ -579,10 +745,28 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         const sendButton = document.getElementById('sendButton');
         const voiceButton = document.getElementById('voiceButton');
         const loading = document.getElementById('loading');
+        const passwordToggle = document.getElementById('passwordToggle');
+        const passwordInput = document.getElementById('password');
         
         // Voice recognition
         let recognition = null;
         let isRecording = false;
+        
+        // Voice synthesis
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                // Cancel any ongoing speech
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'pt-BR'; // Portuguese Brazilian
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+                
+                window.speechSynthesis.speak(utterance);
+            }
+        }
         
         // Initialize Web Speech API
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -728,6 +912,19 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             }
         });
         
+        // Password toggle handler
+        if (passwordToggle) {
+            passwordToggle.addEventListener('click', () => {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    passwordToggle.textContent = '🙈';
+                } else {
+                    passwordInput.type = 'password';
+                    passwordToggle.textContent = '👁️';
+                }
+            });
+        }
+        
         // Logout handler
         logoutBtn.addEventListener('click', logout);
         
@@ -794,15 +991,14 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             loading.classList.add('active');
             
             try {
-                const response = await fetch('/v1/execute', {
+                const response = await fetch('/v1/message', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
-                        command: command,
-                        source: 'web_ui'
+                        text: command
                     })
                 });
                 
@@ -817,11 +1013,13 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 
                 const data = await response.json();
                 
-                // Add response
-                if (data.result) {
-                    addMessage(data.result, 'system');
-                } else if (data.response) {
+                // Extract and display the response field
+                if (data.response) {
                     addMessage(data.response, 'system');
+                    // Speak the response aloud
+                    speak(data.response);
+                } else if (data.error) {
+                    addMessage(`Error: ${data.error}`, 'system');
                 } else {
                     addMessage('Command executed successfully', 'system');
                 }

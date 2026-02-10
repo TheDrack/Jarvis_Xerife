@@ -51,13 +51,19 @@ class TestAPIServer:
         assert "text/html" in response.headers["content-type"]
         # Verify it contains key elements of the Stark Industries interface
         assert "J.A.R.V.I.S." in response.text
-        assert "/v1/execute" in response.text  # Now uses execute endpoint
+        assert "/v1/message" in response.text  # Now uses message endpoint
         assert "<!DOCTYPE html>" in response.text
         # Verify new features
         assert "loginModal" in response.text
         assert "voiceButton" in response.text
         assert "SpeechRecognition" in response.text
         assert "logout" in response.text.lower()
+        # Verify password toggle
+        assert "passwordToggle" in response.text
+        # Verify voice synthesis
+        assert "speechSynthesis" in response.text
+        # Verify reactor loading animation
+        assert "reactor" in response.text
     
     def test_root_head(self, client):
         """Test root HEAD endpoint for monitoring"""
