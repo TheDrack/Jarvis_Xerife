@@ -92,3 +92,22 @@ jarvis.db
 # Self-healing tracking (to prevent infinite loops)
 .github/healing_attempts.json
 jarvis_test.db
+
+# Temporary files and backups
+*.backup
+*.bak
+*.tmp
+*_NEW.*
+*_OLD.*
+*_ORIGINAL.*
+.git/index.lock
+
+# PyTest reports
+report.json
+.pytest_report/
+
+# Autonomous instruction files (created by auto-fixer)
+autonomous_instruction.json
+
+# Issue/PR temporary files
+issue_url.txt

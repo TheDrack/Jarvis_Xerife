@@ -317,8 +317,8 @@ def main():
     print("  Demo Complete!")
     print("="*60)
     print("\n📚 For more information, see:")
-    print("  - API_README.md")
-    print("  - SELF_HEALING_ARCHITECTURE.md")
+    print("  - docs/api/API_README.md")
+    print("  - docs/architecture/SELF_HEALING_ARCHITECTURE.md")
     print("\n")
 
 
