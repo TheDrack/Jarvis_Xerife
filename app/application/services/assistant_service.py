@@ -603,10 +603,18 @@ class AssistantService:
         code_matches = sum(1 for pattern in code_patterns if pattern in error_lower)
         
         # Filter if Render noise is significantly higher than code patterns
-        # and meets minimum threshold
-        if render_matches >= self.MIN_RENDER_NOISE_THRESHOLD and render_matches > code_matches * 2:
-            logger.info(f"Filtered out Render system noise: {error_log[:100]}...")
-            return None
+        # and meets minimum threshold.
+        # Special case: if code_matches is 0, only filter if render noise is present
+        # to avoid filtering legitimate infrastructure issues
+        if render_matches >= self.MIN_RENDER_NOISE_THRESHOLD:
+            if code_matches == 0:
+                # Pure infrastructure noise with no code context - filter it
+                logger.info(f"Filtered out Render system noise: {error_log[:100]}...")
+                return None
+            elif render_matches > code_matches * 2:
+                # Render noise significantly outweighs code patterns - likely infrastructure issue
+                logger.info(f"Filtered out Render system noise: {error_log[:100]}...")
+                return None
         
         return error_log
     
@@ -616,8 +624,9 @@ class AssistantService:
         
         Returns:
             Tuple of (error_message, had_error_before_filtering)
-            - error_message: Filtered error message, or None if filtered out
-            - had_error_before_filtering: True if there was an error before filtering
+            - error_message: Filtered error message, or None if filtered out as Render noise
+            - had_error_before_filtering: True if an error was found in command history
+              (before noise filtering), False if no error was found in history
         """
         try:
             # Search through command history for the most recent error
