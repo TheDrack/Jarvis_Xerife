@@ -7,7 +7,7 @@ import platform
 import sys
 from collections import deque
 from datetime import datetime
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 from app.application.ports import ActionProvider, HistoryProvider, VoiceProvider, WebProvider
 from app.application.services.dependency_manager import DependencyManager
@@ -22,6 +22,9 @@ class AssistantService:
     Main application service that orchestrates the assistant's behavior.
     Uses dependency injection for all external dependencies (ports).
     """
+    
+    # Constants for noise filtering
+    MIN_RENDER_NOISE_THRESHOLD = 2  # Minimum Render noise patterns to trigger filtering
 
     def __init__(
         self,
@@ -543,15 +546,15 @@ class AssistantService:
         # For now, we return None for standard commands
         return None
     
-    # Constants for noise filtering
-    MIN_RENDER_NOISE_THRESHOLD = 2  # Minimum Render noise patterns to trigger filtering
-    
     def _filter_render_noise(self, error_log: Optional[str]) -> Optional[str]:
         """
         Filter out Render deployment system noise from error logs.
         
         Render often reports timeouts, memory issues, and other infrastructure
         logs that are not related to code logic issues. This method filters those out.
+        
+        Uses a ratio-based approach: filters if render_matches > code_matches * 2
+        and render_matches >= MIN_RENDER_NOISE_THRESHOLD.
         
         Args:
             error_log: Raw error log
@@ -580,7 +583,7 @@ class AssistantService:
         error_lower = error_log.lower()
         
         # Check if the error is primarily Render infrastructure noise
-        # If it contains multiple Render patterns and no code-specific patterns, filter it out
+        # Using a ratio-based approach to handle mixed scenarios
         render_matches = sum(1 for pattern in render_noise_patterns if pattern in error_lower)
         
         # Code-specific patterns that indicate actual logic issues
@@ -599,14 +602,15 @@ class AssistantService:
         
         code_matches = sum(1 for pattern in code_patterns if pattern in error_lower)
         
-        # If it's mostly Render noise with minimal code context, filter it out
-        if render_matches >= self.MIN_RENDER_NOISE_THRESHOLD and code_matches == 0:
+        # Filter if Render noise is significantly higher than code patterns
+        # and meets minimum threshold
+        if render_matches >= self.MIN_RENDER_NOISE_THRESHOLD and render_matches > code_matches * 2:
             logger.info(f"Filtered out Render system noise: {error_log[:100]}...")
             return None
         
         return error_log
     
-    def _get_recent_error_log(self) -> tuple[Optional[str], bool]:
+    def _get_recent_error_log(self) -> Tuple[Optional[str], bool]:
         """
         Get the most recent error log from command history.
         
@@ -689,8 +693,13 @@ class AssistantService:
         # Get system information
         system_info = self._get_system_info()
         
-        # Create improvement context from system info
-        improvement_context = f"Sistema: {system_info.get('platform', 'unknown')}"
+        # Create comprehensive improvement context from system info
+        context_parts = [
+            f"Platform: {system_info.get('platform', 'unknown')}",
+            f"Python: {system_info.get('python_version', 'unknown')}",
+            f"Architecture: {system_info.get('architecture', 'unknown')}"
+        ]
+        improvement_context = "\n".join(context_parts)
         
         # Create PR for autonomous correction instead of Issue
         try:
@@ -785,8 +794,13 @@ class AssistantService:
         # Get system information
         system_info = self._get_system_info()
         
-        # Create improvement context from system info
-        improvement_context = f"Sistema: {system_info.get('platform', 'unknown')}"
+        # Create comprehensive improvement context from system info
+        context_parts = [
+            f"Platform: {system_info.get('platform', 'unknown')}",
+            f"Python: {system_info.get('python_version', 'unknown')}",
+            f"Architecture: {system_info.get('architecture', 'unknown')}"
+        ]
+        improvement_context = "\n".join(context_parts)
         
         # Create PR for autonomous correction instead of Issue
         try:
