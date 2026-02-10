@@ -164,34 +164,60 @@ Refactor command processor for better modularity
 ```
 .
 ├── app/
-│   ├── core/          # Core engine and configuration
-│   ├── actions/       # Command actions and handlers
-│   └── utils/         # Utility functions
-├── tests/             # Test suite
-├── dags/              # Airflow DAGs
-├── data/              # Static data files
-├── main.py            # Application entry point
-└── requirements.txt   # Python dependencies
+│   ├── domain/             # Business logic (pure Python, cloud-ready)
+│   │   ├── models/         # Entities (Command, Intent, Response)
+│   │   └── services/       # Domain services
+│   ├── application/        # Use cases and interfaces (Ports)
+│   │   ├── ports/          # Abstract interfaces
+│   │   └── services/       # Application services
+│   ├── adapters/          # Infrastructure implementations
+│   │   ├── edge/          # Hardware adapters (PyAutoGUI, speech)
+│   │   └── infrastructure/ # Cloud/API adapters
+│   └── container.py       # Dependency injection
+├── docs/                  # 📚 All documentation
+│   ├── architecture/      # Architecture and design docs
+│   ├── api/              # API documentation
+│   ├── guides/           # Setup and usage guides
+│   ├── components/       # Component-specific docs
+│   ├── deployment/       # Deployment guides
+│   ├── development/      # Development guides
+│   ├── summaries/        # Historical implementation summaries
+│   └── examples/         # Code examples and demos
+├── tests/                # Test suite (97-100% domain coverage)
+│   ├── domain/           # Domain tests (no hardware!)
+│   ├── application/      # Application tests
+│   └── adapters/         # Adapter tests
+├── scripts/              # Utility scripts
+├── requirements/         # Modular dependencies
+│   ├── core.txt         # Core (cloud-ready)
+│   ├── edge.txt         # Edge (hardware)
+│   ├── dev.txt          # Development
+│   ├── prod-edge.txt    # Production edge
+│   └── prod-cloud.txt   # Production cloud
+├── main.py              # Application entry point
+└── README.md            # Main documentation
 ```
 
 ## Adding New Features
 
-See [EXTENSIBILITY.md](EXTENSIBILITY.md) for detailed guidance on extending the project.
+See [docs/development/EXTENSIBILITY.md](docs/development/EXTENSIBILITY.md) for detailed guidance on extending the project.
 
 ### Basic Steps
 
-1. Create a new module in `app/actions/`
-2. Add type hints to all functions
-3. Write comprehensive tests
-4. Update documentation
-5. Add to `CommandProcessor` if needed
+1. Identify the appropriate layer (Domain, Application, or Adapter)
+2. Create necessary interfaces (Ports) in `app/application/ports/`
+3. Implement concrete adapters in `app/adapters/`
+4. Add type hints to all functions
+5. Write comprehensive tests
+6. Update documentation
 
 ## Documentation
 
 - Use Google-style docstrings
 - Document all public functions and classes
 - Update README.md for user-facing changes
-- Update EXTENSIBILITY.md for developer-facing changes
+- Update relevant docs in `docs/` directory for technical changes
+- See [docs/README.md](docs/README.md) for full documentation index
 
 Example docstring:
 ```python
@@ -215,10 +241,19 @@ def my_function(param: str) -> Optional[str]:
 
 ### Adding a New Command
 
-1. Create handler in `app/actions/`
-2. Register in `CommandProcessor.commands_map`
-3. Add tests in `tests/`
-4. Update documentation
+1. Create command model in `app/domain/models/command.py`
+2. Add interpretation logic in `app/domain/services/command_interpreter.py`
+3. Create adapter for execution in appropriate `app/adapters/` subdirectory
+4. Add tests in `tests/`
+5. Update documentation
+
+### Adding a New Port and Adapter
+
+1. Create port interface in `app/application/ports/`
+2. Implement adapter in `app/adapters/edge/` or `app/adapters/infrastructure/`
+3. Register in dependency injection container
+4. Add tests for both port and adapter
+5. Update architecture documentation
 
 ### Adding Configuration
 
