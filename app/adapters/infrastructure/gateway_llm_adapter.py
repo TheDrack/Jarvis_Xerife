@@ -37,10 +37,13 @@ class GatewayLLMCommandAdapter:
     
     # System instruction for conversational responses - uses Xerife personality from AgentService
     # Using functools.lru_cache for thread-safe initialization
+    # Note: The cache is intentionally global (staticmethod) because the system instruction
+    # is configuration-based and does not change during runtime. This provides better
+    # performance by sharing the same instruction across all instances.
     @staticmethod
     @functools.lru_cache(maxsize=1)
     def get_system_instruction() -> str:
-        """Get the system instruction (thread-safe, cached)."""
+        """Get the system instruction (thread-safe, cached globally)."""
         return AgentService.get_system_instruction()
     
     # Default model for auto-fix recommendations

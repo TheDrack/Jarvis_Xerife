@@ -218,22 +218,20 @@ jobs:
           # Create detailed review request based on state
           if [[ "$FINAL_STATE" == "FAILED_LIMIT" ]]; then
             TITLE="🔧 INTERVENÇÃO HUMANA: Limite de Tentativas Atingido"
-            STATUS="🚨 INTERVENÇÃO HUMANA NECESSÁRIA"
+            STATUS="Limite de Tentativas Atingido"
             REASON="O sistema atingiu o limite máximo de 3 tentativas de auto-reparo."
           elif [[ "$FINAL_STATE" == "NEEDS_HUMAN" ]]; then
             TITLE="🔍 INTERVENÇÃO HUMANA: Erro Requer Análise Manual"
-            STATUS="🚨 INTERVENÇÃO HUMANA NECESSÁRIA"
+            STATUS="Erro Requer Análise Manual"
             REASON="Erro de infraestrutura ou erro não identificado detectado."
           else
             TITLE="🔍 INTERVENÇÃO HUMANA: Falha no Workflow"
-            STATUS="🚨 INTERVENÇÃO HUMANA NECESSÁRIA"
+            STATUS="Falha no Workflow"
             REASON="Falha inesperada no workflow de auto-reparo."
           fi
           
           # Build detailed review body
-          REVIEW_BODY="## 🚨 INTERVENÇÃO HUMANA NECESSÁRIA
-          
-          ### $STATUS - Auto-Repair Review Request
+          REVIEW_BODY="## 🚨 INTERVENÇÃO HUMANA NECESSÁRIA - $STATUS
 
           **Estado Final:** \`$FINAL_STATE\`
           **Motivo:** $REASON

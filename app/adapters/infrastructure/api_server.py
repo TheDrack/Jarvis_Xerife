@@ -1564,7 +1564,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             logger.error(f"Error processing message: {e}", exc_info=True)
             return MessageResponse(
                 success=False,
-                response="Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.",
+                response="Erro ao processar mensagem. Tente novamente.",
                 error=f"Internal server error: {str(e)}"
             )
 
