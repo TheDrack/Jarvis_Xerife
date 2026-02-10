@@ -18,16 +18,19 @@ logger = logging.getLogger(__name__)
 
 class LocalBridgeManager:
     """
-    Manages WebSocket connections from local PCs.
+    Manages WebSocket connections from local PCs and mobile devices.
     
     Allows JARVIS to delegate tasks requiring GUI interaction (PyAutoGUI)
-    to connected local machines.
+    or mobile-specific actions (camera, microphone, sensors) to connected devices.
     """
     
     def __init__(self):
         """Initialize the local bridge manager."""
         # Connected clients: {device_id: WebSocket}
         self.active_connections: Dict[str, WebSocket] = {}
+        
+        # Device types: {device_id: device_type} (desktop, mobile, tablet)
+        self.device_types: Dict[str, str] = {}
         
         # Task queue for each device
         self.task_queues: Dict[str, asyncio.Queue] = {}
@@ -37,30 +40,32 @@ class LocalBridgeManager:
         
         logger.info("LocalBridgeManager initialized")
     
-    async def connect(self, websocket: WebSocket, device_id: str):
+    async def connect(self, websocket: WebSocket, device_id: str, device_type: str = "desktop"):
         """
-        Accept a new WebSocket connection from a local PC.
+        Accept a new WebSocket connection from a local PC or mobile device.
         
         Args:
             websocket: The WebSocket connection
-            device_id: Unique identifier for the local PC
+            device_id: Unique identifier for the device
+            device_type: Type of device (desktop, mobile, tablet)
         """
         await websocket.accept()
         self.active_connections[device_id] = websocket
+        self.device_types[device_id] = device_type.lower()
         self.task_queues[device_id] = asyncio.Queue()
         
-        logger.info(f"Local PC connected: {device_id}")
+        logger.info(f"Device connected: {device_id} (type: {device_type})")
         
         # Send welcome message
         await websocket.send_json({
             "type": "connected",
-            "message": f"Connected to JARVIS. Device ID: {device_id}",
+            "message": f"Connected to JARVIS. Device ID: {device_id}, Type: {device_type}",
             "timestamp": datetime.now().isoformat()
         })
     
     def disconnect(self, device_id: str):
         """
-        Handle disconnection of a local PC.
+        Handle disconnection of a device.
         
         Args:
             device_id: ID of the disconnected device
@@ -68,18 +73,47 @@ class LocalBridgeManager:
         if device_id in self.active_connections:
             del self.active_connections[device_id]
         
+        if device_id in self.device_types:
+            del self.device_types[device_id]
+        
         if device_id in self.task_queues:
             del self.task_queues[device_id]
         
-        logger.info(f"Local PC disconnected: {device_id}")
+        logger.info(f"Device disconnected: {device_id}")
     
-    async def send_task(self, device_id: str, task: Dict) -> Dict:
+    def get_device_type(self, device_id: str) -> str:
+        """
+        Get the type of a connected device.
+        
+        Args:
+            device_id: Device ID
+            
+        Returns:
+            Device type (desktop, mobile, tablet) or 'unknown'
+        """
+        return self.device_types.get(device_id, "unknown")
+    
+    def is_mobile_device(self, device_id: str) -> bool:
+        """
+        Check if a device is a mobile device.
+        
+        Args:
+            device_id: Device ID
+            
+        Returns:
+            True if device is mobile or tablet
+        """
+        device_type = self.get_device_type(device_id)
+        return device_type in ("mobile", "tablet")
+    
+    async def send_task(self, device_id: str, task: Dict, api_key: Optional[str] = None) -> Dict:
         """
         Send a task to a connected local PC.
         
         Args:
             device_id: ID of the target device
             task: Task definition dictionary with 'action' and 'parameters'
+            api_key: Optional API key for command verification (security layer)
             
         Returns:
             Task result from the local PC
@@ -99,6 +133,7 @@ class LocalBridgeManager:
             "task_id": task_id,
             "action": task.get("action"),
             "parameters": task.get("parameters", {}),
+            "api_key": api_key,  # Include API key for security verification
             "timestamp": datetime.now().isoformat()
         }
         

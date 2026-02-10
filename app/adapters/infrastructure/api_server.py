@@ -4,12 +4,14 @@
 import logging
 from datetime import datetime
 import platform
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.staticfiles import StaticFiles
 
 from app.adapters.infrastructure import api_models
 from app.adapters.infrastructure.api_models import (
@@ -158,6 +160,14 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         redoc_url=None,  # Disable redoc
     )
     
+    # Mount static files for PWA support (manifest, service worker, icons)
+    static_path = Path(__file__).parent.parent.parent.parent / "static"
+    if static_path.exists():
+        app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+        logger.info(f"Static files mounted from: {static_path}")
+    else:
+        logger.warning(f"Static directory not found at: {static_path}")
+    
     # Initialize database adapter for distributed mode
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
     
@@ -176,6 +186,19 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/static/manifest.json">
+    
+    <!-- iOS PWA Support -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="JARVIS">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    
+    <!-- Theme Color -->
+    <meta name="theme-color" content="#00d4ff">
+    
     <title>J.A.R.V.I.S. Command Interface</title>
     <style>
         * {
@@ -592,6 +615,72 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             display: none !important;
         }
         
+        /* Mobile Edge Node Telemetry Panel */
+        .telemetry-panel {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00d4ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .telemetry-item {
+            padding: 10px;
+            background: rgba(0, 212, 255, 0.05);
+            border-left: 3px solid #00d4ff;
+            border-radius: 5px;
+        }
+        
+        .telemetry-label {
+            font-size: 0.8em;
+            color: #00d4ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        
+        .telemetry-value {
+            font-size: 1.2em;
+            color: #00ff88;
+            font-weight: bold;
+        }
+        
+        .battery-low {
+            border-left-color: #ff0000;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        
+        .battery-low .telemetry-value {
+            color: #ff0000;
+        }
+        
+        /* Evolution Panel */
+        .evolution-panel {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #ff9500;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .evolution-panel h3 {
+            color: #ff9500;
+            margin-bottom: 15px;
+            text-align: center;
+            text-shadow: 0 0 10px #ff9500;
+        }
+        
+        .evolution-status {
+            padding: 10px;
+            background: rgba(255, 149, 0, 0.05);
+            border-left: 3px solid #ff9500;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
         /* Mobile responsiveness */
         @media (max-width: 768px) {
             .header h1 {
@@ -639,6 +728,10 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             #sendButton {
                 padding: 12px 20px;
                 font-size: 0.9em;
+            }
+            
+            .telemetry-panel {
+                grid-template-columns: 1fr;
             }
         }
         
@@ -700,6 +793,37 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         </div>
         
         <div class="container">
+            <!-- Mobile Edge Node Telemetry Panel -->
+            <div class="telemetry-panel" id="telemetryPanel">
+                <div class="telemetry-item" id="batteryTelemetry">
+                    <div class="telemetry-label">Battery</div>
+                    <div class="telemetry-value" id="batteryValue">-- %</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-label">Location</div>
+                    <div class="telemetry-value" id="locationValue">Detecting...</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-label">Device Type</div>
+                    <div class="telemetry-value" id="deviceType">Desktop</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="telemetry-label">Connection</div>
+                    <div class="telemetry-value" id="connectionStatus">Online</div>
+                </div>
+            </div>
+            
+            <!-- Real-Time Evolution Panel -->
+            <div class="evolution-panel">
+                <h3>⚙️ Evolução em Tempo Real</h3>
+                <div class="evolution-status" id="evolutionStatus">
+                    <div>Aguardando próxima evolução...</div>
+                    <div style="margin-top: 10px; font-size: 0.9em; color: #00d4ff;">
+                        Plugins dinâmicos: <span id="pluginCount">0</span>
+                    </div>
+                </div>
+            </div>
+            
             <div class="terminal" id="terminal">
                 <div class="message system">
                     <div class="message-label">System</div>
@@ -1049,6 +1173,246 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         
         // Initialize app
         checkAuth();
+        
+        // ============================================
+        // Mobile Edge Node Telemetry System
+        // ============================================
+        
+        // Configuration constants
+        const BATTERY_LOW_THRESHOLD = 15; // Percentage - triggers power-saving mode
+        const TELEMETRY_INTERVAL_MS = 30000; // 30 seconds
+        const GPS_CACHE_MAX_AGE_MS = 300000; // 5 minutes
+        
+        let batteryLevel = 100;
+        let batteryCharging = false;
+        let currentLocation = null;
+        let deviceType = detectDeviceType();
+        let telemetryInterval = null;
+        
+        // Detect device type using user agent
+        // Maps various mobile/tablet user agents to device categories
+        function detectDeviceType() {
+            const ua = navigator.userAgent.toLowerCase();
+            // Tablet detection: iPads, Android tablets, Surface tablets, etc.
+            if (/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i.test(ua)) {
+                return 'Tablet';
+            }
+            // Mobile detection: smartphones, feature phones
+            if (/mobile|iphone|ipod|android|blackberry|opera mini|opera mobi|skyfire|maemo|windows phone|palm|iemobile|symbian|symbianos|fennec/i.test(ua)) {
+                return 'Mobile';
+            }
+            return 'Desktop';
+        }
+        
+        // Update device type display
+        document.getElementById('deviceType').textContent = deviceType;
+        
+        // Initialize Battery API
+        async function initBatteryMonitoring() {
+            if ('getBattery' in navigator) {
+                try {
+                    const battery = await navigator.getBattery();
+                    
+                    // Update battery level
+                    function updateBatteryStatus() {
+                        batteryLevel = Math.round(battery.level * 100);
+                        batteryCharging = battery.charging;
+                        
+                        const batteryValue = document.getElementById('batteryValue');
+                        const batteryTelemetry = document.getElementById('batteryTelemetry');
+                        
+                        batteryValue.textContent = `${batteryLevel}% ${batteryCharging ? '⚡' : ''}`;
+                        
+                        // Low battery warning (uses BATTERY_LOW_THRESHOLD constant)
+                        if (batteryLevel < BATTERY_LOW_THRESHOLD && !batteryCharging) {
+                            batteryTelemetry.classList.add('battery-low');
+                            checkBatteryEmergency();
+                        } else {
+                            batteryTelemetry.classList.remove('battery-low');
+                        }
+                    }
+                    
+                    // Initial update
+                    updateBatteryStatus();
+                    
+                    // Listen for changes
+                    battery.addEventListener('levelchange', updateBatteryStatus);
+                    battery.addEventListener('chargingchange', updateBatteryStatus);
+                    
+                } catch (error) {
+                    console.error('Battery API error:', error);
+                    document.getElementById('batteryValue').textContent = 'N/A';
+                }
+            } else {
+                document.getElementById('batteryValue').textContent = 'N/A';
+            }
+        }
+        
+        // Initialize Geolocation
+        function initGeolocation() {
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentLocation = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        };
+                        
+                        const lat = position.coords.latitude.toFixed(4);
+                        const lon = position.coords.longitude.toFixed(4);
+                        document.getElementById('locationValue').textContent = `${lat}, ${lon}`;
+                    },
+                    (error) => {
+                        console.error('Geolocation error:', error);
+                        document.getElementById('locationValue').textContent = 'Denied';
+                    },
+                    {
+                        enableHighAccuracy: false, // Disabled for battery saving on mobile devices
+                        timeout: 10000,
+                        maximumAge: GPS_CACHE_MAX_AGE_MS
+                    }
+                );
+                
+                // Watch for location changes (optional, can be battery intensive)
+                // navigator.geolocation.watchPosition(updateLocation);
+            } else {
+                document.getElementById('locationValue').textContent = 'N/A';
+            }
+        }
+        
+        // Send telemetry to JARVIS
+        async function sendTelemetry() {
+            const token = localStorage.getItem(AUTH_TOKEN_KEY);
+            if (!token) return;
+            
+            const telemetryData = {
+                device_type: deviceType,
+                battery: {
+                    level: batteryLevel,
+                    charging: batteryCharging
+                },
+                location: currentLocation,
+                timestamp: new Date().toISOString()
+            };
+            
+            try {
+                // Send via API (you can also use WebSocket for real-time updates)
+                await fetch('/v1/telemetry', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(telemetryData)
+                });
+            } catch (error) {
+                console.error('Telemetry error:', error);
+            }
+        }
+        
+        // Battery Emergency - Suggest power saving
+        async function checkBatteryEmergency() {
+            if (batteryLevel < BATTERY_LOW_THRESHOLD && !batteryCharging) {
+                const message = `⚠️ ALERTA: Bateria baixa (${batteryLevel}%). Sugerindo modo de economia de energia.`;
+                addMessage(message, 'system');
+                
+                // Auto-suggest power saving to JARVIS
+                const token = localStorage.getItem(AUTH_TOKEN_KEY);
+                if (token) {
+                    try {
+                        await fetch('/v1/message', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                text: `Bateria crítica (${batteryLevel}%). Ative modo economia.`,
+                                priority: 'high',
+                                source: 'mobile_telemetry'
+                            })
+                        });
+                    } catch (error) {
+                        console.error('Failed to send battery alert:', error);
+                    }
+                }
+            }
+        }
+        
+        // Evolution tracking
+        async function updateEvolutionStatus() {
+            const token = localStorage.getItem(AUTH_TOKEN_KEY);
+            if (!token) return;
+            
+            try {
+                // Fetch evolution status from JARVIS
+                const response = await fetch('/v1/evolution/status', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    const evolutionStatus = document.getElementById('evolutionStatus');
+                    const pluginCount = document.getElementById('pluginCount');
+                    
+                    if (data.next_plugin) {
+                        evolutionStatus.innerHTML = `
+                            <div>🧠 Próximo plugin: <strong>${data.next_plugin}</strong></div>
+                            <div style="margin-top: 5px; font-size: 0.9em;">Status: ${data.status || 'Planejando...'}</div>
+                        `;
+                    }
+                    
+                    if (data.plugin_count !== undefined) {
+                        pluginCount.textContent = data.plugin_count;
+                    }
+                }
+            } catch (error) {
+                console.error('Evolution status error:', error);
+            }
+        }
+        
+        // Start telemetry monitoring
+        function startTelemetryMonitoring() {
+            // Initialize monitors
+            initBatteryMonitoring();
+            initGeolocation();
+            
+            // Send telemetry at configured interval (TELEMETRY_INTERVAL_MS)
+            telemetryInterval = setInterval(() => {
+                sendTelemetry();
+                updateEvolutionStatus();
+            }, TELEMETRY_INTERVAL_MS);
+            
+            // Initial evolution status
+            updateEvolutionStatus();
+        }
+        
+        // Start telemetry when authenticated
+        if (checkAuth()) {
+            startTelemetryMonitoring();
+        }
+        
+        // ============================================
+        // PWA Service Worker Registration
+        // ============================================
+        
+        // Register service worker for PWA functionality
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then((registration) => {
+                        console.log('Service Worker registered successfully:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.error('Service Worker registration failed:', error);
+                    });
+            });
+        }
     </script>
 </body>
 </html>
@@ -2463,37 +2827,42 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
     # Local Bridge WebSocket Endpoint for GUI Delegation
     
     @app.websocket("/v1/local-bridge")
-    async def local_bridge_websocket(websocket: WebSocket, device_id: str = "default"):
+    async def local_bridge_websocket(
+        websocket: WebSocket, 
+        device_id: str = "default",
+        device_type: str = "desktop"
+    ):
         """
-        WebSocket endpoint for connecting local PC to JARVIS.
+        WebSocket endpoint for connecting local PC or mobile device to JARVIS.
         
-        Enables JARVIS (running in the cloud) to delegate GUI tasks
-        (PyAutoGUI operations) to a connected local PC.
+        Enables JARVIS (running in the cloud) to delegate GUI tasks (PyAutoGUI)
+        or mobile-specific tasks (camera, sensors, vibration) to connected devices.
         
         Query Parameters:
-            device_id: Unique identifier for the local PC
+            device_id: Unique identifier for the device
+            device_type: Type of device (desktop, mobile, tablet) - default: desktop
             
         Usage:
-            Connect from local PC with:
-            ws://jarvis-host/v1/local-bridge?device_id=my_pc
+            Desktop: ws://jarvis-host/v1/local-bridge?device_id=my_pc&device_type=desktop
+            Mobile:  ws://jarvis-host/v1/local-bridge?device_id=my_phone&device_type=mobile
         """
         from app.application.services.local_bridge import get_bridge_manager
         
         bridge_manager = get_bridge_manager()
         
         try:
-            # Accept connection
-            await bridge_manager.connect(websocket, device_id)
+            # Accept connection with device type
+            await bridge_manager.connect(websocket, device_id, device_type)
             
             # Handle messages
             while True:
                 try:
-                    # Receive message from local PC
+                    # Receive message from device
                     data = await websocket.receive_json()
                     await bridge_manager.handle_message(device_id, data)
                     
                 except WebSocketDisconnect:
-                    logger.info(f"Local PC disconnected: {device_id}")
+                    logger.info(f"Device disconnected: {device_id}")
                     break
                 except Exception as e:
                     logger.error(f"Error handling message from {device_id}: {e}")
@@ -2659,5 +3028,107 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 status_code=500,
                 detail=f"Failed to analyze resources: {str(e)}"
             )
+    
+    # Mobile Edge Node Telemetry Endpoints
+    
+    # Configuration constants
+    BATTERY_LOW_THRESHOLD = 15  # Percentage - triggers power-saving suggestions
+    PLUGINS_DYNAMIC_DIR = "app/plugins/dynamic"  # Directory for dynamically created plugins
+    
+    @app.post("/v1/telemetry")
+    async def receive_telemetry(
+        telemetry_data: Dict[str, Any],
+        current_user: User = Depends(get_current_user)
+    ):
+        """
+        Receive telemetry data from mobile/desktop clients.
+        
+        Telemetry includes battery status, GPS location, device type, etc.
+        Used for context-aware assistance and urgency detection (Meta 37, 38).
+        
+        Args:
+            telemetry_data: Telemetry information from client
+            current_user: Current authenticated user
+            
+        Returns:
+            Acknowledgment and any suggestions
+        """
+        logger.info(f"Telemetry received from {current_user.username}: {telemetry_data}")
+        
+        response = {
+            "status": "received",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Check for low battery and suggest power saving (Meta 91)
+        if telemetry_data.get("battery"):
+            battery_level = telemetry_data["battery"].get("level", 100)
+            battery_charging = telemetry_data["battery"].get("charging", False)
+            
+            if battery_level < BATTERY_LOW_THRESHOLD and not battery_charging:
+                response["suggestions"] = [
+                    "Bateria crítica detectada. Sugerindo desativar funções pesadas da HUD.",
+                    "Reduzir frequência de telemetria para economizar bateria.",
+                    "Considerar modo de economia de energia."
+                ]
+                response["priority"] = "high"
+                
+                logger.warning(f"Low battery detected for {current_user.username}: {battery_level}%")
+        
+        # Store telemetry for context awareness (could be saved to database)
+        # For now, just log it
+        
+        return response
+    
+    @app.get("/v1/evolution/status")
+    async def get_evolution_status_simple(
+        current_user: User = Depends(get_current_user)
+    ):
+        """
+        Get simplified evolution status for HUD display.
+        
+        Shows what plugin JARVIS is planning to code next in app/plugins/dynamic.
+        
+        Returns:
+            Evolution status with next plugin and count
+        """
+        try:
+            from app.application.services.capability_manager import CapabilityManager
+            
+            # Initialize capability manager
+            capability_manager = CapabilityManager(engine=db_adapter.engine)
+            
+            # Get next evolution step
+            next_step = capability_manager.get_next_evolution_step()
+            
+            # Count dynamic plugins using the configured path
+            plugins_dir = Path(PLUGINS_DYNAMIC_DIR)
+            plugin_count = 0
+            if plugins_dir.exists():
+                plugin_count = len([f for f in plugins_dir.glob("*.py") if f.is_file()])
+            
+            if next_step:
+                return {
+                    "next_plugin": next_step["name"],
+                    "status": "Planejando implementação",
+                    "plugin_count": plugin_count,
+                    "progress": next_step.get("progress", 0)
+                }
+            else:
+                return {
+                    "next_plugin": None,
+                    "status": "Todas as capacidades implementadas ou aguardando recursos",
+                    "plugin_count": plugin_count,
+                    "progress": 100
+                }
+        
+        except Exception as e:
+            logger.error(f"Error getting evolution status: {e}")
+            return {
+                "next_plugin": None,
+                "status": "Erro ao obter status",
+                "plugin_count": 0,
+                "error": str(e)
+            }
 
     return app

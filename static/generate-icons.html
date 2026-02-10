@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JARVIS Icon Generator</title>
+</head>
+<body>
+    <h1>JARVIS PWA Icon Generator</h1>
+    <p>This page generates the PWA icons for JARVIS. Right-click on each canvas and save as PNG.</p>
+    
+    <h2>192x192 Icon</h2>
+    <canvas id="icon192" width="192" height="192"></canvas>
+    
+    <h2>512x512 Icon</h2>
+    <canvas id="icon512" width="512" height="512"></canvas>
+    
+    <script>
+        function drawIcon(canvas) {
+            const ctx = canvas.getContext('2d');
+            const size = canvas.width;
+            const center = size / 2;
+            
+            // Background
+            ctx.fillStyle = '#0a0e27';
+            ctx.fillRect(0, 0, size, size);
+            
+            // Outer circle
+            ctx.strokeStyle = '#00d4ff';
+            ctx.lineWidth = size * 0.02;
+            ctx.beginPath();
+            ctx.arc(center, center, size * 0.35, 0, 2 * Math.PI);
+            ctx.stroke();
+            
+            // Inner circle (arc reactor core)
+            ctx.fillStyle = '#00d4ff';
+            ctx.beginPath();
+            ctx.arc(center, center, size * 0.15, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Glow effect
+            const gradient = ctx.createRadialGradient(center, center, size * 0.15, center, center, size * 0.35);
+            gradient.addColorStop(0, 'rgba(0, 212, 255, 0.5)');
+            gradient.addColorStop(1, 'rgba(0, 212, 255, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(center, center, size * 0.35, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Text
+            ctx.fillStyle = '#00d4ff';
+            ctx.font = `bold ${size * 0.12}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('JARVIS', center, size * 0.85);
+        }
+        
+        // Draw both icons
+        drawIcon(document.getElementById('icon192'));
+        drawIcon(document.getElementById('icon512'));
+        
+        // Auto-download function
+        function downloadCanvas(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+        
+        console.log('Icons generated. To save:');
+        console.log('1. Right-click on each canvas and "Save Image As..."');
+        console.log('2. Or run: downloadCanvas("icon192", "icon-192.png")');
+        console.log('3. Or run: downloadCanvas("icon512", "icon-512.png")');
+    </script>
+</body>
+</html>
