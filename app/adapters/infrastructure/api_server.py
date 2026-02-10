@@ -4,8 +4,9 @@
 import logging
 from datetime import datetime
 import platform
+from typing import Any, Dict
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -2307,5 +2308,356 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         except Exception as e:
             logger.error(f"Error triggering Jarvis dispatch: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Dispatch failed: {str(e)}")
+
+    # Evolution and Self-Awareness Endpoints
+    
+    @app.get("/v1/status/evolution", response_model=api_models.EvolutionStatusResponse)
+    async def get_evolution_status():
+        """
+        Get JARVIS evolution status and progress.
+        
+        Returns the overall evolution progress and chapter-by-chapter breakdown
+        of the 102 capabilities defined in JARVIS_OBJECTIVES_MAP.
+        
+        This endpoint provides visibility into JARVIS self-awareness and
+        capability development across 9 chapters.
+        
+        Returns:
+            Evolution status with overall and chapter progress
+        """
+        try:
+            from app.application.services.capability_manager import CapabilityManager
+            
+            # Initialize capability manager
+            capability_manager = CapabilityManager(engine=db_adapter.engine)
+            
+            # Get evolution progress
+            progress = capability_manager.get_evolution_progress()
+            
+            return api_models.EvolutionStatusResponse(
+                overall_progress=progress["overall_progress"],
+                total_capabilities=progress["total_capabilities"],
+                complete_capabilities=progress["complete_capabilities"],
+                partial_capabilities=progress["partial_capabilities"],
+                nonexistent_capabilities=progress["nonexistent_capabilities"],
+                chapters=[
+                    api_models.ChapterProgress(**chapter)
+                    for chapter in progress["chapters"]
+                ]
+            )
+            
+        except Exception as e:
+            logger.error(f"Error getting evolution status: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to get evolution status: {str(e)}")
+    
+    @app.get("/v1/evolution/next-step", response_model=api_models.NextEvolutionStepResponse)
+    async def get_next_evolution_step():
+        """
+        Get the next capability that JARVIS should implement.
+        
+        This is the self-evolution trigger. It returns the highest-priority
+        capability that has all technical requirements satisfied and is ready
+        for implementation.
+        
+        Returns:
+            Next evolution step with capability details and technical blueprint
+            
+        Raises:
+            404: If no capabilities are ready for implementation
+        """
+        try:
+            from app.application.services.capability_manager import CapabilityManager
+            
+            # Initialize capability manager
+            capability_manager = CapabilityManager(engine=db_adapter.engine)
+            
+            # Get next evolution step
+            next_step = capability_manager.get_next_evolution_step()
+            
+            if next_step is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No capabilities ready for implementation. All capabilities either complete or have missing resources."
+                )
+            
+            # Convert blueprint to CapabilityRequirements model
+            blueprint_data = next_step["blueprint"]
+            blueprint_model = api_models.CapabilityRequirements(**blueprint_data)
+            
+            return api_models.NextEvolutionStepResponse(
+                capability_id=next_step["capability_id"],
+                capability_name=next_step["capability_name"],
+                chapter=next_step["chapter"],
+                current_status=next_step["current_status"],
+                blueprint=blueprint_model,
+                priority_score=next_step["priority_score"]
+            )
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting next evolution step: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to get next evolution step: {str(e)}")
+    
+    @app.post("/v1/evolution/scan", response_model=Dict[str, Any])
+    async def scan_capabilities():
+        """
+        Scan the repository to detect which capabilities are already implemented.
+        
+        This endpoint triggers a full scan of the codebase to identify
+        existing functionality and update capability statuses accordingly.
+        
+        Returns:
+            Scan results with updated capabilities and status counts
+        """
+        try:
+            from app.application.services.capability_manager import CapabilityManager
+            
+            # Initialize capability manager
+            capability_manager = CapabilityManager(engine=db_adapter.engine)
+            
+            # Run status scan
+            scan_results = capability_manager.status_scan()
+            
+            return scan_results
+            
+        except Exception as e:
+            logger.error(f"Error scanning capabilities: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to scan capabilities: {str(e)}")
+    
+    @app.get("/v1/evolution/requirements/{capability_id}", response_model=api_models.CapabilityRequirements)
+    async def get_capability_requirements(capability_id: int):
+        """
+        Get technical requirements for a specific capability.
+        
+        Returns a technical blueprint describing what libraries, APIs,
+        environment variables, and permissions are needed to implement
+        the specified capability.
+        
+        Args:
+            capability_id: The ID of the capability (1-102)
+            
+        Returns:
+            Technical blueprint with all requirements
+        """
+        try:
+            from app.application.services.capability_manager import CapabilityManager
+            
+            # Initialize capability manager
+            capability_manager = CapabilityManager(engine=db_adapter.engine)
+            
+            # Get requirements
+            blueprint = capability_manager.check_requirements(capability_id)
+            
+            if "error" in blueprint:
+                raise HTTPException(status_code=404, detail=blueprint["error"])
+            
+            return api_models.CapabilityRequirements(**blueprint)
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting capability requirements: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Failed to get requirements: {str(e)}")
+    
+    # Local Bridge WebSocket Endpoint for GUI Delegation
+    
+    @app.websocket("/v1/local-bridge")
+    async def local_bridge_websocket(websocket: WebSocket, device_id: str = "default"):
+        """
+        WebSocket endpoint for connecting local PC to JARVIS.
+        
+        Enables JARVIS (running in the cloud) to delegate GUI tasks
+        (PyAutoGUI operations) to a connected local PC.
+        
+        Query Parameters:
+            device_id: Unique identifier for the local PC
+            
+        Usage:
+            Connect from local PC with:
+            ws://jarvis-host/v1/local-bridge?device_id=my_pc
+        """
+        from app.application.services.local_bridge import get_bridge_manager
+        
+        bridge_manager = get_bridge_manager()
+        
+        try:
+            # Accept connection
+            await bridge_manager.connect(websocket, device_id)
+            
+            # Handle messages
+            while True:
+                try:
+                    # Receive message from local PC
+                    data = await websocket.receive_json()
+                    await bridge_manager.handle_message(device_id, data)
+                    
+                except WebSocketDisconnect:
+                    logger.info(f"Local PC disconnected: {device_id}")
+                    break
+                except Exception as e:
+                    logger.error(f"Error handling message from {device_id}: {e}")
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": str(e)
+                    })
+        
+        finally:
+            bridge_manager.disconnect(device_id)
+    
+    @app.get("/v1/local-bridge/devices")
+    async def list_connected_devices():
+        """
+        List all connected local devices.
+        
+        Returns:
+            List of connected device IDs
+        """
+        from app.application.services.local_bridge import get_bridge_manager
+        
+        bridge_manager = get_bridge_manager()
+        devices = bridge_manager.get_connected_devices()
+        
+        return {
+            "connected_devices": devices,
+            "count": len(devices)
+        }
+    
+    @app.post("/v1/local-bridge/send-task")
+    async def send_task_to_local_device(device_id: str, task: Dict[str, Any]):
+        """
+        Send a task to a connected local device.
+        
+        Args:
+            device_id: Target device ID
+            task: Task definition with 'action' and 'parameters'
+            
+        Returns:
+            Task result from the local device
+        """
+        from app.application.services.local_bridge import get_bridge_manager
+        
+        bridge_manager = get_bridge_manager()
+        
+        if not bridge_manager.is_device_connected(device_id):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Device {device_id} is not connected"
+            )
+        
+        result = await bridge_manager.send_task(device_id, task)
+        return result
+    
+    # Scavenger Hunt Endpoint for Missing API Keys
+    
+    @app.get("/v1/scavenger-hunt/api-keys")
+    async def get_api_key_guides(api_key_names: str = None):
+        """
+        Get guides for obtaining API keys.
+        
+        When JARVIS encounters missing API keys, this endpoint provides
+        step-by-step instructions on how to obtain them.
+        
+        Query Parameters:
+            api_key_names: Comma-separated list of API key names (optional)
+                          If not provided, returns guides for all known keys
+                          
+        Returns:
+            Dictionary of API key guides
+        """
+        from app.application.services.scavenger_hunt import ScavengerHunt
+        
+        if api_key_names:
+            # Get specific guides
+            keys = [k.strip() for k in api_key_names.split(",")]
+            guides = {}
+            
+            for key in keys:
+                guide = ScavengerHunt.find_guide(key)
+                if guide:
+                    guides[key] = {
+                        "service_name": guide.service_name,
+                        "key_name": guide.key_name,
+                        "steps": guide.steps,
+                        "documentation_url": guide.documentation_url,
+                        "is_free": guide.is_free,
+                        "estimated_time": guide.estimated_time
+                    }
+            
+            return guides
+        else:
+            # Return all guides
+            all_guides = {}
+            for key, guide in ScavengerHunt.API_KEY_GUIDES.items():
+                all_guides[key] = {
+                    "service_name": guide.service_name,
+                    "key_name": guide.key_name,
+                    "steps": guide.steps,
+                    "documentation_url": guide.documentation_url,
+                    "is_free": guide.is_free,
+                    "estimated_time": guide.estimated_time
+                }
+            
+            return all_guides
+    
+    @app.post("/v1/scavenger-hunt/missing-resources")
+    async def analyze_missing_resources(capability_id: int):
+        """
+        Analyze missing resources for a capability and provide acquisition guides.
+        
+        Args:
+            capability_id: The capability ID to analyze
+            
+        Returns:
+            Categorized missing resources with acquisition instructions
+        """
+        from app.application.services.capability_manager import CapabilityManager
+        from app.application.services.scavenger_hunt import ScavengerHunt
+        
+        try:
+            # Initialize capability manager
+            capability_manager = CapabilityManager(engine=db_adapter.engine)
+            
+            # Check for missing resources
+            alert = capability_manager.resource_request(capability_id)
+            
+            if alert is None:
+                return {
+                    "capability_id": capability_id,
+                    "has_missing_resources": False,
+                    "message": "All resources are available for this capability"
+                }
+            
+            # Categorize and provide guides
+            categorized = ScavengerHunt.search_for_missing_resources(
+                alert["missing_resources"]
+            )
+            
+            # Generate acquisition report for API keys
+            api_key_names = [
+                res.get("name") for res in alert["missing_resources"]
+                if res.get("type") == "environment_variable"
+            ]
+            
+            report = None
+            if api_key_names:
+                report = ScavengerHunt.generate_acquisition_report(api_key_names)
+            
+            return {
+                "capability_id": capability_id,
+                "capability_name": alert["capability_name"],
+                "has_missing_resources": True,
+                "missing_resources": alert["missing_resources"],
+                "categorized": categorized,
+                "acquisition_report": report,
+                "alert_level": alert["alert_level"]
+            }
+            
+        except Exception as e:
+            logger.error(f"Error analyzing missing resources: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to analyze resources: {str(e)}"
+            )
 
     return app

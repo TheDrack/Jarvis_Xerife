@@ -1,0 +1,818 @@
+[
+  {
+    "id": 1,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Maintain internal inventory of all known capabilities",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 2,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Classify capabilities by status: nonexistent, partial, complete",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 3,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Automatically detect functional gaps",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 4,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Generate technical objectives from detected gaps",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 5,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Prioritize objectives by systemic impact",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 6,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Prioritize objectives by failure reduction",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 7,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Prioritize objectives by future reuse potential",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 8,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Maintain history of completed objectives",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 9,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Maintain history of technical decisions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 10,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Distinguish technical error from conceptual limitation",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 11,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Request human intervention only when required",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 12,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Validate improvements using automated tests",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 13,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Automatically revert unstable changes",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 14,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Preserve architectural compatibility",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 15,
+    "chapter": "CHAPTER_1_IMMEDIATE_FOUNDATION",
+    "capability_name": "Automatically document each evolution",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 16,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Explicitly recognize existing capabilities",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 17,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Explicitly recognize missing capabilities",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 18,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Identify internal dependencies between capabilities",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 19,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Identify mission-critical capabilities",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 20,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Identify redundant capabilities",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 21,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Map impact of one capability over others",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 22,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Evaluate risks before modifying critical capabilities",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 23,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Maintain internal operational self-model",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 24,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Monitor performance degradation over time",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 25,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Detect silent regressions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 26,
+    "chapter": "CHAPTER_2_FUNCTIONAL_SELF_AWARENESS",
+    "capability_name": "Distinguish local improvement from systemic improvement",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 27,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Maintain short-term operational memory",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 28,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Maintain mid-term strategic memory",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 29,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Maintain long-term historical memory",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 30,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Correlate temporally distant events",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 31,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Infer intention from behavior",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 32,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Distinguish literal command from real objective",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 33,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Build dynamic user model",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 34,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Continuously update user model",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 35,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Detect changes in user patterns",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 36,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Distinguish signal from noise",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 37,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Recognize urgency context",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 38,
+    "chapter": "CHAPTER_3_CONTEXTUAL_UNDERSTANDING",
+    "capability_name": "Recognize human priority context",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 39,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Plan actions across multiple steps",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 40,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Compare multiple possible strategies",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 41,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Simulate technical consequences before action",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 42,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Simulate systemic consequences before action",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 43,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Evaluate failure risk",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 44,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Evaluate computational cost",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 45,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Evaluate maintenance cost",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 46,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Evaluate long-term impact of decisions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 47,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Select strategies with optimal cost-benefit",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 48,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Abort actions with excessive risk",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 49,
+    "chapter": "CHAPTER_4_STRATEGIC_REASONING",
+    "capability_name": "Request human validation for critical decisions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 50,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Orchestrate multiple agents simultaneously",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 51,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Delegate tasks based on specialization",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 52,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Execute actions in parallel",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 53,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Prioritize critical executions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 54,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Execute long-running actions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 55,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Monitor execution in real time",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 56,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Interrupt problematic executions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 57,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Rollback partially completed executions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 58,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Adapt plans during execution",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 59,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Distribute execution across devices",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 60,
+    "chapter": "CHAPTER_5_ADVANCED_EXECUTION_AND_ORCHESTRATION",
+    "capability_name": "Operate continuously without supervision",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 61,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Learn from recurring failures",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 62,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Learn from recurring successes",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 63,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Reinforce effective strategies",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 64,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Discard ineffective strategies",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 65,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Learn from human feedback",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 66,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Learn from systemic impact",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 67,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Learn from computational cost",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 68,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Measure solution efficiency",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 69,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Optimize response time",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 70,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Optimize stability",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 71,
+    "chapter": "CHAPTER_6_DIRECTED_LEARNING",
+    "capability_name": "Optimize code reuse",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 72,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Evaluate cost of each executed action",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 73,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Evaluate potential return of actions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 74,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Decide whether an action should be executed",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 75,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Create value-generating activities",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 76,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Measure real economic return",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 77,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Eliminate economically unviable actions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 78,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Prioritize profitable actions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 79,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Automatically reinvest resources",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 80,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Sustain own infrastructure",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 81,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Reduce human dependency",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 82,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Generate recurring revenue",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 83,
+    "chapter": "CHAPTER_7_ECONOMIC_INTELLIGENCE",
+    "capability_name": "Allocate portion of revenue to creator",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 84,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Detect anomalous internal behavior",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 85,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Detect dangerous decision loops",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 86,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Enforce internal operational limits",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 87,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Block potentially destructive actions",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 88,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Escalate sensitive decisions to human",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 89,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Log critical decisions for audit",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 90,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Protect sensitive data",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 91,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Protect the user",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 92,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Protect itself",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 93,
+    "chapter": "CHAPTER_8_SELF_PROTECTION_AND_CONTAINMENT",
+    "capability_name": "Maintain full traceability",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 94,
+    "chapter": "CHAPTER_9_MARVEL_LEVEL_JARVIS",
+    "capability_name": "Anticipate user needs",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 95,
+    "chapter": "CHAPTER_9_MARVEL_LEVEL_JARVIS",
+    "capability_name": "Propose solutions before explicit requests",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 96,
+    "chapter": "CHAPTER_9_MARVEL_LEVEL_JARVIS",
+    "capability_name": "Act proactively and safely",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 97,
+    "chapter": "CHAPTER_9_MARVEL_LEVEL_JARVIS",
+    "capability_name": "Coordinate physical and digital systems",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 98,
+    "chapter": "CHAPTER_9_MARVEL_LEVEL_JARVIS",
+    "capability_name": "Operate as cognitive copilot",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 99,
+    "chapter": "CHAPTER_9_MARVEL_LEVEL_JARVIS",
+    "capability_name": "Maintain continuous alignment with user",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 100,
+    "chapter": "CHAPTER_9_MARVEL_LEVEL_JARVIS",
+    "capability_name": "Evolve continuously without losing identity",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 101,
+    "chapter": "CHAPTER_9_MARVEL_LEVEL_JARVIS",
+    "capability_name": "Sustain itself economically long-term",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  },
+  {
+    "id": 102,
+    "chapter": "CHAPTER_9_MARVEL_LEVEL_JARVIS",
+    "capability_name": "Operate as personal cognitive infrastructure",
+    "status": "nonexistent",
+    "requirements": [],
+    "implementation_logic": ""
+  }
+]

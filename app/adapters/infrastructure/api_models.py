@@ -409,3 +409,62 @@ class JarvisDispatchResponse(BaseModel):
     success: bool = Field(..., description="Whether dispatch was triggered")
     message: str = Field(..., description="Result message")
     workflow_url: Optional[str] = Field(None, description="URL to monitor workflow execution")
+
+
+# Evolution and Self-Awareness Models
+
+
+class ChapterProgress(BaseModel):
+    """Progress data for a capability chapter"""
+
+    chapter: str = Field(..., description="Chapter name (e.g., CHAPTER_1_IMMEDIATE_FOUNDATION)")
+    total: int = Field(..., description="Total capabilities in this chapter")
+    complete: int = Field(..., description="Number of complete capabilities")
+    partial: int = Field(..., description="Number of partial capabilities")
+    nonexistent: int = Field(..., description="Number of nonexistent capabilities")
+    progress_percentage: float = Field(..., description="Chapter progress percentage (0-100)")
+
+
+class EvolutionStatusResponse(BaseModel):
+    """Response model for /v1/status/evolution endpoint"""
+
+    overall_progress: float = Field(..., description="Overall evolution progress percentage (0-100)")
+    total_capabilities: int = Field(..., description="Total number of capabilities in JARVIS_OBJECTIVES_MAP")
+    complete_capabilities: int = Field(..., description="Number of complete capabilities")
+    partial_capabilities: int = Field(..., description="Number of partial capabilities")
+    nonexistent_capabilities: int = Field(..., description="Number of nonexistent capabilities")
+    chapters: List[ChapterProgress] = Field(..., description="Chapter-by-chapter progress breakdown")
+
+
+class ResourceAlert(BaseModel):
+    """Alert for missing resources required by a capability"""
+
+    type: str = Field(..., description="Resource type: environment_variable, library, api, permission")
+    name: str = Field(..., description="Name of the missing resource")
+    description: str = Field(..., description="Description of what is missing")
+
+
+class CapabilityRequirements(BaseModel):
+    """Technical requirements for a capability"""
+
+    capability_id: int = Field(..., description="Capability ID")
+    capability_name: str = Field(..., description="Capability name")
+    chapter: str = Field(..., description="Chapter this capability belongs to")
+    status: str = Field(..., description="Current status: nonexistent, partial, complete")
+    requirements: List[str] = Field(..., description="List of technical requirements")
+    libraries: List[str] = Field(..., description="Python libraries needed")
+    apis: List[str] = Field(..., description="External APIs needed")
+    env_vars: List[str] = Field(..., description="Environment variables needed")
+    permissions: List[str] = Field(..., description="Permissions needed")
+    blueprint: str = Field(..., description="Technical blueprint for implementation")
+
+
+class NextEvolutionStepResponse(BaseModel):
+    """Response model for next evolution step"""
+
+    capability_id: int = Field(..., description="ID of the next capability to implement")
+    capability_name: str = Field(..., description="Name of the capability")
+    chapter: str = Field(..., description="Chapter this capability belongs to")
+    current_status: str = Field(..., description="Current implementation status")
+    blueprint: CapabilityRequirements = Field(..., description="Technical blueprint")
+    priority_score: int = Field(..., description="Priority score (lower is higher priority)")

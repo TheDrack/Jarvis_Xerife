@@ -15,6 +15,7 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select
 from app.application.ports.history_provider import HistoryProvider
 from app.domain.models.device import Capability, Device
 from app.domain.models.thought_log import ThoughtLog
+from app.domain.models.capability import JarvisCapability
 
 logger = logging.getLogger(__name__)
 
