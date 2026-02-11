@@ -515,9 +515,9 @@ class AutoFixer:
                 temp_file = f.name
             
             try:
-                # Use gh copilot explain command
+                # Use gh copilot explain command with -p flag for non-interactive mode
                 result = subprocess.run(
-                    ["gh", "copilot", "explain", truncated_error],
+                    ["gh", "copilot", "explain", "-p", truncated_error],
                     capture_output=True,
                     text=True,
                     timeout=60,
@@ -556,16 +556,13 @@ class AutoFixer:
             # Truncate prompt to prevent terminal overflow (allows more context than logs)
             truncated_prompt = self._truncate_log(prompt, max_size=MAX_PROMPT_SIZE)
             
-            # Use gh copilot suggest command with shell target for general suggestions
-            # Note: Empty input string is provided via stdin, but actual behavior depends on
-            # gh copilot implementation. May require user interaction in some cases.
+            # Use gh copilot suggest command with -p flag for non-interactive mode
             result = subprocess.run(
-                ["gh", "copilot", "suggest", "-t", "shell", truncated_prompt],
+                ["gh", "copilot", "suggest", "-t", "shell", "-p", truncated_prompt],
                 capture_output=True,
                 text=True,
                 timeout=60,
                 cwd=self.repo_path,
-                input="",  # Attempt to auto-accept, but may not work in all cases
             )
             
             if result.returncode == 0:
