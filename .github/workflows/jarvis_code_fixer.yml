@@ -118,11 +118,11 @@ jobs:
           
           echo "Created issue #$ISSUE_NUMBER"
           echo "DISPATCH_ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
-          # Use heredoc syntax for multi-line environment variable
+          # Use heredoc syntax for multi-line environment variable with unique delimiter
           {
-            echo "DISPATCH_ISSUE_BODY<<EOF"
+            echo "DISPATCH_ISSUE_BODY<<EOF_DISPATCH_ISSUE_BODY_DELIMITER"
             echo "$ISSUE_BODY"
-            echo "EOF"
+            echo "EOF_DISPATCH_ISSUE_BODY_DELIMITER"
           } >> $GITHUB_ENV
 
       - name: Check for Auto-Fix PR
@@ -167,7 +167,19 @@ jobs:
           if ! gh auth status &>/dev/null; then
             echo "$GH_TOKEN" | gh auth login --with-token
           fi
+          
+          # Display auth status with details for validation
+          echo "🔍 Validating GitHub CLI authentication and token permissions:"
           gh auth status
+          
+          # Test Copilot connection to verify token has Copilot permissions
+          echo "🧪 Testing Copilot connection:"
+          if gh copilot explain -p "test connection" &>/dev/null; then
+            echo "✅ Copilot connection successful - token has Copilot permissions"
+          else
+            echo "⚠️ Copilot connection test failed - token may lack Copilot permissions"
+            echo "Attempting to continue with workflow..."
+          fi
           
           # Setup git authentication with the token
           gh auth setup-git
