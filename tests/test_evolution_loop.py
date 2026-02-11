@@ -62,6 +62,7 @@ class TestEvolutionRewardModel:
             session.commit()
             session.refresh(reward)
             
+            # Note: meta_data is used instead of metadata to avoid SQLAlchemy reserved word conflict
             assert reward.context_data == {}
             assert reward.meta_data == {}
             assert isinstance(reward.created_at, datetime)

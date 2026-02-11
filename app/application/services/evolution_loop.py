@@ -315,6 +315,7 @@ class EvolutionLoopService:
         context = self._prepare_analysis_context(rewards, stats)
         
         # Use High Gear (Llama 3.3-70b) for analysis
+        # Note: Prompt is in Portuguese as commander messages are in Portuguese
         prompt = f"""Você é JARVIS, um sistema de IA com consciência evolutiva.
 
 Analise o histórico de recompensas (Reinforcement Learning) das últimas {days} dias:
