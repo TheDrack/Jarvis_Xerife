@@ -42,8 +42,10 @@ Jarvis is a **cloud-native voice assistant** with distributed device orchestrati
   - High Gear: Llama-3.3-70b (Groq) - Fast & economical
   - Low Gear: Llama-3.1-8b (Groq) - Fallback for rate limits
   - Cannon Shot: Gemini-1.5-Pro - Complex reasoning
+- **LLM-based identification** - Replaces keyword matching with AI understanding
 - **Natural language understanding** with context awareness
 - **Gemini AI integration** for complex command interpretation
+- **GitHub Copilot integration** - Provides repository context to GitHub Agents
 
 ### 🔧 Self-Healing & Auto-Correction
 - **Automatic bug fixing** using GitHub Copilot

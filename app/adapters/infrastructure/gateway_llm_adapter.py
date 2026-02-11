@@ -20,6 +20,7 @@ from app.adapters.infrastructure.github_adapter import GitHubAdapter
 from app.application.ports import VoiceProvider
 from app.domain.models import CommandType, Intent
 from app.domain.services.agent_service import AgentService
+from app.domain.services.llm_command_interpreter import LLMCommandInterpreter
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,18 @@ class GatewayLLMCommandAdapter:
             gemini_model=gemini_model,
             default_provider=LLMProvider.GROQ,
         )
+
+        self.llm_interpreter = None
+        try:
+            from app.core.llm_config import LLMConfig
+            if LLMConfig.USE_LLM_COMMAND_INTERPRETATION:
+                self.llm_interpreter = LLMCommandInterpreter(
+                    wake_word=wake_word,
+                    ai_gateway=self.gateway,
+                )
+                logger.info("LLMCommandInterpreter initialized for command interpretation")
+        except Exception as e:
+            logger.warning(f"Failed to initialize LLMCommandInterpreter: {e}")
         
         # Also initialize a fallback Gemini adapter for certain operations
         # that need Gemini-specific features
@@ -128,14 +141,42 @@ class GatewayLLMCommandAdapter:
         Returns:
             Intent object with command type and parameters
         """
-        # For interpretation, we primarily use the Gemini adapter as it's
-        # already well-integrated with the function calling system
-        # The AI Gateway is more useful for general conversational responses
+        if self.llm_interpreter:
+            return self.llm_interpreter.interpret(raw_input)
+        
+        # Fallback to Gemini adapter for interpretation if available
         if self.gemini_adapter:
             return self.gemini_adapter.interpret(raw_input)
         
         # Fallback: return unknown intent
         logger.warning("No adapter available for interpretation")
+        return Intent(
+            command_type=CommandType.UNKNOWN,
+            parameters={"raw_command": raw_input},
+            raw_input=raw_input,
+            confidence=0.0,
+        )
+
+    async def interpret_async(self, raw_input: str) -> Intent:
+        """
+        Async interpretation of a raw text command into a structured Intent.
+        
+        Args:
+            raw_input: Raw text from voice or text input
+            
+        Returns:
+            Intent object with command type and parameters
+        """
+        if self.llm_interpreter:
+            return await self.llm_interpreter.interpret_async(raw_input)
+        
+        if self.gemini_adapter:
+            interpret_async = getattr(self.gemini_adapter, "interpret_async", None)
+            if interpret_async and asyncio.iscoroutinefunction(interpret_async):
+                return await interpret_async(raw_input)
+            return await asyncio.to_thread(self.gemini_adapter.interpret, raw_input)
+        
+        logger.warning("No adapter available for async interpretation")
         return Intent(
             command_type=CommandType.UNKNOWN,
             parameters={"raw_command": raw_input},

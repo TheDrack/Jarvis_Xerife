@@ -29,6 +29,7 @@ Step-by-step guides for setup, usage, and deployment:
 - [TASK_EXECUTOR_QUICKSTART.md](./guides/TASK_EXECUTOR_QUICKSTART.md) - Task executor guide
 - [RENDER_QUICKSTART.md](./guides/RENDER_QUICKSTART.md) - Render deployment
 - [MIGRATION.md](./guides/MIGRATION.md) - Migration guide
+- [LLM_IDENTIFICATION.md](./guides/LLM_IDENTIFICATION.md) - **NEW:** LLM-based identification system
 
 ### 🧩 [Components](./components/)
 Component-specific documentation:
