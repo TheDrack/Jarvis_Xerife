@@ -229,13 +229,12 @@ class AutoFixer:
         # Replace newlines with spaces to create a single-line prompt
         sanitized = prompt.replace('\n', ' ').replace('\r', ' ')
         
-        # Replace multiple spaces with single space
+        # Replace multiple spaces with single space (this also normalizes tabs)
         sanitized = re.sub(r'\s+', ' ', sanitized)
         
-        # Remove control characters except tab (ASCII 9)
-        # Keep printable characters (ASCII 32-126) plus tab
+        # Remove control characters, keep only printable ASCII characters (32-126)
         # ASCII 32 is space (first printable character), 127 is DEL (control character)
-        sanitized = re.sub(r'[^\t\x20-\x7E]', '', sanitized)
+        sanitized = re.sub(r'[^\x20-\x7E]', '', sanitized)
         
         # Strip leading/trailing whitespace
         sanitized = sanitized.strip()
