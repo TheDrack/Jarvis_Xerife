@@ -7,7 +7,7 @@
 
 ## Sumário Executivo
 
-Identificamos e corrigimos **4 problemas críticos** no fluxo do Jarvis Autonomous State Machine que causavam comportamento imprevisível devido a variáveis de ambiente não inicializadas, condições lógicas incorretas, e tokens GitHub vazios no workflow do GitHub Actions.
+Identificamos e corrigimos **5 problemas críticos** no fluxo do Jarvis Autonomous State Machine que causavam comportamento imprevisível devido a variáveis de ambiente não inicializadas, condições lógicas incorretas, tokens GitHub vazios, e falta de autenticação do gh CLI no workflow do GitHub Actions.
 
 ## Problema Reportado
 
@@ -251,6 +251,55 @@ env:
 
 ---
 
+### ✅ Correção #5: Autenticação Explícita do gh CLI
+
+**Arquivo:** `.github/workflows/jarvis_code_fixer.yml`  
+**Linha:** 160-163
+
+**Problema Identificado:**
+```
+Log do erro:
+  2026-02-11 20:15:55,333 - ERROR - GitHub Copilot explain failed: Error: No authentication information found.
+  Copilot can be authenticated with GitHub using an OAuth Token or a Fine-Grained Personal Access Token.
+```
+
+**Causa:**
+- Tokens estavam definidos corretamente (GH_TOKEN, GITHUB_TOKEN, COPILOT_GITHUB_TOKEN)
+- Comando `gh auth setup-git` só autentica **git**, não o **gh CLI**
+- Comandos `gh copilot explain` e `gh copilot suggest` precisam que o gh CLI esteja autenticado
+- O gh CLI não estava usando automaticamente o GH_TOKEN do ambiente
+
+**Antes:**
+```yaml
+run: |
+  gh extension install github/gh-copilot || echo "Copilot extension already installed"
+  
+  # Setup git authentication with the token
+  gh auth setup-git
+```
+
+**Depois:**
+```yaml
+run: |
+  gh extension install github/gh-copilot || echo "Copilot extension already installed"
+  
+  # Authenticate gh CLI with the token
+  # The GH_TOKEN env var is already set, but we need to ensure gh CLI uses it
+  echo "$GH_TOKEN" | gh auth login --with-token || echo "Already authenticated"
+  gh auth status
+  
+  # Setup git authentication with the token
+  gh auth setup-git
+```
+
+**Benefícios:**
+- ✅ gh CLI está explicitamente autenticado antes de executar comandos copilot
+- ✅ `gh copilot explain` e `gh copilot suggest` funcionam corretamente
+- ✅ `gh auth status` confirma autenticação bem-sucedida
+- ✅ Fallback com `|| echo` evita falha se já estiver autenticado
+
+---
+
 ## Fluxo Correto Agora
 
 ### Para Pull Request Normal:
@@ -333,6 +382,7 @@ env:
 2. 🔧 Modificada condição do "Run Pytest" (linha 140)
 3. 🔧 Modificada condição do "Self-Healing Logic" (linha 147)
 4. 🔧 Adicionado fallback `|| github.token` para todos os tokens (linhas 78-79, 150-152, 215-216)
+5. ➕ Adicionado autenticação explícita do gh CLI com `gh auth login` (linha 160-163)
 
 **Diff Completo:**
 ```diff
@@ -390,6 +440,7 @@ pytest tests/test_state_machine.py -v
 - ✅ Issues com 'auto-code' vão direto para healing
 - ✅ Repository dispatch vai direto para healing
 - ✅ Todas as variáveis inicializadas corretamente
+- ✅ gh CLI autenticado antes de executar comandos copilot
 
 ---
 
@@ -403,6 +454,7 @@ pytest tests/test_state_machine.py -v
 - ❌ Fluxo quebrado para events do tipo `issues`
 - ❌ Tokens GitHub vazios causavam falha do `gh` CLI
 - ❌ Workflow falhava com exit code 1 por falta de autenticação
+- ❌ Comandos `gh copilot` falham com "No authentication information found"
 
 ### Depois:
 - ✅ Todas as variáveis têm valores definidos
@@ -414,6 +466,7 @@ pytest tests/test_state_machine.py -v
 - ✅ Auto-correção funcionando para issues
 - ✅ Tokens sempre têm fallback para `github.token`
 - ✅ `gh` CLI autentica corretamente em todos os cenários
+- ✅ Comandos `gh copilot explain` e `gh copilot suggest` funcionam corretamente
 
 ---
 
