@@ -1,4 +1,4 @@
-# Correção do Fluxo do Jarvis Autônomos State Machine
+# Correção do Fluxo do Jarvis Autônomo State Machine
 
 **Data:** 2026-02-11  
 **Status:** ✅ CORRIGIDO
@@ -11,7 +11,7 @@ Identificamos e corrigimos problemas críticos no fluxo do Jarvis Autonomous Sta
 
 ## Problema Reportado
 
-> "estamos com problemas no fluxo do Jarvis Autônomos State machine"
+# > "estamos com problemas no fluxo do Jarvis Autônomo State machine"
 
 ## Análise do Problema
 
