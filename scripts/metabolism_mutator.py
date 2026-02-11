@@ -77,7 +77,7 @@ class MetabolismMutator:
         strategy: str,
         intent: str,
         impact: str
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Aplica mutação controlada no DNA
         
@@ -121,7 +121,7 @@ class MetabolismMutator:
         
         return result
     
-    def _apply_minimal_change(self, intent: str, impact: str) -> Dict[str, any]:
+    def _apply_minimal_change(self, intent: str, impact: str) -> Dict[str, Any]:
         """
         Aplica mudança mínima - estratégia mais segura
         """
@@ -203,7 +203,7 @@ Mudança: <descrição da mudança>
                 'error': str(e)
             }
     
-    def _apply_comprehensive_fix(self, intent: str, impact: str) -> Dict[str, any]:
+    def _apply_comprehensive_fix(self, intent: str, impact: str) -> Dict[str, Any]:
         """
         Aplica correção abrangente - identifica e corrige casos relacionados
         """
@@ -217,7 +217,7 @@ Mudança: <descrição da mudança>
             'message': 'Correção abrangente requer validação humana'
         }
     
-    def _apply_incremental_addition(self, intent: str, impact: str) -> Dict[str, any]:
+    def _apply_incremental_addition(self, intent: str, impact: str) -> Dict[str, Any]:
         """
         Aplica adição incremental - adiciona funcionalidade em etapas
         """
@@ -232,7 +232,7 @@ Mudança: <descrição da mudança>
     
     def _create_manual_marker(
         self, intent: str, impact: str, issue_body: str
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Cria marcador para mudança manual quando automação não está disponível
         """
@@ -313,7 +313,7 @@ O Mecânico Consertador identificou que esta mutação requer implementação ma
         strategy: str,
         intent: str,
         impact: str,
-        result: Dict[str, any]
+        result: Dict[str, Any]
     ):
         """Salva log de mutação para auditoria"""
         try:
@@ -341,7 +341,7 @@ O Mecânico Consertador identificou que esta mutação requer implementação ma
         except Exception as e:
             logger.warning(f"Não foi possível salvar log: {e}")
     
-    def _export_to_github_actions(self, result: Dict[str, any]):
+    def _export_to_github_actions(self, result: Dict[str, Any]):
         """Exporta resultado para GitHub Actions outputs"""
         try:
             github_output = os.getenv('GITHUB_OUTPUT')

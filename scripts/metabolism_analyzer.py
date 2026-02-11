@@ -133,7 +133,7 @@ class MetabolismAnalyzer:
         instruction: str,
         context: str = "",
         event_type: str = ""
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Analisa um evento e determina a estratégia metabólica
         
@@ -433,7 +433,7 @@ class MetabolismAnalyzer:
         impact_type: ImpactType,
         analysis: Dict[str, str],
         context: str
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Verifica se deve escalonar ao COMANDANTE"""
         
         # Verificar palavras-chave de negócio
@@ -479,7 +479,7 @@ class MetabolismAnalyzer:
             'reason': None
         }
     
-    def _save_analysis(self, result: Dict[str, any]):
+    def _save_analysis(self, result: Dict[str, Any]):
         """Salva análise para auditoria"""
         try:
             analysis_dir = self.repo_path / ".github" / "metabolism_logs"
@@ -498,7 +498,7 @@ class MetabolismAnalyzer:
         except Exception as e:
             logger.warning(f"Não foi possível salvar análise: {e}")
     
-    def _export_to_github_actions(self, result: Dict[str, any]):
+    def _export_to_github_actions(self, result: Dict[str, Any]):
         """Exporta resultado para GitHub Actions outputs"""
         try:
             # Obter GITHUB_OUTPUT environment variable
