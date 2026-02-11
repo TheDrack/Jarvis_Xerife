@@ -75,8 +75,8 @@ jobs:
         id: handle_dispatch
         if: github.event_name == 'repository_dispatch'
         env:
-          GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
-          GH_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI }}
         run: |
           # Extract payload from repository_dispatch event
           INTENT="${{ github.event.client_payload.intent }}"
@@ -118,7 +118,12 @@ jobs:
           
           echo "Created issue #$ISSUE_NUMBER"
           echo "DISPATCH_ISSUE_NUMBER=$ISSUE_NUMBER" >> $GITHUB_ENV
-          echo "DISPATCH_ISSUE_BODY=$ISSUE_BODY" >> $GITHUB_ENV
+          # Use heredoc syntax for multi-line environment variable
+          {
+            echo "DISPATCH_ISSUE_BODY<<EOF"
+            echo "$ISSUE_BODY"
+            echo "EOF"
+          } >> $GITHUB_ENV
 
       - name: Check for Auto-Fix PR
         id: check_auto_fix
@@ -147,9 +152,9 @@ jobs:
         if: env.TESTS_FAILED == 'true' || github.event_name == 'repository_dispatch' || github.event_name == 'issues' || env.AUTO_FIX_PR == 'true'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
-          GH_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
-          COPILOT_GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI }}
+          COPILOT_GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI }}
           ISSUE_BODY: ${{ github.event_name == 'repository_dispatch' && env.DISPATCH_ISSUE_BODY || (github.event_name == 'issues' && github.event.issue.body || '') }}
           ISSUE_NUMBER: ${{ github.event_name == 'repository_dispatch' && env.DISPATCH_ISSUE_NUMBER || (github.event.issue.number || github.event.pull_request.number) }}
         run: |
@@ -217,8 +222,8 @@ jobs:
       - name: Request Human Review
         if: always()
         env:
-          GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
-          GH_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI }}
         run: |
           FINAL_STATE="${{ steps.healing_engine.outputs.final_state }}"
           ERROR_DETAILS="${{ steps.healing_engine.outputs.error_details }}"
