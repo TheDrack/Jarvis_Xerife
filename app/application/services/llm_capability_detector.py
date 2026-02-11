@@ -12,6 +12,9 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+from app.adapters.infrastructure.ai_gateway import LLMProvider
+from app.core.llm_config import LLMConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,6 +43,7 @@ class LLMCapabilityDetector:
         """
         self.ai_gateway = ai_gateway
         self.repository_root = repository_root or Path.cwd()
+        self._forced_provider = self._resolve_provider(LLMConfig.CAPABILITY_LLM_PROVIDER)
         
         if not self.ai_gateway:
             logger.warning("No AI Gateway provided for LLM capability detection")
@@ -230,7 +234,7 @@ class LLMCapabilityDetector:
             messages=messages,
             functions=None,
             multimodal=False,
-            force_provider=self._get_forced_provider(),
+            force_provider=self._forced_provider,
         )
         
         # Extract and parse response
@@ -363,12 +367,9 @@ Be conservative - only mark as "complete" if you see clear, working implementati
             "recommendations": ["Enable AI Gateway for accurate capability detection"]
         }
 
-    def _get_forced_provider(self):
-        """Get forced provider based on configuration"""
-        from app.core.llm_config import LLMConfig
-        from app.adapters.infrastructure.ai_gateway import LLMProvider
-        
-        provider_setting = LLMConfig.CAPABILITY_LLM_PROVIDER.lower()
+    def _resolve_provider(self, provider_setting: str):
+        """Resolve provider based on configuration"""
+        provider_setting = provider_setting.lower()
         if provider_setting == "groq":
             return LLMProvider.GROQ
         if provider_setting == "gemini":

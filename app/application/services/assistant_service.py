@@ -115,10 +115,9 @@ class AssistantService:
             Response object with execution result
         """
         # Interpret the command
-        if hasattr(self.interpreter, 'interpret_async') and asyncio.iscoroutinefunction(
-            self.interpreter.interpret_async
-        ):
-            intent = await self.interpreter.interpret_async(user_input)
+        interpret_async = getattr(self.interpreter, 'interpret_async', None)
+        if interpret_async and asyncio.iscoroutinefunction(interpret_async):
+            intent = await interpret_async(user_input)
         else:
             intent = self.interpreter.interpret(user_input)
         logger.info(f"Interpreted intent: {intent.command_type} with params: {intent.parameters}")
