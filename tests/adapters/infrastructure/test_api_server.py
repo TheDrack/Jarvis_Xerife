@@ -84,8 +84,17 @@ class TestAPIServer:
         assert response.status_code == 200
         data = response.json()
         
-        # Validate simple health check response
-        assert data == {"status": "healthy", "version": "1.0.0"}
+        # Validate enhanced health check response
+        assert "status" in data
+        assert "version" in data
+        assert data["version"] == "1.0.0"
+        assert "database" in data
+        assert "security" in data
+        
+        # For SQLite (default in tests), RLS should be N/A
+        if data["database"]["type"] == "sqlite":
+            assert data["security"]["rls_enabled"] == "n/a"
+            assert "note" in data["security"]
 
     def test_login_success(self, client):
         """Test successful login"""
