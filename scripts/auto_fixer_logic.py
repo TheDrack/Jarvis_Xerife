@@ -544,11 +544,11 @@ class AutoFixer:
             # The -p flag allows the prompt to be passed as an argument, avoiding interactive
             # prompts and stdin requirements, which is essential for automation environments
             # Note: subprocess.run with list form safely handles arguments without shell interpretation
-            # Using Claude Sonnet 4.5 as the default model for GitHub Agents as specified
+            # Using Claude 3.5 Sonnet as the default model for GitHub Agents as specified
             # The -- separator is used to pass flags to the copilot CLI itself
             prompt = f"Explain this error: {sanitized_error}"
             result = subprocess.run(
-                ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", prompt],
+                ["gh", "copilot", "--model", "claude-3.5-sonnet", "--", "-p", prompt],
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -588,11 +588,11 @@ class AutoFixer:
             # The -p flag allows the prompt to be passed as an argument, avoiding interactive
             # prompts and stdin requirements, which is essential for automation environments
             # Note: subprocess.run with list form safely handles arguments without shell interpretation
-            # Using Claude Sonnet 4.5 as the default model for GitHub Agents as specified
+            # Using Claude 3.5 Sonnet as the default model for GitHub Agents as specified
             # The -- separator is used to pass flags to the copilot CLI itself
             prompt = f"Suggest a solution for: {sanitized_prompt}"
             result = subprocess.run(
-                ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", prompt],
+                ["gh", "copilot", "--model", "claude-3.5-sonnet", "--", "-p", prompt],
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -688,10 +688,10 @@ Show me the corrected version of this file: {temp_code_file}"""
                 # Sanitize the fix prompt to prevent command-line parsing issues
                 sanitized_fix_prompt = self._sanitize_prompt(fix_prompt)
                 
-                # Use gh copilot with Claude Sonnet 4.5 as default model
+                # Use gh copilot with Claude 3.5 Sonnet as default model
                 # The -- separator is used to pass flags to the copilot CLI itself
                 result = subprocess.run(
-                    ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", sanitized_fix_prompt],
+                    ["gh", "copilot", "--model", "claude-3.5-sonnet", "--", "-p", sanitized_fix_prompt],
                     capture_output=True,
                     text=True,
                     timeout=90,
