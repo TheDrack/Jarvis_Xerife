@@ -544,7 +544,7 @@ class AutoFixer:
             # The -p flag allows the prompt to be passed as an argument, avoiding interactive
             # prompts and stdin requirements, which is essential for automation environments
             # Note: subprocess.run with list form safely handles arguments without shell interpretation
-            # Using Claude 3.5 Sonnet as the default model for GitHub Agents as specified
+            # Using Claude 3.5 Sonnet as the default model for GitHub Copilot as specified
             # The -- separator is used to pass flags to the copilot CLI itself
             prompt = f"Explain this error: {sanitized_error}"
             result = subprocess.run(
@@ -588,7 +588,7 @@ class AutoFixer:
             # The -p flag allows the prompt to be passed as an argument, avoiding interactive
             # prompts and stdin requirements, which is essential for automation environments
             # Note: subprocess.run with list form safely handles arguments without shell interpretation
-            # Using Claude 3.5 Sonnet as the default model for GitHub Agents as specified
+            # Using Claude 3.5 Sonnet as the default model for GitHub Copilot as specified
             # The -- separator is used to pass flags to the copilot CLI itself
             prompt = f"Suggest a solution for: {sanitized_prompt}"
             result = subprocess.run(
