@@ -590,8 +590,9 @@ class AutoFixer:
             # Note: subprocess.run with list form safely handles arguments without shell interpretation
             # Using Claude Sonnet 4.5 as the default model for GitHub Agents as specified
             # The -- separator is used to pass flags to the copilot CLI itself
+            prompt = f"Suggest a solution for: {sanitized_prompt}"
             result = subprocess.run(
-                ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", sanitized_prompt],
+                ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", prompt],
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -684,10 +685,13 @@ File: {file_path}
 
 Show me the corrected version of this file: {temp_code_file}"""
                 
+                # Sanitize the fix prompt to prevent command-line parsing issues
+                sanitized_fix_prompt = self._sanitize_prompt(fix_prompt)
+                
                 # Use gh copilot with Claude Sonnet 4.5 as default model
                 # The -- separator is used to pass flags to the copilot CLI itself
                 result = subprocess.run(
-                    ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", fix_prompt],
+                    ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", sanitized_fix_prompt],
                     capture_output=True,
                     text=True,
                     timeout=90,
