@@ -143,7 +143,7 @@ class MetabolismStateMachine:
             traceback: Optional traceback information
             
         Returns:
-            The new metabolic state
+            The new metabolic state (or legacy equivalent for backward compatibility)
         """
         # Combine error message and traceback for analysis
         full_error = f"{error_message}\n{traceback or ''}"
@@ -156,24 +156,27 @@ class MetabolismStateMachine:
         # Check for auto-fixable errors (DNA mutations we can handle)
         for error_type in self.AUTO_FIXABLE_ERRORS:
             if re.search(error_type, full_error, re.IGNORECASE):
-                self.state = State.METABOLISM_ACTIVE
+                # Use legacy state for backward compatibility
+                self.state = State.CHANGE_REQUESTED
                 self.error_type = error_type
-                logger.info(f"✓ DNA mutation identified: {error_type} -> State: METABOLISM_ACTIVE")
+                logger.info(f"✓ DNA mutation identified: {error_type} -> State: CHANGE_REQUESTED")
                 return self.state
         
         # Check for infrastructure errors (requires COMMANDER)
         for error_pattern in self.INFRASTRUCTURE_ERRORS:
             if re.search(error_pattern, full_error, re.IGNORECASE):
-                self.state = State.COMMANDER_NEEDED
+                # Use legacy state for backward compatibility
+                self.state = State.NEEDS_HUMAN
                 self.escalation_reason = FailureReason.INFRASTRUCTURE_FAILURE
                 self.error_type = error_pattern
-                logger.warning(f"⚠ Infrastructure error detected: {error_pattern} -> State: COMMANDER_NEEDED (Falha de Infra)")
+                logger.warning(f"⚠ Infrastructure error detected: {error_pattern} -> State: NEEDS_HUMAN (Falha de Infra)")
                 return self.state
         
         # Unknown error type (requires COMMANDER review)
-        self.state = State.COMMANDER_NEEDED
+        # Use legacy state for backward compatibility
+        self.state = State.NEEDS_HUMAN
         self.escalation_reason = FailureReason.UNIDENTIFIED_ERROR
-        logger.warning(f"⚠ Unidentified error -> State: COMMANDER_NEEDED (Erro não identificado)")
+        logger.warning(f"⚠ Unidentified error -> State: NEEDS_HUMAN (Erro não identificado)")
         return self.state
     
     def can_attempt_mutation(self) -> bool:
@@ -181,12 +184,16 @@ class MetabolismStateMachine:
         Check if we can attempt a DNA mutation.
         
         Returns:
-            True if state is METABOLISM_ACTIVE and counter < limit
+            True if state allows mutations and counter < limit
         """
-        can_mutate = (self.state == State.METABOLISM_ACTIVE and self.counter < self.limit)
+        # Accept both new and legacy states for backward compatibility
+        can_mutate = (
+            self.state in [State.METABOLISM_ACTIVE, State.CHANGE_REQUESTED] and 
+            self.counter < self.limit
+        )
         
         if not can_mutate:
-            if self.state != State.METABOLISM_ACTIVE:
+            if self.state not in [State.METABOLISM_ACTIVE, State.CHANGE_REQUESTED]:
                 logger.info(f"🛑 Cannot attempt mutation: state is {self.state.value}")
             elif self.counter >= self.limit:
                 logger.info(f"🛑 Cannot attempt mutation: cycle counter ({self.counter}) reached limit ({self.limit})")
@@ -212,22 +219,26 @@ class MetabolismStateMachine:
             homeostasis_ok: Whether homeostasis was maintained (pytest passed)
             
         Returns:
-            The new metabolic state
+            The new metabolic state (or legacy equivalent for backward compatibility)
         """
         self.counter += 1
         logger.info(f"🔁 Metabolic cycle {self.counter}/{self.limit} completed")
         
         if homeostasis_ok:
-            self.state = State.HOMEOSTASIS_ACHIEVED
-            logger.info(f"✅ Homeostasis achieved - DNA is stable -> State: HOMEOSTASIS_ACHIEVED")
+            # Use legacy state for backward compatibility
+            self.state = State.SUCCESS
+            logger.info(f"✅ Homeostasis achieved - DNA is stable -> State: SUCCESS")
             return self.state
         
         # Homeostasis not maintained (tests failed)
         if self.counter >= self.limit:
-            self.state = State.METABOLIC_LIMIT
-            logger.warning(f"⚠️ Metabolic limit reached ({self.limit} cycles) -> State: METABOLIC_LIMIT")
+            # Use legacy state for backward compatibility
+            self.state = State.FAILED_LIMIT
+            logger.warning(f"⚠️ Metabolic limit reached ({self.limit} cycles) -> State: FAILED_LIMIT")
             logger.warning(f"🚨 Escalating to COMMANDER (human intervention required)")
         else:
+            # Stay in CHANGE_REQUESTED for next cycle attempt
+            self.state = State.CHANGE_REQUESTED
             logger.info(f"❌ Homeostasis not achieved, will retry (cycle {self.counter}/{self.limit})")
         
         return self.state
@@ -289,6 +300,21 @@ class MetabolismStateMachine:
             True if human intervention is needed
         """
         return self.should_escalate_to_commander()
+    
+    @property
+    def failure_reason(self) -> Optional[FailureReason]:
+        """
+        Legacy property for backward compatibility.
+        Maps escalation_reason to failure_reason.
+        """
+        return self.escalation_reason
+    
+    @failure_reason.setter
+    def failure_reason(self, value: Optional[FailureReason]):
+        """
+        Legacy property setter for backward compatibility.
+        """
+        self.escalation_reason = value
     
     def get_final_message(self) -> str:
         """
