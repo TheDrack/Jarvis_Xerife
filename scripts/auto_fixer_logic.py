@@ -540,13 +540,15 @@ class AutoFixer:
             # Sanitize the error message for command line usage
             sanitized_error = self._sanitize_prompt(truncated_error)
             
-            # Use gh copilot explain command with -p flag for non-interactive mode
+            # Use gh copilot with -p flag for non-interactive mode
             # The -p flag allows the prompt to be passed as an argument, avoiding interactive
             # prompts and stdin requirements, which is essential for automation environments
             # Note: subprocess.run with list form safely handles arguments without shell interpretation
             # Using Claude Sonnet 4.5 as the default model for GitHub Agents as specified
+            # The -- separator is used to pass flags to the copilot CLI itself
+            prompt = f"Explain this error: {sanitized_error}"
             result = subprocess.run(
-                ["gh", "copilot", "--model", "claude-sonnet-4.5", "explain", "-p", sanitized_error],
+                ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", prompt],
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -582,13 +584,14 @@ class AutoFixer:
             # Sanitize the prompt for command line usage
             sanitized_prompt = self._sanitize_prompt(truncated_prompt)
             
-            # Use gh copilot suggest command with -p flag for non-interactive mode
+            # Use gh copilot with -p flag for non-interactive mode
             # The -p flag allows the prompt to be passed as an argument, avoiding interactive
             # prompts and stdin requirements, which is essential for automation environments
             # Note: subprocess.run with list form safely handles arguments without shell interpretation
             # Using Claude Sonnet 4.5 as the default model for GitHub Agents as specified
+            # The -- separator is used to pass flags to the copilot CLI itself
             result = subprocess.run(
-                ["gh", "copilot", "--model", "claude-sonnet-4.5", "suggest", "-t", "shell", "-p", sanitized_prompt],
+                ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", sanitized_prompt],
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -681,9 +684,10 @@ File: {file_path}
 
 Show me the corrected version of this file: {temp_code_file}"""
                 
-                # Use suggest to get the fix with Claude Sonnet 4.5 as default model
+                # Use gh copilot with Claude Sonnet 4.5 as default model
+                # The -- separator is used to pass flags to the copilot CLI itself
                 result = subprocess.run(
-                    ["gh", "copilot", "--model", "claude-sonnet-4.5", "suggest", fix_prompt],
+                    ["gh", "copilot", "--model", "claude-sonnet-4.5", "--", "-p", fix_prompt],
                     capture_output=True,
                     text=True,
                     timeout=90,
