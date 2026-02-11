@@ -516,6 +516,8 @@ class AutoFixer:
             
             try:
                 # Use gh copilot explain command with -p flag for non-interactive mode
+                # The -p flag allows the prompt to be passed as an argument, avoiding interactive
+                # prompts and stdin requirements, which is essential for automation environments
                 result = subprocess.run(
                     ["gh", "copilot", "explain", "-p", truncated_error],
                     capture_output=True,
@@ -557,6 +559,8 @@ class AutoFixer:
             truncated_prompt = self._truncate_log(prompt, max_size=MAX_PROMPT_SIZE)
             
             # Use gh copilot suggest command with -p flag for non-interactive mode
+            # The -p flag allows the prompt to be passed as an argument, avoiding interactive
+            # prompts and stdin requirements, which is essential for automation environments
             result = subprocess.run(
                 ["gh", "copilot", "suggest", "-t", "shell", "-p", truncated_prompt],
                 capture_output=True,
