@@ -171,7 +171,10 @@ class GatewayLLMCommandAdapter:
             return await self.llm_interpreter.interpret_async(raw_input)
         
         if self.gemini_adapter:
-            return await self.gemini_adapter.interpret_async(raw_input)
+            interpret_async = getattr(self.gemini_adapter, "interpret_async", None)
+            if interpret_async and asyncio.iscoroutinefunction(interpret_async):
+                return await interpret_async(raw_input)
+            return await asyncio.to_thread(self.gemini_adapter.interpret, raw_input)
         
         logger.warning("No adapter available for async interpretation")
         return Intent(
