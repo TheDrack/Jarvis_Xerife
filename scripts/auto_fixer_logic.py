@@ -57,7 +57,6 @@ import json
 import logging
 import os
 import re
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -541,14 +540,12 @@ class AutoFixer:
             # Sanitize the error message for command line usage
             sanitized_error = self._sanitize_prompt(truncated_error)
             
-            # Use shlex.quote() to properly escape the prompt for shell safety
-            quoted_error = shlex.quote(sanitized_error)
-            
             # Use gh copilot explain command with -p flag for non-interactive mode
             # The -p flag allows the prompt to be passed as an argument, avoiding interactive
             # prompts and stdin requirements, which is essential for automation environments
+            # Note: subprocess.run with list form safely handles arguments without shell interpretation
             result = subprocess.run(
-                ["gh", "copilot", "explain", "-p", quoted_error],
+                ["gh", "copilot", "explain", "-p", sanitized_error],
                 capture_output=True,
                 text=True,
                 timeout=60,
@@ -584,14 +581,12 @@ class AutoFixer:
             # Sanitize the prompt for command line usage
             sanitized_prompt = self._sanitize_prompt(truncated_prompt)
             
-            # Use shlex.quote() to properly escape the prompt for shell safety
-            quoted_prompt = shlex.quote(sanitized_prompt)
-            
             # Use gh copilot suggest command with -p flag for non-interactive mode
             # The -p flag allows the prompt to be passed as an argument, avoiding interactive
             # prompts and stdin requirements, which is essential for automation environments
+            # Note: subprocess.run with list form safely handles arguments without shell interpretation
             result = subprocess.run(
-                ["gh", "copilot", "suggest", "-t", "shell", "-p", quoted_prompt],
+                ["gh", "copilot", "suggest", "-t", "shell", "-p", sanitized_prompt],
                 capture_output=True,
                 text=True,
                 timeout=60,
