@@ -69,8 +69,8 @@ jobs:
         id: handle_dispatch
         if: github.event_name == 'repository_dispatch'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
+          GH_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
         run: |
           # Extract payload from repository_dispatch event
           INTENT="${{ github.event.client_payload.intent }}"
@@ -206,8 +206,8 @@ jobs:
       - name: Request Human Review
         if: always()
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
+          GH_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
         run: |
           FINAL_STATE="${{ steps.healing_engine.outputs.final_state }}"
           ERROR_DETAILS="${{ steps.healing_engine.outputs.error_details }}"
