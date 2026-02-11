@@ -74,6 +74,29 @@ class TestLLMCommandInterpreter:
         assert intent.confidence >= 0.9
     
     @pytest.mark.asyncio
+    async def test_llm_low_confidence_uses_fallback(self, interpreter, mock_ai_gateway):
+        """Test low confidence response falls back to keyword interpretation"""
+        mock_response = {
+            "provider": "groq",
+            "response": MagicMock(
+                choices=[
+                    MagicMock(
+                        message=MagicMock(
+                            content='{"command_type": "TYPE_TEXT", "parameters": {"text": "ignored"}, "confidence": 0.2, "reasoning": "Low confidence"}'
+                        )
+                    )
+                ]
+            )
+        }
+        mock_ai_gateway.generate_completion.return_value = mock_response
+        
+        intent = await interpreter.interpret_async("xerife escreva teste")
+        
+        assert intent.command_type == CommandType.TYPE_TEXT
+        assert intent.parameters["text"] == "teste"
+        assert intent.confidence == 1.0
+    
+    @pytest.mark.asyncio
     async def test_llm_interpret_fallback_on_error(self, interpreter, mock_ai_gateway):
         """Test fallback to keyword-based when LLM fails"""
         # Make LLM fail

@@ -5,9 +5,12 @@ This interpreter replaces keyword-based pattern matching with LLM-based understa
 providing more accurate and flexible command interpretation.
 """
 
+import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional
 from app.domain.models import CommandType, Intent
+from app.adapters.infrastructure.ai_gateway import LLMProvider
+from app.core.llm_config import LLMConfig
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +36,8 @@ class LLMCommandInterpreter:
         # Always initialize fallback interpreter for reliability
         from app.domain.services.command_interpreter import CommandInterpreter
         self._fallback_interpreter = CommandInterpreter(wake_word=wake_word)
+        self._min_confidence = LLMConfig.MIN_COMMAND_CONFIDENCE
+        self._forced_provider = self._resolve_provider(LLMConfig.COMMAND_LLM_PROVIDER)
         
         if not self.ai_gateway:
             logger.warning("No AI Gateway provided, will use keyword-based fallback")
@@ -89,6 +94,18 @@ class LLMCommandInterpreter:
         Returns:
             Intent object with command type and parameters
         """
+        if self.ai_gateway:
+            try:
+                asyncio.get_running_loop()
+                logger.warning("Event loop already running, using keyword fallback for sync interpret")
+                return self._fallback_interpretation(raw_input)
+            except RuntimeError:
+                try:
+                    return asyncio.run(self.interpret_async(raw_input))
+                except Exception as e:
+                    logger.error(f"Sync LLM interpretation failed: {e}. Using fallback.", exc_info=True)
+                    return self._fallback_interpretation(raw_input)
+        
         if self._fallback_interpreter:
             return self._fallback_interpreter.interpret(raw_input)
         
@@ -125,6 +142,7 @@ class LLMCommandInterpreter:
             messages=messages,
             functions=None,
             multimodal=False,
+            force_provider=self._forced_provider,
         )
         
         # Parse response to extract intent
@@ -215,7 +233,15 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
             data = json.loads(json_text)
             
             # Map string command type to enum
-            command_type_str = data.get("command_type", "UNKNOWN")
+            command_type_raw = data.get("command_type", "UNKNOWN")
+            if not isinstance(command_type_raw, str):
+                logger.warning(
+                    "Command type from LLM must be a string, got "
+                    f"{type(command_type_raw).__name__}"
+                )
+                return self._fallback_interpretation(raw_input)
+            
+            command_type_str = command_type_raw.upper()
             try:
                 command_type = CommandType[command_type_str]
             except KeyError:
@@ -224,6 +250,13 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
             
             parameters = data.get("parameters", {})
             confidence = float(data.get("confidence", 0.7))
+            
+            if confidence < self._min_confidence:
+                logger.warning(
+                    f"LLM confidence {confidence:.2f} below minimum "
+                    f"{self._min_confidence:.2f}. Using fallback."
+                )
+                return self._fallback_interpretation(raw_input)
             
             logger.info(f"LLM classified as {command_type} with {confidence:.2f} confidence")
             logger.debug(f"LLM reasoning: {data.get('reasoning', 'N/A')}")
@@ -253,6 +286,15 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
             raw_input=raw_input,
             confidence=0.3,
         )
+
+    def _resolve_provider(self, provider_setting: str) -> Optional[LLMProvider]:
+        """Resolve provider based on configuration"""
+        provider_setting = provider_setting.lower()
+        if provider_setting == "groq":
+            return LLMProvider.GROQ
+        if provider_setting == "gemini":
+            return LLMProvider.GEMINI
+        return None
 
     def is_exit_command(self, raw_input: str) -> bool:
         """
