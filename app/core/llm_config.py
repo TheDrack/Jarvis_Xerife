@@ -65,6 +65,13 @@ class LLMConfig:
         "0.7"
     ))
     
+    # Maximum number of capabilities to scan in a single batch
+    # This helps manage LLM API costs and processing time
+    MAX_CAPABILITIES_PER_SCAN = int(os.getenv(
+        "JARVIS_MAX_CAPABILITIES_PER_SCAN",
+        "10"
+    ))
+    
     @classmethod
     def get_config_summary(cls) -> dict:
         """Get a summary of current LLM configuration"""

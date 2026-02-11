@@ -27,6 +27,10 @@ class LLMCapabilityDetector:
     - Can assess code quality and completeness
     """
     
+    # Maximum characters to include in LLM prompt to avoid token overflow
+    # Approximate: 1 token ≈ 4 characters, so 8000 chars ≈ 2000 tokens
+    MAX_CODE_CONTEXT_CHARS = 8000
+    
     def __init__(self, ai_gateway=None, repository_root: Optional[Path] = None):
         """
         Initialize the LLM capability detector
@@ -249,10 +253,9 @@ class LLMCapabilityDetector:
         # Limit code context to avoid token overflow
         context_summary = []
         total_chars = 0
-        max_chars = 8000  # Conservative limit
         
         for file_path, content in code_context.items():
-            if total_chars >= max_chars:
+            if total_chars >= self.MAX_CODE_CONTEXT_CHARS:
                 context_summary.append(f"\n... ({len(code_context) - len(context_summary)} more files omitted)")
                 break
             
@@ -389,15 +392,18 @@ class EnhancedCapabilityManager:
         """
         from sqlmodel import Session, select
         from app.domain.models.capability import JarvisCapability
+        from app.core.llm_config import LLMConfig
         
         logger.info("Starting enhanced LLM-based capability status scan...")
         
         updated_capabilities = []
+        max_scan = LLMConfig.MAX_CAPABILITIES_PER_SCAN
         
         with Session(self.base_manager.engine) as session:
             capabilities = session.exec(select(JarvisCapability)).all()
             
-            for capability in capabilities[:10]:  # Limit to first 10 to avoid token costs
+            # Limit to configured maximum to manage costs
+            for capability in capabilities[:max_scan]:
                 try:
                     # Use LLM to detect capability status
                     analysis = await self.llm_detector.detect_capability_async(
@@ -410,7 +416,7 @@ class EnhancedCapabilityManager:
                     confidence = analysis.get("confidence", 0.0)
                     
                     # Only update if LLM is confident
-                    if confidence >= 0.7 and new_status and new_status != capability.status:
+                    if confidence >= LLMConfig.MIN_CAPABILITY_CONFIDENCE and new_status and new_status != capability.status:
                         logger.info(
                             f"Updating capability {capability.id}: "
                             f"{capability.status} -> {new_status} "
@@ -445,9 +451,11 @@ class EnhancedCapabilityManager:
             }
             
             logger.info(f"Enhanced scan complete. Updated {len(updated_capabilities)} capabilities.")
+            logger.info(f"Scanned {min(max_scan, len(capabilities))} of {len(capabilities)} total capabilities")
             
             return {
                 "total_capabilities": len(all_capabilities),
+                "scanned_capabilities": min(max_scan, len(capabilities)),
                 "nonexistent": status_counts["nonexistent"],
                 "partial": status_counts["partial"],
                 "complete": status_counts["complete"],

@@ -245,10 +245,11 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
         if self._fallback_interpreter:
             return self._fallback_interpreter.interpret(raw_input)
         
-        command = raw_input.lower().strip()
+        # Ultimate fallback: return UNKNOWN
+        normalized_command = raw_input.lower().strip()
         return Intent(
             command_type=CommandType.UNKNOWN,
-            parameters={"raw_command": command},
+            parameters={"raw_command": normalized_command},
             raw_input=raw_input,
             confidence=0.3,
         )

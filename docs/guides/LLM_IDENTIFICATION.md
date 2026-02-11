@@ -290,9 +290,18 @@ if architecture == "Hexagonal Architecture":
 ## Performance Considerations
 
 ### Token Usage
+
+**Estimated token usage (based on testing with cl100k_base encoding):**
 - Command interpretation: ~200-500 tokens per request
 - Capability detection: ~1000-3000 tokens per capability
 - Repository context: ~3000-8000 tokens one-time
+
+**Note:** These are estimates. Actual usage may vary based on:
+- Command/prompt complexity
+- Code size being analyzed
+- Provider-specific tokenization
+
+**Configuration:** Adjust `MAX_CODE_CONTEXT_CHARS` in `LLMCapabilityDetector` to control token usage.
 
 ### Latency
 - Groq: ~200-500ms average
