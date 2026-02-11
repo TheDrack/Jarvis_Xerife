@@ -7,7 +7,7 @@
 
 ## Sumário Executivo
 
-Identificamos e corrigimos problemas críticos no fluxo do Jarvis Autonomous State Machine que causavam comportamento imprevisível devido a variáveis de ambiente não inicializadas e condições lógicas incorretas no workflow do GitHub Actions.
+Identificamos e corrigimos **4 problemas críticos** no fluxo do Jarvis Autonomous State Machine que causavam comportamento imprevisível devido a variáveis de ambiente não inicializadas, condições lógicas incorretas, e tokens GitHub vazios no workflow do GitHub Actions.
 
 ## Problema Reportado
 
@@ -98,6 +98,40 @@ Issue não é processada automaticamente ❌
 
 ---
 
+### 🔴 Problema #4: Tokens GitHub Vazios
+
+**Localização:** `.github/workflows/jarvis_code_fixer.yml` linhas 78-79, 150-152, 215-216
+
+**Código Original:**
+```yaml
+env:
+  GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
+  GH_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
+```
+
+**Descrição:**
+- `secrets.JARVIS_RENDER_TOKEN` pode estar vazio ou não configurado
+- Sem fallback, os tokens ficam vazios
+- `gh` CLI falha porque precisa de autenticação válida
+
+**Log do Erro:**
+```
+AUTO_FIX_PR: true
+GITHUB_TOKEN: 
+GH_TOKEN: 
+COPILOT_GITHUB_TOKEN: 
+gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable.
+Process completed with exit code 1.
+```
+
+**Impacto:**
+- Workflow falha com exit code 1
+- `gh` CLI não consegue autenticar
+- Auto-fixer não consegue criar PRs ou fechar issues
+- Jarvis API requests falham
+
+---
+
 ## Solução Implementada
 
 ### ✅ Correção #1: Inicialização de Variáveis de Estado
@@ -165,6 +199,55 @@ if: env.TESTS_FAILED == 'true' || github.event_name == 'repository_dispatch' || 
 - ✅ Issues com label 'auto-code' são processadas
 - ✅ Não depende de `TESTS_FAILED` para issues
 - ✅ Fluxo completo de auto-correção funciona
+
+---
+
+### ✅ Correção #4: Fallback para Tokens GitHub Vazios
+
+**Arquivo:** `.github/workflows/jarvis_code_fixer.yml`  
+**Linhas:** 78-79, 150-152, 215-216
+
+**Problema Identificado:**
+```
+Log do erro:
+  GITHUB_TOKEN: 
+  GH_TOKEN: 
+  COPILOT_GITHUB_TOKEN: 
+  gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable.
+  Process completed with exit code 1.
+```
+
+**Causa:**
+- `secrets.JARVIS_RENDER_TOKEN` pode estar vazio ou não configurado
+- Sem fallback, os tokens ficam vazios
+- `gh` CLI falha porque precisa de autenticação válida
+
+**Antes:**
+```yaml
+env:
+  GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
+  GH_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
+  COPILOT_GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
+```
+
+**Depois:**
+```yaml
+env:
+  GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
+  GH_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
+  COPILOT_GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN || github.token }}
+```
+
+**Benefícios:**
+- ✅ Se `JARVIS_RENDER_TOKEN` estiver vazio, usa `github.token` (token padrão do Actions)
+- ✅ `gh` CLI sempre tem um token válido para autenticação
+- ✅ Workflow não falha por falta de token
+- ✅ Funciona tanto com token customizado quanto com token padrão
+
+**Locais Corrigidos:**
+1. **Handle Repository Dispatch** - Criação de issues via API
+2. **Self-Healing Logic** - Execução do auto-fixer
+3. **Request Human Review** - Comentários em issues
 
 ---
 
@@ -249,6 +332,7 @@ if: env.TESTS_FAILED == 'true' || github.event_name == 'repository_dispatch' || 
 1. ➕ Adicionado step "Initialize State Variables" (linha 68-72)
 2. 🔧 Modificada condição do "Run Pytest" (linha 140)
 3. 🔧 Modificada condição do "Self-Healing Logic" (linha 147)
+4. 🔧 Adicionado fallback `|| github.token` para todos os tokens (linhas 78-79, 150-152, 215-216)
 
 **Diff Completo:**
 ```diff
@@ -317,6 +401,8 @@ pytest tests/test_state_machine.py -v
 - ❌ Healing engine não executava quando deveria (issues ignoradas)
 - ❌ Difícil de debugar problemas no workflow
 - ❌ Fluxo quebrado para events do tipo `issues`
+- ❌ Tokens GitHub vazios causavam falha do `gh` CLI
+- ❌ Workflow falhava com exit code 1 por falta de autenticação
 
 ### Depois:
 - ✅ Todas as variáveis têm valores definidos
@@ -326,6 +412,8 @@ pytest tests/test_state_machine.py -v
 - ✅ Fluxo completo funcionando para todos os eventos
 - ✅ Integração correta com Jarvis API
 - ✅ Auto-correção funcionando para issues
+- ✅ Tokens sempre têm fallback para `github.token`
+- ✅ `gh` CLI autentica corretamente em todos os cenários
 
 ---
 
