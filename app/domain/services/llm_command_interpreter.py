@@ -233,7 +233,12 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
             data = json.loads(json_text)
             
             # Map string command type to enum
-            command_type_str = str(data.get("command_type", "UNKNOWN")).upper()
+            command_type_raw = data.get("command_type", "UNKNOWN")
+            if not isinstance(command_type_raw, str):
+                logger.warning(f"Invalid command type from LLM: {command_type_raw}")
+                return self._fallback_interpretation(raw_input)
+            
+            command_type_str = command_type_raw.upper()
             try:
                 command_type = CommandType[command_type_str]
             except KeyError:
