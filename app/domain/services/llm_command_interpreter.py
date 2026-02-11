@@ -235,7 +235,10 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
             # Map string command type to enum
             command_type_raw = data.get("command_type", "UNKNOWN")
             if not isinstance(command_type_raw, str):
-                logger.warning(f"Invalid command type from LLM: {command_type_raw}")
+                logger.warning(
+                    "Command type from LLM must be a string, got "
+                    f"{type(command_type_raw).__name__}"
+                )
                 return self._fallback_interpretation(raw_input)
             
             command_type_str = command_type_raw.upper()
