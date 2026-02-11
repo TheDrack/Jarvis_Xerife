@@ -238,7 +238,7 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
                 logger.warning(f"Invalid command type from LLM: {command_type_raw}")
                 return self._fallback_interpretation(raw_input)
             
-            command_type_str = str(command_type_raw).upper()
+            command_type_str = command_type_raw.upper()
             try:
                 command_type = CommandType[command_type_str]
             except KeyError:
