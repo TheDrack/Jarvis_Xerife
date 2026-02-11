@@ -410,6 +410,16 @@ class AutoFixer:
             # Interface keyword - prioritizes API files when combined with API-related terms
             'interface': ['app/adapters/infrastructure/api_models.py', 'app/adapters/infrastructure/api_server.py', 'app/main.py', 'main.py'],
             'frontend': ['app/main.py', 'main.py', 'README.md'],
+            # UI and HUD keywords (English and Portuguese)
+            'hud': ['app/adapters/infrastructure/api_server.py'],
+            'chat': ['app/adapters/infrastructure/api_server.py'],
+            'botão': ['app/adapters/infrastructure/api_server.py'],  # Portuguese for 'button'
+            'button': ['app/adapters/infrastructure/api_server.py'],
+            'transcrição': ['app/adapters/infrastructure/api_server.py'],  # Portuguese for 'transcription'
+            'transcription': ['app/adapters/infrastructure/api_server.py'],
+            'voice': ['app/adapters/infrastructure/api_server.py'],
+            'voz': ['app/adapters/infrastructure/api_server.py'],  # Portuguese for 'voice'
+            'input': ['app/adapters/infrastructure/api_server.py'],
             # Documentation keywords
             'documentation': ['README.md', 'docs/README.md'],
             'documentação': ['README.md', 'docs/README.md'],  # Portuguese
