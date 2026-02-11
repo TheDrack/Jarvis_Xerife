@@ -852,7 +852,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                     placeholder="Enter command or use voice..."
                     autocomplete="off"
                 />
-                <button id="sendButton">Execute</button>
+                <button id="sendButton">Enviar</button>
             </div>
         </div>
     </div>
@@ -912,7 +912,6 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript;
                 commandInput.value = transcript;
-                addMessage(`Voice captured: ${transcript}`, 'system');
             };
             
             recognition.onerror = (event) => {
