@@ -48,9 +48,15 @@ Deployment guides and configurations:
 
 ### 👨‍💻 [Development](./development/)
 Development guides and extensibility:
-- [EXTENSIBILITY.md](./development/EXTENSIBILITY.md) - Extending Jarvis
 - [AUTO_EXTENSIBILITY_SUMMARY.md](./development/AUTO_EXTENSIBILITY_SUMMARY.md) - Auto-extensibility
+- [EXTENSIBILITY.md](./development/EXTENSIBILITY.md) - Extension development
 - [SECURITY_ENCRYPTION.md](./development/SECURITY_ENCRYPTION.md) - Security and encryption
+
+### 📊 Analysis & Verification Reports
+Recent analysis and verification documentation:
+- [STATE_MACHINE_VERIFICATION.md](./STATE_MACHINE_VERIFICATION.md) - **NEW (2026-02-11):** Complete state machine verification
+- [CI_FAILURE_ANALYSIS.md](./CI_FAILURE_ANALYSIS.md) - **NEW (2026-02-11):** CI failure root cause analysis (Issues #151, #152)
+- [TASK_COMPLETION_SUMMARY.md](./TASK_COMPLETION_SUMMARY.md) - **NEW (2026-02-11):** Task completion summary
 
 ### 📝 [Summaries](./summaries/)
 Implementation summaries and historical documentation:
