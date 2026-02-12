@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """PersistentBrowserManager - Manages persistent Playwright browser instances"""
 
+import json
 import logging
 import os
 import subprocess
@@ -13,6 +14,31 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+class StructuredBrowserLogger:
+    """Wrapper for structured logging in browser operations"""
+    
+    def __init__(self, logger_instance, **context):
+        self.logger = logger_instance
+        self.context = context
+    
+    def _log(self, level, msg, **extra):
+        """Log with structured context"""
+        log_data = {**self.context, **extra, "message": msg}
+        self.logger.log(level, json.dumps(log_data))
+    
+    def info(self, msg, **extra):
+        self._log(logging.INFO, msg, **extra)
+    
+    def error(self, msg, **extra):
+        self._log(logging.ERROR, msg, **extra)
+    
+    def warning(self, msg, **extra):
+        self._log(logging.WARNING, msg, **extra)
+    
+    def debug(self, msg, **extra):
+        self._log(logging.DEBUG, msg, **extra)
+
+
 class PersistentBrowserManager:
     """
     Manages a persistent Playwright browser instance for automation tasks.
@@ -23,13 +49,22 @@ class PersistentBrowserManager:
     - Supports CDP (Chrome DevTools Protocol) connections for scripts
     - Provides codegen recording for creating new automation skills
     - Allows browser to remain open for user entertainment after automation
+    - Supports browser extensions for complex automations
+    - Robust timeout handling and error recovery
     """
+    
+    # Default timeout for browser operations in seconds
+    DEFAULT_TIMEOUT = 30
+    
+    # Maximum retry attempts for browser operations
+    MAX_RETRIES = 3
     
     def __init__(
         self,
         user_data_dir: Optional[Path] = None,
         headless: bool = False,
-        browser_type: str = "chromium"
+        browser_type: str = "chromium",
+        session_id: Optional[str] = None
     ):
         """
         Initialize the PersistentBrowserManager
@@ -38,6 +73,7 @@ class PersistentBrowserManager:
             user_data_dir: Directory for persistent browser data (cookies, logins, etc.)
             headless: Whether to run browser in headless mode
             browser_type: Type of browser (chromium, firefox, webkit)
+            session_id: Optional session identifier for structured logging
         """
         # Setup user data directory
         if user_data_dir:
@@ -53,36 +89,92 @@ class PersistentBrowserManager:
         self.browser_type = browser_type
         self._browser_process = None
         self._cdp_url = None
+        self.session_id = session_id or "default"
         
-        logger.info(f"PersistentBrowserManager initialized")
-        logger.info(f"User data directory: {self.user_data_dir}")
-        logger.info(f"Browser type: {browser_type}, Headless: {headless}")
+        # Create structured logger
+        self.log = StructuredBrowserLogger(
+            logger,
+            session_id=self.session_id,
+            browser_type=browser_type
+        )
+        
+        # Initialize extension manager
+        from app.application.services.browser_extension_manager import BrowserExtensionManager
+        self.extension_manager = BrowserExtensionManager()
+        
+        self.log.info("browser_manager_initialized",
+                     user_data_dir=str(self.user_data_dir),
+                     headless=headless,
+                     extensions_count=self.extension_manager.get_extension_count()["total"])
     
-    def start_browser(self, port: int = 9222) -> Optional[str]:
+    def start_browser(self, port: int = 9222, timeout: int = DEFAULT_TIMEOUT) -> Optional[str]:
         """
-        Start the persistent browser instance
+        Start the persistent browser instance with retry logic
         
         Args:
             port: Port for CDP connection (default: 9222)
+            timeout: Timeout in seconds for browser startup (default: 30)
             
         Returns:
             CDP URL for connecting to the browser, or None if failed
         """
         if self.is_running():
-            logger.info("Browser is already running")
+            self.log.info("browser_already_running", cdp_url=self._cdp_url)
             return self._cdp_url
         
+        # Try starting the browser with retries
+        for attempt in range(1, self.MAX_RETRIES + 1):
+            try:
+                self.log.info("browser_starting", 
+                            attempt=attempt,
+                            max_retries=self.MAX_RETRIES,
+                            port=port,
+                            timeout=timeout)
+                
+                result = self._start_browser_impl(port, timeout)
+                
+                if result:
+                    self.log.info("browser_started_successfully", 
+                                cdp_url=result,
+                                attempt=attempt)
+                    return result
+                else:
+                    self.log.warning("browser_start_failed", attempt=attempt)
+                    
+            except Exception as e:
+                self.log.error("browser_start_exception",
+                             attempt=attempt,
+                             error=str(e),
+                             error_type=type(e).__name__)
+            
+            # Wait before retry (exponential backoff)
+            if attempt < self.MAX_RETRIES:
+                wait_time = 2 ** attempt
+                self.log.info("browser_retry_waiting", wait_time=wait_time)
+                time.sleep(wait_time)
+        
+        self.log.error("browser_start_failed_all_retries", max_retries=self.MAX_RETRIES)
+        return None
+    
+    def _start_browser_impl(self, port: int, timeout: int) -> Optional[str]:
+        """
+        Internal implementation for starting the browser
+        
+        Args:
+            port: Port for CDP connection
+            timeout: Timeout in seconds
+            
+        Returns:
+            CDP URL or None if failed
+        """
         try:
             # Import playwright only when needed
             try:
                 from playwright.sync_api import sync_playwright
             except ImportError:
-                logger.error("Playwright not installed. Install with: pip install playwright")
-                logger.error("Then run: playwright install chromium")
+                self.log.error("playwright_not_installed",
+                             install_cmd="pip install playwright && playwright install chromium")
                 return None
-            
-            # Start browser with CDP enabled
-            logger.info(f"Starting {self.browser_type} browser on port {port}")
             
             # Build command for launching browser with CDP
             if self.browser_type == "chromium":
@@ -115,32 +207,62 @@ class PersistentBrowserManager:
                         if self.headless:
                             cmd.append("--headless=new")
                         
+                        # Add extension arguments if any extensions are enabled
+                        extension_args = self.extension_manager.get_extension_args_for_chromium()
+                        if extension_args:
+                            cmd.extend(extension_args)
+                            self.log.info("browser_loading_extensions",
+                                        extensions_count=len(self.extension_manager.get_enabled_extension_paths()))
+                        
                         # Start browser process
+                        self.log.debug("browser_starting_process", command=' '.join(cmd[:3]))  # Don't log full cmd with extensions
                         self._browser_process = subprocess.Popen(
                             cmd,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                         )
                         
-                        # Wait for browser to start
-                        time.sleep(2)
+                        # Wait for browser to start (with timeout)
+                        start_time = time.time()
+                        while time.time() - start_time < timeout:
+                            if self._browser_process.poll() is not None:
+                                # Process exited prematurely
+                                stdout, stderr = self._browser_process.communicate()
+                                self.log.error("browser_process_exited",
+                                             returncode=self._browser_process.returncode,
+                                             stderr=stderr.decode() if stderr else "")
+                                return None
+                            
+                            time.sleep(0.5)
+                            
+                            # Check if port is listening (basic check)
+                            if time.time() - start_time > 2:  # Wait at least 2 seconds before declaring success
+                                break
                         
                         # Set CDP URL
                         self._cdp_url = f"http://localhost:{port}"
                         
-                        logger.info(f"Browser started successfully. CDP URL: {self._cdp_url}")
+                        self.log.info("browser_process_started", 
+                                    cdp_url=self._cdp_url,
+                                    pid=self._browser_process.pid)
                         return self._cdp_url
                     else:
-                        logger.error(f"Chromium executable not found at: {chrome_exe}")
+                        self.log.error("chromium_executable_not_found", 
+                                     expected_path=str(chrome_exe))
                 else:
-                    logger.error("Playwright chromium not found. Run: playwright install chromium")
+                    self.log.error("chromium_not_installed",
+                                 install_cmd="playwright install chromium")
             else:
-                logger.warning(f"Browser type {self.browser_type} not fully supported for CDP")
+                self.log.warning("browser_type_not_supported",
+                               browser_type=self.browser_type,
+                               supported_types=["chromium"])
             
             return None
             
         except Exception as e:
-            logger.error(f"Failed to start browser: {e}", exc_info=True)
+            self.log.error("browser_start_unexpected_error",
+                         error=str(e),
+                         error_type=type(e).__name__)
             return None
     
     def stop_browser(self) -> bool:

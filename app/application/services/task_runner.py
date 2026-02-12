@@ -4,6 +4,7 @@
 import json
 import logging
 import os
+import psutil
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,56 @@ class StructuredLogger:
     
     def debug(self, msg, **extra):
         self._log(logging.DEBUG, msg, **extra)
+
+
+class ResourceMonitor:
+    """Monitor system resource usage during mission execution"""
+    
+    @staticmethod
+    def get_resource_snapshot() -> dict:
+        """
+        Get current resource usage snapshot
+        
+        Returns:
+            Dictionary with CPU, memory, and disk usage
+        """
+        try:
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            memory = psutil.virtual_memory()
+            disk = psutil.disk_usage('/')
+            
+            return {
+                "cpu_percent": round(cpu_percent, 2),
+                "memory_percent": round(memory.percent, 2),
+                "memory_available_mb": round(memory.available / (1024 * 1024), 2),
+                "disk_percent": round(disk.percent, 2),
+                "disk_free_gb": round(disk.free / (1024 * 1024 * 1024), 2),
+            }
+        except Exception as e:
+            logger.warning(f"Failed to get resource snapshot: {e}")
+            return {}
+    
+    @staticmethod
+    def get_process_resources(pid: int) -> dict:
+        """
+        Get resource usage for a specific process
+        
+        Args:
+            pid: Process ID
+            
+        Returns:
+            Dictionary with process CPU and memory usage
+        """
+        try:
+            process = psutil.Process(pid)
+            return {
+                "cpu_percent": round(process.cpu_percent(interval=0.1), 2),
+                "memory_mb": round(process.memory_info().rss / (1024 * 1024), 2),
+                "num_threads": process.num_threads(),
+            }
+        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+            logger.warning(f"Failed to get process resources for PID {pid}: {e}")
+            return {}
 
 
 class DependencyInstallationError(Exception):
@@ -142,6 +193,11 @@ class TaskRunner:
                 browser_interaction=mission.browser_interaction,
                 keep_alive=mission.keep_alive)
         
+        # Capture initial resource snapshot
+        initial_resources = ResourceMonitor.get_resource_snapshot()
+        if initial_resources:
+            log.info("resources_initial", **initial_resources)
+        
         # Create temporary script file
         script_file = None
         venv_path = None
@@ -225,9 +281,15 @@ class TaskRunner:
             
             # Execute the script
             log.info("script_executing", python_exe=python_exe, timeout=mission.timeout)
-            result = self._execute_script(python_exe, script_file, mission.timeout)
+            result = self._execute_script(python_exe, script_file, mission.timeout, log)
             
             execution_time = time.time() - start_time
+            
+            # Capture final resource snapshot
+            final_resources = ResourceMonitor.get_resource_snapshot()
+            if final_resources:
+                log.info("resources_final", **final_resources)
+            
             log.info("mission_completed", 
                     execution_time=execution_time,
                     exit_code=result['exit_code'],
@@ -398,14 +460,15 @@ class TaskRunner:
                          error_type=type(e).__name__)
                 raise DependencyInstallationError(requirement, str(e))
     
-    def _execute_script(self, python_exe: str, script_file: Path, timeout: int) -> dict:
+    def _execute_script(self, python_exe: str, script_file: Path, timeout: int, log: StructuredLogger) -> dict:
         """
-        Execute a Python script and capture output
+        Execute a Python script and capture output with resource monitoring
         
         Args:
             python_exe: Path to Python executable
             script_file: Path to script file
             timeout: Maximum execution time in seconds
+            log: Structured logger instance
             
         Returns:
             Dictionary with stdout, stderr, exit_code, and optional error
@@ -413,28 +476,40 @@ class TaskRunner:
         try:
             logger.debug(f"Running script: {script_file} with timeout {timeout}s")
             
-            result = subprocess.run(
+            # Start process
+            process = subprocess.Popen(
                 [python_exe, str(script_file)],
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=timeout,
                 cwd=str(script_file.parent),
             )
             
-            return {
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "exit_code": result.returncode,
-            }
+            # Monitor process resources
+            process_resources = ResourceMonitor.get_process_resources(process.pid)
+            if process_resources:
+                log.debug("process_resources", pid=process.pid, **process_resources)
             
-        except subprocess.TimeoutExpired as e:
-            logger.error(f"Script execution timeout after {timeout}s")
-            return {
-                "stdout": e.stdout.decode() if e.stdout else "",
-                "stderr": e.stderr.decode() if e.stderr else "",
-                "exit_code": 124,  # Standard timeout exit code
-                "error": f"Execution timeout after {timeout} seconds",
-            }
+            # Wait for completion with timeout
+            try:
+                stdout, stderr = process.communicate(timeout=timeout)
+                return {
+                    "stdout": stdout,
+                    "stderr": stderr,
+                    "exit_code": process.returncode,
+                }
+            except subprocess.TimeoutExpired:
+                # Kill the process on timeout
+                process.kill()
+                stdout, stderr = process.communicate()
+                log.error("script_execution_timeout", timeout=timeout, pid=process.pid)
+                return {
+                    "stdout": stdout or "",
+                    "stderr": stderr or "",
+                    "exit_code": 124,  # Standard timeout exit code
+                    "error": f"Execution timeout after {timeout} seconds",
+                }
+            
         except Exception as e:
             logger.error(f"Error executing script: {e}")
             return {
