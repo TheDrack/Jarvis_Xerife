@@ -76,10 +76,12 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Usar o serviço de auto-evolução para verificar com melhor tratamento de erros
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
           set +e
           python - << 'PYCODE' 2>&1 | tee -a /tmp/auto_evolution_check.log
           import os
           import sys
+          sys.path.insert(0, os.getcwd())
           
           try:
               from app.application.services.auto_evolution import AutoEvolutionService
@@ -163,11 +165,13 @@ jobs:
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
           set +e
           python - << 'PYCODE' 2>&1 | tee /tmp/find_mission.log
           import json
           import os
           import sys
+          sys.path.insert(0, os.getcwd())
           
           try:
               from app.application.services.auto_evolution import AutoEvolutionService
@@ -449,10 +453,12 @@ jobs:
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
           set +e
           python - << 'PYCODE' 2>&1 | tee /tmp/rl_result.log
           import os
           import sys
+          sys.path.insert(0, os.getcwd())
           
           try:
               from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter

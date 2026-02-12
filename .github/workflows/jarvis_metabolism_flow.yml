@@ -163,6 +163,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Executar script de análise metabólica com melhor tratamento de erros
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
           set +e  # Não parar em erros para capturar saída
           OUTPUT=$(python scripts/metabolism_analyzer.py \
             --intent "$INTENT" \
@@ -314,6 +315,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Executar mecânico consertador com estratégia de mutação aprovada
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
           set +e
           OUTPUT=$(python scripts/metabolism_mutator.py \
             --strategy "$MUTATION_STRATEGY" \
