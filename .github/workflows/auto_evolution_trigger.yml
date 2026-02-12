@@ -116,7 +116,7 @@ jobs:
               sys.exit(1)
           PYCODE
           EXIT_CODE=$?
-          set +e
+          set -e
           
           # Mostrar log se houver erro
           if [ $EXIT_CODE -ne 0 ]; then
@@ -238,7 +238,7 @@ jobs:
               sys.exit(1)
           PYCODE
           EXIT_CODE=$?
-          set +e
+          set -e
           
           # Mostrar log
           cat /tmp/find_mission.log >> $GITHUB_STEP_SUMMARY
@@ -512,7 +512,7 @@ jobs:
               sys.exit(0)  # Don't fail the workflow if RL fails
           PYCODE
           EXIT_CODE=$?
-          set +e
+          set -e
           
           # Mostrar resultado
           cat /tmp/rl_result.log >> $GITHUB_STEP_SUMMARY
