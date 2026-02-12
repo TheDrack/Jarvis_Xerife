@@ -492,6 +492,25 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             box-shadow: 0 0 15px rgba(0, 255, 136, 0.3);
         }
         
+        #voiceButton.muted {
+            background: rgba(128, 128, 128, 0.3);
+            border-color: #808080;
+            color: #808080;
+        }
+        
+        #voiceButton.listening {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: #00d4ff;
+            animation: pulse-blue 2s ease-in-out infinite;
+        }
+        
+        #voiceButton.transcribing {
+            background: rgba(255, 0, 0, 0.3);
+            border-color: #ff0000;
+            animation: pulse 1s ease-in-out infinite;
+        }
+        
+        /* Legacy support */
         #voiceButton.recording {
             background: rgba(255, 0, 0, 0.3);
             border-color: #ff0000;
@@ -501,6 +520,27 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         @keyframes pulse {
             0%, 100% { box-shadow: 0 0 15px rgba(255, 0, 0, 0.5); }
             50% { box-shadow: 0 0 30px rgba(255, 0, 0, 0.8); }
+        }
+        
+        @keyframes pulse-blue {
+            0%, 100% { box-shadow: 0 0 15px rgba(0, 212, 255, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(0, 212, 255, 0.8); }
+        }
+        
+        /* Input box waveform visual feedback */
+        #commandInput.voice-active {
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+            animation: waveform 0.5s ease-in-out infinite;
+        }
+        
+        @keyframes waveform {
+            0%, 100% { 
+                box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+            }
+            50% { 
+                box-shadow: 0 0 30px rgba(0, 255, 136, 0.8), 0 0 40px rgba(0, 255, 136, 0.4);
+            }
         }
         
         #sendButton {
@@ -1039,9 +1079,15 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         const passwordToggle = document.getElementById('passwordToggle');
         const passwordInput = document.getElementById('password');
         
-        // Voice recognition
+        // Voice recognition - V.A.S. (Voice Activated System)
         let recognition = null;
         let isRecording = false;
+        let vasState = 'muted'; // 'muted', 'listening' (wake word detection), 'transcribing'
+        let silenceTimer = null;
+        const SILENCE_TIMEOUT = 3000; // 3 seconds
+        // Wake word detection works with Portuguese pronunciation since lang='pt-BR'
+        const WAKE_WORD = 'jarvis';
+        let lastSpeechTime = Date.now();
         
         // Voice synthesis
         function speak(text) {
@@ -1059,33 +1105,144 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             }
         }
         
-        // Initialize Web Speech API
+        // Initialize Web Speech API for V.A.S.
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
+            recognition.continuous = true; // Continuous mode for wake word detection
+            recognition.interimResults = true; // Get interim results for real-time transcription
             recognition.lang = 'pt-BR'; // Portuguese Brazilian
             
             recognition.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                commandInput.value = transcript;
+                const results = event.results;
+                const lastResult = results[results.length - 1];
+                const transcript = lastResult[0].transcript.trim().toLowerCase();
+                
+                lastSpeechTime = Date.now();
+                
+                // Reset silence timer when speech is detected
+                if (silenceTimer) {
+                    clearTimeout(silenceTimer);
+                }
+                
+                if (vasState === 'listening') {
+                    // Wake word detection mode
+                    if (transcript.includes(WAKE_WORD)) {
+                        // Wake word detected! Switch to transcribing mode
+                        vasState = 'transcribing';
+                        updateVoiceButtonState();
+                        commandInput.focus();
+                        commandInput.classList.add('voice-active');
+                        addMessage('Wake word detected. Transcribing...', 'system');
+                        // Clear the wake word from input
+                        commandInput.value = '';
+                    }
+                } else if (vasState === 'transcribing') {
+                    // Transcription mode - write to input box
+                    if (lastResult.isFinal) {
+                        // Final result - append to input
+                        const currentValue = commandInput.value;
+                        const newText = lastResult[0].transcript.trim();
+                        commandInput.value = currentValue ? currentValue + ' ' + newText : newText;
+                    } else {
+                        // Interim result - show in real-time but don't commit yet
+                        // For better UX, we'll just use final results
+                    }
+                    
+                    // Start silence detection
+                    silenceTimer = setTimeout(() => {
+                        handleSilence();
+                    }, SILENCE_TIMEOUT);
+                    
+                    // Visual feedback during speech
+                    commandInput.classList.add('voice-active');
+                }
             };
             
             recognition.onerror = (event) => {
                 console.error('Speech recognition error:', event.error);
-                addMessage(`Voice error: ${event.error}`, 'system');
-                isRecording = false;
-                voiceButton.classList.remove('recording');
+                
+                // Don't show error message for 'no-speech' - it's expected during listening
+                if (event.error !== 'no-speech') {
+                    addMessage(`Voice error: ${event.error}`, 'system');
+                }
+                
+                // Reset state on certain errors
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    vasState = 'muted';
+                    isRecording = false;
+                    updateVoiceButtonState();
+                    addMessage('Microphone access denied. Please allow microphone permissions.', 'system');
+                }
             };
             
             recognition.onend = () => {
-                isRecording = false;
-                voiceButton.classList.remove('recording');
+                // Only stop if we're in muted state, otherwise restart for continuous listening
+                if (vasState === 'listening' && isRecording) {
+                    // Restart for continuous wake word detection
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        // Ignore if already started; log other errors
+                        if (e.name !== 'InvalidStateError') {
+                            console.error('Recognition restart error:', e);
+                        }
+                    }
+                } else if (vasState === 'transcribing' && isRecording) {
+                    // Keep transcribing until manually stopped or silence detected
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        // Ignore if already started; log other errors
+                        if (e.name !== 'InvalidStateError') {
+                            console.error('Recognition restart error:', e);
+                        }
+                    }
+                } else {
+                    isRecording = false;
+                    updateVoiceButtonState();
+                }
+            };
+            
+            recognition.onstart = () => {
+                isRecording = true;
             };
         } else {
-            // Hide voice button if not supported
+            // Browser doesn't support Speech API - show fallback message
+            addMessage('Comando de voz indisponível neste ambiente', 'system');
             voiceButton.style.display = 'none';
+        }
+        
+        // Handle silence detection
+        function handleSilence() {
+            if (vasState === 'transcribing') {
+                // Silence detected - return to wake word listening mode
+                vasState = 'listening';
+                updateVoiceButtonState();
+                commandInput.classList.remove('voice-active');
+                addMessage('Silence detected. Returning to wake word mode...', 'system');
+            }
+        }
+        
+        // Update voice button visual state
+        function updateVoiceButtonState() {
+            // Remove all state classes
+            voiceButton.classList.remove('muted', 'listening', 'transcribing', 'recording');
+            
+            // Add current state class
+            voiceButton.classList.add(vasState);
+            
+            // Update button icon/text based on state
+            if (vasState === 'muted') {
+                voiceButton.innerHTML = '🔇';
+                voiceButton.title = 'Microphone Off - Click to enable wake word detection';
+            } else if (vasState === 'listening') {
+                voiceButton.innerHTML = '🎤';
+                voiceButton.title = 'Listening for wake word "Jarvis" - Click to mute';
+            } else if (vasState === 'transcribing') {
+                voiceButton.innerHTML = '🔴';
+                voiceButton.title = 'Transcribing - Click to stop';
+            }
         }
         
         // Check authentication on load
@@ -1218,7 +1375,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         // Logout handler
         logoutBtn.addEventListener('click', logout);
         
-        // Voice button handler
+        // Voice button handler for V.A.S.
         if (voiceButton) {
             voiceButton.addEventListener('click', () => {
                 if (!recognition) {
@@ -1226,17 +1383,47 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                     return;
                 }
                 
-                if (isRecording) {
-                    recognition.stop();
+                if (vasState === 'muted') {
+                    // Start wake word listening mode
+                    vasState = 'listening';
+                    try {
+                        recognition.start();
+                        updateVoiceButtonState();
+                        addMessage('Wake word detection active. Say "Jarvis" to start transcribing.', 'system');
+                    } catch (e) {
+                        console.error('Failed to start recognition:', e);
+                        vasState = 'muted';
+                        updateVoiceButtonState();
+                    }
+                } else if (vasState === 'listening') {
+                    // Stop and mute
+                    vasState = 'muted';
+                    try {
+                        recognition.stop();
+                    } catch (e) {
+                        // Ignore if already stopped; log other errors
+                        if (e.name !== 'InvalidStateError') {
+                            console.error('Recognition stop error:', e);
+                        }
+                    }
                     isRecording = false;
-                    voiceButton.classList.remove('recording');
-                } else {
-                    recognition.start();
-                    isRecording = true;
-                    voiceButton.classList.add('recording');
-                    addMessage('Listening... Speak now', 'system');
+                    updateVoiceButtonState();
+                    addMessage('Voice detection disabled.', 'system');
+                } else if (vasState === 'transcribing') {
+                    // Stop transcribing and return to listening mode
+                    vasState = 'listening';
+                    commandInput.classList.remove('voice-active');
+                    if (silenceTimer) {
+                        clearTimeout(silenceTimer);
+                        silenceTimer = null;
+                    }
+                    updateVoiceButtonState();
+                    addMessage('Transcription stopped. Back to wake word mode.', 'system');
                 }
             });
+            
+            // Initialize button state
+            updateVoiceButtonState();
         }
         
         // Add message to terminal
@@ -1335,11 +1522,13 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         // Send on button click
         sendButton.addEventListener('click', sendCommand);
         
-        // Send on Enter key
-        commandInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+        // Send on Enter key (Shift+Enter for new line in textarea)
+        commandInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Prevent new line
                 sendCommand();
             }
+            // Shift+Enter will create a new line (default behavior)
         });
         
         // Initialize app
