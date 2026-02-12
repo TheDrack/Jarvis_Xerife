@@ -226,9 +226,9 @@ jobs:
           Aguardando sua análise e orientação nos comentários desta issue/PR."
           
           if [[ -n "${{ github.event.issue.number }}" ]]; then
-            gh issue comment "${{ github.event.issue.number }}" --body "$BODY_TEXT"
+            gh issue comment "${{ github.event.issue.number }}" --repo "${{ github.repository }}" --body "$BODY_TEXT"
           elif [[ -n "${{ github.event.pull_request.number }}" ]]; then
-            gh pr comment "${{ github.event.pull_request.number }}" --body "$BODY_TEXT"
+            gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body "$BODY_TEXT"
           fi
           
           exit 0
@@ -528,6 +528,7 @@ jobs:
           
           # Criar issue para o comandante
           gh issue create \
+            --repo "${{ github.repository }}" \
             --title "🎯 COMANDANTE: Intervenção Necessária - ${{ needs.metabolic_analysis.outputs.event_description }}" \
             --body "$REPORT" \
             --label "commander-review" \

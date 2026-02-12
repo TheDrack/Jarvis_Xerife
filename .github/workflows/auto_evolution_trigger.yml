@@ -402,6 +402,7 @@ jobs:
           
           # Criar PR
           gh pr create \
+            --repo "${{ github.repository }}" \
             --title "$PR_TITLE" \
             --body-file "$BODY_FILE" \
             --base main \
@@ -413,7 +414,7 @@ jobs:
           rm -f "$BODY_FILE"
           
           # Obter número da PR criada
-          PR_NUMBER=$(gh pr view "$BRANCH_NAME" --json number -q .number)
+          PR_NUMBER=$(gh pr view "$BRANCH_NAME" --repo "${{ github.repository }}" --json number -q .number)
           echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           
           echo "**✅ Pull Request criada:** #$PR_NUMBER" >> $GITHUB_STEP_SUMMARY
