@@ -1,0 +1,455 @@
+name: Auto Evolution Trigger
+
+# ==================================================
+# AUTO-EVOLUTION TRIGGER WORKFLOW
+# ==================================================
+#
+# Este workflow implementa o loop de auto-evolução do Jarvis
+# com integração ao sistema de Reinforcement Learning.
+#
+# Lógica:
+# 1. Trigger: PR merged para main
+# 2. Verifica se o PR NÃO é de auto-evolução (evita loop infinito)
+# 3. Se não for auto-evolução:
+#    - Busca próxima missão no ROADMAP.md
+#    - Tenta implementar a solução
+#    - Executa testes
+#    - Se sucesso: recebe recompensa (rewards.py)
+#    - Se falha: recebe punição (rewards.py)
+#
+# ==================================================
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # ==================================================
+  # VERIFICAÇÃO: PR foi merged e não é auto-evolução?
+  # ==================================================
+  check_trigger_conditions:
+    name: "🔍 Verificar Condições de Trigger"
+    runs-on: ubuntu-latest
+    # Só executa se PR foi merged
+    if: github.event.pull_request.merged == true
+    outputs:
+      should_evolve: ${{ steps.check.outputs.should_evolve }}
+      pr_title: ${{ github.event.pull_request.title }}
+      pr_number: ${{ github.event.pull_request.number }}
+      
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || echo "Some dependencies failed, continuing..."
+
+      - name: 🧬 Verificar se deve triggar evolução
+        id: check
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 🧬 AUTO-EVOLUTION TRIGGER CHECK" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "**PR Merged:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Título:** $PR_TITLE" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Usar o serviço de auto-evolução para verificar
+          python -c "
+          from app.application.services.auto_evolution import AutoEvolutionService
+          
+          auto_evolution = AutoEvolutionService()
+          is_auto_evo = auto_evolution.is_auto_evolution_pr(
+              pr_title='$PR_TITLE',
+              pr_body='''$PR_BODY'''
+          )
+          
+          if is_auto_evo:
+              print('Este PR é de auto-evolução. Loop infinito evitado!')
+              print('should_evolve=false')
+              with open('$GITHUB_OUTPUT', 'a') as f:
+                  f.write('should_evolve=false\n')
+          else:
+              print('Este PR NÃO é de auto-evolução. Triggando evolução!')
+              print('should_evolve=true')
+              with open('$GITHUB_OUTPUT', 'a') as f:
+                  f.write('should_evolve=true\n')
+          " | tee -a $GITHUB_STEP_SUMMARY
+
+  # ==================================================
+  # ANÁLISE: Buscar próxima missão do ROADMAP
+  # ==================================================
+  find_next_mission:
+    name: "🎯 Buscar Próxima Missão"
+    needs: check_trigger_conditions
+    if: needs.check_trigger_conditions.outputs.should_evolve == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      has_mission: ${{ steps.find.outputs.has_mission }}
+      mission_description: ${{ steps.find.outputs.mission_description }}
+      mission_context: ${{ steps.find.outputs.mission_context }}
+      
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || echo "Some dependencies failed, continuing..."
+
+      - name: 🎯 Encontrar próxima missão no ROADMAP
+        id: find
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎯 BUSCAR PRÓXIMA MISSÃO DO ROADMAP" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          python -c "
+          import json
+          from app.application.services.auto_evolution import AutoEvolutionService
+          
+          auto_evolution = AutoEvolutionService()
+          
+          # Buscar próxima missão
+          next_mission = auto_evolution.find_next_mission()
+          
+          if next_mission:
+              mission_data = next_mission['mission']
+              section = next_mission['section']
+              priority = next_mission['priority']
+              
+              print(f'✅ Missão encontrada!')
+              print(f'Seção: {section}')
+              print(f'Prioridade: {priority}')
+              print(f'Descrição: {mission_data[\"description\"][:100]}...')
+              
+              # Gerar contexto para o GitHub Copilot
+              context = auto_evolution.get_roadmap_context(next_mission)
+              
+              # Salvar outputs
+              with open('$GITHUB_OUTPUT', 'a') as f:
+                  f.write('has_mission=true\n')
+                  f.write(f'mission_description={mission_data[\"description\"][:200]}\n')
+              
+              # Salvar contexto em arquivo para próximo job
+              with open('mission_context.txt', 'w') as f:
+                  f.write(context)
+              
+              # Summary
+              with open('$GITHUB_STEP_SUMMARY', 'a') as f:
+                  f.write(f'**✅ Missão Encontrada**\n\n')
+                  f.write(f'**Seção:** {section}\n')
+                  f.write(f'**Prioridade:** {priority}\n')
+                  f.write(f'**Descrição:** {mission_data[\"description\"]}\n')
+                  f.write(f'\n**Status:** {mission_data[\"status\"]}\n')
+          else:
+              print('❌ Nenhuma missão encontrada para evoluir')
+              with open('$GITHUB_OUTPUT', 'a') as f:
+                  f.write('has_mission=false\n')
+              
+              with open('$GITHUB_STEP_SUMMARY', 'a') as f:
+                  f.write('**❌ Nenhuma missão encontrada**\n\n')
+                  f.write('Todas as missões no ROADMAP estão completas ou não há missões disponíveis.\n')
+          "
+
+      - name: Upload mission context
+        if: steps.find.outputs.has_mission == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mission-context
+          path: mission_context.txt
+
+  # ==================================================
+  # EVOLUÇÃO: Tentar implementar missão
+  # ==================================================
+  attempt_evolution:
+    name: "🧬 Tentar Evolução"
+    needs: [check_trigger_conditions, find_next_mission]
+    if: needs.find_next_mission.outputs.has_mission == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      evolution_success: ${{ steps.test.outputs.evolution_success }}
+      pr_number: ${{ steps.create_pr.outputs.pr_number }}
+      
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-json-report pytest-cov
+          pip install -r requirements.txt || echo "Some dependencies failed, continuing..."
+
+      - name: Download mission context
+        uses: actions/download-artifact@v4
+        with:
+          name: mission-context
+
+      - name: Configurar Git
+        run: |
+          git config --global user.name "Jarvis-AutoEvolution"
+          git config --global user.email "jarvis-evolution@bot.com"
+
+      - name: 🌱 Criar branch de evolução
+        id: branch
+        run: |
+          TIMESTAMP=$(date +%s)
+          BRANCH_NAME="auto-evolution/mission-${TIMESTAMP}"
+          git checkout -b "$BRANCH_NAME"
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          
+          echo "**Branch:** \`$BRANCH_NAME\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🤖 Usar GitHub Copilot para implementar (simulação)
+        id: implement
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 🤖 IMPLEMENTAÇÃO DA MISSÃO" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Ler contexto da missão
+          if [ -f mission_context.txt ]; then
+            cat mission_context.txt >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Por enquanto, criar um placeholder indicando que o Copilot seria chamado
+          # Em produção, aqui seria integrado com GitHub Copilot Agent
+          echo "**Status:** Em desenvolvimento - Integração com GitHub Copilot Agent" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ Esta é uma implementação inicial. O GitHub Copilot Agent seria" >> $GITHUB_STEP_SUMMARY
+          echo "invocado aqui para implementar a missão automaticamente." >> $GITHUB_STEP_SUMMARY
+          
+          # Criar um arquivo de marcador para demonstração
+          echo "# Auto-Evolution Mission" > docs/AUTO_EVOLUTION_LOG.md
+          echo "" >> docs/AUTO_EVOLUTION_LOG.md
+          echo "Mission attempted at: $(date)" >> docs/AUTO_EVOLUTION_LOG.md
+          echo "" >> docs/AUTO_EVOLUTION_LOG.md
+          cat mission_context.txt >> docs/AUTO_EVOLUTION_LOG.md
+          
+          git add docs/AUTO_EVOLUTION_LOG.md
+          git commit -m "[Auto-Evolution] Attempting mission from ROADMAP"
+
+      - name: 🧪 Executar testes
+        id: test
+        continue-on-error: true
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 🧪 EXECUTAR TESTES" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Executar testes
+          if pytest --json-report --json-report-file=test_report.json; then
+            echo "evolution_success=true" >> $GITHUB_OUTPUT
+            echo "**✅ TESTES PASSARAM**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "A evolução foi bem-sucedida! Recompensa será registrada." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "evolution_success=false" >> $GITHUB_OUTPUT
+            echo "**❌ TESTES FALHARAM**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "A evolução falhou. Punição será registrada." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 📤 Push branch
+        run: |
+          git push origin "$BRANCH_NAME"
+
+      - name: 📝 Criar Pull Request
+        id: create_pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+        run: |
+          MISSION_DESC="${{ needs.find_next_mission.outputs.mission_description }}"
+          
+          PR_TITLE="[Auto-Evolution] ${MISSION_DESC:0:80}"
+          PR_BODY="## 🧬 Auto-Evolution Mission
+          
+          Esta PR foi criada automaticamente pelo sistema de auto-evolução do Jarvis.
+          
+          ### Missão do ROADMAP
+          $MISSION_DESC
+          
+          ### Contexto
+          Ver arquivo \`docs/AUTO_EVOLUTION_LOG.md\` para detalhes completos da missão.
+          
+          ### Status dos Testes
+          Testes foram executados automaticamente. Ver workflow para resultados.
+          
+          ### Reinforcement Learning
+          - Sucesso: +50 pontos (deploy_success)
+          - Falha: -25 pontos (deploy_fail)
+          
+          ---
+          
+          _Criado automaticamente pelo workflow auto_evolution_trigger.yml_
+          _Triggered por: PR #${{ needs.check_trigger_conditions.outputs.pr_number }}_"
+          
+          # Criar PR
+          gh pr create \
+            --title "$PR_TITLE" \
+            --body "$PR_BODY" \
+            --base main \
+            --head "$BRANCH_NAME" \
+            --label "auto-evolution" \
+            --label "jarvis-evolution"
+          
+          # Obter número da PR criada
+          PR_NUMBER=$(gh pr view "$BRANCH_NAME" --json number -q .number)
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          
+          echo "**✅ Pull Request criada:** #$PR_NUMBER" >> $GITHUB_STEP_SUMMARY
+
+  # ==================================================
+  # RECOMPENSA/PUNIÇÃO: Registrar no RL system
+  # ==================================================
+  log_evolution_result:
+    name: "📊 Registrar Resultado no RL"
+    needs: [find_next_mission, attempt_evolution]
+    if: always() && needs.find_next_mission.outputs.has_mission == 'true'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || echo "Some dependencies failed, continuing..."
+
+      - name: 📊 Registrar recompensa/punição
+        env:
+          EVOLUTION_SUCCESS: ${{ needs.attempt_evolution.outputs.evolution_success }}
+          PR_NUMBER: ${{ needs.attempt_evolution.outputs.pr_number }}
+          MISSION_DESC: ${{ needs.find_next_mission.outputs.mission_description }}
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 REINFORCEMENT LEARNING - RESULTADO" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          python -c "
+          from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
+          from app.adapters.infrastructure.reward_adapter import RewardAdapter
+          from app.application.services.evolution_loop import EvolutionLoopService
+          from app.core.config import settings
+          
+          # Inicializar serviços
+          try:
+              db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
+              reward_adapter = RewardAdapter(engine=db_adapter.engine)
+              evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
+              
+              success = '$EVOLUTION_SUCCESS' == 'true'
+              
+              # Registrar resultado
+              reward_id = evolution_service.log_deploy_result(
+                  success=success,
+                  deployment_id='auto-evolution-pr-$PR_NUMBER',
+                  metadata={
+                      'type': 'auto_evolution',
+                      'mission': '$MISSION_DESC',
+                      'pr_number': '$PR_NUMBER',
+                      'workflow_run': '${{ github.run_id }}'
+                  }
+              )
+              
+              if success:
+                  print('✅ Recompensa registrada: +50 pontos (deploy_success)')
+                  print(f'Reward ID: {reward_id}')
+              else:
+                  print('❌ Punição registrada: -25 pontos (deploy_fail)')
+                  print(f'Reward ID: {reward_id}')
+              
+              # Obter status de evolução
+              status = evolution_service.get_evolution_status(days=7)
+              print(f'\n{status[\"commander_message\"]}')
+              
+          except Exception as e:
+              print(f'⚠️ Erro ao registrar no RL system: {e}')
+              print('Continuando sem registro de recompensa...')
+          " | tee -a $GITHUB_STEP_SUMMARY
+
+  # ==================================================
+  # RESUMO: Status final
+  # ==================================================
+  summary:
+    name: "📋 Resumo da Auto-Evolução"
+    needs: [check_trigger_conditions, find_next_mission, attempt_evolution, log_evolution_result]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📋 Gerar resumo
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 📋 RESUMO DO CICLO DE AUTO-EVOLUÇÃO" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "**Trigger:** PR #${{ needs.check_trigger_conditions.outputs.pr_number }} merged" >> $GITHUB_STEP_SUMMARY
+          echo "**Deve Evoluir:** ${{ needs.check_trigger_conditions.outputs.should_evolve }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Missão Encontrada:** ${{ needs.find_next_mission.outputs.has_mission }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Evolução Bem-Sucedida:** ${{ needs.attempt_evolution.outputs.evolution_success }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Princípios da Auto-Evolução:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Toda evolução é triggada por sucesso anterior (PR merged)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Loop infinito evitado (detecta PRs de auto-evolução)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Missões priorizadas por seção do ROADMAP" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Reinforcement Learning integrado (rewards/punishments)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Comandante pode revisar todas as PRs de evolução" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Sistema de Auto-Evolução do Jarvis com Reinforcement Learning_" >> $GITHUB_STEP_SUMMARY
