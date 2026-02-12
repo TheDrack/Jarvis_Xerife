@@ -48,10 +48,13 @@ Jarvis is a **cloud-native voice assistant** with distributed device orchestrati
 - **GitHub Copilot integration** - Provides repository context to GitHub Agents
 
 ### 🔧 Self-Healing & Auto-Correction
-- **Automatic bug fixing** using GitHub Copilot
+- **Metabolism Flow** - Biological-inspired DNA mutation control system
+- **Automatic bug fixing** using GitHub Copilot (Mecânico Consertador)
+- **Metabolic analysis** with intelligent escalation (Mecânico Revisionador)
 - **CI/CD failure detection** and auto-repair
 - **Pull Request generation** for proposed fixes
-- **State machine** for autonomous error handling
+- **State machine** for autonomous error handling with 3-cycle limit
+- **Commander escalation** for complex decisions requiring human judgment
 
 ### 🏗️ Architecture & Deployment
 - **Hexagonal Architecture** - Clean domain logic, testable
@@ -121,11 +124,13 @@ Default credentials: `admin` / `admin123`
 - [Installation Guide](docs/guides/INSTALLER_README.md) - Detailed setup instructions
 - [Local Setup](docs/guides/LOCAL_SETUP.md) - Development environment setup
 - [Quick Start - Self-Healing](docs/guides/SELF_HEALING_QUICK_START.md) - Auto-correction setup
+- [Metabolism Flow](docs/architecture/METABOLISM_FLOW.md) - **NEW:** Biological-inspired DNA mutation system
 
 ### Architecture & Design
 - [Hexagonal Architecture](docs/architecture/ARCHITECTURE.md) - System design
 - [Device Orchestration](docs/architecture/DEVICE_ORCHESTRATION.md) - Multi-device coordination
 - [Self-Healing System](docs/architecture/SELF_HEALING_ARCHITECTURE.md) - Auto-correction architecture
+- [Metabolism Flow](docs/architecture/METABOLISM_FLOW.md) - **NEW:** DNA mutation control system
 
 ### API & Integration
 - [REST API Documentation](docs/api/API_README.md) - API reference

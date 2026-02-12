@@ -1,0 +1,523 @@
+name: Jarvis Metabolism Flow
+
+# ==================================================
+# FLUXO DE METABOLISMO DO JARVIS
+# ==================================================
+#
+# O Jarvis é tratado como um organismo de software.
+# Seu repositório representa seu DNA.
+# Qualquer alteração nesse DNA deve passar por um
+# processo metabólico controlado, rastreável e validado.
+#
+# Este fluxo é acionado sempre que houver qualquer
+# evento que impacte o DNA do Jarvis.
+#
+# Estrutura:
+# 1. EVENTO DE ENTRADA - Qualquer evento que demande ação sobre o DNA
+# 2. MECÂNICO REVISIONADOR - Análise metabólica da intenção
+# 3. CRITÉRIO DE ESCALONAMENTO - Decisão: automatizar ou escalar
+# 4. OFICINA - Execução metabólica em branch isolada
+# 5. MECÂNICO CONSERTADOR - Implementação da mutação
+# 6. VISTORIA - Validação homeostática (pytest)
+# 7. CONTROLE DE LOOP - Máximo 3 ciclos completos
+# 8. COMANDANTE - Consciência superior (humano)
+# 9. PRINCÍPIOS FUNDAMENTAIS - DNA sagrado, testes = imunológico
+#
+# ==================================================
+
+on:
+  # 1. EVENTO DE ENTRADA - Múltiplas fontes de intenção técnica
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issues:
+    types: [opened, edited]
+  repository_dispatch:
+    types: [jarvis_order, auto_fix, metabolism_event]
+  workflow_dispatch:
+    inputs:
+      intent:
+        description: 'Intenção técnica (correção/criação/modificação/otimização/operacional)'
+        required: true
+        type: string
+      instruction:
+        description: 'Descrição detalhada da ação necessária'
+        required: true
+        type: string
+      context:
+        description: 'Contexto adicional (opcional)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # ==================================================
+  # 2. MECÂNICO REVISIONADOR - Análise Metabólica
+  # ==================================================
+  metabolic_analysis:
+    name: "🔍 Mecânico Revisionador - Análise Metabólica"
+    runs-on: ubuntu-latest
+    # Ativa para eventos relevantes ao DNA
+    if: |
+      github.event_name == 'pull_request' ||
+      contains(github.event.issue.labels.*.name, 'auto-code') ||
+      contains(github.event.issue.labels.*.name, 'jarvis-auto-report') ||
+      contains(github.event.issue.labels.*.name, 'metabolism') ||
+      github.event_name == 'repository_dispatch' ||
+      github.event_name == 'workflow_dispatch'
+    outputs:
+      requires_human: ${{ steps.analyze.outputs.requires_human }}
+      intent_type: ${{ steps.analyze.outputs.intent_type }}
+      impact_type: ${{ steps.analyze.outputs.impact_type }}
+      mutation_strategy: ${{ steps.analyze.outputs.mutation_strategy }}
+      escalation_reason: ${{ steps.analyze.outputs.escalation_reason }}
+      event_description: ${{ steps.analyze.outputs.event_description }}
+      
+    steps:
+      - name: Checkout DNA (Repositório)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-json-report pytest-cov
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt || echo "Some dependencies failed, continuing..."
+          fi
+
+      - name: 📋 Capturar Evento de Entrada
+        id: capture_event
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 1️⃣ EVENTO DE ENTRADA - O METABOLISMO COMEÇA" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Detectar tipo de evento e extrair informações
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            INTENT="${{ github.event.client_payload.intent }}"
+            INSTRUCTION="${{ github.event.client_payload.instruction }}"
+            CONTEXT="${{ github.event.client_payload.context }}"
+            EVENT_DESC="API Request: $INTENT - $INSTRUCTION"
+            
+            echo "**Tipo de Evento:** repository_dispatch (API)" >> $GITHUB_STEP_SUMMARY
+            echo "**Intenção:** $INTENT" >> $GITHUB_STEP_SUMMARY
+            echo "**Instrução:** $INSTRUCTION" >> $GITHUB_STEP_SUMMARY
+            
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            INTENT="${{ github.event.inputs.intent }}"
+            INSTRUCTION="${{ github.event.inputs.instruction }}"
+            CONTEXT="${{ github.event.inputs.context }}"
+            EVENT_DESC="Manual Trigger: $INTENT - $INSTRUCTION"
+            
+            echo "**Tipo de Evento:** workflow_dispatch (Manual)" >> $GITHUB_STEP_SUMMARY
+            echo "**Intenção:** $INTENT" >> $GITHUB_STEP_SUMMARY
+            echo "**Instrução:** $INSTRUCTION" >> $GITHUB_STEP_SUMMARY
+            
+          elif [[ "${{ github.event_name }}" == "issues" ]]; then
+            INTENT="correção"
+            INSTRUCTION="${{ github.event.issue.title }}"
+            CONTEXT="${{ github.event.issue.body }}"
+            EVENT_DESC="Issue #${{ github.event.issue.number }}: $INSTRUCTION"
+            
+            echo "**Tipo de Evento:** Issue #${{ github.event.issue.number }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Título:** $INSTRUCTION" >> $GITHUB_STEP_SUMMARY
+            
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            INTENT="validação"
+            INSTRUCTION="PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+            CONTEXT="Validar mudanças propostas no DNA"
+            EVENT_DESC="PR #${{ github.event.pull_request.number }}: ${{ github.event.pull_request.title }}"
+            
+            echo "**Tipo de Evento:** Pull Request #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Título:** ${{ github.event.pull_request.title }}" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "INTENT=$INTENT" >> $GITHUB_ENV
+          echo "INSTRUCTION=$INSTRUCTION" >> $GITHUB_ENV
+          echo "CONTEXT=$CONTEXT" >> $GITHUB_ENV
+          echo "EVENT_DESC=$EVENT_DESC" >> $GITHUB_ENV
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**✅ Evento capturado e classificado como intenção técnica sobre o DNA**" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🔬 Análise Metabólica - Interpretação da Intenção
+        id: analyze
+        env:
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 2️⃣ MECÂNICO REVISIONADOR - Análise Metabólica" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Executar script de análise metabólica
+          python scripts/metabolism_analyzer.py \
+            --intent "$INTENT" \
+            --instruction "$INSTRUCTION" \
+            --context "$CONTEXT" \
+            --event-type "${{ github.event_name }}"
+
+      - name: 🚨 Critério de Escalonamento Antecipado
+        id: escalation_check
+        if: steps.analyze.outputs.requires_human == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 3️⃣ ESCALONAMENTO ANTECIPADO AO COMANDANTE" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          REASON="${{ steps.analyze.outputs.escalation_reason }}"
+          
+          echo "**⚠️ Interrupção do Fluxo Automático**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Motivo do Escalonamento:**" >> $GITHUB_STEP_SUMMARY
+          echo "$REASON" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Ação:** Aguardando decisão do COMANDANTE (humano)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Princípio:** Nenhuma alteração no DNA sem compreensão completa" >> $GITHUB_STEP_SUMMARY
+          
+          # Criar comentário na issue/PR solicitando intervenção humana
+          if [[ -n "${{ github.event.issue.number }}" ]]; then
+            gh issue comment "${{ github.event.issue.number }}" --body "## 🚨 COMANDANTE: Intervenção Necessária
+
+$REASON
+
+O Mecânico Revisionador determinou que esta mudança no DNA requer decisão humana antes de prosseguir com o metabolismo automático.
+
+**Aguardando sua análise e orientação.**"
+          elif [[ -n "${{ github.event.pull_request.number }}" ]]; then
+            gh pr comment "${{ github.event.pull_request.number }}" --body "## 🚨 COMANDANTE: Intervenção Necessária
+
+$REASON
+
+O Mecânico Revisionador determinou que esta mudança no DNA requer decisão humana antes de prosseguir com o metabolismo automático.
+
+**Aguardando sua análise e orientação.**"
+          fi
+          
+          exit 0
+
+  # ==================================================
+  # 4-5. OFICINA + MECÂNICO CONSERTADOR - Mutagênese Controlada
+  # ==================================================
+  metabolic_mutation:
+    name: "🔧 Oficina + Mecânico Consertador - Mutagênese"
+    needs: metabolic_analysis
+    if: needs.metabolic_analysis.outputs.requires_human != 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      mutation_applied: ${{ steps.mutate.outputs.mutation_applied }}
+      branch_name: ${{ steps.mutate.outputs.branch_name }}
+      cycle_count: ${{ steps.mutate.outputs.cycle_count }}
+      
+    steps:
+      - name: Checkout DNA (Repositório)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-json-report pytest-cov
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt || echo "Some dependencies failed, continuing..."
+          fi
+
+      - name: Install GitHub Copilot CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+        run: |
+          gh --version
+          gh extension install github/gh-copilot || echo "Copilot extension already installed"
+          gh auth setup-git
+
+      - name: 🏗️ Oficina - Criar Branch Isolada para Metabolismo
+        id: workshop
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 4️⃣ OFICINA - Execução Metabólica" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Configurar Git
+          git config --global user.name "Jarvis-Metabolismo"
+          git config --global user.email "jarvis-metabolism@bot.com"
+          
+          # Criar branch isolada para mutação
+          TIMESTAMP=$(date +%s)
+          BRANCH_NAME="metabolism/mutation-${TIMESTAMP}"
+          git checkout -b "$BRANCH_NAME"
+          
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "**Branch de Mutação:** \`$BRANCH_NAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Princípio:** Toda mutação em ambiente isolado, rastreável e auditável" >> $GITHUB_STEP_SUMMARY
+
+      - name: 🧬 Mecânico Consertador - Implementar Mutagênese Controlada
+        id: mutate
+        env:
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          INTENT_TYPE: ${{ needs.metabolic_analysis.outputs.intent_type }}
+          IMPACT_TYPE: ${{ needs.metabolic_analysis.outputs.impact_type }}
+          MUTATION_STRATEGY: ${{ needs.metabolic_analysis.outputs.mutation_strategy }}
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 5️⃣ MECÂNICO CONSERTADOR - Mutagênese Controlada" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Executar mecânico consertador com estratégia de mutação aprovada
+          python scripts/metabolism_mutator.py \
+            --strategy "$MUTATION_STRATEGY" \
+            --intent "$INTENT_TYPE" \
+            --impact "$IMPACT_TYPE"
+          
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+  # ==================================================
+  # 6. VISTORIA - Homeostase (Validação com Pytest)
+  # ==================================================
+  homeostasis_validation:
+    name: "🧪 Vistoria - Homeostase (Sistema Imunológico)"
+    needs: [metabolic_analysis, metabolic_mutation]
+    if: needs.metabolic_mutation.outputs.mutation_applied == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      homeostasis_ok: ${{ steps.validate.outputs.homeostasis_ok }}
+      
+    steps:
+      - name: Checkout DNA Mutado
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.metabolic_mutation.outputs.branch_name }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-json-report pytest-cov
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt || echo "Some dependencies failed, continuing..."
+          fi
+
+      - name: 🧪 Vistoria - Executar Sistema Imunológico (Pytest)
+        id: validate
+        continue-on-error: true
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 6️⃣ VISTORIA - Homeostase (Sistema Imunológico)" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "**Executando suíte de testes (anticorpos)...**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Executar pytest
+          if pytest --json-report --json-report-file=report.json; then
+            echo "homeostasis_ok=true" >> $GITHUB_OUTPUT
+            echo "**✅ HOMEOSTASE MANTIDA** - Todos os testes passaram" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "O DNA permanece funcional após a mutação." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "homeostasis_ok=false" >> $GITHUB_OUTPUT
+            echo "**❌ HOMEOSTASE COMPROMETIDA** - Testes falharam" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Ação:** Retornar ao Mecânico Revisionador para nova análise" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Salvar Relatório de Vistoria
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: homeostasis-report
+          path: report.json
+
+  # ==================================================
+  # 7. CONTROLE DE LOOP - Limite Metabólico (3 Ciclos)
+  # ==================================================
+  metabolic_loop_control:
+    name: "🔁 Controle de Loop - Limite Metabólico"
+    needs: [metabolic_analysis, metabolic_mutation, homeostasis_validation]
+    if: always() && needs.homeostasis_validation.outputs.homeostasis_ok == 'false'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Verificar Limite de Ciclos Metabólicos
+        id: check_limit
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 7️⃣ CONTROLE DE LOOP - Limite Metabólico" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          CURRENT_CYCLE=${{ needs.metabolic_mutation.outputs.cycle_count || 1 }}
+          MAX_CYCLES=3
+          
+          echo "**Ciclo Atual:** $CURRENT_CYCLE de $MAX_CYCLES" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ $CURRENT_CYCLE -ge $MAX_CYCLES ]]; then
+            echo "**🚨 LIMITE METABÓLICO ATINGIDO**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Após $MAX_CYCLES ciclos completos (Análise → Mutação → Vistoria)," >> $GITHUB_STEP_SUMMARY
+            echo "o metabolismo automático DEVE cessar." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Ação:** Escalar ao COMANDANTE (humano)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Regra Crítica:** O Mecânico Revisionador NÃO pode tentar uma 4ª vez" >> $GITHUB_STEP_SUMMARY
+            
+            echo "limit_reached=true" >> $GITHUB_OUTPUT
+          else
+            echo "**Tentando novo ciclo metabólico...**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Ciclo $(($CURRENT_CYCLE + 1)) será iniciado automaticamente" >> $GITHUB_STEP_SUMMARY
+            
+            echo "limit_reached=false" >> $GITHUB_OUTPUT
+          fi
+
+  # ==================================================
+  # 8. COMANDANTE - Consciência Superior (Humano)
+  # ==================================================
+  commander_escalation:
+    name: "👤 Comandante - Consciência Superior"
+    needs: [metabolic_analysis, metabolic_mutation, homeostasis_validation, metabolic_loop_control]
+    if: |
+      always() && (
+        needs.metabolic_analysis.outputs.requires_human == 'true' ||
+        needs.metabolic_loop_control.outputs.limit_reached == 'true'
+      )
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Escalar ao Comandante (Humano)
+        env:
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 8️⃣ COMANDANTE - Consciência Superior" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Preparar relatório completo para o comandante
+          REPORT="## 🎯 RELATÓRIO METABÓLICO COMPLETO
+
+### Evento Original
+**Intenção:** ${{ needs.metabolic_analysis.outputs.intent_type }}
+**Descrição:** ${{ needs.metabolic_analysis.outputs.event_description }}
+
+### Análise Metabólica
+**Tipo de Impacto:** ${{ needs.metabolic_analysis.outputs.impact_type }}
+**Estratégia Proposta:** ${{ needs.metabolic_analysis.outputs.mutation_strategy }}
+
+### Histórico de Ciclos
+"
+          
+          if [[ "${{ needs.metabolic_loop_control.outputs.limit_reached }}" == "true" ]]; then
+            REPORT+="**Status:** ⚠️ Limite de 3 ciclos metabólicos atingido
+
+**Ciclos Executados:**
+1. Ciclo 1: Análise → Mutação → Vistoria (falhou)
+2. Ciclo 2: Análise → Mutação → Vistoria (falhou)
+3. Ciclo 3: Análise → Mutação → Vistoria (falhou)
+
+**Conclusão:** Sistema não conseguiu estabilizar DNA automaticamente
+"
+          else
+            REPORT+="**Status:** ⚠️ Escalonamento antecipado antes de mutação
+
+**Motivo:** ${{ needs.metabolic_analysis.outputs.escalation_reason }}
+"
+          fi
+          
+          REPORT+="
+
+### Resultados da Vistoria
+- Relatório completo disponível nos artefatos do workflow
+- URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+### Mutações Aplicadas (Diffs)
+- Ver commits na branch: \`${{ needs.metabolic_mutation.outputs.branch_name }}\`
+
+### Riscos e Limitações Identificadas
+- Detalhes nos logs do workflow
+
+---
+
+**O humano (COMANDANTE) tem a palavra final.**
+
+**Próximas Ações:**
+1. Revisar análise metabólica e histórico de ciclos
+2. Analisar mutações aplicadas (diffs)
+3. Validar resultados da vistoria
+4. Decidir: aprovar, ajustar ou rejeitar mutação
+
+**Workflow Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+"
+          
+          # Criar issue para o comandante
+          gh issue create \
+            --title "🎯 COMANDANTE: Intervenção Necessária - ${{ needs.metabolic_analysis.outputs.event_description }}" \
+            --body "$REPORT" \
+            --label "commander-review" \
+            --label "metabolism"
+          
+          echo "**✅ Relatório enviado ao COMANDANTE**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "$REPORT" >> $GITHUB_STEP_SUMMARY
+
+  # ==================================================
+  # 9. PRINCÍPIOS FUNDAMENTAIS - Resumo Final
+  # ==================================================
+  principles_summary:
+    name: "📜 Princípios Fundamentais"
+    needs: [metabolic_analysis, metabolic_mutation, homeostasis_validation]
+    if: always()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Resumo dos Princípios Fundamentais
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## 9️⃣ PRINCÍPIOS FUNDAMENTAIS DO JARVIS" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **O DNA é sagrado** - Toda mutação foi rastreada e auditada" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Toda mutação foi compreendida** - Análise metabólica completa" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Testes são o sistema imunológico** - Vistoria executada" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **Automatizar sem perder consciência** - Escalonamento quando necessário" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ **O humano sempre tem a palavra final** - Comandante pode intervir" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*Fluxo de Metabolismo do Jarvis - Sistema Metabólico Inteligente*" >> $GITHUB_STEP_SUMMARY

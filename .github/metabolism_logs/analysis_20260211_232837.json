@@ -1,0 +1,31 @@
+{
+  "intent_type": "correção",
+  "impact_type": "estrutural",
+  "motivation": "Evento classificado como correção com impacto estrutural no DNA.",
+  "expected_impact": "Mudanças na arquitetura ou estrutura do código, afetando múltiplos módulos.",
+  "risks": "Risco de quebrar contratos de API existentes | Risco de incompatibilidade com módulos dependentes",
+  "technical_hypothesis": "Aplicar correção mínima e localizada, validando com testes existentes.",
+  "approaches": [
+    {
+      "name": "Mudança Mínima",
+      "description": "Aplicar a menor mudança possível que resolve o problema",
+      "strategy": "minimal_change",
+      "safety_score": 9
+    },
+    {
+      "name": "Correção Abrangente",
+      "description": "Corrigir o problema e casos relacionados identificados",
+      "strategy": "comprehensive_fix",
+      "safety_score": 7
+    }
+  ],
+  "selected_approach": {
+    "name": "Mudança Mínima",
+    "description": "Aplicar a menor mudança possível que resolve o problema",
+    "strategy": "minimal_change",
+    "safety_score": 9
+  },
+  "requires_human": true,
+  "escalation_reason": "Requer julgamento arquitetural humano",
+  "mutation_strategy": null
+}
