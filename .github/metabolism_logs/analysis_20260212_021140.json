@@ -1,0 +1,25 @@
+{
+  "intent_type": "operacional",
+  "impact_type": "comportamental",
+  "motivation": "Evento classificado como operacional com impacto comportamental no DNA.",
+  "expected_impact": "Mudanças no comportamento de funcionalidades existentes.",
+  "risks": "Riscos mínimos identificados",
+  "technical_hypothesis": "Executar ação operacional com validação de integridade.",
+  "approaches": [
+    {
+      "name": "Mudança Mínima",
+      "description": "Aplicar a menor mudança possível que resolve o problema",
+      "strategy": "minimal_change",
+      "safety_score": 9
+    }
+  ],
+  "selected_approach": {
+    "name": "Mudança Mínima",
+    "description": "Aplicar a menor mudança possível que resolve o problema",
+    "strategy": "minimal_change",
+    "safety_score": 9
+  },
+  "requires_human": false,
+  "escalation_reason": null,
+  "mutation_strategy": "minimal_change"
+}
