@@ -76,43 +76,45 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Usar o serviço de auto-evolução para verificar com melhor tratamento de erros
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           set +e
+          set -o pipefail
           python - << 'PYCODE' 2>&1 | tee -a /tmp/auto_evolution_check.log
-import os
-import sys
-
-try:
-    from app.application.services.auto_evolution import AutoEvolutionService
-
-    auto_evolution = AutoEvolutionService()
-    is_auto_evo = auto_evolution.is_auto_evolution_pr(
-        pr_title=os.environ.get('PR_TITLE', ''),
-        pr_body=os.environ.get('PR_BODY', '')
-    )
-
-    if is_auto_evo:
-        print('Este PR é de auto-evolução. Loop infinito evitado!')
-        print('should_evolve=false')
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-            f.write('should_evolve=false\n')
-    else:
-        print('Este PR NÃO é de auto-evolução. Triggando evolução!')
-        print('should_evolve=true')
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-            f.write('should_evolve=true\n')
-    
-    sys.exit(0)
-    
-except Exception as e:
-    print(f'❌ ERROR checking auto-evolution: {e}', file=sys.stderr)
-    import traceback
-    traceback.print_exc()
-    # In case of error, don't trigger evolution for safety
-    with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
-        f.write('should_evolve=false\n')
-    sys.exit(1)
-PYCODE
-          EXIT_CODE=$?
+          import os
+          import sys
+          
+          try:
+              from app.application.services.auto_evolution import AutoEvolutionService
+          
+              auto_evolution = AutoEvolutionService()
+              is_auto_evo = auto_evolution.is_auto_evolution_pr(
+                  pr_title=os.environ.get('PR_TITLE', ''),
+                  pr_body=os.environ.get('PR_BODY', '')
+              )
+          
+              if is_auto_evo:
+                  print('Este PR é de auto-evolução. Loop infinito evitado!')
+                  print('should_evolve=false')
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('should_evolve=false\n')
+              else:
+                  print('Este PR NÃO é de auto-evolução. Triggando evolução!')
+                  print('should_evolve=true')
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('should_evolve=true\n')
+              
+              sys.exit(0)
+              
+          except Exception as e:
+              print(f'❌ ERROR checking auto-evolution: {e}', file=sys.stderr)
+              import traceback
+              traceback.print_exc()
+              # In case of error, don't trigger evolution for safety
+              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+                  f.write('should_evolve=false\n')
+              sys.exit(1)
+          PYCODE
+          EXIT_CODE=${PIPESTATUS[0]}
           set -e
           
           # Mostrar log se houver erro
@@ -163,75 +165,77 @@ PYCODE
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           set +e
+          set -o pipefail
           python - << 'PYCODE' 2>&1 | tee /tmp/find_mission.log
-import json
-import os
-import sys
-
-try:
-    from app.application.services.auto_evolution import AutoEvolutionService
-
-    auto_evolution = AutoEvolutionService()
-
-    # Buscar próxima missão
-    next_mission = auto_evolution.find_next_mission()
-
-    if next_mission:
-        mission_data = next_mission['mission']
-        section = next_mission['section']
-        priority = next_mission['priority']
-        
-        print(f'✅ Missão encontrada!')
-        print(f'Seção: {section}')
-        print(f'Prioridade: {priority}')
-        print(f'Descrição: {mission_data["description"][:100]}...')
-        
-        # Gerar contexto para o GitHub Copilot
-        context = auto_evolution.get_roadmap_context(next_mission)
-        
-        # Salvar outputs (sanitize newlines)
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-            f.write('has_mission=true\n')
-            # Replace newlines with spaces to prevent breaking output format
-            safe_desc = mission_data["description"].replace('\n', ' ')[:200]
-            f.write(f'mission_description={safe_desc}\n')
-        
-        # Salvar contexto em arquivo para próximo job
-        with open('mission_context.txt', 'w') as f:
-            f.write(context)
-        
-        # Summary
-        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
-            f.write(f'**✅ Missão Encontrada**\n\n')
-            f.write(f'**Seção:** {section}\n')
-            f.write(f'**Prioridade:** {priority}\n')
-            f.write(f'**Descrição:** {mission_data["description"]}\n')
-            f.write(f'\n**Status:** {mission_data["status"]}\n')
-        
-        sys.exit(0)
-    else:
-        print('❌ Nenhuma missão encontrada para evoluir')
-        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-            f.write('has_mission=false\n')
-        
-        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
-            f.write('**❌ Nenhuma missão encontrada**\n\n')
-            f.write('Todas as missões no ROADMAP estão completas ou não há missões disponíveis.\n')
-        
-        sys.exit(0)
-        
-except Exception as e:
-    print(f'❌ ERROR finding next mission: {e}', file=sys.stderr)
-    import traceback
-    traceback.print_exc()
-    
-    with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
-        f.write('has_mission=false\n')
-    
-    sys.exit(1)
-PYCODE
-          EXIT_CODE=$?
+          import json
+          import os
+          import sys
+          
+          try:
+              from app.application.services.auto_evolution import AutoEvolutionService
+          
+              auto_evolution = AutoEvolutionService()
+          
+              # Buscar próxima missão
+              next_mission = auto_evolution.find_next_mission()
+          
+              if next_mission:
+                  mission_data = next_mission['mission']
+                  section = next_mission['section']
+                  priority = next_mission['priority']
+                  
+                  print(f'✅ Missão encontrada!')
+                  print(f'Seção: {section}')
+                  print(f'Prioridade: {priority}')
+                  print(f'Descrição: {mission_data["description"][:100]}...')
+                  
+                  # Gerar contexto para o GitHub Copilot
+                  context = auto_evolution.get_roadmap_context(next_mission)
+                  
+                  # Salvar outputs (sanitize newlines)
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('has_mission=true\n')
+                      # Replace newlines with spaces to prevent breaking output format
+                      safe_desc = mission_data["description"].replace('\n', ' ')[:200]
+                      f.write(f'mission_description={safe_desc}\n')
+                  
+                  # Salvar contexto em arquivo para próximo job
+                  with open('mission_context.txt', 'w') as f:
+                      f.write(context)
+                  
+                  # Summary
+                  with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                      f.write(f'**✅ Missão Encontrada**\n\n')
+                      f.write(f'**Seção:** {section}\n')
+                      f.write(f'**Prioridade:** {priority}\n')
+                      f.write(f'**Descrição:** {mission_data["description"]}\n')
+                      f.write(f'\n**Status:** {mission_data["status"]}\n')
+                  
+                  sys.exit(0)
+              else:
+                  print('❌ Nenhuma missão encontrada para evoluir')
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('has_mission=false\n')
+                  
+                  with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                      f.write('**❌ Nenhuma missão encontrada**\n\n')
+                      f.write('Todas as missões no ROADMAP estão completas ou não há missões disponíveis.\n')
+                  
+                  sys.exit(0)
+                  
+          except Exception as e:
+              print(f'❌ ERROR finding next mission: {e}', file=sys.stderr)
+              import traceback
+              traceback.print_exc()
+              
+              with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
+                  f.write('has_mission=false\n')
+              
+              sys.exit(1)
+          PYCODE
+          EXIT_CODE=${PIPESTATUS[0]}
           set -e
           
           # Mostrar log
@@ -449,60 +453,62 @@ PYCODE
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           set +e
+          set -o pipefail
           python - << 'PYCODE' 2>&1 | tee /tmp/rl_result.log
-import os
-import sys
-
-try:
-    from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
-    from app.adapters.infrastructure.reward_adapter import RewardAdapter
-    from app.application.services.evolution_loop import EvolutionLoopService
-    from app.core.config import settings
-
-    # Inicializar serviços
-    db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
-    reward_adapter = RewardAdapter(engine=db_adapter.engine)
-    evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
-    
-    success = os.environ.get('EVOLUTION_SUCCESS') == 'true'
-    pr_number = os.environ.get('PR_NUMBER', 'unknown')
-    mission_desc = os.environ.get('MISSION_DESC', 'unknown')
-    workflow_run = os.environ.get('WORKFLOW_RUN', 'unknown')
-    
-    # Registrar resultado
-    reward_id = evolution_service.log_deploy_result(
-        success=success,
-        deployment_id=f'auto-evolution-pr-{pr_number}',
-        metadata={
-            'type': 'auto_evolution',
-            'mission': mission_desc,
-            'pr_number': pr_number,
-            'workflow_run': workflow_run
-        }
-    )
-    
-    if success:
-        print('✅ Recompensa registrada: +50 pontos (deploy_success)')
-        print(f'Reward ID: {reward_id}')
-    else:
-        print('❌ Punição registrada: -25 pontos (deploy_fail)')
-        print(f'Reward ID: {reward_id}')
-    
-    # Obter status de evolução
-    status = evolution_service.get_evolution_status(days=7)
-    print(f'\n{status["commander_message"]}')
-    
-    sys.exit(0)
-    
-except Exception as e:
-    print(f'⚠️ Error registering RL result: {e}', file=sys.stderr)
-    import traceback
-    traceback.print_exc()
-    print('Continuing without reward registration...')
-    sys.exit(0)  # Don't fail the workflow if RL fails
-PYCODE
-          EXIT_CODE=$?
+          import os
+          import sys
+          
+          try:
+              from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
+              from app.adapters.infrastructure.reward_adapter import RewardAdapter
+              from app.application.services.evolution_loop import EvolutionLoopService
+              from app.core.config import settings
+          
+              # Inicializar serviços
+              db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
+              reward_adapter = RewardAdapter(engine=db_adapter.engine)
+              evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
+              
+              success = os.environ.get('EVOLUTION_SUCCESS') == 'true'
+              pr_number = os.environ.get('PR_NUMBER', 'unknown')
+              mission_desc = os.environ.get('MISSION_DESC', 'unknown')
+              workflow_run = os.environ.get('WORKFLOW_RUN', 'unknown')
+              
+              # Registrar resultado
+              reward_id = evolution_service.log_deploy_result(
+                  success=success,
+                  deployment_id=f'auto-evolution-pr-{pr_number}',
+                  metadata={
+                      'type': 'auto_evolution',
+                      'mission': mission_desc,
+                      'pr_number': pr_number,
+                      'workflow_run': workflow_run
+                  }
+              )
+              
+              if success:
+                  print('✅ Recompensa registrada: +50 pontos (deploy_success)')
+                  print(f'Reward ID: {reward_id}')
+              else:
+                  print('❌ Punição registrada: -25 pontos (deploy_fail)')
+                  print(f'Reward ID: {reward_id}')
+              
+              # Obter status de evolução
+              status = evolution_service.get_evolution_status(days=7)
+              print(f'\n{status["commander_message"]}')
+              
+              sys.exit(0)
+              
+          except Exception as e:
+              print(f'⚠️ Error registering RL result: {e}', file=sys.stderr)
+              import traceback
+              traceback.print_exc()
+              print('Continuing without reward registration...')
+              sys.exit(0)  # Don't fail the workflow if RL fails
+          PYCODE
+          EXIT_CODE=${PIPESTATUS[0]}
           set -e
           
           # Mostrar resultado

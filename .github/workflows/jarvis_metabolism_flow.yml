@@ -163,6 +163,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Executar script de análise metabólica com melhor tratamento de erros
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           set +e  # Não parar em erros para capturar saída
           OUTPUT=$(python scripts/metabolism_analyzer.py \
             --intent "$INTENT" \
@@ -213,22 +214,21 @@ jobs:
           echo "**Princípio:** Nenhuma alteração no DNA sem compreensão completa" >> $GITHUB_STEP_SUMMARY
           
           # Criar comentário na issue/PR solicitando intervenção humana
+          BODY_TEXT="## 🚨 COMANDANTE: Intervenção Necessária
+          
+          ⚠️ **O QUE ACONTECEU:**
+          $REASON
+          
+          🛠️ **MINHA PROPOSTA:**
+          O Mecânico Revisionador determinou que esta mudança no DNA requer decisão humana antes de prosseguir com o metabolismo automático.
+          
+          ✍️ **O QUE EU PRECISO:**
+          Aguardando sua análise e orientação nos comentários desta issue/PR."
+          
           if [[ -n "${{ github.event.issue.number }}" ]]; then
-            gh issue comment "${{ github.event.issue.number }}" --body "## 🚨 COMANDANTE: Intervenção Necessária
-
-$REASON
-
-O Mecânico Revisionador determinou que esta mudança no DNA requer decisão humana antes de prosseguir com o metabolismo automático.
-
-**Aguardando sua análise e orientação.**"
+            gh issue comment "${{ github.event.issue.number }}" --body "$BODY_TEXT"
           elif [[ -n "${{ github.event.pull_request.number }}" ]]; then
-            gh pr comment "${{ github.event.pull_request.number }}" --body "## 🚨 COMANDANTE: Intervenção Necessária
-
-$REASON
-
-O Mecânico Revisionador determinou que esta mudança no DNA requer decisão humana antes de prosseguir com o metabolismo automático.
-
-**Aguardando sua análise e orientação.**"
+            gh pr comment "${{ github.event.pull_request.number }}" --body "$BODY_TEXT"
           fi
           
           exit 0
@@ -312,6 +312,7 @@ O Mecânico Revisionador determinou que esta mudança no DNA requer decisão hum
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Executar mecânico consertador com estratégia de mutação aprovada
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           set +e
           OUTPUT=$(python scripts/metabolism_mutator.py \
             --strategy "$MUTATION_STRATEGY" \
@@ -471,59 +472,59 @@ O Mecânico Revisionador determinou que esta mudança no DNA requer decisão hum
           
           # Preparar relatório completo para o comandante
           REPORT="## 🎯 RELATÓRIO METABÓLICO COMPLETO
-
-### Evento Original
-**Intenção:** ${{ needs.metabolic_analysis.outputs.intent_type }}
-**Descrição:** ${{ needs.metabolic_analysis.outputs.event_description }}
-
-### Análise Metabólica
-**Tipo de Impacto:** ${{ needs.metabolic_analysis.outputs.impact_type }}
-**Estratégia Proposta:** ${{ needs.metabolic_analysis.outputs.mutation_strategy }}
-
-### Histórico de Ciclos
-"
+          
+          ### Evento Original
+          **Intenção:** ${{ needs.metabolic_analysis.outputs.intent_type }}
+          **Descrição:** ${{ needs.metabolic_analysis.outputs.event_description }}
+          
+          ### Análise Metabólica
+          **Tipo de Impacto:** ${{ needs.metabolic_analysis.outputs.impact_type }}
+          **Estratégia Proposta:** ${{ needs.metabolic_analysis.outputs.mutation_strategy }}
+          
+          ### Histórico de Ciclos
+          "
           
           if [[ "${{ needs.metabolic_loop_control.outputs.limit_reached }}" == "true" ]]; then
             REPORT+="**Status:** ⚠️ Limite de 3 ciclos metabólicos atingido
-
-**Ciclos Executados:**
-1. Ciclo 1: Análise → Mutação → Vistoria (falhou)
-2. Ciclo 2: Análise → Mutação → Vistoria (falhou)
-3. Ciclo 3: Análise → Mutação → Vistoria (falhou)
-
-**Conclusão:** Sistema não conseguiu estabilizar DNA automaticamente
-"
+          
+          **Ciclos Executados:**
+          1. Ciclo 1: Análise → Mutação → Vistoria (falhou)
+          2. Ciclo 2: Análise → Mutação → Vistoria (falhou)
+          3. Ciclo 3: Análise → Mutação → Vistoria (falhou)
+          
+          **Conclusão:** Sistema não conseguiu estabilizar DNA automaticamente
+          "
           else
             REPORT+="**Status:** ⚠️ Escalonamento antecipado antes de mutação
-
-**Motivo:** ${{ needs.metabolic_analysis.outputs.escalation_reason }}
-"
+          
+          **Motivo:** ${{ needs.metabolic_analysis.outputs.escalation_reason }}
+          "
           fi
           
           REPORT+="
-
-### Resultados da Vistoria
-- Relatório completo disponível nos artefatos do workflow
-- URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-### Mutações Aplicadas (Diffs)
-- Ver commits na branch: \`${{ needs.metabolic_mutation.outputs.branch_name }}\`
-
-### Riscos e Limitações Identificadas
-- Detalhes nos logs do workflow
-
----
-
-**O humano (COMANDANTE) tem a palavra final.**
-
-**Próximas Ações:**
-1. Revisar análise metabólica e histórico de ciclos
-2. Analisar mutações aplicadas (diffs)
-3. Validar resultados da vistoria
-4. Decidir: aprovar, ajustar ou rejeitar mutação
-
-**Workflow Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-"
+          
+          ### Resultados da Vistoria
+          - Relatório completo disponível nos artefatos do workflow
+          - URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          ### Mutações Aplicadas (Diffs)
+          - Ver commits na branch: \`${{ needs.metabolic_mutation.outputs.branch_name }}\`
+          
+          ### Riscos e Limitações Identificadas
+          - Detalhes nos logs do workflow
+          
+          ---
+          
+          **O humano (COMANDANTE) tem a palavra final.**
+          
+          **Próximas Ações:**
+          1. Revisar análise metabólica e histórico de ciclos
+          2. Analisar mutações aplicadas (diffs)
+          3. Validar resultados da vistoria
+          4. Decidir: aprovar, ajustar ou rejeitar mutação
+          
+          **Workflow Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          "
           
           # Criar issue para o comandante
           gh issue create \

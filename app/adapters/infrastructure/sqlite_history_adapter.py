@@ -26,6 +26,7 @@ class Interaction(SQLModel, table=True):
     """
 
     __tablename__ = "interactions"
+    __table_args__ = {'extend_existing': True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     timestamp: datetime = Field(default_factory=datetime.now, nullable=False)
