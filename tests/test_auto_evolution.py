@@ -166,22 +166,22 @@ class TestAutoEvolutionService:
     
     def test_is_auto_evolution_pr_true_keyword_in_title(self, auto_evolution_service):
         """Test detecting auto-evolution PR by title keyword"""
-        assert auto_evolution_service.is_auto_evolution_pr("[Auto-Evolution] Fix bug") == True
-        assert auto_evolution_service.is_auto_evolution_pr("Auto evolution: new feature") == True
-        assert auto_evolution_service.is_auto_evolution_pr("JARVIS EVOLUTION test") == True
-        assert auto_evolution_service.is_auto_evolution_pr("Self-evolution update") == True
+        assert auto_evolution_service.is_auto_evolution_pr("[Auto-Evolution] Fix bug")
+        assert auto_evolution_service.is_auto_evolution_pr("Auto evolution: new feature")
+        assert auto_evolution_service.is_auto_evolution_pr("JARVIS EVOLUTION test")
+        assert auto_evolution_service.is_auto_evolution_pr("Self-evolution update")
     
     def test_is_auto_evolution_pr_true_keyword_in_body(self, auto_evolution_service):
         """Test detecting auto-evolution PR by body keyword"""
         title = "Regular PR"
         body = "This is an auto-evolution PR from Jarvis"
         
-        assert auto_evolution_service.is_auto_evolution_pr(title, body) == True
+        assert auto_evolution_service.is_auto_evolution_pr(title, body)
     
     def test_is_auto_evolution_pr_false(self, auto_evolution_service):
         """Test non-auto-evolution PR detection"""
-        assert auto_evolution_service.is_auto_evolution_pr("Fix typo in README") == False
-        assert auto_evolution_service.is_auto_evolution_pr("Add new feature", "Some description") == False
+        assert not auto_evolution_service.is_auto_evolution_pr("Fix typo in README")
+        assert not auto_evolution_service.is_auto_evolution_pr("Add new feature", "Some description")
     
     def test_get_success_metrics_file_exists(self, auto_evolution_service):
         """Test getting success metrics from real roadmap"""
