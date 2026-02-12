@@ -1085,6 +1085,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         let vasState = 'muted'; // 'muted', 'listening' (wake word detection), 'transcribing'
         let silenceTimer = null;
         const SILENCE_TIMEOUT = 3000; // 3 seconds
+        // Wake word detection works with Portuguese pronunciation since lang='pt-BR'
         const WAKE_WORD = 'jarvis';
         let lastSpeechTime = Date.now();
         
@@ -1182,14 +1183,20 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                     try {
                         recognition.start();
                     } catch (e) {
-                        // Already started, ignore
+                        // Ignore if already started; log other errors
+                        if (e.name !== 'InvalidStateError') {
+                            console.error('Recognition restart error:', e);
+                        }
                     }
                 } else if (vasState === 'transcribing' && isRecording) {
                     // Keep transcribing until manually stopped or silence detected
                     try {
                         recognition.start();
                     } catch (e) {
-                        // Already started, ignore
+                        // Ignore if already started; log other errors
+                        if (e.name !== 'InvalidStateError') {
+                            console.error('Recognition restart error:', e);
+                        }
                     }
                 } else {
                     isRecording = false;
@@ -1201,8 +1208,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 isRecording = true;
             };
         } else {
-            // Browser doesn't support Speech API
-            console.log('Comando de voz indisponível neste ambiente');
+            // Browser doesn't support Speech API - show fallback message
             addMessage('Comando de voz indisponível neste ambiente', 'system');
             voiceButton.style.display = 'none';
         }
@@ -1210,14 +1216,11 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         // Handle silence detection
         function handleSilence() {
             if (vasState === 'transcribing') {
-                const timeSinceLastSpeech = Date.now() - lastSpeechTime;
-                if (timeSinceLastSpeech >= SILENCE_TIMEOUT) {
-                    // Silence detected - return to wake word listening mode
-                    vasState = 'listening';
-                    updateVoiceButtonState();
-                    commandInput.classList.remove('voice-active');
-                    addMessage('Silence detected. Returning to wake word mode...', 'system');
-                }
+                // Silence detected - return to wake word listening mode
+                vasState = 'listening';
+                updateVoiceButtonState();
+                commandInput.classList.remove('voice-active');
+                addMessage('Silence detected. Returning to wake word mode...', 'system');
             }
         }
         
@@ -1398,7 +1401,10 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                     try {
                         recognition.stop();
                     } catch (e) {
-                        // Already stopped
+                        // Ignore if already stopped; log other errors
+                        if (e.name !== 'InvalidStateError') {
+                            console.error('Recognition stop error:', e);
+                        }
                     }
                     isRecording = false;
                     updateVoiceButtonState();
