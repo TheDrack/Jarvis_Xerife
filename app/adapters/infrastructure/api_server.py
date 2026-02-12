@@ -671,6 +671,91 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             color: #ff0000;
         }
         
+        /* Spatial Orientation Module */
+        .spatial-orientation-panel {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #00ff88;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: none; /* Hidden by default until location is available */
+        }
+        
+        .spatial-orientation-panel.visible {
+            display: block;
+        }
+        
+        .spatial-orientation-panel h3 {
+            color: #00ff88;
+            margin-bottom: 15px;
+            text-align: center;
+            text-shadow: 0 0 10px #00ff88;
+            font-size: 1.2em;
+        }
+        
+        .location-name {
+            text-align: center;
+            padding: 10px;
+            background: rgba(0, 255, 136, 0.05);
+            border-left: 3px solid #00ff88;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            color: #00d4ff;
+            font-size: 0.95em;
+        }
+        
+        .location-name .primary {
+            font-weight: bold;
+            color: #00ff88;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+        
+        .location-name .secondary {
+            font-size: 0.9em;
+            color: #00d4ff;
+            opacity: 0.8;
+        }
+        
+        .map-container {
+            position: relative;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid #00ff88;
+        }
+        
+        .map-container:hover {
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            border-color: #00d4ff;
+        }
+        
+        .map-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .map-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 8px;
+            text-align: center;
+            color: #00ff88;
+            font-size: 0.85em;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .map-container:hover .map-overlay {
+            opacity: 1;
+        }
+        
         /* Evolution Panel */
         .evolution-panel {
             background: rgba(0, 0, 0, 0.6);
@@ -747,6 +832,14 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             
             .telemetry-panel {
                 grid-template-columns: 1fr;
+            }
+            
+            .spatial-orientation-panel h3 {
+                font-size: 1em;
+            }
+            
+            .map-container {
+                max-height: 250px;
             }
         }
         
@@ -825,6 +918,19 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 <div class="telemetry-item">
                     <div class="telemetry-label">Connection</div>
                     <div class="telemetry-value" id="connectionStatus">Online</div>
+                </div>
+            </div>
+            
+            <!-- Spatial Orientation Module -->
+            <div class="spatial-orientation-panel" id="spatialOrientationPanel">
+                <h3>📍 Orientação Espacial</h3>
+                <div class="location-name" id="locationName">
+                    <div class="primary">Carregando localização...</div>
+                    <div class="secondary"></div>
+                </div>
+                <div class="map-container" id="mapContainer" title="Clique para abrir no Google Maps">
+                    <img id="mapImage" src="" alt="Mapa de localização">
+                    <div class="map-overlay">🗺️ Clique para visualizar no Google Maps</div>
                 </div>
             </div>
             
@@ -1196,10 +1302,13 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         const BATTERY_LOW_THRESHOLD = 15; // Percentage - triggers power-saving mode
         const TELEMETRY_INTERVAL_MS = 30000; // 30 seconds
         const GPS_CACHE_MAX_AGE_MS = 300000; // 5 minutes
+        const SIGNIFICANT_DISPLACEMENT_METERS = 50; // Minimum displacement to update map
+        const GOOGLE_MAPS_API_KEY = 'AIzaSyBs0TFhtLaPFMdIpPaHElrCsjDKiCRMrZM'; // Note: In production, use environment variable
         
         let batteryLevel = 100;
         let batteryCharging = false;
         let currentLocation = null;
+        let lastMapLocation = null; // Track last location where map was updated
         let deviceType = detectDeviceType();
         let telemetryInterval = null;
         
@@ -1262,7 +1371,116 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             }
         }
         
-        // Initialize Geolocation
+        // Calculate distance between two coordinates using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Earth's radius in meters
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+            
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            
+            return R * c; // Distance in meters
+        }
+        
+        // Update the spatial orientation module with map and geocoding
+        async function updateSpatialOrientation(latitude, longitude) {
+            const panel = document.getElementById('spatialOrientationPanel');
+            const mapImage = document.getElementById('mapImage');
+            const mapContainer = document.getElementById('mapContainer');
+            const locationName = document.getElementById('locationName');
+            
+            // Check if we should update the map (significant displacement or first time)
+            if (lastMapLocation) {
+                const distance = calculateDistance(
+                    lastMapLocation.latitude,
+                    lastMapLocation.longitude,
+                    latitude,
+                    longitude
+                );
+                
+                // Only update if displacement is significant
+                if (distance < SIGNIFICANT_DISPLACEMENT_METERS) {
+                    console.log(`Displacement: ${distance.toFixed(2)}m - Skipping map update`);
+                    return;
+                }
+                
+                console.log(`Significant displacement: ${distance.toFixed(2)}m - Updating map`);
+            }
+            
+            // Update last map location
+            lastMapLocation = { latitude, longitude };
+            
+            // Generate Static Maps URL
+            const zoom = 16;
+            const size = '600x300';
+            const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${latitude},${longitude}&zoom=${zoom}&size=${size}&markers=color:red%7C${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`;
+            
+            // Update map image
+            mapImage.src = mapUrl;
+            
+            // Make map clickable - redirect to Google Maps
+            mapContainer.onclick = () => {
+                const googleMapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+                window.open(googleMapsUrl, '_blank');
+            };
+            
+            // Fetch location name using Geocoding API
+            try {
+                const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_MAPS_API_KEY}`;
+                const response = await fetch(geocodeUrl);
+                const data = await response.json();
+                
+                if (data.status === 'OK' && data.results.length > 0) {
+                    const result = data.results[0];
+                    const addressComponents = result.address_components;
+                    
+                    // Extract neighborhood and establishment
+                    let neighborhood = '';
+                    let establishment = '';
+                    let locality = '';
+                    
+                    for (const component of addressComponents) {
+                        if (component.types.includes('neighborhood') || component.types.includes('sublocality')) {
+                            neighborhood = component.long_name;
+                        }
+                        if (component.types.includes('locality')) {
+                            locality = component.long_name;
+                        }
+                        if (component.types.includes('establishment') || component.types.includes('point_of_interest')) {
+                            establishment = component.long_name;
+                        }
+                    }
+                    
+                    // Display location name
+                    const primaryLocation = establishment || neighborhood || locality || 'Localização atual';
+                    const secondaryLocation = establishment ? (neighborhood || locality) : '';
+                    
+                    locationName.innerHTML = `
+                        <div class="primary">${primaryLocation}</div>
+                        ${secondaryLocation ? `<div class="secondary">${secondaryLocation}</div>` : ''}
+                    `;
+                } else {
+                    locationName.innerHTML = `
+                        <div class="primary">Localização: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}</div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Geocoding error:', error);
+                locationName.innerHTML = `
+                    <div class="primary">Localização: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}</div>
+                `;
+            }
+            
+            // Show the panel
+            panel.classList.add('visible');
+        }
+        
+        // Initialize Geolocation with spatial orientation module
         function initGeolocation() {
             if ('geolocation' in navigator) {
                 navigator.geolocation.getCurrentPosition(
@@ -1276,10 +1494,14 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                         const lat = position.coords.latitude.toFixed(4);
                         const lon = position.coords.longitude.toFixed(4);
                         document.getElementById('locationValue').textContent = `${lat}, ${lon}`;
+                        
+                        // Update spatial orientation module
+                        updateSpatialOrientation(position.coords.latitude, position.coords.longitude);
                     },
                     (error) => {
                         console.error('Geolocation error:', error);
                         document.getElementById('locationValue').textContent = 'Denied';
+                        // Keep spatial orientation panel hidden if location is denied
                     },
                     {
                         enableHighAccuracy: false, // Disabled for battery saving on mobile devices
@@ -1288,8 +1510,31 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                     }
                 );
                 
-                // Watch for location changes (optional, can be battery intensive)
-                // navigator.geolocation.watchPosition(updateLocation);
+                // Watch for location changes and update spatial orientation
+                navigator.geolocation.watchPosition(
+                    (position) => {
+                        currentLocation = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude,
+                            accuracy: position.coords.accuracy
+                        };
+                        
+                        const lat = position.coords.latitude.toFixed(4);
+                        const lon = position.coords.longitude.toFixed(4);
+                        document.getElementById('locationValue').textContent = `${lat}, ${lon}`;
+                        
+                        // Update spatial orientation (will only update map if displacement > 50m)
+                        updateSpatialOrientation(position.coords.latitude, position.coords.longitude);
+                    },
+                    (error) => {
+                        console.error('Geolocation watch error:', error);
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: GPS_CACHE_MAX_AGE_MS
+                    }
+                );
             } else {
                 document.getElementById('locationValue').textContent = 'N/A';
             }
