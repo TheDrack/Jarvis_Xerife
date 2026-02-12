@@ -111,3 +111,7 @@ autonomous_instruction.json
 
 # Issue/PR temporary files
 issue_url.txt
+
+# Metabolism logs and markers (workflow artifacts)
+.github/metabolism_logs/
+.github/metabolism_markers/

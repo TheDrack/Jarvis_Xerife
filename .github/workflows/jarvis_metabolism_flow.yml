@@ -162,12 +162,32 @@ jobs:
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Executar script de análise metabólica
-          python scripts/metabolism_analyzer.py \
+          # Executar script de análise metabólica com melhor tratamento de erros
+          set +e  # Não parar em erros para capturar saída
+          OUTPUT=$(python scripts/metabolism_analyzer.py \
             --intent "$INTENT" \
             --instruction "$INSTRUCTION" \
             --context "$CONTEXT" \
-            --event-type "${{ github.event_name }}"
+            --event-type "${{ github.event_name }}" 2>&1)
+          EXIT_CODE=$?
+          set -e
+          
+          # Mostrar saída completa
+          echo "$OUTPUT"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Saída do Analisador" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" | tail -50 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Verificar se houve erro
+          if [ $EXIT_CODE -ne 0 ] && [ $EXIT_CODE -ne 1 ]; then
+            echo "**❌ ERRO na análise metabólica (código: $EXIT_CODE)**" >> $GITHUB_STEP_SUMMARY
+            exit $EXIT_CODE
+          fi
+          
+          # Exit code 1 = requires_human, 0 = prosseguir automático
+          exit $EXIT_CODE
 
       - name: 🚨 Critério de Escalonamento Antecipado
         id: escalation_check
@@ -292,12 +312,31 @@ O Mecânico Revisionador determinou que esta mudança no DNA requer decisão hum
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Executar mecânico consertador com estratégia de mutação aprovada
-          python scripts/metabolism_mutator.py \
+          set +e
+          OUTPUT=$(python scripts/metabolism_mutator.py \
             --strategy "$MUTATION_STRATEGY" \
             --intent "$INTENT_TYPE" \
-            --impact "$IMPACT_TYPE"
+            --impact "$IMPACT_TYPE" 2>&1)
+          EXIT_CODE=$?
+          set -e
+          
+          # Mostrar saída completa
+          echo "$OUTPUT"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Saída do Mutador" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" | tail -50 >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Verificar sucesso
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "**❌ ERRO na mutagênese (código: $EXIT_CODE)**" >> $GITHUB_STEP_SUMMARY
+            exit $EXIT_CODE
+          fi
           
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**✅ Mutagênese executada com sucesso**" >> $GITHUB_STEP_SUMMARY
 
   # ==================================================
   # 6. VISTORIA - Homeostase (Validação com Pytest)

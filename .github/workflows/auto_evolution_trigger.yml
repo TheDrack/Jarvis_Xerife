@@ -75,28 +75,56 @@ jobs:
           echo "**Título:** $PR_TITLE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Usar o serviço de auto-evolução para verificar
-          python - << 'PYCODE' | tee -a $GITHUB_STEP_SUMMARY
+          # Usar o serviço de auto-evolução para verificar com melhor tratamento de erros
+          set +e
+          python - << 'PYCODE' 2>&1 | tee -a /tmp/auto_evolution_check.log
 import os
-from app.application.services.auto_evolution import AutoEvolutionService
+import sys
 
-auto_evolution = AutoEvolutionService()
-is_auto_evo = auto_evolution.is_auto_evolution_pr(
-    pr_title=os.environ.get('PR_TITLE', ''),
-    pr_body=os.environ.get('PR_BODY', '')
-)
+try:
+    from app.application.services.auto_evolution import AutoEvolutionService
 
-if is_auto_evo:
-    print('Este PR é de auto-evolução. Loop infinito evitado!')
-    print('should_evolve=false')
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+    auto_evolution = AutoEvolutionService()
+    is_auto_evo = auto_evolution.is_auto_evolution_pr(
+        pr_title=os.environ.get('PR_TITLE', ''),
+        pr_body=os.environ.get('PR_BODY', '')
+    )
+
+    if is_auto_evo:
+        print('Este PR é de auto-evolução. Loop infinito evitado!')
+        print('should_evolve=false')
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write('should_evolve=false\n')
+    else:
+        print('Este PR NÃO é de auto-evolução. Triggando evolução!')
+        print('should_evolve=true')
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write('should_evolve=true\n')
+    
+    sys.exit(0)
+    
+except Exception as e:
+    print(f'❌ ERRO ao verificar auto-evolução: {e}', file=sys.stderr)
+    import traceback
+    traceback.print_exc()
+    # Em caso de erro, não triggamos evolução por segurança
+    with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
         f.write('should_evolve=false\n')
-else:
-    print('Este PR NÃO é de auto-evolução. Triggando evolução!')
-    print('should_evolve=true')
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-        f.write('should_evolve=true\n')
+    sys.exit(1)
 PYCODE
+          EXIT_CODE=$?
+          set -e
+          
+          # Mostrar log se houver erro
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**❌ ERRO ao verificar trigger (código: $EXIT_CODE)**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat /tmp/auto_evolution_check.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            cat /tmp/auto_evolution_check.log >> $GITHUB_STEP_SUMMARY
+          fi
 
   # ==================================================
   # ANÁLISE: Buscar próxima missão do ROADMAP
@@ -135,56 +163,85 @@ PYCODE
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          python - << 'PYCODE'
+          set +e
+          python - << 'PYCODE' 2>&1 | tee /tmp/find_mission.log
 import json
 import os
-from app.application.services.auto_evolution import AutoEvolutionService
+import sys
 
-auto_evolution = AutoEvolutionService()
+try:
+    from app.application.services.auto_evolution import AutoEvolutionService
 
-# Buscar próxima missão
-next_mission = auto_evolution.find_next_mission()
+    auto_evolution = AutoEvolutionService()
 
-if next_mission:
-    mission_data = next_mission['mission']
-    section = next_mission['section']
-    priority = next_mission['priority']
+    # Buscar próxima missão
+    next_mission = auto_evolution.find_next_mission()
+
+    if next_mission:
+        mission_data = next_mission['mission']
+        section = next_mission['section']
+        priority = next_mission['priority']
+        
+        print(f'✅ Missão encontrada!')
+        print(f'Seção: {section}')
+        print(f'Prioridade: {priority}')
+        print(f'Descrição: {mission_data["description"][:100]}...')
+        
+        # Gerar contexto para o GitHub Copilot
+        context = auto_evolution.get_roadmap_context(next_mission)
+        
+        # Salvar outputs (sanitize newlines)
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write('has_mission=true\n')
+            # Replace newlines with spaces to prevent breaking output format
+            safe_desc = mission_data["description"].replace('\n', ' ')[:200]
+            f.write(f'mission_description={safe_desc}\n')
+        
+        # Salvar contexto em arquivo para próximo job
+        with open('mission_context.txt', 'w') as f:
+            f.write(context)
+        
+        # Summary
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+            f.write(f'**✅ Missão Encontrada**\n\n')
+            f.write(f'**Seção:** {section}\n')
+            f.write(f'**Prioridade:** {priority}\n')
+            f.write(f'**Descrição:** {mission_data["description"]}\n')
+            f.write(f'\n**Status:** {mission_data["status"]}\n')
+        
+        sys.exit(0)
+    else:
+        print('❌ Nenhuma missão encontrada para evoluir')
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write('has_mission=false\n')
+        
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+            f.write('**❌ Nenhuma missão encontrada**\n\n')
+            f.write('Todas as missões no ROADMAP estão completas ou não há missões disponíveis.\n')
+        
+        sys.exit(0)
+        
+except Exception as e:
+    print(f'❌ ERRO ao buscar missão: {e}', file=sys.stderr)
+    import traceback
+    traceback.print_exc()
     
-    print(f'✅ Missão encontrada!')
-    print(f'Seção: {section}')
-    print(f'Prioridade: {priority}')
-    print(f'Descrição: {mission_data["description"][:100]}...')
-    
-    # Gerar contexto para o GitHub Copilot
-    context = auto_evolution.get_roadmap_context(next_mission)
-    
-    # Salvar outputs (sanitize newlines)
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-        f.write('has_mission=true\n')
-        # Replace newlines with spaces to prevent breaking output format
-        safe_desc = mission_data["description"].replace('\n', ' ')[:200]
-        f.write(f'mission_description={safe_desc}\n')
-    
-    # Salvar contexto em arquivo para próximo job
-    with open('mission_context.txt', 'w') as f:
-        f.write(context)
-    
-    # Summary
-    with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
-        f.write(f'**✅ Missão Encontrada**\n\n')
-        f.write(f'**Seção:** {section}\n')
-        f.write(f'**Prioridade:** {priority}\n')
-        f.write(f'**Descrição:** {mission_data["description"]}\n')
-        f.write(f'\n**Status:** {mission_data["status"]}\n')
-else:
-    print('❌ Nenhuma missão encontrada para evoluir')
-    with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+    with open(os.environ.get('GITHUB_OUTPUT', '/dev/null'), 'a') as f:
         f.write('has_mission=false\n')
     
-    with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
-        f.write('**❌ Nenhuma missão encontrada**\n\n')
-        f.write('Todas as missões no ROADMAP estão completas ou não há missões disponíveis.\n')
+    sys.exit(1)
 PYCODE
+          EXIT_CODE=$?
+          set -e
+          
+          # Mostrar log
+          cat /tmp/find_mission.log >> $GITHUB_STEP_SUMMARY
+          
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**❌ ERRO ao buscar missão (código: $EXIT_CODE)**" >> $GITHUB_STEP_SUMMARY
+            exit $EXIT_CODE
+          fi
 
       - name: Upload mission context
         if: steps.find.outputs.has_mission == 'true'
@@ -392,15 +449,18 @@ PYCODE
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          python - << 'PYCODE' | tee -a $GITHUB_STEP_SUMMARY
+          set +e
+          python - << 'PYCODE' 2>&1 | tee /tmp/rl_result.log
 import os
-from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
-from app.adapters.infrastructure.reward_adapter import RewardAdapter
-from app.application.services.evolution_loop import EvolutionLoopService
-from app.core.config import settings
+import sys
 
-# Inicializar serviços
 try:
+    from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
+    from app.adapters.infrastructure.reward_adapter import RewardAdapter
+    from app.application.services.evolution_loop import EvolutionLoopService
+    from app.core.config import settings
+
+    # Inicializar serviços
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
     reward_adapter = RewardAdapter(engine=db_adapter.engine)
     evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
@@ -433,10 +493,23 @@ try:
     status = evolution_service.get_evolution_status(days=7)
     print(f'\n{status["commander_message"]}')
     
+    sys.exit(0)
+    
 except Exception as e:
-    print(f'⚠️ Erro ao registrar no RL system: {e}')
+    print(f'⚠️ Erro ao registrar no RL system: {e}', file=sys.stderr)
+    import traceback
+    traceback.print_exc()
     print('Continuando sem registro de recompensa...')
+    sys.exit(0)  # Não falhar o workflow se RL falhar
 PYCODE
+          EXIT_CODE=$?
+          set -e
+          
+          # Mostrar resultado
+          cat /tmp/rl_result.log >> $GITHUB_STEP_SUMMARY
+          
+          # Não falhar o workflow se RL falhar
+          exit 0
 
   # ==================================================
   # RESUMO: Status final

@@ -162,38 +162,15 @@ Arquivo: <caminho do arquivo>
 Mudança: <descrição da mudança>
 """
             
-            # Executar gh copilot suggest
-            logger.info("🤖 Consultando GitHub Copilot...")
-            result = subprocess.run(
-                ['gh', 'copilot', 'suggest', '-t', 'shell', prompt],
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
+            # Nota: GitHub Copilot CLI mudou sua API
+            # A abordagem atual é criar um marcador para intervenção manual
+            # até que a integração com Copilot Agent seja implementada
+            logger.info("🤖 Preparando para consultar GitHub Copilot...")
+            logger.warning("⚠️ Integração com Copilot Agent em desenvolvimento")
+            logger.info("📝 Criando marcador para implementação assistida...")
             
-            if result.returncode != 0:
-                logger.warning(f"⚠️ Copilot não disponível: {result.stderr}")
-                # Fallback: criar marcador indicando que mudança manual é necessária
-                return self._create_manual_marker(intent, impact, issue_body)
-            
-            copilot_suggestion = result.stdout
-            logger.info(f"✅ Sugestão recebida: {len(copilot_suggestion)} caracteres")
-            
-            # Por enquanto, registrar a sugestão mas não aplicar automaticamente
-            # para evitar mudanças não validadas
-            self.mutation_log.append({
-                'type': 'minimal_change',
-                'suggestion': copilot_suggestion[:500],
-                'status': 'suggestion_generated'
-            })
-            
-            return {
-                'success': True,
-                'mutation_applied': False,  # Não aplicado automaticamente
-                'suggestion': copilot_suggestion,
-                'files_changed': [],
-                'message': 'Sugestão gerada - aguardando aprovação'
-            }
+            # Criar marcador com contexto completo para orientar implementação
+            return self._create_manual_marker(intent, impact, issue_body, prompt)
             
         except subprocess.TimeoutExpired:
             logger.error("❌ Timeout ao consultar Copilot")
@@ -236,7 +213,7 @@ Mudança: <descrição da mudança>
         }
     
     def _create_manual_marker(
-        self, intent: str, impact: str, issue_body: str
+        self, intent: str, impact: str, issue_body: str, prompt: str = ""
     ) -> Dict[str, Any]:
         """
         Cria marcador para mudança manual quando automação não está disponível
@@ -260,6 +237,8 @@ Mudança: <descrição da mudança>
 ## Descrição do Evento
 
 {issue_body}
+
+{f"## Contexto Técnico\\n\\n{prompt}\\n" if prompt else ""}
 
 ## Ação Necessária
 

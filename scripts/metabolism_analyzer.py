@@ -682,8 +682,8 @@ correção, criação, modificação, otimização, operacional ou validação""
                 f.write(f"requires_human={str(result['requires_human']).lower()}\n")
                 f.write(f"intent_type={result['intent_type']}\n")
                 f.write(f"impact_type={result['impact_type']}\n")
-                f.write(f"mutation_strategy={result.get('mutation_strategy', '')}\n")
-                f.write(f"escalation_reason={result.get('escalation_reason', '')}\n")
+                f.write(f"mutation_strategy={result.get('mutation_strategy') or ''}\n")
+                f.write(f"escalation_reason={result.get('escalation_reason') or ''}\n")
                 f.write(f"event_description={result.get('motivation', '')}\n")
             
             logger.info("✅ Outputs exportados para GitHub Actions")
