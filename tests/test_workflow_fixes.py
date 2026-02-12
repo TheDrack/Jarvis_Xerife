@@ -26,6 +26,7 @@ def test_metabolism_analyzer():
     print("TEST 1: Metabolism Analyzer")
     print("=" * 60)
     
+    # Use context manager for automatic cleanup
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         output_file = f.name
     
@@ -76,8 +77,12 @@ def test_metabolism_analyzer():
         traceback.print_exc()
         return False
     finally:
-        if os.path.exists(output_file):
-            os.unlink(output_file)
+        # Always cleanup the temporary file
+        try:
+            if os.path.exists(output_file):
+                os.unlink(output_file)
+        except Exception:
+            pass  # Best effort cleanup
 
 
 def test_metabolism_mutator():
@@ -86,6 +91,7 @@ def test_metabolism_mutator():
     print("TEST 2: Metabolism Mutator")
     print("=" * 60)
     
+    # Use context manager for automatic cleanup
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         output_file = f.name
     
@@ -125,8 +131,12 @@ def test_metabolism_mutator():
         traceback.print_exc()
         return False
     finally:
-        if os.path.exists(output_file):
-            os.unlink(output_file)
+        # Always cleanup the temporary file
+        try:
+            if os.path.exists(output_file):
+                os.unlink(output_file)
+        except Exception:
+            pass  # Best effort cleanup
 
 
 def test_auto_evolution_service():

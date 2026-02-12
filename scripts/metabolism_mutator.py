@@ -225,7 +225,7 @@ Mudança: <descrição da mudança>
             prompt: Optional technical context/prompt for implementation guidance
             
         Returns:
-            Dictionary with mutation result including marker file path
+            Dictionary with mutation result including marker file path.
         """
         logger.info("📝 Criando marcador para mudança manual...")
         
