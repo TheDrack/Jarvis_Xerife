@@ -6,6 +6,7 @@ They test the full lifecycle: browser startup, CDP connection, codegen recording
 timeout handling, and cleanup.
 """
 
+import os
 import subprocess
 import tempfile
 import time
@@ -426,5 +427,3 @@ class TestBrowserManagerExtensionSupport:
         assert session_dir.exists()
         assert local_storage.exists()
 
-
-import os
