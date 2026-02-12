@@ -3,7 +3,7 @@
 
 import logging
 import re
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -156,8 +156,8 @@ class AutoEvolutionService:
         Priority order:
         1. In-progress missions (🔄) in "AGORA" section
         2. Planned missions (📋) in "AGORA" section
-        3. Unchecked missions ([ ]) in "AGORA" section
-        4. In-progress missions in "PRÓXIMO" section
+        3. In-progress missions (🔄) in "PRÓXIMO" section
+        4. Planned missions (📋) in "PRÓXIMO" section
         
         Returns:
             Dictionary with mission details or None if no mission found
@@ -203,7 +203,7 @@ class AutoEvolutionService:
                         'priority': 'medium'
                     }
         
-        # Priority 2: Look in PRÓXIMO section for in-progress
+        # Priority 3: Look in PRÓXIMO section for in-progress
         if proximo_section:
             for mission in proximo_section['missions']:
                 if mission['status'] == 'in_progress':
@@ -212,6 +212,16 @@ class AutoEvolutionService:
                         'mission': mission,
                         'section': 'PRÓXIMO',
                         'priority': 'medium'
+                    }
+            
+            # Priority 4: Planned missions in PRÓXIMO (lower priority)
+            for mission in proximo_section['missions']:
+                if mission['status'] == 'planned':
+                    logger.info(f"Found planned mission in PRÓXIMO: {mission['description'][:50]}...")
+                    return {
+                        'mission': mission,
+                        'section': 'PRÓXIMO',
+                        'priority': 'low'
                     }
         
         logger.warning("No suitable mission found in roadmap")

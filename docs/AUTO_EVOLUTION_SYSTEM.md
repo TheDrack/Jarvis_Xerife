@@ -260,6 +260,35 @@ PRs de auto-evolução recebem labels:
 
 Isso facilita filtrar e revisar essas PRs.
 
+### 4. Tratamento de Erros Externos
+
+O sistema diferencia entre falhas lógicas e erros de infraestrutura:
+
+**Erros Externos (não contam como punição de lógica):**
+- ❌ Falhas de rede/firewall (DNS, timeout, conexão)
+- ❌ Indisponibilidade de APIs externas
+- ❌ Problemas de infraestrutura do CI/CD
+- ❌ Falta de permissões/secrets
+
+**Falhas de Lógica (punição aplicada):**
+- ✅ Testes falharam por código incorreto
+- ✅ Syntax errors ou bugs introduzidos
+- ✅ Lógica de negócio incorreta
+
+**Tratamento:**
+```python
+try:
+    # Executar evolução
+    result = attempt_evolution()
+except NetworkError as e:
+    # Erro externo - não punir
+    log_external_error(e)
+    retry_later()
+except TestFailure as e:
+    # Falha de lógica - aplicar punição
+    evolution_service.log_deploy_result(success=False)
+```
+
 ## Monitoramento e Métricas
 
 ### Métricas de Evolução

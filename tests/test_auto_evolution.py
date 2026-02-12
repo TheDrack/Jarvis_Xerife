@@ -2,7 +2,6 @@
 """Tests for Auto Evolution Service"""
 
 import pytest
-from pathlib import Path
 from app.application.services.auto_evolution import AutoEvolutionService
 
 
