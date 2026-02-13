@@ -423,9 +423,7 @@ jobs:
             --title "$PR_TITLE" \
             --body-file "$BODY_FILE" \
             --base main \
-            --head "$BRANCH_NAME" \
-            --label "auto-evolution" \
-            --label "jarvis-evolution"
+            --head "$BRANCH_NAME"
           
           # Cleanup
           rm -f "$BODY_FILE"
