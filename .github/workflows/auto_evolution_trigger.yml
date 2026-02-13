@@ -67,6 +67,7 @@ jobs:
         id: check
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "## 🧬 AUTO-EVOLUTION TRIGGER CHECK" >> $GITHUB_STEP_SUMMARY
@@ -76,10 +77,28 @@ jobs:
           echo "**Push para main detectado**" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Mensagem:** $COMMIT_MSG" >> $GITHUB_STEP_SUMMARY
+          echo "**Author:** ${{ github.event.head_commit.author.name }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Detectar se o merge veio de auto-evolução ou PR externa
+          # Detectar se o merge veio de auto-evolução através de múltiplos sinais
+          IS_AUTO_EVO=false
+          
+          # Sinal 1: Mensagem de commit contém marcadores de auto-evolução
           if [[ "$COMMIT_MSG" == *"[Auto-Evolution]"* ]] || [[ "$COMMIT_MSG" == *"auto-evolution"* ]]; then
+            IS_AUTO_EVO=true
+          fi
+          
+          # Sinal 2: Autor do commit é o bot de auto-evolução
+          if [[ "${{ github.event.head_commit.author.name }}" == "Jarvis-AutoEvolution" ]]; then
+            IS_AUTO_EVO=true
+          fi
+          
+          # Sinal 3: Branch name indica auto-evolution
+          if [[ "${{ github.event.ref }}" == *"auto-evolution"* ]]; then
+            IS_AUTO_EVO=true
+          fi
+          
+          if [ "$IS_AUTO_EVO" = true ]; then
             echo "**Origem:** Merge de Auto-Evolução (próprio sistema)" >> $GITHUB_STEP_SUMMARY
             echo "**Ação:** Consolidar conhecimento, NÃO criar nova evolução" >> $GITHUB_STEP_SUMMARY
             echo "merge_source=auto-evolution" >> $GITHUB_OUTPUT

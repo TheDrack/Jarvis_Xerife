@@ -57,10 +57,24 @@ jobs:
 
       - name: Get Attempt Number
         id: get_attempt
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # Buscar número de tentativas dos commits
-          ATTEMPT=$(git log --oneline --grep="Auto-correção tentativa" | wc -l)
+          # Get workflow runs for this PR to count attempts
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          WORKFLOW_NAME="Jarvis Metabolism Flow"
+          
+          # Count previous runs of this workflow for this PR
+          ATTEMPT=$(gh run list --workflow="$WORKFLOW_NAME" --json conclusion,headBranch \
+            --jq "[.[] | select(.headBranch==\"${{ github.event.pull_request.head.ref }}\") | select(.conclusion != null)] | length")
           ATTEMPT=$((ATTEMPT + 1))
+          
+          # Fallback to git log if GH API fails
+          if [ -z "$ATTEMPT" ] || [ "$ATTEMPT" -eq 0 ]; then
+            ATTEMPT=$(git log --oneline --grep="🤖 Auto-correção tentativa" | wc -l)
+            ATTEMPT=$((ATTEMPT + 1))
+          fi
+          
           echo "attempt_number=$ATTEMPT" >> $GITHUB_OUTPUT
           echo "**Tentativa:** $ATTEMPT de 3" >> $GITHUB_STEP_SUMMARY
 
@@ -149,7 +163,7 @@ jobs:
   auto_correction:
     name: "🔧 Auto-Correção - Tentativa ${{ needs.test_pr.outputs.attempt_number }}"
     needs: test_pr
-    if: needs.test_pr.outputs.tests_passed == 'false' && needs.test_pr.outputs.attempt_number < 3
+    if: needs.test_pr.outputs.tests_passed == 'false' && fromJSON(needs.test_pr.outputs.attempt_number) < 3
     runs-on: ubuntu-latest
     
     steps:
@@ -245,10 +259,18 @@ jobs:
 
       - name: Push Correção
         run: |
-          git push origin "${{ github.event.pull_request.head.ref }}" || echo "Push failed, possibly no changes"
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**🔄 Nova tentativa será iniciada automaticamente...**" >> $GITHUB_STEP_SUMMARY
+          # Check if there are changes to push
+          if git diff-index --quiet HEAD --; then
+            echo "Nenhuma mudança para fazer push" >> $GITHUB_STEP_SUMMARY
+          else
+            if git push origin "${{ github.event.pull_request.head.ref }}"; then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "**🔄 Nova tentativa será iniciada automaticamente...**" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "❌ Falha ao fazer push. Verifique permissões." >> $GITHUB_STEP_SUMMARY
+              exit 1
+            fi
+          fi
 
       - name: Comentar na PR
         env:
@@ -271,7 +293,7 @@ jobs:
   escalate_to_commander:
     name: "🚨 Escalonar ao Comandante"
     needs: test_pr
-    if: needs.test_pr.outputs.tests_passed == 'false' && needs.test_pr.outputs.attempt_number >= 3
+    if: needs.test_pr.outputs.tests_passed == 'false' && fromJSON(needs.test_pr.outputs.attempt_number) >= 3
     runs-on: ubuntu-latest
     
     steps:
