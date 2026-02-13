@@ -448,15 +448,125 @@ Implementações futuras podem incluir:
 - [ ] Machine learning para prever sucesso de evolução
 - [ ] Rollback automático se evolução quebra produção
 
-## Referências
+## Sistema de Evolução Marvel
 
-- [ROADMAP.md](../ROADMAP.md) - Roadmap do projeto
-- [RL_EVOLUTION_MODULE.md](./RL_EVOLUTION_MODULE.md) - Sistema de Reinforcement Learning
-- [evolution_loop.py](../app/application/services/evolution_loop.py) - Serviço de RL
-- [auto_evolution.py](../app/application/services/auto_evolution.py) - Serviço de auto-evolução
+### O que é?
+
+O **Sistema de Evolução Marvel** é uma extensão do sistema de auto-evolução que foca especificamente nas **9 habilidades de nível Marvel** (CHAPTER_9 do JARVIS_OBJECTIVES_MAP).
+
+Enquanto o sistema base de auto-evolução gerencia missões gerais do ROADMAP.md, o sistema Marvel gerencia a evolução para capacidades avançadas comparáveis ao J.A.R.V.I.S. da Marvel.
+
+### Componentes Marvel
+
+1. **MARVEL_ROADMAP.md** - Apostila de Evolução com as 9 habilidades Marvel
+2. **MarvelEvolutionService** - Serviço especializado para evolução Marvel
+3. **demo_marvel_evolution.py** - Script de demonstração do ciclo Marvel
+
+### As 9 Habilidades Marvel
+
+1. **Interface Holográfica** - Antecipar necessidades do usuário (Cap. 94)
+2. **Diagnóstico de Armadura** - Propor soluções proativamente (Cap. 95)
+3. **Controle de Periféricos** - Ação proativa e segura (Cap. 96)
+4. **Sistemas Integrados** - Coordenar físico e digital (Cap. 97)
+5. **Copiloto Cognitivo** - Operar como assistente mental (Cap. 98)
+6. **Alinhamento Contínuo** - Manter sintonia com usuário (Cap. 99)
+7. **Evolução Preservando Identidade** - Evoluir sem perder essência (Cap. 100)
+8. **Sustentabilidade Econômica** - Autossuficiência financeira (Cap. 101)
+9. **Infraestrutura Cognitiva Pessoal** - Fundação do pensamento (Cap. 102)
+
+### Ciclo de Aprendizado Marvel
+
+```python
+from app.application.services.marvel_evolution import MarvelEvolutionService
+
+# 1. Inicializar serviço
+marvel_service = MarvelEvolutionService()
+
+# 2. Encontrar próxima habilidade Marvel
+next_skill = marvel_service.find_next_marvel_skill()
+
+# 3. Implementar scripts necessários
+# (baseado em next_skill['scripts_needed'])
+
+# 4. Executar Metabolismo (pytest)
+test_results = {'passed': 4, 'total': 4, 'success_rate': 100.0}
+
+# 5. Validar habilidade
+is_valid = marvel_service.is_skill_validated_by_metabolismo(
+    skill_number=next_skill['skill']['number'],
+    test_results=test_results
+)
+
+# 6. Se aprovado, marcar como aprendida
+if is_valid:
+    marvel_service.mark_marvel_skill_as_learned(next_skill['skill']['number'])
+    
+    # 7. Gerar relatório para o Comandante
+    report = marvel_service.generate_progress_report(
+        skill_name=next_skill['skill']['name'],
+        tests_passed=4,
+        tests_total=4,
+        learning_time="2 horas"
+    )
+    print(report)
+```
+
+### Relatório de Progresso Marvel
+
+Exemplo de saída após aprender uma habilidade:
+
+```
+🤖 Comandante, mais uma habilidade do Jarvis Marvel foi integrada ao meu DNA.
+
+Habilidade Aprendida: Interface Holográfica - Antecipar Necessidades do Usuário
+Testes Passaram: 4/4 (100%)
+Tempo de Aprendizado: 2 horas
+
+📈 Progresso Geral: 1/9 habilidades Marvel (11.1% completo)
+Estamos 11.1% mais próximos do Xerife Marvel.
+
+Próxima Missão: Diagnóstico de Armadura - Propor Soluções Proativamente
+```
+
+### Diferenças: Auto-Evolução vs Marvel
+
+| Aspecto | Auto-Evolução | Marvel Evolution |
+|---------|---------------|------------------|
+| Roadmap | `docs/ROADMAP.md` | `docs/MARVEL_ROADMAP.md` |
+| Foco | Missões gerais | 9 habilidades Marvel |
+| Serviço | `AutoEvolutionService` | `MarvelEvolutionService` |
+| Capacidades | Todas (IDs 1-102) | Apenas CHAPTER_9 (IDs 94-102) |
+| Relatórios | Genérico | Português, tema Marvel |
+| Objetivo | Estabilização geral | Nível Marvel (J.A.R.V.I.S.) |
+
+### Demonstração
+
+Execute o script de demonstração para ver o sistema Marvel em ação:
+
+```bash
+python scripts/demo_marvel_evolution.py
+```
+
+### Referências Marvel
+
+- [MARVEL_ROADMAP.md](./MARVEL_ROADMAP.md) - Apostila de Evolução Marvel
+- [marvel_evolution.py](../app/application/services/marvel_evolution.py) - Serviço Marvel
+- [demo_marvel_evolution.py](../scripts/demo_marvel_evolution.py) - Demo do sistema
+- [test_marvel_evolution.py](../tests/test_marvel_evolution.py) - Testes do sistema
 
 ---
 
-**Última Atualização**: 2026-02-12  
+## Referências
+
+- [ROADMAP.md](../ROADMAP.md) - Roadmap do projeto
+- [MARVEL_ROADMAP.md](./MARVEL_ROADMAP.md) - **NOVO:** Apostila de Evolução Marvel
+- [RL_EVOLUTION_MODULE.md](./RL_EVOLUTION_MODULE.md) - Sistema de Reinforcement Learning
+- [evolution_loop.py](../app/application/services/evolution_loop.py) - Serviço de RL
+- [auto_evolution.py](../app/application/services/auto_evolution.py) - Serviço de auto-evolução
+- [marvel_evolution.py](../app/application/services/marvel_evolution.py) - **NOVO:** Serviço de evolução Marvel
+
+---
+
+**Última Atualização**: 2026-02-13  
 **Mantido por**: Equipe Jarvis  
-**Status**: ✅ Implementado e Testado
+**Status**: ✅ Implementado e Testado (Auto-Evolução + Marvel)

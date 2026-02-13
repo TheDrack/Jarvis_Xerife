@@ -50,6 +50,7 @@ Jarvis is a **cloud-native voice assistant** with distributed device orchestrati
 ### 🔧 Self-Healing & Auto-Evolution
 - **Metabolism Flow** - Biological-inspired DNA mutation control system
 - **Auto-Evolution System** - Self-improvement based on ROADMAP with Reinforcement Learning
+- **Marvel Evolution System** - **NEW:** 9 advanced skills to reach J.A.R.V.I.S. Marvel level
 - **Automatic bug fixing** using GitHub Copilot (Mecânico Consertador)
 - **Metabolic analysis** with intelligent escalation (Mecânico Revisionador)
 - **CI/CD failure detection** and auto-repair
@@ -265,6 +266,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - **[API Documentation](docs/api/API_README.md)** - REST API reference
 - **[LLM Integration](docs/api/LLM_INTEGRATION.md)** - Multi-tier LLM system
 - **[Auto-Evolution System](docs/AUTO_EVOLUTION_SYSTEM.md)** - Self-improvement with RL
+- **[Marvel Evolution System](docs/MARVEL_ROADMAP.md)** - **NEW:** 9 advanced Marvel-level skills
 - **[Reinforcement Learning](docs/RL_EVOLUTION_MODULE.md)** - Reward system documentation
 - **[Full Roadmap](docs/ROADMAP.md)** - Detailed project roadmap
 - **[Architecture Decision Records](docs/README.md)** - Design decisions
