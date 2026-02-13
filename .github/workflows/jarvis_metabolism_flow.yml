@@ -81,6 +81,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Teste de Identidade
+        run: gh auth status
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -154,8 +160,8 @@ jobs:
       - name: 🔬 Análise Metabólica - Interpretação da Intenção
         id: analyze
         env:
-          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
-          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "## 2️⃣ MECÂNICO REVISIONADOR - Análise Metabólica" >> $GITHUB_STEP_SUMMARY
@@ -194,8 +200,8 @@ jobs:
         id: escalation_check
         if: steps.analyze.outputs.requires_human == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
-          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "## 3️⃣ ESCALONAMENTO ANTECIPADO AO COMANDANTE" >> $GITHUB_STEP_SUMMARY
@@ -251,6 +257,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Teste de Identidade
+        run: gh auth status
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -267,8 +279,8 @@ jobs:
 
       - name: Install GitHub Copilot CLI
         env:
-          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
-          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh --version
           gh extension install github/gh-copilot || echo "Copilot extension already installed"
@@ -299,8 +311,8 @@ jobs:
       - name: 🧬 Mecânico Consertador - Implementar Mutagênese Controlada
         id: mutate
         env:
-          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
-          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           INTENT_TYPE: ${{ needs.metabolic_analysis.outputs.intent_type }}
           IMPACT_TYPE: ${{ needs.metabolic_analysis.outputs.impact_type }}
@@ -356,6 +368,12 @@ jobs:
         with:
           ref: ${{ needs.metabolic_mutation.outputs.branch_name }}
           fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Teste de Identidade
+        run: gh auth status
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
