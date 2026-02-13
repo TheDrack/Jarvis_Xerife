@@ -1098,7 +1098,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         // Voice recognition - V.A.S. (Voice Activated System)
         let recognition = null;
         let isRecording = false;
-        let vasState = 'muted'; // 'muted', 'listening' (wake word detection), 'transcribing'
+        let vasState = 'listening'; // 'muted', 'listening' (wake word detection), 'transcribing'
         let silenceTimer = null;
         const SILENCE_TIMEOUT = 3000; // 3 seconds
         // Wake word detection works with Portuguese pronunciation since lang='pt-BR'
