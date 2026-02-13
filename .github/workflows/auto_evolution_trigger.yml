@@ -49,6 +49,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.JARVIS_TOKEN_CI }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -146,6 +147,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.JARVIS_TOKEN_CI }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -431,6 +433,8 @@ jobs:
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.JARVIS_TOKEN_CI }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
