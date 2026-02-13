@@ -377,9 +377,11 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Ler contexto da missão
+          ROADMAP_CONTEXT=""
           if [ -f mission_context.txt ]; then
             cat mission_context.txt >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
+            ROADMAP_CONTEXT=$(cat mission_context.txt)
           fi
           
           # Usar o metabolism_mutator para implementar a missão
@@ -394,7 +396,8 @@ jobs:
           OUTPUT=$(python scripts/metabolism_mutator.py \
             --strategy "minimal_change" \
             --intent "implementação" \
-            --impact "funcional" 2>&1)
+            --impact "funcional" \
+            --roadmap-context "$ROADMAP_CONTEXT" 2>&1)
           EXIT_CODE=$?
           set -e
           
@@ -426,8 +429,48 @@ jobs:
             echo "**✅ Implementação concluída**" >> $GITHUB_STEP_SUMMARY
           fi
 
+      - name: ✅ Validação Pré-PR - Verificar Mudanças Reais
+        id: validate
+        run: |
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ VALIDAÇÃO PRÉ-PR" >> $GITHUB_STEP_SUMMARY
+          echo "==================================================" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Verificar se há mudanças reais no código via git diff
+          git add -A
+          
+          # Obter diff (excluindo arquivos de log temporários)
+          if git diff --cached --quiet --exit-code; then
+            echo "**❌ FALHA: Nenhuma mudança técnica detectada**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "A mutação não gerou nenhuma alteração no código." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Evolução abortada: Nenhuma melhoria técnica foi gerada.**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            # Há mudanças - mostrar estatísticas
+            STATS=$(git diff --cached --stat)
+            echo "**✅ MUDANÇAS DETECTADAS**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "$STATS" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Contar arquivos modificados
+            FILES_CHANGED=$(git diff --cached --name-only | wc -l)
+            echo "**Arquivos modificados:** $FILES_CHANGED" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: 🧪 Executar testes
         id: test
+        if: steps.validate.outputs.has_changes == 'true'
         continue-on-error: true
         run: |
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
@@ -449,11 +492,13 @@ jobs:
           fi
 
       - name: 📤 Push branch
+        if: steps.validate.outputs.has_changes == 'true'
         run: |
           git push origin "$BRANCH_NAME"
 
       - name: 📝 Criar Pull Request
         id: create_pr
+        if: steps.validate.outputs.has_changes == 'true'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GH_TOKEN: ${{ github.token }}
