@@ -1102,7 +1102,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         let silenceTimer = null;
         const SILENCE_TIMEOUT = 3000; // 3 seconds
         // Wake word detection works with Portuguese pronunciation since lang='pt-BR'
-        const WAKE_WORD = 'jarvis';
+        // Both app name (jarvis) and user-configured wake word (e.g., xerife) are supported
+        const WAKE_WORDS = ['jarvis']; // Will be updated with configured wake_word from /v1/status
         let lastSpeechTime = Date.now();
         
         // Voice synthesis
@@ -1167,14 +1168,15 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 }
                 
                 if (vasState === 'listening') {
-                    // Wake word detection mode
-                    if (transcript.includes(WAKE_WORD)) {
+                    // Wake word detection mode - check for any wake word
+                    const detectedWakeWord = WAKE_WORDS.find(word => transcript.includes(word));
+                    if (detectedWakeWord) {
                         // Wake word detected! Switch to transcribing mode
                         vasState = 'transcribing';
                         updateVoiceButtonState();
                         commandInput.focus();
                         commandInput.classList.add('voice-active');
-                        addMessage('Wake word detected. Transcribing...', 'system');
+                        addMessage(`Wake word "${detectedWakeWord}" detected. Transcribing...`, 'system');
                         // Clear the wake word from input
                         commandInput.value = '';
                     }
@@ -1279,7 +1281,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 voiceButton.title = 'Microphone Off - Click to enable wake word detection';
             } else if (vasState === 'listening') {
                 voiceButton.innerHTML = '🎤';
-                voiceButton.title = 'Listening for wake word "Jarvis" - Click to mute';
+                const wakeWordsDisplay = WAKE_WORDS.join('" or "');
+                voiceButton.title = `Listening for wake word "${wakeWordsDisplay}" - Click to mute`;
             } else if (vasState === 'transcribing') {
                 voiceButton.innerHTML = '🔴';
                 voiceButton.title = 'Transcribing - Click to stop';
@@ -1352,16 +1355,43 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         }
         
         // Show main interface
-        function showMainInterface(username) {
+        async function showMainInterface(username) {
             userDisplay.textContent = `User: ${username}`;
             loginModal.classList.remove('active');
             mainInterface.classList.remove('hidden');
             commandInput.focus();
             
+            // Fetch wake word from status endpoint and add it to WAKE_WORDS
+            await fetchWakeWord();
+            
             // Greet the user when HUD opens
             const greeting = getGreeting();
             addMessage(greeting, 'jarvis');
             speak(greeting);
+        }
+        
+        // Fetch configured wake word from backend
+        async function fetchWakeWord() {
+            try {
+                const token = localStorage.getItem(AUTH_TOKEN_KEY);
+                const response = await fetch('/v1/status', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.wake_word && !WAKE_WORDS.includes(data.wake_word)) {
+                        WAKE_WORDS.push(data.wake_word);
+                        console.log(`Wake words configured: ${WAKE_WORDS.join(', ')}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching wake word:', error);
+                // Continue with default wake words if fetch fails
+            }
         }
         
         // Activity monitoring
