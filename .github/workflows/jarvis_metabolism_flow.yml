@@ -320,8 +320,7 @@ jobs:
           # Adicionar label de revisão manual
           gh pr edit "$PR_NUMBER" \
             --repo "${{ github.repository }}" \
-            --add-label "manual-review-required" \
-            --add-label "metabolism-failure"
+            --add-label "commander-review"
           
           echo "**✅ PR marcada para revisão manual**" >> $GITHUB_STEP_SUMMARY
 
@@ -349,7 +348,7 @@ jobs:
           3. Aplicar correção manual ou fechar a PR
           
           ---
-          **Labels adicionadas:** \`manual-review-required\`, \`metabolism-failure\`
+          **Label adicionada:** \`commander-review\`
           
           _Sistema de Autonomia Total - Escalonamento automático após 3 falhas_"
 
@@ -378,8 +377,7 @@ jobs:
           ---
           _Criado automaticamente pelo Fluxo de Metabolismo_" \
             --label "commander-review" \
-            --label "metabolism" \
-            --label "high-priority"
+            --label "metabolism"
 
   # ==================================================
   # RESUMO - Princípios Fundamentais
