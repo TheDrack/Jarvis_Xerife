@@ -106,10 +106,19 @@ jobs:
             echo "**Ação:** Triggando novo ciclo de evolução" >> $GITHUB_STEP_SUMMARY
           fi
           
+          # Define as variáveis de forma limpa
+          if [ "$IS_AUTO_EVO" = true ]; then
+            FINAL_SOURCE="auto-evolution"
+            FINAL_EVOLVE="false"
+          else
+            FINAL_SOURCE="external"
+            FINAL_EVOLVE="true"
+          fi
+          
+          # Grava no output usando o formato seguro
           {
-            echo "merge_source=${IS_AUTO_EVO:+auto-evolution}"
-            echo "${IS_AUTO_EVO:-external}" # Fallback lógico
-            echo "should_evolve=$([ "$IS_AUTO_EVO" = true ] && echo "false" || echo "true")"
+            echo "merge_source=$FINAL_SOURCE"
+            echo "should_evolve=$FINAL_EVOLVE"
             echo "commit_message<<EOF"
             echo "$COMMIT_MSG"
             echo "EOF"
