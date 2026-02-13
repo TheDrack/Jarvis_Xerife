@@ -101,16 +101,19 @@ jobs:
           if [ "$IS_AUTO_EVO" = true ]; then
             echo "**Origem:** Merge de Auto-Evolução (próprio sistema)" >> $GITHUB_STEP_SUMMARY
             echo "**Ação:** Consolidar conhecimento, NÃO criar nova evolução" >> $GITHUB_STEP_SUMMARY
-            echo "merge_source=auto-evolution" >> $GITHUB_OUTPUT
-            echo "should_evolve=false" >> $GITHUB_OUTPUT
           else
             echo "**Origem:** Merge de PR Externa ou commit manual" >> $GITHUB_STEP_SUMMARY
             echo "**Ação:** Triggando novo ciclo de evolução" >> $GITHUB_STEP_SUMMARY
-            echo "merge_source=external" >> $GITHUB_OUTPUT
-            echo "should_evolve=true" >> $GITHUB_OUTPUT
           fi
           
-          echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          {
+            echo "merge_source=${IS_AUTO_EVO:+auto-evolution}"
+            echo "${IS_AUTO_EVO:-external}" # Fallback lógico
+            echo "should_evolve=$([ "$IS_AUTO_EVO" = true ] && echo "false" || echo "true")"
+            echo "commit_message<<EOF"
+            echo "$COMMIT_MSG"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
   # ==================================================
   # CONSOLIDAÇÃO: Atualizar base de conhecimento após merge
