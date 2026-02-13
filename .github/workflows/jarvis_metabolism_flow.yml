@@ -526,7 +526,6 @@ jobs:
           "
           
           # Criar issue para o comandante
-          echo "${{ github.token }}" | gh auth login --with-token
           gh issue create \
             --repo "TheDrack/Jarvis_Xerife" \
             --title "🎯 COMANDANTE: Intervenção Necessária - ${{ needs.metabolic_analysis.outputs.event_description }}" \
