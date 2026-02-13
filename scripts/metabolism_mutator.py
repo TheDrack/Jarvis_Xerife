@@ -267,7 +267,7 @@ class MetabolismMutator:
             logger.info("⚠️ Detectada missão: Error Recovery (requer implementação manual)")
         
         # Logs estruturados
-        elif re.search(r'\blog\b', combined_text) and \
+        elif re.search(r'\blogs?\b', combined_text) and \
              (re.search(r'\bestruturad\w*\b', combined_text) or re.search(r'\bstructured\b', combined_text)):
             analysis['mission_type'] = 'structured_logging'
             analysis['target_files'] = [
