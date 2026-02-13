@@ -14,21 +14,22 @@ on:
     types:
       - completed
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
 jobs:
   create-issue:
     # Only run if the workflow failed
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     
-    permissions:
-      contents: read
-      issues: write
-    
     steps:
       - name: Get workflow information
         id: workflow-info
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Get workflow run details
           echo "Workflow Run ID: ${{ github.event.workflow_run.id }}"
@@ -44,7 +45,7 @@ jobs:
       - name: Get workflow logs
         id: get-logs
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Download logs using GitHub CLI
           echo "Fetching logs for workflow run ${{ github.event.workflow_run.id }}..."

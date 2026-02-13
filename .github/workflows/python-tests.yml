@@ -6,11 +6,23 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ github.token }}
+    
+    - name: Teste de Identidade
+      run: gh auth status
+      env:
+        GH_TOKEN: ${{ github.token }}
 
     - name: Set up uv
       uses: astral-sh/setup-uv@v7
