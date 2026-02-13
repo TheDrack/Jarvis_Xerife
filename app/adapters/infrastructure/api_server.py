@@ -1892,8 +1892,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             if (!token) return;
             
             try {
-                // Fetch evolution status from JARVIS
-                const response = await fetch('/v1/evolution/status', {
+                // Fetch roadmap progress from JARVIS
+                const response = await fetch('/v1/roadmap/progress', {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -1906,13 +1906,22 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                     const evolutionStatus = document.getElementById('evolutionStatus');
                     const pluginCount = document.getElementById('pluginCount');
                     
-                    if (data.next_plugin) {
+                    // Display roadmap completion percentage
+                    if (data.completion_percentage !== undefined) {
                         evolutionStatus.innerHTML = `
-                            <div>🧠 Próximo plugin: <strong>${data.next_plugin}</strong></div>
-                            <div style="margin-top: 5px; font-size: 0.9em;">Status: ${data.status || 'Planejando...'}</div>
+                            <div><strong>${data.completion_percentage.toFixed(1)}%</strong></div>
+                            <div style="margin-top: 5px; font-size: 0.85em;">
+                                ✅ ${data.completed || 0} | 🔄 ${data.in_progress || 0} | 📋 ${data.planned || 0}
+                            </div>
+                        `;
+                    } else if (data.error) {
+                        evolutionStatus.innerHTML = `
+                            <div>❌ Erro</div>
+                            <div style="margin-top: 5px; font-size: 0.85em;">${data.error}</div>
                         `;
                     }
                     
+                    // Update plugin count if available (keeping backward compatibility)
                     if (data.plugin_count !== undefined) {
                         pluginCount.textContent = data.plugin_count;
                     }
@@ -3788,6 +3797,57 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 "next_plugin": None,
                 "status": "Erro ao obter status",
                 "plugin_count": 0,
+                "error": str(e)
+            }
+    
+    @app.get("/v1/roadmap/progress")
+    async def get_roadmap_progress(
+        current_user: User = Depends(get_current_user)
+    ):
+        """
+        Get roadmap progress metrics for HUD display.
+        
+        Returns completion percentage based on ROADMAP.md missions.
+        
+        Returns:
+            Roadmap progress with completion percentage
+        """
+        try:
+            from app.application.services.auto_evolution import AutoEvolutionService
+            
+            # Initialize auto evolution service
+            auto_evolution = AutoEvolutionService()
+            
+            # Get success metrics from roadmap
+            metrics = auto_evolution.get_success_metrics()
+            
+            if 'error' in metrics:
+                logger.error(f"Error getting roadmap metrics: {metrics['error']}")
+                return {
+                    "completion_percentage": 0.0,
+                    "total_missions": 0,
+                    "completed": 0,
+                    "in_progress": 0,
+                    "planned": 0,
+                    "error": metrics['error']
+                }
+            
+            return {
+                "completion_percentage": metrics['completion_percentage'],
+                "total_missions": metrics['total_missions'],
+                "completed": metrics['completed'],
+                "in_progress": metrics['in_progress'],
+                "planned": metrics['planned']
+            }
+        
+        except Exception as e:
+            logger.error(f"Error getting roadmap progress: {e}")
+            return {
+                "completion_percentage": 0.0,
+                "total_missions": 0,
+                "completed": 0,
+                "in_progress": 0,
+                "planned": 0,
                 "error": str(e)
             }
 
