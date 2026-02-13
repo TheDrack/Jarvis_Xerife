@@ -1,8 +1,0 @@
-{
-  "title": "Impedir transcrição direta no chat (manter apenas no input para edição) e renomear botão 'Execute' para 'Enviar'.",
-  "description": "Impedir transcrição direta no chat (manter apenas no input para edição) e renomear botão 'Execute' para 'Enviar'.",
-  "error_log": null,
-  "improvement_context": "Platform: Linux-6.8.0-1044-aws-x86_64-with-glibc2.36\nPython: 3.13.4\nArchitecture: x86_64",
-  "created_at": "2026-02-11T01:34:37.245529",
-  "triggered_by": "jarvis_self_correction"
-}
