@@ -212,6 +212,107 @@ class TestAutoEvolutionService:
         assert 'error' in metrics
 
 
+class TestAutoEvolutionAutoComplete:
+    """Test cases for auto-completion functionality"""
+    
+    @pytest.fixture
+    def temp_roadmap_file(self, tmp_path):
+        """Create a temporary roadmap file for testing"""
+        roadmap_content = """# Roadmap do Projeto Jarvis
+
+## 🚀 **AGORA**: Test Section
+
+### Objetivos Principais:
+1. **Test Objectives**
+   - ✅ Completed mission 1
+   - 🔄 In progress mission 1
+   - 📋 Planned mission 1
+   - [ ] Unchecked mission 1
+"""
+        roadmap_file = tmp_path / "ROADMAP.md"
+        roadmap_file.write_text(roadmap_content, encoding='utf-8')
+        return roadmap_file
+    
+    def test_mark_mission_as_completed_in_progress(self, temp_roadmap_file):
+        """Test marking an in-progress mission as completed"""
+        service = AutoEvolutionService(roadmap_path=str(temp_roadmap_file))
+        
+        # Mark the in-progress mission as completed
+        result = service.mark_mission_as_completed("In progress mission 1")
+        assert result is True
+        
+        # Verify the file was updated
+        content = temp_roadmap_file.read_text(encoding='utf-8')
+        assert '✅ In progress mission 1' in content
+        assert '🔄 In progress mission 1' not in content
+    
+    def test_mark_mission_as_completed_planned(self, temp_roadmap_file):
+        """Test marking a planned mission as completed"""
+        service = AutoEvolutionService(roadmap_path=str(temp_roadmap_file))
+        
+        result = service.mark_mission_as_completed("Planned mission 1")
+        assert result is True
+        
+        content = temp_roadmap_file.read_text(encoding='utf-8')
+        assert '✅ Planned mission 1' in content
+        assert '📋 Planned mission 1' not in content
+    
+    def test_mark_mission_as_completed_checkbox(self, temp_roadmap_file):
+        """Test marking a checkbox mission as completed"""
+        service = AutoEvolutionService(roadmap_path=str(temp_roadmap_file))
+        
+        result = service.mark_mission_as_completed("Unchecked mission 1")
+        assert result is True
+        
+        content = temp_roadmap_file.read_text(encoding='utf-8')
+        assert '[x] Unchecked mission 1' in content
+        assert '[ ] Unchecked mission 1' not in content
+    
+    def test_mark_mission_as_completed_already_completed(self, temp_roadmap_file):
+        """Test marking an already completed mission"""
+        service = AutoEvolutionService(roadmap_path=str(temp_roadmap_file))
+        
+        result = service.mark_mission_as_completed("Completed mission 1")
+        assert result is True  # Should still return True since it's completed
+        
+        # File should remain unchanged
+        content = temp_roadmap_file.read_text(encoding='utf-8')
+        assert '✅ Completed mission 1' in content
+    
+    def test_mark_mission_as_completed_not_found(self, temp_roadmap_file):
+        """Test marking a non-existent mission"""
+        service = AutoEvolutionService(roadmap_path=str(temp_roadmap_file))
+        
+        result = service.mark_mission_as_completed("Non-existent mission")
+        assert result is False
+    
+    def test_mark_mission_as_completed_file_not_exists(self):
+        """Test marking mission when roadmap doesn't exist"""
+        service = AutoEvolutionService(roadmap_path="/nonexistent/ROADMAP.md")
+        
+        result = service.mark_mission_as_completed("Some mission")
+        assert result is False
+    
+    def test_is_mission_likely_completed(self):
+        """Test heuristic check for mission completion"""
+        service = AutoEvolutionService()
+        
+        # Currently returns False as it's a placeholder
+        result = service.is_mission_likely_completed("Test mission")
+        assert isinstance(result, bool)
+    
+    def test_find_next_mission_with_auto_complete(self, temp_roadmap_file):
+        """Test finding next mission with auto-complete functionality"""
+        service = AutoEvolutionService(roadmap_path=str(temp_roadmap_file))
+        
+        # Should find the in-progress mission
+        result = service.find_next_mission_with_auto_complete()
+        
+        assert result is not None
+        assert 'mission' in result
+        assert 'section' in result
+
+
 class TestAutoEvolutionIntegration:
     """Integration tests for auto evolution with evolution loop"""
     

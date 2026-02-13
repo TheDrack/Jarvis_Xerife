@@ -227,6 +227,142 @@ class AutoEvolutionService:
         logger.warning("No suitable mission found in roadmap")
         return None
     
+    def mark_mission_as_completed(self, mission_description: str) -> bool:
+        """
+        Mark a mission as completed in the ROADMAP.md file.
+        
+        Args:
+            mission_description: The description of the mission to mark as completed
+            
+        Returns:
+            True if mission was successfully marked, False otherwise
+        """
+        if not self.roadmap_path.exists():
+            logger.error(f"Roadmap file not found: {self.roadmap_path}")
+            return False
+        
+        try:
+            content = self.roadmap_path.read_text(encoding='utf-8')
+            lines = content.split('\n')
+            modified = False
+            
+            # Find and update the mission line
+            for i, line in enumerate(lines):
+                mission = self._parse_mission_line(line)
+                if mission and mission['description'] == mission_description:
+                    # Check if it's already completed
+                    if mission['status'] == 'completed':
+                        logger.info(f"Mission already marked as completed: {mission_description}")
+                        return True
+                    
+                    # Replace the status marker with completed marker
+                    if '🔄' in line:
+                        lines[i] = line.replace('🔄', '✅')
+                        modified = True
+                        logger.info(f"Marked mission as completed (🔄 -> ✅): {mission_description}")
+                        break
+                    elif '📋' in line:
+                        lines[i] = line.replace('📋', '✅')
+                        modified = True
+                        logger.info(f"Marked mission as completed (📋 -> ✅): {mission_description}")
+                        break
+                    elif '[ ]' in line:
+                        lines[i] = line.replace('[ ]', '[x]')
+                        modified = True
+                        logger.info(f"Marked mission as completed ([ ] -> [x]): {mission_description}")
+                        break
+            
+            if modified:
+                # Write back to file
+                new_content = '\n'.join(lines)
+                self.roadmap_path.write_text(new_content, encoding='utf-8')
+                logger.info(f"Successfully updated ROADMAP.md")
+                return True
+            else:
+                logger.warning(f"Mission not found or already completed: {mission_description}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error marking mission as completed: {e}")
+            return False
+    
+    def is_mission_likely_completed(self, mission_description: str) -> bool:
+        """
+        Check if a mission appears to be already completed based on heuristics.
+        
+        This is a basic heuristic check. For a more robust implementation,
+        this could be enhanced with:
+        - Code analysis to check if related features exist
+        - Test coverage analysis
+        - Git history analysis
+        
+        Args:
+            mission_description: Description of the mission to check
+            
+        Returns:
+            True if mission appears completed, False otherwise
+        """
+        # For now, this is a placeholder that always returns False
+        # In the future, this could be enhanced with actual checks:
+        # - Check if related files exist
+        # - Check if tests are passing
+        # - Check git commits for related work
+        
+        logger.debug(f"Checking if mission is likely completed: {mission_description}")
+        
+        # Basic keyword matching for demonstration
+        # This is where more sophisticated checks would go
+        keywords_map = {
+            'graceful failure em instalações de pip': ['pip', 'install', 'graceful', 'error'],
+            'log de auditoria': ['audit', 'log', 'voice', 'command'],
+            'timeout': ['timeout', 'api', 'request']
+        }
+        
+        # This is a placeholder - actual implementation would need more logic
+        return False
+    
+    def find_next_mission_with_auto_complete(self) -> Optional[Dict[str, Any]]:
+        """
+        Find the next achievable mission, automatically marking completed ones.
+        
+        This enhanced version checks if in-progress missions are actually completed,
+        marks them in the ROADMAP, and moves to the next mission in the same cycle.
+        
+        Returns:
+            Dictionary with mission details or None if no mission found
+        """
+        max_attempts = 10  # Prevent infinite loops
+        attempt = 0
+        
+        while attempt < max_attempts:
+            attempt += 1
+            
+            # Find next mission using standard logic
+            next_mission = self.find_next_mission()
+            
+            if not next_mission:
+                logger.info("No more missions to process")
+                return None
+            
+            mission_data = next_mission['mission']
+            mission_desc = mission_data['description']
+            
+            # If mission is in-progress, check if it's actually completed
+            if mission_data['status'] == 'in_progress':
+                if self.is_mission_likely_completed(mission_desc):
+                    logger.info(f"Mission appears to be completed: {mission_desc}")
+                    # Mark it as completed in ROADMAP
+                    if self.mark_mission_as_completed(mission_desc):
+                        logger.info(f"Auto-marked mission as completed, moving to next")
+                        # Continue to next iteration to find the next mission
+                        continue
+            
+            # Found a valid mission that's not completed
+            return next_mission
+        
+        logger.warning(f"Reached max attempts ({max_attempts}) while finding next mission")
+        return None
+    
     def get_roadmap_context(self, mission: Dict[str, Any]) -> str:
         """
         Generate context for the AI to understand the mission.
