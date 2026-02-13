@@ -225,7 +225,9 @@ class MetabolismMutator:
         combined_text = issue_lower + " " + roadmap_lower
         
         # Missão: Graceful failure em instalações de pip
-        if 'graceful' in combined_text and ('fail' in combined_text or 'failure' in combined_text) and 'pip' in combined_text:
+        if re.search(r'\bgraceful\b', combined_text) and \
+           (re.search(r'\bfail\b', combined_text) or re.search(r'\bfailure\b', combined_text)) and \
+           re.search(r'\bpip\b', combined_text):
             analysis['mission_type'] = 'graceful_pip_failure'
             analysis['target_files'] = [
                 'app/application/services/task_runner.py',
@@ -241,7 +243,7 @@ class MetabolismMutator:
             logger.info("✅ Detectada missão: Graceful Pip Failure")
             
         # Timeout handling
-        elif 'timeout' in combined_text and 'handling' in combined_text:
+        elif re.search(r'\btimeout\b', combined_text) and re.search(r'\bhandling\b', combined_text):
             analysis['mission_type'] = 'timeout_handling'
             analysis['target_files'] = [
                 'app/application/services/task_runner.py'
@@ -255,7 +257,7 @@ class MetabolismMutator:
             logger.info("✅ Detectada missão: Timeout Handling")
             
         # Error recovery
-        elif 'error recovery' in combined_text or 'auto.*recovery' in combined_text:
+        elif re.search(r'\berror\s+recovery\b', combined_text) or re.search(r'\bauto\S*\s+recovery\b', combined_text):
             analysis['mission_type'] = 'error_recovery'
             analysis['required_actions'] = [
                 'Implementar retry logic',
@@ -265,7 +267,8 @@ class MetabolismMutator:
             logger.info("⚠️ Detectada missão: Error Recovery (requer implementação manual)")
         
         # Logs estruturados
-        elif 'log' in combined_text and ('estruturad' in combined_text or 'structured' in combined_text):
+        elif re.search(r'\blog\b', combined_text) and \
+             (re.search(r'\bestruturad\w*\b', combined_text) or re.search(r'\bstructured\b', combined_text)):
             analysis['mission_type'] = 'structured_logging'
             analysis['target_files'] = [
                 'app/application/services/task_runner.py'
@@ -359,10 +362,16 @@ class MetabolismMutator:
             
             content = file_path.read_text(encoding='utf-8')
             
-            # Verificar se graceful failure já está implementado
-            has_try_except = 'try:' in content and 'except' in content
-            has_timeout = 'timeout' in content.lower()
-            has_error_handling = 'DependencyInstallationError' in content or 'error' in content.lower()
+            # Verificar se graceful failure já está implementado usando padrões mais robustos
+            # Procurar por try/except blocks específicos de instalação
+            has_try_except = re.search(r'try:\s*\n.*?except\s+\w+', content, re.DOTALL) is not None
+            # Procurar por timeout como parâmetro ou configuração (não apenas como texto)
+            has_timeout = re.search(r'timeout\s*[=:]', content) is not None
+            # Procurar por classes ou tratamento de erro específico
+            has_error_handling = (
+                'DependencyInstallationError' in content or 
+                re.search(r'except\s+\w*Error', content) is not None
+            )
             
             if has_try_except and has_timeout and has_error_handling:
                 logger.info(f"✅ {file_path.name} já possui graceful failure handling")

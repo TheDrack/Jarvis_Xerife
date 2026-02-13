@@ -442,7 +442,8 @@ jobs:
             echo "**❌ FALHA: Nenhuma mudança técnica detectada**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "A mutação não gerou nenhuma alteração no código." >> $GITHUB_STEP_SUMMARY
-            echo "Evolução abortada: Nenhuma melhoria técnica foi gerada." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Evolução abortada: Nenhuma melhoria técnica foi gerada.**" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "has_changes=false" >> $GITHUB_OUTPUT
             exit 1
