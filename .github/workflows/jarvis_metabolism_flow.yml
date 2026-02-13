@@ -5,7 +5,7 @@ name: Jarvis Metabolism Flow
 # ==================================================
 #
 # Regras de Engajamento:
-# 1. Trigger: APENAS pull_request (qualquer branch)
+# 1. Trigger: APENAS pull_request_target (qualquer branch)
 # 2. O Metabolismo é o juiz - testes validam automaticamente
 # 3. Se testes passarem: Auto-Merge
 # 4. Se testes falharem: Auto-Correção (máximo 3 tentativas)
@@ -14,13 +14,14 @@ name: Jarvis Metabolism Flow
 # ==================================================
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
+  actions: write
 
 jobs:
   # ==================================================
@@ -37,7 +38,7 @@ jobs:
       - name: Checkout PR Branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           fetch-depth: 0
           token: ${{ github.token }}
@@ -170,7 +171,7 @@ jobs:
       - name: Checkout PR Branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           fetch-depth: 0
           token: ${{ github.token }}

@@ -3,13 +3,14 @@ name: Python Tests
 on:
   push:
     branches: [ main ]
-  pull_request:
+  pull_request_target:
     branches: [ main ]
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
+  actions: write
 
 jobs:
   test:
@@ -17,6 +18,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
         token: ${{ github.token }}
     
     - name: Teste de Identidade
@@ -65,3 +67,12 @@ jobs:
         # Executa os testes e gera o relatório de cobertura
         # Ignora avisos de deprecation do passlib no log para clareza
         uv run pytest -W ignore::DeprecationWarning --cov=app tests/
+
+    - name: Enable Auto-Merge on PR
+      if: github.event_name == 'pull_request_target'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        PR_NUMBER="${{ github.event.pull_request.number }}"
+        echo "Enabling auto-merge for PR #$PR_NUMBER"
+        gh pr merge "$PR_NUMBER" --auto --merge --repo "${{ github.repository }}" || true
