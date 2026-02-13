@@ -462,8 +462,8 @@ jobs:
     steps:
       - name: Escalar ao Comandante (Humano)
         env:
-          GH_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.JARVIS_RENDER_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
+          GH_TOKEN: ${{ secrets.JARVIS_TOKEN_CI || github.token }}
         run: |
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "## 8️⃣ COMANDANTE - Consciência Superior" >> $GITHUB_STEP_SUMMARY
