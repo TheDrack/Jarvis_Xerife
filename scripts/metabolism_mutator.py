@@ -237,6 +237,9 @@ Mudança: <descrição da mudança>
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             marker_file = marker_dir / f"mutation_{timestamp}.md"
             
+            # Prepare technical context section separately to avoid backslash in f-string
+            technical_context = f"## Contexto Técnico\n\n{prompt}\n" if prompt else ""
+            
             marker_content = f"""# Marcador de Mutação Metabólica
 
 **Timestamp:** {timestamp}
@@ -247,7 +250,7 @@ Mudança: <descrição da mudança>
 
 {issue_body}
 
-{f"## Contexto Técnico\\n\\n{prompt}\\n" if prompt else ""}
+{technical_context}
 
 ## Ação Necessária
 

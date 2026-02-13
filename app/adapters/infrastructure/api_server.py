@@ -1105,6 +1105,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         // Both app name (jarvis) and user-configured wake word (e.g., xerife) are supported
         const WAKE_WORDS = ['jarvis']; // Will be updated with configured wake_word from /v1/status
         let lastSpeechTime = Date.now();
+        let resultIndex = 0; // Track the last processed result index to avoid echo
         
         // Voice synthesis
         function speak(text) {
@@ -1156,43 +1157,46 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             recognition.lang = 'pt-BR'; // Portuguese Brazilian
             
             recognition.onresult = (event) => {
-                const results = event.results;
-                const lastResult = results[results.length - 1];
-                const transcript = lastResult[0].transcript.trim().toLowerCase();
+                // Process only new results to avoid echo
+                for (let i = resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    const transcript = result[0].transcript.trim().toLowerCase();
+                    
+                    lastSpeechTime = Date.now();
+                    
+                    if (vasState === 'listening') {
+                        // Wake word detection mode - check for any wake word
+                        const detectedWakeWord = WAKE_WORDS.find(word => transcript.includes(word));
+                        if (detectedWakeWord) {
+                            // Wake word detected! Switch to transcribing mode
+                            vasState = 'transcribing';
+                            updateVoiceButtonState();
+                            commandInput.classList.add('voice-active');
+                            addMessage(`Wake word "${detectedWakeWord}" detected. Transcribing...`, 'system');
+                            // Clear the wake word from input and reset result index
+                            commandInput.value = '';
+                            resultIndex = event.results.length; // Skip all results up to this point
+                            break; // Exit loop after detecting wake word
+                        }
+                    } else if (vasState === 'transcribing') {
+                        // Transcription mode - write to input box
+                        if (result.isFinal) {
+                            // Final result - append to input
+                            const currentValue = commandInput.value;
+                            const newText = result[0].transcript.trim();
+                            commandInput.value = currentValue ? currentValue + ' ' + newText : newText;
+                            resultIndex = i + 1; // Mark this result as processed
+                        }
+                    }
+                }
                 
-                lastSpeechTime = Date.now();
-                
-                // Reset silence timer when speech is detected
+                // Reset silence timer when speech is detected (outside loop)
                 if (silenceTimer) {
                     clearTimeout(silenceTimer);
                 }
                 
-                if (vasState === 'listening') {
-                    // Wake word detection mode - check for any wake word
-                    const detectedWakeWord = WAKE_WORDS.find(word => transcript.includes(word));
-                    if (detectedWakeWord) {
-                        // Wake word detected! Switch to transcribing mode
-                        vasState = 'transcribing';
-                        updateVoiceButtonState();
-                        commandInput.focus();
-                        commandInput.classList.add('voice-active');
-                        addMessage(`Wake word "${detectedWakeWord}" detected. Transcribing...`, 'system');
-                        // Clear the wake word from input
-                        commandInput.value = '';
-                    }
-                } else if (vasState === 'transcribing') {
-                    // Transcription mode - write to input box
-                    if (lastResult.isFinal) {
-                        // Final result - append to input
-                        const currentValue = commandInput.value;
-                        const newText = lastResult[0].transcript.trim();
-                        commandInput.value = currentValue ? currentValue + ' ' + newText : newText;
-                    } else {
-                        // Interim result - show in real-time but don't commit yet
-                        // For better UX, we'll just use final results
-                    }
-                    
-                    // Start silence detection
+                // Start silence detection for transcribing state (outside loop to avoid multiple timers)
+                if (vasState === 'transcribing') {
                     silenceTimer = setTimeout(() => {
                         handleSilence();
                     }, SILENCE_TIMEOUT);
@@ -1264,6 +1268,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 updateVoiceButtonState();
                 commandInput.classList.remove('voice-active');
                 addMessage('Silence detected. Returning to wake word mode...', 'system');
+                // Reset result index for clean state
+                resultIndex = 0;
             }
         }
         
@@ -1359,7 +1365,6 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             userDisplay.textContent = `User: ${username}`;
             loginModal.classList.remove('active');
             mainInterface.classList.remove('hidden');
-            commandInput.focus();
             
             // Fetch wake word from status endpoint and add it to WAKE_WORDS (non-blocking)
             fetchWakeWord();
@@ -1462,6 +1467,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 if (vasState === 'muted') {
                     // Start wake word listening mode
                     vasState = 'listening';
+                    resultIndex = 0; // Reset result index for clean state
                     try {
                         recognition.start();
                         updateVoiceButtonState();
@@ -1474,6 +1480,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 } else if (vasState === 'listening') {
                     // Stop and mute
                     vasState = 'muted';
+                    resultIndex = 0; // Reset result index for clean state
                     try {
                         recognition.stop();
                     } catch (e) {
@@ -1488,6 +1495,7 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 } else if (vasState === 'transcribing') {
                     // Stop transcribing and return to listening mode
                     vasState = 'listening';
+                    resultIndex = 0; // Reset result index for clean state
                     commandInput.classList.remove('voice-active');
                     if (silenceTimer) {
                         clearTimeout(silenceTimer);
@@ -1591,7 +1599,6 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
                 // Re-enable button and hide loading
                 sendButton.disabled = false;
                 loading.classList.remove('active');
-                commandInput.focus();
             }
         }
         
