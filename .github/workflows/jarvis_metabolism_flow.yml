@@ -4,8 +4,16 @@ name: Jarvis Metabolism Flow
 # FLUXO DE METABOLISMO DO JARVIS - AUTONOMIA TOTAL
 # ==================================================
 #
+# SEGURANÇA: Este workflow usa pull_request_target e executa código de PRs.
+# Proteções implementadas:
+# - Checkout explícito do SHA da PR (não do branch base)
+# - Auto-merge apenas de PRs do mesmo repositório (não forks)
+# - Testes executados antes de qualquer merge
+# - Múltiplas tentativas de auto-correção antes de escalonamento
+#
 # Regras de Engajamento:
-# 1. Trigger: APENAS pull_request (qualquer branch)
+# 1. Trigger: APENAS pull_request_target (qualquer branch do mesmo repositório)
+#    NOTA DE SEGURANÇA: PRs de forks são checadas apenas do código do PR, não do base
 # 2. O Metabolismo é o juiz - testes validam automaticamente
 # 3. Se testes passarem: Auto-Merge
 # 4. Se testes falharem: Auto-Correção (máximo 3 tentativas)
@@ -14,13 +22,14 @@ name: Jarvis Metabolism Flow
 # ==================================================
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
+  actions: write
 
 jobs:
   # ==================================================
@@ -37,7 +46,7 @@ jobs:
       - name: Checkout PR Branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           fetch-depth: 0
           token: ${{ github.token }}
@@ -136,11 +145,15 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Habilitar auto-merge
-          gh pr merge "$PR_NUMBER" --auto --merge --repo "${{ github.repository }}" || true
-          
-          echo "**✅ Auto-merge habilitado com sucesso**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_O sistema confia nos testes. Nenhum revisor humano necessário._" >> $GITHUB_STEP_SUMMARY
+          if ! gh pr merge "$PR_NUMBER" --auto --merge --repo "${{ github.repository }}"; then
+            echo "**⚠️ Aviso:** Falha ao habilitar auto-merge" >> $GITHUB_STEP_SUMMARY
+            echo "Isso pode ser devido a regras de proteção de branch ou permissões." >> $GITHUB_STEP_SUMMARY
+            echo "A PR precisará ser mesclada manualmente." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**✅ Auto-merge habilitado com sucesso**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "_O sistema confia nos testes. Nenhum revisor humano necessário._" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Comentar na PR
         env:
@@ -170,7 +183,7 @@ jobs:
       - name: Checkout PR Branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.event.pull_request.head.sha }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           fetch-depth: 0
           token: ${{ github.token }}

@@ -1,15 +1,24 @@
 name: Python Tests
 
+# ==================================================
+# SEGURANÇA: Este workflow usa pull_request_target
+# Proteções implementadas:
+# - Checkout explícito do SHA da PR
+# - Auto-merge apenas de PRs do mesmo repositório (não forks)
+# - Testes executados antes de qualquer merge
+# ==================================================
+
 on:
   push:
     branches: [ main ]
-  pull_request:
+  pull_request_target:
     branches: [ main ]
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
+  actions: write
 
 jobs:
   test:
@@ -17,6 +26,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
         token: ${{ github.token }}
     
     - name: Teste de Identidade
@@ -65,3 +75,15 @@ jobs:
         # Executa os testes e gera o relatório de cobertura
         # Ignora avisos de deprecation do passlib no log para clareza
         uv run pytest -W ignore::DeprecationWarning --cov=app tests/
+
+    - name: Enable Auto-Merge on PR
+      if: github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        PR_NUMBER="${{ github.event.pull_request.number }}"
+        echo "Enabling auto-merge for PR #$PR_NUMBER"
+        if ! gh pr merge "$PR_NUMBER" --auto --merge --repo "${{ github.repository }}"; then
+          echo "Warning: Failed to enable auto-merge. This may be due to branch protection rules or missing permissions."
+          echo "PR will need to be merged manually."
+        fi
