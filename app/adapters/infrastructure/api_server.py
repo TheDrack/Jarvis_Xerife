@@ -1361,8 +1361,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
             mainInterface.classList.remove('hidden');
             commandInput.focus();
             
-            // Fetch wake word from status endpoint and add it to WAKE_WORDS
-            await fetchWakeWord();
+            // Fetch wake word from status endpoint and add it to WAKE_WORDS (non-blocking)
+            fetchWakeWord();
             
             // Greet the user when HUD opens
             const greeting = getGreeting();
