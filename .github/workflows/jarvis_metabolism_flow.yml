@@ -351,6 +351,73 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**✅ Mutagênese executada com sucesso**" >> $GITHUB_STEP_SUMMARY
 
+      - name: 📤 Push Branch e Criar Pull Request
+        id: create_pr
+        if: steps.mutate.outputs.mutation_applied == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Push da branch com mutações
+          git push origin "$BRANCH_NAME"
+          
+          # Capturar referência do evento que gerou o metabolismo
+          EVENT_REF=""
+          CLOSING_KEYWORD=""
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            EVENT_REF="PR #${{ github.event.pull_request.number }}"
+          elif [[ "${{ github.event_name }}" == "issues" ]]; then
+            EVENT_REF="Issue #${{ github.event.issue.number }}"
+            CLOSING_KEYWORD="Closes #${{ github.event.issue.number }}"
+          elif [[ -n "${{ github.sha }}" ]]; then
+            EVENT_REF="Commit ${{ github.sha }}"
+          fi
+          
+          # Criar body da PR em arquivo temporário
+          BODY_FILE="$(mktemp)"
+          {
+            printf '%s\n' "## 🧬 Mutação Metabólica Automática"
+            printf '\n'
+            printf '%s\n' "Esta PR foi criada automaticamente pelo Fluxo de Metabolismo do Jarvis."
+            printf '\n'
+            printf '%s\n' "### Evento Original"
+            printf '%s\n' "**Origem:** ${EVENT_REF}"
+            printf '%s\n' "**Intenção:** ${{ needs.metabolic_analysis.outputs.intent_type }}"
+            printf '%s\n' "**Impacto:** ${{ needs.metabolic_analysis.outputs.impact_type }}"
+            printf '\n'
+            printf '%s\n' "### Estratégia de Mutação"
+            printf '%s\n' "${{ needs.metabolic_analysis.outputs.mutation_strategy }}"
+            printf '\n'
+            printf '%s\n' "### Próximos Passos"
+            printf '%s\n' "1. Revisar as mudanças aplicadas"
+            printf '%s\n' "2. Executar testes (vistoria homeostática)"
+            printf '%s\n' "3. Aprovar ou solicitar ajustes"
+            printf '\n'
+            if [[ -n "$CLOSING_KEYWORD" ]]; then
+              printf '%s\n' "$CLOSING_KEYWORD"
+              printf '\n'
+            fi
+            printf '%s\n' "---"
+            printf '%s\n' "_Workflow Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}_"
+          } > "$BODY_FILE"
+          
+          # Criar PR
+          PR_URL=$(gh pr create \
+            --repo "${{ github.repository }}" \
+            --title "🧬 [Metabolismo] ${{ needs.metabolic_analysis.outputs.event_description }}" \
+            --body-file "$BODY_FILE" \
+            --base main \
+            --head "$BRANCH_NAME")
+          
+          # Cleanup
+          rm -f "$BODY_FILE"
+          
+          # Obter número da PR
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          
+          echo "**✅ Pull Request criada:** $PR_URL" >> $GITHUB_STEP_SUMMARY
+
   # ==================================================
   # 6. VISTORIA - Homeostase (Validação com Pytest)
   # ==================================================
@@ -487,12 +554,23 @@ jobs:
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
+          # Capturar referência do evento que gerou o metabolismo
+          EVENT_REF=""
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            EVENT_REF="PR #${{ github.event.pull_request.number }}"
+          elif [[ "${{ github.event_name }}" == "issues" ]]; then
+            EVENT_REF="Issue #${{ github.event.issue.number }}"
+          elif [[ -n "${{ github.sha }}" ]]; then
+            EVENT_REF="Commit ${{ github.sha }}"
+          fi
+          
           # Preparar relatório completo para o comandante
           REPORT="## 🎯 RELATÓRIO METABÓLICO COMPLETO
           
           ### Evento Original
           **Intenção:** ${{ needs.metabolic_analysis.outputs.intent_type }}
           **Descrição:** ${{ needs.metabolic_analysis.outputs.event_description }}
+          **Origem:** ${EVENT_REF}
           
           ### Análise Metabólica
           **Tipo de Impacto:** ${{ needs.metabolic_analysis.outputs.impact_type }}
@@ -541,6 +619,10 @@ jobs:
           4. Decidir: aprovar, ajustar ou rejeitar mutação
           
           **Workflow Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
+          ---
+          
+          **Relacionado a:** ${EVENT_REF}
           "
           
           # Criar issue para o comandante

@@ -322,10 +322,11 @@ jobs:
           
           echo "**Branch:** \`$BRANCH_NAME\`" >> $GITHUB_STEP_SUMMARY
 
-      - name: 🤖 Usar GitHub Copilot para implementar (simulação)
+      - name: 🤖 Implementar Missão via Metabolism Mutator
         id: implement
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          MISSION_DESC: ${{ needs.find_next_mission.outputs.mission_description }}
         run: |
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "## 🤖 IMPLEMENTAÇÃO DA MISSÃO" >> $GITHUB_STEP_SUMMARY
@@ -338,22 +339,49 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
           fi
           
-          # Por enquanto, criar um placeholder indicando que o Copilot seria chamado
-          # Em produção, aqui seria integrado com GitHub Copilot Agent
-          echo "**Status:** Em desenvolvimento - Integração com GitHub Copilot Agent" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "⚠️ Esta é uma implementação inicial. O GitHub Copilot Agent seria" >> $GITHUB_STEP_SUMMARY
-          echo "invocado aqui para implementar a missão automaticamente." >> $GITHUB_STEP_SUMMARY
+          # Usar o metabolism_mutator para implementar a missão
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
+          export ISSUE_BODY="$MISSION_DESC"
+          export ISSUE_NUMBER="auto-evolution"
           
-          # Criar um arquivo de marcador para demonstração
+          echo "**📝 Aplicando mutação automática para missão do ROADMAP...**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          set +e
+          OUTPUT=$(python scripts/metabolism_mutator.py \
+            --strategy "minimal_change" \
+            --intent "implementação" \
+            --impact "funcional" 2>&1)
+          EXIT_CODE=$?
+          set -e
+          
+          # Mostrar saída (últimas 50 linhas para evitar logs excessivamente longos)
+          MAX_OUTPUT_LINES=50
+          echo "$OUTPUT"
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Saída da Implementação" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "$OUTPUT" | tail -n $MAX_OUTPUT_LINES >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Atualizar AUTO_EVOLUTION_LOG
           echo "# Auto-Evolution Mission" > docs/AUTO_EVOLUTION_LOG.md
           echo "" >> docs/AUTO_EVOLUTION_LOG.md
-          echo "Mission attempted at: $(date)" >> docs/AUTO_EVOLUTION_LOG.md
+          echo "**Mission attempted at:** $(date)" >> docs/AUTO_EVOLUTION_LOG.md
+          echo "" >> docs/AUTO_EVOLUTION_LOG.md
+          echo "**Status:** Mutação aplicada via metabolism_mutator.py" >> docs/AUTO_EVOLUTION_LOG.md
           echo "" >> docs/AUTO_EVOLUTION_LOG.md
           cat mission_context.txt >> docs/AUTO_EVOLUTION_LOG.md
           
-          git add docs/AUTO_EVOLUTION_LOG.md
-          git commit -m "[Auto-Evolution] Attempting mission from ROADMAP"
+          # Commitar mudanças
+          git add .
+          git commit -m "[Auto-Evolution] Attempting mission from ROADMAP" || true
+          
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "**⚠️ Implementação parcial - requer revisão humana**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**✅ Implementação concluída**" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: 🧪 Executar testes
         id: test
