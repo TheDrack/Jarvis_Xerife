@@ -119,52 +119,42 @@ jobs:
         run: |
           git config --global user.name "Jarvis-AutoEvolution"
           git config --global user.email "jarvis@bot.com"
-          pip install pytest pytest-json-report
-          pip install -r requirements.txt || echo "..."
+          # INSTALAÇÃO COMPLETA DOS ANTICORPOS
+          pip install pytest pytest-json-report pytest-cov requests
+          pip install -r requirements.txt || echo "Aviso: Algumas dependências falharam, mas continuaremos..."
 
       - name: 🤖 Executar Ciclo de Reinforcement Learning
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           ISSUE_BODY: ${{ needs.find_next_mission.outputs.mission_description }}
         run: |
-          # 1. Preparação
-          git config --global user.name "Jarvis-AutoEvolution"
-          git config --global user.email "jarvis@bot.com"
-          
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
           export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           
-          # 2. Mutação (O Conserto do DNA)
-          set +e
+          # 2. Mutação com Modelo Estável
+          # Certifique-se de que o python scripts/metabolism_mutator.py use o modelo correto
           python scripts/metabolism_mutator.py \
             --strategy "minimal_change" \
             --intent "auto-evolution-mission" \
             --impact "functional-improvement" \
             --roadmap-context "$(cat mission_context.txt)"
-          MUTATOR_EXIT=$?
-          set -e
-
-          # 3. Verificação de Mudanças + Testes
-          # O git add -A garante que até os arquivos que estavam no .gitignore (antes da nossa correção) sejam vistos
+          
+          # 3. Forçar reconhecimento das mudanças
           git add -A 
 
           if [ -z "$(git status --porcelain)" ]; then
-             echo "⚠️ Sem mudanças reais no DNA. Encerrando."
+             echo "⚠️ Sem mudanças. Encerrando."
              exit 0
           fi
 
-          # 4. Feedback do Ambiente (Testes)
-          echo "🧪 Iniciando Testes de Validação..."
+          # 4. Testes com plugins carregados
+          echo "🧪 Validando DNA..."
           if pytest --json-report --json-report-file=test_report.json; then
-             echo "✅ Sucesso! DNA Saudável. Consolidando Evolução..."
+             echo "✅ Sucesso! Consolidando Evolução..."
              git commit -m "[Auto-Evolution] Mission Accomplished - RL Reward Positive"
-             # Usamos o push forçado para garantir que a branch suba sem conflitos
              git push origin "$BRANCH_NAME"
-             
-             # Opcional: Aqui o JARVIS poderia abrir um PR automaticamente
           else
-             echo "❌ Falha nos testes! Aplicando Punição (Descartando Mutação)..."
-             # Não commitamos código quebrado no DNA principal
+             echo "❌ Falha nos testes! Punição aplicada."
              exit 1
           fi
