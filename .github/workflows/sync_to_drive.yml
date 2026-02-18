@@ -19,5 +19,5 @@ jobs:
           # Convertendo o JSON puro para Base64 antes de enviar para a Action
           credentials: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           filename: "Jarvis_Xerife-main.zip"
-          folderId: ${{ secrets.DRIVER_FOLDER_ID }}
+          folderId: ${{ secrets.DRIVE_FOLDER_ID }}
           overwrite: "true"
