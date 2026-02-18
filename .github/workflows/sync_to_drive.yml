@@ -13,29 +13,35 @@ jobs:
       - name: Create ZIP
         run: zip -r Jarvis_Xerife-main.zip . -x "*.git*" "venv/*" "__pycache__/*"
 
-      - name: Authenticate to Google Cloud
-        id: auth
-        uses: google-github-actions/auth@v1
-        with:
-          credentials_json: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-
-      - name: Setup Cloud SDK
-        uses: google-github-actions/setup-gcloud@v1
-
-      - name: Upload to Google Drive
+      - name: Upload to Drive
+        shell: python
+        env:
+          G_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
         run: |
-          # Usando o rclone que é nativo em runners e excelente para o Drive
-          sudo apt-get update && sudo apt-get install -y rclone
+          import os, json
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.http import MediaFileUpload
+
+          # Instalação rápida de dependências se necessário
+          os.system('pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib')
+
+          info = json.loads(os.environ['G_JSON'])
+          creds = service_account.Credentials.from_service_account_info(info)
+          service = build('drive', 'v3', credentials=creds)
+
+          file_metadata = {'name': 'Jarvis_Xerife-main.zip', 'parents': [os.environ['FOLDER_ID']]}
+          media = MediaFileUpload('Jarvis_Xerife-main.zip', mimetype='application/zip')
           
-          # Configura o rclone para usar a sua conta de serviço
-          mkdir -p ~/.config/rclone
-          cat <<EOF > ~/.config/rclone/rclone.conf
-          [gdrive]
-          type = drive
-          scope = drive
-          service_account_contents = ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          root_folder_id = ${{ secrets.DRIVE_FOLDER_ID }}
-          EOF
-          
-          # Faz o upload forçando a sobrescrita
-          rclone copyto Jarvis_Xerife-main.zip gdrive:Jarvis_Xerife-main.zip
+          # Tenta atualizar se já existir, senão cria
+          q = f"name='Jarvis_Xerife-main.zip' and '{os.environ['FOLDER_ID']}' in parents"
+          results = service.files().list(q=q).execute()
+          files = results.get('files', [])
+
+          if files:
+              service.files().update(fileId=files[0]['id'], media_body=media).execute()
+              print("Missão Cumprida: Arquivo Atualizado.")
+          else:
+              service.files().create(body=file_metadata, media_body=media).execute()
+              print("Missão Cumprida: Novo Arquivo Criado.")
