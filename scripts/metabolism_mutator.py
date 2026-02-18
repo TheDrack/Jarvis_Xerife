@@ -200,75 +200,91 @@ class MetabolismMutator:
         }
     
     def _engineering_brainstorm(self, issue_body: str, roadmap_context: str) -> Dict[str, Any]:
-        """
-        Brainstorming de Engenharia Dinâmico via Groq/LLM
-        """
+        """Brainstorming de IA Robusto via Groq"""
         logger.info("🧠 Iniciando Brainstorming de IA via Groq...")
         
         api_key = os.getenv('GROQ_API_KEY')
         if not api_key:
-            logger.error("❌ GROQ_API_KEY não encontrada. Abortando decisão dinâmica.")
-            return {'can_auto_implement': False, 'mission_type': 'error_no_api'}
+            logger.error("❌ GROQ_API_KEY não encontrada.")
+            return {'can_auto_implement': False}
 
         prompt = f"""
-        Você é o arquiteto do sistema JARVIS. Sua missão é analisar o ROADMAP e a missão atual para decidir qual código deve ser alterado.
+        Você é o Motor de Evolução do JARVIS. Analise a missão e o roadmap abaixo e decida quais arquivos devem ser alterados.
         
-        CONTEXTO DO ROADMAP:
-        {roadmap_context}
+        MISSÃO ATUAL: {issue_body}
+        ROADMAP: {roadmap_context}
         
-        MISSÃO ATUAL:
-        {issue_body}
-        
-        Sua resposta deve ser estritamente em JSON com o seguinte formato:
+        Responda ESTRITAMENTE um objeto JSON:
         {{
-            "mission_type": "string",
-            "target_files": ["caminho/do/arquivo.py"],
-            "required_actions": ["ação 1", "ação 2"],
-            "can_auto_implement": true,
-            "proposed_code_change": "descrição técnica da mudança"
+            "mission_type": "evolution",
+            "target_files": ["caminho/relativo/do/arquivo.py"],
+            "required_actions": ["descrição técnica do que mudar"],
+            "can_auto_implement": true
         }}
         """
 
         try:
-            # Chamada simplificada para a Groq (usando requests ou sdk disponível)
-            # Aqui simulamos a lógica que você deve plugar com sua biblioteca de preferência
-            # ou via subprocess chamando o curl para a Groq.
             import requests
             response = requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "llama3-70b-8192",
+                    "model": "llama-3.3-70b-specdec",
                     "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.1,
                     "response_format": {"type": "json_object"}
-                }
+                },
+                timeout=30
             )
-            analysis = response.json()['choices'][0]['message']['content']
-            return json.loads(analysis)
+            
+            resp_data = response.json()
+            if 'choices' not in resp_data:
+                logger.error(f"❌ Erro na API Groq: {resp_data}")
+                return {'can_auto_implement': False}
+                
+            analysis = json.loads(resp_data['choices'][0]['message']['content'])
+            return analysis
         except Exception as e:
-            logger.error(f"❌ Falha na consulta à Groq: {e}")
+            logger.error(f"❌ Falha crítica no brainstorm: {e}")
             return {'can_auto_implement': False}
 
     def _reactive_mutation(self, mission_analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Executa a mutação real baseada na decisão da IA
-        """
+        """Aplica a mutação de código real nos arquivos alvo"""
         logger.info("⚡ Executando Mutação Autônoma...")
-        
         files_changed = []
-        target_files = mission_analysis.get('target_files', [])
-        
-        for file_path_str in target_files:
+        api_key = os.getenv('GROQ_API_KEY')
+
+        for file_path_str in mission_analysis.get('target_files', []):
             file_path = self.repo_path / file_path_str
             if not file_path.exists(): continue
             
-            # SOLICITA O CÓDIGO NOVO PARA A IA
-            new_code = self._ask_llm_for_code(file_path, mission_analysis)
+            current_code = file_path.read_text(encoding='utf-8')
             
-            if new_code:
-                file_path.write_text(new_code, encoding='utf-8')
-                files_changed.append(str(file_path))
-                logger.info(f"✅ Arquivo {file_path_str} evoluído com sucesso.")
+            # Pedir para a IA reescrever o arquivo
+            prompt = f"Melhore este código para: {mission_analysis['required_actions']}\n\nCÓDIGO ATUAL:\n{current_code}"
+            
+            try:
+                import requests
+                resp = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    json={
+                        "model": "llama-3.3-70b-specdec",
+                        "messages": [
+                            {"role": "system", "content": "Você é um programador sênior. Responda APENAS com o código puro, sem explicações ou markdown."},
+                            {"role": "user", "content": prompt}
+                        ]
+                    }
+                )
+                new_code = resp.json()['choices'][0]['message']['content']
+                # Limpa blocos de código markdown se a IA ignorar o system prompt
+                new_code = re.sub(r'```python\n|```', '', new_code)
+                
+                file_path.write_text(new_code.strip(), encoding='utf-8')
+                files_changed.append(file_path_str)
+                logger.info(f"✅ DNA do arquivo {file_path_str} atualizado.")
+            except Exception as e:
+                logger.error(f"❌ Erro ao mutar {file_path_str}: {e}")
 
         return {
             'success': len(files_changed) > 0,
@@ -276,60 +292,6 @@ class MetabolismMutator:
             'files_changed': files_changed
         }
 
-    
-    def _reactive_mutation(self, mission_analysis: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Mutação Reativa - Implementa mudanças baseadas na análise da missão
-        
-        Args:
-            mission_analysis: Resultado do brainstorming de engenharia
-            
-        Returns:
-            Resultado da mutação
-        """
-        logger.info("⚡ Iniciando Mutação Reativa...")
-        
-        mission_type = mission_analysis['mission_type']
-        files_changed = []
-        
-        # Roteamento baseado no tipo de missão
-        if mission_type == 'graceful_pip_failure':
-            logger.info("🔧 Implementando Graceful Pip Failure...")
-            result = self._implement_graceful_pip_failure()
-            files_changed.extend(result.get('files_changed', []))
-        elif mission_type == 'timeout_handling':
-            logger.info("⏱️ Implementando Timeout Handling...")
-            result = self._implement_timeout_handling()
-            files_changed.extend(result.get('files_changed', []))
-        elif mission_type == 'structured_logging':
-            logger.info("📝 Implementando Structured Logging...")
-            result = self._implement_structured_logging()
-            files_changed.extend(result.get('files_changed', []))
-        else:
-            logger.warning(f"⚠️ Tipo de missão não suportado para auto-implementação: {mission_type}")
-            return {
-                'success': False,
-                'mutation_applied': False,
-                'error': f'Mission type {mission_type} requires manual implementation'
-            }
-        
-        # Verificar se houve mudanças reais
-        if files_changed:
-            logger.info(f"✅ Arquivos modificados: {files_changed}")
-            return {
-                'success': True,
-                'mutation_applied': True,
-                'files_changed': files_changed,
-                'mission_type': mission_type,
-                'message': f'Auto-mutation applied for {mission_type}'
-            }
-        else:
-            logger.warning("⚠️ Nenhum arquivo foi modificado")
-            return {
-                'success': False,
-                'mutation_applied': False,
-                'error': 'No files were modified during mutation'
-            }
     
     def _implement_graceful_pip_failure(self) -> Dict[str, Any]:
         """
