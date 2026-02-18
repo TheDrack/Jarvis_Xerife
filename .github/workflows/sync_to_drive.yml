@@ -1,7 +1,7 @@
 name: Sync JARVIS to Google Drive
 on:
   push:
-    branches: [ main ] # Sincroniza sempre que houver um merge na main
+    branches: [ main ]
 
 jobs:
   sync:
@@ -12,13 +12,13 @@ jobs:
 
       - name: Create ZIP
         run: |
-          # Zipando o projeto, ignorando arquivos pesados e desnecessários
+          # Zipando e ignorando pastas desnecessárias
           zip -r Jarvis_Xerife-main.zip . -x "*.git*" "venv/*" "__pycache__/*" "node_modules/*"
 
       - name: Upload to Google Drive
-        uses: jscat/upload-to-google-drive@v2
+        uses: adityak74/google-drive-upload-git-action@main
         with:
-          drive-parent-id: ${{ secrets.DRIVE_FOLDER_ID }}
-          service-account-json: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          file-path: Jarvis_Xerife-main.zip
-          overwrite: true
+          credentials: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          filename: Jarvis_Xerife-main.zip
+          folderId: ${{ secrets.DRIVE_FOLDER_ID }}
+          overwrite: "true"
