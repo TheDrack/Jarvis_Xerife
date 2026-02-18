@@ -381,37 +381,39 @@ jobs:
         id: implement
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          MISSION_DESC: ${{ needs.find_next_mission.outputs.mission_description }}
         run: |
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "## 🤖 IMPLEMENTAÇÃO DA MISSÃO" >> $GITHUB_STEP_SUMMARY
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Ler contexto da missão
-          ROADMAP_CONTEXT=""
+          # LEITURA DIRETA DO ARQUIVO (SEGURANÇA TOTAL)
           if [ -f mission_context.txt ]; then
-            cat mission_context.txt >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
             ROADMAP_CONTEXT=$(cat mission_context.txt)
+          else
+            echo "❌ ERRO: Arquivo mission_context.txt não encontrado!"
+            exit 1
           fi
+
+          # BUSCAR DESCRIÇÃO DO OUTPUT DO JOB ANTERIOR
+          MISSION_DESC="${{ needs.find_next_mission.outputs.mission_description }}"
           
-          # Usar o metabolism_mutator para implementar a missão
           export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           export ISSUE_BODY="$MISSION_DESC"
           export ISSUE_NUMBER="auto-evolution"
           
-          echo "**📝 Aplicando mutação automática para missão do ROADMAP...**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**📝 Aplicando mutação automática para: $MISSION_DESC**" >> $GITHUB_STEP_SUMMARY
           
           set +e
+          # Execução do Mutator usando a variável ROADMAP_CONTEXT carregada do arquivo
           OUTPUT=$(python scripts/metabolism_mutator.py \
             --strategy "minimal_change" \
             --intent "implementação" \
             --impact "funcional" \
             --roadmap-context "$ROADMAP_CONTEXT" 2>&1)
           EXIT_CODE=$?
-          set -e
+          set 
+
           
           # Mostrar saída (últimas 50 linhas para evitar logs excessivamente longos)
           MAX_OUTPUT_LINES=50
