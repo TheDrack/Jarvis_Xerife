@@ -19,5 +19,5 @@ jobs:
         with:
           credentials: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           filename: Jarvis_Xerife-main.zip
-          folderId: ${{ secrets.DRIVE_FOLDER_ID }}
+          folderId: ${{ secrets.DRIVER_FOLDER_ID }}
           overwrite: "true"
