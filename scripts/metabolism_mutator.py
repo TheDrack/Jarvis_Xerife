@@ -201,87 +201,81 @@ class MetabolismMutator:
     
     def _engineering_brainstorm(self, issue_body: str, roadmap_context: str) -> Dict[str, Any]:
         """
-        Brainstorming de Engenharia - Analisa a missão e determina ações
-        
-        Args:
-            issue_body: Descrição da missão
-            roadmap_context: Contexto completo do ROADMAP
-            
-        Returns:
-            Dicionário com análise da missão
+        Brainstorming de Engenharia Dinâmico via Groq/LLM
         """
-        logger.info("🧠 Iniciando Brainstorming de Engenharia...")
+        logger.info("🧠 Iniciando Brainstorming de IA via Groq...")
         
-        analysis = {
-            'mission_type': 'unknown',
-            'target_files': [],
-            'required_actions': [],
-            'can_auto_implement': False
+        api_key = os.getenv('GROQ_API_KEY')
+        if not api_key:
+            logger.error("❌ GROQ_API_KEY não encontrada. Abortando decisão dinâmica.")
+            return {'can_auto_implement': False, 'mission_type': 'error_no_api'}
+
+        prompt = f"""
+        Você é o arquiteto do sistema JARVIS. Sua missão é analisar o ROADMAP e a missão atual para decidir qual código deve ser alterado.
+        
+        CONTEXTO DO ROADMAP:
+        {roadmap_context}
+        
+        MISSÃO ATUAL:
+        {issue_body}
+        
+        Sua resposta deve ser estritamente em JSON com o seguinte formato:
+        {{
+            "mission_type": "string",
+            "target_files": ["caminho/do/arquivo.py"],
+            "required_actions": ["ação 1", "ação 2"],
+            "can_auto_implement": true,
+            "proposed_code_change": "descrição técnica da mudança"
+        }}
+        """
+
+        try:
+            # Chamada simplificada para a Groq (usando requests ou sdk disponível)
+            # Aqui simulamos a lógica que você deve plugar com sua biblioteca de preferência
+            # ou via subprocess chamando o curl para a Groq.
+            import requests
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "llama3-70b-8192",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "response_format": {"type": "json_object"}
+                }
+            )
+            analysis = response.json()['choices'][0]['message']['content']
+            return json.loads(analysis)
+        except Exception as e:
+            logger.error(f"❌ Falha na consulta à Groq: {e}")
+            return {'can_auto_implement': False}
+
+    def _reactive_mutation(self, mission_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Executa a mutação real baseada na decisão da IA
+        """
+        logger.info("⚡ Executando Mutação Autônoma...")
+        
+        files_changed = []
+        target_files = mission_analysis.get('target_files', [])
+        
+        for file_path_str in target_files:
+            file_path = self.repo_path / file_path_str
+            if not file_path.exists(): continue
+            
+            # SOLICITA O CÓDIGO NOVO PARA A IA
+            new_code = self._ask_llm_for_code(file_path, mission_analysis)
+            
+            if new_code:
+                file_path.write_text(new_code, encoding='utf-8')
+                files_changed.append(str(file_path))
+                logger.info(f"✅ Arquivo {file_path_str} evoluído com sucesso.")
+
+        return {
+            'success': len(files_changed) > 0,
+            'mutation_applied': len(files_changed) > 0,
+            'files_changed': files_changed
         }
-        
-        # Detectar tipo de missão baseado em palavras-chave
-        issue_lower = issue_body.lower()
-        roadmap_lower = roadmap_context.lower()
-        combined_text = issue_lower + " " + roadmap_lower
-        
-        # Missão: Graceful failure em instalações de pip
-        if re.search(r'\bgraceful\b', combined_text) and \
-           (re.search(r'\bfail\b', combined_text) or re.search(r'\bfailure\b', combined_text)) and \
-           re.search(r'\bpip\b', combined_text):
-            analysis['mission_type'] = 'graceful_pip_failure'
-            analysis['target_files'] = [
-                'app/application/services/task_runner.py',
-                'app/application/services/dependency_manager.py'
-            ]
-            analysis['required_actions'] = [
-                'Adicionar try/except blocks em instalações pip',
-                'Adicionar validação de instalação',
-                'Melhorar logging estruturado',
-                'Retornar erros amigáveis ao usuário'
-            ]
-            analysis['can_auto_implement'] = True  # Este tipo pode ser implementado automaticamente
-            logger.info("✅ Detectada missão: Graceful Pip Failure")
-            
-        # Timeout handling
-        elif re.search(r'\btimeout\b', combined_text) and re.search(r'\bhandling\b', combined_text):
-            analysis['mission_type'] = 'timeout_handling'
-            analysis['target_files'] = [
-                'app/application/services/task_runner.py'
-            ]
-            analysis['required_actions'] = [
-                'Adicionar timeout em operações de longa duração',
-                'Implementar graceful shutdown',
-                'Logging de timeout events'
-            ]
-            analysis['can_auto_implement'] = True
-            logger.info("✅ Detectada missão: Timeout Handling")
-            
-        # Error recovery
-        elif re.search(r'\berror\s+recovery\b', combined_text) or re.search(r'\bauto\S*\s+recovery\b', combined_text):
-            analysis['mission_type'] = 'error_recovery'
-            analysis['required_actions'] = [
-                'Implementar retry logic',
-                'Adicionar fallback mechanisms'
-            ]
-            analysis['can_auto_implement'] = False  # Mais complexo
-            logger.info("⚠️ Detectada missão: Error Recovery (requer implementação manual)")
-        
-        # Logs estruturados
-        elif re.search(r'\blogs?\b', combined_text) and \
-             (re.search(r'\bestruturad\w*\b', combined_text) or re.search(r'\bstructured\b', combined_text)):
-            analysis['mission_type'] = 'structured_logging'
-            analysis['target_files'] = [
-                'app/application/services/task_runner.py'
-            ]
-            analysis['required_actions'] = [
-                'Adicionar campos estruturados aos logs',
-                'Incluir mission_id, device_id, session_id'
-            ]
-            analysis['can_auto_implement'] = True
-            logger.info("✅ Detectada missão: Structured Logging")
-        
-        logger.info(f"📊 Análise completa: {analysis['mission_type']}")
-        return analysis
+
     
     def _reactive_mutation(self, mission_analysis: Dict[str, Any]) -> Dict[str, Any]:
         """
