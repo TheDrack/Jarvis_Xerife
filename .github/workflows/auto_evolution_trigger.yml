@@ -106,23 +106,20 @@ jobs:
             echo "**Ação:** Triggando novo ciclo de evolução" >> $GITHUB_STEP_SUMMARY
           fi
           
-          # Define as variáveis de forma limpa
+          # Define as variáveis de forma clara
           if [ "$IS_AUTO_EVO" = true ]; then
-            FINAL_SOURCE="auto-evolution"
             FINAL_EVOLVE="false"
+            FINAL_SOURCE="auto-evolution"
           else
-            FINAL_SOURCE="external"
             FINAL_EVOLVE="true"
+            FINAL_SOURCE="external"
           fi
           
-          # Grava no output usando o formato seguro
-          {
-            echo "merge_source=$FINAL_SOURCE"
-            echo "should_evolve=$FINAL_EVOLVE"
-            echo "commit_message<<EOF"
-            echo "$COMMIT_MSG"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          # GRAVAÇÃO CORRETA NOS OUTPUTS
+          echo "should_evolve=$FINAL_EVOLVE" >> "$GITHUB_OUTPUT"
+          echo "merge_source=$FINAL_SOURCE" >> "$GITHUB_OUTPUT"
+          echo "commit_message=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
+
 
   # ==================================================
   # CONSOLIDAÇÃO: Atualizar base de conhecimento após merge
@@ -259,33 +256,35 @@ jobs:
                   priority = next_mission['priority']
                   
                   print(f'✅ Missão encontrada!')
-                  print(f'Seção: {section}')
-                  print(f'Prioridade: {priority}')
-                  print(f'Descrição: {mission_data["description"][:100]}...')
                   
-                  # Gerar contexto para o GitHub Copilot
-                  context = auto_evolution.get_roadmap_context(next_mission)
-                  
-                  # Salvar outputs (sanitize newlines)
+                  # 1. PREPARAÇÃO DOS OUTPUTS (O que o GitHub vai ler)
+                  # Usamos o arquivo GITHUB_OUTPUT para passar dados entre Jobs
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write('has_mission=true\n')
-                      # Replace newlines with spaces to prevent breaking output format
-                      safe_desc = mission_data["description"].replace('\n', ' ')[:200]
+                      # Remove quebras de linha da descrição para não quebrar o log
+                      safe_desc = mission_data["description"].replace('\n', ' ')
                       f.write(f'mission_description={safe_desc}\n')
-                  
-                  # Salvar contexto em arquivo para próximo job
-                  with open('mission_context.txt', 'w') as f:
-                      f.write(context)
-                  
-                  # Summary
+
+                  # 2. GERAÇÃO DO RESUMO (O que aparece na tela pra você)
                   with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
                       f.write(f'**✅ Missão Encontrada**\n\n')
                       f.write(f'**Seção:** {section}\n')
                       f.write(f'**Prioridade:** {priority}\n')
                       f.write(f'**Descrição:** {mission_data["description"]}\n')
-                      f.write(f'\n**Status:** {mission_data["status"]}\n')
+
+                  # 3. CRIAÇÃO DO CONTEXTO (Para o próximo passo de codificação)
+                  # Salva o contexto completo para que a IA saiba o que fazer
+                  context = auto_evolution.get_roadmap_context(next_mission)
+                  with open('mission_context.txt', 'w') as f:
+                      f.write(context)
                   
                   sys.exit(0)
+              else:
+                  print('❌ Nenhuma missão pendente encontrada')
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('has_mission=false\n')
+                  sys.exit(0)
+
               else:
                   print('❌ Nenhuma missão encontrada para evoluir')
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
@@ -332,7 +331,11 @@ jobs:
   attempt_evolution:
     name: "🧬 Tentar Evolução"
     needs: [check_trigger_conditions, find_next_mission]
-    if: needs.find_next_mission.outputs.has_mission == 'true'
+        if: |
+      always() && 
+      needs.find_next_mission.result == 'success' && 
+      needs.find_next_mission.outputs.has_mission == 'true'
+
     runs-on: ubuntu-latest
     outputs:
       evolution_success: ${{ steps.test.outputs.evolution_success }}
