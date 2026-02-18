@@ -318,7 +318,7 @@ jobs:
         if: steps.find.outputs.has_mission == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: mission-context
+          name: mission-context  # O NOME TEM QUE SER IGUAL AO DOWNLOAD
           path: mission_context.txt
 
   # ==================================================
