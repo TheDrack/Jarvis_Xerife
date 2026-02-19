@@ -34,13 +34,13 @@ jobs:
 
     - name: Install dependencies
       run: |
-        # Criamos o venv e instalamos tudo em um único bloco para garantir o contexto
+        # Criamos o venv e instalamos tudo em um único bloco
         uv venv
         uv pip install pyinstaller bcrypt==4.0.1 passlib[bcrypt]==1.7.4 -r requirements.txt
     
     - name: Build executable with PyInstaller
       run: |
-        # Forçamos o uso do venv local
+        # Forçamos o uso do venv local para evitar erro de 'No virtual environment found'
         uv run python build_config.py
     
     - name: Verify build
@@ -48,11 +48,8 @@ jobs:
         if (Test-Path "dist\Jarvis_Installer.exe") {
           $item = Get-Item "dist\Jarvis_Installer.exe"
           Write-Host "✓ Executable built successfully: $($item.FullName)"
-          $size = $item.Length / 1MB
-          Write-Host "✓ Size: $([math]::Round($size, 2)) MB"
         } else {
           Write-Host "✗ Executable not found"
-          if (Test-Path "dist") { ls dist }
           exit 1
         }
       shell: pwsh
