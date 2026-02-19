@@ -47,7 +47,7 @@
            if (message.type === 'launchBrowser') {
                (async () => {
                    const browser = await playwright[browserType].launch();
-                   worker.worker.postMessage({ type: 'browserLaunched', browser });
+                   worker.worker.postMessage({ type: 'browserLaunched', browser: browser });
                })();
            } else if (message.type === 'closeBrowser') {
                (async () => {
