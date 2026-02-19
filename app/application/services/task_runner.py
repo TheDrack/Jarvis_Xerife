@@ -1,8 +1,7 @@
-# -*- coding: utf-8 -*-
+
 import logging, subprocess, sys, tempfile, time
 from pathlib import Path
 from app.domain.models.mission import Mission, MissionResult
-# Importação do logger estruturado (Objetivo da Missão)
 from app.application.services.structured_logger import StructuredLogger
 
 logger = logging.getLogger(__name__)
@@ -21,7 +20,6 @@ class TaskRunner:
 
     def execute_mission(self, mission: Mission, session_id="default") -> MissionResult:
         start_time = time.time()
-        # LOGS ESTRUTURADOS APLICADOS
         s_log = StructuredLogger(logger, mission_id=mission.mission_id, device_id=self.device_id, session_id=session_id)
         s_log.info("Iniciando missão")
         
@@ -36,7 +34,6 @@ class TaskRunner:
                 return MissionResult(mission.mission_id, res.returncode==0, res.stdout, res.stderr, res.returncode, time.time()-start_time)
             except subprocess.TimeoutExpired:
                 s_log.error("Timeout na missão")
-                # O CÓDIGO 124 QUE OS TESTES EXIGEM
                 return MissionResult(mission.mission_id, False, "", "Timeout", 124, time.time()-start_time)
             except subprocess.CalledProcessError as e:
                 s_log.error(f"Erro na missão: {str(e)}")
@@ -51,3 +48,4 @@ class TaskRunner:
                 shutil.rmtree(tmp)
             except Exception as e:
                 s_log.error(f"Erro ao remover diretório temporário: {str(e)}")
+   
