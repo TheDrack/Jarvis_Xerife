@@ -25,7 +25,7 @@ class TaskRunner:
         self.cache_dir = Path(cache_dir) if cache_dir else Path(tempfile.gettempdir()) / "jarvis_task_cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
-        # Correção FAILED test_task_runner_with_sandbox_mode
+        # Vital para test_task_runner_with_sandbox_mode
         self.sandbox_dir = self.cache_dir / "sandbox"
         if self.sandbox_mode:
             self.sandbox_dir.mkdir(parents=True, exist_ok=True)
@@ -44,6 +44,7 @@ class TaskRunner:
     def execute_mission(self, mission: Mission, session_id: Optional[str] = None) -> MissionResult:
         start_time = time.time()
         session_id = session_id or "default"
+        # Implementação central da Missão: Logs Estruturados
         log = StructuredLogger(logger, mission_id=mission.mission_id, device_id=self.device_id, session_id=session_id)
         script_file, venv_path = None, None
 
@@ -63,6 +64,7 @@ class TaskRunner:
             else:
                 python_exe = sys.executable
 
+            log.info("script_executing", python_exe=python_exe)
             res = subprocess.run([python_exe, str(script_file)], capture_output=True, text=True, timeout=mission.timeout)
             exec_time = time.time() - start_time
             
@@ -77,6 +79,7 @@ class TaskRunner:
                 }
             )
         except Exception as e:
+            log.error("mission_failed", error=str(e))
             return MissionResult(mission_id=mission.mission_id, success=False, stderr=str(e), exit_code=1, execution_time=time.time()-start_time)
         finally:
             if not mission.keep_alive and script_file:
@@ -95,7 +98,6 @@ class TaskRunner:
         return self.total_cost_usd <= self.budget_cap_usd if self.budget_cap_usd else True
 
     def get_budget_status(self) -> dict:
-        # Correção FAILED test_budget_status (KeyError: 'remaining_usd')
         remaining = (self.budget_cap_usd - self.total_cost_usd) if self.budget_cap_usd else None
         return {
             "total_cost_usd": self.total_cost_usd,
