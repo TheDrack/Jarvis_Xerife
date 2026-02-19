@@ -68,18 +68,55 @@ class AutoEvolutionService:
         return sections
 
     def _parse_mission_line(self, line: str) -> Optional[Dict[str, Any]]:
-        # Suporta tanto emojis quanto checkboxes
-        emoji_pattern = r'^\s*[-*]\s*(✅|🔄|📋)\s+(.+)$'
-        emoji_match = re.match(emoji_pattern, line)
-        if emoji_match:
-            status_emoji, description = emoji_match.groups()
-            status_map = {'✅': 'completed', '🔄': 'in_progress', '📋': 'planned'}
+        """Parse robusto para identificar missões independente do marcador de lista."""
+        # Regex atualizada: Ignora o marcador inicial (-, *, o) e foca no emoji + descrição
+        # Aceita: "  o 🔄 Descrição", "- ✅ Descrição", "* 📋 Descrição"
+        pattern = r'^\s*[-*o]?\s*(✅|🔄|📋|\[[ xX]\])\s+(.+)$'
+        match = re.match(pattern, line)
+        
+        if match:
+            status_raw, description = match.groups()
+            
+            # Normalização de Status
+            if status_raw in ['✅', '[x]', '[X]']:
+                status = 'completed'
+            elif status_raw == '🔄':
+                status = 'in_progress'
+            else:
+                status = 'planned'
+                
             return {
                 'description': description.strip(),
-                'status': status_map.get(status_emoji, 'unknown'),
+                'status': status,
                 'original_line': line.strip()
             }
         return None
+
+    def mark_mission_as_completed(self, mission_description: str) -> bool:
+        """Marca a missão como concluída preservando a estrutura original da linha."""
+        if not self.roadmap_path.exists(): return False
+
+        try:
+            lines = self.roadmap_path.read_text(encoding='utf-8').splitlines()
+            modified = False
+
+            for i, line in enumerate(lines):
+                # Busca parcial: se a descrição da missão está na linha e não está concluída
+                if mission_description in line and '✅' not in line and '[x]' not in line:
+                    # Substitui qualquer marcador de progresso/pendente pelo de check
+                    new_line = line.replace('🔄', '✅').replace('📋', '✅').replace('[ ]', '[x]')
+                    if new_line != line:
+                        lines[i] = new_line
+                        modified = True
+                        break
+
+            if modified:
+                self.roadmap_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+                return True
+        except Exception as e:
+            logger.error(f"Erro ao atualizar ROADMAP: {e}")
+        return False
+
 
     def find_next_mission(self) -> Optional[Dict[str, Any]]:
         roadmap_data = self.parse_roadmap()
