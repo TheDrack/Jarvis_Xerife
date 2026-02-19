@@ -117,13 +117,17 @@ jobs:
         run: |
           git config --global user.name "Jarvis-AutoEvolution"
           git config --global user.email "jarvis@bot.com"
-          pip install pytest pytest-json-report pytest-cov requests sqlmodel pydantic
+          # Adicionado pytest-asyncio para resolver o erro de funções async
+          pip install pytest pytest-json-report pytest-cov pytest-asyncio requests sqlmodel pydantic
           pip install -r requirements.txt || true
+
       - name: 🤖 RL Cycle
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_BODY: ${{ needs.find_next_mission.outputs.mission_description }}
+          # Força o pytest a rodar funções async automaticamente
+          PYTEST_ASYNCIO_MODE: "auto" 
         run: |
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
@@ -141,12 +145,12 @@ jobs:
             exit 0
           fi
 
-          # Roda testes com isolamento de chaves
+          # Roda os testes com o plugin asyncio ativo
           if (unset GROQ_API_KEY OPENAI_API_KEY GEMINI_API_KEY && pytest); then
             git commit -m "[Auto-Evolution] Mission Accomplished - RL Reward Positive"
             git push origin "$BRANCH_NAME"
-            gh pr create --title "🧬 Evolução: $ISSUE_BODY" --body "Processo autônomo de mutação e validação concluído." --base main --head "$BRANCH_NAME"
+            gh pr create --title "🧬 Evolução: $ISSUE_BODY" --body "Processo autônomo concluído. Testes async validados." --base main --head "$BRANCH_NAME"
           else
-            echo "❌ Mutação falhou nos testes de integridade."
+            echo "❌ Mutação falhou nos testes (Integridade ou Async)."
             exit 1
           fi
