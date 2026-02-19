@@ -16,7 +16,6 @@ from app.domain.models.mission import Mission, MissionResult
 
 logger = logging.getLogger(__name__)
 
-
 class StructuredLogger:
     """Wrapper for structured logging with context"""
     
@@ -77,6 +76,8 @@ class TaskRunner:
         cache_dir: Optional[Path] = None,
         use_venv: bool = True,
         device_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        mission_id: Optional[str] = None,
         sandbox_mode: bool = False,
         budget_cap_usd: Optional[float] = None,
     ):
@@ -87,11 +88,15 @@ class TaskRunner:
             cache_dir: Optional directory for caching libraries and environments
             use_venv: Whether to use virtual environments (default: True)
             device_id: Optional device identifier for logging context
+            session_id: Optional session identifier for logging context
+            mission_id: Optional mission identifier for logging context
             sandbox_mode: Enable sandbox mode for safer code execution (default: False)
             budget_cap_usd: Optional budget cap in USD for mission execution
         """
         self.use_venv = use_venv
         self.device_id = device_id or "unknown"
+        self.session_id = session_id or "default"
+        self.mission_id = mission_id or "default"
         self.sandbox_mode = sandbox_mode
         self.budget_cap_usd = budget_cap_usd
         
@@ -134,7 +139,7 @@ class TaskRunner:
             logger,
             mission_id=mission_id,
             device_id=self.device_id,
-            session_id=session_id
+            session_id=session_id,
         )
         
         log.info("mission_started", 
@@ -246,6 +251,9 @@ class TaskRunner:
                     "venv_path": str(venv_path) if venv_path else None,
                     "script_path": str(script_file),
                     "persistent": mission.keep_alive,
+                    "device_id": self.device_id,
+                    "session_id": session_id,
+                    "mission_id": mission_id,
                 }
             )
             
@@ -535,4 +543,7 @@ class TaskRunner:
             "remaining_usd": (self.budget_cap_usd - self.total_cost_usd) if self.budget_cap_usd else None,
             "within_budget": self.is_within_budget(),
             "missions_tracked": len(self.mission_costs),
+            "device_id": self.device_id,
+            "session_id": self.session_id,
+            "mission_id": self.mission_id,
         }
