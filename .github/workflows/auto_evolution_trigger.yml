@@ -23,7 +23,7 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Necessário para ler o histórico de commits corretamente
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -43,10 +43,8 @@ jobs:
               from app.application.services.auto_evolution import AutoEvolutionService
               auto = AutoEvolutionService()
               
-              # Coleta dados do último commit de forma robusta
               commit_msg = os.popen("git log -1 --pretty=%B").read()
               author = os.popen("git log -1 --pretty=%an").read()
-              # Verifica se o log menciona a branch de evolução (comum em Pull Requests)
               last_log = os.popen("git log -1").read()
               
               is_auto_evolution = (
@@ -57,31 +55,25 @@ jobs:
               )
               
               if is_auto_evolution:
-                  print(f"🎯 Evolução Detectada (Msg: {commit_msg.splitlines()[0]}). Sincronizando Roadmap...")
-                  
-                  # Tenta identificar e marcar a missão que acabou de ser merjada
+                  print(f"🎯 Evolução Detectada. Sincronizando Roadmap...")
                   next_m = auto.find_next_mission_with_auto_complete()
                   if next_m:
                       mission_desc = next_m['mission']['description']
                       if auto.mark_mission_as_completed(mission_desc):
-                          print(f"✅ Missão '{mission_desc}' finalizada no arquivo.")
-                          
-                          # Configura git e sobe a alteração do Roadmap para a Main
                           os.system("git config --global user.name 'Jarvis-AutoEvolution'")
                           os.system("git config --global user.email 'jarvis@bot.com'")
                           os.system("git add docs/ROADMAP.md")
-                          # Evita erro se o arquivo já estiver marcado ou sem mudanças
-                          os.system("git commit -m '[Auto-Evolution] Roadmap Synchronized ✅' || echo 'No changes to commit'")
+                          os.system("git commit -m '[Auto-Evolution] Roadmap Synchronized ✅' || echo 'No changes'")
                           os.system("git push origin main")
                   
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write('should_evolve=false\n')
               else:
-                  print(f"🚀 Commit manual detectado (Autor: {author}). Iniciando busca por nova missão...")
+                  print(f"🚀 Commit manual. Iniciando busca por nova missão...")
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write('should_evolve=true\n')
           except Exception as e:
-              print(f"Erro na decisão estratégica: {e}")
+              print(f"Erro na decisão: {e}")
               sys.exit(1)
           PYCODE
 
@@ -196,9 +188,12 @@ jobs:
             --impact "functional-improvement" \
             --roadmap-context "$(cat mission_context.txt)"
           
+          # --- FILTRO DE DNA: Ignora logs para evitar PRs vazias ---
           git add -A
+          git reset .github/metabolism_logs/ 
+          
           if [ -z "$(git status --porcelain)" ]; then
-            echo "⚠️ Nenhuma mudança detectada."
+            echo "⚠️ Nenhuma mudança de CÓDIGO detectada. Abortando PR."
             exit 0
           fi
 
