@@ -43,12 +43,24 @@ jobs:
         run: |
           uv run pytest --json-report --json-report-file=report_1.json tests/
 
-      - name: ✅ Auto-Merge
+      - name: ✅ Auto-Merge (Comando Direto ou Sucesso JARVIS)
+        # Se os testes passaram:
+        # 1. É PR e você é o autor? MERGE (Ignora risco).
+        # 2. É PR e o Jarvis propôs? MERGE (Mecânico já validou no passo anterior).
         if: steps.run_tests.outcome == 'success' && github.event.pull_request.number != null
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh pr merge "${{ github.event.pull_request.number }}" --auto --merge --repo "${{ github.repository }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          COMMANDER="TheDrack" 
+          
+          if [ "$PR_AUTHOR" == "$COMMANDER" ]; then
+            echo "🫡 Comando direto detectado. Ignorando restrições de DNA."
+            gh pr merge "${{ github.event.pull_request.number }}" --auto --merge --repo "${{ github.repository }}"
+          else
+            # Para outros autores ou automações, o merge só ocorre se não houve bloqueio prévio
+            gh pr merge "${{ github.event.pull_request.number }}" --auto --merge --repo "${{ github.repository }}"
+          fi
 
       - name: 🔧 Ciclo de Cura 1
         if: steps.run_tests.outcome == 'failure'
@@ -60,7 +72,11 @@ jobs:
           uv run python scripts/self_healing_mutator.py --report "report_1.json"
           uv run python scripts/metabolism_analyzer.py --intent "auto-fix" --instruction "Reparar falhas" --repo-path "." > analysis_1.txt
           
-          if grep -q '"requires_human": true' analysis_1.txt; then
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          COMMANDER="TheDrack"
+
+          # Se falhou e foi VOCÊ que subiu, o Jarvis tenta curar mas NÃO bloqueia por risco arquitetural
+          if grep -q '"requires_human": true' analysis_1.txt && [ "$PR_AUTHOR" != "$COMMANDER" ]; then
             echo "stop_healing=true" >> $GITHUB_ENV
           else
             git config --global user.name "Jarvis-AutoCura"
@@ -84,6 +100,6 @@ jobs:
             gh pr edit "$PR_NUMBER" --add-label "commander-review" --repo "$REPO"
             gh pr comment "$PR_NUMBER" --repo "$REPO" --body "## 🚨 INTERVENÇÃO NECESSÁRIA
             O metabolismo identificou um cenário que exige sua supervisão.
-            - **Motivo**: ${{ env.stop_healing == 'true' && 'Risco Arquitetural Detectado' || 'Falha persistente' }}
+            - **Motivo**: ${{ env.stop_healing == 'true' && 'Risco Arquitetural (Automação)' || 'Falha persistente nos testes' }}
             _Analise os logs para restaurar a homeostase._"
           fi
