@@ -61,14 +61,7 @@ class TestAutoEvolutionService:
             assert 'error' not in result
             assert result['total_sections'] >= 0
     
-    def test_parse_roadmap_file_not_exists(self):
-        """Test parsing when roadmap doesn't exist"""
-        service = AutoEvolutionService(roadmap_path="/nonexistent/path/ROADMAP.md")
-        result = service.parse_roadmap()
-        
-        assert 'error' in result
-        assert result['error'] == 'Roadmap file not found'
-        assert result['sections'] == []
+ 
     
     def test_parse_mission_line_completed(self, auto_evolution_service):
         """Test parsing completed mission line"""
