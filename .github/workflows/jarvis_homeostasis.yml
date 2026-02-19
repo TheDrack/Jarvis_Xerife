@@ -1,0 +1,121 @@
+name: "🧬 JARVIS: Homeostase e Auto-Cura"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request_target:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+jobs:
+  homeostasis:
+    name: "🧪 Vistoria e Auto-Cura"
+    runs-on: ubuntu-latest
+    
+    steps:
+      # 1. PREPARAÇÃO DO TERRENO
+      - name: 🛰️ Checkout (SHA da PR ou Main)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          fetch-depth: 0
+
+      - name: 📦 Setup Environment (UV)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: 🔧 Instalar Dependências do Sistema
+        run: |
+          uv venv --python 3.13
+          uv pip install pytest pytest-json-report pytest-cov requests sqlmodel pydantic groq
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+
+      # 2. O JUIZ: EXECUÇÃO ÚNICA DOS TESTES
+      - name: 🧪 Executar Pytest
+        id: run_tests
+        continue-on-error: true
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          uv run pytest --json-report --json-report-file=report_1.json tests/
+
+      # 3. CAMINHO A: SUCESSO (Homeostase Mantida)
+      - name: ✅ Auto-Merge
+        if: steps.run_tests.outcome == 'success' && github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr merge "${{ github.event.pull_request.number }}" --auto --merge --repo "${{ github.repository }}"
+          gh pr comment "${{ github.event.pull_request.number }}" --body "## ✅ Homeostase Mantida. DNA validado."
+
+      # 4. CAMINHO B: FALHA (Início do Ciclo de Auto-Cura)
+      - name: 🔧 Ciclo de Cura 1 (Proposta e Análise)
+        if: steps.run_tests.outcome == 'failure'
+        id: heal_step_1
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          # A IA propõe a correção baseada no report_1.json
+          python scripts/self_healing_mutator.py --report "report_1.json"
+          
+          # 🔬 O MECÂNICO REVISIONADOR entra em cena
+          python scripts/metabolism_analyzer.py --intent "auto-fix" --repo-path "." > analysis_1.txt
+          
+          if grep -q "REQUIRES_HUMAN: true" analysis_1.txt; then
+            echo "stop_healing=true" >> $GITHUB_ENV
+          else
+            git config --global user.name "Jarvis-AutoCura"
+            git config --global user.email "jarvis@bot.com"
+            git add .
+            git commit -m "🤖 [Auto-Cura] Tentativa 1: Corrigindo falhas detectadas"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+            # Re-testar
+            uv run pytest --json-report --json-report-file=report_2.json tests/ || echo "still_failing=true" >> $GITHUB_ENV
+          fi
+
+      - name: 🔧 Ciclo de Cura 2 (Última Tentativa)
+        if: env.still_failing == 'true' && env.stop_healing != 'true'
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          python scripts/self_healing_mutator.py --report "report_2.json"
+          
+          # Nova vistoria do Mecânico
+          python scripts/metabolism_analyzer.py --intent "auto-fix" --repo-path "." > analysis_2.txt
+          
+          if ! grep -q "REQUIRES_HUMAN: true" analysis_2.txt; then
+            git add .
+            git commit -m "🤖 [Auto-Cura] Tentativa 2: Ajuste final"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+            uv run pytest tests/ || echo "final_failure=true" >> $GITHUB_ENV
+          else
+            echo "final_failure=true" >> $GITHUB_ENV
+          fi
+
+      # 5. ESCALONAMENTO (Intervenção Humana)
+      - name: 🚨 Escalonar ao Comandante
+        if: env.final_failure == 'true' || env.stop_healing == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit "${{ github.event.pull_request.number }}" --add-label "commander-review"
+          gh pr comment "${{ github.event.pull_request.number }}" --body "## 🚨 COMANDANTE: Intervenção Necessária
+          O metabolismo falhou na auto-cura ou o **Mecânico Revisionador** detectou alto risco.
+          
+          **Status:** Escalonado para revisão manual.
+          ---
+          _Por favor, aplique as correções necessárias para restaurar a homeostase._"
+          
+          gh issue create --title "🔴 Falha na Auto-Cura: PR #${{ github.event.pull_request.number }}" \
+                          --body "O JARVIS tentou se curar mas os limites de segurança foram atingidos. Verifique a PR #${{ github.event.pull_request.number }}." \
+                          --label "commander-review, bug"
