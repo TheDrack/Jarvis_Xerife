@@ -22,20 +22,25 @@ class MetabolismMutator:
         self.mutation_log = []
 
     def _engineering_brainstorm(self, issue_body: str, roadmap_context: str) -> Dict[str, Any]:
-        """Brainstorming de IA com Telemetria de Tokens"""
-        logger.info("🧠 Iniciando Brainstorming de IA via Groq (Llama-3-70b)...")
+        """IA decide o que e onde mudar sem vício em logs"""
+        logger.info("🧠 Brainstorming de Evolução...")
         api_key = os.getenv('GROQ_API_KEY')
         
         prompt = f"""
-        Você é o Motor de Evolução do JARVIS.
-        MISSÃO: {issue_body}
+        Você é o Motor de Evolução do JARVIS. 
         CONTEXTO: {roadmap_context}
+        MISSÃO: {issue_body}
+
+        TAREFA:
+        1. Identifique o arquivo .py mais relevante para esta missão em 'app/'.
+        2. Planeje uma mudança funcional real (não apenas logs).
+        3. Se a missão for sobre 'logs estruturados', mude como os dados são passados nos arquivos de serviço.
         
-        Analise e responda APENAS um JSON:
+        Responda APENAS um JSON:
         {{
-            "mission_type": "structured_logging",
+            "mission_type": "functional_upgrade",
             "target_files": ["app/application/services/task_runner.py"],
-            "required_actions": ["Adicionar mission_id, device_id nos logs"],
+            "required_actions": ["Implementar passagem de mission_id e device_id no construtor e logs"],
             "can_auto_implement": true
         }}
         """
@@ -46,26 +51,26 @@ class MetabolismMutator:
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={"Authorization": f"Bearer {api_key}"},
                 json={
-                    "model": "llama3-70b-8192",
+                    "model": "llama3-70b-8192", # Modelo estável
                     "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.1,
+                    "temperature": 0.2,
                     "response_format": {"type": "json_object"}
                 }
             )
-            
             data = response.json()
-            usage = data.get('usage', {})
-            total_tokens = usage.get('total_tokens', 0)
-            cost_estimate = (total_tokens / 1_000_000) * 0.70
-            
-            logger.info(f"📊 Telemetria: {total_tokens} tokens consumidos (~${cost_estimate:.6f})")
-
             content = json.loads(data['choices'][0]['message']['content'])
-            content['usage'] = {'total_tokens': total_tokens, 'cost': cost_estimate}
+            
+            # Telemetria para o Dashboard
+            usage = data.get('usage', {})
+            content['usage'] = {
+                'total_tokens': usage.get('total_tokens', 0),
+                'cost': (usage.get('total_tokens', 0) / 1_000_000) * 0.70
+            }
             return content
         except Exception as e:
-            logger.error(f"❌ Falha no brainstorm: {e}")
+            logger.error(f"❌ Falha: {e}")
             return {'can_auto_implement': False}
+
 
     def _update_evolution_dashboard(self, mission_name: str, tokens: int, cost: float):
         """Atualiza o Dashboard de Evolução no README.md"""
@@ -109,7 +114,19 @@ class MetabolismMutator:
             if not file_path.exists(): continue
             
             current_code = file_path.read_text(encoding='utf-8')
-            prompt = f"Melhore este código para implementar: {mission_analysis.get('required_actions')}. Responda apenas o código.\n\nCÓDIGO ATUAL:\n{current_code}"
+            prompt = f"""
+            Como Programador Sênior, implemente as seguintes ações no código abaixo:
+            AÇÕES: {mission_analysis.get('required_actions')}
+            
+            REGRAS:
+            - Retorne APENAS o código completo atualizado.
+            - Não use blocos de Markdown (```).
+            - Mantenha a compatibilidade com os testes existentes.
+
+            CÓDIGO ATUAL:
+            {current_code}
+            """
+
             
             try:
                 import requests
