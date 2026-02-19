@@ -1,46 +1,35 @@
+from abc import ABC, abstractmethod
+import logging
 
-# Extension Manager para Automações Complexas
+logger = logging.getLogger(__name__)
 
-class ExtensionManager:
-    def __init__(self):
-        self.extensions = {}
-
-    def register_extension(self, name, extension):
-        self.extensions[name] = extension
-
-    def get_extension(self, name):
-        return self.extensions.get(name)
-
-    def list_extensions(self):
-        return list(self.extensions.keys())
-
-class AutomationExtension:
-    def __init__(self, name):
+class AutomationExtension(ABC):
+    """Classe base para todas as extensões do JARVIS"""
+    def __init__(self, name: str):
         self.name = name
 
-    def execute(self):
+    @abstractmethod
+    def execute(self, context: dict):
         pass
 
-class ExampleExtension(AutomationExtension):
+class ExtensionManager:
+    """Gerencia o ciclo de vida de extensões complexas"""
     def __init__(self):
-        super().__init__('example')
+        self._extensions = {}
 
-    def execute(self):
-        print('Executando extensão de exemplo')
+    def register_extension(self, extension: AutomationExtension):
+        self._extensions[extension.name] = extension
+        logger.info(f"🧩 Extensão '{extension.name}' registrada com sucesso.")
 
-# Criando o gerenciador de extensões
-manager = ExtensionManager()
-
-# Registrando uma extensão
-extension = ExampleExtension()
-manager.register_extension(extension.name, extension)
-
-# Listando extensões registradas
-print('Extensões registradas:')
-for extension_name in manager.list_extensions():
-    print(extension_name)
-
-# Executando uma extensão
-extension_to_execute = manager.get_extension('example')
-if extension_to_execute:
-    extension_to_execute.execute()
+    def run_extension(self, name: str, context: dict):
+        ext = self._extensions.get(name)
+        if not ext:
+            logger.error(f"❌ Extensão '{name}' não encontrada.")
+            return None
+        
+        try:
+            logger.info(f"🚀 Executando extensão: {name}")
+            return ext.execute(context)
+        except Exception as e:
+            logger.error(f"💥 Erro ao executar {name}: {e}")
+            raise
