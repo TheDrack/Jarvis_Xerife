@@ -158,15 +158,17 @@ jobs:
           else
             echo "❌ [FALHA] DNA Instável. Analisando Log Técnico (Code $TEST_EXIT_CODE):"
             echo "-------------------------------------------------------"
-            # Tenta mostrar o erro específico, se não achar, mostra o final do log
+            # Prioridade 1: Mostrar falhas de teste (FAILED)
             if grep -q "FAILED" pytest_log.txt; then
-               grep -A 15 -B 2 "FAILED" pytest_log.txt
+               grep -A 20 -B 5 "FAILED" pytest_log.txt
+            # Prioridade 2: Mostrar erros de importação/traceback
             else
-               tail -n 40 pytest_log.txt
+               tail -n 50 pytest_log.txt
             fi
             echo "-------------------------------------------------------"
             exit 1
           fi
+
 
       - name: 📦 Arquivar Evidências
         if: always()
