@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 import logging, subprocess, sys, tempfile, time
 from pathlib import Path
@@ -51,3 +52,4 @@ class TaskRunner:
                 shutil.rmtree(tmp)
             except Exception as e:
                 s_log.error(f"Erro ao remover diretório temporário: {str(e)}")
+   
