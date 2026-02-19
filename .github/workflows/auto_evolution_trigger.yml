@@ -12,36 +12,67 @@ permissions:
 
 jobs:
   # ==================================================
-  # 1. VERIFICAÇÃO: Bloqueia loops de auto-evolução
+  # 1. ORQUESTRAÇÃO: Decide se Conclui ou se Evolui
   # ==================================================
-  check_trigger_conditions:
-    name: "🔍 Verificar Condições de Trigger"
+  process_evolution:
+    name: "🧬 Orquestrador de Evolução"
     runs-on: ubuntu-latest
     outputs:
-      should_evolve: ${{ steps.check.outputs.should_evolve }}
+      should_evolve: ${{ steps.decide.outputs.should_evolve }}
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
 
-      - name: 🧬 Validar Origem
-        id: check
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Instalar Dependências
+        run: pip install sqlmodel pydantic requests
+
+      - name: 🧠 Decisão Estratégica
+        id: decide
         run: |
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
-          AUTHOR_NAME="${{ github.event.head_commit.author.name }}"
-          
-          if [[ "$COMMIT_MSG" == *"[Auto-Evolution]"* ]] || [[ "$AUTHOR_NAME" == "Jarvis-AutoEvolution" ]]; then
-            echo "should_evolve=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_evolve=true" >> "$GITHUB_OUTPUT"
-          fi
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
+          python - << 'PYCODE'
+          import os, sys
+          try:
+              from app.application.services.auto_evolution import AutoEvolutionService
+              auto = AutoEvolutionService()
+              
+              commit_msg = os.popen("git log -1 --pretty=%B").read()
+              author = os.popen("git log -1 --pretty=%an").read()
+              
+              # CONDIÇÃO DE CONCLUSÃO: Se o merge veio da nossa própria mutação
+              if "[Auto-Evolution]" in commit_msg or "Jarvis-AutoEvolution" in author:
+                  print("🎯 Detectado Merge de Evolução. Atualizando Roadmap...")
+                  # Extraímos o contexto da missão concluída e marcamos como ✅
+                  # Isso evita que a mesma missão seja selecionada novamente
+                  next_m = auto.find_next_mission_with_auto_complete()
+                  if next_m:
+                      auto.mark_mission_as_completed(next_m['mission']['description'])
+                      print(f"✅ Missão '{next_m['mission']['description']}' finalizada.")
+                  
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('should_evolve=false\n')
+              else:
+                  # CONDIÇÃO DE INÍCIO: Commit manual detectado, hora de evoluir
+                  print("🚀 Commit manual. Iniciando busca por nova missão...")
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('should_evolve=true\n')
+          except Exception as e:
+              print(f"Erro na decisão: {e}")
+              sys.exit(1)
+          PYCODE
 
   # ==================================================
-  # 2. ANÁLISE: Busca missão com dependências isoladas
+  # 2. ANÁLISE: Busca próxima missão se necessário
   # ==================================================
   find_next_mission:
     name: "🎯 Buscar Próxima Missão"
-    needs: check_trigger_conditions
-    if: needs.check_trigger_conditions.outputs.should_evolve == 'true'
+    needs: process_evolution
+    if: needs.process_evolution.outputs.should_evolve == 'true'
     runs-on: ubuntu-latest
     outputs:
       has_mission: ${{ steps.find.outputs.has_mission }}
@@ -54,7 +85,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 📦 Instalar Dependências de Análise
+      - name: 📦 Instalar Dependências
         run: pip install sqlmodel pydantic requests
 
       - name: 🎯 Seleção de Missão
@@ -77,8 +108,7 @@ jobs:
                       f.write(f'mission_description={desc}\n')
                   
                   with open('mission_context.txt', 'w') as f:
-                      f.write(f"ROADMAP CONTEXT: {auto.get_roadmap_context(next_mission)}\n")
-                      f.write(f"MISSION: {m_data['description']}")
+                      f.write(auto.get_roadmap_context(next_mission))
               else:
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write('has_mission=false\n')
@@ -95,11 +125,11 @@ jobs:
           path: mission_context.txt
 
   # ==================================================
-  # 3. EVOLUÇÃO: Mutação Autônoma (Com PR Descritiva)
+  # 3. EVOLUÇÃO: Mutação e PR
   # ==================================================
   attempt_evolution:
     name: "🧬 Tentar Evolução Autônoma"
-    needs: [check_trigger_conditions, find_next_mission]
+    needs: find_next_mission
     if: needs.find_next_mission.outputs.has_mission == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -127,7 +157,6 @@ jobs:
           git checkout -b "$BRANCH_NAME"
           export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           
-          echo "🧠 [IA] Iniciando mutação do DNA..."
           python scripts/metabolism_mutator.py \
             --strategy "minimal_change" \
             --intent "auto-evolution-mission" \
@@ -136,25 +165,19 @@ jobs:
           
           git add -A
           if [ -z "$(git status --porcelain)" ]; then
-            echo "⚠️ [STATUS] Nenhuma mudança detectada pela IA."
+            echo "⚠️ Nenhuma mudança detectada."
             exit 0
           fi
 
-          echo "🚀 [PUSH] Enviando Evolução para Revisão..."
           git commit -m "[Auto-Evolution] DNA Mutated - Awaiting CI Validation"
           git push origin "$BRANCH_NAME"
           
-          # Lemos o resumo gerado pelo script Python. Se não existir, usamos um padrão.
-          if [ -f "mutation_summary.txt" ]; then
-            SUMMARY=$(cat mutation_summary.txt)
-          else
-            SUMMARY="DNA Mutado com sucesso. Verifique as alterações nos arquivos."
-          fi
+          SUMMARY=$(cat mutation_summary.txt 2>/dev/null || echo "DNA Mutado com sucesso.")
           
           gh pr create --title "🧬 Evolução: $ISSUE_BODY" \
                        --body "### ✅ Mudanças Implementadas
           $SUMMARY
 
           ---
-          *Gerado automaticamente pelo sistema de auto-evolução JARVIS.*" \
+          *Gerado pelo sistema JARVIS.*" \
                        --base main --head "$BRANCH_NAME"
