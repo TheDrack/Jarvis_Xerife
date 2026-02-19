@@ -11,9 +11,6 @@ permissions:
   issues: write
 
 jobs:
-  # ==================================================
-  # 1. VERIFICAÇÃO: Mantém a distinção para evitar loop
-  # ==================================================
   check_trigger_conditions:
     name: "🔍 Verificar Condições de Trigger"
     runs-on: ubuntu-latest
@@ -22,23 +19,22 @@ jobs:
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: 🧬 Validar Origem
         id: check
         run: |
           COMMIT_MSG="${{ github.event.head_commit.message }}"
-          # Se o commit for do JARVIS, não trigga evolução (apenas consolidação abaixo)
-          if [[ "$COMMIT_MSG" == *"[Auto-Evolution]"* ]] || [[ "${{ github.event.head_commit.author.name }}" == "Jarvis-AutoEvolution" ]]; then
+          AUTHOR_NAME="${{ github.event.head_commit.author.name }}"
+          echo "Commit Msg: $COMMIT_MSG"
+          echo "Author: $AUTHOR_NAME"
+          
+          # Se o commit tiver a tag ou for do bot, cancelamos o loop
+          if [[ "$COMMIT_MSG" == *"[Auto-Evolution]"* ]] || [[ "$AUTHOR_NAME" == "Jarvis-AutoEvolution" ]]; then
             echo "should_evolve=false" >> "$GITHUB_OUTPUT"
           else
             echo "should_evolve=true" >> "$GITHUB_OUTPUT"
           fi
 
-  # ==================================================
-  # 2. ANÁLISE: Busca missão e prepara o contexto do RL
-  # ==================================================
   find_next_mission:
     name: "🎯 Buscar Próxima Missão"
     needs: check_trigger_conditions
@@ -47,7 +43,6 @@ jobs:
     outputs:
       has_mission: ${{ steps.find.outputs.has_mission }}
       mission_description: ${{ steps.find.outputs.mission_description }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,15 +50,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Instalar dependências
-        run: pip install -r requirements.txt || echo "..."
-
-      - name: 🎯 Seleção de Missão via Auto-Evolution Service
+      - name: 🎯 Seleção de Missão
         id: find
         run: |
           export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           python - << 'PYCODE'
-          import os, sys
+          import os, sys, json
           try:
               from app.application.services.auto_evolution import AutoEvolutionService
               auto = AutoEvolutionService()
@@ -71,113 +63,75 @@ jobs:
               
               if next_mission:
                   m_data = next_mission['mission']
-                  # Grava para o GitHub Actions ler
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write('has_mission=true\n')
                       f.write(f'mission_description={m_data["description"].replace(chr(10), " ")}\n')
-                  # Preserva o contexto completo para o RL
+                  
+                  # Salva o contexto expandido para a IA saber o que fazer
                   with open('mission_context.txt', 'w') as f:
-                      f.write(auto.get_roadmap_context(next_mission))
+                      f.write(f"ROADMAP CONTEXT: {auto.get_roadmap_context(next_mission)}\n")
+                      f.write(f"MISSION: {m_data['description']}")
               else:
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write('has_mission=false\n')
           except Exception as e:
-              print(f"Erro na busca: {e}")
+              print(f"Erro: {e}")
               sys.exit(1)
           PYCODE
-      
-      - name: Upload mission context
-        if: steps.find.outputs.has_mission == 'true'
+      - name: Upload Context
         uses: actions/upload-artifact@v4
         with:
           name: mission-context
           path: mission_context.txt
 
-  # ==================================================
-  # 3. EVOLUÇÃO AUTÔNOMA: Mutação + Testes + Rewards
-  # ==================================================
   attempt_evolution:
     name: "🧬 Tentar Evolução Autônoma"
     needs: [check_trigger_conditions, find_next_mission]
-    if: |
-      always() && 
-      needs.find_next_mission.result == 'success' && 
-      needs.find_next_mission.outputs.has_mission == 'true'
+    if: needs.find_next_mission.outputs.has_mission == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout código
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ github.token }}
-      
-      - name: Download context
+          fetch-depth: 0
+      - name: Download Context
         uses: actions/download-artifact@v4
         with:
           name: mission-context
-
-      - name: Configurar Ambiente de Mutação
+      - name: Setup Env
         run: |
           git config --global user.name "Jarvis-AutoEvolution"
           git config --global user.email "jarvis@bot.com"
-          # Adicionamos pytest-asyncio para suportar as funções async da LLM
-          pip install pytest pytest-json-report pytest-cov pytest-asyncio requests
-          pip install -r requirements.txt || echo "Aviso: Dependências parciais."
-
-      - name: 🤖 Executar Ciclo de Reinforcement Learning
+          pip install pytest pytest-json-report pytest-cov requests
+          pip install -r requirements.txt || true
+      - name: 🤖 RL Cycle
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          # Esta é a chave mestra que faltava para o 'gh pr create'
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_BODY: ${{ needs.find_next_mission.outputs.mission_description }}
-          AUTO_EVOLUTION_MODE: "true"
         run: |
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
           export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           
-          # 2. Mutação com Modelo Estável
-          # Certifique-se de que o python scripts/metabolism_mutator.py use o modelo correto
+          # Executa o mutador com o contexto real do roadmap
           python scripts/metabolism_mutator.py \
             --strategy "minimal_change" \
             --intent "auto-evolution-mission" \
             --impact "functional-improvement" \
             --roadmap-context "$(cat mission_context.txt)"
           
-          # 3. Forçar reconhecimento das mudanças
-          git add -A 
-
+          git add -A
           if [ -z "$(git status --porcelain)" ]; then
-             echo "⚠️ Sem mudanças. Encerrando."
-             exit 0
+            echo "⚠️ IA não propôs mudanças no código."
+            exit 0
           fi
 
-          # 4. Feedback do Ambiente (Testes)
-          echo "🧪 Iniciando Testes de Validação com Isolamento Total..."
-          
-          if (unset GROQ_API_KEY OPENAI_API_KEY GEMINI_API_KEY && pytest --json-report --json-report-file=test_report.json); then
-            echo "✅ Sucesso! DNA Saudável. Consolidando Evolução..."
-            
-            # Removemos o test_report.json do commit para não sujar o histórico
-            git add -A
-            git reset test_report.json 2>/dev/null || true
-            
+          if (unset GROQ_API_KEY OPENAI_API_KEY GEMINI_API_KEY && pytest); then
             git commit -m "[Auto-Evolution] Mission Accomplished - RL Reward Positive"
             git push origin "$BRANCH_NAME"
-
-            # ABERTURA AUTOMÁTICA DE PR
-            echo "pull-request: Criando PR para a missão..."
-            gh pr create --title "🧬 Evolução: Mission Accomplished ($BRANCH_NAME)" \
-                         --body "O JARVIS completou a missão com sucesso. DNA validado por 619+ testes." \
-                         --base main --head "$BRANCH_NAME"
+            gh pr create --title "🧬 Evolução: $ISSUE_BODY" --body "Auto-PR via JARVIS." --base main --head "$BRANCH_NAME"
           else
-            echo "❌ Falha nos testes! O novo DNA é instável."
+            echo "❌ Falha nos testes."
             exit 1
           fi
-
-      # Guardamos o relatório como um artefato oficial do GitHub (limpo e acessível)
-      - name: Arquivar Relatório de Testes
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-report-${{ github.run_id }}
-          path: test_report.json
