@@ -23,6 +23,7 @@ class TaskRunner:
         start_time = time.time()
         # LOGS ESTRUTURADOS APLICADOS
         s_log = StructuredLogger(logger, mission_id=mission.mission_id, device_id=self.device_id, session_id=session_id)
+        s_log.info("Iniciando missão")
         
         try:
             tmp = Path(tempfile.mkdtemp())
@@ -31,9 +32,14 @@ class TaskRunner:
             
             try:
                 res = subprocess.run([sys.executable, str(script_file)], capture_output=True, text=True, timeout=mission.timeout)
+                s_log.info("Missão concluída com sucesso" if res.returncode == 0 else "Missão falhou")
                 return MissionResult(mission.mission_id, res.returncode==0, res.stdout, res.stderr, res.returncode, time.time()-start_time)
             except subprocess.TimeoutExpired:
+                s_log.error("Timeout na missão")
                 # O CÓDIGO 124 QUE OS TESTES EXIGEM
                 return MissionResult(mission.mission_id, False, "", "Timeout", 124, time.time()-start_time)
         except Exception as e:
+            s_log.error(f"Erro na missão: {str(e)}")
             return MissionResult(mission.mission_id, False, "", str(e), 1, time.time()-start_time)
+        finally:
+            s_log.info("Missão finalizada")
