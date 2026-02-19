@@ -49,7 +49,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh pr merge "${{ github.event.pull_request.number }}" --auto --merge --repo "${{ github.repository }}"
-          gh pr comment "${{ github.event.pull_request.number }}" --body "## ✅ Homeostase Mantida. DNA validado automaticamente."
+          gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body "## ✅ Homeostase Mantida. DNA validado automaticamente."
 
       - name: 🔧 Ciclo de Cura 1
         if: steps.run_tests.outcome == 'failure'
@@ -58,7 +58,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 1. Tenta a cura
+          # 1. Tenta a cura via UV
           uv run python scripts/self_healing_mutator.py --report "report_1.json"
           
           # 2. Vistoria do Mecânico (Análise de Risco)
@@ -72,6 +72,7 @@ jobs:
             git config --global user.email "jarvis@bot.com"
             git add .
             git commit -m "🤖 [Auto-Cura] Tentativa 1: Corrigindo falhas detectadas"
+            # Push direto para a branch da PR usando a referência correta
             git push origin HEAD:${{ github.event.pull_request.head.ref }}
             uv run pytest --json-report --json-report-file=report_2.json tests/ || echo "still_failing=true" >> $GITHUB_ENV
           fi
@@ -82,7 +83,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           uv run python scripts/self_healing_mutator.py --report "report_2.json"
-          uv run python scripts/metabolism_analyzer.py --intent "auto-fix" --instruction "Ajuste fino pós-falha na tentativa 1" --repo-path "." > analysis_2.txt
+          uv run python scripts/metabolism_analyzer.py --intent "auto-fix" --instruction "Ajuste fino pós-falha" --repo-path "." > analysis_2.txt
           
           if ! grep -q '"requires_human": true' analysis_2.txt; then
             git add .
@@ -94,9 +95,15 @@ jobs:
           fi
 
       - name: 🚨 Escalonar ao Comandante
-        if: env.final_failure == 'true' || env.stop_healing == 'true'
+        if: always() && (env.final_failure == 'true' || env.stop_healing == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          gh pr edit "${{ github.event.pull_request.number }}" --add-label "commander-review"
-          gh pr comment "${{ github.event.pull_request.number }}" --body "## 🚨 Intervenção Necessária. O sistema atingiu o limite de auto-cura ou detectou risco arquitetural."
+          REPO="${{ github.repository }}"
+          # O uso de --repo evita o erro de 'not on any branch'
+          gh pr edit "$PR_NUMBER" --add-label "commander-review" --repo "$REPO"
+          gh pr comment "$PR_NUMBER" --repo "$REPO" --body "## 🚨 INTERVENÇÃO NECESSÁRIA
+          O metabolismo atingiu o limite de segurança ou a cura falhou.
+          - **Motivo**: ${{ env.stop_healing == 'true' && 'Risco Arquitetural' || 'Falha persistente nos testes' }}
+          _Aguardando comando manual._"
