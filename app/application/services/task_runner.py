@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 import logging, subprocess, sys, tempfile, time
 from pathlib import Path
@@ -43,3 +44,5 @@ class TaskRunner:
             return MissionResult(mission.mission_id, False, "", str(e), 1, time.time()-start_time)
         finally:
             s_log.info("Missão finalizada")
+            s_log.info(f"Missão {mission.mission_id} concluída com device_id {self.device_id} e session_id {session_id}")
+   
