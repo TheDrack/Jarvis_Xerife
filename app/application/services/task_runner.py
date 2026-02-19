@@ -140,7 +140,10 @@ class TaskRunner:
         log.info("mission_started", 
                 requirements=mission.requirements,
                 browser_interaction=mission.browser_interaction,
-                keep_alive=mission.keep_alive)
+                keep_alive=mission.keep_alive,
+                mission_id=mission_id,
+                device_id=self.device_id,
+                session_id=session_id)
         
         # Create temporary script file
         script_file = None
@@ -181,7 +184,10 @@ class TaskRunner:
                         log.error("dependency_installation_failed",
                                 error=str(e),
                                 failed_package=e.package,
-                                stderr=e.stderr)
+                                stderr=e.stderr,
+                                mission_id=mission_id,
+                                device_id=self.device_id,
+                                session_id=session_id)
                         
                         execution_time = time.time() - start_time
                         return MissionResult(
@@ -210,7 +216,10 @@ class TaskRunner:
                         log.error("dependency_installation_failed",
                                 error=str(e),
                                 failed_package=e.package,
-                                stderr=e.stderr)
+                                stderr=e.stderr,
+                                mission_id=mission_id,
+                                device_id=self.device_id,
+                                session_id=session_id)
                         
                         execution_time = time.time() - start_time
                         return MissionResult(
@@ -231,7 +240,10 @@ class TaskRunner:
             log.info("mission_completed", 
                     execution_time=execution_time,
                     exit_code=result['exit_code'],
-                    success=result["exit_code"] == 0)
+                    success=result["exit_code"] == 0,
+                    mission_id=mission_id,
+                    device_id=self.device_id,
+                    session_id=session_id)
             
             # Create result
             mission_result = MissionResult(
@@ -246,6 +258,9 @@ class TaskRunner:
                     "venv_path": str(venv_path) if venv_path else None,
                     "script_path": str(script_file),
                     "persistent": mission.keep_alive,
+                    "mission_id": mission_id,
+                    "device_id": self.device_id,
+                    "session_id": session_id
                 }
             )
             
@@ -258,7 +273,10 @@ class TaskRunner:
                      error=str(e),
                      error_type=type(e).__name__,
                      traceback=tb,
-                     execution_time=execution_time)
+                     execution_time=execution_time,
+                     mission_id=mission_id,
+                     device_id=self.device_id,
+                     session_id=session_id)
             
             return MissionResult(
                 mission_id=mission_id,
