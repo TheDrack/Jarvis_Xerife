@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necessário para ler o histórico de commits corretamente
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -41,30 +43,45 @@ jobs:
               from app.application.services.auto_evolution import AutoEvolutionService
               auto = AutoEvolutionService()
               
+              # Coleta dados do último commit de forma robusta
               commit_msg = os.popen("git log -1 --pretty=%B").read()
               author = os.popen("git log -1 --pretty=%an").read()
+              # Verifica se o log menciona a branch de evolução (comum em Pull Requests)
+              last_log = os.popen("git log -1").read()
               
-              if "[Auto-Evolution]" in commit_msg or "Jarvis-AutoEvolution" in author:
-                  print("🎯 Detectado Merge de Evolução. Sincronizando Roadmap...")
+              is_auto_evolution = (
+                  "[Auto-Evolution]" in commit_msg or 
+                  "Jarvis-AutoEvolution" in author or 
+                  "auto-evolution/" in last_log or
+                  "auto-evolution/" in commit_msg
+              )
+              
+              if is_auto_evolution:
+                  print(f"🎯 Evolução Detectada (Msg: {commit_msg.splitlines()[0]}). Sincronizando Roadmap...")
+                  
+                  # Tenta identificar e marcar a missão que acabou de ser merjada
                   next_m = auto.find_next_mission_with_auto_complete()
                   if next_m:
-                      # O método mark_mission_as_completed agora lida com os marcadores 'o' e emojis
-                      if auto.mark_mission_as_completed(next_m['mission']['description']):
-                          print(f"✅ Missão '{next_m['mission']['description']}' marcada no arquivo.")
+                      mission_desc = next_m['mission']['description']
+                      if auto.mark_mission_as_completed(mission_desc):
+                          print(f"✅ Missão '{mission_desc}' finalizada no arquivo.")
+                          
+                          # Configura git e sobe a alteração do Roadmap para a Main
                           os.system("git config --global user.name 'Jarvis-AutoEvolution'")
                           os.system("git config --global user.email 'jarvis@bot.com'")
                           os.system("git add docs/ROADMAP.md")
-                          os.system("git commit -m '[Auto-Evolution] Roadmap Synchronized ✅'")
+                          # Evita erro se o arquivo já estiver marcado ou sem mudanças
+                          os.system("git commit -m '[Auto-Evolution] Roadmap Synchronized ✅' || echo 'No changes to commit'")
                           os.system("git push origin main")
                   
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write('should_evolve=false\n')
               else:
-                  print("🚀 Commit manual. Iniciando busca por nova missão...")
+                  print(f"🚀 Commit manual detectado (Autor: {author}). Iniciando busca por nova missão...")
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write('should_evolve=true\n')
           except Exception as e:
-              print(f"Erro na decisão: {e}")
+              print(f"Erro na decisão estratégica: {e}")
               sys.exit(1)
           PYCODE
 
@@ -123,7 +140,6 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          # Executa o script que você encontrou para validar a segurança da missão
           python scripts/metabolism_analyzer.py \
             --intent "auto-evolution" \
             --instruction "${{ steps.find.outputs.mission_description }}" \
@@ -145,7 +161,6 @@ jobs:
   attempt_evolution:
     name: "🧬 Executar Mutação"
     needs: find_and_analyze
-    # SÓ EXECUTA SE: tiver missão E o Mecânico NÃO exigir humano
     if: |
       needs.find_and_analyze.outputs.has_mission == 'true' && 
       needs.find_and_analyze.outputs.requires_human == 'false'
@@ -175,7 +190,6 @@ jobs:
           git checkout -b "$BRANCH_NAME"
           export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           
-          # O mutator agora decide qual arquivo criar ou editar
           python scripts/metabolism_mutator.py \
             --strategy "minimal_change" \
             --intent "auto-evolution-mission" \
