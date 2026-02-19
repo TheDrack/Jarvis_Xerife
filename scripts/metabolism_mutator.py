@@ -129,7 +129,13 @@ class MetabolismMutator:
                     json={
                         "model": "llama-3.3-70b-versatile",
                         "messages": [
-                            {"role": "system", "content": "Você é um compilador humano. Responda EXCLUSIVAMENTE com código Python. Proibido usar Markdown, blocos de código (```) ou explicações."},
+                            {"role": "system", "content": """Você é o Engenheiro de Evolução do JARVIS.
+REGRAS DE OURO PARA MUTAÇÃO:
+1. NUNCA altere a assinatura (parâmetros) de métodos públicos ou construtores (__init__) que já existem. 
+2. Se precisar de novos parâmetros, eles DEVEM ter valores padrão (ex: sandbox_mode=False).
+3. Preserve todos os nomes de classes e métodos.
+4. O código deve ser compatível com a versão anterior para não quebrar os testes existentes.
+5. Responda apenas com o código puro."""},
                             {"role": "user", "content": prompt}
                         ],
                         "temperature": 0.1
