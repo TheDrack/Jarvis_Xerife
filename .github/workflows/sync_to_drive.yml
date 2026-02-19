@@ -10,58 +10,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Create ZIP
-        run: zip -r Jarvis_Xerife-main.zip . -x "*.git*" "venv/*" "__pycache__/*"
-
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
-      - name: Upload to Drive
-        shell: python
+      - name: Consolidate and Upload
         env:
           G_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-        run: |
-          import os, json
-          from google.oauth2 import service_account
-          from googleapiclient.discovery import build
-          from googleapiclient.http import MediaFileUpload
-
-          try:
-              # Limpando possíveis espaços ou quebras de linha que o celular insere
-              json_raw = os.environ['G_JSON'].strip()
-              folder_id = os.environ['DRIVE_FOLDER_ID'].strip()
-              
-              info = json.loads(json_raw)
-              creds = service_account.Credentials.from_service_account_info(
-                  info, scopes=['https://www.googleapis.com/auth/drive']
-              )
-              service = build('drive', 'v3', credentials=creds)
-
-              file_name = 'Jarvis_Xerife-main.zip'
-              
-              # Verifica se o arquivo local existe antes de tentar o upload
-              if not os.path.exists(file_name):
-                  print(f"Erro: {file_name} não encontrado no corredor do GitHub.")
-                  exit(1)
-
-              media = MediaFileUpload(file_name, mimetype='application/zip', resumable=True)
-              
-              # Busca arquivo existente na pasta especificada
-              query = f"name='{file_name}' and '{folder_id}' in parents and trashed = false"
-              results = service.files().list(q=query, fields="files(id)").execute()
-              files = results.get('files', [])
-
-              if files:
-                  file_id = files[0]['id']
-                  service.files().update(fileId=file_id, media_body=media).execute()
-                  print(f"Sincronização concluída: Alvo {file_id} atualizado no Drive.")
-              else:
-                  file_metadata = {'name': file_name, 'parents': [folder_id]}
-                  file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-                  print(f"Sincronização concluída: Novo artefato criado com ID {file.get('id')}.")
-          except Exception as e:
-              print(f"Falha na comunicação: {str(e)}")
-              exit(1)
+        run: python app/infrastructure/drive_sync.py
