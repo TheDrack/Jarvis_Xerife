@@ -21,16 +21,23 @@ class MetabolismMutator:
             subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
             import requests
 
-        # --- PASSO 1: DECIDIR O ALVO (ARQUITETURA) ---
+         # --- PASSO 1: DECIDIR O ALVO (ARQUITETURA) ---
         analysis_prompt = f"""
         Missão: {issue_body}
         Contexto do Roadmap: {roadmap_context}
-        Como um Arquiteto de Software, decida qual arquivo deve ser criado ou editado para realizar esta missão.
+        Como um Arquiteto de Software, decida qual arquivo deve ser criado ou editado.
+        
+        DIRETRIZES DE CAMINHO:
+        - Serviços de aplicação: 'app/application/services/'
+        - Adaptores/Infra: 'app/adapters/infrastructure/'
+        - Scripts utilitários: 'scripts/'
+        
         Retorne um JSON com:
-        "target_file": "caminho/relativo/do/arquivo.py",
+        "target_file": "caminho/completo/relativo.py",
         "action": "create" ou "edit",
         "reason": "breve explicação"
         """
+
 
         try:
             resp_analysis = requests.post(self.groq_url, headers={"Authorization": f"Bearer {api_key}"},
