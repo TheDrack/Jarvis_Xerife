@@ -3,6 +3,7 @@ from pathlib import Path
 
 class AutoEvolutionService:
     def __init__(self, roadmap_path="docs/ROADMAP.md"):
+        # Convertemos para Path absoluto ou garantimos que seja Path
         self.roadmap_path = Path(roadmap_path)
 
     def is_auto_evolution_pr(self, title: str, body: str = "") -> bool:
@@ -20,8 +21,11 @@ class AutoEvolutionService:
                 f"PRIORIDADE: {mission.get('priority', 'high')}\nSTATUS: in_progress")
 
     def parse_roadmap(self):
-        # Se o arquivo não existe, lançamos o erro MANUALMENTE com a string exata.
-        # Não deixamos o sistema lançar o erro sozinho para evitar o prefixo [Errno 2].
+        """
+        Lança FileNotFoundError com a mensagem exata exigida pelo teste.
+        """
+        # IMPORTANTE: O teste espera exatamente esta string. 
+        # Verificamos manualmente antes de qualquer operação de IO do SO.
         if not self.roadmap_path.exists():
             raise FileNotFoundError("Roadmap file not found")
             
@@ -45,7 +49,7 @@ class AutoEvolutionService:
         return data
 
     def find_next_mission_with_auto_complete(self):
-        # Repetimos a lógica de erro estrita aqui
+        # Mantendo a consistência do erro para o workflow
         if not self.roadmap_path.exists():
             raise FileNotFoundError("Roadmap file not found")
         return self.find_next_mission()
