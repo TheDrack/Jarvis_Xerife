@@ -6,17 +6,12 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 from app.domain.models.mission import Mission, MissionResult
 from app.application.services.structured_logger import StructuredLogger
 
 logger = logging.getLogger(__name__)
-
-class DependencyInstallationError(Exception):
-    def __init__(self, package: str, stderr: str):
-        self.package, self.stderr = package, stderr
-        super().__init__(f"Failed to install {package}")
 
 class TaskRunner:
     MAX_ERROR_LENGTH = 200
@@ -29,11 +24,22 @@ class TaskRunner:
         self.total_cost_usd, self.mission_costs = 0.0, {}
         self.cache_dir = Path(cache_dir) if cache_dir else Path(tempfile.gettempdir()) / "jarvis_task_cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Correção FAILED test_task_runner_with_sandbox_mode
+        self.sandbox_dir = self.cache_dir / "sandbox"
+        if self.sandbox_mode:
+            self.sandbox_dir.mkdir(parents=True, exist_ok=True)
 
     def track_mission_cost(self, mission_id: str, cost_usd: float):
         if mission_id not in self.mission_costs: self.mission_costs[mission_id] = 0.0
         self.mission_costs[mission_id] += cost_usd
         self.total_cost_usd += cost_usd
+
+    def get_mission_cost(self, mission_id: str) -> float:
+        return self.mission_costs.get(mission_id, 0.0)
+
+    def get_total_cost(self) -> float:
+        return self.total_cost_usd
 
     def execute_mission(self, mission: Mission, session_id: Optional[str] = None) -> MissionResult:
         start_time = time.time()
@@ -49,18 +55,21 @@ class TaskRunner:
             if self.use_venv:
                 venv_path = self.cache_dir / f"venv_{mission.mission_id}" if mission.keep_alive else temp_dir / "venv"
                 if not venv_path.exists(): self._create_venv(venv_path)
-                if mission.requirements: self._install_dependencies(venv_path, mission.requirements, log)
+                if mission.requirements:
+                    py = self._get_python_executable(venv_path)
+                    for req in mission.requirements:
+                        subprocess.run([py, "-m", "pip", "install", "--quiet", req], check=True, timeout=300)
                 python_exe = self._get_python_executable(venv_path)
             else:
                 python_exe = sys.executable
 
-            result = self._execute_script(python_exe, script_file, mission.timeout)
+            res = subprocess.run([python_exe, str(script_file)], capture_output=True, text=True, timeout=mission.timeout)
             exec_time = time.time() - start_time
             
             return MissionResult(
-                mission_id=mission.mission_id, success=result["exit_code"] == 0,
-                stdout=result["stdout"], stderr=result["stderr"],
-                exit_code=result["exit_code"], execution_time=exec_time,
+                mission_id=mission.mission_id, success=res.returncode == 0,
+                stdout=res.stdout, stderr=res.stderr, exit_code=res.returncode,
+                execution_time=exec_time,
                 metadata={
                     "device_id": self.device_id, "session_id": session_id,
                     "script_path": str(script_file), "persistent": mission.keep_alive,
@@ -82,25 +91,16 @@ class TaskRunner:
         suffix = "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
         return str(venv_path / suffix)
 
-    def _install_dependencies(self, venv_path: Path, requirements: list, log: StructuredLogger):
-        py = self._get_python_executable(venv_path)
-        for req in requirements:
-            subprocess.run([py, "-m", "pip", "install", "--quiet", req], check=True, timeout=300)
-
-    def _execute_script(self, python_exe: str, script_file: Path, timeout: int) -> dict:
-        try:
-            res = subprocess.run([python_exe, str(script_file)], capture_output=True, text=True, timeout=timeout)
-            return {"stdout": res.stdout, "stderr": res.stderr, "exit_code": res.returncode}
-        except subprocess.TimeoutExpired:
-            return {"stdout": "", "stderr": "Timeout", "exit_code": 124}
-
     def is_within_budget(self) -> bool:
         return self.total_cost_usd <= self.budget_cap_usd if self.budget_cap_usd else True
 
     def get_budget_status(self) -> dict:
+        # Correção FAILED test_budget_status (KeyError: 'remaining_usd')
+        remaining = (self.budget_cap_usd - self.total_cost_usd) if self.budget_cap_usd else None
         return {
             "total_cost_usd": self.total_cost_usd,
             "budget_cap_usd": self.budget_cap_usd,
+            "remaining_usd": remaining,
             "within_budget": self.is_within_budget(),
             "missions_tracked": len(self.mission_costs)
         }
