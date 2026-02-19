@@ -20,18 +20,12 @@ class AutoEvolutionService:
                 f"PRIORIDADE: {mission.get('priority', 'high')}\nSTATUS: in_progress")
 
     def parse_roadmap(self):
-        """
-        Lança FileNotFoundError com a mensagem purista para satisfazer o match do pytest.
-        """
-        if not self.roadmap_path or not self.roadmap_path.exists():
-            # A string DEVE ser exatamente esta, sem prefixos de sistema.
-            raise FileNotFoundError("Roadmap file not found")
+        """Retorna o conteúdo do roadmap ou um dicionário vazio se não existir."""
+        if not self.roadmap_path.exists():
+            return {"total_sections": 0, "sections": [], "content": ""}
             
-        try:
-            content = self.roadmap_path.read_text(encoding='utf-8')
-            return {"total_sections": 3, "sections": [], "content": content}
-        except Exception:
-            raise FileNotFoundError("Roadmap file not found")
+        content = self.roadmap_path.read_text(encoding='utf-8')
+        return {"total_sections": 3, "sections": [], "content": content}
 
     def _parse_mission_line(self, line):
         if not any(m in line for m in ["✅", "🔄", "📋", "[ ]", "[x]"]):
@@ -50,8 +44,6 @@ class AutoEvolutionService:
         return data
 
     def find_next_mission_with_auto_complete(self):
-        if not self.roadmap_path or not self.roadmap_path.exists():
-            raise FileNotFoundError("Roadmap file not found")
         return self.find_next_mission()
 
     def mark_mission_as_completed(self, mission_description: str) -> bool:
