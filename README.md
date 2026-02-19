@@ -1,8 +1,9 @@
 # Jarvis - Intelligent Voice Assistant & Distributed Automation Platform
 
-[![Python Tests](https://github.com/TheDrack/python/actions/workflows/python-tests.yml/badge.svg?branch=main)](https://github.com/TheDrack/python/actions/workflows/python-tests.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![🧬 JARVIS: Homeostase e Auto-Cura](https://github.com/TheDrack/Jarvis_Xerife/actions/workflows/jarvis_homeostasis.yml/badge.svg?branch=main)](https://github.com/TheDrack/Jarvis_Xerife/actions/workflows/jarvis_homeostasis.yml)
+[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 
 > **Jarvis evolved beyond a simple voice assistant** - It's now a distributed orchestration platform that intelligently coordinates multiple devices ("Soldiers") based on their capabilities, location, and network proximity.
 
