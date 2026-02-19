@@ -50,7 +50,7 @@ class ExtensionManager:
         self._use_uv = use_uv and self._check_uv_available()
         if not self._use_uv and use_uv:
             logger.warning("uv not available, falling back to pip for package installation")
-        logger.info(f"ExtensionManager initialized (using {'uv' if self._use_uv else 'pip'})")
+        logger.info(f"ExtensionManager initialized (using {{'uv' if self._use_uv else 'pip'}})")
 
     def _check_uv_available(self) -> bool:
         """
@@ -95,12 +95,12 @@ class ExtensionManager:
             return True
 
         # Install the package
-        logger.info(f"Installing package '{install_name}' via {'uv' if self._use_uv else 'pip'}...")
+        logger.info(f"Installing package '{install_name}' via {{'uv' if self._use_uv else 'pip'}}...")
         if self._install_package_impl(install_name):
             # Verify installation
             if self._check_package_installed(package_name):
                 self._installed_capabilities.add(package_name)
-                logger.info(f"✅ Successfully installed new skill (library): '{package_name}'")
+                logger.info(f" Successfully installed new skill (library): '{package_name}'")
                 return True
             else:
                 logger.error(f"Package '{install_name}' installed but module '{package_name}' still not importable")
