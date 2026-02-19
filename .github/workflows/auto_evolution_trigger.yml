@@ -95,7 +95,7 @@ jobs:
           path: mission_context.txt
 
   # ==================================================
-  # 3. EVOLUÇÃO: Mutação Autônoma (Sem bloqueio de testes locais)
+  # 3. EVOLUÇÃO: Mutação Autônoma (Com PR Descritiva)
   # ==================================================
   attempt_evolution:
     name: "🧬 Tentar Evolução Autônoma"
@@ -144,6 +144,17 @@ jobs:
           git commit -m "[Auto-Evolution] DNA Mutated - Awaiting CI Validation"
           git push origin "$BRANCH_NAME"
           
+          # Lemos o resumo gerado pelo script Python. Se não existir, usamos um padrão.
+          if [ -f "mutation_summary.txt" ]; then
+            SUMMARY=$(cat mutation_summary.txt)
+          else
+            SUMMARY="DNA Mutado com sucesso. Verifique as alterações nos arquivos."
+          fi
+          
           gh pr create --title "🧬 Evolução: $ISSUE_BODY" \
-                       --body "### ✅ Nova Mutação Proposta\n- **Missão:** $ISSUE_BODY\n- **Status:** DNA Mutado. Aguardando validação de integridade no CI principal." \
+                       --body "### ✅ Mudanças Implementadas
+          $SUMMARY
+
+          ---
+          *Gerado automaticamente pelo sistema de auto-evolução JARVIS.*" \
                        --base main --head "$BRANCH_NAME"
