@@ -41,14 +41,18 @@ class TaskRunner:
         try:
             script_file = tmp / "script.py"
             script_file.write_text(mission.code)
-            # O timeout precisa ser tratado explicitamente para retornar 124
             try:
                 res = subprocess.run([sys.executable, str(script_file)], capture_output=True, text=True, timeout=mission.timeout)
-                return MissionResult(mission.mission_id, res.returncode==0, res.stdout, res.stderr, res.returncode, time.time()-start_time, metadata={"script_path": str(script_file)})
+                # O teste exige 'persistent' e 'script_path' em metadata
+                metadata = {
+                    "script_path": str(script_file),
+                    "persistent": getattr(mission, 'keep_alive', False)
+                }
+                return MissionResult(mission.mission_id, res.returncode==0, res.stdout, res.stderr, res.returncode, time.time()-start_time, metadata=metadata)
             except subprocess.TimeoutExpired:
-                # O teste test_execute_mission_timeout exige exit_code 124
-                return MissionResult(mission.mission_id, False, "", "Timeout", 124, time.time()-start_time, metadata={})
+                metadata = {"persistent": getattr(mission, 'keep_alive', False)}
+                return MissionResult(mission.mission_id, False, "", "Timeout", 124, time.time()-start_time, metadata=metadata)
         except Exception as e:
-            return MissionResult(mission.mission_id, False, "", str(e), 1, time.time()-start_time)
+            return MissionResult(mission.mission_id, False, "", str(e), 1, time.time()-start_time, metadata={"persistent": False})
         finally:
             if tmp.exists(): shutil.rmtree(tmp)
