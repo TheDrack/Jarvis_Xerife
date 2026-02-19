@@ -26,9 +26,11 @@ jobs:
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          # Tentativa nos dois caminhos possíveis da arquitetura
           if [ -f "app/adapters/infrastructure/drive_sync.py" ]; then
             python app/adapters/infrastructure/drive_sync.py
-          else
+          elif [ -f "app/infrastructure/drive_sync.py" ]; then
             python app/infrastructure/drive_sync.py
+          else
+            echo "❌ Erro: drive_sync.py não encontrado."
+            exit 1
           fi
