@@ -26,7 +26,7 @@ jobs:
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          # 🎯 Ajustado para o nome correto: consolidator.py
+          # 🎯 Executa o consolidator garantindo o path
           if [ -f "app/adapters/infrastructure/consolidator.py" ]; then
             python app/adapters/infrastructure/consolidator.py
           elif [ -f "app/infrastructure/consolidator.py" ]; then

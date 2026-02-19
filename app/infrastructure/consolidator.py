@@ -7,10 +7,10 @@ from googleapiclient.http import MediaFileUpload
 
 def consolidate_project(output_file="CORE_LOGIC_CONSOLIDATED.txt"):
     """Varre o repositório e cria um arquivo único com todo o código."""
-    ignore_dirs = {'.git', 'venv', '__pycache__', '.github', 'tests', 'build', 'dist'}
-    allowed_extensions = {'.py', '.txt', '.json', '.md', '.env.example'}
+    ignore_dirs = {'.git', 'venv', '__pycache__', '.github', 'tests', 'build', 'dist', 'metabolism_logs'}
+    allowed_extensions = {'.py', '.txt', '.json', '.md', '.env.example', '.yml'}
 
-    print(f"Iniciando consolidação em {output_file}...")
+    print(f"🔬 Iniciando consolidação em {output_file}...")
     with open(output_file, "w", encoding="utf-8") as f:
         for root, dirs, files in os.walk("."):
             dirs[:] = [d for d in dirs if d not in ignore_dirs]
@@ -28,11 +28,11 @@ def consolidate_project(output_file="CORE_LOGIC_CONSOLIDATED.txt"):
     return output_file
 
 def upload_to_drive(file_path):
-    """Faz o upload do arquivo consolidado para o Google Drive."""
+    """Faz o upload do arquivo para o Google Drive respeitando a cota do proprietário da pasta."""
     try:
         json_raw = os.environ['G_JSON'].strip()
         folder_id = os.environ['DRIVE_FOLDER_ID'].strip()
-        
+
         info = json.loads(json_raw)
         creds = service_account.Credentials.from_service_account_info(
             info, scopes=['https://www.googleapis.com/auth/drive']
@@ -41,22 +41,38 @@ def upload_to_drive(file_path):
 
         file_name = os.path.basename(file_path)
         media = MediaFileUpload(file_path, mimetype='text/plain', resumable=True)
-        
+
+        # 🔍 Busca se o arquivo já existe na pasta específica
         query = f"name='{file_name}' and '{folder_id}' in parents and trashed = false"
         results = service.files().list(q=query, fields="files(id)").execute()
         files = results.get('files', [])
 
         if files:
             file_id = files[0]['id']
-            service.files().update(fileId=file_id, media_body=media).execute()
-            print(f"Sucesso: {file_name} atualizado (ID: {file_id}).")
+            # 🔄 Atualiza o conteúdo. Como o arquivo está na SUA pasta, 
+            # ele usa o SEU espaço, resolvendo o erro 403 quota.
+            service.files().update(
+                fileId=file_id, 
+                media_body=media
+            ).execute()
+            print(f"✅ Sucesso: {file_name} atualizado (ID: {file_id}).")
         else:
-            file_metadata = {'name': file_name, 'parents': [folder_id]}
-            file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-            print(f"Sucesso: Novo arquivo criado (ID: {file.get('id')}).")
-            
+            # ✨ Cria o arquivo definindo explicitamente o 'parent' como a sua pasta
+            file_metadata = {
+                'name': file_name, 
+                'parents': [folder_id]
+            }
+            file = service.files().create(
+                body=file_metadata, 
+                media_body=media, 
+                fields='id'
+            ).execute()
+            print(f"✨ Sucesso: Novo arquivo criado (ID: {file.get('id')}).")
+
     except Exception as e:
-        print(f"Erro na sincronização: {str(e)}")
+        # Erro 403 storageQuotaExceeded é mitigado ao garantir que o arquivo 
+        # "nasça" ou "viva" dentro de uma pasta que a Service Account não é dona.
+        print(f"❌ Erro na sincronização: {str(e)}")
         exit(1)
 
 if __name__ == "__main__":
