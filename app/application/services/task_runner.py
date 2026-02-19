@@ -2,6 +2,7 @@ import logging, subprocess, sys, tempfile, time
 from pathlib import Path
 from app.domain.models.mission import Mission, MissionResult
 from app.application.services.structured_logger import StructuredLogger
+from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
 
@@ -23,27 +24,16 @@ class TaskRunner:
         s_log.info("Iniciando missão")
         
         try:
-            tmp = Path(tempfile.mkdtemp())
-            script_file = tmp / "script.py"
-            script_file.write_text(mission.code)
-            
-            try:
-                res = subprocess.run([sys.executable, str(script_file)], capture_output=True, text=True, timeout=mission.timeout)
-                s_log.info("Missão concluída com sucesso" if res.returncode == 0 else "Missão falhou")
-                return MissionResult(mission.mission_id, res.returncode==0, res.stdout, res.stderr, res.returncode, time.time()-start_time)
-            except subprocess.TimeoutExpired:
-                s_log.error("Timeout na missão")
-                return MissionResult(mission.mission_id, False, "", "Timeout", 124, time.time()-start_time)
-            except subprocess.CalledProcessError as e:
-                s_log.error(f"Erro na missão: {str(e)}")
-                return MissionResult(mission.mission_id, False, "", str(e), e.returncode, time.time()-start_time)
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context()
+                page = context.new_page()
+                page.set_timeout(mission.timeout)
+                page.evaluate(mission.code)
+                s_log.info("Missão concluída com sucesso")
+                return MissionResult(mission.mission_id, True, "", "", 0, time.time()-start_time)
         except Exception as e:
             s_log.error(f"Erro na missão: {str(e)}")
             return MissionResult(mission.mission_id, False, "", str(e), 1, time.time()-start_time)
         finally:
             s_log.info("Missão finalizada")
-            try:
-                import shutil
-                shutil.rmtree(tmp)
-            except Exception as e:
-                s_log.error(f"Erro ao remover diretório temporário: {str(e)}")
