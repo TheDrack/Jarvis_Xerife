@@ -6,45 +6,42 @@ on:
       - main
     tags:
       - 'v*'
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
+  actions: write  # Essencial para resolver o erro 403 no upload-artifact
 
 jobs:
   build-windows:
     runs-on: windows-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         token: ${{ github.token }}
-    
+
     - name: Teste de Identidade
       run: gh auth status
       env:
         GH_TOKEN: ${{ github.token }}
-    
+
     - name: Set up uv
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v5 # Versão estável recomendada
       with:
         enable-cache: true
-    
-    - name: Create virtual environment
-      run: uv venv --python 3.13
-    
+
+    - name: Set up Python
+      run: uv python install 3.13
+
     - name: Install dependencies
       run: |
+        # Instalação limpa e direta usando uv
         uv pip install pyinstaller
-        
-        # Install dependencies in specific order to avoid conflicts
-        uv pip install bcrypt==4.0.1
-        uv pip install passlib[bcrypt]==1.7.4
-        
-        # Install core dependencies
+        uv pip install bcrypt==4.0.1 passlib[bcrypt]==1.7.4
         uv pip install -r requirements.txt
     
     - name: Build executable with PyInstaller
@@ -54,22 +51,26 @@ jobs:
     - name: Verify build
       run: |
         if (Test-Path "dist\Jarvis_Installer.exe") {
-          Write-Host "✓ Executable built successfully"
-          $size = (Get-Item "dist\Jarvis_Installer.exe").Length / 1MB
+          $item = Get-Item "dist\Jarvis_Installer.exe"
+          Write-Host "✓ Executable built successfully: $($item.FullName)"
+          $size = $item.Length / 1MB
           Write-Host "✓ Size: $([math]::Round($size, 2)) MB"
         } else {
-          Write-Host "✗ Executable not found"
+          Write-Host "✗ Executable not found em dist\"
+          ls dist\ # Lista o que foi gerado para debug
           exit 1
         }
       shell: pwsh
-    
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: Jarvis_Installer
         path: dist/Jarvis_Installer.exe
         retention-days: 30
-    
+        if-no-files-found: error # Garante que falhe se o arquivo sumir
+        compression-level: 6
+
     - name: Create Release (on tag)
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
