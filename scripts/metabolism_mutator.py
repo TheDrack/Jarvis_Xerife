@@ -14,6 +14,10 @@ class MetabolismMutator:
         issue_body = os.getenv('ISSUE_BODY', 'Evolução')
         api_key = os.getenv('GROQ_API_KEY')
 
+        if not api_key:
+            logger.error("GROQ_API_KEY não encontrada.")
+            return {'success': False}
+
         try:
             import requests
         except ImportError:
@@ -80,7 +84,8 @@ class MetabolismMutator:
             new_code = content.get('code', "")
             summary = content.get('summary', "")
 
-            if isinstance(summary, list): summary = "\n".join([f"- {item}" for item in summary])
+            if isinstance(summary, list): 
+                summary = "\n".join([f"- {item}" for item in summary])
 
             if len(new_code.strip()) > 20:
                 path.write_text(new_code, encoding='utf-8')
@@ -100,5 +105,8 @@ if __name__ == '__main__':
     parser.add_argument('--impact', required=True)
     parser.add_argument('--roadmap-context', default="")
     args = parser.parse_args()
-    MutabolismMutator().apply_mutation(args.strategy, args.intent, args.impact, args.roadmap_context)
+    
+    # CORREÇÃO DO NOME DA CLASSE AQUI:
+    mutator = MetabolismMutator()
+    mutator.apply_mutation(args.strategy, args.intent, args.impact, args.roadmap_context)
     sys.exit(0)
