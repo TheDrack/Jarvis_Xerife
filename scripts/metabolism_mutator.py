@@ -13,7 +13,7 @@ class MetabolismMutator:
 
     def _engineering_brainstorm(self, issue_body: str, roadmap_context: str) -> Dict[str, Any]:
         api_key = os.getenv('GROQ_API_KEY')
-        prompt = f"ROADMAP: {roadmap_context}\nMISSÃO: {issue_body}\nRetorne JSON com mission_type, target_files, required_actions, can_auto_implement."
+        prompt = f"ROADMAP: {roadmap_context}\nMISSÃO: {issue_body}\nRetorne JSON: mission_type, target_files, required_actions, can_auto_implement."
         try:
             import requests
             resp = requests.post(self.groq_url, headers={"Authorization": f"Bearer {api_key}"},
@@ -24,7 +24,9 @@ class MetabolismMutator:
             usage = data.get('usage', {})
             content['usage'] = {'total_tokens': usage.get('total_tokens', 0), 'cost': (usage.get('total_tokens', 0)/1e6)*0.7}
             return content
-        except: return {'can_auto_implement': False}
+        except Exception as e:
+            logger.error(f"Erro no brainstorm: {e}")
+            return {'can_auto_implement': False}
 
     def _validate_integrity(self, old_code: str, new_code: str) -> bool:
         old_methods = set(re.findall(r'def\s+(\w+)\s*\(', old_code))
@@ -38,20 +40,22 @@ class MetabolismMutator:
             path = self.repo_path / file_path_str
             if not path.exists(): continue
             current = path.read_text(encoding='utf-8')
-            prompt = f"Implemente a missão mantendo os métodos originais. Use exit_code 124 para Timeout. CÓDIGO:\n{current}"
+            prompt = f"Implemente: {analysis.get('required_actions')}. Use exit_code 124 para Timeout. Retorne código COMPLETO.\nCÓDIGO:\n{current}"
             try:
                 import requests
                 resp = requests.post(self.groq_url, headers={"Authorization": f"Bearer {api_key}"},
                                    json={"model": "llama-3.3-70b-versatile", "messages": [
-                                       {"role": "system", "content": "Retorne APENAS o código Python completo."},
+                                       {"role": "system", "content": "Retorne APENAS o código Python completo. SEM markdown."},
                                        {"role": "user", "content": prompt}], "temperature": 0.1}, timeout=60)
                 new_code = resp.json()['choices'][0]['message']['content']
                 new_code = re.sub(r'```(?:python)?', '', new_code).strip()
+                # Validação de sintaxe básica
                 compile(new_code, file_path_str, 'exec')
                 if self._validate_integrity(current, new_code):
                     path.write_text(new_code, encoding='utf-8')
                     files_changed.append(file_path_str)
-            except: pass
+            except Exception as e:
+                logger.error(f"Erro mutando {file_path_str}: {e}")
         return {'success': len(files_changed) > 0, 'mutation_applied': len(files_changed) > 0, 'files_changed': files_changed}
 
     def apply_mutation(self, strategy: str, intent: str, impact: str, roadmap_context: str = None) -> Dict[str, Any]:
