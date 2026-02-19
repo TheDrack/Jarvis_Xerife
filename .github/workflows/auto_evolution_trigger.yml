@@ -144,6 +144,7 @@ jobs:
 
           echo "🧪 [TESTES] Validando integridade do novo DNA..."
           unset GROQ_API_KEY OPENAI_API_KEY GEMINI_API_KEY
+          # Executa o pytest e captura TUDO
           pytest --json-report --json-report-file=test_report.json > pytest_log.txt 2>&1
           TEST_EXIT_CODE=$?
 
@@ -155,13 +156,13 @@ jobs:
                          --body "### ✅ Evolução Concluída\n- **Missão:** $ISSUE_BODY\n- **Status:** DNA Validado e Saudável." \
                          --base main --head "$BRANCH_NAME"
           else
-            echo "❌ [FALHA] DNA Instável. Erro de Coleta/Execução (Code $TEST_EXIT_CODE):"
+            echo "❌ [FALHA] DNA Instável. Analisando Log Técnico (Code $TEST_EXIT_CODE):"
             echo "-------------------------------------------------------"
-            # Mostramos o TOPO do arquivo se for erro 2, ou o FIM se forem falhas de teste
-            if [ $TEST_EXIT_CODE -eq 2 ]; then
-               head -n 25 pytest_log.txt
+            # Tenta mostrar o erro específico, se não achar, mostra o final do log
+            if grep -q "FAILED" pytest_log.txt; then
+               grep -A 15 -B 2 "FAILED" pytest_log.txt
             else
-               grep -E "^E  |FAILED" pytest_log.txt | tail -n 15
+               tail -n 40 pytest_log.txt
             fi
             echo "-------------------------------------------------------"
             exit 1
