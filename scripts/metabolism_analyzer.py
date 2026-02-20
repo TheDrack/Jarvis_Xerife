@@ -21,15 +21,19 @@ class MetabolismAnalyzer:
         self.min_context_length = 5
 
     def analyze_event(self, intent: str, instruction: str, context: str) -> Dict[str, Any]:
+        # Identifica se é uma evolução para ajustar o rigor, mas não ignora a segurança
+        is_evolution = "DNA Mutated" in context or "Auto-Evolution" in context
         full_context = f"Instrução: {instruction}\nContexto: {context}"
+        
         if len(full_context) < self.min_context_length:
             return self._escalate(EscalationReason.INSUFFICIENT_INFORMATION)
 
+        # Filtros de segurança permanecem ativos mesmo para Auto-Evolução
         if any(kw in full_context.lower() for kw in ['database', 'schema', 'auth', 'delete']):
             return self._escalate(EscalationReason.ARCHITECTURAL_JUDGMENT)
 
-        system_p = "Você é o Mecânico do JARVIS. Responda APENAS JSON: {'requires_human': bool, 'reason': str, 'risk_level': int}"
-        user_p = f"INTENÇÃO: {intent}\nPROPOSTA: {full_context}"
+        system_p = "Você é o Mecânico do JARVIS. Analise se a mudança é segura. Responda APENAS JSON: {'requires_human': bool, 'reason': str, 'risk_level': int}"
+        user_p = f"INTENÇÃO: {intent}\nPROPOSTA: {full_context}\nEVOLUÇÃO: {is_evolution}"
 
         try:
             analysis = self.core.ask_jarvis(system_p, user_p)
