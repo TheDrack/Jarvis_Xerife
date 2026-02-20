@@ -28,20 +28,25 @@
 
    const worker = new Worker(__filename);
 
+   let workerPlaywright;
+
    worker.on('message', async (message) => {
      if (message.type === 'init') {
-       const workerPlaywright = new WorkerPlaywright();
+       workerPlaywright = new WorkerPlaywright();
        await workerPlaywright.init();
        worker.postMessage({ type: 'initialized' });
      } else if (message.type === 'execute') {
-       const workerPlaywright = new WorkerPlaywright();
-       await workerPlaywright.init();
+       if (!workerPlaywright) {
+         workerPlaywright = new WorkerPlaywright();
+         await workerPlaywright.init();
+       }
        const result = await workerPlaywright.execute(message.script);
        worker.postMessage({ type: 'result', result });
-       await workerPlaywright.close();
      } else if (message.type === 'close') {
-       const workerPlaywright = new WorkerPlaywright();
-       await workerPlaywright.close();
+       if (workerPlaywright) {
+         await workerPlaywright.close();
+         workerPlaywright = null;
+       }
        worker.postMessage({ type: 'closed' });
      }
    });
