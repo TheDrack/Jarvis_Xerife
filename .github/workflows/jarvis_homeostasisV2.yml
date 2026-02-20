@@ -15,7 +15,6 @@ permissions:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Condição simplificada para evitar erro de indexação
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
@@ -33,7 +32,8 @@ jobs:
       - name: 🔧 Preparar Ambiente
         run: |
           uv venv --python 3.13
-          uv pip install pytest pytest-json-report requests sqlmodel pydantic groq
+          # Instalando TODAS as dependências para satisfazer o pytest.ini
+          uv pip install pytest pytest-json-report pytest-cov requests sqlmodel pydantic groq
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
       - name: 🔄 Ciclo de Cura e Decisão
@@ -43,11 +43,12 @@ jobs:
         run: |
           ATTEMPT=1
           SUCCESS=false
-          FINAL_MSG="Sem erros"
+          FINAL_MSG="Falha de execução"
 
           while [ $ATTEMPT -le 2 ]; do
             echo "🧪 Tentativa $ATTEMPT..."
             
+            # Tenta rodar o teste. Se passar, SUCESSO.
             if uv run pytest --json-report --json-report-file=report.json tests/; then
               echo "✅ Testes aprovados."
               SUCCESS=true
@@ -55,11 +56,15 @@ jobs:
               break
             fi
             
-            # Extração de log segura para o Mecânico
-            ERR_DATA=$(cat report.json | jq -c '.tests[] | select(.outcome == "failed") | {id: .nodeid, msg: .call.crash.message}' | head -c 500)
+            # Se o relatório não existir (erro de config), gera log genérico
+            if [ ! -f report.json ]; then
+              ERR_DATA="Erro crítico: report.json não gerado. Verifique logs do pytest."
+            else
+              ERR_DATA=$(cat report.json | jq -c '.tests[] | select(.outcome == "failed") | {id: .nodeid, msg: .call.crash.message}' | head -c 500)
+            fi
             
-            # Análise de Risco
-            RISK_OUT=$(uv run python scripts/metabolism_analyzer.py --intent "self-healing" --instruction "Reparo" --context "Err: $ERR_DATA")
+            # Análise de Risco com o Mecânico
+            RISK_OUT=$(uv run python scripts/metabolism_analyzer.py --intent "self-healing" --instruction "Reparo" --context "Log: $ERR_DATA")
             
             if echo "$RISK_OUT" | grep -q '"requires_human": true'; then
               FINAL_MSG=$(echo $RISK_OUT | jq -r '.reason')
@@ -67,7 +72,7 @@ jobs:
               break
             fi
 
-            # Cura Automática
+            # Tentativa de Cura
             uv run python scripts/self_healing_mutator.py --report "report.json"
             
             git config --global user.name "Jarvis-AutoEvolution"
@@ -95,5 +100,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue create --title "🚨 Homeostase V2: @TheDrack" --body "Falha persistente. Motivo: ${{ env.FINAL_REASON }}"
+          gh issue create --title "🚨 Homeostase V2: @TheDrack" --body "O sistema falhou. Motivo: ${{ env.FINAL_REASON }}"
           exit 1
