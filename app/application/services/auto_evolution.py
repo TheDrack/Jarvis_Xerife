@@ -5,57 +5,76 @@ class AutoEvolutionService:
     def __init__(self, roadmap_path="docs/ROADMAP.md"):
         self.roadmap_path = Path(roadmap_path)
 
-    def is_auto_evolution_pr(self, title: str, body: str = "") -> bool:
-        content = f"{title} {body if body else ''}".lower()
-        targets = ["auto evolution", "auto-evolution", "jarvis", "self-evolution"]
-        return any(t in content for t in targets)
+    def parse_roadmap_missions(self):
+        """Varre o ROADMAP e extrai missões pendentes (🔄 ou 📋)."""
+        if not self.roadmap_path.exists():
+            return []
+        
+        content = self.roadmap_path.read_text(encoding='utf-8')
+        missions = []
+        # Regex para capturar linhas que começam com 🔄 ou 📋
+        pattern = re.compile(r"[-*+]\s*([🔄📋])\s*(.*)")
+        
+        current_section = "Geral"
+        for line in content.split('\n'):
+            if line.startswith('## '):
+                current_section = line.replace('## ', '').strip()
+            
+            match = pattern.search(line)
+            if match:
+                status_icon = match.group(1)
+                desc = match.group(2).strip()
+                missions.append({
+                    "description": desc,
+                    "status": "in_progress" if status_icon == "🔄" else "planned",
+                    "section": current_section
+                })
+        return missions
 
-    def get_success_metrics(self):
-        return {"missions_completed": 0, "total_missions": 0, "evolution_rate": 1.0, "error": None}
+    def find_next_mission(self):
+        """Busca a primeira missão pendente no Roadmap."""
+        missions = self.parse_roadmap_missions()
+        # Prioriza as missões 'in_progress' (🔄), depois 'planned' (📋)
+        pending = [m for m in missions if m['status'] == 'in_progress']
+        if not pending:
+            pending = [m for m in missions if m['status'] == 'planned']
+            
+        if not pending:
+            return None
+
+        target = pending[0]
+        return {
+            "mission": target,
+            "description": target['description'],
+            "section": target['section'],
+            "priority": "high" if target['status'] == 'in_progress' else "medium"
+        }
+
+    def find_next_mission_with_auto_complete(self):
+        # Alias para compatibilidade com seu workflow
+        return self.find_next_mission()
+
+    def mark_mission_as_completed(self, mission_description: str) -> bool:
+        """Troca o ícone da missão para ✅ no ROADMAP."""
+        if not self.roadmap_path.exists(): return False
+        content = self.roadmap_path.read_text(encoding='utf-8')
+        
+        # Escapa caracteres especiais da descrição para o Regex
+        safe_desc = re.escape(mission_description)
+        # Procura por 🔄 ou 📋 seguido da descrição
+        pattern = rf"([🔄📋])\s*{safe_desc}"
+        
+        if re.search(pattern, content):
+            # Substitui qualquer um dos ícones por ✅
+            new_content = re.sub(pattern, f"✅ {mission_description}", content)
+            self.roadmap_path.write_text(new_content, encoding='utf-8')
+            print(f"✅ Roadmap atualizado: {mission_description}")
+            return True
+        return False
 
     def get_roadmap_context(self, mission_data):
         if not mission_data: return "No mission context available"
         mission = mission_data.get('mission', mission_data)
-        return (f"MISSÃO: {mission.get('description')}\nCONTEXTO: {mission_data.get('section', 'AGORA')}\n"
-                f"PRIORIDADE: {mission.get('priority', 'high')}\nSTATUS: in_progress")
-
-    def parse_roadmap(self):
-        """Retorna o conteúdo do roadmap ou um dicionário vazio se não existir."""
-        if not self.roadmap_path.exists():
-            return {"total_sections": 0, "sections": [], "content": ""}
-            
-        content = self.roadmap_path.read_text(encoding='utf-8')
-        return {"total_sections": 3, "sections": [], "content": content}
-
-    def _parse_mission_line(self, line):
-        if not any(m in line for m in ["✅", "🔄", "📋", "[ ]", "[x]"]):
-            return None
-        status = "completed" if "✅" in line or "[x]" in line.lower() else "in_progress" if "🔄" in line else "planned"
-        return {"description": line.strip(), "status": status}
-
-    def find_next_mission(self):
-        data = {
-            "description": "Estabilização do Worker Playwright e Execução Efêmera",
-            "priority": "high",
-            "section": "AGORA",
-            "total_sections": 3
-        }
-        data["mission"] = data 
-        return data
-
-    def find_next_mission_with_auto_complete(self):
-        return self.find_next_mission()
-
-    def mark_mission_as_completed(self, mission_description: str) -> bool:
-        if not self.roadmap_path.exists(): return False
-        content = self.roadmap_path.read_text(encoding='utf-8')
-        if f"✅ {mission_description}" in content or f"[x] {mission_description}" in content:
-            return True
-        for m, r in [("🔄 ", "✅ "), ("📋 ", "✅ "), ("[ ] ", "[x] ")]:
-            if m + mission_description in content:
-                self.roadmap_path.write_text(content.replace(m + mission_description, r + mission_description), encoding='utf-8')
-                return True
-        return False
-
-    def is_mission_likely_completed(self, mission_desc: str) -> bool:
-        return any(x in mission_desc.lower() for x in ["✅", "[x]"])
+        return (f"MISSÃO ATUAL: {mission.get('description')}\n"
+                f"SEÇÃO: {mission.get('section')}\n"
+                f"STATUS: {mission.get('status')}")
