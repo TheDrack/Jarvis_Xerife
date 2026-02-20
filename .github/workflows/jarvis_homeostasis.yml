@@ -48,6 +48,7 @@ jobs:
         run: |
           uv run pytest --json-report --json-report-file=report_1.json tests/
 
+
       - name: 🔬 Análise de Risco (Mecânico)
         id: risk_check
         run: |
@@ -59,23 +60,24 @@ jobs:
           fi
 
       - name: ✅ Auto-Merge (Protocolo Voz do Dono)
-        # Só executa se os testes passaram e é uma Pull Request
         if: steps.run_tests.outcome == 'success' && github.event.pull_request.number != null
         env:
           GH_TOKEN: ${{ github.token }}
-          # Mapeamento explícito para o Bash não se perder
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           COMMANDER: "TheDrack"
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "🔬 Analisando autor da PR: $PR_AUTHOR"
+          echo "🔬 Autor Detectado: '$PR_AUTHOR'"
+          echo "🔬 Nível de Risco: '${{ env.HIGH_RISK }}'"
           
-          # Se o autor for você OU se o Mecânico deu sinal verde (HIGH_RISK=false)
-          if [ "$PR_AUTHOR" == "$COMMANDER" ] || [ "${{ env.HIGH_RISK }}" == "false" ]; then
-            echo "🫡 Condições de segurança atingidas (Autor: $PR_AUTHOR / Risco: ${{ env.HIGH_RISK }})."
-            echo "🚀 Executando Merge..."
+          # Ajuste de robustez: Compara strings de forma segura
+          if [ "$PR_AUTHOR" = "$COMMANDER" ]; then
+            echo "🫡 Voz do Dono detectada. Ignorando análise de risco."
+            gh pr merge "$PR_NUMBER" --auto --merge --repo "${{ github.repository }}"
+          elif [ "${{ env.HIGH_RISK }}" = "false" ]; then
+            echo "✅ Risco baixo validado pelo Mecânico. Procedendo com merge automático."
             gh pr merge "$PR_NUMBER" --auto --merge --repo "${{ github.repository }}"
           else
-            echo "⚠️ Merge bloqueado: DNA Sensível detectado em PR de terceiro/IA. Aguardando Comandante."
+            echo "⚠️ Merge Retido: Autor '$PR_AUTHOR' não é o Comandante e o risco é '${{ env.HIGH_RISK }}'."
             exit 0
           fi
