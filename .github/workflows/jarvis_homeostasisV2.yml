@@ -45,21 +45,29 @@ jobs:
           SUCCESS=false
           while [ $ATTEMPT -le 2 ]; do
             echo "🧪 Tentativa $ATTEMPT..."
-            # Roda testes e gera o relatório para o Mutator
+            # Roda testes e gera o relatório
             uv run pytest --json-report --json-report-file=report.json tests/ && SUCCESS=true && break
             
             echo "🔬 Analisando Risco com o Mecânico..."
-            # Usa o MetabolismAnalyzer para checar se é DNA crítico
-            RISK_OUT=$(uv run python scripts/metabolism_analyzer.py --intent "self-healing" --instruction "Reparo de teste" --context "$(cat report.json | jq -c '.summary')")
+            
+            # EXTRAÇÃO DE CONTEXTO: Pegamos o resumo e os detalhes das falhas
+            # Isso garante que ultrapassamos os 100 caracteres do min_context_length
+            ERROR_CONTEXT=$(cat report.json | jq -c '.tests[] | select(.outcome == "failed") | {nodeid, message: .call.crash.message}')
+            SUMMARY_CONTEXT=$(cat report.json | jq -c '.summary')
+            FULL_CTX="Summary: $SUMMARY_CONTEXT | Errors: $ERROR_CONTEXT"
+
+            RISK_OUT=$(uv run python scripts/metabolism_analyzer.py \
+              --intent "self-healing" \
+              --instruction "Reparo de teste" \
+              --context "$FULL_CTX")
             
             if echo "$RISK_OUT" | grep -q '"requires_human": true'; then
-              echo "⚠️ Risco Crítico: Intervenção humana exigida."
+              echo "⚠️ Risco Crítico ou Contexto Insuficiente. Escalando..."
               echo "REASON=$(echo $RISK_OUT | jq -r '.reason')" >> $GITHUB_ENV
               break
             fi
 
             echo "🩹 Aplicando Cura Automática..."
-            # Chama o seu script específico de cura
             uv run python scripts/self_healing_mutator.py --report "report.json"
             
             git config --global user.name "Jarvis-AutoEvolution"
@@ -70,6 +78,7 @@ jobs:
             ATTEMPT=$((ATTEMPT+1))
           done
           echo "final_status=$SUCCESS" >> $GITHUB_OUTPUT
+
 
       - name: ✅ Auto-Merge (Voz do Dono)
         if: steps.healing.outputs.final_status == 'true' && github.event.pull_request.number != null
