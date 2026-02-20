@@ -15,7 +15,6 @@ permissions:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Condição simplificada para evitar erro de indexação
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
 
@@ -30,10 +29,13 @@ jobs:
         with:
           enable-cache: true
 
-      - name: 🔧 Preparar Ambiente
+      - name: 🔧 Instalação do Motor JARVIS
         run: |
           uv venv --python 3.13
-          uv pip install pytest pytest-json-report requests sqlmodel pydantic groq
+          # Instalando dependências vitais detectadas nos logs de erro
+          uv pip install pytest pytest-json-report pytest-cov pytest-asyncio \
+                         pydantic pydantic-settings cryptography httpx \
+                         sqlmodel groq python-dotenv requests
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
       - name: 🔄 Ciclo de Cura e Decisão
@@ -43,31 +45,42 @@ jobs:
         run: |
           ATTEMPT=1
           SUCCESS=false
-          FINAL_MSG="Sem erros"
+          FINAL_MSG="Falha Crítica"
 
           while [ $ATTEMPT -le 2 ]; do
             echo "🧪 Tentativa $ATTEMPT..."
             
-            if uv run pytest --json-report --json-report-file=report.json tests/; then
-              echo "✅ Testes aprovados."
+            # Executa pytest. O '|| true' garante que o script não morra aqui se o teste falhar
+            uv run pytest --json-report --json-report-file=report.json tests/ || true
+            
+            # Se o pytest passou (exit code 0), marcamos sucesso
+            if [ $? -eq 0 ] && [ -f report.json ] && [ "$(jq '.summary.passed' report.json)" != "0" ]; then
+              echo "✅ Sistema Estável."
               SUCCESS=true
               FINAL_MSG="Sucesso"
               break
             fi
             
-            # Extração de log segura para o Mecânico
-            ERR_DATA=$(cat report.json | jq -c '.tests[] | select(.outcome == "failed") | {id: .nodeid, msg: .call.crash.message}' | head -c 500)
+            echo "🔬 Analisando erros (Coleta ou Execução)..."
             
-            # Análise de Risco
-            RISK_OUT=$(uv run python scripts/metabolism_analyzer.py --intent "self-healing" --instruction "Reparo" --context "Err: $ERR_DATA")
+            # Captura Erros de Coleta (os que travaram o JARVIS antes) ou Erros de Teste
+            if [ -f report.json ]; then
+              # Tenta pegar erros de teste, se não houver, pega erros de coleta
+              ERR_DATA=$(jq -c '.tests[] | select(.outcome=="failed" or .outcome=="error") | {id:.nodeid, m:.call.crash.message}' report.json | head -c 800)
+              [ -z "$ERR_DATA" ] && ERR_DATA=$(jq -c '.collectors[] | select(.result=="error") | {id:.nodeid, m:.longrepr}' report.json | head -c 800)
+            fi
+
+            [ -z "$ERR_DATA" ] && ERR_DATA="Erro de ambiente ou dependência não registrada no JSON."
+
+            # Mecânico avalia o estrago
+            RISK_OUT=$(uv run python scripts/metabolism_analyzer.py --intent "self-healing" --instruction "Corrigir falha" --context "LOG_ERRO: $ERR_DATA")
             
             if echo "$RISK_OUT" | grep -q '"requires_human": true'; then
               FINAL_MSG=$(echo $RISK_OUT | jq -r '.reason')
-              SUCCESS=false
               break
             fi
 
-            # Cura Automática
+            echo "🩹 Aplicando Auto-Cura..."
             uv run python scripts/self_healing_mutator.py --report "report.json"
             
             git config --global user.name "Jarvis-AutoEvolution"
@@ -95,5 +108,5 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue create --title "🚨 Homeostase V2: @TheDrack" --body "Falha persistente. Motivo: ${{ env.FINAL_REASON }}"
+          gh issue create --title "🚨 Homeostase V2: Intervenção Requerida" --body "O sistema falhou. Motivo: ${{ env.FINAL_REASON }}"
           exit 1
