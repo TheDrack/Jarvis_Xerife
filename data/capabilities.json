@@ -17,7 +17,9 @@
       "status": "complete",
       "auto": true,
       "priority": 1,
-      "depends_on": ["CAP-001"],
+      "depends_on": [
+        "CAP-001"
+      ],
       "notes": "Chapter: IMMEDIATE_FOUNDATION - Existe infraestrutura de fallback e detecção de capacidade."
     },
     {
@@ -27,7 +29,9 @@
       "status": "complete",
       "auto": true,
       "priority": 1,
-      "depends_on": ["CAP-002"],
+      "depends_on": [
+        "CAP-002"
+      ],
       "notes": "Chapter: IMMEDIATE_FOUNDATION - Implementado no fluxo de Auto-Evolution (scripts/metabolism_mutator.py)."
     },
     {
@@ -37,17 +41,21 @@
       "status": "complete",
       "auto": true,
       "priority": 1,
-      "depends_on": ["CAP-003"],
+      "depends_on": [
+        "CAP-003"
+      ],
       "notes": "Chapter: IMMEDIATE_FOUNDATION - Método _engineering_brainstorm() realiza esta tarefa."
     },
     {
       "id": "CAP-005",
       "title": "Prioritize objectives by systemic impact",
       "description": "Rank technical goals based on how significantly they affect the overall system architecture.",
-      "status": "partial",
+      "status": "complete",
       "auto": true,
       "priority": 1,
-      "depends_on": ["CAP-004"],
+      "depends_on": [
+        "CAP-004"
+      ],
       "notes": "Chapter: IMMEDIATE_FOUNDATION - Lógica de priorização básica presente no seletor de missões."
     },
     {
@@ -57,7 +65,9 @@
       "status": "partial",
       "auto": true,
       "priority": 1,
-      "depends_on": ["CAP-004"],
+      "depends_on": [
+        "CAP-004"
+      ],
       "notes": "Chapter: IMMEDIATE_FOUNDATION - Foco em 'error recovery' e 'timeout handling' no mutador."
     },
     {
@@ -67,7 +77,9 @@
       "status": "complete",
       "auto": true,
       "priority": 1,
-      "depends_on": ["CAP-004"],
+      "depends_on": [
+        "CAP-004"
+      ],
       "notes": "Chapter: IMMEDIATE_FOUNDATION - A arquitetura foi refatorada para ser 100% modular."
     },
     {
@@ -77,7 +89,9 @@
       "status": "complete",
       "auto": true,
       "priority": 1,
-      "depends_on": ["CAP-004"],
+      "depends_on": [
+        "CAP-004"
+      ],
       "notes": "Chapter: IMMEDIATE_FOUNDATION - Mantido via CHANGELOG.md e logs de missões."
     },
     {
@@ -127,7 +141,9 @@
       "status": "complete",
       "auto": true,
       "priority": 1,
-      "depends_on": ["CAP-012"],
+      "depends_on": [
+        "CAP-012"
+      ],
       "notes": "Chapter: IMMEDIATE_FOUNDATION - Fluxo de CI/CD aborta evolução se os testes falharem."
     },
     {
@@ -147,7 +163,9 @@
       "status": "complete",
       "auto": true,
       "priority": 1,
-      "depends_on": ["CAP-008"],
+      "depends_on": [
+        "CAP-008"
+      ],
       "notes": "Chapter: IMMEDIATE_FOUNDATION - O mutador gera arquivos MD para cada implementação."
     },
     {
@@ -157,7 +175,9 @@
       "status": "complete",
       "auto": true,
       "priority": 2,
-      "depends_on": ["CAP-001"],
+      "depends_on": [
+        "CAP-001"
+      ],
       "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - JarvisEngine e CommandProcessor gerenciam isso."
     },
     {
@@ -167,7 +187,9 @@
       "status": "complete",
       "auto": true,
       "priority": 2,
-      "depends_on": ["CAP-003"],
+      "depends_on": [
+        "CAP-003"
+      ],
       "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Realizado via análise de ROADMAP.md."
     },
     {
@@ -177,7 +199,9 @@
       "status": "complete",
       "auto": true,
       "priority": 2,
-      "depends_on": ["CAP-016"],
+      "depends_on": [
+        "CAP-016"
+      ],
       "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Estrutura de injeção de dependência no container.py."
     },
     {
@@ -187,7 +211,9 @@
       "status": "partial",
       "auto": true,
       "priority": 2,
-      "depends_on": ["CAP-016"],
+      "depends_on": [
+        "CAP-016"
+      ],
       "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Lógica básica de identificação de 'Core Features'."
     },
     {
@@ -197,7 +223,9 @@
       "status": "pending",
       "auto": true,
       "priority": 2,
-      "depends_on": ["CAP-016"],
+      "depends_on": [
+        "CAP-016"
+      ],
       "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS"
     },
     {
@@ -207,7 +235,9 @@
       "status": "partial",
       "auto": true,
       "priority": 2,
-      "depends_on": ["CAP-018"],
+      "depends_on": [
+        "CAP-018"
+      ],
       "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Cobertura de testes cruzados no pytest."
     },
     {
@@ -217,7 +247,10 @@
       "status": "partial",
       "auto": true,
       "priority": 2,
-      "depends_on": ["CAP-019", "CAP-021"],
+      "depends_on": [
+        "CAP-019",
+        "CAP-021"
+      ],
       "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Validação Pré-PR no workflow."
     },
     {
@@ -247,7 +280,9 @@
       "status": "complete",
       "auto": true,
       "priority": 2,
-      "depends_on": ["CAP-012"],
+      "depends_on": [
+        "CAP-012"
+      ],
       "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Realizado via validação de lógica nos testes unitários."
     },
     {
@@ -297,7 +332,9 @@
       "status": "pending",
       "auto": true,
       "priority": 3,
-      "depends_on": ["CAP-029"],
+      "depends_on": [
+        "CAP-029"
+      ],
       "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
     },
     {
@@ -317,7 +354,9 @@
       "status": "partial",
       "auto": true,
       "priority": 3,
-      "depends_on": ["CAP-031"],
+      "depends_on": [
+        "CAP-031"
+      ],
       "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Lógica de interpretação de voz vs comando."
     },
     {
@@ -337,7 +376,9 @@
       "status": "pending",
       "auto": true,
       "priority": 3,
-      "depends_on": ["CAP-033"],
+      "depends_on": [
+        "CAP-033"
+      ],
       "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
     },
     {
@@ -347,7 +388,9 @@
       "status": "pending",
       "auto": true,
       "priority": 3,
-      "depends_on": ["CAP-034"],
+      "depends_on": [
+        "CAP-034"
+      ],
       "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
     },
     {
@@ -417,7 +460,9 @@
       "status": "pending",
       "auto": true,
       "priority": 4,
-      "depends_on": ["CAP-041"],
+      "depends_on": [
+        "CAP-041"
+      ],
       "notes": "Chapter: STRATEGIC_REASONING"
     },
     {
@@ -467,7 +512,11 @@
       "status": "pending",
       "auto": true,
       "priority": 4,
-      "depends_on": ["CAP-040", "CAP-043", "CAP-044"],
+      "depends_on": [
+        "CAP-040",
+        "CAP-043",
+        "CAP-044"
+      ],
       "notes": "Chapter: STRATEGIC_REASONING"
     },
     {
@@ -477,7 +526,9 @@
       "status": "complete",
       "auto": true,
       "priority": 4,
-      "depends_on": ["CAP-043"],
+      "depends_on": [
+        "CAP-043"
+      ],
       "notes": "Chapter: STRATEGIC_REASONING - O sistema aborta evolução se não houver mudanças reais ou falha nos testes."
     },
     {
@@ -487,7 +538,9 @@
       "status": "complete",
       "auto": true,
       "priority": 4,
-      "depends_on": ["CAP-011"],
+      "depends_on": [
+        "CAP-011"
+      ],
       "notes": "Chapter: STRATEGIC_REASONING - PR no GitHub exige revisão humana."
     },
     {
@@ -507,7 +560,9 @@
       "status": "complete",
       "auto": true,
       "priority": 5,
-      "depends_on": ["CAP-050"],
+      "depends_on": [
+        "CAP-050"
+      ],
       "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - CommandProcessor roteia para JarvisEngine ou WebNavigator."
     },
     {
@@ -557,7 +612,9 @@
       "status": "complete",
       "auto": true,
       "priority": 5,
-      "depends_on": ["CAP-055"],
+      "depends_on": [
+        "CAP-055"
+      ],
       "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Tratamento de falhas graciosas em pip e timeouts."
     },
     {
@@ -567,7 +624,9 @@
       "status": "partial",
       "auto": true,
       "priority": 5,
-      "depends_on": ["CAP-056"],
+      "depends_on": [
+        "CAP-056"
+      ],
       "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Abort via git checkout/clean."
     },
     {
@@ -577,7 +636,9 @@
       "status": "pending",
       "auto": true,
       "priority": 5,
-      "depends_on": ["CAP-055"],
+      "depends_on": [
+        "CAP-055"
+      ],
       "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION"
     },
     {
@@ -597,7 +658,11 @@
       "status": "partial",
       "auto": true,
       "priority": 5,
-      "depends_on": ["CAP-011", "CAP-048", "CAP-055"],
+      "depends_on": [
+        "CAP-011",
+        "CAP-048",
+        "CAP-055"
+      ],
       "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Fluxo auto_evolution_trigger.yml é autônomo."
     },
     {
@@ -607,7 +672,9 @@
       "status": "partial",
       "auto": true,
       "priority": 6,
-      "depends_on": ["CAP-008"],
+      "depends_on": [
+        "CAP-008"
+      ],
       "notes": "Chapter: DIRECTED_LEARNING - Histórico de falhas analisado no brainstorming."
     },
     {
@@ -617,7 +684,9 @@
       "status": "pending",
       "auto": true,
       "priority": 6,
-      "depends_on": ["CAP-008"],
+      "depends_on": [
+        "CAP-008"
+      ],
       "notes": "Chapter: DIRECTED_LEARNING"
     },
     {
@@ -627,7 +696,9 @@
       "status": "pending",
       "auto": true,
       "priority": 6,
-      "depends_on": ["CAP-062"],
+      "depends_on": [
+        "CAP-062"
+      ],
       "notes": "Chapter: DIRECTED_LEARNING"
     },
     {
@@ -637,7 +708,9 @@
       "status": "pending",
       "auto": true,
       "priority": 6,
-      "depends_on": ["CAP-061"],
+      "depends_on": [
+        "CAP-061"
+      ],
       "notes": "Chapter: DIRECTED_LEARNING"
     },
     {
@@ -657,7 +730,9 @@
       "status": "pending",
       "auto": true,
       "priority": 6,
-      "depends_on": ["CAP-021"],
+      "depends_on": [
+        "CAP-021"
+      ],
       "notes": "Chapter: DIRECTED_LEARNING"
     },
     {
@@ -667,7 +742,9 @@
       "status": "pending",
       "auto": true,
       "priority": 6,
-      "depends_on": ["CAP-044"],
+      "depends_on": [
+        "CAP-044"
+      ],
       "notes": "Chapter: DIRECTED_LEARNING"
     },
     {
@@ -687,7 +764,9 @@
       "status": "pending",
       "auto": true,
       "priority": 6,
-      "depends_on": ["CAP-067"],
+      "depends_on": [
+        "CAP-067"
+      ],
       "notes": "Chapter: DIRECTED_LEARNING"
     },
     {
@@ -697,7 +776,9 @@
       "status": "complete",
       "auto": true,
       "priority": 6,
-      "depends_on": ["CAP-061"],
+      "depends_on": [
+        "CAP-061"
+      ],
       "notes": "Chapter: DIRECTED_LEARNING - Refatoração para OO e remoção de hard-coding."
     },
     {
@@ -707,7 +788,9 @@
       "status": "complete",
       "auto": true,
       "priority": 6,
-      "depends_on": ["CAP-007"],
+      "depends_on": [
+        "CAP-007"
+      ],
       "notes": "Chapter: DIRECTED_LEARNING - Arquitetura modular permite reuso imediato."
     },
     {
@@ -737,7 +820,10 @@
       "status": "pending",
       "auto": true,
       "priority": 7,
-      "depends_on": ["CAP-072", "CAP-073"],
+      "depends_on": [
+        "CAP-072",
+        "CAP-073"
+      ],
       "notes": "Chapter: ECONOMIC_INTELLIGENCE"
     },
     {
@@ -757,7 +843,9 @@
       "status": "pending",
       "auto": true,
       "priority": 7,
-      "depends_on": ["CAP-075"],
+      "depends_on": [
+        "CAP-075"
+      ],
       "notes": "Chapter: ECONOMIC_INTELLIGENCE"
     },
     {
@@ -767,7 +855,9 @@
       "status": "pending",
       "auto": true,
       "priority": 7,
-      "depends_on": ["CAP-076"],
+      "depends_on": [
+        "CAP-076"
+      ],
       "notes": "Chapter: ECONOMIC_INTELLIGENCE"
     },
     {
@@ -777,7 +867,9 @@
       "status": "pending",
       "auto": true,
       "priority": 7,
-      "depends_on": ["CAP-076"],
+      "depends_on": [
+        "CAP-076"
+      ],
       "notes": "Chapter: ECONOMIC_INTELLIGENCE"
     },
     {
@@ -787,7 +879,9 @@
       "status": "pending",
       "auto": true,
       "priority": 7,
-      "depends_on": ["CAP-075"],
+      "depends_on": [
+        "CAP-075"
+      ],
       "notes": "Chapter: ECONOMIC_INTELLIGENCE"
     },
     {
@@ -797,7 +891,9 @@
       "status": "pending",
       "auto": true,
       "priority": 7,
-      "depends_on": ["CAP-075"],
+      "depends_on": [
+        "CAP-075"
+      ],
       "notes": "Chapter: ECONOMIC_INTELLIGENCE"
     },
     {
@@ -807,7 +903,9 @@
       "status": "partial",
       "auto": true,
       "priority": 7,
-      "depends_on": ["CAP-080"],
+      "depends_on": [
+        "CAP-080"
+      ],
       "notes": "Chapter: ECONOMIC_INTELLIGENCE - Evolução autônoma reduz trabalho manual."
     },
     {
@@ -817,7 +915,9 @@
       "status": "pending",
       "auto": true,
       "priority": 7,
-      "depends_on": ["CAP-075"],
+      "depends_on": [
+        "CAP-075"
+      ],
       "notes": "Chapter: ECONOMIC_INTELLIGENCE"
     },
     {
@@ -827,7 +927,9 @@
       "status": "pending",
       "auto": true,
       "priority": 7,
-      "depends_on": ["CAP-082"],
+      "depends_on": [
+        "CAP-082"
+      ],
       "notes": "Chapter: ECONOMIC_INTELLIGENCE"
     },
     {
@@ -837,7 +939,9 @@
       "status": "partial",
       "auto": true,
       "priority": 8,
-      "depends_on": ["CAP-023"],
+      "depends_on": [
+        "CAP-023"
+      ],
       "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Monitoramento via CI/CD detecta anomalias em PRs."
     },
     {
@@ -867,7 +971,9 @@
       "status": "partial",
       "auto": true,
       "priority": 8,
-      "depends_on": ["CAP-043"],
+      "depends_on": [
+        "CAP-043"
+      ],
       "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Remoção de hard-coded paths e credenciais."
     },
     {
@@ -877,7 +983,9 @@
       "status": "complete",
       "auto": true,
       "priority": 8,
-      "depends_on": ["CAP-011"],
+      "depends_on": [
+        "CAP-011"
+      ],
       "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - PR Workflow exige validação."
     },
     {
@@ -887,7 +995,9 @@
       "status": "complete",
       "auto": true,
       "priority": 8,
-      "depends_on": ["CAP-009"],
+      "depends_on": [
+        "CAP-009"
+      ],
       "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Auditável via histórico de Git e logs de missão."
     },
     {
@@ -927,7 +1037,9 @@
       "status": "complete",
       "auto": true,
       "priority": 8,
-      "depends_on": ["CAP-089"],
+      "depends_on": [
+        "CAP-089"
+      ],
       "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Git blame e logs de PR."
     },
     {
@@ -937,7 +1049,9 @@
       "status": "pending",
       "auto": true,
       "priority": 9,
-      "depends_on": ["CAP-033"],
+      "depends_on": [
+        "CAP-033"
+      ],
       "notes": "Chapter: MARVEL_LEVEL_JARVIS"
     },
     {
@@ -947,7 +1061,9 @@
       "status": "pending",
       "auto": true,
       "priority": 9,
-      "depends_on": ["CAP-094"],
+      "depends_on": [
+        "CAP-094"
+      ],
       "notes": "Chapter: MARVEL_LEVEL_JARVIS"
     },
     {
@@ -957,7 +1073,10 @@
       "status": "partial",
       "auto": true,
       "priority": 9,
-      "depends_on": ["CAP-060", "CAP-095"],
+      "depends_on": [
+        "CAP-060",
+        "CAP-095"
+      ],
       "notes": "Chapter: MARVEL_LEVEL_JARVIS - Evolução autônoma é uma ação proativa."
     },
     {
@@ -987,7 +1106,9 @@
       "status": "complete",
       "auto": true,
       "priority": 9,
-      "depends_on": ["CAP-032"],
+      "depends_on": [
+        "CAP-032"
+      ],
       "notes": "Chapter: MARVEL_LEVEL_JARVIS - Alinhado via ROADMAP.md controlado pelo usuário."
     },
     {
@@ -997,7 +1118,9 @@
       "status": "complete",
       "auto": true,
       "priority": 9,
-      "depends_on": ["CAP-102"],
+      "depends_on": [
+        "CAP-102"
+      ],
       "notes": "Chapter: MARVEL_LEVEL_JARVIS - Fluxo de Auto-Evolution garante evolução contínua."
     },
     {
@@ -1007,7 +1130,9 @@
       "status": "pending",
       "auto": true,
       "priority": 9,
-      "depends_on": ["CAP-080"],
+      "depends_on": [
+        "CAP-080"
+      ],
       "notes": "Chapter: MARVEL_LEVEL_JARVIS"
     },
     {
@@ -1017,7 +1142,9 @@
       "status": "partial",
       "auto": true,
       "priority": 9,
-      "depends_on": ["CAP-098"],
+      "depends_on": [
+        "CAP-098"
+      ],
       "notes": "Chapter: MARVEL_LEVEL_JARVIS - O sistema já possui ports/adapters para ser expansível."
     }
   ]
