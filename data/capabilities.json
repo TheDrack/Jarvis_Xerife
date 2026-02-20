@@ -62,7 +62,7 @@
       "id": "CAP-006",
       "title": "Prioritize objectives by failure reduction",
       "description": "Rank goals based on their ability to minimize system errors and downtime.",
-      "status": "partial",
+      "status": "complete",
       "auto": true,
       "priority": 1,
       "depends_on": [
