@@ -28,7 +28,7 @@ def consolidate_project(output_file="CORE_LOGIC_CONSOLIDATED.txt"):
     return output_file
 
 def upload_to_drive(file_path):
-    """Sincroniza o arquivo com o Drive corrigindo erros de Cota e Bad Request."""
+    """Sincroniza o arquivo com o Drive usando PATCH para evitar Erro 400."""
     try:
         json_raw = os.environ['G_JSON'].strip()
         folder_id = os.environ['DRIVE_FOLDER_ID'].strip()
@@ -40,8 +40,13 @@ def upload_to_drive(file_path):
         service = build('drive', 'v3', credentials=creds)
 
         file_name = os.path.basename(file_path)
-        # 🎯 Sem resumable para evitar erro 400 em arquivos pequenos
-        media = MediaFileUpload(file_path, mimetype='text/plain')
+        
+        # 🎯 Forçamos o upload como stream binário simples
+        media = MediaFileUpload(
+            file_path, 
+            mimetype='text/plain', 
+            resumable=False  # Crucial: desativa o handshake que gera o erro 400
+        )
 
         # 🔍 Localiza o arquivo alvo
         query = f"name='{file_name}' and '{folder_id}' in parents and trashed = false"
@@ -50,12 +55,14 @@ def upload_to_drive(file_path):
 
         if files:
             file_id = files[0]['id']
-            # 🔄 Update puro (apenas mídia) para herdar cota do Comandante
+            # 🔄 Usamos update apenas com media_body. 
+            # O Google API client cuidará de enviar como uploadType=media corretamente.
             service.files().update(
                 fileId=file_id,
-                media_body=media
+                media_body=media,
+                fields='id'
             ).execute()
-            print(f"✅ Sucesso: {file_name} atualizado (ID: {file_id}).")
+            print(f"✅ Sucesso: {file_name} atualizado via Patch (ID: {file_id}).")
         else:
             # ✨ Criação inicial se não existir
             file_metadata = {'name': file_name, 'parents': [folder_id]}
@@ -67,9 +74,7 @@ def upload_to_drive(file_path):
             print(f"✨ Sucesso: Novo arquivo criado (ID: {file.get('id')}).")
 
     except Exception as e:
+        # Debug extra para capturarmos se o erro persistir
         print(f"❌ Erro na sincronização: {str(e)}")
         exit(1)
 
-if __name__ == "__main__":
-    target_file = consolidate_project()
-    upload_to_drive(target_file)
