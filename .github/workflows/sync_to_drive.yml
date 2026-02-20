@@ -26,12 +26,10 @@ jobs:
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          # 🎯 Executa o consolidator garantindo o path
-          if [ -f "app/adapters/infrastructure/consolidator.py" ]; then
-            python app/adapters/infrastructure/consolidator.py
-          elif [ -f "app/infrastructure/consolidator.py" ]; then
+          # 🎯 Ajustado para o caminho: app/infrastructure/consolidator.py
+          if [ -f "app/infrastructure/consolidator.py" ]; then
             python app/infrastructure/consolidator.py
           else
-            echo "❌ Erro: consolidator.py não encontrado."
+            echo "❌ Erro: consolidator.py não encontrado em app/infrastructure/"
             exit 1
           fi
