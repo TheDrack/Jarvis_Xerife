@@ -1,112 +1,67 @@
-# -*- coding: utf-8 -*-
-import os, sys, json, re, argparse, logging
-from pathlib import Path
+import os
+import sys
+import json
+import argparse
+from app.application.services.auto_evolution import AutoEvolutionService
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-logger = logging.getLogger("Mutator")
-
-class MetabolismMutator:
-    def __init__(self, repo_path=None):
-        self.repo_path = Path(repo_path) if repo_path else Path(os.getcwd())
-        self.groq_url = "https://api.groq.com/openai/v1/chat/completions"
-
-    def apply_mutation(self, strategy, intent, impact, roadmap_context):
-        issue_body = os.getenv('ISSUE_BODY', 'Evolução')
-        api_key = os.getenv('GROQ_API_KEY')
-
-        if not api_key:
-            logger.error("GROQ_API_KEY não encontrada.")
-            return {'success': False}
-
-        try:
-            import requests
-        except ImportError:
-            import subprocess
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
-            import requests
-
-        # --- PASSO 1: ARQUITETURA ---
-        analysis_prompt = f"""
-        Missão: {issue_body}
-        Contexto do Roadmap: {roadmap_context}
-        Decida qual arquivo deve ser criado ou editado.
-        DIRETRIZES:
-        - Serviços: 'app/application/services/'
-        - Infra: 'app/adapters/infrastructure/'
-        - Scripts: 'scripts/'
-        Retorne um JSON com: "target_file", "action", "reason".
-        """
-
-        try:
-            resp_analysis = requests.post(self.groq_url, headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [{"role": "system", "content": "Arquiteto Senior. JSON puro."}, {"role": "user", "content": analysis_prompt}],
-                    "response_format": {"type": "json_object"}
-                }, timeout=30)
-
-            if resp_analysis.status_code != 200:
-                logger.error(f"Erro API Arquitetura: {resp_analysis.text}")
-                return {'success': False}
-
-            analysis_data = json.loads(resp_analysis.json()['choices'][0]['message']['content'])
-            target_file = analysis_data['target_file']
-            logger.info(f"🎯 Alvo: {target_file}")
-
-            path = self.repo_path / target_file
-            path.parent.mkdir(parents=True, exist_ok=True)
-            current_code = path.read_text(encoding='utf-8') if path.exists() else "# Novo arquivo JARVIS"
-
-            # --- PASSO 2: ENGENHARIA ---
-            mutation_prompt = f"Missão: {issue_body}\nArquivo: {target_file}\nCÓDIGO ATUAL:\n{current_code}\nRetorne JSON com 'code' e 'summary'."
-
-            resp_mutation = requests.post(self.groq_url, headers={"Authorization": f"Bearer {api_key}"},
-                json={
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [
-                        {"role": "system", "content": "Engenheiro Senior. Responda APENAS JSON. Campo 'code' deve ter o arquivo COMPLETO."},
-                        {"role": "user", "content": mutation_prompt}
-                    ],
-                    "response_format": {"type": "json_object"},
-                    "temperature": 0.1
-                }, timeout=60)
-
-            if resp_mutation.status_code != 200:
-                logger.error(f"Erro API Engenharia: {resp_mutation.text}")
-                return {'success': False}
-
-            data = resp_mutation.json()
-            if 'choices' not in data:
-                logger.error("Resposta da API sem 'choices'")
-                return {'success': False}
-
-            content = json.loads(data['choices'][0]['message']['content'])
-            new_code = content.get('code', "")
-            summary = content.get('summary', "")
-
-            if isinstance(summary, list): 
-                summary = "\n".join([f"- {item}" for item in summary])
-
-            if len(new_code.strip()) > 20:
-                path.write_text(new_code, encoding='utf-8')
-                (self.repo_path / "mutation_summary.txt").write_text(str(summary), encoding='utf-8')
-                logger.info(f"✅ DNA mutado: {target_file}")
-                return {'success': True}
-
-        except Exception as e:
-            logger.error(f"❌ Falha crítica: {e}")
-
-        return {'success': False}
-
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--strategy', required=True)
-    parser.add_argument('--intent', required=True)
-    parser.add_argument('--impact', required=True)
-    parser.add_argument('--roadmap-context', default="")
+    parser.add_argument("--strategy", type=str, default="minimal_change")
+    parser.add_argument("--intent", type=str, required=True)
+    parser.add_argument("--roadmap-context", type=str, default="")
     args = parser.parse_args()
+
+    auto = AutoEvolutionService()
     
-    # CORREÇÃO DO NOME DA CLASSE AQUI:
-    mutator = MetabolismMutator()
-    mutator.apply_mutation(args.strategy, args.intent, args.impact, args.roadmap_context)
-    sys.exit(0)
+    # 1. LÓGICA DE AUTO-CURA (FIX TEST FAILURE)
+    if args.intent == "fix-test-failure":
+        print("🔧 Iniciando protocolo de Auto-Cura...")
+        report_path = "report.json"
+        error_context = ""
+        
+        if os.path.exists(report_path):
+            with open(report_path, 'r') as f:
+                report = json.load(f)
+                # Extrai apenas falhas para o contexto
+                failures = [test for test in report.get("tests", []) if test.get("outcome") == "failed"]
+                error_context = json.dumps(failures, indent=2)
+        
+        # Aqui o Mutador chama a LLM passando o código + error_context
+        # (A lógica de chamada à LLM já existe no seu CORE_LOGIC)
+        success = auto.apply_mutation(intent=args.intent, context=error_context)
+        sys.exit(0 if success else 1)
+
+    # 2. LÓGICA DE AUTO-EVOLUÇÃO (ROADMAP)
+    elif args.intent == "auto-evolution-mission":
+        print("🧬 Iniciando evolução via Roadmap...")
+        mission_data = auto.find_next_mission_with_auto_complete()
+        
+        if not mission_data:
+            print("📭 Nenhuma missão pendente.")
+            sys.exit(0)
+
+        mission_desc = mission_data['mission']['description']
+        context = auto.get_roadmap_context(mission_data)
+        
+        # Cria branch para a evolução
+        branch_name = f"auto-evolution/mission-{os.popen('date +%s').read().strip()}"
+        os.system(f"git checkout -b {branch_name}")
+        
+        # Executa a mutação no código
+        success = auto.apply_mutation(intent=mission_desc, context=context)
+        
+        if success:
+            # Commit das alterações (ignorando logs)
+            os.system("git add -A && git reset .github/metabolism_logs/")
+            if os.popen("git status --porcelain").read().strip():
+                os.system(f"git config user.name 'Jarvis-AutoEvolution'")
+                os.system(f"git config user.email 'jarvis@bot.com'")
+                os.system(f"git commit -m '[Auto-Evolution] DNA Mutated: {mission_desc}'")
+                os.system(f"git push origin {branch_name}")
+                print(f"✅ Mutação aplicada na branch {branch_name}")
+            else:
+                print("⚠️ Nenhuma mudança de código gerada.")
+        sys.exit(0 if success else 1)
+
+if __name__ == "__main__":
+    main()
