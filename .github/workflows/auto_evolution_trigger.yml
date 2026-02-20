@@ -84,3 +84,76 @@ jobs:
                       f.write("should_evolve=true\n")
                       f.write(f"capability_id={next_cap['id']}\n")
           PYCODE
+
+# ==================================================
+  # 2. ANÁLISE: Seleção por Capability + Risco
+  # ==================================================
+  find_and_analyze:
+    name: "🎯 Seleção e Análise por Capability"
+    needs: process_evolution
+    if: needs.process_evolution.outputs.should_evolve == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      has_mission: ${{ steps.select.outputs.has_mission }}
+      capability_id: ${{ steps.select.outputs.capability_id }}
+      capability_name: ${{ steps.select.outputs.capability_name }}
+      requires_human: ${{ steps.analyzer.outputs.requires_human }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Instalar Dependências
+        run: pip install pydantic sqlmodel requests
+
+      - name: 🎯 Seleção de Capability
+        id: select
+        run: |
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
+          python - << 'PYCODE'
+          import os
+          from app.application.services.auto_evolution import AutoEvolutionService
+
+          auto = AutoEvolutionService()
+          cap = auto.find_next_capability()
+
+          if not cap:
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("has_mission=false\n")
+          else:
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("has_mission=true\n")
+                  f.write(f"capability_id={cap['id']}\n")
+                  f.write(f"capability_name={cap['capability_name']}\n")
+
+              with open("capability_context.txt", "w") as ctx:
+                  ctx.write(f"CAPABILITY ID: {cap['id']}\n")
+                  ctx.write(f"NAME: {cap['capability_name']}\n")
+                  ctx.write(f"CHAPTER: {cap['chapter']}\n")
+                  ctx.write(f"CURRENT STATUS: {cap['status']}\n")
+          PYCODE
+
+      - name: 🔬 Mecânico Revisionador (Análise de Risco)
+        if: steps.select.outputs.has_mission == 'true'
+        id: analyzer
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          python scripts/metabolism_analyzer.py \
+            --intent "auto-evolution" \
+            --instruction "Implement capability: ${{ steps.select.outputs.capability_name }}" \
+            --context "$(cat capability_context.txt)" \
+            --repo-path "."
+
+      - name: Upload Context
+        if: steps.select.outputs.has_mission == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: capability-context
+          path: |
+            capability_context.txt
+            .github/metabolism_logs/
