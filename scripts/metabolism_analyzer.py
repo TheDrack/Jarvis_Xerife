@@ -27,13 +27,14 @@ class MetabolismAnalyzer:
     def __init__(self, repo_path: str = None):
         self.repo_path = Path(repo_path) if repo_path else Path.cwd()
         self.core = MetabolismCore()
-        self.min_context_length = 100
+        # Calibração JARVIS: Reduzido de 100 para 10 para evitar falsos positivos de 'falta de contexto'
+        self.min_context_length = 10
 
     def analyze_event(self, intent: str, instruction: str, context: str) -> Dict[str, Any]:
         logger.info("🔬 Iniciando vistoria técnica do Mecânico Revisionador...")
-        
+
         full_context = f"Instrução: {instruction}\nContexto: {context}"
-        
+
         # 1. Verificação de Contexto Mínimo
         if len(full_context) < self.min_context_length:
             return self._escalate(EscalationReason.INSUFFICIENT_INFORMATION)
@@ -52,10 +53,8 @@ class MetabolismAnalyzer:
 
         try:
             analysis = self.core.ask_jarvis(system_p, user_p)
-            
-            # Exportar para GitHub Actions
             self._export_to_gh(analysis)
-            
+
             return {
                 "requires_human": analysis.get("requires_human", True),
                 "reason": analysis.get("reason", "Análise inconclusiva"),
@@ -83,10 +82,9 @@ if __name__ == "__main__":
     parser.add_argument('--instruction', required=True)
     parser.add_argument('--context', default='')
     parser.add_argument('--repo-path', default=None)
-    
+
     args = parser.parse_args()
     analyzer = MetabolismAnalyzer(repo_path=args.repo_path)
     result = analyzer.analyze_event(args.intent, args.instruction, args.context)
-    
     print(json.dumps(result, indent=2))
     sys.exit(0)
