@@ -32,30 +32,36 @@ class MetabolismCore:
         try:
             resp = requests.post(self.url, headers=headers, json=payload, timeout=60)
             
-            # Tratamento para erro de validação de JSON da própria Groq
             if resp.status_code != 200:
                 if "json_validate_failed" in resp.text:
-                    # Tira a exigência de json_object e tenta de novo como texto puro
                     payload.pop("response_format", None)
                     resp = requests.post(self.url, headers=headers, json=payload, timeout=60)
                 else:
                     raise Exception(f"Erro na API Groq: {resp.text}")
 
             full_content = resp.json()['choices'][0]['message']['content']
-            
-            # --- LIMPADOR DE DNA (REGEX) ---
-            # Tenta encontrar o bloco JSON mesmo que a IA tenha enviado texto extra
             return self._safe_json_decode(full_content)
 
         except Exception as e:
             raise Exception(f"Falha na comunicação com o Cérebro: {str(e)}")
 
     def _safe_json_decode(self, content):
-        """
-        Extrai e limpa o JSON de strings sujas ou blocos markdown.
-        """
+        """Extrai e limpa o JSON de strings sujas ou blocos markdown."""
         try:
-            # Tentativa 1: Decodificação direta
             return json.loads(content)
         except json.JSONDecodeError:
-            # Tent
+            # Tenta encontrar o padrão {...}
+            match = re.search(r'(\{.*\})', content, re.DOTALL)
+            if match:
+                try:
+                    return json.loads(match.group(1))
+                except Exception:
+                    # Se falhar o load do match, segue para sanitização manual
+                    pass
+            
+            # Limpeza agressiva de quebras de linha que quebram o JSON
+            sanitized = content.replace('\n', '\\n').replace('\r', '\\r')
+            try:
+                return json.loads(sanitized)
+            except Exception as e:
+                raise Exception(f"DNA corrompido para decodificação: {str(e)}")
