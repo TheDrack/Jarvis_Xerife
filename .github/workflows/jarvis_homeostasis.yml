@@ -16,6 +16,8 @@ permissions:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
+    # Evita rodar duplicado se for um push em uma branch com PR aberta
+    if: github.event_name == 'pull_request_target' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     steps:
@@ -43,26 +45,27 @@ jobs:
         run: |
           uv run pytest --json-report --json-report-file=report_1.json tests/
 
-      - name: ✅ Auto-Merge (Comando Direto ou Sucesso JARVIS)
-        # Se os testes passaram:
-        # 1. É PR e você é o autor? MERGE (Ignora risco).
-        # 2. É PR e o Jarvis propôs? MERGE (Mecânico já validou no passo anterior).
-        if: steps.run_tests.outcome == 'success' && github.event.pull_request.number != null
+      - name: 🔬 Análise de Risco (Mecânico Revisionador)
+        id: risk_check
+        run: |
+          uv run python scripts/metabolism_analyzer.py --intent "auto-evolution" --instruction "Validar autonomia" --repo-path "." > analysis_result.txt
+          if grep -q '"requires_human": true' analysis_result.txt; then
+            echo "high_risk=true" >> $GITHUB_ENV
+          else
+            echo "high_risk=false" >> $GITHUB_ENV
+          fi
+
+      - name: ✅ Auto-Merge
+        if: |
+          steps.run_tests.outcome == 'success' && 
+          github.event.pull_request.number != null && 
+          (github.event.pull_request.user.login == 'TheDrack' || env.high_risk == 'false')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-          COMMANDER="TheDrack" 
-          
-          if [ "$PR_AUTHOR" == "$COMMANDER" ]; then
-            echo "🫡 Comando direto detectado. Ignorando restrições de DNA."
-            gh pr merge "${{ github.event.pull_request.number }}" --auto --merge --repo "${{ github.repository }}"
-          else
-            # Para outros autores ou automações, o merge só ocorre se não houve bloqueio prévio
-            gh pr merge "${{ github.event.pull_request.number }}" --auto --merge --repo "${{ github.repository }}"
-          fi
+          gh pr merge "${{ github.event.pull_request.number }}" --auto --merge --repo "${{ github.repository }}"
 
-      - name: 🔧 Ciclo de Cura 1
+      - name: 🔧 Ciclo de Cura
         if: steps.run_tests.outcome == 'failure'
         id: heal_step_1
         env:
@@ -70,36 +73,32 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           uv run python scripts/self_healing_mutator.py --report "report_1.json"
-          uv run python scripts/metabolism_analyzer.py --intent "auto-fix" --instruction "Reparar falhas" --repo-path "." > analysis_1.txt
           
-          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
-          COMMANDER="TheDrack"
-
-          # Se falhou e foi VOCÊ que subiu, o Jarvis tenta curar mas NÃO bloqueia por risco arquitetural
-          if grep -q '"requires_human": true' analysis_1.txt && [ "$PR_AUTHOR" != "$COMMANDER" ]; then
+          # Definição segura da branch de destino
+          TARGET_BRANCH="${{ github.event.pull_request.head.ref || 'main' }}"
+          PR_USER="${{ github.event.pull_request.user.login || github.actor }}"
+          
+          if [ "${{ env.high_risk }}" == "true" ] && [ "$PR_USER" != "TheDrack" ]; then
             echo "stop_healing=true" >> $GITHUB_ENV
           else
             git config --global user.name "Jarvis-AutoCura"
             git config --global user.email "jarvis@bot.com"
             git add .
-            git commit -m "🤖 [Auto-Cura] Aplicando correção"
-            TARGET_REF=${{ github.event.pull_request.head.ref || 'main' }}
-            git push origin HEAD:$TARGET_REF
+            git commit -m "🤖 [Auto-Cura] Evolução validada" || echo "Nada para commitar"
+            
+            # 🚀 Push corrigido com fallback para main
+            git push origin HEAD:$TARGET_BRANCH
             uv run pytest --json-report --json-report-file=report_2.json tests/ || echo "still_failing=true" >> $GITHUB_ENV
           fi
 
-      - name: 🚨 Escalonar ao Comandante
+      - name: 🚨 Escalonar
         if: always() && (env.final_failure == 'true' || env.stop_healing == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           PR_NUMBER="${{ github.event.pull_request.number || github.event.number }}"
-          REPO="${{ github.repository }}"
-          
           if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
-            gh pr edit "$PR_NUMBER" --add-label "commander-review" --repo "$REPO"
-            gh pr comment "$PR_NUMBER" --repo "$REPO" --body "## 🚨 INTERVENÇÃO NECESSÁRIA
-            O metabolismo identificou um cenário que exige sua supervisão.
-            - **Motivo**: ${{ env.stop_healing == 'true' && 'Risco Arquitetural (Automação)' || 'Falha persistente nos testes' }}
-            _Analise os logs para restaurar a homeostase._"
+            gh pr edit "$PR_NUMBER" --add-label "commander-review" --repo "${{ github.repository }}"
+            gh pr comment "$PR_NUMBER" --repo "${{ github.repository }}" --body "## 🚨 INTERVENÇÃO NECESSÁRIA
+            Risco ou Falha detectada: ${{ env.stop_healing == 'true' && 'DNA Sensível' || 'Erro persistente' }}."
           fi
