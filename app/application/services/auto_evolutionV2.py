@@ -29,12 +29,12 @@ class AutoEvolutionServiceV2:
         )
 
     def get_success_metrics(self) -> Dict:
-        """Calcula métricas reais baseadas nos 102 itens de capacidade."""
+        """Calcula métricas reais baseadas nos itens de capacidade."""
         data = self._load_data()
         caps = data.get("capabilities", [])
         total = len(caps)
         completed = len([c for c in caps if c.get("status") == "complete"])
-        
+
         return {
             "missions_completed": completed,
             "total_missions": total,
@@ -44,30 +44,49 @@ class AutoEvolutionServiceV2:
 
     def find_next_mission(self) -> Optional[Dict]:
         """
-        Algoritmo de seleção:
-        1. Filtra itens não completados.
-        2. Valida se TODAS as dependências em 'depends_on' estão 'complete'.
-        3. Prioriza pelo menor valor numérico no campo 'priority'.
+        Algoritmo de seleção baseado em Dependências e Prioridade.
         """
         data = self._load_data()
         caps = data.get("capabilities", [])
         completed_ids = {c["id"] for c in caps if c.get("status") == "complete"}
-        
+
         pending = [c for c in caps if c.get("status") != "complete"]
-        # Ordenação por prioridade (1 é maior que 2)
+        # Prioridade 1 vem antes de 2
         pending.sort(key=lambda x: x.get("priority", 99))
 
         for cap in pending:
             deps = cap.get("depends_on", [])
-            # Só avança se não houver dependências ou se todas estiverem no set de completas
             if not deps or all(d in completed_ids for d in deps):
+                # Retornamos o objeto completo para o contexto
                 return {
                     "mission": cap,
                     "id": cap.get("id"),
                     "title": cap.get("title"),
-                    "context": cap.get("notes", "N/A")
+                    "description": cap.get("description", ""),
+                    "notes": cap.get("notes", "N/A"),
+                    "priority": cap.get("priority", 3)
                 }
         return None
+
+    def get_roadmap_context(self, mission_data: Dict) -> str:
+        """
+        Transforma os dados da missão em texto para a IA.
+        Soluciona o erro: 'AutoEvolutionServiceV2' object has no attribute 'get_roadmap_context'
+        """
+        if not mission_data:
+            return "No mission context available"
+        
+        # Extrai a missão do dicionário retornado pelo find_next_mission
+        cap = mission_data.get('mission', mission_data)
+        
+        return (
+            f"IDENTIFICADOR: {cap.get('id')}\n"
+            f"CAPACIDADE: {cap.get('title')}\n"
+            f"DESCRIÇÃO: {cap.get('description')}\n"
+            f"DEPENDÊNCIAS: {', '.join(cap.get('depends_on', []))}\n"
+            f"NOTAS/CAPÍTULO: {cap.get('notes', 'N/A')}\n"
+            f"STATUS: {cap.get('status', 'pending')}"
+        )
 
     def mark_mission_as_completed(self, cap_id: str) -> bool:
         """Atualiza o status no JSON usando o ID único."""
@@ -78,7 +97,7 @@ class AutoEvolutionServiceV2:
                 cap["status"] = "complete"
                 found = True
                 break
-        
+
         if found:
             self._save_data(data)
         return found
