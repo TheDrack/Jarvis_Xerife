@@ -4,10 +4,6 @@ on:
   pull_request:
     branches: [ main ]
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
   homeostasis:
     runs-on: ubuntu-latest
@@ -21,28 +17,22 @@ jobs:
           uv pip install pytest pytest-json-report requests sqlmodel pydantic groq
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
-      - name: 🧪 Testes e Auto-Cura (Loop)
+      - name: 🧪 Ciclo de Testes e Correção
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          # Tentativa 1
+          # O mutador aqui deve ser chamado com a flag de correção de erro se o pytest falhar
           uv run pytest --json-report --json-report-file=report.json tests/ || (
-            # Se falhar, Mutador age (Retry 1)
-            uv run python scripts/metabolism_mutator.py --strategy "minimal_change" --intent "fix-test-failure"
-            uv run pytest --json-report --json-report-file=report.json tests/ || (
-              # Se falhar denovo, Mutador age (Retry 2)
-              uv run python scripts/metabolism_mutator.py --strategy "minimal_change" --intent "fix-test-failure"
-              uv run pytest tests/
-            )
+            uv run python scripts/metabolism_mutator.py --strategy "minimal_change" --intent "fix-test-failure" &&
+            uv run pytest tests/
           )
 
-      - name: 🔬 Risco e Merge
+      - name: 🔬 Validação de Risco e Auto-Merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # O Analyzer decide se o risco permite merge automático
           uv run python scripts/metabolism_analyzer.py --intent "auto-evolution" --repo-path "." > analysis.txt
-          if [ "${{ github.event.pull_request.user.login }}" = "TheDrack" ] || ! grep -q '"requires_human": true' analysis.txt; then
+          if [ "${{ github.event.pull_request.user.login }}" = "TheDrack" ] || grep -q '"requires_human": false' analysis.txt; then
             gh pr merge ${{ github.event.pull_request.number }} --auto --merge
-          else
-            exit 1
           fi
