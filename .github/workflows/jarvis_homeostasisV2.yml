@@ -1,4 +1,4 @@
-name: "🧬 JARVIS: Homeostase e Auto-Cura"
+name: "🧬 JARVIS: Homeostase e Auto-Cura V2"
 
 on:
   push:
@@ -15,8 +15,10 @@ permissions:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Evita rodar em commits de sincronização do próprio bot
-    if: (github.event_name == 'pull_request') || (github.event_name == 'push' && !contains(github.event.head_commit.message, '[Auto-Evolution]'))
+    # Evita loops infinitos de commits de auto-cura ou sincronização
+    if: |
+      (github.event_name == 'pull_request') || 
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '[Auto-Cura]') && !contains(github.event.head_commit.message, '[Auto-Evolution]'))
     runs-on: ubuntu-latest
 
     steps:
@@ -30,70 +32,91 @@ jobs:
         with:
           enable-cache: true
 
-      - name: 🔧 Ambiente
+      - name: 🔧 Preparar Ambiente
         run: |
           uv venv --python 3.13
           uv pip install pytest pytest-json-report requests sqlmodel pydantic groq
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
-      - name: 🔄 Ciclo de Cura (Até 2 Tentativas)
-        id: healing
+      - name: 🔄 Ciclo de Cura e Decisão
+        id: healing_process
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           ATTEMPT=1
           SUCCESS=false
-          while [ $ATTEMPT -le 2 ]; do
-            echo "🧪 Tentativa $ATTEMPT..."
-            # Roda testes e gera o relatório
-            uv run pytest --json-report --json-report-file=report.json tests/ && SUCCESS=true && break
-            
-            echo "🔬 Analisando Risco com o Mecânico..."
-            
-            # EXTRAÇÃO DE CONTEXTO: Pegamos o resumo e os detalhes das falhas
-            # Isso garante que ultrapassamos os 100 caracteres do min_context_length
-            ERROR_CONTEXT=$(cat report.json | jq -c '.tests[] | select(.outcome == "failed") | {nodeid, message: .call.crash.message}')
-            SUMMARY_CONTEXT=$(cat report.json | jq -c '.summary')
-            FULL_CTX="Summary: $SUMMARY_CONTEXT | Errors: $ERROR_CONTEXT"
+          REASON="Testes falharam persistentemente"
 
+          while [ $ATTEMPT -le 2 ]; do
+            echo "🧪 Tentativa de Teste $ATTEMPT..."
+            
+            # 1. Execução do Teste
+            if uv run pytest --json-report --json-report-file=report.json tests/; then
+              echo "✅ SUCESSO: Testes aprovados."
+              SUCCESS=true
+              break
+            fi
+            
+            echo "🔬 Falha detectada. Consultando o Mecânico..."
+            
+            # 2. Preparação de contexto rico para o Mecânico (evita erro de 'informação insuficiente')
+            ERROR_DATA=$(cat report.json | jq -c '.tests[] | select(.outcome == "failed") | {id: .nodeid, err: .call.crash.message}' | head -c 1200)
+            SUMMARY_DATA=$(cat report.json | jq -c '.summary')
+            
             RISK_OUT=$(uv run python scripts/metabolism_analyzer.py \
               --intent "self-healing" \
-              --instruction "Reparo de teste" \
-              --context "$FULL_CTX")
+              --instruction "Análise de falha de teste" \
+              --context "Summary: $SUMMARY_DATA | Failures: $ERROR_DATA")
             
+            # 3. Verificação de Risco
             if echo "$RISK_OUT" | grep -q '"requires_human": true'; then
-              echo "⚠️ Risco Crítico ou Contexto Insuficiente. Escalando..."
-              echo "REASON=$(echo $RISK_OUT | jq -r '.reason')" >> $GITHUB_ENV
+              REASON=$(echo $RISK_OUT | jq -r '.reason')
+              echo "⚠️ BLOQUEIO: Mecânico exige intervenção humana. Motivo: $REASON"
+              SUCCESS=false
               break
             fi
 
-            echo "🩹 Aplicando Cura Automática..."
+            echo "🩹 Iniciando Mutação de Cura..."
+            # 4. Aplicação da Cura
             uv run python scripts/self_healing_mutator.py --report "report.json"
             
+            # 5. Commit da correção para a branch
             git config --global user.name "Jarvis-AutoEvolution"
             git config --global user.email "jarvis@bot.com"
             git add -A
-            git commit -m "🤖 [Auto-Cura] Tentativa de correção #$ATTEMPT"
+            git commit -m "🤖 [Auto-Cura] Correção aplicada (Tentativa $ATTEMPT)" || echo "Nenhuma mudança necessária"
             
             ATTEMPT=$((ATTEMPT+1))
           done
+
           echo "final_status=$SUCCESS" >> $GITHUB_OUTPUT
+          echo "FINAL_REASON=$REASON" >> $GITHUB_ENV
 
-
-      - name: ✅ Auto-Merge (Voz do Dono)
-        if: steps.healing.outputs.final_status == 'true' && github.event.pull_request.number != null
+      - name: ✅ Finalização: Auto-Merge
+        # Se os testes passaram (original ou corrigido), faz o Merge se for PR sua
+        if: steps.healing_process.outputs.final_status == 'true' && github.event.pull_request.number != null
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Protocolo 'Voz do Dono'
           if [ "${{ github.event.pull_request.user.login }}" = "TheDrack" ]; then
+            echo "🫡 Voz do Dono confirmada. Realizando Merge Automático..."
             gh pr merge ${{ github.event.pull_request.number }} --auto --merge
+          else
+            echo "✅ Testes OK, mas autor não é o Comandante. Aguardando revisão manual por segurança."
           fi
 
-      - name: 🚨 Escalação
-        if: steps.healing.outputs.final_status == 'false'
+      - name: 🚨 Finalização: Escalação
+        # Se após 2 tentativas ou risco crítico o status for falha, abre Issue
+        if: steps.healing_process.outputs.final_status == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue create --title "🚨 Falha na Homeostase: @TheDrack" \
-            --body "O sistema falhou após 2 tentativas ou detectou risco crítico. **Motivo:** ${{ env.REASON }}"
+          echo "❌ Falha crítica. Notificando Comandante..."
+          gh issue create --title "🚨 Homeostase V2: Intervenção Requerida (@TheDrack)" \
+            --body "O sistema não pôde se auto-curar. 
+            **Status:** Falha Final
+            **Motivo da Retenção:** ${{ env.FINAL_REASON }}
+            
+            Verifique os logs para detalhes técnicos."
           exit 1
