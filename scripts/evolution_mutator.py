@@ -19,9 +19,15 @@ def evolve():
 
     # --- PASSO 1: ARQUITETURA ---
     system_arch = (
-        "Você é o Arquiteto Senior do JARVIS. Sua única tarefa é decidir o arquivo alvo.\n"
-        "Responda EXCLUSIVAMENTE um JSON: {\"target_file\": \"caminho/do/arquivo.py\", \"reason\": \"motivo\"}"
+        "Você é o Arquiteto Senior do JARVIS. Sua missão é decidir o local EXATO do arquivo.\n"
+        "REGRAS DE ORGANIZAÇÃO:\n"
+        "1. Serviços e lógica: 'app/application/services/'\n"
+        "2. Modelos de dados: 'app/domain/models/'\n"
+        "3. Scripts utilitários: 'scripts/'\n"
+        "4. Configurações: 'config/'\n"
+        "Retorne APENAS o JSON: {\"target_file\": \"caminho/completo/nome_do_arquivo.py\", \"reason\": \"justificativa\"}"
     )
+
     user_arch = f"MISSÃO: {issue_body}\nCONTEXTO TÉCNICO: {args.roadmap_context}"
 
     try:
