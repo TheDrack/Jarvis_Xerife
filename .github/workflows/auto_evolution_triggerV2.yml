@@ -18,7 +18,7 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Essencial para ler o histórico de commits
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -40,53 +40,60 @@ jobs:
               from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
               auto = AutoEvolutionServiceV2()
               
+              # Obtemos a mensagem completa do commit (incluindo o corpo) e o autor
               last_msg = os.popen("git log -1 --pretty=%B").read()
               last_auth = os.popen("git log -1 --pretty=%an").read()
               
-              print(f"DEBUG: Último commit: {last_msg.strip()} por {last_auth}")
+              print(f"--- DEBUG INFO ---")
+              print(f"Author: {last_auth.strip()}")
+              print(f"Message: {last_msg.strip()}")
+              print(f"------------------")
 
-              # 1. IDENTIFICAÇÃO DE ESTADOS
-              # Verifica se o commit é do bot
+              # 1. IDENTIFICAÇÃO DE ESTADOS (BUSCA MULTILINE)
+              # Verifica se a tag existe em qualquer parte da mensagem
               is_auto = "[Auto-Evolution]" in last_msg or "Jarvis-AutoEvolution" in last_auth
-              # Verifica se é especificamente um commit de sincronização (trava anti-loop)
+              # Verifica se é o commit de sincronização do JSON
               is_sync = "Inventory Synchronized" in last_msg
 
-              # CASO A: Commit de Sincronização (O bot acabou de atualizar o JSON)
+              # CASO A: Commit de Sincronização (Auto-bloqueio)
               if is_sync:
-                  print("🛡️ Trava Anti-Loop: Inventário já sincronizado. Encerrando ciclo.")
+                  print("🛡️ Trava Anti-Loop: O inventário já foi atualizado. Parando.")
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write("action=idle\n")
                   sys.exit(0)
 
-              # CASO B: Commit de Mutação vindo de um Merge na Main
+              # CASO B: É um Merge ou Push que contém código de evolução
               elif is_auto and not is_sync:
-                  print("🎯 Mutação detectada. Sincronizando inventário JSON...")
+                  print("🎯 Identificado commit de evolução. Iniciando sincronização do JSON...")
+                  # Procura o ID da missão (CAP-XXX) em toda a mensagem
                   match = re.search(r'CAP-\d+', last_msg)
+                  
                   if match:
                       cap_id = match.group()
+                      print(f"✅ Atualizando status da missão {cap_id} para 'complete'...")
                       if auto.mark_mission_as_completed(cap_id):
                           os.system("git config --global user.name 'Jarvis-AutoEvolution'")
                           os.system("git config --global user.email 'jarvis@bot.com'")
                           os.system("git add data/capabilities.json")
-                          # Mensagem chave para ativar a trava 'is_sync' no próximo trigger
-                          os.system("git commit -m '[Auto-Evolution] Inventory Synchronized ✅' || echo 'No changes'")
+                          # A mensagem abaixo garante que o PRÓXIMO trigger caia no CASO A
+                          os.system(f"git commit -m '[Auto-Evolution] Inventory Synchronized ✅ for {cap_id}' || echo 'No changes'")
                           os.system("git push origin main")
                   
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write("action=sync_only\n")
                   sys.exit(0)
 
-              # CASO C: Commit Manual ou de terceiros (Hora de evoluir!)
+              # CASO C: Commit humano ou Merge de outra feature
               else:
-                  print("🚀 Detectado commit humano ou externo. Buscando nova missão...")
+                  print("🚀 Detectado commit humano. Verificando se há missões pendentes...")
                   next_m = auto.find_next_mission()
                   if next_m:
                       cap_id = next_m['id']
-                      # Verifica se já existe uma PR aberta para esta missão
-                      pr_list = os.popen(f'gh pr list --search "{cap_id}" --json title').read()
+                      # Verifica se já não existe uma PR aberta para este CAP-ID
+                      pr_check = os.popen(f'gh pr list --search "{cap_id}" --state open --json title').read()
                       
-                      if len(pr_list.strip()) > 5:
-                          print(f"⚠️ PR para {cap_id} já está aberta. Aguardando interação humana.")
+                      if len(pr_check.strip()) > 5:
+                          print(f"⚠️ Já existe uma PR aberta para {cap_id}. Aguardando merge.")
                           action = "wait"
                       else:
                           with open('mission_context.txt', 'w', encoding='utf-8') as f:
@@ -95,44 +102,7 @@ jobs:
                           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                               f.write(f"mission_desc={cap_id}: {next_m['title']}\n")
                   else:
-                      print("✅ Nenhuma missão pendente no inventário.")
+                      print("✅ Tudo em dia. Nenhuma missão pendente.")
                       action = "idle"
                   
-                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                      f.write(f"action={action}\n")
-
-          except Exception as e:
-              print(f"Erro Crítico: {e}")
-              sys.exit(1)
-          PYCODE
-
-      - name: 🤖 Executar Mutação de DNA
-        if: steps.flow.outputs.action == 'evolve'
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_BODY: ${{ steps.flow.outputs.mission_desc }}
-        run: |
-          git config --global user.name "Jarvis-AutoEvolution"
-          git config --global user.email "jarvis@bot.com"
-          
-          BRANCH_NAME="auto-evolution/mission-$(date +%s)"
-          git checkout -b "$BRANCH_NAME"
-          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
-          
-          python scripts/evolution_mutator.py \
-            --strategy "minimal_change" \
-            --intent "auto-evolution-mission" \
-            --impact "functional-improvement" \
-            --roadmap-context "$(cat mission_context.txt)"
-          
-          git add -A
-          if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "[Auto-Evolution] DNA Mutated: $ISSUE_BODY"
-            git push origin "$BRANCH_NAME"
-            gh pr create --title "🧬 Evolução: $ISSUE_BODY" \
-                         --body "Evolução automática baseada no inventário JSON." \
-                         --base main --head "$BRANCH_NAME"
-          else
-            echo "Nenhuma mudança de DNA detectada."
-          fi
+                  with open(os
