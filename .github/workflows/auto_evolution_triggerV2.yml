@@ -1,0 +1,179 @@
+name: Auto Evolution Trigger
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # ==================================================
+  # 1. ORQUESTRAÇÃO: Sincroniza JSON ou Decide Evoluir
+  # ==================================================
+  process_evolution:
+    name: "🧬 Orquestrador de Evolução V2"
+    runs-on: ubuntu-latest
+    outputs:
+      should_evolve: ${{ steps.decide.outputs.should_evolve }}
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🧠 Decisão Estratégica (Data-Driven)
+        id: decide
+        run: |
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
+          python - << 'PYCODE'
+          import os, sys
+          try:
+              # Importamos a V2 para validação via JSON
+              from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
+              auto = AutoEvolutionServiceV2()
+              
+              commit_msg = os.popen("git log -1 --pretty=%B").read()
+              author = os.popen("git log -1 --pretty=%an").read()
+              
+              # Identifica se o último commit veio do próprio fluxo de evolução
+              is_auto_evolution = "[Auto-Evolution]" in commit_msg or "Jarvis-AutoEvolution" in author
+              
+              if is_auto_evolution:
+                  print(f"🎯 Evolução Detectada. Sincronizando Inventário JSON...")
+                  # Busca a missão que acabamos de tentar realizar
+                  next_m = auto.find_next_mission()
+                  if next_m:
+                      # Na V2, usamos o ID para marcar como completo
+                      cap_id = next_m['id']
+                      if auto.mark_mission_as_completed(cap_id):
+                          os.system("git config --global user.name 'Jarvis-AutoEvolution'")
+                          os.system("git config --global user.email 'jarvis@bot.com'")
+                          os.system("git add data/capabilities.json")
+                          os.system("git commit -m '[Auto-Evolution] Inventory Synchronized ✅' || echo 'No changes'")
+                          os.system("git push origin main")
+                  
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('should_evolve=false\n')
+              else:
+                  print(f"🚀 Commit manual detectado. Buscando próxima capacidade no inventário...")
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('should_evolve=true\n')
+          except Exception as e:
+              print(f"Erro na decisão V2: {e}")
+              sys.exit(1)
+          PYCODE
+
+  # ==================================================
+  # 2. ANÁLISE: Busca missão baseada em Dependências
+  # ==================================================
+  find_and_analyze:
+    name: "🎯 Seleção de Capacidade (V2)"
+    needs: process_evolution
+    if: needs.process_evolution.outputs.should_evolve == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      has_mission: ${{ steps.find.outputs.has_mission }}
+      mission_description: ${{ steps.find.outputs.mission_description }}
+      requires_human: ${{ steps.analyzer.outputs.requires_human }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 🎯 Seleção via Grafo de Dependências
+        id: find
+        run: |
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
+          python - << 'PYCODE'
+          import os, sys
+          try:
+              from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
+              auto = AutoEvolutionServiceV2()
+              next_mission = auto.find_next_mission()
+              
+              if next_mission:
+                  # Extraímos os dados do dicionário V2
+                  desc = f"{next_mission['id']}: {next_mission['title']}"
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('has_mission=true\n')
+                      f.write(f'mission_description={desc}\n')
+                  
+                  with open('mission_context.txt', 'w') as f:
+                      f.write(auto.get_roadmap_context(next_mission))
+              else:
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write('has_mission=false\n')
+          except Exception as e:
+              print(f"Erro na seleção V2: {e}")
+              sys.exit(1)
+          PYCODE
+
+      - name: 🔬 Análise de Risco (Metabolismo)
+        if: steps.find.outputs.has_mission == 'true'
+        id: analyzer
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          # O script de metabolismo permanece, mas agora com contexto JSON
+          python scripts/metabolism_analyzer.py \
+            --intent "auto-evolution" \
+            --instruction "${{ steps.find.outputs.mission_description }}" \
+            --context "$(cat mission_context.txt)" \
+            --repo-path "."
+          
+      - name: Upload Context
+        if: steps.find.outputs.has_mission == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mission-context
+          path: |
+            mission_context.txt
+
+  # ==================================================
+  # 3. EVOLUÇÃO: Mutação Dinâmica
+  # ==================================================
+  attempt_evolution:
+    name: "🧬 Executar Mutação"
+    needs: find_and_analyze
+    if: |
+      needs.find_and_analyze.outputs.has_mission == 'true' && 
+      needs.find_and_analyze.outputs.requires_human == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Download Context
+        uses: actions/download-artifact@v4
+        with:
+          name: mission-context
+      
+      - name: 🤖 Mutação de DNA Dinâmica
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_BODY: ${{ needs.find_and_analyze.outputs.mission_description }}
+        run: |
+          BRANCH_NAME="auto-evolution/mission-$(date +%s)"
+          git checkout -b "$BRANCH_NAME"
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
+          
+          # ALTERADO: Agora chamamos o evolution_mutator.py
+          python scripts/evolution_mutator.py \
+            --strategy "minimal_change" \
+            --intent "auto-evolution-mission" \
+            --impact "functional-improvement" \
+            --roadmap-context "$(cat mission_context.txt)"
