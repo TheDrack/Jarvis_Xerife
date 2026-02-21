@@ -1,3 +1,4 @@
+from app.domain.models.cap_023_core import execute as cap_023_exec
 from app.domain.models.cap_100_core import execute as cap_100_exec
 from app.domain.models.cap_054_core import execute as cap_054_exec
 from app.domain.models.cap_042_core import execute as cap_042_exec
@@ -8,6 +9,7 @@ from app.domain.models.cap_002_core import execute as cap_002_exec
 class ModelsContainer:
     def __init__(self):
         self.registry = {
+            "CAP-023": cap_023_exec,
             "CAP-100": cap_100_exec,
             "CAP-054": cap_054_exec,
             "CAP-042": cap_042_exec,
