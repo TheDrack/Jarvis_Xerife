@@ -5,16 +5,17 @@ def execute(context=None):
     user_actions = context.get('user_actions', [])
     goals = []
     for action in user_actions:
-        intent = analyze_action(action)
-        if intent:
-            goals.append(intent)
+        # Infer intention from behavior
+        intention = infer_intention(action)
+        if intention:
+            goals.append(intention)
     return goals
 
-def analyze_action(action):
-    # Lógica para analisar a ação e identificar a intenção
-    # Exemplo: se a ação for 'abrir porta', a intenção pode ser 'entrar'
+def infer_intention(action):
+    # Implementar lógica para inferir intenção
+    # Exemplo: se o usuário pede para ligar a luz, a intenção pode ser 'iluminar o ambiente'
     intentions = {
-        'abrir porta': 'entrar',
-        'fechar porta': 'sair'
+        'ligar_luz': 'iluminar o ambiente',
+        'desligar_luz': 'economizar energia'
     }
     return intentions.get(action, None)
