@@ -499,7 +499,7 @@
             "id": "CAP-046",
             "title": "Evaluate long-term impact of decisions",
             "description": "Assess how current choices will limit or enable future system growth.",
-            "status": "partial",
+            "status": "complete",
             "auto": true,
             "priority": 4,
             "depends_on": [],
