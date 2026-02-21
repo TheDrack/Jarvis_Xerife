@@ -257,7 +257,7 @@
       "id": "CAP-023",
       "title": "Maintain internal operational self-model",
       "description": "Create a real-time digital representation of the system's own state and processes.",
-      "status": "partial",
+      "status": "complete",
       "auto": true,
       "priority": 2,
       "depends_on": [],
