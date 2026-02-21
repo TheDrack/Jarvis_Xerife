@@ -329,7 +329,7 @@
       "id": "CAP-030",
       "title": "Correlate temporally distant events",
       "description": "Identify patterns and links between events that occurred at different times.",
-      "status": "pending",
+      "status": "complete",
       "auto": true,
       "priority": 3,
       "depends_on": [
