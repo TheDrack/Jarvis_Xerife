@@ -4,36 +4,25 @@
          import logging
          from app.domain.capabilities import metrics
 
-         # Inicializar o logger
+         # Inicializa o logger
          logger = logging.getLogger(__name__)
 
-         # Definir o intervalo de tempo para monitorar o desempenho
-         interval = 60  # 1 minuto
+         # Verifica se o contexto é válido
+         if context is None:
+            logger.error('Contexto inválido')
+            return False
 
-         # Definir o limite de desempenho aceitável
-         threshold = 0.5  # 50% de desempenho em relação ao baseline
+         # Coleta as métricas de desempenho do sistema
+         system_metrics = metrics.collect_system_metrics()
 
-         # Carregar o baseline de desempenho
-         baseline = metrics.load_baseline()
+         # Calcula a degradação do desempenho ao longo do tempo
+         performance_degradation = metrics.calculate_performance_degradation(system_metrics)
 
-         # Loop infinito para monitorar o desempenho
-         while True:
-            # Medir o tempo de execução do sistema
-            start_time = time.time()
-            # Executar uma tarefa de exemplo (substituir por uma tarefa real)
-            example_task()
-            end_time = time.time()
+         # Verifica se houve degradação significativa do desempenho
+         if performance_degradation > 0.1:
+            logger.warning('Degradação do desempenho detectada')
+            # Executa ações para mitigar a degradação do desempenho
+            metrics.mitigate_performance_degradation()
 
-            # Calcular o tempo de execução
-            execution_time = end_time - start_time
-
-            # Calcular a taxa de desempenho
-            performance_ratio = execution_time / baseline
-
-            # Verificar se o desempenho está abaixo do limite aceitável
-            if performance_ratio > threshold:
-               logger.warning(f'Desempenho degradado: {performance_ratio:.2f}')
-
-            # Aguardar o intervalo de tempo para a próxima medição
-            time.sleep(interval)
+         return True
    
