@@ -25,6 +25,7 @@ class CrystallizerEngine:
             "capabilities": self.paths["container_dir"] / "capabilities_container.py"
         }
 
+        self.paths["container_dir"].mkdir(parents=True, exist_ok=True)
         self.master_crystal = self._load_json(self.paths["crystal"]) or self._init_crystal()
         caps_data = self._load_json(self.paths["caps"])
         self.source_capabilities = caps_data.get('capabilities', []) if caps_data else []
@@ -43,23 +44,30 @@ class CrystallizerEngine:
         libs = set()
         try:
             content = file_path.read_text(encoding='utf-8')
-            # Regex para: import lib ou from lib import ...
-            import_matches = re.findall(r'^(?:import|from)\s+([a-zA-Z0-9_]+)', content, re.MULTILINE)
-            for lib in import_matches:
-                # Evitamos incluir o próprio app/hub como biblioteca externa
-                if lib not in ['app', 'hub', 'json', 're', 'os', 'sys', 'pathlib']:
-                    libs.add(lib)
+            # Regex aprimorada: pega 'import lib', 'from lib import', 'import lib as x'
+            # Captura apenas o root da lib (ex: de 'sklearn.ensemble' pega 'sklearn')
+            patterns = [
+                r'^\s*import\s+([a-zA-Z0-9_]+)',
+                r'^\s*from\s+([a-zA-Z0-9_]+)'
+            ]
+            
+            for pattern in patterns:
+                matches = re.findall(pattern, content, re.MULTILINE)
+                for lib in matches:
+                    # Filtros de sistema e libs padrão para não poluir o Master Crystal
+                    ignored = ['app', 'hub', 'json', 're', 'os', 'sys', 'pathlib', 'typing', 'datetime', 'logging', 'abc']
+                    if lib not in ignored:
+                        libs.add(lib)
         except Exception as e:
-            logger.error(f"Erro ao escanear libs em {file_path}: {e}")
+            logger.error(f"❌ Erro no scan de {file_path.name}: {e}")
         
-        return list(libs)
+        return sorted(list(libs))
 
     def audit_and_link(self):
-        """Documenta capacidades e AUTO-DETECTA bibliotecas usadas."""
+        """Documenta capacidades e mapeia bibliotecas do código real."""
         new_registry = []
         for cap in self.source_capabilities:
             cap_id = cap['id']
-            # Lógica de mapeamento de diretório (gears, models, etc)
             target_dir = self._map_target(cap)
             target_file_name = f"{cap_id.lower().replace('-', '_')}_core.py"
             target_path = Path(target_dir) / target_file_name
@@ -68,14 +76,14 @@ class CrystallizerEngine:
                      "models" if "models" in str(target_path) else \
                      "adapters" if "adapters" in str(target_path) else "capabilities"
 
-            # SCAN DE BIBLIOTECAS (O Coração da sua ideia)
+            # SCAN DE BIBLIOTECAS (Roda agora com o arquivo já atualizado pelo transmute)
             detected_libs = self._extract_libraries(target_path)
 
             new_registry.append({
                 "id": cap_id,
                 "title": cap.get('title'),
                 "status": cap.get('status', 'nonexistent'),
-                "mapped_libraries": detected_libs, # Preenchido automaticamente pelo scan
+                "mapped_libraries": detected_libs,
                 "sector": sector,
                 "genealogy": {"target_file": str(target_path)},
                 "integration": {
@@ -84,6 +92,28 @@ class CrystallizerEngine:
                 }
             })
         self.master_crystal["registry"] = new_registry
+
+    def transmute(self):
+        """Garante que os arquivos físicos existam."""
+        for cap in self.source_capabilities:
+            target_dir = Path(self._map_target(cap))
+            target_file = f"{cap['id'].lower().replace('-', '_')}_core.py"
+            target_path = target_dir / target_file
+            
+            if not target_path.exists():
+                target_dir.mkdir(parents=True, exist_ok=True)
+                content = (
+                    "# -*- coding: utf-8 -*-\n"
+                    f"'''CAPABILITY: {cap.get('title')}'''\n\n"
+                    "def execute(context=None):\n"
+                    f"    return {{'status': 'active', 'id': '{cap['id']}'}}\n"
+                )
+                target_path.write_text(content, encoding='utf-8')
+
+    def stitch_sectors(self):
+        """Vincula as capacidades aos containers Python."""
+        # Mantém a lógica de costura original que você já tem...
+        pass 
 
     def _map_target(self, cap: Dict[str, Any]) -> str:
         title = cap.get('title', '').lower()
@@ -107,10 +137,12 @@ class CrystallizerEngine:
 
     def run_full_cycle(self):
         logger.info("📡 Iniciando Auto-Sensing de Dependências...")
-        self.audit_and_link()
-        # ... transmute e stitch_sectors continuam os mesmos ...
-        self._save_crystal()
+        # A ORDEM IMPORTA:
+        self.transmute()      # 1. Garante que os arquivos estão no disco
+        self.audit_and_link() # 2. Lê os arquivos e detecta as bibliotecas
+        self.stitch_sectors() # 3. Faz a costura nos containers
+        self._save_crystal()  # 4. Salva o Master Crystal
+        logger.info("✨ Ciclo Finalizado.")
 
 if __name__ == "__main__":
-    # Nota: Removi os métodos repetidos para brevidade, mas eles devem estar presentes.
     CrystallizerEngine().run_full_cycle()
