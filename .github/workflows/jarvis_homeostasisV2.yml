@@ -29,9 +29,12 @@ jobs:
 
       - name: 🔧 Instalação do DNA
         run: |
-          # --clear resolve o erro de 'A virtual environment already exists'
+          # --clear resolve o erro de ambiente persistente
           uv venv --clear --python 3.11
-          uv pip install pytest pytest-json-report sqlmodel groq requests python-dotenv
+          
+          # Instalando dependências incluindo pytest-cov exigido pelo seu pytest.ini
+          uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv
+          
           # Registra o PYTHONPATH no ambiente do GitHub Actions
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
@@ -41,9 +44,10 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           # 1. Executa os testes e gera o relatório em JSON
+          # O pytest agora reconhecerá os argumentos de cobertura (--cov) do seu inifile
           uv run pytest --json-report --json-report-file=report.json || true
           
-          # 2. Verifica se houve falhas ou erros
+          # 2. Verifica se houve falhas ou erros no relatório gerado
           if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ] && [ "$(jq '.summary.errors // 0' report.json)" == "0" ]; then
             echo "✅ DNA íntegro. Iniciando Cristalização e Auto-Sensing..."
             
@@ -54,7 +58,7 @@ jobs:
           else
             echo "❌ Falhas detectadas no DNA. Iniciando Mutator de Auto-Cura..."
             
-            # Aqui entraria o script scripts/self_healing_mutator.py se você desejar
+            # Aqui o sistema pode evoluir para chamar o scripts/self_healing_mutator.py
             echo "final_status=false" >> $GITHUB_OUTPUT
           fi
 
@@ -86,8 +90,8 @@ jobs:
           fi
 
       - name: 🚨 Escalação
-        # Se falhar e não houver cura, abre uma issue (opcional)
+        # Se falhar e não houver cura, o workflow indica a falha
         if: steps.healing_process.outputs.final_status == 'false'
         run: |
-          echo "🚨 O sistema não conseguiu se auto-curar. Verifique os logs do Pytest."
+          echo "🚨 O sistema não passou nos testes de homeostase. Verifique o report.json."
           exit 1
