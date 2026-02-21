@@ -58,12 +58,12 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_BODY: ${{ steps.flow.outputs.mission_desc }}
-          PYTHONPATH: . # Garante que o Python veja a pasta app
+          PYTHONPATH: .
         run: |
           git config --global user.name "Jarvis-AutoEvolution"
           git config --global user.email "jarvis@bot.com"
           
-          # 1. DNA Completo
+          # 1. Instalação do DNA Completo
           uv pip install pytest pytest-json-report pytest-cov pytest-asyncio \
                          pydantic pydantic-settings cryptography httpx \
                          sqlmodel groq python-dotenv \
@@ -79,24 +79,25 @@ jobs:
             --strategy "minimal_change" --intent "auto-evolution" \
             --impact "functional-improvement" --roadmap-context "$(cat mission_context.txt)"
 
-          # 3. Ciclo de Auto-Cura
+          # 3. Ciclo de Auto-Cura (Homeostase com Verificação Rigorosa)
           ATTEMPT=1
           while [ $ATTEMPT -le 2 ]; do
             echo "🧪 Vistoria de Cura - Tentativa $ATTEMPT"
             uv run pytest --json-report --json-report-file=report.json tests/ || true
             
-            # Captura valores numéricos reais para evitar erros de comparação
+            # Melhorei a captura: Se a chave não existir, o jq retorna 0 de forma segura
             FAILED=$(jq '.summary.failed // 0' report.json)
-            ERRORS=$(jq '.summary.errors // 0' report.json)
+            # Se o pytest falha na coleção, os erros ficam em 'exitstatus' ou fora do summary
+            ERRORS=$(jq '(.summary.errors // 0) + (if .exitstatus != 0 and .summary == null then 1 else 0 end)' report.json)
             
-            echo "Relatório: Falhas=$FAILED, Erros=$ERRORS"
+            echo "📊 Resultado da Vistoria: Falhas=$FAILED, Erros de Sistema=$ERRORS"
 
             if [ "$FAILED" -eq "0" ] && [ "$ERRORS" -eq "0" ]; then
               echo "✅ Código 100% Saudável!"
               break
             fi
             
-            echo "🔧 Iniciando Mutator de Cura para resolver $FAILED falhas e $ERRORS erros..."
+            echo "🔧 Instabilidade Detectada. Iniciando Mutator de Cura..."
             uv run python scripts/self_healing_mutator.py --report "report.json"
             
             git add -A
@@ -104,12 +105,13 @@ jobs:
             ATTEMPT=$((ATTEMPT+1))
           done
 
-          # 4. PR (Mesmo com erros residuais, ele cria para análise, mas agora o commit avisa)
+          # 4. Finalização e PR
           git add -A
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "[Auto-Evolution] DNA Evoluído: $ISSUE_BODY"
             git push origin "$BRANCH_NAME"
+            # O corpo do PR agora confessa se o código ainda tem problemas
             gh pr create --title "🧬 Evolução: $ISSUE_BODY" \
-                         --body "Evolução e Cura executadas. Status Final: Falhas=$FAILED, Erros=$ERRORS" \
+                         --body "Evolução e Cura integradas. Status Final da Vistoria: Falhas=$FAILED, Erros=$ERRORS" \
                          --base main --head "$BRANCH_NAME"
           fi
