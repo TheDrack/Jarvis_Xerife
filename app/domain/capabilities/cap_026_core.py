@@ -1,7 +1,23 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Distinguish local improvement from systemic improvement
-ID: CAP-026"""
 
 def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-026"}
+    if context is None:
+        context = {}
+    
+    # Avaliar se a mudança beneficia uma tarefa específica ou a arquitetura inteira
+    def evaluate_change(change):
+        if change['scope'] == 'local':
+            return 'A mudança beneficia uma tarefa específica.'
+        elif change['scope'] == 'systemic':
+            return 'A mudança beneficia a arquitetura inteira.'
+        else:
+            return 'Não foi possível determinar o escopo da mudança.'
+    
+    # Simular uma mudança para teste
+    change = {
+        'scope': 'systemic',
+        'description': 'Mudança no sistema de gerenciamento de banco de dados.'
+    }
+    
+    result = evaluate_change(change)
+    return result
+   
