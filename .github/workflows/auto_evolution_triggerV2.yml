@@ -2,6 +2,8 @@ name: JARVIS Integrated Evolution
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -10,108 +12,119 @@ permissions:
   issues: write
 
 jobs:
-  evolution_and_healing:
-    name: "🧬 Ciclo de Evolução e Homeostase"
+  # JOB 1: A GÊNESE (Cria a PR de Evolução)
+  evolution_cycle:
+    name: "🧬 Ciclo de Evolução"
+    # Só roda no push direto na main (ou manual), não em PRs
+    if: github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[Auto-Evolution]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.JARVIS_PAT }} # Essencial para disparar o próximo Job
 
-      - name: 📦 Setup UV e Python
+      - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-          python-version: '3.13'
 
       - name: 🧠 Orquestrador de Missão
         id: flow
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          uv pip install sqlmodel pydantic requests
-          export PYTHONPATH=$PYTHONPATH:$(pwd)
-          python - << 'PYCODE'
+          uv venv && uv pip install sqlmodel pydantic requests
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
+          uv run python - << 'PYCODE'
           import os, sys
           from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
           try:
               auto = AutoEvolutionServiceV2()
-              last_msg = os.popen("git log -1 --pretty=%B").read()
-              if "[Auto-Evolution]" in last_msg:
-                  out = "action=idle\n"
+              next_m = auto.find_next_mission()
+              if next_m:
+                  with open('mission_context.txt', 'w', encoding='utf-8') as f:
+                      f.write(auto.get_roadmap_context(next_m))
+                  print(f"::set-output name=action::evolve")
+                  print(f"::set-output name=mission_desc::{next_m['id']}: {next_m['title']}")
               else:
-                  next_m = auto.find_next_mission()
-                  if next_m:
-                      with open('mission_context.txt', 'w', encoding='utf-8') as f:
-                          f.write(auto.get_roadmap_context(next_m))
-                      out = f"action=evolve\nmission_desc={next_m['id']}: {next_m['title']}\n"
-                  else:
-                      out = "action=idle\n"
-              with open(os.environ['GITHUB_OUTPUT'], 'a') as f: f.write(out)
-          except Exception as e:
-              print(f"❌ Erro: {e}"); sys.exit(1)
+                  print(::set-output name=action::idle")
+          except Exception as e: sys.exit(1)
           PYCODE
 
-      - name: 🤖 Mutação e Auto-Cura
+      - name: 🤖 Mutação e Abertura de PR
         if: steps.flow.outputs.action == 'evolve'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_BODY: ${{ steps.flow.outputs.mission_desc }}
-          PYTHONPATH: .
+          GH_TOKEN: ${{ secrets.JARVIS_PAT }} # PAT aqui faz a PR "acordar" o próximo job
         run: |
-          git config --global user.name "Jarvis-AutoEvolution"
+          git config --global user.name "Jarvis-Bot"
           git config --global user.email "jarvis@bot.com"
           
-          # 1. Instalação do DNA Completo
-          uv pip install pytest pytest-json-report pytest-cov pytest-asyncio \
-                         pydantic pydantic-settings cryptography httpx \
-                         sqlmodel groq python-dotenv \
-                         fastapi python-jose[cryptography] passlib[bcrypt] bcrypt \
-                         -e .
-          
-          # 2. Setup de Branch e Evolução
+          # Crystallize & Mutate
+          uv run python app/application/services/crystallization/crystallizer_engine.py
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
           
-          python app/application/services/crystallization/crystallizer_engine.py
-          python scripts/evolution_mutator.py \
-            --strategy "minimal_change" --intent "auto-evolution" \
-            --impact "functional-improvement" --roadmap-context "$(cat mission_context.txt)"
-
-          # 3. Ciclo de Auto-Cura (Homeostase com Verificação Rigorosa)
-          ATTEMPT=1
-          while [ $ATTEMPT -le 2 ]; do
-            echo "🧪 Vistoria de Cura - Tentativa $ATTEMPT"
-            uv run pytest --json-report --json-report-file=report.json tests/ || true
-            
-            # Melhorei a captura: Se a chave não existir, o jq retorna 0 de forma segura
-            FAILED=$(jq '.summary.failed // 0' report.json)
-            # Se o pytest falha na coleção, os erros ficam em 'exitstatus' ou fora do summary
-            ERRORS=$(jq '(.summary.errors // 0) + (if .exitstatus != 0 and .summary == null then 1 else 0 end)' report.json)
-            
-            echo "📊 Resultado da Vistoria: Falhas=$FAILED, Erros de Sistema=$ERRORS"
-
-            if [ "$FAILED" -eq "0" ] && [ "$ERRORS" -eq "0" ]; then
-              echo "✅ Código 100% Saudável!"
-              break
-            fi
-            
-            echo "🔧 Instabilidade Detectada. Iniciando Mutator de Cura..."
-            uv run python scripts/self_healing_mutator.py --report "report.json"
-            
-            git add -A
-            git commit -m "🤖 [Auto-Cura] Correção Integrada #$ATTEMPT" || echo "Sem mudanças"
-            ATTEMPT=$((ATTEMPT+1))
-          done
-
-          # 4. Finalização e PR
+          uv run python scripts/evolution_mutator.py \
+            --strategy "minimal_change" \
+            --impact "functional-improvement" \
+            --roadmap-context "$(cat mission_context.txt)"
+          
           git add -A
-          if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "[Auto-Evolution] DNA Evoluído: $ISSUE_BODY"
-            git push origin "$BRANCH_NAME"
-            # O corpo do PR agora confessa se o código ainda tem problemas
-            gh pr create --title "🧬 Evolução: $ISSUE_BODY" \
-                         --body "Evolução e Cura integradas. Status Final da Vistoria: Falhas=$FAILED, Erros=$ERRORS" \
-                         --base main --head "$BRANCH_NAME"
-          fi
+          git commit -m "[Auto-Evolution] DNA Mutated: ${{ steps.flow.outputs.mission_desc }}"
+          git push origin "$BRANCH_NAME"
+          
+          gh pr create --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
+                       --body "Iniciando verificação de Homeostase..." \
+                       --base main --head "$BRANCH_NAME"
+
+  # JOB 2: A HOMEOSTASE (Roda DENTRO da PR criada acima)
+  homeostasis:
+    name: "🧪 Homeostase e Auto-Cura"
+    # Roda apenas em Pull Requests (incluindo as criadas pelo Job 1)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🛰️ Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.JARVIS_PAT }}
+
+      - name: 📦 Setup UV e Ambiente
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: 🔧 Instalação
+        run: |
+          uv venv --python 3.13
+          uv pip install pytest pytest-json-report pydantic sqlmodel groq requests
+          echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
+
+      - name: 🔄 Ciclo de Cura Ativa
+        id: healing
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          SUCCESS=false
+          for i in {1..2}; do
+            uv run pytest --json-report --json-report-file=report.json tests/ || true
+            if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ]; then
+              SUCCESS=true && break
+            fi
+            uv run python scripts/self_healing_mutator.py --report "report.json"
+            git config --global user.name "Jarvis-Bot"
+            git config --global user.email "jarvis@bot.com"
+            git add -A
+            git commit -m "🤖 [Auto-Cura] Estabilização #$i" && git push origin ${{ github.event.pull_request.head.ref }} || echo "Sem mudanças"
+          done
+          echo "final_status=$SUCCESS" >> $GITHUB_OUTPUT
+
+      - name: ✅ Auto-Merge
+        if: steps.healing.outputs.final_status == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.JARVIS_PAT }}
+        run: gh pr merge ${{ github.event.pull_request.number }} --auto --merge
+
+      - name: 🚨 Escalação
+        if: steps.healing.outputs.final_status == 'false'
+        run: exit 1
