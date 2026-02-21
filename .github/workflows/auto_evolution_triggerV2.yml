@@ -12,13 +12,11 @@ permissions:
   issues: write
 
 jobs:
-  # JOB 1: A GÊNESE
+  # JOB 1: A GÊNESE (Sempre roda no Push à Main)
   evolution_cycle:
     name: "🧬 Ciclo de Evolução"
     if: github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[Auto-Evolution]')
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
       - name: 🛰️ Checkout
         uses: actions/checkout@v4
@@ -36,14 +34,13 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GH_TOKEN: ${{ secrets.JARVIS_PAT || secrets.GITHUB_TOKEN }}
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          # 1. Setup do Ambiente Unificado
           uv venv --python 3.11
           uv pip install sqlmodel pydantic requests groq python-dotenv
           source .venv/bin/activate
-          export PYTHONPATH="${{ github.workspace }}"
-
-          # 2. Identificação da Missão
+          
+          # 1. Identificação da Missão
           python - << 'PYCODE'
           import os, sys
           from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
@@ -59,46 +56,39 @@ jobs:
                   with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
                       f.write("action=idle\n")
           except Exception as e:
-              print(f"❌ Erro no Orquestrador: {e}"); sys.exit(1)
+              print(f"❌ Erro: {e}"); sys.exit(1)
           PYCODE
 
-          # 3. Execução da Evolução (Apenas se houver missão)
+          # 2. Mutação e PR
           if [ "${{ steps.flow.outputs.action }}" == "evolve" ]; then
             git config --global user.name "Jarvis-Bot"
             git config --global user.email "jarvis@bot.com"
-
-            # Cristalização
             python app/application/services/crystallization/crystallizer_engine.py
-
-            # Setup de Branch
+            
             BRANCH_NAME="auto-evolution/mission-$(date +%s)"
             git checkout -b "$BRANCH_NAME"
-
-            # Mutação com Verbose para Debug
+            
             python scripts/evolution_mutator.py \
               --strategy "minimal_change" \
               --intent "auto-evolution-mission" \
               --impact "functional-improvement" \
               --roadmap-context "$(cat mission_context.txt)"
 
-            # Commit e PR
             git add -A
             if [ -n "$(git status --porcelain)" ]; then
               git commit -m "[Auto-Evolution] DNA Mutated: ${{ steps.flow.outputs.mission_desc }}"
               git push origin "$BRANCH_NAME"
               gh pr create --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
-                           --body "Ciclo automático JARVIS. Iniciando validação de Homeostase." \
+                           --body "Vistoria técnica iniciada pela Homeostase." \
                            --base main --head "$BRANCH_NAME"
             fi
           fi
 
-  # JOB 2: A HOMEOSTASE
+  # JOB 2: A HOMEOSTASE (Acorda apenas quando a PR é criada)
   homeostasis:
     name: "🧪 Homeostase e Auto-Cura"
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
       - name: 🛰️ Checkout PR
         uses: actions/checkout@v4
@@ -115,21 +105,18 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GH_TOKEN: ${{ secrets.JARVIS_PAT || secrets.GITHUB_TOKEN }}
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           uv venv --python 3.13
           uv pip install pytest pytest-json-report pydantic sqlmodel groq requests python-dotenv
           source .venv/bin/activate
-          export PYTHONPATH="${{ github.workspace }}"
           
           SUCCESS=false
           for i in {1..2}; do
-            echo "🧪 Tentativa de Estabilização $i..."
             pytest --json-report --json-report-file=report.json tests/ || true
-            
             if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ]; then
               SUCCESS=true && break
             fi
-            
             python scripts/self_healing_mutator.py --report "report.json"
             git config --global user.name "Jarvis-Bot"
             git config --global user.email "jarvis@bot.com"
