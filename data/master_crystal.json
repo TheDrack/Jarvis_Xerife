@@ -12,9 +12,8 @@
         {
             "id": "CAP-001",
             "title": "Maintain internal inventory of all known capabilities",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_001_core.py"
             },
             "integration": {
@@ -25,9 +24,8 @@
         {
             "id": "CAP-002",
             "title": "Classify capabilities by status: nonexistent, partial, complete",
-            "status": "crystallized",
+            "sector": "models",
             "genealogy": {
-                "target_suggested": "app/domain/models/",
                 "target_file": "app/domain/models/cap_002_core.py"
             },
             "integration": {
@@ -38,9 +36,8 @@
         {
             "id": "CAP-003",
             "title": "Automatically detect functional gaps",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_003_core.py"
             },
             "integration": {
@@ -51,9 +48,8 @@
         {
             "id": "CAP-004",
             "title": "Generate technical objectives from detected gaps",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_004_core.py"
             },
             "integration": {
@@ -64,9 +60,8 @@
         {
             "id": "CAP-005",
             "title": "Prioritize objectives by systemic impact",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_005_core.py"
             },
             "integration": {
@@ -77,9 +72,8 @@
         {
             "id": "CAP-006",
             "title": "Prioritize objectives by failure reduction",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_006_core.py"
             },
             "integration": {
@@ -90,9 +84,8 @@
         {
             "id": "CAP-007",
             "title": "Prioritize objectives by future reuse potential",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_007_core.py"
             },
             "integration": {
@@ -103,9 +96,8 @@
         {
             "id": "CAP-008",
             "title": "Maintain history of completed objectives",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_008_core.py"
             },
             "integration": {
@@ -116,9 +108,8 @@
         {
             "id": "CAP-009",
             "title": "Maintain history of technical decisions",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_009_core.py"
             },
             "integration": {
@@ -129,9 +120,8 @@
         {
             "id": "CAP-010",
             "title": "Distinguish technical error from conceptual limitation",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_010_core.py"
             },
             "integration": {
@@ -142,9 +132,8 @@
         {
             "id": "CAP-011",
             "title": "Request human intervention only when required",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_011_core.py"
             },
             "integration": {
@@ -155,9 +144,8 @@
         {
             "id": "CAP-012",
             "title": "Validate improvements using automated tests",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_012_core.py"
             },
             "integration": {
@@ -168,9 +156,8 @@
         {
             "id": "CAP-013",
             "title": "Automatically revert unstable changes",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_013_core.py"
             },
             "integration": {
@@ -181,9 +168,8 @@
         {
             "id": "CAP-014",
             "title": "Preserve architectural compatibility",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_014_core.py"
             },
             "integration": {
@@ -194,9 +180,8 @@
         {
             "id": "CAP-015",
             "title": "Automatically document each evolution",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_015_core.py"
             },
             "integration": {
@@ -207,9 +192,8 @@
         {
             "id": "CAP-016",
             "title": "Explicitly recognize existing capabilities",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_016_core.py"
             },
             "integration": {
@@ -220,9 +204,8 @@
         {
             "id": "CAP-017",
             "title": "Explicitly recognize missing capabilities",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_017_core.py"
             },
             "integration": {
@@ -233,9 +216,8 @@
         {
             "id": "CAP-018",
             "title": "Identify internal dependencies between capabilities",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_018_core.py"
             },
             "integration": {
@@ -246,9 +228,8 @@
         {
             "id": "CAP-019",
             "title": "Identify mission-critical capabilities",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_019_core.py"
             },
             "integration": {
@@ -259,9 +240,8 @@
         {
             "id": "CAP-020",
             "title": "Identify redundant capabilities",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_020_core.py"
             },
             "integration": {
@@ -272,9 +252,8 @@
         {
             "id": "CAP-021",
             "title": "Map impact of one capability over others",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_021_core.py"
             },
             "integration": {
@@ -285,9 +264,8 @@
         {
             "id": "CAP-022",
             "title": "Evaluate risks before modifying critical capabilities",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_022_core.py"
             },
             "integration": {
@@ -298,9 +276,8 @@
         {
             "id": "CAP-023",
             "title": "Maintain internal operational self-model",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_023_core.py"
             },
             "integration": {
@@ -311,9 +288,8 @@
         {
             "id": "CAP-024",
             "title": "Monitor performance degradation over time",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_024_core.py"
             },
             "integration": {
@@ -324,9 +300,8 @@
         {
             "id": "CAP-025",
             "title": "Detect silent regressions",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_025_core.py"
             },
             "integration": {
@@ -337,9 +312,8 @@
         {
             "id": "CAP-026",
             "title": "Distinguish local improvement from systemic improvement",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_026_core.py"
             },
             "integration": {
@@ -350,9 +324,8 @@
         {
             "id": "CAP-027",
             "title": "Maintain short-term operational memory",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_027_core.py"
             },
             "integration": {
@@ -363,9 +336,8 @@
         {
             "id": "CAP-028",
             "title": "Maintain mid-term strategic memory",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_028_core.py"
             },
             "integration": {
@@ -376,9 +348,8 @@
         {
             "id": "CAP-029",
             "title": "Maintain long-term historical memory",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_029_core.py"
             },
             "integration": {
@@ -389,9 +360,8 @@
         {
             "id": "CAP-030",
             "title": "Correlate temporally distant events",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_030_core.py"
             },
             "integration": {
@@ -402,9 +372,8 @@
         {
             "id": "CAP-031",
             "title": "Infer intention from behavior",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_031_core.py"
             },
             "integration": {
@@ -415,9 +384,8 @@
         {
             "id": "CAP-032",
             "title": "Distinguish literal command from real objective",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_032_core.py"
             },
             "integration": {
@@ -428,9 +396,8 @@
         {
             "id": "CAP-033",
             "title": "Build dynamic user model",
-            "status": "crystallized",
+            "sector": "models",
             "genealogy": {
-                "target_suggested": "app/domain/models/",
                 "target_file": "app/domain/models/cap_033_core.py"
             },
             "integration": {
@@ -441,9 +408,8 @@
         {
             "id": "CAP-034",
             "title": "Continuously update user model",
-            "status": "crystallized",
+            "sector": "models",
             "genealogy": {
-                "target_suggested": "app/domain/models/",
                 "target_file": "app/domain/models/cap_034_core.py"
             },
             "integration": {
@@ -454,9 +420,8 @@
         {
             "id": "CAP-035",
             "title": "Detect changes in user patterns",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_035_core.py"
             },
             "integration": {
@@ -467,9 +432,8 @@
         {
             "id": "CAP-036",
             "title": "Distinguish signal from noise",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_036_core.py"
             },
             "integration": {
@@ -480,9 +444,8 @@
         {
             "id": "CAP-037",
             "title": "Recognize urgency context",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_037_core.py"
             },
             "integration": {
@@ -493,9 +456,8 @@
         {
             "id": "CAP-038",
             "title": "Recognize human priority context",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_038_core.py"
             },
             "integration": {
@@ -506,9 +468,8 @@
         {
             "id": "CAP-039",
             "title": "Plan actions across multiple steps",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_039_core.py"
             },
             "integration": {
@@ -519,9 +480,8 @@
         {
             "id": "CAP-040",
             "title": "Compare multiple possible strategies",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_040_core.py"
             },
             "integration": {
@@ -532,9 +492,8 @@
         {
             "id": "CAP-041",
             "title": "Simulate technical consequences before action",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_041_core.py"
             },
             "integration": {
@@ -545,9 +504,8 @@
         {
             "id": "CAP-042",
             "title": "Simulate systemic consequences before action",
-            "status": "crystallized",
+            "sector": "models",
             "genealogy": {
-                "target_suggested": "app/domain/models/",
                 "target_file": "app/domain/models/cap_042_core.py"
             },
             "integration": {
@@ -558,9 +516,8 @@
         {
             "id": "CAP-043",
             "title": "Evaluate failure risk",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_043_core.py"
             },
             "integration": {
@@ -571,9 +528,8 @@
         {
             "id": "CAP-044",
             "title": "Evaluate computational cost",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_044_core.py"
             },
             "integration": {
@@ -584,9 +540,8 @@
         {
             "id": "CAP-045",
             "title": "Evaluate maintenance cost",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_045_core.py"
             },
             "integration": {
@@ -597,9 +552,8 @@
         {
             "id": "CAP-046",
             "title": "Evaluate long-term impact of decisions",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_046_core.py"
             },
             "integration": {
@@ -610,9 +564,8 @@
         {
             "id": "CAP-047",
             "title": "Select strategies with optimal cost-benefit",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_047_core.py"
             },
             "integration": {
@@ -623,9 +576,8 @@
         {
             "id": "CAP-048",
             "title": "Abort actions with excessive risk",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_048_core.py"
             },
             "integration": {
@@ -636,9 +588,8 @@
         {
             "id": "CAP-049",
             "title": "Request human validation for critical decisions",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_049_core.py"
             },
             "integration": {
@@ -649,9 +600,8 @@
         {
             "id": "CAP-050",
             "title": "Orchestrate multiple agents simultaneously",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_050_core.py"
             },
             "integration": {
@@ -662,9 +612,8 @@
         {
             "id": "CAP-051",
             "title": "Delegate tasks based on specialization",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_051_core.py"
             },
             "integration": {
@@ -675,9 +624,8 @@
         {
             "id": "CAP-052",
             "title": "Execute actions in parallel",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_052_core.py"
             },
             "integration": {
@@ -688,9 +636,8 @@
         {
             "id": "CAP-053",
             "title": "Prioritize critical executions",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_053_core.py"
             },
             "integration": {
@@ -701,9 +648,8 @@
         {
             "id": "CAP-054",
             "title": "Execute long-running actions",
-            "status": "crystallized",
+            "sector": "models",
             "genealogy": {
-                "target_suggested": "app/domain/models/",
                 "target_file": "app/domain/models/cap_054_core.py"
             },
             "integration": {
@@ -714,9 +660,8 @@
         {
             "id": "CAP-055",
             "title": "Monitor execution in real time",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_055_core.py"
             },
             "integration": {
@@ -727,9 +672,8 @@
         {
             "id": "CAP-056",
             "title": "Interrupt problematic executions",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_056_core.py"
             },
             "integration": {
@@ -740,9 +684,8 @@
         {
             "id": "CAP-057",
             "title": "Rollback partially completed executions",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_057_core.py"
             },
             "integration": {
@@ -753,9 +696,8 @@
         {
             "id": "CAP-058",
             "title": "Adapt plans during execution",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_058_core.py"
             },
             "integration": {
@@ -766,9 +708,8 @@
         {
             "id": "CAP-059",
             "title": "Distribute execution across devices",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_059_core.py"
             },
             "integration": {
@@ -779,9 +720,8 @@
         {
             "id": "CAP-060",
             "title": "Operate continuously without supervision",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_060_core.py"
             },
             "integration": {
@@ -792,9 +732,8 @@
         {
             "id": "CAP-061",
             "title": "Learn from recurring failures",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_061_core.py"
             },
             "integration": {
@@ -805,9 +744,8 @@
         {
             "id": "CAP-062",
             "title": "Learn from recurring successes",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_062_core.py"
             },
             "integration": {
@@ -818,9 +756,8 @@
         {
             "id": "CAP-063",
             "title": "Reinforce effective strategies",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_063_core.py"
             },
             "integration": {
@@ -831,9 +768,8 @@
         {
             "id": "CAP-064",
             "title": "Discard ineffective strategies",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_064_core.py"
             },
             "integration": {
@@ -844,9 +780,8 @@
         {
             "id": "CAP-065",
             "title": "Learn from human feedback",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_065_core.py"
             },
             "integration": {
@@ -857,9 +792,8 @@
         {
             "id": "CAP-066",
             "title": "Learn from systemic impact",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_066_core.py"
             },
             "integration": {
@@ -870,9 +804,8 @@
         {
             "id": "CAP-067",
             "title": "Learn from computational cost",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_067_core.py"
             },
             "integration": {
@@ -883,9 +816,8 @@
         {
             "id": "CAP-068",
             "title": "Measure solution efficiency",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_068_core.py"
             },
             "integration": {
@@ -896,9 +828,8 @@
         {
             "id": "CAP-069",
             "title": "Optimize response time",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_069_core.py"
             },
             "integration": {
@@ -909,9 +840,8 @@
         {
             "id": "CAP-070",
             "title": "Optimize stability",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_070_core.py"
             },
             "integration": {
@@ -922,9 +852,8 @@
         {
             "id": "CAP-071",
             "title": "Optimize code reuse",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_071_core.py"
             },
             "integration": {
@@ -935,9 +864,8 @@
         {
             "id": "CAP-072",
             "title": "Evaluate cost of each executed action",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_072_core.py"
             },
             "integration": {
@@ -948,9 +876,8 @@
         {
             "id": "CAP-073",
             "title": "Evaluate potential return of actions",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_073_core.py"
             },
             "integration": {
@@ -961,9 +888,8 @@
         {
             "id": "CAP-074",
             "title": "Decide whether an action should be executed",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_074_core.py"
             },
             "integration": {
@@ -974,9 +900,8 @@
         {
             "id": "CAP-075",
             "title": "Create value-generating activities",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_075_core.py"
             },
             "integration": {
@@ -987,9 +912,8 @@
         {
             "id": "CAP-076",
             "title": "Measure real economic return",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_076_core.py"
             },
             "integration": {
@@ -1000,9 +924,8 @@
         {
             "id": "CAP-077",
             "title": "Eliminate economically unviable actions",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_077_core.py"
             },
             "integration": {
@@ -1013,9 +936,8 @@
         {
             "id": "CAP-078",
             "title": "Prioritize profitable actions",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_078_core.py"
             },
             "integration": {
@@ -1026,9 +948,8 @@
         {
             "id": "CAP-079",
             "title": "Automatically reinvest resources",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_079_core.py"
             },
             "integration": {
@@ -1039,9 +960,8 @@
         {
             "id": "CAP-080",
             "title": "Sustain own infrastructure",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_080_core.py"
             },
             "integration": {
@@ -1052,9 +972,8 @@
         {
             "id": "CAP-081",
             "title": "Reduce human dependency",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_081_core.py"
             },
             "integration": {
@@ -1065,9 +984,8 @@
         {
             "id": "CAP-082",
             "title": "Generate recurring revenue",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_082_core.py"
             },
             "integration": {
@@ -1078,9 +996,8 @@
         {
             "id": "CAP-083",
             "title": "Allocate portion of revenue to creator",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_083_core.py"
             },
             "integration": {
@@ -1091,9 +1008,8 @@
         {
             "id": "CAP-084",
             "title": "Detect anomalous internal behavior",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_084_core.py"
             },
             "integration": {
@@ -1104,9 +1020,8 @@
         {
             "id": "CAP-085",
             "title": "Detect dangerous decision loops",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_085_core.py"
             },
             "integration": {
@@ -1117,9 +1032,8 @@
         {
             "id": "CAP-086",
             "title": "Enforce internal operational limits",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_086_core.py"
             },
             "integration": {
@@ -1130,9 +1044,8 @@
         {
             "id": "CAP-087",
             "title": "Block potentially destructive actions",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_087_core.py"
             },
             "integration": {
@@ -1143,9 +1056,8 @@
         {
             "id": "CAP-088",
             "title": "Escalate sensitive decisions to human",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_088_core.py"
             },
             "integration": {
@@ -1156,9 +1068,8 @@
         {
             "id": "CAP-089",
             "title": "Log critical decisions for audit",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_089_core.py"
             },
             "integration": {
@@ -1169,9 +1080,8 @@
         {
             "id": "CAP-090",
             "title": "Protect sensitive data",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_090_core.py"
             },
             "integration": {
@@ -1182,9 +1092,8 @@
         {
             "id": "CAP-091",
             "title": "Protect the user",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_091_core.py"
             },
             "integration": {
@@ -1195,9 +1104,8 @@
         {
             "id": "CAP-092",
             "title": "Protect itself",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_092_core.py"
             },
             "integration": {
@@ -1208,9 +1116,8 @@
         {
             "id": "CAP-093",
             "title": "Maintain full traceability",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_093_core.py"
             },
             "integration": {
@@ -1221,9 +1128,8 @@
         {
             "id": "CAP-094",
             "title": "Anticipate user needs",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_094_core.py"
             },
             "integration": {
@@ -1234,9 +1140,8 @@
         {
             "id": "CAP-095",
             "title": "Propose solutions before explicit requests",
-            "status": "crystallized",
+            "sector": "adapters",
             "genealogy": {
-                "target_suggested": "app/adapters/",
                 "target_file": "app/adapters/cap_095_core.py"
             },
             "integration": {
@@ -1247,9 +1152,8 @@
         {
             "id": "CAP-096",
             "title": "Act proactively and safely",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_096_core.py"
             },
             "integration": {
@@ -1260,9 +1164,8 @@
         {
             "id": "CAP-097",
             "title": "Coordinate physical and digital systems",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_097_core.py"
             },
             "integration": {
@@ -1273,9 +1176,8 @@
         {
             "id": "CAP-098",
             "title": "Operate as cognitive copilot",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_098_core.py"
             },
             "integration": {
@@ -1286,9 +1188,8 @@
         {
             "id": "CAP-099",
             "title": "Maintain continuous alignment with user",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_099_core.py"
             },
             "integration": {
@@ -1299,9 +1200,8 @@
         {
             "id": "CAP-100",
             "title": "Evolve continuously without losing identity",
-            "status": "crystallized",
+            "sector": "models",
             "genealogy": {
-                "target_suggested": "app/domain/models/",
                 "target_file": "app/domain/models/cap_100_core.py"
             },
             "integration": {
@@ -1312,9 +1212,8 @@
         {
             "id": "CAP-101",
             "title": "Sustain itself economically long-term",
-            "status": "crystallized",
+            "sector": "gears",
             "genealogy": {
-                "target_suggested": "app/domain/gears/",
                 "target_file": "app/domain/gears/cap_101_core.py"
             },
             "integration": {
@@ -1325,9 +1224,8 @@
         {
             "id": "CAP-102",
             "title": "Operate as personal cognitive infrastructure",
-            "status": "crystallized",
+            "sector": "capabilities",
             "genealogy": {
-                "target_suggested": "app/domain/capabilities/",
                 "target_file": "app/domain/capabilities/cap_102_core.py"
             },
             "integration": {
