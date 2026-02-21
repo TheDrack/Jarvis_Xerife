@@ -11,126 +11,118 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger("Crystallizer")
 
 class CrystallizerEngine:
-    def __init__(self, 
-                 cap_path="data/capabilities.json", 
-                 crystal_path="data/master_crystal.json", 
-                 container_path="app/container.py"):
-
+    def __init__(self, cap_path="data/capabilities.json", crystal_path="data/master_crystal.json"):
         self.paths = {
             "caps": Path(cap_path),
             "crystal": Path(crystal_path),
-            "container": Path(container_path)
+            "container_dir": Path("app/application/containers")
         }
         
-        self.paths["caps"].parent.mkdir(parents=True, exist_ok=True)
+        self.sectors = {
+            "gears": self.paths["container_dir"] / "gears_container.py",
+            "models": self.paths["container_dir"] / "models_container.py",
+            "adapters": self.paths["container_dir"] / "adapters_container.py",
+            "capabilities": self.paths["container_dir"] / "capabilities_container.py"
+        }
+
+        self.paths["container_dir"].mkdir(parents=True, exist_ok=True)
         self.master_crystal = self._load_json(self.paths["crystal"]) or self._init_crystal()
         caps_data = self._load_json(self.paths["caps"])
         self.capabilities = caps_data.get('capabilities', []) if caps_data else []
 
     def _load_json(self, path: Path):
-        try:
-            if path.exists():
-                with open(path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-        except Exception as e:
-            logger.error(f"Erro ao ler JSON em {path}: {str(e)}")
+        if path.exists():
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
         return None
 
     def _init_crystal(self):
-        return {
-            "system_id": "JARVIS_CORE",
-            "version": "1.1.0",
-            "last_scan": None,
-            "registry": []
-        }
+        return {"system_id": "JARVIS_CORE", "version": "2.0.0", "registry": []}
+
+    def _get_sector(self, target_path: str) -> str:
+        if "gears" in target_path: return "gears"
+        if "models" in target_path: return "models"
+        if "adapters" in target_path: return "adapters"
+        return "capabilities"
 
     def _map_target(self, cap: Dict[str, Any]) -> str:
         title = cap.get('title', '').lower()
         desc = cap.get('description', '').lower()
-        if any(x in title or x in desc for x in ["llm", "ai", "gear", "cognition", "groq"]):
-            return "app/domain/gears/"
-        if any(x in title or x in desc for x in ["model", "state", "entity", "schema"]):
-            return "app/domain/models/"
-        if any(x in title or x in desc for x in ["adapter", "web", "pyautogui", "os", "keyboard"]):
-            return "app/adapters/"
+        if any(x in title or x in desc for x in ["llm", "ai", "gear", "cognition"]): return "app/domain/gears/"
+        if any(x in title or x in desc for x in ["model", "state", "entity"]): return "app/domain/models/"
+        if any(x in title or x in desc for x in ["adapter", "web", "os", "github"]): return "app/adapters/"
         return "app/domain/capabilities/"
 
     def run_full_cycle(self):
-        logger.info("🚀 Iniciando Ciclo de Cristalização JARVIS...")
+        logger.info("🚀 Iniciando Cristalização Setorial...")
         self.audit()
         self.transmute()
-        self.stitch()
+        self.stitch_sectors()
         self._save_crystal()
-        logger.info("✨ Cristalização Concluída.")
+        logger.info("✨ Ciclo Concluído.")
 
     def audit(self):
-        container_content = self.paths["container"].read_text(encoding='utf-8') if self.paths["container"].exists() else ""
         new_registry = []
         for cap in self.capabilities:
             cap_id = cap['id']
             target_dir = self._map_target(cap)
             target_file = f"{cap_id.lower().replace('-', '_')}_core.py"
             target_path = os.path.join(target_dir, target_file)
-            is_in_container = f'"{cap_id}"' in container_content
-            is_physically_present = Path(target_path).exists()
+            sector = self._get_sector(target_path)
+            
+            container_file = self.sectors[sector]
+            is_in_container = False
+            if container_file.exists():
+                is_in_container = f'"{cap_id}"' in container_file.read_text(encoding='utf-8')
 
             new_registry.append({
                 "id": cap_id,
                 "title": cap['title'],
-                "status": "crystallized" if is_in_container and is_physically_present else "incomplete",
-                "genealogy": {"target_suggested": target_dir, "target_file": target_path},
-                "integration": {"in_container": is_in_container, "physically_present": is_physically_present}
+                "sector": sector,
+                "genealogy": {"target_file": target_path},
+                "integration": {"in_container": is_in_container, "physically_present": Path(target_path).exists()}
             })
         self.master_crystal["registry"] = new_registry
-        self.master_crystal["last_scan"] = datetime.now().isoformat()
 
     def transmute(self):
         for entry in self.master_crystal["registry"]:
             if not entry["integration"]["physically_present"]:
                 t_path = Path(entry["genealogy"]["target_file"])
-                t_dir = Path(entry["genealogy"]["target_suggested"])
-                t_dir.mkdir(parents=True, exist_ok=True)
-                (t_dir / "__init__.py").touch()
-
-                # Definindo o conteúdo fora da f-string de escrita direta para evitar SyntaxError
-                title = entry['title']
-                cid = entry['id']
-                
+                t_path.parent.mkdir(parents=True, exist_ok=True)
                 content = (
                     "# -*- coding: utf-8 -*-\n"
-                    f'"""CAPABILITY: {title}\n'
-                    f'ID: {cid}"""\n\n'
+                    f"'''CAPABILITY: {entry['title']}'''\n"
                     "def execute(context=None):\n"
-                    "    # JARVIS INITIAL STATE\n"
-                    f'    return {{"status": "initialized", "id": "{cid}"}}\n'
+                    f"    return {{'status': 'initialized', 'id': '{entry['id']}'}}\n"
                 )
-
-                with open(t_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                
-                logger.info(f"  [💎] Criado: {t_path}")
+                t_path.write_text(content, encoding='utf-8')
                 entry["integration"]["physically_present"] = True
 
-    def stitch(self):
-        if not self.paths["container"].exists(): return
-        content = self.paths["container"].read_text(encoding='utf-8')
-        modified = False
+    def stitch_sectors(self):
+        for sector, path in self.sectors.items():
+            if not path.exists():
+                path.write_text(f"# -*- coding: utf-8 -*-\nclass {sector.capitalize()}Container:\n    def __init__(self):\n        self.registry = {{}}\n", encoding='utf-8')
+
         for entry in self.master_crystal["registry"]:
             if entry["integration"]["physically_present"] and not entry["integration"]["in_container"]:
+                sector = entry["sector"]
+                container_path = self.sectors[sector]
+                content = container_path.read_text(encoding='utf-8')
+                
                 cap_id = entry["id"]
                 var_name = f"{cap_id.lower().replace('-', '_')}_exec"
-                raw_path = entry["genealogy"]["target_file"].replace('.py', '').replace('/', '.').replace('\\', '.')
-                import_stmt = f"from {raw_path} import execute as {var_name}"
-                if import_stmt not in content:
-                    content = re.sub(r'(from app\..*import .*)', r'\1\n' + import_stmt, content, count=1)
+                import_path = entry["genealogy"]["target_file"].replace('.py', '').replace('/', '.')
+                
+                import_stmt = f"from {import_path} import execute as {var_name}"
                 mapping = f'            "{cap_id}": {var_name},'
-                if f'"{cap_id}"' not in content:
-                    content = re.sub(r'(self\.capabilities = \{)', r'\1\n' + mapping, content)
-                    modified = True
-                    entry["integration"]["in_container"] = True
-                    entry["status"] = "crystallized"
-        if modified:
-            self.paths["container"].write_text(content, encoding='utf-8')
+
+                if import_stmt not in content:
+                    content = import_stmt + "\n" + content
+                if mapping not in content:
+                    content = content.replace("self.registry = {", f"self.registry = {{\n{mapping}")
+                
+                container_path.write_text(content, encoding='utf-8')
+                entry["integration"]["in_container"] = True
 
     def _save_crystal(self):
         with open(self.paths["crystal"], 'w', encoding='utf-8') as f:
