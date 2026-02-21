@@ -351,7 +351,7 @@
             "id": "CAP-032",
             "title": "Distinguish literal command from real objective",
             "description": "Differentiate between what was said and what is actually needed for the mission.",
-            "status": "partial",
+            "status": "complete",
             "auto": true,
             "priority": 3,
             "depends_on": [
