@@ -457,7 +457,7 @@
             "id": "CAP-042",
             "title": "Simulate systemic consequences before action",
             "description": "Predict the long-term ripple effects of an action across the whole entity.",
-            "status": "pending",
+            "status": "complete",
             "auto": true,
             "priority": 4,
             "depends_on": [

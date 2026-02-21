@@ -1,5 +1,31 @@
-# -*- coding: utf-8 -*-
-'''CAPABILITY: Simulate systemic consequences before action
-DEPENDS ON: ['CAP-041']'''
+
 def execute(context=None):
-    return {'status': 'active', 'id': 'CAP-042'}
+    if context is None:
+        context = {}
+    
+    # Carregar dependências
+    from app.domain.capabilities.cap_041_core import execute as cap_041_execute
+    
+    # Simular consequências sistêmicas
+    def simulate_systemic_consequences(action):
+        # Prever efeitos em longo prazo
+        long_term_effects = []
+        
+        # Iterar sobre todas as entidades afetadas
+        for entity in context['entities']:
+            # Prever efeitos da ação na entidade
+            effects = cap_041_execute({'action': action, 'entity': entity})
+            
+            # Adicionar efeitos à lista de efeitos em longo prazo
+            long_term_effects.extend(effects)
+        
+        return long_term_effects
+    
+    # Executar simulação
+    action = context.get('action')
+    if action:
+        systemic_consequences = simulate_systemic_consequences(action)
+        return systemic_consequences
+    else:
+        return 'Ação não definida'
+   
