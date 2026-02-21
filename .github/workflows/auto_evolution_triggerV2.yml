@@ -14,7 +14,6 @@ permissions:
 jobs:
   evolution_cycle:
     name: "🧬 Ciclo de Evolução"
-    # Evita loops infinitos e só roda em pushes diretos ou disparos manuais
     if: github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[Auto-Evolution]')
     runs-on: ubuntu-latest
     outputs:
@@ -43,16 +42,37 @@ jobs:
         run: |
           uv venv --python 3.11
           source .venv/bin/activate
-          # Instalando dependências necessárias para o core e scripts
-          uv pip install sqlmodel requests #pydantic  groq python-dotenv
+          # Reinstalando dependências necessárias
+          uv pip install sqlmodel requests pydantic groq python-dotenv
           
           python - << 'PYCODE'
-          import os, sys
+          import os, sys, re
           from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
+          
           try:
               auto = AutoEvolutionServiceV2()
-              next_m = auto.find_next_mission()
               github_output = os.environ.get('GITHUB_OUTPUT')
+              
+              # --- LÓGICA RECUPERADA DA IMAGEM (VERDE) ---
+              last_msg = os.popen("git log -1 --pretty=%B").read()
+              print(f"--- ANALISANDO DNA ---\nMsg: {last_msg.strip()}")
+              
+              is_auto = "auto-evolution/mission" in last_msg
+              is_sync = "Inventory Synchronized" in last_msg
+              
+              if is_sync:
+                  print("🛡️ Trava Anti-Loop."); out = "action=idle\n"
+              elif is_auto:
+                  print("🎯 Merge de Evolução detectado.")
+                  match = re.search(r'CAP-\d+', last_msg)
+                  if match:
+                      cap_id = match.group()
+                      # Marca como completada para não repetir
+                      auto.mark_mission_as_completed(cap_id)
+                      print(f"✅ Missão {cap_id} sincronizada na Homeostase.")
+              
+              # --- BUSCA PRÓXIMA MISSÃO ---
+              next_m = auto.find_next_mission()
               
               if next_m:
                   context = auto.get_roadmap_context(next_m)
@@ -62,11 +82,12 @@ jobs:
                   with open(github_output, 'a') as f:
                       f.write(f"action=evolve\n")
                       f.write(f"mission_desc={next_m['id']}: {next_m['title']}\n")
-                  print(f"🚀 Missão encontrada: {next_m['id']}")
+                  print(f"🚀 Próxima missão preparada: {next_m['id']}")
               else:
                   with open(github_output, 'a') as f:
                       f.write("action=idle\n")
                   print("😴 Nenhuma missão pendente.")
+                  
           except Exception as e:
               print(f"❌ Erro no Orquestrador: {e}")
               sys.exit(1)
@@ -87,7 +108,6 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           
           # 1. Cristalização Setorial
-          echo "💎 Cristalizando estado atual..."
           python app/application/services/crystallization/crystallizer_engine.py
           
           # 2. Setup de Branch
@@ -97,33 +117,25 @@ jobs:
           git push origin "$BRANCH_NAME"
           echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
           
-          # 3. Mutação (DNA Injection) - Adicionado logs para debug
-          echo "🧬 Iniciando Mutação de DNA..."
+          # 3. Mutação
           if ! python scripts/evolution_mutator.py \
             --strategy "minimal_change" \
             --intent "auto-evolution-mission" \
             --impact "functional-improvement" \
             --roadmap-context "$(cat mission_context.txt)"; then
-              echo "❌ Falha crítica no mutator. Verifique logs do script scripts/evolution_mutator.py"
+              echo "❌ Falha crítica no mutator."
               exit 1
           fi
 
-          # 4. Verificação de Alterações e Push do PR
+          # 4. PR
           git add -A
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "[Auto-Evolution] DNA Mutated: ${{ steps.flow.outputs.mission_desc }}"
             git push origin "$BRANCH_NAME"
             
-            echo "📢 Criando Pull Request..."
             PR_URL=$(gh pr create \
                          --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
                          --body "### 🧠 Auto-Evolução Detectada\nMissão: ${{ steps.flow.outputs.mission_desc }}\n\nStatus: Auto-Cura e Melhoria em andamento." \
-                         --base main \
-                         --head "$BRANCH_NAME")
-            
-            PR_NUMBER=$(echo $PR_URL | awk -F'/' '{print $6}')
-            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "✅ PR #$PR_NUMBER criado com sucesso."
-          else
-            echo "⚠️ Mutator rodou mas não gerou alterações físicas no código."
+                         --base main --head "$BRANCH_NAME")
+            echo "pr_number=$(echo $PR_URL | awk -F'/' '{print $6}')" >> $GITHUB_OUTPUT
           fi
