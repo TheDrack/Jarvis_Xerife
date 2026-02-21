@@ -479,7 +479,7 @@
             "id": "CAP-044",
             "title": "Evaluate computational cost",
             "description": "Estimate the CPU, memory, and token usage for a given strategy.",
-            "status": "pending",
+            "status": "complete",
             "auto": true,
             "priority": 4,
             "depends_on": [],
