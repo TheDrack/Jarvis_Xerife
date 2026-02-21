@@ -1,42 +1,40 @@
-# -*- coding: utf-8 -*-
+# app/application/containers/hub.py
+
 import importlib
 import logging
 
-logger = logging.getLogger("JarvisHub")
-
 class JarvisHub:
     def __init__(self):
-        # Mapeamento para Lazy Loading
+        self._cache = {}
+        # Mapeamento fixo de setores para containers
         self.sector_map = {
             "gears": "app.application.containers.gears_container",
             "models": "app.application.containers.models_container",
             "adapters": "app.application.containers.adapters_container",
             "capabilities": "app.application.containers.capabilities_container"
         }
-        self._cache = {}
 
     def resolve(self, cap_id: str, sector: str):
-        """Carrega e retorna o executor da capacidade apenas sob demanda."""
-        if cap_id in self._cache:
-            return self._cache[cap_id]
+        """O Hub apenas guia o fluxo para o executor correto."""
+        key = f"{sector}_{cap_id}"
+        if key in self._cache:
+            return self._cache[key]
 
         module_path = self.sector_map.get(sector)
-        if not module_path:
-            return None
+        if not module_path: return None
 
         try:
+            # Carregamento dinâmico do container do setor
             module = importlib.import_module(module_path)
             container_class = getattr(module, f"{sector.capitalize()}Container")
-            container_instance = container_class()
+            container = container_class()
             
-            executor = container_instance.registry.get(cap_id)
-            if executor:
-                self._cache[cap_id] = executor
-                return executor
+            # O Hub entrega a função 'execute' mapeada no container
+            executor = container.registry.get(cap_id)
+            self._cache[key] = executor
+            return executor
         except Exception as e:
-            logger.error(f"Erro ao carregar setor {sector} para {cap_id}: {e}")
-        
-        return None
+            logging.error(f"Erro ao guiar para {cap_id} no setor {sector}: {e}")
+            return None
 
-# Singleton para uso em todo o JARVIS
 hub = JarvisHub()
