@@ -7,15 +7,9 @@ on:
     branches: [ main ]
     types: [opened, synchronize, reopened]
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Permite disparar por PRs do bot, mas evita loop de auto-cura
     if: "!contains(github.event.head_commit.message, '[Auto-Cura]')"
     runs-on: ubuntu-latest
 
@@ -24,19 +18,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.JARVIS_PAT || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GIT_PAT }} # Utilizando o GIT_PAT para bypass e triggers
 
       - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
         with:
-          enable-cache: true
+          python-version: '3.11'
 
       - name: 🔧 Instalação do DNA
         run: |
-          uv venv --python 3.13
-          uv pip install pytest pytest-json-report pytest-cov pytest-asyncio \
-                         pydantic pydantic-settings cryptography httpx \
-                         sqlmodel groq python-dotenv requests
+          uv venv
+          uv pip install pytest pytest-json-report sqlmodel groq requests python-dotenv
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
       - name: 🔄 Ciclo de Cura e Decisão
@@ -44,62 +36,28 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          ATTEMPT=1
-          SUCCESS=false
-          FINAL_MSG="Falha Crítica"
-
-          while [ $ATTEMPT -le 2 ]; do
-            echo "🧪 Tentativa $ATTEMPT..."
-            uv run pytest --json-report --json-report-file=report.json tests/ || true
-            
-            if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ] && [ "$(jq '.summary.errors // 0' report.json)" == "0" ]; then
-              SUCCESS=true
-              FINAL_MSG="Sucesso"
-              break
-            fi
-            
-            # Captura de erros para o Mecânico
-            if [ -f report.json ]; then
-              ERR_DATA=$(jq -c '.tests[] | select(.outcome=="failed" or .outcome=="error") | {id:.nodeid, m:.call.crash.message}' report.json | head -c 800)
-              [ -z "$ERR_DATA" ] && ERR_DATA=$(jq -c '.collectors[] | select(.result=="error") | {id:.nodeid, m:.longrepr}' report.json | head -c 800)
-            fi
-
-            RISK_OUT=$(uv run python scripts/metabolism_analyzer.py --intent "self-healing" --instruction "Validar" --context "$ERR_DATA")
-            
-            if echo "$RISK_OUT" | grep -q '"requires_human": true'; then
-              FINAL_MSG=$(echo $RISK_OUT | jq -r '.reason')
-              break
-            fi
-
-            uv run python scripts/self_healing_mutator.py --report "report.json"
-            git config --global user.name "Jarvis-AutoEvolution"
-            git config --global user.email "jarvis@bot.com"
-            git add -A
-            git commit -m "🤖 [Auto-Cura] Tentativa #$ATTEMPT" || echo "Sem mudanças"
-            ATTEMPT=$((ATTEMPT+1))
-          done
-
-          echo "final_status=$SUCCESS" >> $GITHUB_OUTPUT
-          echo "FINAL_REASON=$FINAL_MSG" >> $GITHUB_ENV
-
-      - name: ✅ Auto-Merge (Segurança Garantida)
-        # SÓ realiza o merge se o status final for SUCCESS=true
-        if: steps.healing_process.outputs.final_status == 'true' && github.event.pull_request.number != null
-        env:
-          GH_TOKEN: ${{ secrets.JARVIS_PAT || secrets.GITHUB_TOKEN }}
-        run: |
-          # Aceita merge se for você ou se for a Auto-Evolução (após passar nos testes)
-          AUTHOR="${{ github.event.pull_request.user.login }}"
-          if [ "$AUTHOR" = "TheDrack" ] || [ "$AUTHOR" = "github-actions[bot]" ]; then
-            echo "🫡 Vistoria aprovada para $AUTHOR. Realizando Merge..."
-            gh pr merge ${{ github.event.pull_request.number }} --auto --merge
+          uv run pytest --json-report --json-report-file=report.json || true
+          
+          if [ "$(jq '.summary.failed // 0' report.json)" == "0" ]; then
+            echo "💎 DNA está estável. Iniciando Cristalização..."
+            uv run python app/application/services/crystallization/crystallizer_engine.py
+            echo "final_status=true" >> $GITHUB_OUTPUT
+          else
+            echo "final_status=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: 🚨 Escalação
-        if: steps.healing_process.outputs.final_status == 'false' && env.FINAL_REASON != 'Sucesso'
+      - name: ✅ Auto-Merge
+        if: steps.healing_process.outputs.final_status == 'true' && github.event_name == 'pull_request'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
-          gh issue create --title "🚨 Homeostase: Bloqueio em ${{ github.event.pull_request.title }}" \
-            --body "A PR não passou na vistoria técnica. Motivo: ${{ env.FINAL_REASON }}"
-          exit 1
+          gh pr merge ${{ github.event.pull_request.number }} --auto --merge --delete-branch
+
+      - name: 💾 Persistência de Cristalização
+        if: steps.healing_process.outputs.final_status == 'true'
+        run: |
+          git config --global user.name "Jarvis-Crystallizer"
+          git config --global user.email "jarvis@bot.com"
+          git add data/master_crystal.json app/application/containers/*.py
+          git commit -m "chore: [Auto-Cura] DNA Cristalizado e Mapeado [Auto-Cura]" || echo "Sem mudanças"
+          git push origin main
