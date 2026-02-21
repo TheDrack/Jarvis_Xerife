@@ -75,4 +75,4 @@ jobs:
                   # Força o modo IDLE para não iniciar nova missão no mesmo ciclo
                   with open(github_output, 'a') as f:
                       f.write("action=idle\n")
-                  sys.exit(0
+                  sys.exit(0)
