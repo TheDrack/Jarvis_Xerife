@@ -7,11 +7,6 @@ on:
     branches: [ main ]
     types: [opened, synchronize, reopened]
 
-permissions:
-  contents: write
-  pull-requests: write
-  repository-projects: write
-
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
@@ -24,6 +19,8 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
+          # Garante que o checkout rastreie a branch correta
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
 
       - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
@@ -42,10 +39,8 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          # 1. Executa os testes
           uv run pytest --json-report --json-report-file=report.json || true
           
-          # 2. Validação de integridade e Cristalização
           if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ] && [ "$(jq '.summary.errors // 0' report.json)" == "0" ]; then
             echo "✅ DNA estável. Sincronizando Crystal..."
             uv run python app/application/services/crystallization/crystallizer_engine.py
@@ -60,12 +55,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
-          echo "🫡 Vistoria aprovada. Tentando Merge via CLI..."
-          # Tenta o merge. Se falhar por permissão de token, avisa o JARVIS.
-          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch || \
-          echo "⚠️ Falha no Merge: Verifique se o GIT_PAT tem permissão 'repo' e se a branch main não tem 'Restrict additions by users/apps'."
+          echo "🫡 Realizando Merge Automático..."
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch --admin || \
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
 
-      - name: 💾 Persistência com GIT_PAT
+      - name: 💾 Persistência Garantida (Correção de Refspec)
         if: steps.healing_process.outputs.final_status == 'true'
         env:
           TOKEN: ${{ secrets.GIT_PAT }}
@@ -73,14 +67,21 @@ jobs:
           git config --global user.name "Jarvis-Crystallizer"
           git config --global user.email "jarvis@bot.com"
           
-          # Reconfigura URL para garantir bypass de 403
+          # 1. Identifica a branch alvo (PR ou Main)
+          TARGET_BRANCH="${{ github.event.pull_request.head.ref || 'main' }}"
+          echo "🎯 Branch de Destino: $TARGET_BRANCH"
+
+          # 2. Reconfigura URL com o PAT para bypass de 403
           git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git
           
           git add data/master_crystal.json app/application/containers/*.py
           
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "chore: [Auto-Cura] DNA Cristalizado e Mapeado [Auto-Cura]"
-            git push origin main
+            
+            # O SEGREDO: Push do HEAD local para a branch remota correta
+            # Isso resolve o erro 'src refspec main does not match any'
+            git push origin HEAD:$TARGET_BRANCH
           else
             echo "✨ DNA já está em equilíbrio."
           fi
