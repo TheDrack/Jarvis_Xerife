@@ -14,6 +14,7 @@ permissions:
 jobs:
   evolution_cycle:
     name: "🧬 Ciclo de Evolução"
+    # Evita loops infinitos e só roda em pushes diretos ou disparos manuais
     if: github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[Auto-Evolution]')
     runs-on: ubuntu-latest
     outputs:
@@ -30,8 +31,10 @@ jobs:
 
       - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
 
-      - name: 🧠 Orquestrador e Mutação
+      - name: 🧠 Orquestrador e Identificação de Missão
         id: flow
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -39,21 +42,34 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
         run: |
           uv venv --python 3.11
+          source .venv/bin/activate
+          # Instalando dependências necessárias para o core e scripts
           uv pip install sqlmodel pydantic requests groq python-dotenv
-          PY_VENV=".venv/bin/python"
-          $PY_VENV - << 'PYCODE'
+          
+          python - << 'PYCODE'
           import os, sys
           from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
           try:
               auto = AutoEvolutionServiceV2()
               next_m = auto.find_next_mission()
-              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-                  if next_m:
-                      with open('mission_context.txt', 'w', encoding='utf-8') as mc:
-                          mc.write(auto.get_roadmap_context(next_m))
-                      f.write(f"action=evolve\nmission_desc={next_m['id']}: {next_m['title']}\n")
-                  else: f.write("action=idle\n")
-          except Exception as e: sys.exit(1)
+              github_output = os.environ.get('GITHUB_OUTPUT')
+              
+              if next_m:
+                  context = auto.get_roadmap_context(next_m)
+                  with open('mission_context.txt', 'w', encoding='utf-8') as mc:
+                      mc.write(context)
+                  
+                  with open(github_output, 'a') as f:
+                      f.write(f"action=evolve\n")
+                      f.write(f"mission_desc={next_m['id']}: {next_m['title']}\n")
+                  print(f"🚀 Missão encontrada: {next_m['id']}")
+              else:
+                  with open(github_output, 'a') as f:
+                      f.write("action=idle\n")
+                  print("😴 Nenhuma missão pendente.")
+          except Exception as e:
+              print(f"❌ Erro no Orquestrador: {e}")
+              sys.exit(1)
           PYCODE
 
       - name: 🤖 Mutação e Abertura de PR
@@ -66,34 +82,48 @@ jobs:
         run: |
           git config --global user.name "Jarvis-Bot"
           git config --global user.email "jarvis@bot.com"
-          PY_VENV=".venv/bin/python"
+          
+          source .venv/bin/activate
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           
-          # 1. Cristalização
-          $PY_VENV app/application/services/crystallization/crystallizer_engine.py
+          # 1. Cristalização Setorial
+          echo "💎 Cristalizando estado atual..."
+          python app/application/services/crystallization/crystallizer_engine.py
           
-          # 2. Setup e Push Imediato (Garante checkout na Homeostase)
+          # 2. Setup de Branch
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
           git commit --allow-empty -m "🧬 [Auto-Evolution] Iniciando Missão: ${{ steps.flow.outputs.mission_desc }}"
           git push origin "$BRANCH_NAME"
           echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
           
-          # 3. Mutação (DNA Injection)
-          if ! $PY_VENV scripts/evolution_mutator.py \
+          # 3. Mutação (DNA Injection) - Adicionado logs para debug
+          echo "🧬 Iniciando Mutação de DNA..."
+          if ! python scripts/evolution_mutator.py \
             --strategy "minimal_change" \
             --intent "auto-evolution-mission" \
             --impact "functional-improvement" \
             --roadmap-context "$(cat mission_context.txt)"; then
-              echo "❌ Falha no mutator, a Homeostase assumirá o controle."
+              echo "❌ Falha crítica no mutator. Verifique logs do script scripts/evolution_mutator.py"
               exit 1
           fi
 
+          # 4. Verificação de Alterações e Push do PR
           git add -A
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "[Auto-Evolution] DNA Mutated: ${{ steps.flow.outputs.mission_desc }}"
             git push origin "$BRANCH_NAME"
-            PR_URL=$(gh pr create --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
-                         --body "Auto-Cura em andamento." --base main --head "$BRANCH_NAME")
-            echo "pr_number=$(echo $PR_URL | awk -F'/' '{print $6}')" >> $GITHUB_OUTPUT
+            
+            echo "📢 Criando Pull Request..."
+            PR_URL=$(gh pr create \
+                         --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
+                         --body "### 🧠 Auto-Evolução Detectada\nMissão: ${{ steps.flow.outputs.mission_desc }}\n\nStatus: Auto-Cura e Melhoria em andamento." \
+                         --base main \
+                         --head "$BRANCH_NAME")
+            
+            PR_NUMBER=$(echo $PR_URL | awk -F'/' '{print $6}')
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "✅ PR #$PR_NUMBER criado com sucesso."
+          else
+            echo "⚠️ Mutator rodou mas não gerou alterações físicas no código."
           fi
