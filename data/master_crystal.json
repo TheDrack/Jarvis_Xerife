@@ -1,7 +1,7 @@
 {
     "system_id": "JARVIS_CORE",
     "version": "1.0.0",
-    "last_scan": "2026-02-21T14:41:46.555754",
+    "last_scan": "2026-02-21T16:09:30.908123",
     "crystallization_summary": {
         "total_capabilities": 102,
         "crystallized": 50,
@@ -12,7 +12,7 @@
             "id": "CAP-001",
             "title": "Maintain internal inventory of all known capabilities",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_001_core.py"
@@ -26,9 +26,7 @@
             "id": "CAP-002",
             "title": "Classify capabilities by status: nonexistent, partial, complete",
             "status": "complete",
-            "depends_on": [
-                "CAP-001"
-            ],
+            "mapped_libraries": [],
             "sector": "models",
             "genealogy": {
                 "target_file": "app/domain/models/cap_002_core.py"
@@ -42,9 +40,7 @@
             "id": "CAP-003",
             "title": "Automatically detect functional gaps",
             "status": "complete",
-            "depends_on": [
-                "CAP-002"
-            ],
+            "mapped_libraries": [],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_003_core.py"
@@ -58,9 +54,7 @@
             "id": "CAP-004",
             "title": "Generate technical objectives from detected gaps",
             "status": "complete",
-            "depends_on": [
-                "CAP-003"
-            ],
+            "mapped_libraries": [],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_004_core.py"
@@ -74,9 +68,7 @@
             "id": "CAP-005",
             "title": "Prioritize objectives by systemic impact",
             "status": "complete",
-            "depends_on": [
-                "CAP-004"
-            ],
+            "mapped_libraries": [],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_005_core.py"
@@ -90,9 +82,7 @@
             "id": "CAP-006",
             "title": "Prioritize objectives by failure reduction",
             "status": "complete",
-            "depends_on": [
-                "CAP-004"
-            ],
+            "mapped_libraries": [],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_006_core.py"
@@ -106,9 +96,7 @@
             "id": "CAP-007",
             "title": "Prioritize objectives by future reuse potential",
             "status": "complete",
-            "depends_on": [
-                "CAP-004"
-            ],
+            "mapped_libraries": [],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_007_core.py"
@@ -122,9 +110,7 @@
             "id": "CAP-008",
             "title": "Maintain history of completed objectives",
             "status": "complete",
-            "depends_on": [
-                "CAP-004"
-            ],
+            "mapped_libraries": [],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_008_core.py"
@@ -138,7 +124,7 @@
             "id": "CAP-009",
             "title": "Maintain history of technical decisions",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_009_core.py"
@@ -152,7 +138,7 @@
             "id": "CAP-010",
             "title": "Distinguish technical error from conceptual limitation",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_010_core.py"
@@ -166,7 +152,7 @@
             "id": "CAP-011",
             "title": "Request human intervention only when required",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_011_core.py"
@@ -180,7 +166,7 @@
             "id": "CAP-012",
             "title": "Validate improvements using automated tests",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_012_core.py"
@@ -194,9 +180,7 @@
             "id": "CAP-013",
             "title": "Automatically revert unstable changes",
             "status": "complete",
-            "depends_on": [
-                "CAP-012"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_013_core.py"
@@ -210,7 +194,7 @@
             "id": "CAP-014",
             "title": "Preserve architectural compatibility",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_014_core.py"
@@ -224,9 +208,7 @@
             "id": "CAP-015",
             "title": "Automatically document each evolution",
             "status": "complete",
-            "depends_on": [
-                "CAP-008"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_015_core.py"
@@ -240,9 +222,7 @@
             "id": "CAP-016",
             "title": "Explicitly recognize existing capabilities",
             "status": "complete",
-            "depends_on": [
-                "CAP-001"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_016_core.py"
@@ -256,9 +236,7 @@
             "id": "CAP-017",
             "title": "Explicitly recognize missing capabilities",
             "status": "complete",
-            "depends_on": [
-                "CAP-003"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_017_core.py"
@@ -272,9 +250,7 @@
             "id": "CAP-018",
             "title": "Identify internal dependencies between capabilities",
             "status": "complete",
-            "depends_on": [
-                "CAP-016"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_018_core.py"
@@ -288,9 +264,7 @@
             "id": "CAP-019",
             "title": "Identify mission-critical capabilities",
             "status": "complete",
-            "depends_on": [
-                "CAP-016"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_019_core.py"
@@ -304,9 +278,7 @@
             "id": "CAP-020",
             "title": "Identify redundant capabilities",
             "status": "complete",
-            "depends_on": [
-                "CAP-016"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_020_core.py"
@@ -320,9 +292,7 @@
             "id": "CAP-021",
             "title": "Map impact of one capability over others",
             "status": "complete",
-            "depends_on": [
-                "CAP-018"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_021_core.py"
@@ -336,10 +306,7 @@
             "id": "CAP-022",
             "title": "Evaluate risks before modifying critical capabilities",
             "status": "complete",
-            "depends_on": [
-                "CAP-019",
-                "CAP-021"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_022_core.py"
@@ -353,7 +320,7 @@
             "id": "CAP-023",
             "title": "Maintain internal operational self-model",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "models",
             "genealogy": {
                 "target_file": "app/domain/models/cap_023_core.py"
@@ -367,7 +334,7 @@
             "id": "CAP-024",
             "title": "Monitor performance degradation over time",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_024_core.py"
@@ -381,9 +348,7 @@
             "id": "CAP-025",
             "title": "Detect silent regressions",
             "status": "complete",
-            "depends_on": [
-                "CAP-012"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_025_core.py"
@@ -397,7 +362,7 @@
             "id": "CAP-026",
             "title": "Distinguish local improvement from systemic improvement",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_026_core.py"
@@ -411,7 +376,7 @@
             "id": "CAP-027",
             "title": "Maintain short-term operational memory",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_027_core.py"
@@ -425,7 +390,7 @@
             "id": "CAP-028",
             "title": "Maintain mid-term strategic memory",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_028_core.py"
@@ -439,7 +404,7 @@
             "id": "CAP-029",
             "title": "Maintain long-term historical memory",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_029_core.py"
@@ -453,9 +418,7 @@
             "id": "CAP-030",
             "title": "Correlate temporally distant events",
             "status": "complete",
-            "depends_on": [
-                "CAP-029"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_030_core.py"
@@ -469,7 +432,7 @@
             "id": "CAP-031",
             "title": "Infer intention from behavior",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_031_core.py"
@@ -483,9 +446,7 @@
             "id": "CAP-032",
             "title": "Distinguish literal command from real objective",
             "status": "partial",
-            "depends_on": [
-                "CAP-031"
-            ],
+            "mapped_libraries": [],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_032_core.py"
@@ -499,7 +460,7 @@
             "id": "CAP-033",
             "title": "Build dynamic user model",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "models",
             "genealogy": {
                 "target_file": "app/domain/models/cap_033_core.py"
@@ -513,9 +474,7 @@
             "id": "CAP-034",
             "title": "Continuously update user model",
             "status": "pending",
-            "depends_on": [
-                "CAP-033"
-            ],
+            "mapped_libraries": [],
             "sector": "models",
             "genealogy": {
                 "target_file": "app/domain/models/cap_034_core.py"
@@ -529,9 +488,7 @@
             "id": "CAP-035",
             "title": "Detect changes in user patterns",
             "status": "pending",
-            "depends_on": [
-                "CAP-034"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_035_core.py"
@@ -545,7 +502,7 @@
             "id": "CAP-036",
             "title": "Distinguish signal from noise",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_036_core.py"
@@ -559,7 +516,7 @@
             "id": "CAP-037",
             "title": "Recognize urgency context",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_037_core.py"
@@ -573,7 +530,7 @@
             "id": "CAP-038",
             "title": "Recognize human priority context",
             "status": "pending",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_038_core.py"
@@ -587,7 +544,7 @@
             "id": "CAP-039",
             "title": "Plan actions across multiple steps",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_039_core.py"
@@ -601,7 +558,7 @@
             "id": "CAP-040",
             "title": "Compare multiple possible strategies",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_040_core.py"
@@ -615,7 +572,7 @@
             "id": "CAP-041",
             "title": "Simulate technical consequences before action",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_041_core.py"
@@ -629,9 +586,7 @@
             "id": "CAP-042",
             "title": "Simulate systemic consequences before action",
             "status": "pending",
-            "depends_on": [
-                "CAP-041"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_042_core.py"
@@ -645,7 +600,7 @@
             "id": "CAP-043",
             "title": "Evaluate failure risk",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_043_core.py"
@@ -659,7 +614,7 @@
             "id": "CAP-044",
             "title": "Evaluate computational cost",
             "status": "pending",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_044_core.py"
@@ -673,7 +628,7 @@
             "id": "CAP-045",
             "title": "Evaluate maintenance cost",
             "status": "pending",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_045_core.py"
@@ -687,7 +642,7 @@
             "id": "CAP-046",
             "title": "Evaluate long-term impact of decisions",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_046_core.py"
@@ -701,11 +656,7 @@
             "id": "CAP-047",
             "title": "Select strategies with optimal cost-benefit",
             "status": "pending",
-            "depends_on": [
-                "CAP-040",
-                "CAP-043",
-                "CAP-044"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_047_core.py"
@@ -719,9 +670,7 @@
             "id": "CAP-048",
             "title": "Abort actions with excessive risk",
             "status": "complete",
-            "depends_on": [
-                "CAP-043"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_048_core.py"
@@ -735,9 +684,7 @@
             "id": "CAP-049",
             "title": "Request human validation for critical decisions",
             "status": "complete",
-            "depends_on": [
-                "CAP-011"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_049_core.py"
@@ -751,7 +698,7 @@
             "id": "CAP-050",
             "title": "Orchestrate multiple agents simultaneously",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_050_core.py"
@@ -765,9 +712,7 @@
             "id": "CAP-051",
             "title": "Delegate tasks based on specialization",
             "status": "complete",
-            "depends_on": [
-                "CAP-050"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_051_core.py"
@@ -781,7 +726,7 @@
             "id": "CAP-052",
             "title": "Execute actions in parallel",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_052_core.py"
@@ -795,7 +740,7 @@
             "id": "CAP-053",
             "title": "Prioritize critical executions",
             "status": "pending",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_053_core.py"
@@ -809,7 +754,7 @@
             "id": "CAP-054",
             "title": "Execute long-running actions",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_054_core.py"
@@ -823,7 +768,7 @@
             "id": "CAP-055",
             "title": "Monitor execution in real time",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_055_core.py"
@@ -837,9 +782,7 @@
             "id": "CAP-056",
             "title": "Interrupt problematic executions",
             "status": "complete",
-            "depends_on": [
-                "CAP-055"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_056_core.py"
@@ -853,9 +796,7 @@
             "id": "CAP-057",
             "title": "Rollback partially completed executions",
             "status": "partial",
-            "depends_on": [
-                "CAP-056"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_057_core.py"
@@ -869,9 +810,7 @@
             "id": "CAP-058",
             "title": "Adapt plans during execution",
             "status": "pending",
-            "depends_on": [
-                "CAP-055"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_058_core.py"
@@ -885,7 +824,7 @@
             "id": "CAP-059",
             "title": "Distribute execution across devices",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_059_core.py"
@@ -899,11 +838,7 @@
             "id": "CAP-060",
             "title": "Operate continuously without supervision",
             "status": "partial",
-            "depends_on": [
-                "CAP-011",
-                "CAP-048",
-                "CAP-055"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_060_core.py"
@@ -917,9 +852,7 @@
             "id": "CAP-061",
             "title": "Learn from recurring failures",
             "status": "partial",
-            "depends_on": [
-                "CAP-008"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_061_core.py"
@@ -933,9 +866,7 @@
             "id": "CAP-062",
             "title": "Learn from recurring successes",
             "status": "pending",
-            "depends_on": [
-                "CAP-008"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_062_core.py"
@@ -949,9 +880,7 @@
             "id": "CAP-063",
             "title": "Reinforce effective strategies",
             "status": "pending",
-            "depends_on": [
-                "CAP-062"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_063_core.py"
@@ -965,9 +894,7 @@
             "id": "CAP-064",
             "title": "Discard ineffective strategies",
             "status": "pending",
-            "depends_on": [
-                "CAP-061"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_064_core.py"
@@ -981,7 +908,7 @@
             "id": "CAP-065",
             "title": "Learn from human feedback",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_065_core.py"
@@ -995,9 +922,7 @@
             "id": "CAP-066",
             "title": "Learn from systemic impact",
             "status": "pending",
-            "depends_on": [
-                "CAP-021"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_066_core.py"
@@ -1011,9 +936,7 @@
             "id": "CAP-067",
             "title": "Learn from computational cost",
             "status": "pending",
-            "depends_on": [
-                "CAP-044"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_067_core.py"
@@ -1027,7 +950,7 @@
             "id": "CAP-068",
             "title": "Measure solution efficiency",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_068_core.py"
@@ -1041,9 +964,7 @@
             "id": "CAP-069",
             "title": "Optimize response time",
             "status": "pending",
-            "depends_on": [
-                "CAP-067"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_069_core.py"
@@ -1057,9 +978,7 @@
             "id": "CAP-070",
             "title": "Optimize stability",
             "status": "complete",
-            "depends_on": [
-                "CAP-061"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_070_core.py"
@@ -1073,9 +992,7 @@
             "id": "CAP-071",
             "title": "Optimize code reuse",
             "status": "complete",
-            "depends_on": [
-                "CAP-007"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_071_core.py"
@@ -1089,7 +1006,7 @@
             "id": "CAP-072",
             "title": "Evaluate cost of each executed action",
             "status": "pending",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_072_core.py"
@@ -1103,7 +1020,7 @@
             "id": "CAP-073",
             "title": "Evaluate potential return of actions",
             "status": "pending",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_073_core.py"
@@ -1117,10 +1034,7 @@
             "id": "CAP-074",
             "title": "Decide whether an action should be executed",
             "status": "pending",
-            "depends_on": [
-                "CAP-072",
-                "CAP-073"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_074_core.py"
@@ -1134,7 +1048,7 @@
             "id": "CAP-075",
             "title": "Create value-generating activities",
             "status": "pending",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_075_core.py"
@@ -1148,9 +1062,7 @@
             "id": "CAP-076",
             "title": "Measure real economic return",
             "status": "pending",
-            "depends_on": [
-                "CAP-075"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_076_core.py"
@@ -1164,9 +1076,7 @@
             "id": "CAP-077",
             "title": "Eliminate economically unviable actions",
             "status": "pending",
-            "depends_on": [
-                "CAP-076"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_077_core.py"
@@ -1180,9 +1090,7 @@
             "id": "CAP-078",
             "title": "Prioritize profitable actions",
             "status": "pending",
-            "depends_on": [
-                "CAP-076"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_078_core.py"
@@ -1196,9 +1104,7 @@
             "id": "CAP-079",
             "title": "Automatically reinvest resources",
             "status": "pending",
-            "depends_on": [
-                "CAP-075"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_079_core.py"
@@ -1212,9 +1118,7 @@
             "id": "CAP-080",
             "title": "Sustain own infrastructure",
             "status": "pending",
-            "depends_on": [
-                "CAP-075"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_080_core.py"
@@ -1228,9 +1132,7 @@
             "id": "CAP-081",
             "title": "Reduce human dependency",
             "status": "partial",
-            "depends_on": [
-                "CAP-080"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_081_core.py"
@@ -1244,9 +1146,7 @@
             "id": "CAP-082",
             "title": "Generate recurring revenue",
             "status": "pending",
-            "depends_on": [
-                "CAP-075"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_082_core.py"
@@ -1260,9 +1160,7 @@
             "id": "CAP-083",
             "title": "Allocate portion of revenue to creator",
             "status": "pending",
-            "depends_on": [
-                "CAP-082"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_083_core.py"
@@ -1276,9 +1174,7 @@
             "id": "CAP-084",
             "title": "Detect anomalous internal behavior",
             "status": "partial",
-            "depends_on": [
-                "CAP-023"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_084_core.py"
@@ -1292,7 +1188,7 @@
             "id": "CAP-085",
             "title": "Detect dangerous decision loops",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_085_core.py"
@@ -1306,7 +1202,7 @@
             "id": "CAP-086",
             "title": "Enforce internal operational limits",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_086_core.py"
@@ -1320,9 +1216,7 @@
             "id": "CAP-087",
             "title": "Block potentially destructive actions",
             "status": "partial",
-            "depends_on": [
-                "CAP-043"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_087_core.py"
@@ -1336,9 +1230,7 @@
             "id": "CAP-088",
             "title": "Escalate sensitive decisions to human",
             "status": "complete",
-            "depends_on": [
-                "CAP-011"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_088_core.py"
@@ -1352,9 +1244,7 @@
             "id": "CAP-089",
             "title": "Log critical decisions for audit",
             "status": "complete",
-            "depends_on": [
-                "CAP-009"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_089_core.py"
@@ -1368,7 +1258,7 @@
             "id": "CAP-090",
             "title": "Protect sensitive data",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_090_core.py"
@@ -1382,7 +1272,7 @@
             "id": "CAP-091",
             "title": "Protect the user",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_091_core.py"
@@ -1396,7 +1286,7 @@
             "id": "CAP-092",
             "title": "Protect itself",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_092_core.py"
@@ -1410,9 +1300,7 @@
             "id": "CAP-093",
             "title": "Maintain full traceability",
             "status": "complete",
-            "depends_on": [
-                "CAP-089"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_093_core.py"
@@ -1426,9 +1314,7 @@
             "id": "CAP-094",
             "title": "Anticipate user needs",
             "status": "pending",
-            "depends_on": [
-                "CAP-033"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_094_core.py"
@@ -1442,9 +1328,7 @@
             "id": "CAP-095",
             "title": "Propose solutions before explicit requests",
             "status": "pending",
-            "depends_on": [
-                "CAP-094"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_095_core.py"
@@ -1458,10 +1342,7 @@
             "id": "CAP-096",
             "title": "Act proactively and safely",
             "status": "partial",
-            "depends_on": [
-                "CAP-060",
-                "CAP-095"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_096_core.py"
@@ -1475,7 +1356,7 @@
             "id": "CAP-097",
             "title": "Coordinate physical and digital systems",
             "status": "complete",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_097_core.py"
@@ -1489,7 +1370,7 @@
             "id": "CAP-098",
             "title": "Operate as cognitive copilot",
             "status": "partial",
-            "depends_on": [],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_098_core.py"
@@ -1503,9 +1384,7 @@
             "id": "CAP-099",
             "title": "Maintain continuous alignment with user",
             "status": "complete",
-            "depends_on": [
-                "CAP-032"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_099_core.py"
@@ -1519,9 +1398,7 @@
             "id": "CAP-100",
             "title": "Evolve continuously without losing identity",
             "status": "complete",
-            "depends_on": [
-                "CAP-102"
-            ],
+            "mapped_libraries": [],
             "sector": "models",
             "genealogy": {
                 "target_file": "app/domain/models/cap_100_core.py"
@@ -1535,9 +1412,7 @@
             "id": "CAP-101",
             "title": "Sustain itself economically long-term",
             "status": "pending",
-            "depends_on": [
-                "CAP-080"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_101_core.py"
@@ -1551,9 +1426,7 @@
             "id": "CAP-102",
             "title": "Operate as personal cognitive infrastructure",
             "status": "partial",
-            "depends_on": [
-                "CAP-098"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_102_core.py"
