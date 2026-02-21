@@ -1,39 +1,50 @@
 
       def execute(context=None):
+         # Import necessary libraries
          import time
          import logging
          from app.domain.capabilities import metrics
 
-         # Inicializar o logger
+         # Initialize logger
          logger = logging.getLogger(__name__)
 
-         # Definir o intervalo de tempo para monitorar o desempenho
-         interval = 60  # 1 minuto
+         # Define performance metrics to track
+         metrics_to_track = ['system_speed', 'reliability']
 
-         # Definir o limite de desempenho aceitável
-         threshold = 0.5  # 50% de desempenho em relação ao baseline
+         # Initialize a dictionary to store performance data
+         performance_data = {}
 
-         # Carregar o baseline de desempenho
-         baseline = metrics.load_baseline()
+         # Loop through each metric and collect data
+         for metric in metrics_to_track:
+            # Collect current metric value
+            if metric == 'system_speed':
+               value = metrics.get_system_speed()
+            elif metric == 'reliability':
+               value = metrics.get_reliability()
 
-         # Loop infinito para monitorar o desempenho
-         while True:
-            # Medir o tempo de execução do sistema
-            start_time = time.time()
-            # Executar uma tarefa de exemplo (substituir por uma tarefa real)
-            example_task()
-            end_time = time.time()
+            # Store metric value in performance data dictionary
+            performance_data[metric] = value
 
-            # Calcular o tempo de execução
-            execution_time = end_time - start_time
+            # Log collected metric value
+            logger.info(f'Collected {metric} value: {value}')
 
-            # Calcular a taxa de desempenho
-            performance_ratio = execution_time / baseline
+         # Analyze performance data to identify long-term efficiency drops
+         efficiency_drops = analyze_performance_data(performance_data)
 
-            # Verificar se o desempenho está abaixo do limite aceitável
-            if performance_ratio > threshold:
-               logger.warning(f'Desempenho degradado: {performance_ratio:.2f}')
+         # Log identified efficiency drops
+         logger.info(f'Identified efficiency drops: {efficiency_drops}')
 
-            # Aguardar o intervalo de tempo para a próxima medição
-            time.sleep(interval)
+         # Return analysis results
+         return efficiency_drops
+
+      def analyze_performance_data(performance_data):
+         # Implement logic to analyze performance data and identify long-term efficiency drops
+         # For demonstration purposes, a simple threshold-based analysis is used
+         efficiency_drops = []
+
+         for metric, value in performance_data.items():
+            if value < 0.8:  # Threshold value (e.g., 80%)
+               efficiency_drops.append(metric)
+
+         return efficiency_drops
    
