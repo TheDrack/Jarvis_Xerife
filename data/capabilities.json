@@ -363,7 +363,7 @@
             "id": "CAP-033",
             "title": "Build dynamic user model",
             "description": "Create a profile of the user's preferences, style, and working habits.",
-            "status": "partial",
+            "status": "complete",
             "auto": true,
             "priority": 3,
             "depends_on": [],
