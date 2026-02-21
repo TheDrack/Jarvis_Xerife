@@ -1,5 +1,26 @@
-# -*- coding: utf-8 -*-
-'''CAPABILITY: Compare multiple possible strategies
-DEPENDS ON: []'''
+
 def execute(context=None):
-    return {'status': 'active', 'id': 'CAP-040'}
+    if context is None:
+        context = {}
+    
+    # Carregar as estratégias disponíveis
+    strategies = context.get('strategies', [])
+    
+    # Verificar se há estratégias disponíveis
+    if not strategies:
+        raise ValueError('Nenhuma estratégia disponível')
+    
+    # Inicializar o resultado
+    result = {}
+    
+    # Avaliar cada estratégia
+    for strategy in strategies:
+        # Executar a estratégia
+        strategy_result = strategy.execute(context)
+        
+        # Armazenar o resultado da estratégia
+        result[strategy.__name__] = strategy_result
+    
+    # Retornar o resultado
+    return result
+   
