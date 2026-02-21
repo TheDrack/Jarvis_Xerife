@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
 import os
-import re
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -17,7 +16,7 @@ class CrystallizerEngine:
             "crystal": Path(crystal_path),
             "container_dir": Path("app/application/containers")
         }
-        
+
         self.sectors = {
             "gears": self.paths["container_dir"] / "gears_container.py",
             "models": self.paths["container_dir"] / "models_container.py",
@@ -26,7 +25,11 @@ class CrystallizerEngine:
         }
 
         self.paths["container_dir"].mkdir(parents=True, exist_ok=True)
+        
+        # Carrega ou inicializa o cristal mestre
         self.master_crystal = self._load_json(self.paths["crystal"]) or self._init_crystal()
+        
+        # Carrega as capacidades do arquivo fonte
         caps_data = self._load_json(self.paths["caps"])
         self.capabilities = caps_data.get('capabilities', []) if caps_data else []
 
@@ -37,7 +40,19 @@ class CrystallizerEngine:
         return None
 
     def _init_crystal(self):
-        return {"system_id": "JARVIS_CORE", "version": "2.0.0", "registry": []}
+        """Inicializa a estrutura base do JARVIS_CORE."""
+        return {
+            "system_id": "JARVIS_CORE",
+            "version": "2.0.0",
+            "last_scan": datetime.now().isoformat(),
+            "crystallization_summary": {
+                "total_capabilities": 0,
+                "crystallized": 0,
+                "connected_legacy": 1,
+                "orphan": 0
+            },
+            "registry": []
+        }
 
     def _get_sector(self, target_path: str) -> str:
         if "gears" in target_path: return "gears"
@@ -55,10 +70,11 @@ class CrystallizerEngine:
 
     def run_full_cycle(self):
         logger.info("🚀 Iniciando Cristalização Setorial...")
-        self.audit()
-        self.transmute()
-        self.stitch_sectors()
-        self._save_crystal()
+        self.audit()           # Mapeia o estado atual
+        self.transmute()       # Cria arquivos físicos se não existirem
+        self.stitch_sectors()  # Registra nos containers Python
+        self._update_metrics() # Atualiza o resumo (O QUE ESTAVA FALTANDO)
+        self._save_crystal()   # Persiste no JSON
         logger.info("✨ Ciclo Concluído.")
 
     def audit(self):
@@ -69,7 +85,7 @@ class CrystallizerEngine:
             target_file = f"{cap_id.lower().replace('-', '_')}_core.py"
             target_path = os.path.join(target_dir, target_file)
             sector = self._get_sector(target_path)
-            
+
             container_file = self.sectors[sector]
             is_in_container = False
             if container_file.exists():
@@ -80,7 +96,10 @@ class CrystallizerEngine:
                 "title": cap['title'],
                 "sector": sector,
                 "genealogy": {"target_file": target_path},
-                "integration": {"in_container": is_in_container, "physically_present": Path(target_path).exists()}
+                "integration": {
+                    "in_container": is_in_container, 
+                    "physically_present": Path(target_path).exists()
+                }
             })
         self.master_crystal["registry"] = new_registry
 
@@ -108,11 +127,12 @@ class CrystallizerEngine:
                 sector = entry["sector"]
                 container_path = self.sectors[sector]
                 content = container_path.read_text(encoding='utf-8')
-                
+
                 cap_id = entry["id"]
                 var_name = f"{cap_id.lower().replace('-', '_')}_exec"
-                import_path = entry["genealogy"]["target_file"].replace('.py', '').replace('/', '.')
-                
+                # Ajusta path para formato de import python
+                import_path = entry["genealogy"]["target_file"].replace('.py', '').replace('/', '.').replace('\\', '.')
+
                 import_stmt = f"from {import_path} import execute as {var_name}"
                 mapping = f'            "{cap_id}": {var_name},'
 
@@ -120,9 +140,26 @@ class CrystallizerEngine:
                     content = import_stmt + "\n" + content
                 if mapping not in content:
                     content = content.replace("self.registry = {", f"self.registry = {{\n{mapping}")
-                
+
                 container_path.write_text(content, encoding='utf-8')
                 entry["integration"]["in_container"] = True
+
+    def _update_metrics(self):
+        """Calcula o status da cristalização baseado no registro atual."""
+        registry = self.master_crystal.get("registry", [])
+        total = len(registry)
+        
+        # Um item está cristalizado se está presente no disco E registrado no container
+        crystallized = sum(1 for e in registry if e["integration"]["physically_present"] and e["integration"]["in_container"])
+        orphan = total - crystallized
+
+        self.master_crystal["last_scan"] = datetime.now().isoformat()
+        self.master_crystal["crystallization_summary"] = {
+            "total_capabilities": total,
+            "crystallized": crystallized,
+            "connected_legacy": 1, # Ajustar conforme necessidade de legado
+            "orphan": orphan
+        }
 
     def _save_crystal(self):
         with open(self.paths["crystal"], 'w', encoding='utf-8') as f:
