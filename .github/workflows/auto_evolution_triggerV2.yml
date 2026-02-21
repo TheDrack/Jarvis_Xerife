@@ -76,3 +76,79 @@ jobs:
                   with open(github_output, 'a') as f:
                       f.write("action=idle\n")
                   sys.exit(0)
+
+              # 3. SE FOR PUSH EXTERNO (Não-Evolução): Busca nova missão
+              print("🟢 Caminho livre. Consultando Roadmap para nova evolução...")
+              next_m = auto.find_next_mission()
+              
+              if next_m:
+                  context = auto.get_roadmap_context(next_m)
+                  with open('mission_context.txt', 'w', encoding='utf-8') as mc:
+                      mc.write(context)
+                  
+                  with open(github_output, 'a') as f:
+                      f.write(f"action=evolve\n")
+                      f.write(f"mission_desc={next_m['id']}: {next_m['title']}\n")
+                  print(f"🚀 Iniciando Missão: {next_m['id']}")
+              else:
+                  with open(github_output, 'a') as f:
+                      f.write("action=idle\n")
+                  print("😴 Nenhuma missão pendente.")
+                  
+          except Exception as e:
+              print(f"❌ Falha no Orquestrador: {e}")
+              sys.exit(1)
+          PYCODE
+
+      - name: 🤖 Mutação e Abertura de PR
+        id: create_pr
+        if: steps.flow.outputs.action == 'evolve'
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GH_TOKEN: ${{ secrets.JARVIS_PAT || secrets.GITHUB_TOKEN }}
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          git config --global user.name "Jarvis-Bot"
+          git config --global user.email "jarvis@bot.com"
+          
+          source .venv/bin/activate
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
+          
+          # 1. Cristalização do estado atual
+          python app/application/services/crystallization/crystallizer_engine.py
+          
+          # 2. Criação da Branch para a nova missão
+          BRANCH_NAME="auto-evolution/mission-$(date +%s)"
+          git checkout -b "$BRANCH_NAME"
+          git commit --allow-empty -m "🧬 [Auto-Evolution] Iniciando Missão: ${{ steps.flow.outputs.mission_desc }}"
+          git push origin "$BRANCH_NAME"
+          echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          
+          # 3. Execução do Mutator (DNA Injection)
+          if ! python scripts/evolution_mutator.py \
+            --strategy "minimal_change" \
+            --intent "auto-evolution-mission" \
+            --impact "functional-improvement" \
+            --roadmap-context "$(cat mission_context.txt)"; then
+              echo "❌ Falha crítica no mutator script."
+              exit 1
+          fi
+
+          # 4. Finalização e Criação do PR
+          git add -A
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m "[Auto-Evolution] DNA Mutated: ${{ steps.flow.outputs.mission_desc }}"
+            git push origin "$BRANCH_NAME"
+            
+            echo "📢 Abrindo Pull Request..."
+            PR_URL=$(gh pr create \
+                         --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
+                         --body "### 🧠 Auto-Evolução Detectada\nMissão: ${{ steps.flow.outputs.mission_desc }}\n\nStatus: Mutação em andamento." \
+                         --base main --head "$BRANCH_NAME")
+            
+            PR_NUMBER=$(echo $PR_URL | awk -F'/' '{print $6}')
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "✅ Ciclo de mutação finalizado com sucesso."
+          else
+            echo "⚠️ Nenhuma alteração foi necessária para esta missão."
+          fi
