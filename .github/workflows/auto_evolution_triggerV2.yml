@@ -1,11 +1,7 @@
 name: JARVIS Integrated Evolution
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+  workflow_dispatch: # Evolução agora é um ato de vontade manual
 
 permissions:
   contents: write
@@ -15,7 +11,7 @@ permissions:
 jobs:
   evolution_cycle:
     name: "🧬 Ciclo de Evolução"
-    # Evita rodar em PRs ou se o commit já for de uma evolução concluída
+    # Mantemos a trava de segurança para não re-evoluir sobre um DNA recém-mutado
     if: github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[Auto-Evolution] DNA Mutated')
     runs-on: ubuntu-latest
     outputs:
@@ -28,7 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # Uso obrigatório do GIT_PAT para que a PR dispare os workflows de Homeostase
+          # O GIT_PAT é crucial para que a PR aberta dispare a Homeostase automaticamente
           token: ${{ secrets.GIT_PAT }}
 
       - name: 📦 Setup UV
@@ -44,6 +40,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
+          # Setup do ambiente isolado com UV
           uv venv --clear --python 3.11
           source .venv/bin/activate
           uv pip install sqlmodel requests pydantic groq python-dotenv
@@ -62,20 +59,20 @@ jobs:
               is_auto_evolution = bool(re.search(r'auto-evolution|mission-\d+', last_msg, re.IGNORECASE))
               is_sync = "Inventory Synchronized" in last_msg
               
-              # Sincronização de status sem cristalização
+              # Sincronização lógica do Roadmap
               if is_auto_evolution and not is_sync:
-                  print("🎯 DNA de Evolução detectado. Atualizando status da missão...")
+                  print("🎯 DNA de Evolução detectado. Sincronizando inventário...")
                   match = re.search(r'CAP-\d+', last_msg)
                   if match:
                       cap_id = match.group()
                       if auto.mark_mission_as_completed(cap_id):
-                          print(f"✅ Missão {cap_id} marcada como integrada no sistema.")
+                          print(f"✅ Missão {cap_id} integrada com sucesso.")
                   
                   with open(github_output, 'a') as f:
                       f.write("action=idle\n")
                   sys.exit(0)
 
-              print("🟢 Analisando apostila de aprendizado para próxima mutação...")
+              print("🟢 Buscando próxima mutação na apostila de aprendizado...")
               next_m = auto.find_next_mission()
               
               if next_m:
@@ -86,11 +83,11 @@ jobs:
                   with open(github_output, 'a', encoding='utf-8') as f:
                       f.write(f"action=evolve\n")
                       f.write(f"mission_desc={next_m['id']}: {next_m['title']}\n")
-                  print(f"🚀 Missão identificada: {next_m['id']}")
+                  print(f"🚀 Alvo identificado: {next_m['id']}")
               else:
                   with open(github_output, 'a') as f:
                       f.write("action=idle\n")
-                  print("😴 Nenhuma missão pendente.")
+                  print("😴 Sem missões pendentes no momento.")
                   
           except Exception as e:
               print(f"❌ Falha no Orquestrador: {e}")
@@ -110,38 +107,38 @@ jobs:
           
           source .venv/bin/activate
           
-          # Criação da Branch de Mutação
+          # Criação de Branch Única
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
           
-          # Execução do Mutator para gerar o novo código
+          # Execução do Mutator (Criação do código funcional)
           if ! python scripts/evolution_mutator.py \
             --strategy "minimal_change" \
             --intent "auto-evolution-mission" \
             --impact "functional-improvement" \
             --roadmap-context "$(cat mission_context.txt)"; then
-              echo "❌ Falha na geração da mutação."
+              echo "❌ Falha crítica no motor de mutação."
               exit 1
           fi
 
-          # Persistência da Mutação e Abertura de PR
+          # Persistência e Push via GIT_PAT
           git add -A
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "[Auto-Evolution] DNA Mutated: ${{ steps.flow.outputs.mission_desc }}"
             
-            # Garantia de bypass 403 usando o GIT_PAT na URL
+            # Blindagem contra erro 403
             git remote set-url origin https://x-access-token:${{ secrets.GIT_PAT }}@github.com/${{ github.repository }}.git
             git push origin "$BRANCH_NAME"
             
-            echo "📢 Solicitando integração via Pull Request..."
+            echo "📢 Criando Pull Request..."
             PR_URL=$(gh pr create \
                          --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
-                         --body "### 🧠 Ciclo de Auto-Evolução \nMissão: ${{ steps.flow.outputs.mission_desc }} \n\n Status: Código mutado com sucesso. Homeostase deve validar a integridade." \
+                         --body "### 🧠 Evolução JARVIS \n**Missão:** ${{ steps.flow.outputs.mission_desc }} \n\n*Aguardando validação da Homeostase.*" \
                          --base main --head "$BRANCH_NAME")
             
             echo "pr_number=$(echo $PR_URL | awk -F'/' '{print $6}')" >> $GITHUB_OUTPUT
             echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
           else
-            echo "⚠️ Nenhuma alteração gerada pela mutação."
+            echo "⚠️ A mutação não gerou novos dados."
             echo "action=idle" >> $GITHUB_OUTPUT
           fi
