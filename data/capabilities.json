@@ -437,7 +437,7 @@
             "id": "CAP-040",
             "title": "Compare multiple possible strategies",
             "description": "Evaluate different approaches to solving a problem before executing.",
-            "status": "partial",
+            "status": "complete",
             "auto": true,
             "priority": 4,
             "depends_on": [],
