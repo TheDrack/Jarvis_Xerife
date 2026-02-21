@@ -10,52 +10,49 @@ permissions:
   issues: write
 
 jobs:
-  evolution_cycle:
-    name: "🧬 Ciclo Unificado JARVIS"
+  evolution_and_healing:
+    name: "🧬 Ciclo de Evolução e Homeostase"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - name: 📦 Setup UV e Python
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: '3.11'
-
-      - name: 📦 Instalar Dependências
-        run: pip install sqlmodel pydantic requests
+          enable-cache: true
+          python-version: '3.13'
 
       - name: 🧠 Orquestrador de Missão
         id: flow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          uv pip install sqlmodel pydantic requests
           export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           python - << 'PYCODE'
-          import os, sys, re
+          import os, sys
           from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
           try:
               auto = AutoEvolutionServiceV2()
               last_msg = os.popen("git log -1 --pretty=%B").read()
-              
-              # Prevenção de Loops
-              if "[Auto-Evolution] Inventory Synchronized" in last_msg:
+              if "[Auto-Evolution]" in last_msg:
                   out = "action=idle\n"
               else:
                   next_m = auto.find_next_mission()
                   if next_m:
-                      cap_id = next_m['id']
                       with open('mission_context.txt', 'w', encoding='utf-8') as f:
                           f.write(auto.get_roadmap_context(next_m))
-                      out = f"action=evolve\nmission_desc={cap_id}: {next_m['title']}\n"
+                      out = f"action=evolve\nmission_desc={next_m['id']}: {next_m['title']}\n"
                   else:
                       out = "action=idle\n"
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f: f.write(out)
           except Exception as e:
-              print(f"❌ Erro no Orquestrador: {e}"); sys.exit(1)
+              print(f"❌ Erro: {e}"); sys.exit(1)
           PYCODE
 
-      - name: 🤖 Cristalização e Mutação
+      - name: 🤖 Mutação e Auto-Cura
         if: steps.flow.outputs.action == 'evolve'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -65,28 +62,45 @@ jobs:
           git config --global user.name "Jarvis-AutoEvolution"
           git config --global user.email "jarvis@bot.com"
           
-          # 1. Cristalização (Define arquitetura e cria placeholders)
-          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
-          python app/application/services/crystallization/crystallizer_engine.py
+          # 1. Preparar Ambiente para Cura
+          uv pip install pytest pytest-json-report pytest-cov pytest-asyncio \
+                         pydantic pydantic-settings cryptography httpx \
+                         sqlmodel groq python-dotenv
           
-          # 2. Setup de Branch
+          # 2. Evolução (Crystallizer + Mutator)
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
+          export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           
-          # 3. Mutação (Injeta a lógica nos arquivos criados pelo Crystallizer)
-          # Corrigido: Adicionado o argumento --impact obrigatório
+          python app/application/services/crystallization/crystallizer_engine.py
           python scripts/evolution_mutator.py \
-            --strategy "minimal_change" \
-            --intent "auto-evolution-mission" \
-            --impact "functional-improvement" \
-            --roadmap-context "$(cat mission_context.txt)"
-          
-          # 4. Sincronização e PR
+            --strategy "minimal_change" --intent "auto-evolution" \
+            --impact "functional-improvement" --roadmap-context "$(cat mission_context.txt)"
+
+          # 3. Ciclo de Auto-Cura (Homeostase Integrada)
+          ATTEMPT=1
+          while [ $ATTEMPT -le 2 ]; do
+            echo "🧪 Vistoria de Cura - Tentativa $ATTEMPT"
+            uv run pytest --json-report --json-report-file=report.json tests/ || true
+            
+            if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ]; then
+              echo "✅ Código Saudável!"
+              break
+            fi
+            
+            echo "🔧 Detectada instabilidade. Iniciando Mutator de Cura..."
+            uv run python scripts/self_healing_mutator.py --report "report.json"
+            git add -A
+            git commit -m "🤖 [Auto-Cura] Correção Integrada #$ATTEMPT" || echo "Sem mudanças"
+            ATTEMPT=$((ATTEMPT+1))
+          done
+
+          # 4. Finalização e PR
           git add -A
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "[Auto-Evolution] DNA Mutated & Crystallized: $ISSUE_BODY"
+            git commit -m "[Auto-Evolution] DNA Evoluído e Curado: $ISSUE_BODY"
             git push origin "$BRANCH_NAME"
-            gh pr create --title "🧬 Evolução: $ISSUE_BODY" \
-                         --body "Ciclo de evolução completo. Estrutura gerada pelo Crystallizer e lógica injetada pelo Mutator." \
+            gh pr create --title "🧬 Evolução Curada: $ISSUE_BODY" \
+                         --body "Ciclo completo: Evolução + Auto-Cura integradas sem dependências externas." \
                          --base main --head "$BRANCH_NAME"
           fi
