@@ -67,21 +67,27 @@ jobs:
           git config --global user.name "Jarvis-Bot"
           git config --global user.email "jarvis@bot.com"
           PY_VENV=".venv/bin/python"
-          
-          # Injeção de caminho para evitar ModuleNotFoundError
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           
+          # 1. Cristalização
           $PY_VENV app/application/services/crystallization/crystallizer_engine.py
           
+          # 2. Setup e Push Imediato da Branch (Garante que a Homeostase a encontre)
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
+          git commit --allow-empty -m "🧬 [Auto-Evolution] Iniciando Missão: ${{ steps.flow.outputs.mission_desc }}"
+          git push origin "$BRANCH_NAME"
           echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
           
-          $PY_VENV scripts/evolution_mutator.py \
+          # 3. Mutação
+          if ! $PY_VENV scripts/evolution_mutator.py \
             --strategy "minimal_change" \
             --intent "auto-evolution-mission" \
             --impact "functional-improvement" \
-            --roadmap-context "$(cat mission_context.txt)"
+            --roadmap-context "$(cat mission_context.txt)"; then
+              echo "❌ Falha no mutator, mas a branch já está no servidor para a Homeostase curar."
+              exit 1
+          fi
 
           git add -A
           if [ -n "$(git status --porcelain)" ]; then
@@ -98,12 +104,12 @@ jobs:
     needs: evolution_cycle
     runs-on: ubuntu-latest
     steps:
-      - name: 🛰️ Checkout
+      - name: 🛰️ Checkout (Branch de Missão ou Main)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # Busca a branch da evolução ou a da PR atual
-          ref: ${{ needs.evolution_cycle.outputs.branch || github.event.pull_request.head.ref || github.ref }}
+          # Fallback para main se a branch de missão não foi criada/encontrada
+          ref: ${{ needs.evolution_cycle.outputs.branch || github.ref }}
           token: ${{ secrets.JARVIS_PAT || secrets.GITHUB_TOKEN }}
 
       - name: 📦 Setup UV
@@ -122,11 +128,15 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           
           SUCCESS=false
+          # Tentativa de Cura se houver falha prévia ou testes falharem
           for i in {1..2}; do
             .venv/bin/pytest --json-report --json-report-file=report.json tests/ || true
+            
+            # Se testes passaram, sucesso. Se não, cura.
             if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ]; then
               SUCCESS=true && break
             fi
+            
             $PY_VENV scripts/self_healing_mutator.py --report "report.json"
             git config --global user.name "Jarvis-Bot"
             git config --global user.email "jarvis@bot.com"
