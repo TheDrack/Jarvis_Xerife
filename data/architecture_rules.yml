@@ -1,0 +1,17 @@
+# Regras de Destino para a Cristalização
+rules:
+  adapters:
+    keywords: ["pyautogui", "keyboard", "sqlite", "requests", "os", "shutil"]
+    description: "Ferramentas de execução direta e IO. Sem frescuras."
+  
+  domain_gears:
+    keywords: ["llm_reasoning", "cognitive_router", "model_selector"]
+    description: "Apenas para lógica que exige seleção de potência (Ex: LLMs)."
+
+  domain_capabilities:
+    keywords: ["business_logic", "validation", "inventory_management"]
+    description: "Inteligência pura do JARVIS. Onde a regra reside."
+
+  application_services:
+    keywords: ["flow", "orchestration", "loop", "bridge"]
+    description: "Os orquestradores que conectam os soltos ao Core."
