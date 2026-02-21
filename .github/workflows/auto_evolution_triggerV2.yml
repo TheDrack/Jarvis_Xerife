@@ -63,7 +63,7 @@ jobs:
               
               # 2. SE FOR MERGE DE AUTO-EVOLUÇÃO: Sincroniza e Encerra (FIM DO LOOP)
               if is_auto_evolution and not is_sync:
-                  print("🎯 DNA de Evolução detectado. Sincronizando Homeostase...")
+                  print("🎯 DNA de Evolução detectado. Cristalizando aprendizado...")
                   
                   # Busca o CAP-ID na mensagem do commit para finalizar no banco
                   match = re.search(r'CAP-\d+', last_msg)
@@ -78,7 +78,7 @@ jobs:
                   sys.exit(0)
 
               # 3. SE FOR PUSH EXTERNO (Não-Evolução): Busca nova missão
-              print("🟢 Caminho livre. Consultando Roadmap para nova evolução...")
+              print("🟢 Caminho livre. Consultando apostila de aprendizado para nova evolução...")
               next_m = auto.find_next_mission()
               
               if next_m:
@@ -87,12 +87,12 @@ jobs:
                       mc.write(context)
                   
                   with open(github_output, 'a') as f:
-                      f.write(f"action=evolve\n")
-                      f.write(f"mission_desc={next_m['id']}: {next_m['title']}\n")
+                      f.write(f"action=evolve \n")
+                      f.write(f"mission_desc={next_m['id']}: {next_m['title']} \n")
                   print(f"🚀 Iniciando Missão: {next_m['id']}")
               else:
                   with open(github_output, 'a') as f:
-                      f.write("action=idle\n")
+                      f.write("action=idle \n")
                   print("😴 Nenhuma missão pendente.")
                   
           except Exception as e:
@@ -115,7 +115,7 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           
           # 1. Cristalização do estado atual
-          python app/application/services/crystallization/crystallizer_engine.py
+          python app/application/services/crystalization/crystalizer_engine.py
           
           # 2. Criação da Branch para a nova missão
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
@@ -143,7 +143,7 @@ jobs:
             echo "📢 Abrindo Pull Request..."
             PR_URL=$(gh pr create \
                          --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
-                         --body "### 🧠 Auto-Evolução Detectada\nMissão: ${{ steps.flow.outputs.mission_desc }}\n\nStatus: Mutação em andamento." \
+                         --body "### 🧠 Auto-Evolução Detectada \nvMissão: ${{ steps.flow.outputs.mission_desc }} \n\n Status: Mutação em andamento." \
                          --base main --head "$BRANCH_NAME")
             
             PR_NUMBER=$(echo $PR_URL | awk -F'/' '{print $6}')
