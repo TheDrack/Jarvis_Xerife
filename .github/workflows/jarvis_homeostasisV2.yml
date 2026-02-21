@@ -10,7 +10,7 @@ on:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Evita loops: não executa se o commit for gerado pelo próprio processo de cura
+    # Evita loops infinitos
     if: "!contains(github.event.head_commit.message, '[Auto-Cura]')"
     runs-on: ubuntu-latest
 
@@ -19,7 +19,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GIT_PAT }} # Chave mestra para disparar outros fluxos e fazer merge
+          token: ${{ secrets.GIT_PAT }} # O GIT_PAT deve ter permissão de 'repo' ou 'contents:write'
 
       - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
@@ -29,13 +29,8 @@ jobs:
 
       - name: 🔧 Instalação do DNA
         run: |
-          # --clear resolve o erro de ambiente persistente
           uv venv --clear --python 3.11
-          
-          # Instalando dependências incluindo pytest-cov exigido pelo seu pytest.ini
           uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv
-          
-          # Registra o PYTHONPATH no ambiente do GitHub Actions
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
       - name: 🔄 Ciclo de Cura e Decisão
@@ -43,43 +38,40 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          # 1. Executa os testes e gera o relatório em JSON
-          # O pytest agora reconhecerá os argumentos de cobertura (--cov) do seu inifile
+          # 1. Executa os testes
           uv run pytest --json-report --json-report-file=report.json || true
           
-          # 2. Verifica se houve falhas ou erros no relatório gerado
+          # 2. Validação de integridade
           if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ] && [ "$(jq '.summary.errors // 0' report.json)" == "0" ]; then
-            echo "✅ DNA íntegro. Iniciando Cristalização e Auto-Sensing..."
-            
-            # Roda o Crystallizer para mapear as bibliotecas do código novo (Auto-Sensing)
+            echo "✅ DNA estável. Sincronizando Crystal..."
             uv run python app/application/services/crystallization/crystallizer_engine.py
-            
             echo "final_status=true" >> $GITHUB_OUTPUT
           else
-            echo "❌ Falhas detectadas no DNA. Iniciando Mutator de Auto-Cura..."
-            
-            # Aqui o sistema pode evoluir para chamar o scripts/self_healing_mutator.py
+            echo "❌ DNA corrompido. Iniciando Mutator..."
             echo "final_status=false" >> $GITHUB_OUTPUT
           fi
 
       - name: ✅ Auto-Merge
-        # SÓ realiza o merge se for uma PR e os testes passarem (status=true)
         if: steps.healing_process.outputs.final_status == 'true' && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
-          AUTHOR="${{ github.event.pull_request.user.login }}"
-          echo "🫡 Vistoria aprovada para $AUTHOR. Realizando Merge Automático..."
+          echo "🫡 Vistoria aprovada. Realizando Merge via CLI..."
           gh pr merge ${{ github.event.pull_request.number }} --auto --merge --delete-branch
 
-      - name: 💾 Persistência de Cristalização
-        # Se os testes passaram, salvamos o mapeamento do Master Crystal no repositório
+      - name: 💾 Persistência com GIT_PAT
         if: steps.healing_process.outputs.final_status == 'true'
+        env:
+          # Injetamos o token para uso no remote set-url
+          TOKEN: ${{ secrets.GIT_PAT }}
         run: |
           git config --global user.name "Jarvis-Crystallizer"
           git config --global user.email "jarvis@bot.com"
           
-          # Adiciona o Master Crystal (com as mapped_libraries) e os Containers atualizados
+          # FORÇAR AUTENTICAÇÃO: Reconfigura a URL do remote para usar o PAT explicitamente
+          # Isso evita o erro 403 Permission Denied
+          git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git
+          
           git add data/master_crystal.json app/application/containers/*.py
           
           if [ -n "$(git status --porcelain)" ]; then
@@ -90,8 +82,7 @@ jobs:
           fi
 
       - name: 🚨 Escalação
-        # Se falhar e não houver cura, o workflow indica a falha
         if: steps.healing_process.outputs.final_status == 'false'
         run: |
-          echo "🚨 O sistema não passou nos testes de homeostase. Verifique o report.json."
+          echo "🚨 Falha na homeostase. Verifique o report.json."
           exit 1
