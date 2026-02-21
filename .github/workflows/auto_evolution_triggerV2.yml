@@ -44,7 +44,7 @@ jobs:
           uv venv --python 3.11
           source .venv/bin/activate
           # Instalando dependências necessárias para o core e scripts
-          #uv pip install sqlmodel pydantic requests groq python-dotenv
+          uv pip install sqlmodel #pydantic requests groq python-dotenv
           
           python - << 'PYCODE'
           import os, sys
