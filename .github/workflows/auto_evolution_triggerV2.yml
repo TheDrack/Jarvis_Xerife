@@ -71,6 +71,8 @@ jobs:
                       cap_id = match.group()
                       if auto.mark_mission_as_completed(cap_id):
                           print(f"✅ Sincronização concluída: {cap_id} integrada.")
+             # 3. Cristalização do estado atual
+                  python app/application/services/crystallization/crystallizer_engine.py
                   
                   # Força o modo IDLE para não iniciar nova missão no mesmo ciclo
                   with open(github_output, 'a') as f:
@@ -115,7 +117,7 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:$(pwd)
           
           # 1. Cristalização do estado atual
-          python app/application/services/crystalization/crystalizer_engine.py
+          python app/application/services/crystallization/crystallizer_engine.py
           
           # 2. Criação da Branch para a nova missão
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
