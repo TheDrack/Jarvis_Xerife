@@ -373,7 +373,7 @@
             "id": "CAP-034",
             "title": "Continuously update user model",
             "description": "Adjust the user profile in real-time based on new interactions.",
-            "status": "pending",
+            "status": "complete",
             "auto": true,
             "priority": 3,
             "depends_on": [
