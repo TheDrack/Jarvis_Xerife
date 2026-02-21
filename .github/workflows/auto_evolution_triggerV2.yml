@@ -7,6 +7,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   evolution_cycle:
@@ -21,10 +22,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 📦 Install Deps
+      - name: 📦 Instalar Dependências
         run: pip install sqlmodel pydantic requests
 
-      - name: 🧠 Orquestrador e Sincronizador
+      - name: 🧠 Orquestrador de Missão
         id: flow
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -36,9 +37,9 @@ jobs:
           try:
               auto = AutoEvolutionServiceV2()
               last_msg = os.popen("git log -1 --pretty=%B").read()
-              is_sync = "[Auto-Evolution] Inventory Synchronized" in last_msg
               
-              if is_sync:
+              # Prevenção de Loops
+              if "[Auto-Evolution] Inventory Synchronized" in last_msg:
                   out = "action=idle\n"
               else:
                   next_m = auto.find_next_mission()
@@ -51,7 +52,7 @@ jobs:
                       out = "action=idle\n"
               with open(os.environ['GITHUB_OUTPUT'], 'a') as f: f.write(out)
           except Exception as e:
-              print(f"❌ Erro: {e}"); sys.exit(1)
+              print(f"❌ Erro no Orquestrador: {e}"); sys.exit(1)
           PYCODE
 
       - name: 🤖 Cristalização e Mutação
@@ -64,21 +65,28 @@ jobs:
           git config --global user.name "Jarvis-AutoEvolution"
           git config --global user.email "jarvis@bot.com"
           
-          # 1. Cristaliza primeiro (Cria a casca)
+          # 1. Cristalização (Define arquitetura e cria placeholders)
           export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
           python app/application/services/crystallization/crystallizer_engine.py
           
-          # 2. Prepara Branch de Evolução
+          # 2. Setup de Branch
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
           
-          # 3. Muta (Preenche a lógica)
-          python scripts/evolution_mutator.py --strategy "minimal_change" --intent "auto-evolution-mission" --roadmap-context "$(cat mission_context.txt)"
+          # 3. Mutação (Injeta a lógica nos arquivos criados pelo Crystallizer)
+          # Corrigido: Adicionado o argumento --impact obrigatório
+          python scripts/evolution_mutator.py \
+            --strategy "minimal_change" \
+            --intent "auto-evolution-mission" \
+            --impact "functional-improvement" \
+            --roadmap-context "$(cat mission_context.txt)"
           
-          # 4. Commit Unificado (Código + Estrutura + Master Crystal)
+          # 4. Sincronização e PR
           git add -A
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "[Auto-Evolution] DNA Mutated & Crystallized: $ISSUE_BODY"
             git push origin "$BRANCH_NAME"
-            gh pr create --title "🧬 Evolução: $ISSUE_BODY" --body "Automated evolution and crystallization cycle." --base main --head "$BRANCH_NAME"
+            gh pr create --title "🧬 Evolução: $ISSUE_BODY" \
+                         --body "Ciclo de evolução completo. Estrutura gerada pelo Crystallizer e lógica injetada pelo Mutator." \
+                         --base main --head "$BRANCH_NAME"
           fi
