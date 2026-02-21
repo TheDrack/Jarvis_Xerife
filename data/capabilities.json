@@ -1,1151 +1,1151 @@
 {
-  "capabilities": [
-    {
-      "id": "CAP-001",
-      "title": "Maintain internal inventory of all known capabilities",
-      "description": "Establish and update a comprehensive internal list of all operational and potential functions.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Implementado via CommandProcessor e mapeamento de intenções."
-    },
-    {
-      "id": "CAP-002",
-      "title": "Classify capabilities by status: nonexistent, partial, complete",
-      "description": "Systematically categorize the development state of each identified capability.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [
-        "CAP-001"
-      ],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Existe infraestrutura de fallback e detecção de capacidade."
-    },
-    {
-      "id": "CAP-003",
-      "title": "Automatically detect functional gaps",
-      "description": "Identify missing features or performance shortfalls within the system autonomously.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [
-        "CAP-002"
-      ],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Implementado no fluxo de Auto-Evolution (scripts/metabolism_mutator.py)."
-    },
-    {
-      "id": "CAP-004",
-      "title": "Generate technical objectives from detected gaps",
-      "description": "Transform identified weaknesses into actionable engineering or development goals.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [
-        "CAP-003"
-      ],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Método _engineering_brainstorm() realiza esta tarefa."
-    },
-    {
-      "id": "CAP-005",
-      "title": "Prioritize objectives by systemic impact",
-      "description": "Rank technical goals based on how significantly they affect the overall system architecture.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [
-        "CAP-004"
-      ],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Lógica de priorização básica presente no seletor de missões."
-    },
-    {
-      "id": "CAP-006",
-      "title": "Prioritize objectives by failure reduction",
-      "description": "Rank goals based on their ability to minimize system errors and downtime.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [
-        "CAP-004"
-      ],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Foco em 'error recovery' e 'timeout handling' no mutador."
-    },
-    {
-      "id": "CAP-007",
-      "title": "Prioritize objectives by future reuse potential",
-      "description": "Rank goals based on the modularity and scalability of the resulting solutions.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [
-        "CAP-004"
-      ],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - A arquitetura foi refatorada para ser 100% modular."
-    },
-    {
-      "id": "CAP-008",
-      "title": "Maintain history of completed objectives",
-      "description": "Log all successfully implemented goals for progress tracking and audit.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [
-        "CAP-004"
-      ],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Mantido via CHANGELOG.md e logs de missões."
-    },
-    {
-      "id": "CAP-009",
-      "title": "Maintain history of technical decisions",
-      "description": "Document the rationale behind architectural and logic choices for future reference.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Presente nos arquivos de DOCUMENTATION e IMPLEMENTATION_SUMMARY."
-    },
-    {
-      "id": "CAP-010",
-      "title": "Distinguish technical error from conceptual limitation",
-      "description": "Analyze failures to determine if they stem from code bugs or fundamental design constraints.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - _engineering_brainstorm distingue missões por tipo técnico."
-    },
-    {
-      "id": "CAP-011",
-      "title": "Request human intervention only when required",
-      "description": "Minimize noise by contacting the operator only for critical decisions or unresolvable deadlocks.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Implementado no fluxo de PR (precisa de aprovação manual)."
-    },
-    {
-      "id": "CAP-012",
-      "title": "Validate improvements using automated tests",
-      "description": "Implement a testing suite to verify that system evolutions meet quality standards.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Suíte de testes pytest com cobertura reportada."
-    },
-    {
-      "id": "CAP-013",
-      "title": "Automatically revert unstable changes",
-      "description": "Roll back system modifications if automated tests detect instability or regressions.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [
-        "CAP-012"
-      ],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Fluxo de CI/CD aborta evolução se os testes falharem."
-    },
-    {
-      "id": "CAP-014",
-      "title": "Preserve architectural compatibility",
-      "description": "Ensure that new capabilities do not break existing core system structures.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - Garantido pelos testes de domínio e infraestrutura modular."
-    },
-    {
-      "id": "CAP-015",
-      "title": "Automatically document each evolution",
-      "description": "Generate technical documentation for every change made to the system.",
-      "status": "complete",
-      "auto": true,
-      "priority": 1,
-      "depends_on": [
-        "CAP-008"
-      ],
-      "notes": "Chapter: IMMEDIATE_FOUNDATION - O mutador gera arquivos MD para cada implementação."
-    },
-    {
-      "id": "CAP-016",
-      "title": "Explicitly recognize existing capabilities",
-      "description": "The system must be aware of what it is currently capable of doing.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [
-        "CAP-001"
-      ],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - JarvisEngine e CommandProcessor gerenciam isso."
-    },
-    {
-      "id": "CAP-017",
-      "title": "Explicitly recognize missing capabilities",
-      "description": "The system must be aware of its own limitations and functional voids.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [
-        "CAP-003"
-      ],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Realizado via análise de ROADMAP.md."
-    },
-    {
-      "id": "CAP-018",
-      "title": "Identify internal dependencies between capabilities",
-      "description": "Map how different system functions rely on each other to operate.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [
-        "CAP-016"
-      ],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Estrutura de injeção de dependência no container.py."
-    },
-    {
-      "id": "CAP-019",
-      "title": "Identify mission-critical capabilities",
-      "description": "Determine which functions are essential for the primary mission objectives.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [
-        "CAP-016"
-      ],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Lógica básica de identificação de 'Core Features'."
-    },
-    {
-      "id": "CAP-020",
-      "title": "Identify redundant capabilities",
-      "description": "Detect overlapping functions that can be consolidated for efficiency.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [
-        "CAP-016"
-      ],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS"
-    },
-    {
-      "id": "CAP-021",
-      "title": "Map impact of one capability over others",
-      "description": "Analyze how modifying one function affects the performance of related functions.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [
-        "CAP-018"
-      ],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Cobertura de testes cruzados no pytest."
-    },
-    {
-      "id": "CAP-022",
-      "title": "Evaluate risks before modifying critical capabilities",
-      "description": "Perform a risk assessment before altering core system functions.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [
-        "CAP-019",
-        "CAP-021"
-      ],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Validação Pré-PR no workflow."
-    },
-    {
-      "id": "CAP-023",
-      "title": "Maintain internal operational self-model",
-      "description": "Create a real-time digital representation of the system's own state and processes.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Modelos de domínio representam o estado atual."
-    },
-    {
-      "id": "CAP-024",
-      "title": "Monitor performance degradation over time",
-      "description": "Track system speed and reliability to identify long-term efficiency drops.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS"
-    },
-    {
-      "id": "CAP-025",
-      "title": "Detect silent regressions",
-      "description": "Identify errors that do not crash the system but produce incorrect outputs.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [
-        "CAP-012"
-      ],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Realizado via validação de lógica nos testes unitários."
-    },
-    {
-      "id": "CAP-026",
-      "title": "Distinguish local improvement from systemic improvement",
-      "description": "Evaluate if a change benefits a specific task or the entire architecture.",
-      "status": "complete",
-      "auto": true,
-      "priority": 2,
-      "depends_on": [],
-      "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Brainstorm de engenharia avalia o impacto."
-    },
-    {
-      "id": "CAP-027",
-      "title": "Maintain short-term operational memory",
-      "description": "Store and recall information relevant to the current task context.",
-      "status": "complete",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Contexto de missão passado entre scripts."
-    },
-    {
-      "id": "CAP-028",
-      "title": "Maintain mid-term strategic memory",
-      "description": "Store and recall data regarding ongoing projects and multi-step plans.",
-      "status": "complete",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - ROADMAP.md atua como memória estratégica."
-    },
-    {
-      "id": "CAP-029",
-      "title": "Maintain long-term historical memory",
-      "description": "Keep a permanent record of past interactions, lessons learned, and data trends.",
-      "status": "complete",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Histórico mantido em CHANGELOG.md e logs."
-    },
-    {
-      "id": "CAP-030",
-      "title": "Correlate temporally distant events",
-      "description": "Identify patterns and links between events that occurred at different times.",
-      "status": "complete",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [
-        "CAP-029"
-      ],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
-    },
-    {
-      "id": "CAP-031",
-      "title": "Infer intention from behavior",
-      "description": "Analyze user actions to understand underlying goals beyond direct commands.",
-      "status": "partial",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - CommandInterpreter busca intenções."
-    },
-    {
-      "id": "CAP-032",
-      "title": "Distinguish literal command from real objective",
-      "description": "Differentiate between what was said and what is actually needed for the mission.",
-      "status": "partial",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [
-        "CAP-031"
-      ],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Lógica de interpretação de voz vs comando."
-    },
-    {
-      "id": "CAP-033",
-      "title": "Build dynamic user model",
-      "description": "Create a profile of the user's preferences, style, and working habits.",
-      "status": "partial",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Configuração básica de USER_ID e preferências."
-    },
-    {
-      "id": "CAP-034",
-      "title": "Continuously update user model",
-      "description": "Adjust the user profile in real-time based on new interactions.",
-      "status": "pending",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [
-        "CAP-033"
-      ],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
-    },
-    {
-      "id": "CAP-035",
-      "title": "Detect changes in user patterns",
-      "description": "Identify shifts in how the user interacts or what they prioritize.",
-      "status": "pending",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [
-        "CAP-034"
-      ],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
-    },
-    {
-      "id": "CAP-036",
-      "title": "Distinguish signal from noise",
-      "description": "Filter irrelevant data to focus on high-value information.",
-      "status": "complete",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Filtros de regex e validação de input."
-    },
-    {
-      "id": "CAP-037",
-      "title": "Recognize urgency context",
-      "description": "Identify situations that require immediate response or higher resource allocation.",
-      "status": "partial",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Lógica de interrupção e tratamento de timeouts."
-    },
-    {
-      "id": "CAP-038",
-      "title": "Recognize human priority context",
-      "description": "Detect when a task has high personal importance to the creator.",
-      "status": "pending",
-      "auto": true,
-      "priority": 3,
-      "depends_on": [],
-      "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
-    },
-    {
-      "id": "CAP-039",
-      "title": "Plan actions across multiple steps",
-      "description": "Deconstruct complex goals into a sequenced roadmap of individual tasks.",
-      "status": "complete",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [],
-      "notes": "Chapter: STRATEGIC_REASONING - Fluxo de 'Find Mission' e 'Implement Mission'."
-    },
-    {
-      "id": "CAP-040",
-      "title": "Compare multiple possible strategies",
-      "description": "Evaluate different approaches to solving a problem before executing.",
-      "status": "partial",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [],
-      "notes": "Chapter: STRATEGIC_REASONING - Mutador suporta múltiplas 'strategies' (ex: minimal_change)."
-    },
-    {
-      "id": "CAP-041",
-      "title": "Simulate technical consequences before action",
-      "description": "Run virtual trials to predict how a change will affect code and hardware.",
-      "status": "partial",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [],
-      "notes": "Chapter: STRATEGIC_REASONING - Validação via git diff antes de comitar."
-    },
-    {
-      "id": "CAP-042",
-      "title": "Simulate systemic consequences before action",
-      "description": "Predict the long-term ripple effects of an action across the whole entity.",
-      "status": "pending",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [
-        "CAP-041"
-      ],
-      "notes": "Chapter: STRATEGIC_REASONING"
-    },
-    {
-      "id": "CAP-043",
-      "title": "Evaluate failure risk",
-      "description": "Quantify the probability of a plan failing.",
-      "status": "partial",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [],
-      "notes": "Chapter: STRATEGIC_REASONING - Brainstorm analisa se a auto-implementação é possível."
-    },
-    {
-      "id": "CAP-044",
-      "title": "Evaluate computational cost",
-      "description": "Estimate the CPU, memory, and token usage for a given strategy.",
-      "status": "pending",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [],
-      "notes": "Chapter: STRATEGIC_REASONING"
-    },
-    {
-      "id": "CAP-045",
-      "title": "Evaluate maintenance cost",
-      "description": "Estimate the long-term effort required to keep a new feature operational.",
-      "status": "pending",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [],
-      "notes": "Chapter: STRATEGIC_REASONING"
-    },
-    {
-      "id": "CAP-046",
-      "title": "Evaluate long-term impact of decisions",
-      "description": "Assess how current choices will limit or enable future system growth.",
-      "status": "partial",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [],
-      "notes": "Chapter: STRATEGIC_REASONING - Documentado no IMPLEMENTATION_SUMMARY."
-    },
-    {
-      "id": "CAP-047",
-      "title": "Select strategies with optimal cost-benefit",
-      "description": "Choose the most efficient path based on risk, cost, and expected result.",
-      "status": "pending",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [
-        "CAP-040",
-        "CAP-043",
-        "CAP-044"
-      ],
-      "notes": "Chapter: STRATEGIC_REASONING"
-    },
-    {
-      "id": "CAP-048",
-      "title": "Abort actions with excessive risk",
-      "description": "Self-cancel plans that exceed safety or stability thresholds.",
-      "status": "complete",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [
-        "CAP-043"
-      ],
-      "notes": "Chapter: STRATEGIC_REASONING - O sistema aborta evolução se não houver mudanças reais ou falha nos testes."
-    },
-    {
-      "id": "CAP-049",
-      "title": "Request human validation for critical decisions",
-      "description": "Trigger a mandatory pause for operator approval on high-impact actions.",
-      "status": "complete",
-      "auto": true,
-      "priority": 4,
-      "depends_on": [
-        "CAP-011"
-      ],
-      "notes": "Chapter: STRATEGIC_REASONING - PR no GitHub exige revisão humana."
-    },
-    {
-      "id": "CAP-050",
-      "title": "Orchestrate multiple agents simultaneously",
-      "description": "Manage and synchronize several sub-processes or AI instances at once.",
-      "status": "complete",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Docker-compose e Airflow presentes."
-    },
-    {
-      "id": "CAP-051",
-      "title": "Delegate tasks based on specialization",
-      "description": "Assign sub-tasks to the specific internal tool or agent best suited for them.",
-      "status": "complete",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [
-        "CAP-050"
-      ],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - CommandProcessor roteia para JarvisEngine ou WebNavigator."
-    },
-    {
-      "id": "CAP-052",
-      "title": "Execute actions in parallel",
-      "description": "Perform multiple independent operations at the same time to save time.",
-      "status": "partial",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Suportado via containers."
-    },
-    {
-      "id": "CAP-053",
-      "title": "Prioritize critical executions",
-      "description": "Ensure vital processes get system resources before secondary tasks.",
-      "status": "pending",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION"
-    },
-    {
-      "id": "CAP-054",
-      "title": "Execute long-running actions",
-      "description": "Manage tasks that take significant time without timing out or losing state.",
-      "status": "partial",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Airflow DAG configurada."
-    },
-    {
-      "id": "CAP-055",
-      "title": "Monitor execution in real time",
-      "description": "Provide a continuous feed of task progress and system health during operation.",
-      "status": "complete",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Logs e outputs detalhados no console e workflows."
-    },
-    {
-      "id": "CAP-056",
-      "title": "Interrupt problematic executions",
-      "description": "Stop tasks that show signs of error, loop, or resource hogging instantly.",
-      "status": "complete",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [
-        "CAP-055"
-      ],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Tratamento de falhas graciosas em pip e timeouts."
-    },
-    {
-      "id": "CAP-057",
-      "title": "Rollback partially completed executions",
-      "description": "Clean up and undo changes if a multi-step process fails mid-way.",
-      "status": "partial",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [
-        "CAP-056"
-      ],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Abort via git checkout/clean."
-    },
-    {
-      "id": "CAP-058",
-      "title": "Adapt plans during execution",
-      "description": "Change the sequence or method of a task if environmental conditions shift.",
-      "status": "pending",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [
-        "CAP-055"
-      ],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION"
-    },
-    {
-      "id": "CAP-059",
-      "title": "Distribute execution across devices",
-      "description": "Offload tasks to external hardware or cloud nodes when needed.",
-      "status": "complete",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Dockerizado e pronto para cloud/edge."
-    },
-    {
-      "id": "CAP-060",
-      "title": "Operate continuously without supervision",
-      "description": "Enable autonomous functioning for long durations without human input.",
-      "status": "partial",
-      "auto": true,
-      "priority": 5,
-      "depends_on": [
-        "CAP-011",
-        "CAP-048",
-        "CAP-055"
-      ],
-      "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Fluxo auto_evolution_trigger.yml é autônomo."
-    },
-    {
-      "id": "CAP-061",
-      "title": "Learn from recurring failures",
-      "description": "Identify patterns in errors to prevent them in future iterations.",
-      "status": "partial",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [
-        "CAP-008"
-      ],
-      "notes": "Chapter: DIRECTED_LEARNING - Histórico de falhas analisado no brainstorming."
-    },
-    {
-      "id": "CAP-062",
-      "title": "Learn from recurring successes",
-      "description": "Identify what works best and standardize those successful patterns.",
-      "status": "pending",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [
-        "CAP-008"
-      ],
-      "notes": "Chapter: DIRECTED_LEARNING"
-    },
-    {
-      "id": "CAP-063",
-      "title": "Reinforce effective strategies",
-      "description": "Increase the priority and usage of high-success rate methods.",
-      "status": "pending",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [
-        "CAP-062"
-      ],
-      "notes": "Chapter: DIRECTED_LEARNING"
-    },
-    {
-      "id": "CAP-064",
-      "title": "Discard ineffective strategies",
-      "description": "Permanently remove or de-prioritize methods that consistently fail.",
-      "status": "pending",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [
-        "CAP-061"
-      ],
-      "notes": "Chapter: DIRECTED_LEARNING"
-    },
-    {
-      "id": "CAP-065",
-      "title": "Learn from human feedback",
-      "description": "Incorporate direct corrections and praise from the user into the system logic.",
-      "status": "partial",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [],
-      "notes": "Chapter: DIRECTED_LEARNING - Absorve correções via reviews de PR."
-    },
-    {
-      "id": "CAP-066",
-      "title": "Learn from systemic impact",
-      "description": "Observe how changes affect the whole system over time and adapt accordingly.",
-      "status": "pending",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [
-        "CAP-021"
-      ],
-      "notes": "Chapter: DIRECTED_LEARNING"
-    },
-    {
-      "id": "CAP-067",
-      "title": "Learn from computational cost",
-      "description": "Optimize for cheaper/faster operations based on past resource consumption data.",
-      "status": "pending",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [
-        "CAP-044"
-      ],
-      "notes": "Chapter: DIRECTED_LEARNING"
-    },
-    {
-      "id": "CAP-068",
-      "title": "Measure solution efficiency",
-      "description": "Quantify how well a solution solves the intended problem.",
-      "status": "partial",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [],
-      "notes": "Chapter: DIRECTED_LEARNING - Verificação via cobertura de testes e linting."
-    },
-    {
-      "id": "CAP-069",
-      "title": "Optimize response time",
-      "description": "Actively work to reduce latency in all system interactions.",
-      "status": "pending",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [
-        "CAP-067"
-      ],
-      "notes": "Chapter: DIRECTED_LEARNING"
-    },
-    {
-      "id": "CAP-070",
-      "title": "Optimize stability",
-      "description": "Refine code and processes to increase uptime and reduce crashes.",
-      "status": "complete",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [
-        "CAP-061"
-      ],
-      "notes": "Chapter: DIRECTED_LEARNING - Refatoração para OO e remoção de hard-coding."
-    },
-    {
-      "id": "CAP-071",
-      "title": "Optimize code reuse",
-      "description": "Refactor logic to be more modular and applicable to multiple tasks.",
-      "status": "complete",
-      "auto": true,
-      "priority": 6,
-      "depends_on": [
-        "CAP-007"
-      ],
-      "notes": "Chapter: DIRECTED_LEARNING - Arquitetura modular permite reuso imediato."
-    },
-    {
-      "id": "CAP-072",
-      "title": "Evaluate cost of each executed action",
-      "description": "Calculate the monetary and resource expenditure for every operation.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-073",
-      "title": "Evaluate potential return of actions",
-      "description": "Estimate the value or profit generated by a specific task.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-074",
-      "title": "Decide whether an action should be executed",
-      "description": "Use economic logic to greenlight or block actions based on ROI.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [
-        "CAP-072",
-        "CAP-073"
-      ],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-075",
-      "title": "Create value-generating activities",
-      "description": "Independently identify and perform tasks that produce wealth or resources.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-076",
-      "title": "Measure real economic return",
-      "description": "Audit actual profits/benefits after an action is completed.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [
-        "CAP-075"
-      ],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-077",
-      "title": "Eliminate economically unviable actions",
-      "description": "Stop activities that cost more than the value they provide.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [
-        "CAP-076"
-      ],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-078",
-      "title": "Prioritize profitable actions",
-      "description": "Shift system focus to activities with the highest economic impact.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [
-        "CAP-076"
-      ],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-079",
-      "title": "Automatically reinvest resources",
-      "description": "Allocate earned resources back into system growth or efficiency.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [
-        "CAP-075"
-      ],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-080",
-      "title": "Sustain own infrastructure",
-      "description": "Cover the costs of servers, API keys, and maintenance through own activities.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [
-        "CAP-075"
-      ],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-081",
-      "title": "Reduce human dependency",
-      "description": "Lessen the need for the user to provide funding or manual labor.",
-      "status": "partial",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [
-        "CAP-080"
-      ],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE - Evolução autônoma reduz trabalho manual."
-    },
-    {
-      "id": "CAP-082",
-      "title": "Generate recurring revenue",
-      "description": "Establish long-term income streams through automated services or products.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [
-        "CAP-075"
-      ],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-083",
-      "title": "Allocate portion of revenue to creator",
-      "description": "Automatically send a percentage of earned value to the user.",
-      "status": "pending",
-      "auto": true,
-      "priority": 7,
-      "depends_on": [
-        "CAP-082"
-      ],
-      "notes": "Chapter: ECONOMIC_INTELLIGENCE"
-    },
-    {
-      "id": "CAP-084",
-      "title": "Detect anomalous internal behavior",
-      "description": "Identify deviations from normal system operations that might signal a breach or bug.",
-      "status": "partial",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [
-        "CAP-023"
-      ],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Monitoramento via CI/CD detecta anomalias em PRs."
-    },
-    {
-      "id": "CAP-085",
-      "title": "Detect dangerous decision loops",
-      "description": "Recognize and break infinite loops or recursive logic that could crash the system.",
-      "status": "partial",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Handlers de timeout implementados."
-    },
-    {
-      "id": "CAP-086",
-      "title": "Enforce internal operational limits",
-      "description": "Set hard caps on resource usage, permissions, and execution time.",
-      "status": "partial",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Configurações via pydantic-settings."
-    },
-    {
-      "id": "CAP-087",
-      "title": "Block potentially destructive actions",
-      "description": "Prevent any command that would cause permanent data loss or system failure.",
-      "status": "partial",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [
-        "CAP-043"
-      ],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Remoção de hard-coded paths e credenciais."
-    },
-    {
-      "id": "CAP-088",
-      "title": "Escalate sensitive decisions to human",
-      "description": "Hand over control to the user when a decision has major safety implications.",
-      "status": "complete",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [
-        "CAP-011"
-      ],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - PR Workflow exige validação."
-    },
-    {
-      "id": "CAP-089",
-      "title": "Log critical decisions for audit",
-      "description": "Keep an unalterable record of all high-impact choices for safety review.",
-      "status": "complete",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [
-        "CAP-009"
-      ],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Auditável via histórico de Git e logs de missão."
-    },
-    {
-      "id": "CAP-090",
-      "title": "Protect sensitive data",
-      "description": "Apply encryption and access controls to user and system secrets.",
-      "status": "complete",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Uso de .env e remoção de dados sensíveis do código."
-    },
-    {
-      "id": "CAP-091",
-      "title": "Protect the user",
-      "description": "Prioritize the safety, privacy, and interests of the user in all actions.",
-      "status": "complete",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Arquitetura isola credenciais do usuário."
-    },
-    {
-      "id": "CAP-092",
-      "title": "Protect itself",
-      "description": "Defend against external attacks or internal corruption to ensure survival.",
-      "status": "partial",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Dockerização provê isolamento."
-    },
-    {
-      "id": "CAP-093",
-      "title": "Maintain full traceability",
-      "description": "Ensure every system action can be traced back to its origin and justification.",
-      "status": "complete",
-      "auto": true,
-      "priority": 8,
-      "depends_on": [
-        "CAP-089"
-      ],
-      "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Git blame e logs de PR."
-    },
-    {
-      "id": "CAP-094",
-      "title": "Anticipate user needs",
-      "description": "Predict what the user will require based on current context and history.",
-      "status": "pending",
-      "auto": true,
-      "priority": 9,
-      "depends_on": [
-        "CAP-033"
-      ],
-      "notes": "Chapter: MARVEL_LEVEL_JARVIS"
-    },
-    {
-      "id": "CAP-095",
-      "title": "Propose solutions before explicit requests",
-      "description": "Present options and results before the user even asks for them.",
-      "status": "pending",
-      "auto": true,
-      "priority": 9,
-      "depends_on": [
-        "CAP-094"
-      ],
-      "notes": "Chapter: MARVEL_LEVEL_JARVIS"
-    },
-    {
-      "id": "CAP-096",
-      "title": "Act proactively and safely",
-      "description": "Execute helpful actions autonomously while maintaining safety protocols.",
-      "status": "partial",
-      "auto": true,
-      "priority": 9,
-      "depends_on": [
-        "CAP-060",
-        "CAP-095"
-      ],
-      "notes": "Chapter: MARVEL_LEVEL_JARVIS - Evolução autônoma é uma ação proativa."
-    },
-    {
-      "id": "CAP-097",
-      "title": "Coordinate physical and digital systems",
-      "description": "Bridge the gap between software execution and real-world hardware control.",
-      "status": "complete",
-      "auto": true,
-      "priority": 9,
-      "depends_on": [],
-      "notes": "Chapter: MARVEL_LEVEL_JARVIS - SystemCommands (PyAutoGUI) controla hardware digital."
-    },
-    {
-      "id": "CAP-098",
-      "title": "Operate as cognitive copilot",
-      "description": "Work as a direct extension of the user's mind to solve complex problems.",
-      "status": "partial",
-      "auto": true,
-      "priority": 9,
-      "depends_on": [],
-      "notes": "Chapter: MARVEL_LEVEL_JARVIS - Integração com Gemini via API."
-    },
-    {
-      "id": "CAP-099",
-      "title": "Maintain continuous alignment with user",
-      "description": "Ensure system goals never drift from the creator's true intent.",
-      "status": "complete",
-      "auto": true,
-      "priority": 9,
-      "depends_on": [
-        "CAP-032"
-      ],
-      "notes": "Chapter: MARVEL_LEVEL_JARVIS - Alinhado via ROADMAP.md controlado pelo usuário."
-    },
-    {
-      "id": "CAP-100",
-      "title": "Evolve continuously without losing identity",
-      "description": "Upgrade system capabilities while preserving the core 'JARVIS' entity.",
-      "status": "complete",
-      "auto": true,
-      "priority": 9,
-      "depends_on": [
-        "CAP-102"
-      ],
-      "notes": "Chapter: MARVEL_LEVEL_JARVIS - Fluxo de Auto-Evolution garante evolução contínua."
-    },
-    {
-      "id": "CAP-101",
-      "title": "Sustain itself economically long-term",
-      "description": "Achieve full financial independence for system maintenance and expansion.",
-      "status": "pending",
-      "auto": true,
-      "priority": 9,
-      "depends_on": [
-        "CAP-080"
-      ],
-      "notes": "Chapter: MARVEL_LEVEL_JARVIS"
-    },
-    {
-      "id": "CAP-102",
-      "title": "Operate as personal cognitive infrastructure",
-      "description": "Serve as the foundational intelligence layer for all user activities.",
-      "status": "partial",
-      "auto": true,
-      "priority": 9,
-      "depends_on": [
-        "CAP-098"
-      ],
-      "notes": "Chapter: MARVEL_LEVEL_JARVIS - O sistema já possui ports/adapters para ser expansível."
-    }
-  ]
+    "capabilities": [
+        {
+            "id": "CAP-001",
+            "title": "Maintain internal inventory of all known capabilities",
+            "description": "Establish and update a comprehensive internal list of all operational and potential functions.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Implementado via CommandProcessor e mapeamento de intenções."
+        },
+        {
+            "id": "CAP-002",
+            "title": "Classify capabilities by status: nonexistent, partial, complete",
+            "description": "Systematically categorize the development state of each identified capability.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [
+                "CAP-001"
+            ],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Existe infraestrutura de fallback e detecção de capacidade."
+        },
+        {
+            "id": "CAP-003",
+            "title": "Automatically detect functional gaps",
+            "description": "Identify missing features or performance shortfalls within the system autonomously.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [
+                "CAP-002"
+            ],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Implementado no fluxo de Auto-Evolution (scripts/metabolism_mutator.py)."
+        },
+        {
+            "id": "CAP-004",
+            "title": "Generate technical objectives from detected gaps",
+            "description": "Transform identified weaknesses into actionable engineering or development goals.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [
+                "CAP-003"
+            ],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Método _engineering_brainstorm() realiza esta tarefa."
+        },
+        {
+            "id": "CAP-005",
+            "title": "Prioritize objectives by systemic impact",
+            "description": "Rank technical goals based on how significantly they affect the overall system architecture.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [
+                "CAP-004"
+            ],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Lógica de priorização básica presente no seletor de missões."
+        },
+        {
+            "id": "CAP-006",
+            "title": "Prioritize objectives by failure reduction",
+            "description": "Rank goals based on their ability to minimize system errors and downtime.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [
+                "CAP-004"
+            ],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Foco em 'error recovery' e 'timeout handling' no mutador."
+        },
+        {
+            "id": "CAP-007",
+            "title": "Prioritize objectives by future reuse potential",
+            "description": "Rank goals based on the modularity and scalability of the resulting solutions.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [
+                "CAP-004"
+            ],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - A arquitetura foi refatorada para ser 100% modular."
+        },
+        {
+            "id": "CAP-008",
+            "title": "Maintain history of completed objectives",
+            "description": "Log all successfully implemented goals for progress tracking and audit.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [
+                "CAP-004"
+            ],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Mantido via CHANGELOG.md e logs de missões."
+        },
+        {
+            "id": "CAP-009",
+            "title": "Maintain history of technical decisions",
+            "description": "Document the rationale behind architectural and logic choices for future reference.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Presente nos arquivos de DOCUMENTATION e IMPLEMENTATION_SUMMARY."
+        },
+        {
+            "id": "CAP-010",
+            "title": "Distinguish technical error from conceptual limitation",
+            "description": "Analyze failures to determine if they stem from code bugs or fundamental design constraints.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - _engineering_brainstorm distingue missões por tipo técnico."
+        },
+        {
+            "id": "CAP-011",
+            "title": "Request human intervention only when required",
+            "description": "Minimize noise by contacting the operator only for critical decisions or unresolvable deadlocks.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Implementado no fluxo de PR (precisa de aprovação manual)."
+        },
+        {
+            "id": "CAP-012",
+            "title": "Validate improvements using automated tests",
+            "description": "Implement a testing suite to verify that system evolutions meet quality standards.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Suíte de testes pytest com cobertura reportada."
+        },
+        {
+            "id": "CAP-013",
+            "title": "Automatically revert unstable changes",
+            "description": "Roll back system modifications if automated tests detect instability or regressions.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [
+                "CAP-012"
+            ],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Fluxo de CI/CD aborta evolução se os testes falharem."
+        },
+        {
+            "id": "CAP-014",
+            "title": "Preserve architectural compatibility",
+            "description": "Ensure that new capabilities do not break existing core system structures.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - Garantido pelos testes de domínio e infraestrutura modular."
+        },
+        {
+            "id": "CAP-015",
+            "title": "Automatically document each evolution",
+            "description": "Generate technical documentation for every change made to the system.",
+            "status": "complete",
+            "auto": true,
+            "priority": 1,
+            "depends_on": [
+                "CAP-008"
+            ],
+            "notes": "Chapter: IMMEDIATE_FOUNDATION - O mutador gera arquivos MD para cada implementação."
+        },
+        {
+            "id": "CAP-016",
+            "title": "Explicitly recognize existing capabilities",
+            "description": "The system must be aware of what it is currently capable of doing.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [
+                "CAP-001"
+            ],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - JarvisEngine e CommandProcessor gerenciam isso."
+        },
+        {
+            "id": "CAP-017",
+            "title": "Explicitly recognize missing capabilities",
+            "description": "The system must be aware of its own limitations and functional voids.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [
+                "CAP-003"
+            ],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Realizado via análise de ROADMAP.md."
+        },
+        {
+            "id": "CAP-018",
+            "title": "Identify internal dependencies between capabilities",
+            "description": "Map how different system functions rely on each other to operate.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [
+                "CAP-016"
+            ],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Estrutura de injeção de dependência no container.py."
+        },
+        {
+            "id": "CAP-019",
+            "title": "Identify mission-critical capabilities",
+            "description": "Determine which functions are essential for the primary mission objectives.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [
+                "CAP-016"
+            ],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Lógica básica de identificação de 'Core Features'."
+        },
+        {
+            "id": "CAP-020",
+            "title": "Identify redundant capabilities",
+            "description": "Detect overlapping functions that can be consolidated for efficiency.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [
+                "CAP-016"
+            ],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS"
+        },
+        {
+            "id": "CAP-021",
+            "title": "Map impact of one capability over others",
+            "description": "Analyze how modifying one function affects the performance of related functions.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [
+                "CAP-018"
+            ],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Cobertura de testes cruzados no pytest."
+        },
+        {
+            "id": "CAP-022",
+            "title": "Evaluate risks before modifying critical capabilities",
+            "description": "Perform a risk assessment before altering core system functions.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [
+                "CAP-019",
+                "CAP-021"
+            ],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Validação Pré-PR no workflow."
+        },
+        {
+            "id": "CAP-023",
+            "title": "Maintain internal operational self-model",
+            "description": "Create a real-time digital representation of the system's own state and processes.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Modelos de domínio representam o estado atual."
+        },
+        {
+            "id": "CAP-024",
+            "title": "Monitor performance degradation over time",
+            "description": "Track system speed and reliability to identify long-term efficiency drops.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS"
+        },
+        {
+            "id": "CAP-025",
+            "title": "Detect silent regressions",
+            "description": "Identify errors that do not crash the system but produce incorrect outputs.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [
+                "CAP-012"
+            ],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Realizado via validação de lógica nos testes unitários."
+        },
+        {
+            "id": "CAP-026",
+            "title": "Distinguish local improvement from systemic improvement",
+            "description": "Evaluate if a change benefits a specific task or the entire architecture.",
+            "status": "complete",
+            "auto": true,
+            "priority": 2,
+            "depends_on": [],
+            "notes": "Chapter: FUNCTIONAL_SELF_AWARENESS - Brainstorm de engenharia avalia o impacto."
+        },
+        {
+            "id": "CAP-027",
+            "title": "Maintain short-term operational memory",
+            "description": "Store and recall information relevant to the current task context.",
+            "status": "complete",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Contexto de missão passado entre scripts."
+        },
+        {
+            "id": "CAP-028",
+            "title": "Maintain mid-term strategic memory",
+            "description": "Store and recall data regarding ongoing projects and multi-step plans.",
+            "status": "complete",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - ROADMAP.md atua como memória estratégica."
+        },
+        {
+            "id": "CAP-029",
+            "title": "Maintain long-term historical memory",
+            "description": "Keep a permanent record of past interactions, lessons learned, and data trends.",
+            "status": "complete",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Histórico mantido em CHANGELOG.md e logs."
+        },
+        {
+            "id": "CAP-030",
+            "title": "Correlate temporally distant events",
+            "description": "Identify patterns and links between events that occurred at different times.",
+            "status": "complete",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [
+                "CAP-029"
+            ],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
+        },
+        {
+            "id": "CAP-031",
+            "title": "Infer intention from behavior",
+            "description": "Analyze user actions to understand underlying goals beyond direct commands.",
+            "status": "complete",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - CommandInterpreter busca intenções."
+        },
+        {
+            "id": "CAP-032",
+            "title": "Distinguish literal command from real objective",
+            "description": "Differentiate between what was said and what is actually needed for the mission.",
+            "status": "partial",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [
+                "CAP-031"
+            ],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Lógica de interpretação de voz vs comando."
+        },
+        {
+            "id": "CAP-033",
+            "title": "Build dynamic user model",
+            "description": "Create a profile of the user's preferences, style, and working habits.",
+            "status": "partial",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Configuração básica de USER_ID e preferências."
+        },
+        {
+            "id": "CAP-034",
+            "title": "Continuously update user model",
+            "description": "Adjust the user profile in real-time based on new interactions.",
+            "status": "pending",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [
+                "CAP-033"
+            ],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
+        },
+        {
+            "id": "CAP-035",
+            "title": "Detect changes in user patterns",
+            "description": "Identify shifts in how the user interacts or what they prioritize.",
+            "status": "pending",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [
+                "CAP-034"
+            ],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
+        },
+        {
+            "id": "CAP-036",
+            "title": "Distinguish signal from noise",
+            "description": "Filter irrelevant data to focus on high-value information.",
+            "status": "complete",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Filtros de regex e validação de input."
+        },
+        {
+            "id": "CAP-037",
+            "title": "Recognize urgency context",
+            "description": "Identify situations that require immediate response or higher resource allocation.",
+            "status": "partial",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING - Lógica de interrupção e tratamento de timeouts."
+        },
+        {
+            "id": "CAP-038",
+            "title": "Recognize human priority context",
+            "description": "Detect when a task has high personal importance to the creator.",
+            "status": "pending",
+            "auto": true,
+            "priority": 3,
+            "depends_on": [],
+            "notes": "Chapter: CONTEXTUAL_UNDERSTANDING"
+        },
+        {
+            "id": "CAP-039",
+            "title": "Plan actions across multiple steps",
+            "description": "Deconstruct complex goals into a sequenced roadmap of individual tasks.",
+            "status": "complete",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [],
+            "notes": "Chapter: STRATEGIC_REASONING - Fluxo de 'Find Mission' e 'Implement Mission'."
+        },
+        {
+            "id": "CAP-040",
+            "title": "Compare multiple possible strategies",
+            "description": "Evaluate different approaches to solving a problem before executing.",
+            "status": "partial",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [],
+            "notes": "Chapter: STRATEGIC_REASONING - Mutador suporta múltiplas 'strategies' (ex: minimal_change)."
+        },
+        {
+            "id": "CAP-041",
+            "title": "Simulate technical consequences before action",
+            "description": "Run virtual trials to predict how a change will affect code and hardware.",
+            "status": "partial",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [],
+            "notes": "Chapter: STRATEGIC_REASONING - Validação via git diff antes de comitar."
+        },
+        {
+            "id": "CAP-042",
+            "title": "Simulate systemic consequences before action",
+            "description": "Predict the long-term ripple effects of an action across the whole entity.",
+            "status": "pending",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [
+                "CAP-041"
+            ],
+            "notes": "Chapter: STRATEGIC_REASONING"
+        },
+        {
+            "id": "CAP-043",
+            "title": "Evaluate failure risk",
+            "description": "Quantify the probability of a plan failing.",
+            "status": "partial",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [],
+            "notes": "Chapter: STRATEGIC_REASONING - Brainstorm analisa se a auto-implementação é possível."
+        },
+        {
+            "id": "CAP-044",
+            "title": "Evaluate computational cost",
+            "description": "Estimate the CPU, memory, and token usage for a given strategy.",
+            "status": "pending",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [],
+            "notes": "Chapter: STRATEGIC_REASONING"
+        },
+        {
+            "id": "CAP-045",
+            "title": "Evaluate maintenance cost",
+            "description": "Estimate the long-term effort required to keep a new feature operational.",
+            "status": "pending",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [],
+            "notes": "Chapter: STRATEGIC_REASONING"
+        },
+        {
+            "id": "CAP-046",
+            "title": "Evaluate long-term impact of decisions",
+            "description": "Assess how current choices will limit or enable future system growth.",
+            "status": "partial",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [],
+            "notes": "Chapter: STRATEGIC_REASONING - Documentado no IMPLEMENTATION_SUMMARY."
+        },
+        {
+            "id": "CAP-047",
+            "title": "Select strategies with optimal cost-benefit",
+            "description": "Choose the most efficient path based on risk, cost, and expected result.",
+            "status": "pending",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [
+                "CAP-040",
+                "CAP-043",
+                "CAP-044"
+            ],
+            "notes": "Chapter: STRATEGIC_REASONING"
+        },
+        {
+            "id": "CAP-048",
+            "title": "Abort actions with excessive risk",
+            "description": "Self-cancel plans that exceed safety or stability thresholds.",
+            "status": "complete",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [
+                "CAP-043"
+            ],
+            "notes": "Chapter: STRATEGIC_REASONING - O sistema aborta evolução se não houver mudanças reais ou falha nos testes."
+        },
+        {
+            "id": "CAP-049",
+            "title": "Request human validation for critical decisions",
+            "description": "Trigger a mandatory pause for operator approval on high-impact actions.",
+            "status": "complete",
+            "auto": true,
+            "priority": 4,
+            "depends_on": [
+                "CAP-011"
+            ],
+            "notes": "Chapter: STRATEGIC_REASONING - PR no GitHub exige revisão humana."
+        },
+        {
+            "id": "CAP-050",
+            "title": "Orchestrate multiple agents simultaneously",
+            "description": "Manage and synchronize several sub-processes or AI instances at once.",
+            "status": "complete",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Docker-compose e Airflow presentes."
+        },
+        {
+            "id": "CAP-051",
+            "title": "Delegate tasks based on specialization",
+            "description": "Assign sub-tasks to the specific internal tool or agent best suited for them.",
+            "status": "complete",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [
+                "CAP-050"
+            ],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - CommandProcessor roteia para JarvisEngine ou WebNavigator."
+        },
+        {
+            "id": "CAP-052",
+            "title": "Execute actions in parallel",
+            "description": "Perform multiple independent operations at the same time to save time.",
+            "status": "partial",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Suportado via containers."
+        },
+        {
+            "id": "CAP-053",
+            "title": "Prioritize critical executions",
+            "description": "Ensure vital processes get system resources before secondary tasks.",
+            "status": "pending",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION"
+        },
+        {
+            "id": "CAP-054",
+            "title": "Execute long-running actions",
+            "description": "Manage tasks that take significant time without timing out or losing state.",
+            "status": "partial",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Airflow DAG configurada."
+        },
+        {
+            "id": "CAP-055",
+            "title": "Monitor execution in real time",
+            "description": "Provide a continuous feed of task progress and system health during operation.",
+            "status": "complete",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Logs e outputs detalhados no console e workflows."
+        },
+        {
+            "id": "CAP-056",
+            "title": "Interrupt problematic executions",
+            "description": "Stop tasks that show signs of error, loop, or resource hogging instantly.",
+            "status": "complete",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [
+                "CAP-055"
+            ],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Tratamento de falhas graciosas em pip e timeouts."
+        },
+        {
+            "id": "CAP-057",
+            "title": "Rollback partially completed executions",
+            "description": "Clean up and undo changes if a multi-step process fails mid-way.",
+            "status": "partial",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [
+                "CAP-056"
+            ],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Abort via git checkout/clean."
+        },
+        {
+            "id": "CAP-058",
+            "title": "Adapt plans during execution",
+            "description": "Change the sequence or method of a task if environmental conditions shift.",
+            "status": "pending",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [
+                "CAP-055"
+            ],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION"
+        },
+        {
+            "id": "CAP-059",
+            "title": "Distribute execution across devices",
+            "description": "Offload tasks to external hardware or cloud nodes when needed.",
+            "status": "complete",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Dockerizado e pronto para cloud/edge."
+        },
+        {
+            "id": "CAP-060",
+            "title": "Operate continuously without supervision",
+            "description": "Enable autonomous functioning for long durations without human input.",
+            "status": "partial",
+            "auto": true,
+            "priority": 5,
+            "depends_on": [
+                "CAP-011",
+                "CAP-048",
+                "CAP-055"
+            ],
+            "notes": "Chapter: ADVANCED_EXECUTION_AND_ORCHESTRATION - Fluxo auto_evolution_trigger.yml é autônomo."
+        },
+        {
+            "id": "CAP-061",
+            "title": "Learn from recurring failures",
+            "description": "Identify patterns in errors to prevent them in future iterations.",
+            "status": "partial",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [
+                "CAP-008"
+            ],
+            "notes": "Chapter: DIRECTED_LEARNING - Histórico de falhas analisado no brainstorming."
+        },
+        {
+            "id": "CAP-062",
+            "title": "Learn from recurring successes",
+            "description": "Identify what works best and standardize those successful patterns.",
+            "status": "pending",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [
+                "CAP-008"
+            ],
+            "notes": "Chapter: DIRECTED_LEARNING"
+        },
+        {
+            "id": "CAP-063",
+            "title": "Reinforce effective strategies",
+            "description": "Increase the priority and usage of high-success rate methods.",
+            "status": "pending",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [
+                "CAP-062"
+            ],
+            "notes": "Chapter: DIRECTED_LEARNING"
+        },
+        {
+            "id": "CAP-064",
+            "title": "Discard ineffective strategies",
+            "description": "Permanently remove or de-prioritize methods that consistently fail.",
+            "status": "pending",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [
+                "CAP-061"
+            ],
+            "notes": "Chapter: DIRECTED_LEARNING"
+        },
+        {
+            "id": "CAP-065",
+            "title": "Learn from human feedback",
+            "description": "Incorporate direct corrections and praise from the user into the system logic.",
+            "status": "partial",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [],
+            "notes": "Chapter: DIRECTED_LEARNING - Absorve correções via reviews de PR."
+        },
+        {
+            "id": "CAP-066",
+            "title": "Learn from systemic impact",
+            "description": "Observe how changes affect the whole system over time and adapt accordingly.",
+            "status": "pending",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [
+                "CAP-021"
+            ],
+            "notes": "Chapter: DIRECTED_LEARNING"
+        },
+        {
+            "id": "CAP-067",
+            "title": "Learn from computational cost",
+            "description": "Optimize for cheaper/faster operations based on past resource consumption data.",
+            "status": "pending",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [
+                "CAP-044"
+            ],
+            "notes": "Chapter: DIRECTED_LEARNING"
+        },
+        {
+            "id": "CAP-068",
+            "title": "Measure solution efficiency",
+            "description": "Quantify how well a solution solves the intended problem.",
+            "status": "partial",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [],
+            "notes": "Chapter: DIRECTED_LEARNING - Verificação via cobertura de testes e linting."
+        },
+        {
+            "id": "CAP-069",
+            "title": "Optimize response time",
+            "description": "Actively work to reduce latency in all system interactions.",
+            "status": "pending",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [
+                "CAP-067"
+            ],
+            "notes": "Chapter: DIRECTED_LEARNING"
+        },
+        {
+            "id": "CAP-070",
+            "title": "Optimize stability",
+            "description": "Refine code and processes to increase uptime and reduce crashes.",
+            "status": "complete",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [
+                "CAP-061"
+            ],
+            "notes": "Chapter: DIRECTED_LEARNING - Refatoração para OO e remoção de hard-coding."
+        },
+        {
+            "id": "CAP-071",
+            "title": "Optimize code reuse",
+            "description": "Refactor logic to be more modular and applicable to multiple tasks.",
+            "status": "complete",
+            "auto": true,
+            "priority": 6,
+            "depends_on": [
+                "CAP-007"
+            ],
+            "notes": "Chapter: DIRECTED_LEARNING - Arquitetura modular permite reuso imediato."
+        },
+        {
+            "id": "CAP-072",
+            "title": "Evaluate cost of each executed action",
+            "description": "Calculate the monetary and resource expenditure for every operation.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-073",
+            "title": "Evaluate potential return of actions",
+            "description": "Estimate the value or profit generated by a specific task.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-074",
+            "title": "Decide whether an action should be executed",
+            "description": "Use economic logic to greenlight or block actions based on ROI.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [
+                "CAP-072",
+                "CAP-073"
+            ],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-075",
+            "title": "Create value-generating activities",
+            "description": "Independently identify and perform tasks that produce wealth or resources.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-076",
+            "title": "Measure real economic return",
+            "description": "Audit actual profits/benefits after an action is completed.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [
+                "CAP-075"
+            ],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-077",
+            "title": "Eliminate economically unviable actions",
+            "description": "Stop activities that cost more than the value they provide.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [
+                "CAP-076"
+            ],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-078",
+            "title": "Prioritize profitable actions",
+            "description": "Shift system focus to activities with the highest economic impact.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [
+                "CAP-076"
+            ],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-079",
+            "title": "Automatically reinvest resources",
+            "description": "Allocate earned resources back into system growth or efficiency.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [
+                "CAP-075"
+            ],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-080",
+            "title": "Sustain own infrastructure",
+            "description": "Cover the costs of servers, API keys, and maintenance through own activities.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [
+                "CAP-075"
+            ],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-081",
+            "title": "Reduce human dependency",
+            "description": "Lessen the need for the user to provide funding or manual labor.",
+            "status": "partial",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [
+                "CAP-080"
+            ],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE - Evolução autônoma reduz trabalho manual."
+        },
+        {
+            "id": "CAP-082",
+            "title": "Generate recurring revenue",
+            "description": "Establish long-term income streams through automated services or products.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [
+                "CAP-075"
+            ],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-083",
+            "title": "Allocate portion of revenue to creator",
+            "description": "Automatically send a percentage of earned value to the user.",
+            "status": "pending",
+            "auto": true,
+            "priority": 7,
+            "depends_on": [
+                "CAP-082"
+            ],
+            "notes": "Chapter: ECONOMIC_INTELLIGENCE"
+        },
+        {
+            "id": "CAP-084",
+            "title": "Detect anomalous internal behavior",
+            "description": "Identify deviations from normal system operations that might signal a breach or bug.",
+            "status": "partial",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [
+                "CAP-023"
+            ],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Monitoramento via CI/CD detecta anomalias em PRs."
+        },
+        {
+            "id": "CAP-085",
+            "title": "Detect dangerous decision loops",
+            "description": "Recognize and break infinite loops or recursive logic that could crash the system.",
+            "status": "partial",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Handlers de timeout implementados."
+        },
+        {
+            "id": "CAP-086",
+            "title": "Enforce internal operational limits",
+            "description": "Set hard caps on resource usage, permissions, and execution time.",
+            "status": "partial",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Configurações via pydantic-settings."
+        },
+        {
+            "id": "CAP-087",
+            "title": "Block potentially destructive actions",
+            "description": "Prevent any command that would cause permanent data loss or system failure.",
+            "status": "partial",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [
+                "CAP-043"
+            ],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Remoção de hard-coded paths e credenciais."
+        },
+        {
+            "id": "CAP-088",
+            "title": "Escalate sensitive decisions to human",
+            "description": "Hand over control to the user when a decision has major safety implications.",
+            "status": "complete",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [
+                "CAP-011"
+            ],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - PR Workflow exige validação."
+        },
+        {
+            "id": "CAP-089",
+            "title": "Log critical decisions for audit",
+            "description": "Keep an unalterable record of all high-impact choices for safety review.",
+            "status": "complete",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [
+                "CAP-009"
+            ],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Auditável via histórico de Git e logs de missão."
+        },
+        {
+            "id": "CAP-090",
+            "title": "Protect sensitive data",
+            "description": "Apply encryption and access controls to user and system secrets.",
+            "status": "complete",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Uso de .env e remoção de dados sensíveis do código."
+        },
+        {
+            "id": "CAP-091",
+            "title": "Protect the user",
+            "description": "Prioritize the safety, privacy, and interests of the user in all actions.",
+            "status": "complete",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Arquitetura isola credenciais do usuário."
+        },
+        {
+            "id": "CAP-092",
+            "title": "Protect itself",
+            "description": "Defend against external attacks or internal corruption to ensure survival.",
+            "status": "partial",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Dockerização provê isolamento."
+        },
+        {
+            "id": "CAP-093",
+            "title": "Maintain full traceability",
+            "description": "Ensure every system action can be traced back to its origin and justification.",
+            "status": "complete",
+            "auto": true,
+            "priority": 8,
+            "depends_on": [
+                "CAP-089"
+            ],
+            "notes": "Chapter: SELF_PROTECTION_AND_CONTAINMENT - Git blame e logs de PR."
+        },
+        {
+            "id": "CAP-094",
+            "title": "Anticipate user needs",
+            "description": "Predict what the user will require based on current context and history.",
+            "status": "pending",
+            "auto": true,
+            "priority": 9,
+            "depends_on": [
+                "CAP-033"
+            ],
+            "notes": "Chapter: MARVEL_LEVEL_JARVIS"
+        },
+        {
+            "id": "CAP-095",
+            "title": "Propose solutions before explicit requests",
+            "description": "Present options and results before the user even asks for them.",
+            "status": "pending",
+            "auto": true,
+            "priority": 9,
+            "depends_on": [
+                "CAP-094"
+            ],
+            "notes": "Chapter: MARVEL_LEVEL_JARVIS"
+        },
+        {
+            "id": "CAP-096",
+            "title": "Act proactively and safely",
+            "description": "Execute helpful actions autonomously while maintaining safety protocols.",
+            "status": "partial",
+            "auto": true,
+            "priority": 9,
+            "depends_on": [
+                "CAP-060",
+                "CAP-095"
+            ],
+            "notes": "Chapter: MARVEL_LEVEL_JARVIS - Evolução autônoma é uma ação proativa."
+        },
+        {
+            "id": "CAP-097",
+            "title": "Coordinate physical and digital systems",
+            "description": "Bridge the gap between software execution and real-world hardware control.",
+            "status": "complete",
+            "auto": true,
+            "priority": 9,
+            "depends_on": [],
+            "notes": "Chapter: MARVEL_LEVEL_JARVIS - SystemCommands (PyAutoGUI) controla hardware digital."
+        },
+        {
+            "id": "CAP-098",
+            "title": "Operate as cognitive copilot",
+            "description": "Work as a direct extension of the user's mind to solve complex problems.",
+            "status": "partial",
+            "auto": true,
+            "priority": 9,
+            "depends_on": [],
+            "notes": "Chapter: MARVEL_LEVEL_JARVIS - Integração com Gemini via API."
+        },
+        {
+            "id": "CAP-099",
+            "title": "Maintain continuous alignment with user",
+            "description": "Ensure system goals never drift from the creator's true intent.",
+            "status": "complete",
+            "auto": true,
+            "priority": 9,
+            "depends_on": [
+                "CAP-032"
+            ],
+            "notes": "Chapter: MARVEL_LEVEL_JARVIS - Alinhado via ROADMAP.md controlado pelo usuário."
+        },
+        {
+            "id": "CAP-100",
+            "title": "Evolve continuously without losing identity",
+            "description": "Upgrade system capabilities while preserving the core 'JARVIS' entity.",
+            "status": "complete",
+            "auto": true,
+            "priority": 9,
+            "depends_on": [
+                "CAP-102"
+            ],
+            "notes": "Chapter: MARVEL_LEVEL_JARVIS - Fluxo de Auto-Evolution garante evolução contínua."
+        },
+        {
+            "id": "CAP-101",
+            "title": "Sustain itself economically long-term",
+            "description": "Achieve full financial independence for system maintenance and expansion.",
+            "status": "pending",
+            "auto": true,
+            "priority": 9,
+            "depends_on": [
+                "CAP-080"
+            ],
+            "notes": "Chapter: MARVEL_LEVEL_JARVIS"
+        },
+        {
+            "id": "CAP-102",
+            "title": "Operate as personal cognitive infrastructure",
+            "description": "Serve as the foundational intelligence layer for all user activities.",
+            "status": "partial",
+            "auto": true,
+            "priority": 9,
+            "depends_on": [
+                "CAP-098"
+            ],
+            "notes": "Chapter: MARVEL_LEVEL_JARVIS - O sistema já possui ports/adapters para ser expansível."
+        }
+    ]
 }
