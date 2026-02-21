@@ -17,8 +17,8 @@ jobs:
       - name: 🛰️ Checkout
         uses: actions/checkout@v4
         with:
-          # Alterado para GIT_PAT para garantir que o push tenha força total
           token: ${{ secrets.GIT_PAT }}
+          fetch-depth: 0
 
       - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
@@ -29,26 +29,22 @@ jobs:
       - name: 🧠 Run Crystallizer Engine (Full Cycle)
         env:
           PYTHONPATH: ${{ github.workspace }}
-          # Caso seu motor precise consultar algo externo (opcional)
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          # Usando UV para velocidade e consistência com o resto do sistema
           uv venv --clear --python 3.11
           uv pip install requests sqlmodel pydantic python-dotenv
           
-          # Executando via uv run para garantir o ambiente virtual
           uv run python - << 'PYCODE'
           import sys
-          import os
           from app.application.services.crystallization.crystallizer_engine import CrystallizerEngine
           
           try:
               print("💎 Iniciando Full Cycle do Crystallizer Engine...")
               engine = CrystallizerEngine()
               engine.run_full_cycle()
-              print("✨ Cristalização concluída com sucesso.")
+              print("✨ Cristalização concluída.")
           except Exception as e:
-              print(f"❌ Erro crítico na cristalização: {e}")
+              print(f"❌ Erro: {e}")
               sys.exit(1)
           PYCODE
           
@@ -59,19 +55,21 @@ jobs:
           git config --global user.name "Jarvis-Crystallizer"
           git config --global user.email "jarvis@bot.com"
           
-          # Reconfigura URL para evitar erro 403 (Permission Denied)
+          # 1. Reconfigura URL para garantir permissão
           git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git
           
-          # Garante que estamos na main e sincronizados
-          git checkout main || git checkout -b main
-          git pull origin main --rebase
-          
-          # Adiciona o Master Crystal e os Containers gerados/atualizados
+          # 2. Adiciona as mudanças
           git add data/master_crystal.json app/application/containers/*.py
           
-          # Realiza o commit apenas se houver mudanças detectadas
+          # 3. Se houver mudanças, faz o commit ANTES do pull
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "chore: [Crystallizer] DNA Mapping & Container Synchronization [Auto-Cura]"
+            
+            # 4. Agora sim, puxamos as mudanças do servidor integrando com as nossas
+            # O rebase agora funciona porque o nosso 'trabalho' já está commitado localmente
+            git pull origin main --rebase
+            
+            # 5. Push final
             git push origin main
           else
             echo "✅ DNA já está sincronizado e estável."
