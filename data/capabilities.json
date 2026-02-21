@@ -267,7 +267,7 @@
       "id": "CAP-024",
       "title": "Monitor performance degradation over time",
       "description": "Track system speed and reliability to identify long-term efficiency drops.",
-      "status": "pending",
+      "status": "complete",
       "auto": true,
       "priority": 2,
       "depends_on": [],
