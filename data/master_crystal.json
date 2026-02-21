@@ -1,11 +1,11 @@
 {
     "system_id": "JARVIS_CORE",
     "version": "1.0.0",
-    "last_scan": "2026-02-21T18:03:13.751105",
+    "last_scan": "2026-02-21T18:06:45.659067",
     "crystallization_summary": {
         "total_capabilities": 102,
-        "crystallized": 50,
-        "orphan": 52
+        "crystallized": 52,
+        "orphan": 50
     },
     "registry": [
         {
@@ -27,9 +27,9 @@
             "title": "Classify capabilities by status: nonexistent, partial, complete",
             "status": "complete",
             "mapped_libraries": [],
-            "sector": "models",
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/models/cap_002_core.py"
+                "target_file": "app/domain/gears/cap_002_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -334,9 +334,7 @@
             "id": "CAP-024",
             "title": "Monitor performance degradation over time",
             "status": "complete",
-            "mapped_libraries": [
-                "time"
-            ],
+            "mapped_libraries": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_024_core.py"
@@ -365,9 +363,9 @@
             "title": "Distinguish local improvement from systemic improvement",
             "status": "complete",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_026_core.py"
+                "target_file": "app/domain/adapters/cap_026_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -547,9 +545,9 @@
             "title": "Plan actions across multiple steps",
             "status": "complete",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_039_core.py"
+                "target_file": "app/domain/adapters/cap_039_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -561,9 +559,9 @@
             "title": "Compare multiple possible strategies",
             "status": "partial",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_040_core.py"
+                "target_file": "app/domain/adapters/cap_040_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -589,9 +587,9 @@
             "title": "Simulate systemic consequences before action",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_042_core.py"
+                "target_file": "app/domain/adapters/cap_042_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -617,9 +615,9 @@
             "title": "Evaluate computational cost",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_044_core.py"
+                "target_file": "app/domain/adapters/cap_044_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -631,9 +629,9 @@
             "title": "Evaluate maintenance cost",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_045_core.py"
+                "target_file": "app/domain/adapters/cap_045_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -659,9 +657,9 @@
             "title": "Select strategies with optimal cost-benefit",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_047_core.py"
+                "target_file": "app/domain/adapters/cap_047_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -715,9 +713,9 @@
             "title": "Delegate tasks based on specialization",
             "status": "complete",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_051_core.py"
+                "target_file": "app/domain/gears/cap_051_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -799,9 +797,9 @@
             "title": "Rollback partially completed executions",
             "status": "partial",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_057_core.py"
+                "target_file": "app/domain/gears/cap_057_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -827,9 +825,9 @@
             "title": "Distribute execution across devices",
             "status": "complete",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_059_core.py"
+                "target_file": "app/domain/adapters/cap_059_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -925,9 +923,9 @@
             "title": "Learn from systemic impact",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_066_core.py"
+                "target_file": "app/domain/adapters/cap_066_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -939,9 +937,9 @@
             "title": "Learn from computational cost",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_067_core.py"
+                "target_file": "app/domain/adapters/cap_067_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1009,9 +1007,9 @@
             "title": "Evaluate cost of each executed action",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_072_core.py"
+                "target_file": "app/domain/adapters/cap_072_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1023,9 +1021,9 @@
             "title": "Evaluate potential return of actions",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_073_core.py"
+                "target_file": "app/domain/gears/cap_073_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1079,9 +1077,9 @@
             "title": "Eliminate economically unviable actions",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_077_core.py"
+                "target_file": "app/domain/gears/cap_077_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1219,9 +1217,9 @@
             "title": "Block potentially destructive actions",
             "status": "partial",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_087_core.py"
+                "target_file": "app/domain/gears/cap_087_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1331,9 +1329,9 @@
             "title": "Propose solutions before explicit requests",
             "status": "pending",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_095_core.py"
+                "target_file": "app/domain/adapters/cap_095_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1359,9 +1357,9 @@
             "title": "Coordinate physical and digital systems",
             "status": "complete",
             "mapped_libraries": [],
-            "sector": "capabilities",
+            "sector": "adapters",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_097_core.py"
+                "target_file": "app/domain/adapters/cap_097_core.py"
             },
             "integration": {
                 "in_container": true,

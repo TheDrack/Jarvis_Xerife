@@ -1,3 +1,8 @@
+from app.domain.adapters.cap_097_core import execute as cap_097_exec
+from app.domain.adapters.cap_066_core import execute as cap_066_exec
+from app.domain.adapters.cap_045_core import execute as cap_045_exec
+from app.domain.adapters.cap_042_core import execute as cap_042_exec
+from app.domain.adapters.cap_026_core import execute as cap_026_exec
 from app.adapters.cap_095_core import execute as cap_095_exec
 from app.adapters.cap_077_core import execute as cap_077_exec
 from app.adapters.cap_072_core import execute as cap_072_exec
@@ -12,6 +17,11 @@ from app.adapters.cap_039_core import execute as cap_039_exec
 class AdaptersContainer:
     def __init__(self):
         self.registry = {
+            "CAP-097": cap_097_exec,
+            "CAP-066": cap_066_exec,
+            "CAP-045": cap_045_exec,
+            "CAP-042": cap_042_exec,
+            "CAP-026": cap_026_exec,
             "CAP-095": cap_095_exec,
             "CAP-077": cap_077_exec,
             "CAP-072": cap_072_exec,

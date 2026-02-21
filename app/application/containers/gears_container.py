@@ -1,3 +1,7 @@
+from app.domain.gears.cap_077_core import execute as cap_077_exec
+from app.domain.gears.cap_073_core import execute as cap_073_exec
+from app.domain.gears.cap_051_core import execute as cap_051_exec
+from app.domain.gears.cap_002_core import execute as cap_002_exec
 from app.domain.gears.cap_007_core import execute as cap_007_exec
 from app.domain.gears.cap_005_core import execute as cap_005_exec
 from app.domain.gears.cap_004_core import execute as cap_004_exec
@@ -31,6 +35,10 @@ from app.domain.gears.cap_001_core import execute as cap_001_exec
 class GearsContainer:
     def __init__(self):
         self.registry = {
+            "CAP-077": cap_077_exec,
+            "CAP-073": cap_073_exec,
+            "CAP-051": cap_051_exec,
+            "CAP-002": cap_002_exec,
             "CAP-007": cap_007_exec,
             "CAP-005": cap_005_exec,
             "CAP-004": cap_004_exec,
