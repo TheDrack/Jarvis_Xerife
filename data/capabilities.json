@@ -385,7 +385,7 @@
             "id": "CAP-035",
             "title": "Detect changes in user patterns",
             "description": "Identify shifts in how the user interacts or what they prioritize.",
-            "status": "pending",
+            "status": "complete",
             "auto": true,
             "priority": 3,
             "depends_on": [
