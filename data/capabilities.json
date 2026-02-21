@@ -569,7 +569,7 @@
             "id": "CAP-052",
             "title": "Execute actions in parallel",
             "description": "Perform multiple independent operations at the same time to save time.",
-            "status": "partial",
+            "status": "complete",
             "auto": true,
             "priority": 5,
             "depends_on": [],
