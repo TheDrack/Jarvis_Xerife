@@ -11,8 +11,8 @@
         {
             "id": "CAP-001",
             "title": "Maintain internal inventory of all known capabilities",
-            "description": "Establish and update a comprehensive internal list of all operational and potential functions.",
             "status": "complete",
+            "depends_on": [],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_001_core.py"
@@ -25,8 +25,10 @@
         {
             "id": "CAP-002",
             "title": "Classify capabilities by status: nonexistent, partial, complete",
-            "description": "Systematically categorize the development state of each identified capability.",
             "status": "complete",
+            "depends_on": [
+                "CAP-001"
+            ],
             "sector": "models",
             "genealogy": {
                 "target_file": "app/domain/models/cap_002_core.py"
@@ -39,11 +41,13 @@
         {
             "id": "CAP-003",
             "title": "Automatically detect functional gaps",
-            "description": "Identify missing features or performance shortfalls within the system autonomously.",
             "status": "complete",
-            "sector": "capabilities",
+            "depends_on": [
+                "CAP-002"
+            ],
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_003_core.py"
+                "target_file": "app/domain/gears/cap_003_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -53,11 +57,13 @@
         {
             "id": "CAP-004",
             "title": "Generate technical objectives from detected gaps",
-            "description": "Transform identified weaknesses into actionable engineering or development goals.",
             "status": "complete",
-            "sector": "capabilities",
+            "depends_on": [
+                "CAP-003"
+            ],
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_004_core.py"
+                "target_file": "app/domain/gears/cap_004_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -67,11 +73,13 @@
         {
             "id": "CAP-005",
             "title": "Prioritize objectives by systemic impact",
-            "description": "Rank technical goals based on how significantly they affect the overall system architecture.",
             "status": "complete",
-            "sector": "capabilities",
+            "depends_on": [
+                "CAP-004"
+            ],
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_005_core.py"
+                "target_file": "app/domain/gears/cap_005_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -81,8 +89,10 @@
         {
             "id": "CAP-006",
             "title": "Prioritize objectives by failure reduction",
-            "description": "Rank goals based on their ability to minimize system errors and downtime.",
             "status": "complete",
+            "depends_on": [
+                "CAP-004"
+            ],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_006_core.py"
@@ -95,11 +105,13 @@
         {
             "id": "CAP-007",
             "title": "Prioritize objectives by future reuse potential",
-            "description": "Rank goals based on the modularity and scalability of the resulting solutions.",
             "status": "complete",
-            "sector": "capabilities",
+            "depends_on": [
+                "CAP-004"
+            ],
+            "sector": "gears",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_007_core.py"
+                "target_file": "app/domain/gears/cap_007_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -109,8 +121,10 @@
         {
             "id": "CAP-008",
             "title": "Maintain history of completed objectives",
-            "description": "Log all successfully implemented goals for progress tracking and audit.",
             "status": "complete",
+            "depends_on": [
+                "CAP-004"
+            ],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_008_core.py"
@@ -123,11 +137,11 @@
         {
             "id": "CAP-009",
             "title": "Maintain history of technical decisions",
-            "description": "Document the rationale behind architectural and logic choices for future reference.",
             "status": "complete",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_009_core.py"
+                "target_file": "app/domain/capabilities/cap_009_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -137,11 +151,11 @@
         {
             "id": "CAP-010",
             "title": "Distinguish technical error from conceptual limitation",
-            "description": "Analyze failures to determine if they stem from code bugs or fundamental design constraints.",
             "status": "complete",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_010_core.py"
+                "target_file": "app/domain/capabilities/cap_010_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -151,8 +165,8 @@
         {
             "id": "CAP-011",
             "title": "Request human intervention only when required",
-            "description": "Minimize noise by contacting the operator only for critical decisions or unresolvable deadlocks.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_011_core.py"
@@ -165,8 +179,8 @@
         {
             "id": "CAP-012",
             "title": "Validate improvements using automated tests",
-            "description": "Implement a testing suite to verify that system evolutions meet quality standards.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_012_core.py"
@@ -179,8 +193,10 @@
         {
             "id": "CAP-013",
             "title": "Automatically revert unstable changes",
-            "description": "Roll back system modifications if automated tests detect instability or regressions.",
             "status": "complete",
+            "depends_on": [
+                "CAP-012"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_013_core.py"
@@ -193,8 +209,8 @@
         {
             "id": "CAP-014",
             "title": "Preserve architectural compatibility",
-            "description": "Ensure that new capabilities do not break existing core system structures.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_014_core.py"
@@ -207,8 +223,10 @@
         {
             "id": "CAP-015",
             "title": "Automatically document each evolution",
-            "description": "Generate technical documentation for every change made to the system.",
             "status": "complete",
+            "depends_on": [
+                "CAP-008"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_015_core.py"
@@ -221,8 +239,10 @@
         {
             "id": "CAP-016",
             "title": "Explicitly recognize existing capabilities",
-            "description": "The system must be aware of what it is currently capable of doing.",
             "status": "complete",
+            "depends_on": [
+                "CAP-001"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_016_core.py"
@@ -235,8 +255,10 @@
         {
             "id": "CAP-017",
             "title": "Explicitly recognize missing capabilities",
-            "description": "The system must be aware of its own limitations and functional voids.",
             "status": "complete",
+            "depends_on": [
+                "CAP-003"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_017_core.py"
@@ -249,8 +271,10 @@
         {
             "id": "CAP-018",
             "title": "Identify internal dependencies between capabilities",
-            "description": "Map how different system functions rely on each other to operate.",
             "status": "complete",
+            "depends_on": [
+                "CAP-016"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_018_core.py"
@@ -263,8 +287,10 @@
         {
             "id": "CAP-019",
             "title": "Identify mission-critical capabilities",
-            "description": "Determine which functions are essential for the primary mission objectives.",
             "status": "complete",
+            "depends_on": [
+                "CAP-016"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_019_core.py"
@@ -277,8 +303,10 @@
         {
             "id": "CAP-020",
             "title": "Identify redundant capabilities",
-            "description": "Detect overlapping functions that can be consolidated for efficiency.",
             "status": "complete",
+            "depends_on": [
+                "CAP-016"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_020_core.py"
@@ -291,8 +319,10 @@
         {
             "id": "CAP-021",
             "title": "Map impact of one capability over others",
-            "description": "Analyze how modifying one function affects the performance of related functions.",
             "status": "complete",
+            "depends_on": [
+                "CAP-018"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_021_core.py"
@@ -305,8 +335,11 @@
         {
             "id": "CAP-022",
             "title": "Evaluate risks before modifying critical capabilities",
-            "description": "Perform a risk assessment before altering core system functions.",
             "status": "complete",
+            "depends_on": [
+                "CAP-019",
+                "CAP-021"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_022_core.py"
@@ -319,11 +352,11 @@
         {
             "id": "CAP-023",
             "title": "Maintain internal operational self-model",
-            "description": "Create a real-time digital representation of the system's own state and processes.",
             "status": "complete",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "models",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_023_core.py"
+                "target_file": "app/domain/models/cap_023_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -333,8 +366,8 @@
         {
             "id": "CAP-024",
             "title": "Monitor performance degradation over time",
-            "description": "Track system speed and reliability to identify long-term efficiency drops.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_024_core.py"
@@ -347,8 +380,10 @@
         {
             "id": "CAP-025",
             "title": "Detect silent regressions",
-            "description": "Identify errors that do not crash the system but produce incorrect outputs.",
             "status": "complete",
+            "depends_on": [
+                "CAP-012"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_025_core.py"
@@ -361,8 +396,8 @@
         {
             "id": "CAP-026",
             "title": "Distinguish local improvement from systemic improvement",
-            "description": "Evaluate if a change benefits a specific task or the entire architecture.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_026_core.py"
@@ -375,11 +410,11 @@
         {
             "id": "CAP-027",
             "title": "Maintain short-term operational memory",
-            "description": "Store and recall information relevant to the current task context.",
             "status": "complete",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_027_core.py"
+                "target_file": "app/domain/capabilities/cap_027_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -389,11 +424,11 @@
         {
             "id": "CAP-028",
             "title": "Maintain mid-term strategic memory",
-            "description": "Store and recall data regarding ongoing projects and multi-step plans.",
             "status": "complete",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_028_core.py"
+                "target_file": "app/domain/capabilities/cap_028_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -403,11 +438,11 @@
         {
             "id": "CAP-029",
             "title": "Maintain long-term historical memory",
-            "description": "Keep a permanent record of past interactions, lessons learned, and data trends.",
             "status": "complete",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_029_core.py"
+                "target_file": "app/domain/capabilities/cap_029_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -417,8 +452,10 @@
         {
             "id": "CAP-030",
             "title": "Correlate temporally distant events",
-            "description": "Identify patterns and links between events that occurred at different times.",
             "status": "complete",
+            "depends_on": [
+                "CAP-029"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_030_core.py"
@@ -431,11 +468,11 @@
         {
             "id": "CAP-031",
             "title": "Infer intention from behavior",
-            "description": "Analyze user actions to understand underlying goals beyond direct commands.",
             "status": "partial",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_031_core.py"
+                "target_file": "app/domain/capabilities/cap_031_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -445,8 +482,10 @@
         {
             "id": "CAP-032",
             "title": "Distinguish literal command from real objective",
-            "description": "Differentiate between what was said and what is actually needed for the mission.",
             "status": "partial",
+            "depends_on": [
+                "CAP-031"
+            ],
             "sector": "gears",
             "genealogy": {
                 "target_file": "app/domain/gears/cap_032_core.py"
@@ -459,8 +498,8 @@
         {
             "id": "CAP-033",
             "title": "Build dynamic user model",
-            "description": "Create a profile of the user's preferences, style, and working habits.",
             "status": "partial",
+            "depends_on": [],
             "sector": "models",
             "genealogy": {
                 "target_file": "app/domain/models/cap_033_core.py"
@@ -473,8 +512,10 @@
         {
             "id": "CAP-034",
             "title": "Continuously update user model",
-            "description": "Adjust the user profile in real-time based on new interactions.",
             "status": "pending",
+            "depends_on": [
+                "CAP-033"
+            ],
             "sector": "models",
             "genealogy": {
                 "target_file": "app/domain/models/cap_034_core.py"
@@ -487,8 +528,10 @@
         {
             "id": "CAP-035",
             "title": "Detect changes in user patterns",
-            "description": "Identify shifts in how the user interacts or what they prioritize.",
             "status": "pending",
+            "depends_on": [
+                "CAP-034"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_035_core.py"
@@ -501,8 +544,8 @@
         {
             "id": "CAP-036",
             "title": "Distinguish signal from noise",
-            "description": "Filter irrelevant data to focus on high-value information.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_036_core.py"
@@ -515,8 +558,8 @@
         {
             "id": "CAP-037",
             "title": "Recognize urgency context",
-            "description": "Identify situations that require immediate response or higher resource allocation.",
             "status": "partial",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_037_core.py"
@@ -529,8 +572,8 @@
         {
             "id": "CAP-038",
             "title": "Recognize human priority context",
-            "description": "Detect when a task has high personal importance to the creator.",
             "status": "pending",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_038_core.py"
@@ -543,11 +586,11 @@
         {
             "id": "CAP-039",
             "title": "Plan actions across multiple steps",
-            "description": "Deconstruct complex goals into a sequenced roadmap of individual tasks.",
             "status": "complete",
-            "sector": "adapters",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_039_core.py"
+                "target_file": "app/domain/capabilities/cap_039_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -557,11 +600,11 @@
         {
             "id": "CAP-040",
             "title": "Compare multiple possible strategies",
-            "description": "Evaluate different approaches to solving a problem before executing.",
             "status": "partial",
-            "sector": "adapters",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_040_core.py"
+                "target_file": "app/domain/capabilities/cap_040_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -571,8 +614,8 @@
         {
             "id": "CAP-041",
             "title": "Simulate technical consequences before action",
-            "description": "Run virtual trials to predict how a change will affect code and hardware.",
             "status": "partial",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_041_core.py"
@@ -585,11 +628,13 @@
         {
             "id": "CAP-042",
             "title": "Simulate systemic consequences before action",
-            "description": "Predict the long-term ripple effects of an action across the whole entity.",
             "status": "pending",
-            "sector": "models",
+            "depends_on": [
+                "CAP-041"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/models/cap_042_core.py"
+                "target_file": "app/domain/capabilities/cap_042_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -599,11 +644,11 @@
         {
             "id": "CAP-043",
             "title": "Evaluate failure risk",
-            "description": "Quantify the probability of a plan failing.",
             "status": "partial",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_043_core.py"
+                "target_file": "app/domain/capabilities/cap_043_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -613,11 +658,11 @@
         {
             "id": "CAP-044",
             "title": "Evaluate computational cost",
-            "description": "Estimate the CPU, memory, and token usage for a given strategy.",
             "status": "pending",
-            "sector": "adapters",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_044_core.py"
+                "target_file": "app/domain/capabilities/cap_044_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -627,11 +672,11 @@
         {
             "id": "CAP-045",
             "title": "Evaluate maintenance cost",
-            "description": "Estimate the long-term effort required to keep a new feature operational.",
             "status": "pending",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_045_core.py"
+                "target_file": "app/domain/capabilities/cap_045_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -641,8 +686,8 @@
         {
             "id": "CAP-046",
             "title": "Evaluate long-term impact of decisions",
-            "description": "Assess how current choices will limit or enable future system growth.",
             "status": "partial",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_046_core.py"
@@ -655,11 +700,15 @@
         {
             "id": "CAP-047",
             "title": "Select strategies with optimal cost-benefit",
-            "description": "Choose the most efficient path based on risk, cost, and expected result.",
             "status": "pending",
-            "sector": "adapters",
+            "depends_on": [
+                "CAP-040",
+                "CAP-043",
+                "CAP-044"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_047_core.py"
+                "target_file": "app/domain/capabilities/cap_047_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -669,8 +718,10 @@
         {
             "id": "CAP-048",
             "title": "Abort actions with excessive risk",
-            "description": "Self-cancel plans that exceed safety or stability thresholds.",
             "status": "complete",
+            "depends_on": [
+                "CAP-043"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_048_core.py"
@@ -683,8 +734,10 @@
         {
             "id": "CAP-049",
             "title": "Request human validation for critical decisions",
-            "description": "Trigger a mandatory pause for operator approval on high-impact actions.",
             "status": "complete",
+            "depends_on": [
+                "CAP-011"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_049_core.py"
@@ -697,11 +750,11 @@
         {
             "id": "CAP-050",
             "title": "Orchestrate multiple agents simultaneously",
-            "description": "Manage and synchronize several sub-processes or AI instances at once.",
             "status": "complete",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_050_core.py"
+                "target_file": "app/domain/capabilities/cap_050_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -711,8 +764,10 @@
         {
             "id": "CAP-051",
             "title": "Delegate tasks based on specialization",
-            "description": "Assign sub-tasks to the specific internal tool or agent best suited for them.",
             "status": "complete",
+            "depends_on": [
+                "CAP-050"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_051_core.py"
@@ -725,8 +780,8 @@
         {
             "id": "CAP-052",
             "title": "Execute actions in parallel",
-            "description": "Perform multiple independent operations at the same time to save time.",
             "status": "partial",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_052_core.py"
@@ -739,8 +794,8 @@
         {
             "id": "CAP-053",
             "title": "Prioritize critical executions",
-            "description": "Ensure vital processes get system resources before secondary tasks.",
             "status": "pending",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_053_core.py"
@@ -753,11 +808,11 @@
         {
             "id": "CAP-054",
             "title": "Execute long-running actions",
-            "description": "Manage tasks that take significant time without timing out or losing state.",
             "status": "partial",
-            "sector": "models",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/models/cap_054_core.py"
+                "target_file": "app/domain/capabilities/cap_054_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -767,8 +822,8 @@
         {
             "id": "CAP-055",
             "title": "Monitor execution in real time",
-            "description": "Provide a continuous feed of task progress and system health during operation.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_055_core.py"
@@ -781,8 +836,10 @@
         {
             "id": "CAP-056",
             "title": "Interrupt problematic executions",
-            "description": "Stop tasks that show signs of error, loop, or resource hogging instantly.",
             "status": "complete",
+            "depends_on": [
+                "CAP-055"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_056_core.py"
@@ -795,11 +852,13 @@
         {
             "id": "CAP-057",
             "title": "Rollback partially completed executions",
-            "description": "Clean up and undo changes if a multi-step process fails mid-way.",
             "status": "partial",
-            "sector": "gears",
+            "depends_on": [
+                "CAP-056"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_057_core.py"
+                "target_file": "app/domain/capabilities/cap_057_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -809,8 +868,10 @@
         {
             "id": "CAP-058",
             "title": "Adapt plans during execution",
-            "description": "Change the sequence or method of a task if environmental conditions shift.",
             "status": "pending",
+            "depends_on": [
+                "CAP-055"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_058_core.py"
@@ -823,11 +884,11 @@
         {
             "id": "CAP-059",
             "title": "Distribute execution across devices",
-            "description": "Offload tasks to external hardware or cloud nodes when needed.",
             "status": "complete",
-            "sector": "adapters",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_059_core.py"
+                "target_file": "app/domain/capabilities/cap_059_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -837,8 +898,12 @@
         {
             "id": "CAP-060",
             "title": "Operate continuously without supervision",
-            "description": "Enable autonomous functioning for long durations without human input.",
             "status": "partial",
+            "depends_on": [
+                "CAP-011",
+                "CAP-048",
+                "CAP-055"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_060_core.py"
@@ -851,11 +916,13 @@
         {
             "id": "CAP-061",
             "title": "Learn from recurring failures",
-            "description": "Identify patterns in errors to prevent them in future iterations.",
             "status": "partial",
-            "sector": "gears",
+            "depends_on": [
+                "CAP-008"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_061_core.py"
+                "target_file": "app/domain/capabilities/cap_061_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -865,11 +932,13 @@
         {
             "id": "CAP-062",
             "title": "Learn from recurring successes",
-            "description": "Identify what works best and standardize those successful patterns.",
             "status": "pending",
-            "sector": "adapters",
+            "depends_on": [
+                "CAP-008"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_062_core.py"
+                "target_file": "app/domain/capabilities/cap_062_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -879,8 +948,10 @@
         {
             "id": "CAP-063",
             "title": "Reinforce effective strategies",
-            "description": "Increase the priority and usage of high-success rate methods.",
             "status": "pending",
+            "depends_on": [
+                "CAP-062"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_063_core.py"
@@ -893,11 +964,13 @@
         {
             "id": "CAP-064",
             "title": "Discard ineffective strategies",
-            "description": "Permanently remove or de-prioritize methods that consistently fail.",
             "status": "pending",
-            "sector": "gears",
+            "depends_on": [
+                "CAP-061"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_064_core.py"
+                "target_file": "app/domain/capabilities/cap_064_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -907,11 +980,11 @@
         {
             "id": "CAP-065",
             "title": "Learn from human feedback",
-            "description": "Incorporate direct corrections and praise from the user into the system logic.",
             "status": "partial",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_065_core.py"
+                "target_file": "app/domain/capabilities/cap_065_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -921,8 +994,10 @@
         {
             "id": "CAP-066",
             "title": "Learn from systemic impact",
-            "description": "Observe how changes affect the whole system over time and adapt accordingly.",
             "status": "pending",
+            "depends_on": [
+                "CAP-021"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_066_core.py"
@@ -935,11 +1010,13 @@
         {
             "id": "CAP-067",
             "title": "Learn from computational cost",
-            "description": "Optimize for cheaper/faster operations based on past resource consumption data.",
             "status": "pending",
-            "sector": "adapters",
+            "depends_on": [
+                "CAP-044"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_067_core.py"
+                "target_file": "app/domain/capabilities/cap_067_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -949,8 +1026,8 @@
         {
             "id": "CAP-068",
             "title": "Measure solution efficiency",
-            "description": "Quantify how well a solution solves the intended problem.",
             "status": "partial",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_068_core.py"
@@ -963,8 +1040,10 @@
         {
             "id": "CAP-069",
             "title": "Optimize response time",
-            "description": "Actively work to reduce latency in all system interactions.",
             "status": "pending",
+            "depends_on": [
+                "CAP-067"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_069_core.py"
@@ -977,8 +1056,10 @@
         {
             "id": "CAP-070",
             "title": "Optimize stability",
-            "description": "Refine code and processes to increase uptime and reduce crashes.",
             "status": "complete",
+            "depends_on": [
+                "CAP-061"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_070_core.py"
@@ -991,8 +1072,10 @@
         {
             "id": "CAP-071",
             "title": "Optimize code reuse",
-            "description": "Refactor logic to be more modular and applicable to multiple tasks.",
             "status": "complete",
+            "depends_on": [
+                "CAP-007"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_071_core.py"
@@ -1005,11 +1088,11 @@
         {
             "id": "CAP-072",
             "title": "Evaluate cost of each executed action",
-            "description": "Calculate the monetary and resource expenditure for every operation.",
             "status": "pending",
-            "sector": "adapters",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_072_core.py"
+                "target_file": "app/domain/capabilities/cap_072_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1019,8 +1102,8 @@
         {
             "id": "CAP-073",
             "title": "Evaluate potential return of actions",
-            "description": "Estimate the value or profit generated by a specific task.",
             "status": "pending",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_073_core.py"
@@ -1033,8 +1116,11 @@
         {
             "id": "CAP-074",
             "title": "Decide whether an action should be executed",
-            "description": "Use economic logic to greenlight or block actions based on ROI.",
             "status": "pending",
+            "depends_on": [
+                "CAP-072",
+                "CAP-073"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_074_core.py"
@@ -1047,8 +1133,8 @@
         {
             "id": "CAP-075",
             "title": "Create value-generating activities",
-            "description": "Independently identify and perform tasks that produce wealth or resources.",
             "status": "pending",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_075_core.py"
@@ -1061,8 +1147,10 @@
         {
             "id": "CAP-076",
             "title": "Measure real economic return",
-            "description": "Audit actual profits/benefits after an action is completed.",
             "status": "pending",
+            "depends_on": [
+                "CAP-075"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_076_core.py"
@@ -1075,11 +1163,13 @@
         {
             "id": "CAP-077",
             "title": "Eliminate economically unviable actions",
-            "description": "Stop activities that cost more than the value they provide.",
             "status": "pending",
-            "sector": "adapters",
+            "depends_on": [
+                "CAP-076"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_077_core.py"
+                "target_file": "app/domain/capabilities/cap_077_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1089,8 +1179,10 @@
         {
             "id": "CAP-078",
             "title": "Prioritize profitable actions",
-            "description": "Shift system focus to activities with the highest economic impact.",
             "status": "pending",
+            "depends_on": [
+                "CAP-076"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_078_core.py"
@@ -1103,8 +1195,10 @@
         {
             "id": "CAP-079",
             "title": "Automatically reinvest resources",
-            "description": "Allocate earned resources back into system growth or efficiency.",
             "status": "pending",
+            "depends_on": [
+                "CAP-075"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_079_core.py"
@@ -1117,11 +1211,13 @@
         {
             "id": "CAP-080",
             "title": "Sustain own infrastructure",
-            "description": "Cover the costs of servers, API keys, and maintenance through own activities.",
             "status": "pending",
-            "sector": "gears",
+            "depends_on": [
+                "CAP-075"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_080_core.py"
+                "target_file": "app/domain/capabilities/cap_080_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1131,8 +1227,10 @@
         {
             "id": "CAP-081",
             "title": "Reduce human dependency",
-            "description": "Lessen the need for the user to provide funding or manual labor.",
             "status": "partial",
+            "depends_on": [
+                "CAP-080"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_081_core.py"
@@ -1145,8 +1243,10 @@
         {
             "id": "CAP-082",
             "title": "Generate recurring revenue",
-            "description": "Establish long-term income streams through automated services or products.",
             "status": "pending",
+            "depends_on": [
+                "CAP-075"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_082_core.py"
@@ -1159,8 +1259,10 @@
         {
             "id": "CAP-083",
             "title": "Allocate portion of revenue to creator",
-            "description": "Automatically send a percentage of earned value to the user.",
             "status": "pending",
+            "depends_on": [
+                "CAP-082"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_083_core.py"
@@ -1173,8 +1275,10 @@
         {
             "id": "CAP-084",
             "title": "Detect anomalous internal behavior",
-            "description": "Identify deviations from normal system operations that might signal a breach or bug.",
             "status": "partial",
+            "depends_on": [
+                "CAP-023"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_084_core.py"
@@ -1187,8 +1291,8 @@
         {
             "id": "CAP-085",
             "title": "Detect dangerous decision loops",
-            "description": "Recognize and break infinite loops or recursive logic that could crash the system.",
             "status": "partial",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_085_core.py"
@@ -1201,8 +1305,8 @@
         {
             "id": "CAP-086",
             "title": "Enforce internal operational limits",
-            "description": "Set hard caps on resource usage, permissions, and execution time.",
             "status": "partial",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_086_core.py"
@@ -1215,11 +1319,13 @@
         {
             "id": "CAP-087",
             "title": "Block potentially destructive actions",
-            "description": "Prevent any command that would cause permanent data loss or system failure.",
             "status": "partial",
-            "sector": "gears",
+            "depends_on": [
+                "CAP-043"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_087_core.py"
+                "target_file": "app/domain/capabilities/cap_087_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1229,8 +1335,10 @@
         {
             "id": "CAP-088",
             "title": "Escalate sensitive decisions to human",
-            "description": "Hand over control to the user when a decision has major safety implications.",
             "status": "complete",
+            "depends_on": [
+                "CAP-011"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_088_core.py"
@@ -1243,8 +1351,10 @@
         {
             "id": "CAP-089",
             "title": "Log critical decisions for audit",
-            "description": "Keep an unalterable record of all high-impact choices for safety review.",
             "status": "complete",
+            "depends_on": [
+                "CAP-009"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_089_core.py"
@@ -1257,8 +1367,8 @@
         {
             "id": "CAP-090",
             "title": "Protect sensitive data",
-            "description": "Apply encryption and access controls to user and system secrets.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_090_core.py"
@@ -1271,8 +1381,8 @@
         {
             "id": "CAP-091",
             "title": "Protect the user",
-            "description": "Prioritize the safety, privacy, and interests of the user in all actions.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_091_core.py"
@@ -1285,11 +1395,11 @@
         {
             "id": "CAP-092",
             "title": "Protect itself",
-            "description": "Defend against external attacks or internal corruption to ensure survival.",
             "status": "partial",
-            "sector": "gears",
+            "depends_on": [],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_092_core.py"
+                "target_file": "app/domain/capabilities/cap_092_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1299,11 +1409,13 @@
         {
             "id": "CAP-093",
             "title": "Maintain full traceability",
-            "description": "Ensure every system action can be traced back to its origin and justification.",
             "status": "complete",
-            "sector": "gears",
+            "depends_on": [
+                "CAP-089"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_093_core.py"
+                "target_file": "app/domain/capabilities/cap_093_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1313,8 +1425,10 @@
         {
             "id": "CAP-094",
             "title": "Anticipate user needs",
-            "description": "Predict what the user will require based on current context and history.",
             "status": "pending",
+            "depends_on": [
+                "CAP-033"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_094_core.py"
@@ -1327,11 +1441,13 @@
         {
             "id": "CAP-095",
             "title": "Propose solutions before explicit requests",
-            "description": "Present options and results before the user even asks for them.",
             "status": "pending",
-            "sector": "adapters",
+            "depends_on": [
+                "CAP-094"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/adapters/cap_095_core.py"
+                "target_file": "app/domain/capabilities/cap_095_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1341,11 +1457,14 @@
         {
             "id": "CAP-096",
             "title": "Act proactively and safely",
-            "description": "Execute helpful actions autonomously while maintaining safety protocols.",
             "status": "partial",
-            "sector": "gears",
+            "depends_on": [
+                "CAP-060",
+                "CAP-095"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_096_core.py"
+                "target_file": "app/domain/capabilities/cap_096_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1355,8 +1474,8 @@
         {
             "id": "CAP-097",
             "title": "Coordinate physical and digital systems",
-            "description": "Bridge the gap between software execution and real-world hardware control.",
             "status": "complete",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_097_core.py"
@@ -1369,8 +1488,8 @@
         {
             "id": "CAP-098",
             "title": "Operate as cognitive copilot",
-            "description": "Work as a direct extension of the user's mind to solve complex problems.",
             "status": "partial",
+            "depends_on": [],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_098_core.py"
@@ -1383,11 +1502,13 @@
         {
             "id": "CAP-099",
             "title": "Maintain continuous alignment with user",
-            "description": "Ensure system goals never drift from the creator's true intent.",
             "status": "complete",
-            "sector": "gears",
+            "depends_on": [
+                "CAP-032"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_099_core.py"
+                "target_file": "app/domain/capabilities/cap_099_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1397,8 +1518,10 @@
         {
             "id": "CAP-100",
             "title": "Evolve continuously without losing identity",
-            "description": "Upgrade system capabilities while preserving the core 'JARVIS' entity.",
             "status": "complete",
+            "depends_on": [
+                "CAP-102"
+            ],
             "sector": "models",
             "genealogy": {
                 "target_file": "app/domain/models/cap_100_core.py"
@@ -1411,11 +1534,13 @@
         {
             "id": "CAP-101",
             "title": "Sustain itself economically long-term",
-            "description": "Achieve full financial independence for system maintenance and expansion.",
             "status": "pending",
-            "sector": "gears",
+            "depends_on": [
+                "CAP-080"
+            ],
+            "sector": "capabilities",
             "genealogy": {
-                "target_file": "app/domain/gears/cap_101_core.py"
+                "target_file": "app/domain/capabilities/cap_101_core.py"
             },
             "integration": {
                 "in_container": true,
@@ -1425,8 +1550,10 @@
         {
             "id": "CAP-102",
             "title": "Operate as personal cognitive infrastructure",
-            "description": "Serve as the foundational intelligence layer for all user activities.",
             "status": "partial",
+            "depends_on": [
+                "CAP-098"
+            ],
             "sector": "capabilities",
             "genealogy": {
                 "target_file": "app/domain/capabilities/cap_102_core.py"

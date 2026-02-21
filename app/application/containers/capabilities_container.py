@@ -1,3 +1,34 @@
+from app.domain.capabilities.cap_101_core import execute as cap_101_exec
+from app.domain.capabilities.cap_099_core import execute as cap_099_exec
+from app.domain.capabilities.cap_096_core import execute as cap_096_exec
+from app.domain.capabilities.cap_095_core import execute as cap_095_exec
+from app.domain.capabilities.cap_093_core import execute as cap_093_exec
+from app.domain.capabilities.cap_092_core import execute as cap_092_exec
+from app.domain.capabilities.cap_087_core import execute as cap_087_exec
+from app.domain.capabilities.cap_080_core import execute as cap_080_exec
+from app.domain.capabilities.cap_077_core import execute as cap_077_exec
+from app.domain.capabilities.cap_072_core import execute as cap_072_exec
+from app.domain.capabilities.cap_067_core import execute as cap_067_exec
+from app.domain.capabilities.cap_065_core import execute as cap_065_exec
+from app.domain.capabilities.cap_064_core import execute as cap_064_exec
+from app.domain.capabilities.cap_062_core import execute as cap_062_exec
+from app.domain.capabilities.cap_061_core import execute as cap_061_exec
+from app.domain.capabilities.cap_059_core import execute as cap_059_exec
+from app.domain.capabilities.cap_057_core import execute as cap_057_exec
+from app.domain.capabilities.cap_054_core import execute as cap_054_exec
+from app.domain.capabilities.cap_050_core import execute as cap_050_exec
+from app.domain.capabilities.cap_047_core import execute as cap_047_exec
+from app.domain.capabilities.cap_045_core import execute as cap_045_exec
+from app.domain.capabilities.cap_044_core import execute as cap_044_exec
+from app.domain.capabilities.cap_043_core import execute as cap_043_exec
+from app.domain.capabilities.cap_042_core import execute as cap_042_exec
+from app.domain.capabilities.cap_040_core import execute as cap_040_exec
+from app.domain.capabilities.cap_039_core import execute as cap_039_exec
+from app.domain.capabilities.cap_029_core import execute as cap_029_exec
+from app.domain.capabilities.cap_028_core import execute as cap_028_exec
+from app.domain.capabilities.cap_027_core import execute as cap_027_exec
+from app.domain.capabilities.cap_010_core import execute as cap_010_exec
+from app.domain.capabilities.cap_009_core import execute as cap_009_exec
 from app.domain.capabilities.cap_102_core import execute as cap_102_exec
 from app.domain.capabilities.cap_098_core import execute as cap_098_exec
 from app.domain.capabilities.cap_097_core import execute as cap_097_exec
@@ -64,6 +95,37 @@ from app.domain.capabilities.cap_003_core import execute as cap_003_exec
 class CapabilitiesContainer:
     def __init__(self):
         self.registry = {
+            "CAP-101": cap_101_exec,
+            "CAP-099": cap_099_exec,
+            "CAP-096": cap_096_exec,
+            "CAP-095": cap_095_exec,
+            "CAP-093": cap_093_exec,
+            "CAP-092": cap_092_exec,
+            "CAP-087": cap_087_exec,
+            "CAP-080": cap_080_exec,
+            "CAP-077": cap_077_exec,
+            "CAP-072": cap_072_exec,
+            "CAP-067": cap_067_exec,
+            "CAP-065": cap_065_exec,
+            "CAP-064": cap_064_exec,
+            "CAP-062": cap_062_exec,
+            "CAP-061": cap_061_exec,
+            "CAP-059": cap_059_exec,
+            "CAP-057": cap_057_exec,
+            "CAP-054": cap_054_exec,
+            "CAP-050": cap_050_exec,
+            "CAP-047": cap_047_exec,
+            "CAP-045": cap_045_exec,
+            "CAP-044": cap_044_exec,
+            "CAP-043": cap_043_exec,
+            "CAP-042": cap_042_exec,
+            "CAP-040": cap_040_exec,
+            "CAP-039": cap_039_exec,
+            "CAP-029": cap_029_exec,
+            "CAP-028": cap_028_exec,
+            "CAP-027": cap_027_exec,
+            "CAP-010": cap_010_exec,
+            "CAP-009": cap_009_exec,
             "CAP-102": cap_102_exec,
             "CAP-098": cap_098_exec,
             "CAP-097": cap_097_exec,
