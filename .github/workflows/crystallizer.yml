@@ -1,4 +1,4 @@
-name: JARVIS Crystallizer
+name: "💎 JARVIS: Crystallizer"
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ on:
     paths:
       - 'data/capabilities.json'
       - 'app/domain/**'
+      - 'app/application/services/**'
 
 jobs:
   organize:
@@ -16,23 +17,29 @@ jobs:
       - name: 🛰️ Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.JARVIS_PAT || secrets.GITHUB_TOKEN }}
+          # Alterado para GIT_PAT para garantir que o push tenha força total
+          token: ${{ secrets.GIT_PAT }}
 
-      - name: 📦 Setup Python
-        uses: actions/setup-python@v5
+      - name: 📦 Setup UV
+        uses: astral-sh/setup-uv@v5
         with:
+          enable-cache: true
           python-version: '3.11'
 
       - name: 🧠 Run Crystallizer Engine (Full Cycle)
         env:
           PYTHONPATH: ${{ github.workspace }}
+          # Caso seu motor precise consultar algo externo (opcional)
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          # Instalando dependências mínimas para o motor rodar
-          pip install requests sqlmodel pydantic
+          # Usando UV para velocidade e consistência com o resto do sistema
+          uv venv --clear --python 3.11
+          uv pip install requests sqlmodel pydantic python-dotenv
           
-          # Executando o motor exatamente como no orquestrador
-          python - << 'PYCODE'
+          # Executando via uv run para garantir o ambiente virtual
+          uv run python - << 'PYCODE'
           import sys
+          import os
           from app.application.services.crystallization.crystallizer_engine import CrystallizerEngine
           
           try:
@@ -46,16 +53,25 @@ jobs:
           PYCODE
           
       - name: 🔄 Sync DNA Map & Containers
+        env:
+          TOKEN: ${{ secrets.GIT_PAT }}
         run: |
           git config --global user.name "Jarvis-Crystallizer"
           git config --global user.email "jarvis@bot.com"
           
+          # Reconfigura URL para evitar erro 403 (Permission Denied)
+          git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git
+          
+          # Garante que estamos na main e sincronizados
+          git checkout main || git checkout -b main
+          git pull origin main --rebase
+          
           # Adiciona o Master Crystal e os Containers gerados/atualizados
           git add data/master_crystal.json app/application/containers/*.py
           
-          # Realiza o commit apenas se houver mudanças detectadas no ciclo
+          # Realiza o commit apenas se houver mudanças detectadas
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "chore: [Crystallizer] DNA Mapping & Container Synchronization"
+            git commit -m "chore: [Crystallizer] DNA Mapping & Container Synchronization [Auto-Cura]"
             git push origin main
           else
             echo "✅ DNA já está sincronizado e estável."

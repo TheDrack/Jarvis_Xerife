@@ -10,6 +10,7 @@ on:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
+    # Evita loops infinitos de execuções automáticas
     if: "!contains(github.event.head_commit.message, '[Auto-Cura]')"
     runs-on: ubuntu-latest
 
@@ -19,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
-          # Garante que o checkout rastreie a branch correta
+          # Garante o checkout na branch correta (PR ou Push)
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
 
       - name: 📦 Setup UV
@@ -30,64 +31,53 @@ jobs:
 
       - name: 🔧 Instalação do DNA
         run: |
+          # Limpa o ambiente para evitar erros de persistência
           uv venv --clear --python 3.11
+          
+          # Instala apenas o necessário para testes e validação
           uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv
+          
+          # Define o PYTHONPATH para que os módulos locais sejam encontrados
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
-      - name: 🔄 Ciclo de Cura e Decisão
+      - name: 🔄 Ciclo de Testes e Decisão
         id: healing_process
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
+          # 1. Executa a bateria de testes
+          # O pytest usará as configurações de cobertura do seu pytest.ini
           uv run pytest --json-report --json-report-file=report.json || true
           
+          # 2. Analisa o resultado para decidir o próximo passo
           if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ] && [ "$(jq '.summary.errors // 0' report.json)" == "0" ]; then
-            echo "✅ DNA estável. Sincronizando Crystal..."
-            uv run python app/application/services/crystallization/crystallizer_engine.py
+            echo "✅ DNA íntegro. Aprovando para integração."
             echo "final_status=true" >> $GITHUB_OUTPUT
           else
-            echo "❌ DNA corrompido."
+            echo "❌ Falhas detectadas no DNA. Homeostase requer intervenção ou auto-cura."
+            # O final_status como false impede o merge automático
             echo "final_status=false" >> $GITHUB_OUTPUT
           fi
 
       - name: ✅ Auto-Merge
+        # Só realiza o merge se os testes passaram e se for uma Pull Request
         if: steps.healing_process.outputs.final_status == 'true' && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
-          echo "🫡 Realizando Merge Automático..."
+          echo "🫡 Vistoria concluída com sucesso. Realizando integração automática..."
+          
+          # Tenta o merge usando o GIT_PAT via CLI do GitHub
           gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch --admin || \
           gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
 
-      - name: 💾 Persistência Garantida (Correção de Refspec)
-        if: steps.healing_process.outputs.final_status == 'true'
-        env:
-          TOKEN: ${{ secrets.GIT_PAT }}
-        run: |
-          git config --global user.name "Jarvis-Crystallizer"
-          git config --global user.email "jarvis@bot.com"
-          
-          # 1. Identifica a branch alvo (PR ou Main)
-          TARGET_BRANCH="${{ github.event.pull_request.head.ref || 'main' }}"
-          echo "🎯 Branch de Destino: $TARGET_BRANCH"
-
-          # 2. Reconfigura URL com o PAT para bypass de 403
-          git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git
-          
-          git add data/master_crystal.json app/application/containers/*.py
-          
-          if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "chore: [Auto-Cura] DNA Cristalizado e Mapeado [Auto-Cura]"
-            
-            # O SEGREDO: Push do HEAD local para a branch remota correta
-            # Isso resolve o erro 'src refspec main does not match any'
-            git push origin HEAD:$TARGET_BRANCH
-          else
-            echo "✨ DNA já está em equilíbrio."
-          fi
-
       - name: 🚨 Escalação
+        # Se os testes falharem, o workflow termina com erro para alertar a entidade
         if: steps.healing_process.outputs.final_status == 'false'
         run: |
-          echo "🚨 Falha na homeostase. Verifique o report.json."
+          echo "🚨 O DNA não atingiu a homeostase. Verifique os logs de teste abaixo."
+          # Exibe um resumo das falhas no log do GitHub Actions para facilitar a leitura
+          if [ -f report.json ]; then
+            jq '.tests[] | select(.outcome == "failed") | {nodeid, message: .call.crash.message}' report.json
+          fi
           exit 1

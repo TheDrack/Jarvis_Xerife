@@ -28,7 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # USANDO O GIT_PAT PARA QUE O PUSH DISPARE A HOMEOSTASE
+          # Uso obrigatório do GIT_PAT para que a PR dispare os workflows de Homeostase
           token: ${{ secrets.GIT_PAT }}
 
       - name: 📦 Setup UV
@@ -44,7 +44,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          # Limpeza e setup do ambiente
           uv venv --clear --python 3.11
           source .venv/bin/activate
           uv pip install sqlmodel requests pydantic groq python-dotenv
@@ -52,7 +51,6 @@ jobs:
           python - << 'PYCODE'
           import os, sys, re
           from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
-          from app.application.services.crystallization.crystallizer_engine import CrystallizerEngine
           
           try:
               auto = AutoEvolutionServiceV2()
@@ -64,23 +62,20 @@ jobs:
               is_auto_evolution = bool(re.search(r'auto-evolution|mission-\d+', last_msg, re.IGNORECASE))
               is_sync = "Inventory Synchronized" in last_msg
               
+              # Sincronização de status sem cristalização
               if is_auto_evolution and not is_sync:
-                  print("🎯 DNA de Evolução detectado. Cristalizando aprendizado...")
+                  print("🎯 DNA de Evolução detectado. Atualizando status da missão...")
                   match = re.search(r'CAP-\d+', last_msg)
                   if match:
                       cap_id = match.group()
                       if auto.mark_mission_as_completed(cap_id):
-                          print(f"✅ Sincronização concluída: {cap_id} integrada.")
-                  
-                  print("💎 Rodando Crystallizer Engine...")
-                  engine = CrystallizerEngine()
-                  engine.run_full_cycle()
+                          print(f"✅ Missão {cap_id} marcada como integrada no sistema.")
                   
                   with open(github_output, 'a') as f:
                       f.write("action=idle\n")
                   sys.exit(0)
 
-              print("🟢 Caminho livre. Consultando missões...")
+              print("🟢 Analisando apostila de aprendizado para próxima mutação...")
               next_m = auto.find_next_mission()
               
               if next_m:
@@ -91,7 +86,7 @@ jobs:
                   with open(github_output, 'a', encoding='utf-8') as f:
                       f.write(f"action=evolve\n")
                       f.write(f"mission_desc={next_m['id']}: {next_m['title']}\n")
-                  print(f"🚀 Iniciando Missão: {next_m['id']}")
+                  print(f"🚀 Missão identificada: {next_m['id']}")
               else:
                   with open(github_output, 'a') as f:
                       f.write("action=idle\n")
@@ -115,36 +110,38 @@ jobs:
           
           source .venv/bin/activate
           
-          # 1. Cristalização pré-mutação
-          python app/application/services/crystallization/crystallizer_engine.py
-          
-          # 2. Criação da Branch
+          # Criação da Branch de Mutação
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
           
-          # 3. Execução do Mutator
-          python scripts/evolution_mutator.py \
+          # Execução do Mutator para gerar o novo código
+          if ! python scripts/evolution_mutator.py \
             --strategy "minimal_change" \
             --intent "auto-evolution-mission" \
             --impact "functional-improvement" \
-            --roadmap-context "$(cat mission_context.txt)"
+            --roadmap-context "$(cat mission_context.txt)"; then
+              echo "❌ Falha na geração da mutação."
+              exit 1
+          fi
 
-          # 4. Finalização e Criação do PR com GIT_PAT
+          # Persistência da Mutação e Abertura de PR
           git add -A
           if [ -n "$(git status --porcelain)" ]; then
             git commit -m "[Auto-Evolution] DNA Mutated: ${{ steps.flow.outputs.mission_desc }}"
+            
+            # Garantia de bypass 403 usando o GIT_PAT na URL
+            git remote set-url origin https://x-access-token:${{ secrets.GIT_PAT }}@github.com/${{ github.repository }}.git
             git push origin "$BRANCH_NAME"
             
-            echo "📢 Abrindo Pull Request via GIT_PAT..."
-            # O PR aberto aqui com GIT_PAT disparará a Homeostase (on: pull_request)
+            echo "📢 Solicitando integração via Pull Request..."
             PR_URL=$(gh pr create \
                          --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
-                         --body "### 🧠 Auto-Evolução Detectada \nMissão: ${{ steps.flow.outputs.mission_desc }} \n\n Status: Mutação concluída. Aguardando Homeostase." \
+                         --body "### 🧠 Ciclo de Auto-Evolução \nMissão: ${{ steps.flow.outputs.mission_desc }} \n\n Status: Código mutado com sucesso. Homeostase deve validar a integridade." \
                          --base main --head "$BRANCH_NAME")
             
             echo "pr_number=$(echo $PR_URL | awk -F'/' '{print $6}')" >> $GITHUB_OUTPUT
             echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
           else
-            echo "⚠️ Nenhuma alteração necessária."
+            echo "⚠️ Nenhuma alteração gerada pela mutação."
             echo "action=idle" >> $GITHUB_OUTPUT
           fi
