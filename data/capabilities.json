@@ -579,7 +579,7 @@
             "id": "CAP-053",
             "title": "Prioritize critical executions",
             "description": "Ensure vital processes get system resources before secondary tasks.",
-            "status": "pending",
+            "status": "complete",
             "auto": true,
             "priority": 5,
             "depends_on": [],
