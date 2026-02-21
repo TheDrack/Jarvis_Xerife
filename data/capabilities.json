@@ -589,7 +589,7 @@
             "id": "CAP-054",
             "title": "Execute long-running actions",
             "description": "Manage tasks that take significant time without timing out or losing state.",
-            "status": "partial",
+            "status": "complete",
             "auto": true,
             "priority": 5,
             "depends_on": [],
