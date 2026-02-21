@@ -7,10 +7,14 @@ on:
     branches: [ main ]
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: write
+  pull-requests: write
+  repository-projects: write
+
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Evita loops infinitos
     if: "!contains(github.event.head_commit.message, '[Auto-Cura]')"
     runs-on: ubuntu-latest
 
@@ -19,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GIT_PAT }} # O GIT_PAT deve ter permissão de 'repo' ou 'contents:write'
+          token: ${{ secrets.GIT_PAT }}
 
       - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
@@ -41,13 +45,13 @@ jobs:
           # 1. Executa os testes
           uv run pytest --json-report --json-report-file=report.json || true
           
-          # 2. Validação de integridade
+          # 2. Validação de integridade e Cristalização
           if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ] && [ "$(jq '.summary.errors // 0' report.json)" == "0" ]; then
             echo "✅ DNA estável. Sincronizando Crystal..."
             uv run python app/application/services/crystallization/crystallizer_engine.py
             echo "final_status=true" >> $GITHUB_OUTPUT
           else
-            echo "❌ DNA corrompido. Iniciando Mutator..."
+            echo "❌ DNA corrompido."
             echo "final_status=false" >> $GITHUB_OUTPUT
           fi
 
@@ -56,20 +60,20 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
-          echo "🫡 Vistoria aprovada. Realizando Merge via CLI..."
-          gh pr merge ${{ github.event.pull_request.number }} --auto --merge --delete-branch
+          echo "🫡 Vistoria aprovada. Tentando Merge via CLI..."
+          # Tenta o merge. Se falhar por permissão de token, avisa o JARVIS.
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch || \
+          echo "⚠️ Falha no Merge: Verifique se o GIT_PAT tem permissão 'repo' e se a branch main não tem 'Restrict additions by users/apps'."
 
       - name: 💾 Persistência com GIT_PAT
         if: steps.healing_process.outputs.final_status == 'true'
         env:
-          # Injetamos o token para uso no remote set-url
           TOKEN: ${{ secrets.GIT_PAT }}
         run: |
           git config --global user.name "Jarvis-Crystallizer"
           git config --global user.email "jarvis@bot.com"
           
-          # FORÇAR AUTENTICAÇÃO: Reconfigura a URL do remote para usar o PAT explicitamente
-          # Isso evita o erro 403 Permission Denied
+          # Reconfigura URL para garantir bypass de 403
           git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git
           
           git add data/master_crystal.json app/application/containers/*.py
