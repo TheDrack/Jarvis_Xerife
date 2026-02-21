@@ -1,7 +1,10 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Recognize human priority context
-ID: CAP-038"""
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-038"}
+   def execute(context=None):
+       if context is None:
+           context = {}
+       task_importance = context.get('task_importance', 0)
+       if task_importance > 5:
+           return {'priority': 'high'}
+       else:
+           return {'priority': 'low'}
+   

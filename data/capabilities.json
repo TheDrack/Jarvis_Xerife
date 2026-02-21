@@ -417,7 +417,7 @@
             "id": "CAP-038",
             "title": "Recognize human priority context",
             "description": "Detect when a task has high personal importance to the creator.",
-            "status": "pending",
+            "status": "complete",
             "auto": true,
             "priority": 3,
             "depends_on": [],
