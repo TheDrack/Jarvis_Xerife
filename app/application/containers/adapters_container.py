@@ -13,9 +13,16 @@ from app.adapters.cap_047_core import execute as cap_047_exec
 from app.adapters.cap_044_core import execute as cap_044_exec
 from app.adapters.cap_040_core import execute as cap_040_exec
 from app.adapters.cap_039_core import execute as cap_039_exec
+from app.adapters.audio_engine import AudioAdapter
+
+           
+
 # -*- coding: utf-8 -*-
 class AdaptersContainer:
     def __init__(self):
+
+        self.audio_engine = AudioAdapter(hf_token="SEU_TOKEN")
+
         self.registry = {
             "CAP-097": cap_097_exec,
             "CAP-066": cap_066_exec,
@@ -31,4 +38,6 @@ class AdaptersContainer:
             "CAP-047": cap_047_exec,
             "CAP-044": cap_044_exec,
             "CAP-040": cap_040_exec,
-            "CAP-039": cap_039_exec,}
+            "CAP-039": cap_039_exec,
+            "audio_processor": self.audio_engine.get_embedding,
+            "diarizer": self.audio_engine.get_diarization}
