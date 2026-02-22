@@ -91,10 +91,21 @@ from app.domain.capabilities.cap_007_core import execute as cap_007_exec
 from app.domain.capabilities.cap_005_core import execute as cap_005_exec
 from app.domain.capabilities.cap_004_core import execute as cap_004_exec
 from app.domain.capabilities.cap_003_core import execute as cap_003_exec
+from app.domain_capabilities.biometry_logic import BiometryCapability
+        
+        }
+
 # -*- coding: utf-8 -*-
 class CapabilitiesContainer:
     def __init__(self):
+
+        self.biometry = BiometryCapability()
+        
         self.registry = {
+
+            "identify_speaker": self.biometry.identify_speaker,
+            "learn_voice": self.biometry.learn_silently
+        
             "CAP-101": cap_101_exec,
             "CAP-099": cap_099_exec,
             "CAP-096": cap_096_exec,
