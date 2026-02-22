@@ -165,14 +165,14 @@
         {
             "id": "CAP-012",
             "title": "Validate improvements using automated tests",
-            "status": "complete",
-            "mapped_libraries": [],
-            "sector": "capabilities",
+            "status": "in_progress",
+            "mapped_libraries": ["torch", "torchaudio", "speechbrain", "pyannote.audio"],
+            "sector": "infraestructure",
             "genealogy": {
-                "target_file": "app/domain/capabilities/cap_012_core.py"
+                "target_file": "app/infrastructure/sensors/vocal_engine.py"
             },
             "integration": {
-                "in_container": true,
+                "in_container": false,
                 "physically_present": true
             }
         },
