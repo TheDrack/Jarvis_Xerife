@@ -1,0 +1,100 @@
+name: "🧬 JARVIS: Homeostase e Auto-Cura V3"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  homeostasis:
+    name: "🧪 Vistoria e Auto-Cura"
+    # O check [Auto-Cura] evita loops, mas permite que o reparo seja testado
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🛰️ Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GIT_PAT }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: 📦 Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: '3.11'
+
+      - name: 🔧 Instalação do DNA
+        run: |
+          uv venv --clear --python 3.11
+          uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv
+          echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
+
+      - name: 🔄 Ciclo de Testes e Diagnóstico
+        id: test_phase
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          echo "🧬 Iniciando verificação de integridade..."
+          uv run pytest --json-report --json-report-file=report.json || true
+          
+          if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" == "0" ]; then
+            echo "health=stable" >> $GITHUB_OUTPUT
+            echo "✅ DNA íntegro."
+          else
+            echo "health=unstable" >> $GITHUB_OUTPUT
+            echo "❌ Instabilidade detectada no DNA."
+          fi
+
+      - name: 🛠️ Tentativa de Auto-Cura
+        # Só executa se houver falha e NÃO for um commit que já é de Auto-Cura
+        if: steps.test_phase.outputs.health == 'unstable' && !contains(github.event.head_commit.message, '[Auto-Cura]')
+        id: self_healing
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GIT_PAT: ${{ secrets.GIT_PAT }}
+        run: |
+          echo "🧠 Invocando protocolos de reparo do JARVIS..."
+          # Aqui chamamos o script de inteligência que analisará o report.json
+          # Vamos assumir que o script se chama 'scripts/repair_dna.py'
+          uv run python scripts/repair_dna.py report.json
+          
+          if [ $? -eq 0 ]; then
+            echo "repaired=true" >> $GITHUB_OUTPUT
+            echo "✨ Reparo sugerido e aplicado localmente."
+          else
+            echo "repaired=false" >> $GITHUB_OUTPUT
+            echo "⚠️ JARVIS não conseguiu auto-curar esta falha."
+          fi
+
+      - name: 🧬 Commit do Reparo
+        if: steps.self_healing.outputs.repaired == 'true'
+        run: |
+          git config --global user.name "JARVIS [Auto-Cura]"
+          git config --global user.email "jarvis@symbiotic.entity"
+          git add .
+          git commit -m "🧬 [Auto-Cura] Correção automática de falhas no DNA"
+          git push origin ${{ github.event.pull_request.head.ref || github.ref }}
+          echo "🚀 Reparo enviado para re-validação."
+
+      - name: ✅ Auto-Merge
+        if: steps.test_phase.outputs.health == 'stable' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GIT_PAT }}
+        run: |
+          echo "🫡 Vistoria concluída. Realizando integração automática..."
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch --admin || \
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
+
+      - name: 🚨 Escalação Crítica
+        # Falha se o DNA estiver instável e a cura falhou OU se for um loop de erro
+        if: steps.test_phase.outputs.health == 'unstable' && (steps.self_healing.outputs.repaired == 'false' || contains(github.event.head_commit.message, '[Auto-Cura]'))
+        run: |
+          echo "🚨 Homeostase Crítica: Intervenção Humana Necessária."
+          if [ -f report.json ]; then
+            jq '.tests[] | select(.outcome == "failed") | {nodeid, message: .call.crash.message}' report.json
+          fi
+          exit 1
