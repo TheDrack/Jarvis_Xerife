@@ -4,34 +4,35 @@ import shutil
 import logging
 from pathlib import Path
 
-# Configuração de Logs para identificação rápida
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%H:%M:%S'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S')
 logger = logging.getLogger("JARVIS_CLEANER")
 
+# Mapeamento baseado no seu log de execução real
 MIGRATION_MAP = {
-    # Origem -> Destino
-    "src/adapters/bridge/jarvis_local_agent.py": "app/adapters/edge/jarvis_local_agent.py",
     "jarvis_local_agent.py": "app/adapters/edge/jarvis_local_agent.py",
     "worker_pc.py": "app/adapters/edge/worker_pc.py",
     "src/domain/models/system_state.py": "app/domain/models/system_state.py",
     "src/domain/usecases/monitor_performance_degradation.py": "app/domain/capabilities/monitor_performance_degradation.py",
     "mission_selector.py": "app/domain/capabilities/mission_selector.py",
-    "src/domain/gears/llm_reasoning.py": "app/domain/gears/llm_reasoning.py",
     "main.py": "app/application/services/main.py",
     "serve.py": "app/application/services/serve.py",
-    "src/application/services/flow_manager.py": "app/application/services/flow_manager.py"
 }
 
+# Regras de substituição de strings para corrigir os caminhos internos
 IMPORT_RULES = [
-    (r'from src\.domain\.models import system_state', 'from app.domain.models import system_state'),
-    (r'from src\.domain\.gears import llm_reasoning', 'from app.domain.gears import llm_reasoning'),
+    # Corrige referências ao antigo SRC
+    (r'from src\.domain\.models', 'from app.domain.models'),
+    (r'from src\.domain\.usecases', 'from app.domain.capabilities'),
+    (r'from src\.application', 'from app.application'),
+    (r'from src\.adapters', 'from app.adapters'),
+    
+    # Corrige imports que eram locais na raiz e agora estão em subpastas
+    (r'import system_state', 'from app.domain.models import system_state'),
     (r'import mission_selector', 'from app.domain.capabilities import mission_selector'),
-    (r'from src\.', 'from app.'),
     (r'import jarvis_local_agent', 'from app.adapters.edge import jarvis_local_agent'),
+    
+    # Garante que o domínio não tente importar da raiz
+    (r'from system_state', 'from app.domain.models.system_state'),
 ]
 
 def fix_imports_in_file(file_path):
@@ -43,12 +44,12 @@ def fix_imports_in_file(file_path):
         
         if new_content != content:
             file_path.write_text(new_content, encoding='utf-8')
-            logger.info(f"[OK] Imports corrigidos: {file_path}")
+            logger.info(f"  [OK] Imports ajustados em: {file_path}")
     except Exception as e:
-        logger.error(f"[ERRO] Falha ao editar {file_path}: {e}")
+        logger.error(f"  [ERRO] Falha ao processar conteúdo de {file_path}: {e}")
 
 def run_migration():
-    logger.info("Iniciando Fase 1: Movimentação de arquivos...")
+    logger.info("=== FASE 1: MOVIMENTAÇÃO DIRETA ===")
     for src_str, dest_str in MIGRATION_MAP.items():
         src, dest = Path(src_str), Path(dest_str)
         if src.exists():
@@ -59,17 +60,20 @@ def run_migration():
             except Exception as e:
                 logger.error(f"[ERRO] Falha ao mover {src}: {e}")
         else:
-            logger.warning(f"[AVISO] Não encontrado: {src}")
+            # Silencioso se já foi movido em run anterior
+            pass
 
-    logger.info("Iniciando Fase 2: Correção de Imports...")
-    # Varre a pasta app inteira buscando arquivos .py para corrigir referências
+    logger.info("=== FASE 2: REFATORAÇÃO DE IMPORTS ===")
+    # Varre app/ e garante que todos os arquivos falem a nova língua
     for py_file in Path("app").rglob("*.py"):
         fix_imports_in_file(py_file)
 
-    # Limpeza final
-    if Path("src").exists() and not any(Path("src").iterdir()):
-        Path("src").rmdir()
-        logger.info("[LIMPEZA] Pasta 'src' legada removida.")
+    # Limpeza de diretórios fantasmas
+    for legacy_dir in ["src"]:
+        dir_path = Path(legacy_dir)
+        if dir_path.exists() and not any(dir_path.iterdir()):
+            dir_path.rmdir()
+            logger.info(f"[LIMPEZA] Diretório '{legacy_dir}' removido.")
 
 if __name__ == "__main__":
     run_migration()
