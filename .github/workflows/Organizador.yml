@@ -2,8 +2,6 @@ name: "JARVIS: Cristalização de Estrutura"
 
 on:
   workflow_dispatch: # Permite rodar manualmente
-  push:
-    branches: [ main, master ]
 
 jobs:
   organize:
