@@ -621,7 +621,7 @@
             "id": "CAP-057",
             "title": "Rollback partially completed executions",
             "description": "Clean up and undo changes if a multi-step process fails mid-way.",
-            "status": "partial",
+            "status": "complete",
             "auto": true,
             "priority": 5,
             "depends_on": [
