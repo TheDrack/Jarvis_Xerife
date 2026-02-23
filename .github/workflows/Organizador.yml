@@ -18,6 +18,9 @@ jobs:
       - name: Run Script
         run: python scripts/clean_legacy.py
 
+      - name: Fix Build Paths
+        run: python scripts/fix_build_paths.py
+
       - name: Commit Changes
         run: |
           git config --local user.email "jarvis@simbiose.ai"
@@ -25,3 +28,4 @@ jobs:
           git add .
           git commit -m "chore: organização estrutural e correção de imports" || echo "Sem mudanças"
           git push
+
