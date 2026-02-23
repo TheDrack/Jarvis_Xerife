@@ -1,10 +1,10 @@
-name: "JARVIS: Cristalização de Estrutura"
+name: "JARVIS: Cleanup and Refactor"
 
 on:
-  workflow_dispatch: # Permite rodar manualmente
+  workflow_dispatch:
 
 jobs:
-  organize:
+  refactor:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -15,13 +15,13 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Execute Crystallization Script
-        run: python .github/scripts/organizer.py
+      - name: Run Script
+        run: python scripts/clean_legacy.py
 
       - name: Commit Changes
         run: |
           git config --local user.email "jarvis@simbiose.ai"
           git config --local user.name "JARVIS Protocol"
           git add .
-          git commit -m "chore: cristalização de estrutura aplicada [protocolo jarvis]" || echo "Sem mudanças para commitar"
+          git commit -m "chore: organização estrutural e correção de imports" || echo "Sem mudanças"
           git push
