@@ -10,13 +10,13 @@ on:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Condição: Só executa se o workflow anterior falhou E não foi este próprio workflow
+    # Condição corrigida e alinhada
     if: >
       github.event.workflow_run.conclusion == 'failure' &&
       github.event.workflow_run.name != '🧬 JARVIS: Self Healing V3'
     
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout do Código
         uses: actions/checkout@v4
@@ -26,14 +26,10 @@ jobs:
           echo "⚠️ Falha detectada no workflow: ${{ github.event.workflow_run.name }}"
           echo "🔗 URL da falha: ${{ github.event.workflow_run.html_url }}"
 
-      # Adicione aqui seus comandos de cura (ex: scripts de fix, linter, etc)
       - name: Executar Protocolo de Reparo
         run: |
           echo "Iniciando diagnóstico e reparo automático..."
-          # Exemplo: npm run fix ou python healer.py
-
-
-    steps:
+         
       - name: 🛰️ Checkout
         uses: actions/checkout@v4
         with:
