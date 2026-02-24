@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: 🛰️ Checkout
-        uses: actions/checkout@@v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
@@ -45,10 +45,12 @@ jobs:
           PYTHONPATH: "."
         run: |
           echo "🧪 Iniciando bateria de testes..."
+          # Captura saída bruta para o Healer analisar via Regex
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
+          cat pytest_log.txt
           
           if grep -qE "ERRORS|failed|IndentationError|Interrupted" pytest_log.txt; then
-            echo "🚨 Anomalias detectadas. Ativando Cura por Reestruturação..."
+            echo "🚨 Anomalias detectadas. Ativando Cura Profunda..."
             uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
             
             echo "🔄 Revalidando integridade pós-cura..."
@@ -60,7 +62,7 @@ jobs:
               echo "healed=true" >> $GITHUB_OUTPUT
               echo "final_status=true" >> $GITHUB_OUTPUT
             else
-              echo "❌ Falha crítica: O DNA não aceitou a reestruturação automática."
+              echo "❌ Falha: DNA permanece instável após tentativa de reindentação."
               echo "final_status=false" >> $GITHUB_OUTPUT
             fi
           else
@@ -74,7 +76,7 @@ jobs:
           git config --local user.email "jarvis@simbiose.ai"
           git config --local user.name "🧬 JARVIS Homeostase"
           git add .
-          git commit -m "[Auto-Cura] Reindentação global via Autopep8"
+          git commit -m "[Auto-Cura] Reindentação global de arquivos corrompidos"
           git push
 
       - name: 🚨 Escalação
