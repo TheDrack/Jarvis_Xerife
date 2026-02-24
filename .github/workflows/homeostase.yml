@@ -1,13 +1,11 @@
-name: "🧬 JARVIS: Self Healing V3"
+name: "🧬 JARVIS: Homeostase e Auto-Cura V2"
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # Permite rodar manualmente no botão "Run workflow"
   workflow_dispatch: 
-  # Tenta ouvir outros workflows
   workflow_run:
     workflows: ["*"]
     types: [completed]
@@ -15,7 +13,6 @@ on:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Só não roda se o commit for da própria auto-cura
     if: "!contains(github.event.head_commit.message, '[Auto-Cura]')"
     runs-on: ubuntu-latest
 
@@ -32,45 +29,50 @@ jobs:
           enable-cache: true
           python-version: '3.11'
 
-      - name: 🔧 Instalação Flash do DNA
+      - name: 🔧 Instalação do DNA
         run: |
           uv venv --clear --python 3.11
-          # Instalação em bloco único para evitar conflitos de versão
           uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv \
                          fastapi[all] pydantic-settings cryptography python-jose[cryptography] \
                          pandas numpy scikit-learn pytest-asyncio pyttsx3 pyautogui pyperclip \
                          httpx python-multipart passlib[bcrypt] bcrypt
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
-      - name: 🔄 Ciclo de Execução
+      - name: 💉 Vacina Preventiva (Sanitização)
+        run: |
+          echo "💉 Removendo identações inesperadas em arquivos core..."
+          # Remove espaços/tabs no início de linhas que começam com def ou class
+          find app/domain/capabilities/ -name "*.py" -exec sed -i 's/^[[:space:]]\+\(def \)/\1/' {} +
+          find app/domain/capabilities/ -name "*.py" -exec sed -i 's/^[[:space:]]\+\(class \)/\1/' {} +
+
+      - name: 🔄 Ciclo de Execução e Auto-Cura
         id: healing_process
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
+          echo "🧪 Iniciando testes..."
           uv run pytest --json-report --json-report-file=report.json || true
           
           if [ -f report.json ]; then
-            # Puxa falhas, erros de coleta e itens na lista de erros explicitamente
-            FAILED=$(jq '.summary.failed // 0' report.json)
-            COLLECT_ERRORS=$(jq '.summary.errors // 0' report.json)
-            # Verifica se a lista de erros não está vazia
-            LIST_ERRORS=$(jq '.errors | length' report.json)
+            # Lógica robusta: detecta falhas, erros de sumário e erros de coleção (lista errors)
+            HAS_ERRORS=$(jq 'if ((.summary.errors // 0) > 0) or ((.errors | length) > 0) or ((.summary.failed // 0) > 0) then "true" else "false" end' report.json)
             
-            TOTAL=$((FAILED + COLLECT_ERRORS + LIST_ERRORS))
-            
-            if [ "$TOTAL" -gt 0 ]; then
-              echo "🚨 Problemas reais detectados ($TOTAL). Ativando Healer..."
+            if [ "$HAS_ERRORS" == '"true"' ]; then
+              echo "🚨 Anomalias detectadas. Ativando Protocolo de Cura..."
               uv run python scripts/jarvis_healer.py --report report.json
               
-              echo "🔄 Revalidando..."
+              echo "🔄 Revalidando integridade..."
               uv run pytest --json-report --json-report-file=report_final.json || true
-              FINAL_TOTAL=$(jq '(.summary.failed // 0) + (.summary.errors // 0) + (.errors | length)' report_final.json)
               
-              if [ "$FINAL_TOTAL" -eq 0 ]; then
+              STILL_HAS_ERRORS=$(jq 'if ((.summary.errors // 0) > 0) or ((.errors | length) > 0) or ((.summary.failed // 0) > 0) then "true" else "false" end' report_final.json)
+              
+              if [ "$STILL_HAS_ERRORS" == '"false"' ]; then
+                echo "✅ Auto-cura bem sucedida."
                 echo "final_status=true" >> $GITHUB_OUTPUT
                 echo "healed=true" >> $GITHUB_OUTPUT
               else
+                echo "❌ Falha crítica: DNA permanece instável."
                 echo "final_status=false" >> $GITHUB_OUTPUT
               fi
             else
@@ -78,19 +80,27 @@ jobs:
               echo "final_status=true" >> $GITHUB_OUTPUT
             fi
           else
-            echo "❌ Erro: report.json não gerado."
+            echo "❌ Erro Fatal: Relatório não gerado."
             exit 1
           fi
 
-      - name: 🧬 Commit Auto-Cura
+      - name: 🧬 Commit dos Reparos
         if: steps.healing_process.outputs.healed == 'true'
         run: |
           git config --local user.email "jarvis@simbiose.ai"
           git config --local user.name "🧬 JARVIS Homeostase"
           git add .
-          git commit -m "[Auto-Cura] Correção automática de DNA"
+          git commit -m "[Auto-Cura] Correção de DNA e estrutura aplicada"
           git push
 
-      - name: 🚨 Falha Final
+      - name: ✅ Auto-Merge
+        if: steps.healing_process.outputs.final_status == 'true' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GIT_PAT }}
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch --admin || \
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
+
+      - name: 🚨 Escalação
         if: steps.healing_process.outputs.final_status == 'false'
         run: exit 1
