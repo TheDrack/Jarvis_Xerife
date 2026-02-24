@@ -45,17 +45,16 @@ jobs:
           PYTHONPATH: "."
         run: |
           echo "🧪 Iniciando bateria de testes..."
-          # Salvamos a saída do terminal para garantir que o Healer leia o que o Pytest cuspiu
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           cat pytest_log.txt
           
-          # DETECÇÃO BRUTA: Se o log contém 'ERRORS' ou 'failed' ou 'IndentationError'
           if grep -qE "ERRORS|failed|IndentationError|Interrupted" pytest_log.txt; then
-            echo "🚨 Anomalias detectadas no log. Ativando Protocolo de Cura..."
+            echo "🚨 Anomalias detectadas. Ativando Cura Agressiva..."
             uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
             
             echo "🔄 Revalidando integridade pós-cura..."
             uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
+            cat final_log.txt
             
             if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
               echo "✅ Auto-cura bem sucedida."
@@ -76,7 +75,7 @@ jobs:
           git config --local user.email "jarvis@simbiose.ai"
           git config --local user.name "🧬 JARVIS Homeostase"
           git add .
-          git commit -m "[Auto-Cura] Correção de DNA aplicada via log analysis"
+          git commit -m "[Auto-Cura] DNA Sanitizado e Estruturado"
           git push
 
       - name: 🚨 Escalação
