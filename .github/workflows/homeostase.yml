@@ -1,4 +1,4 @@
-name: "JARVIS Self Healing V3"
+name: "🧬 JARVIS Self Healing V3"
 
 on:
   pull_request:
