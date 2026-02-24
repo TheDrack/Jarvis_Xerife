@@ -2,24 +2,23 @@
 import argparse
 import json
 import re
+import os
 from pathlib import Path
 
 def structural_healing(file_path, error_msg):
-    """Corrige erros de indentação e estrutura básica."""
+    """Corrige erros de indentação (unexpected indent)."""
     try:
         content = file_path.read_text(encoding='utf-8')
-        new_content = content
-        
-        # Correção agressiva de Indentação para imports e definições
-        if "IndentationError" in error_msg:
-            # Remove espaços/tabs no início de linhas que começam com palavras-chave core
-            new_content = re.sub(r'^[ \t]+(from|import|def|class)', r'\1', content, flags=re.M)
-        
-        if new_content != content:
-            file_path.write_text(new_content, encoding='utf-8')
-            return True
+        # Remove espaços no início da linha 2 se houver IndentationError
+        lines = content.splitlines()
+        if len(lines) >= 2 and "IndentationError" in error_msg:
+            # Tenta limpar a indentação da linha citada ou de todas as defs
+            new_content = re.sub(r'^[ \t]+(def|class|import|from)', r'\1', content, flags=re.M)
+            if new_content != content:
+                file_path.write_text(new_content, encoding='utf-8')
+                return True
     except Exception as e:
-        print(f"  [!] Erro ao acessar {file_path}: {e}")
+        print(f"Erro ao processar arquivo: {e}")
     return False
 
 def heal():
@@ -27,38 +26,27 @@ def heal():
     parser.add_argument('--report', required=True)
     args = parser.parse_args()
     
-    report_path = Path(args.report)
-    if not report_path.exists():
-        print("❌ Relatório não encontrado.")
-        return
-
-    with open(report_path, 'r', encoding='utf-8') as f:
+    with open(args.report, 'r') as f:
         report = json.load(f)
 
-    # Coleta issues de execução (tests) e de coleção (errors)
-    all_issues = report.get('tests', []) + report.get('errors', [])
+    # O Pytest coloca erros de Indentação/Import na lista de topo 'errors'
+    issues = report.get('errors', []) + report.get('tests', [])
     
-    processed_files = set()
-
-    for issue in all_issues:
-        if issue.get('outcome') == 'passed':
-            continue
+    for issue in issues:
+        if issue.get('outcome') == 'passed': continue
         
-        # Extrai o caminho do arquivo do nodeid
+        # Em erros de coleção, o caminho está no 'nodeid' ou 'message'
         nodeid = issue.get('nodeid', '')
-        file_str = nodeid.split('::')[0] if '::' in nodeid else nodeid
-        file_path = Path(file_str)
-        
-        # Pega a mensagem de erro (longrepr ou mensagem de erro de coleção)
         error_msg = str(issue.get('longrepr', ''))
         
-        if file_path.exists() and file_path.is_file() and file_path not in processed_files:
-            print(f"🧬 Analisando: {file_path}")
-            if structural_healing(file_path, error_msg):
-                print(f"✅ Patch estrutural aplicado em {file_path}")
-                processed_files.add(file_path)
-            else:
-                print(f"⚠️ Não foi possível aplicar patch automático em {file_path}")
+        # Extrai o caminho do arquivo do erro de coleção
+        # Ex: "app/domain/capabilities/cap_053_core.py"
+        file_match = re.search(r'([\w/]+\.py)', nodeid + error_msg)
+        if file_match:
+            path = Path(file_match.group(1))
+            if path.exists():
+                print(f"🧬 Curando anomalia em: {path}")
+                structural_healing(path, error_msg)
 
 if __name__ == "__main__":
     heal()
