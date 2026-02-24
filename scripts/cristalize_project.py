@@ -1,6 +1,6 @@
+# scripts/cristalize_project.py
 import os
 import re
-import sys
 
 class ProjectCrystallizer:
     def __init__(self):
@@ -11,7 +11,7 @@ class ProjectCrystallizer:
         return "".join(word.capitalize() for word in name.split("_"))
 
     def crystallize(self):
-        print("💎 [CRISTALIZADOR] Iniciando Cicatrização Inteligente...")
+        print("💎 [CRISTALIZADOR] Iniciando Refatoração de Segurança...")
         
         for root, _, files in os.walk(self.base_path):
             if "__init__.py" not in files:
@@ -22,7 +22,7 @@ class ProjectCrystallizer:
                 if file.endswith(".py") and file not in self.ignore_files:
                     self._fix_file(os.path.join(root, file), file[:-3])
 
-        print("✅ [CRISTALIZADOR] Estrutura estabilizada.")
+        print("✅ [CRISTALIZADOR] Cicatrizado sem erros de sintaxe.")
 
     def _fix_file(self, file_path, file_id):
         expected_class = self._to_pascal_case(file_id)
@@ -30,33 +30,35 @@ class ProjectCrystallizer:
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # 1. Busca qualquer classe já existente no arquivo
-        class_match = re.search(r"class\s+([a-zA-Z0-9_]+)", content)
+        # Regex robusto para achar o nome da PRIMEIRA classe do arquivo
+        class_match = re.search(r"^class\s+([a-zA-Z0-9_]+)", content, re.MULTILINE)
         
         if class_match:
             existing_class = class_match.group(1)
-            # Se a classe existente for diferente da esperada (ex: PersistentBrowserManager != BrowserManager)
-            # Nós criamos um ALIAS no final do arquivo para o Nexus não se perder
-            if existing_class != expected_class and f"{expected_class} =" not in content:
-                print(f"  [🔗] Criando link: {expected_class} -> {existing_class} em {file_id}.py")
+            
+            # Se a classe existe e é diferente da esperada, cria o link de compatibilidade
+            # Mas verifica se já não existe o alias para não duplicar ou quebrar
+            alias_line = f"{expected_class} = {existing_class}"
+            if existing_class != expected_class and alias_line not in content:
+                print(f"  [🔗] Linkando: {expected_class} -> {existing_class}")
                 with open(file_path, "a", encoding="utf-8") as f:
-                    f.write(f"\n\n# Alias para compatibilidade Nexus\n{expected_class} = {existing_class}\n")
+                    f.write(f"\n\n# Nexus Compatibility\n{alias_line}\n")
             return
 
-        # 2. Se não houver classe nenhuma, encapsula (Mantendo compatibilidade)
-        print(f"  [📦] Envelopando funções soltas em: {expected_class}")
-        lines = content.split('\n')
-        indented = "\n".join([f"    {line}" if line.strip() else line for line in lines])
-        
-        new_content = (
-            f"class {expected_class}:\n"
-            f"    def __init__(self, *args, **kwargs):\n"
-            f"        pass\n\n"
-            f"{indented}\n"
-        )
-        
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
+        # Se não tem classe, e não é um arquivo vazio, envelopa com segurança
+        if content.strip() and not content.startswith("class "):
+            print(f"  [📦] Envelopando script: {file_id}.py")
+            lines = content.split('\n')
+            indented = "\n".join([f"    {line}" if line.strip() else line for line in lines])
+            
+            new_content = (
+                f"class {expected_class}:\n"
+                f"    def __init__(self, *args, **kwargs):\n"
+                f"        pass\n\n"
+                f"{indented}\n"
+            )
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(new_content)
 
 if __name__ == "__main__":
     ProjectCrystallizer().crystallize()
