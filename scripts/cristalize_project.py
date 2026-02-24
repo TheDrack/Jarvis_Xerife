@@ -1,6 +1,5 @@
 import os
 import re
-import sys
 
 class ProjectCrystallizer:
     def __init__(self):
@@ -11,7 +10,7 @@ class ProjectCrystallizer:
         return "".join(word.capitalize() for word in name.split("_"))
 
     def crystallize(self):
-        print("💎 [CRISTALIZADOR] Iniciando Cicatrização Inteligente...")
+        print("💎 [CRISTALIZADOR] Iniciando Operação de Auto-Cura...")
         
         for root, _, files in os.walk(self.base_path):
             if "__init__.py" not in files:
@@ -22,41 +21,53 @@ class ProjectCrystallizer:
                 if file.endswith(".py") and file not in self.ignore_files:
                     self._fix_file(os.path.join(root, file), file[:-3])
 
-        print("✅ [CRISTALIZADOR] Estrutura estabilizada.")
+        print("✅ [CRISTALIZADOR] Projeto Cristalizado e Estabilizado.")
 
     def _fix_file(self, file_path, file_id):
         expected_class = self._to_pascal_case(file_id)
         
         with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
+            lines = f.readlines()
 
-        # 1. Busca qualquer classe já existente no arquivo
-        class_match = re.search(r"class\s+([a-zA-Z0-9_]+)", content)
+        # Limpeza de emergência: Remove linhas corrompidas como 'Mission = class'
+        clean_lines = [l for l in lines if not re.search(rf"^{expected_class}\s*=\s*class\b", l)]
+        content = "".join(clean_lines)
+
+        # Busca classes reais definidas no arquivo
+        # Ignora classes que são apenas aliases ou comentários
+        found_classes = re.findall(r"^class\s+([a-zA-Z0-9_]+)", content, re.MULTILINE)
         
-        if class_match:
-            existing_class = class_match.group(1)
-            # Se a classe existente for diferente da esperada (ex: PersistentBrowserManager != BrowserManager)
-            # Nós criamos um ALIAS no final do arquivo para o Nexus não se perder
-            if existing_class != expected_class and f"{expected_class} =" not in content:
-                print(f"  [🔗] Criando link: {expected_class} -> {existing_class} em {file_id}.py")
-                with open(file_path, "a", encoding="utf-8") as f:
-                    f.write(f"\n\n# Alias para compatibilidade Nexus\n{expected_class} = {existing_class}\n")
+        if found_classes:
+            # Se a classe esperada já existe como uma definição real de classe, não faz nada
+            if expected_class in found_classes:
+                if len(lines) != len(clean_lines): # Se limpou algo, salva
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(content)
+                return
+
+            # Se a classe esperada NÃO existe, mas outras existem, cria alias para a PRIMEIRA classe
+            primary_class = found_classes[0]
+            alias_line = f"{expected_class} = {primary_class}"
+            
+            if alias_line not in content:
+                print(f"  [🔗] Linkando: {expected_class} -> {primary_class} em {file_id}.py")
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(content.rstrip() + f"\n\n# Nexus Compatibility\n{alias_line}\n")
             return
 
-        # 2. Se não houver classe nenhuma, encapsula (Mantendo compatibilidade)
-        print(f"  [📦] Envelopando funções soltas em: {expected_class}")
-        lines = content.split('\n')
-        indented = "\n".join([f"    {line}" if line.strip() else line for line in lines])
-        
-        new_content = (
-            f"class {expected_class}:\n"
-            f"    def __init__(self, *args, **kwargs):\n"
-            f"        pass\n\n"
-            f"{indented}\n"
-        )
-        
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
+        # Se não há nenhuma classe, envelopa o conteúdo
+        if content.strip() and not content.strip().startswith("class "):
+            print(f"  [📦] Envelopando script: {file_id}.py")
+            indented = "\n".join([f"    {l}" if l.strip() else l for l in content.split('\n')])
+            
+            new_content = (
+                f"class {expected_class}:\n"
+                f"    def __init__(self, *args, **kwargs):\n"
+                f"        pass\n\n"
+                f"{indented}\n"
+            )
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(new_content)
 
 if __name__ == "__main__":
     ProjectCrystallizer().crystallize()
