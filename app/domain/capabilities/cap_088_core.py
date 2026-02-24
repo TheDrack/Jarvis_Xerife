@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Escalate sensitive decisions to human
-ID: CAP-088"""
+class Cap088Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-088"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Escalate sensitive decisions to human
+    ID: CAP-088"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-088"}
+

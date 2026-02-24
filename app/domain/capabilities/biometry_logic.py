@@ -28,3 +28,6 @@ class BiometryCapability:
     def _load_memory(self):
         try: return torch.load(self.storage_path)
         except: return {}
+
+# Nexus Compatibility
+BiometryLogic = BiometryCapability

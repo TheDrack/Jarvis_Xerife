@@ -34,3 +34,6 @@ class CAP052(Capability):
         def action3(self):
             # Implemente a ação 3 aqui
             print('Ação 3 concluída')
+
+# Nexus Compatibility
+Cap052Core = CAP052

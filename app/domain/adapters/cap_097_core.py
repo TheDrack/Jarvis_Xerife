@@ -1,6 +1,11 @@
-# -*- coding: utf-8 -*-
-'''CAPABILITY: Coordinate physical and digital systems'''
+class Cap097Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # Template gerado pelo Crystallizer
-    return {'status': 'active', 'id': 'CAP-097'}
+    # -*- coding: utf-8 -*-
+    '''CAPABILITY: Coordinate physical and digital systems'''
+
+    def execute(context=None):
+        # Template gerado pelo Crystallizer
+        return {'status': 'active', 'id': 'CAP-097'}
+

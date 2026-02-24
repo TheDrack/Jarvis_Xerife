@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Identify internal dependencies between capabilities
-ID: CAP-018"""
+class Cap018Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-018"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Identify internal dependencies between capabilities
+    ID: CAP-018"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-018"}
+

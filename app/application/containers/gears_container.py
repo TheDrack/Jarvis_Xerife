@@ -18,3 +18,6 @@ class Container:
             "CAP-004": cap_004_exec,
             "CAP-003": cap_003_exec,
             "CAP-001": cap_001_exec,}
+
+# Nexus Compatibility
+GearsContainer = Container

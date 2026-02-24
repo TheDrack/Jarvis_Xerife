@@ -566,3 +566,6 @@ Este link abre o ambiente de edição do GitHub Copilot Agent diretamente, com o
             # TODO: Consider reusing client for better performance with connection pooling
             # Currently closing after each request to avoid connection issues
             await self.close()
+
+# Nexus Compatibility
+GithubAdapter = GitHubAdapter

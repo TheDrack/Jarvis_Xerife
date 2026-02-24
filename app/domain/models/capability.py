@@ -28,3 +28,6 @@ class JarvisCapability(SQLModel, table=True):
     implementation_logic: str = Field(default="", nullable=False)  # How the capability is/should be implemented
     created_at: datetime = Field(default_factory=datetime.now, nullable=False)
     updated_at: datetime = Field(default_factory=datetime.now, nullable=False)
+
+# Nexus Compatibility
+Capability = JarvisCapability

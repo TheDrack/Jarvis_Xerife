@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Optimize stability
-ID: CAP-070"""
+class Cap070Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-070"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Optimize stability
+    ID: CAP-070"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-070"}
+

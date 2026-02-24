@@ -45,4 +45,6 @@ cap020.add_capability(capability3)
 redundant_capabilities = cap020.identify_redundant_capabilities()
 
 print(json.dumps(redundant_capabilities, indent=4))
-   
+
+# Nexus Compatibility
+Cap020IdentifyRedundantCapabilities = Capability

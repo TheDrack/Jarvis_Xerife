@@ -176,3 +176,6 @@ class JarvisEngine:
                 return None
 
         return command
+
+# Nexus Compatibility
+VoiceEngine = JarvisEngine

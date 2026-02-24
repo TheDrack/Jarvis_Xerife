@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Adapt plans during execution
-ID: CAP-058"""
+class Cap058Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-058"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Adapt plans during execution
+    ID: CAP-058"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-058"}
+

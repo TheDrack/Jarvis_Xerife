@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Optimize code reuse
-ID: CAP-071"""
+class Cap071Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-071"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Optimize code reuse
+    ID: CAP-071"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-071"}
+

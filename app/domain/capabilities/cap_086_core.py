@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Enforce internal operational limits
-ID: CAP-086"""
+class Cap086Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-086"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Enforce internal operational limits
+    ID: CAP-086"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-086"}
+

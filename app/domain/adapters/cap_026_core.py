@@ -1,6 +1,11 @@
-# -*- coding: utf-8 -*-
-'''CAPABILITY: Distinguish local improvement from systemic improvement'''
+class Cap026Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # Template gerado pelo Crystallizer
-    return {'status': 'active', 'id': 'CAP-026'}
+    # -*- coding: utf-8 -*-
+    '''CAPABILITY: Distinguish local improvement from systemic improvement'''
+
+    def execute(context=None):
+        # Template gerado pelo Crystallizer
+        return {'status': 'active', 'id': 'CAP-026'}
+

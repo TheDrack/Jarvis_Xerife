@@ -702,3 +702,6 @@ Este é um erro de infraestrutura externa (Google Gemini API) e requer análise 
                 f"Error generating conversational response: {e}", exc_info=True
             )
             return "Desculpe, ocorreu um erro. Pode tentar novamente?"
+
+# Nexus Compatibility
+GeminiAdapter = LLMCommandAdapter

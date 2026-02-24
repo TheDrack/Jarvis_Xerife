@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Protect itself
-ID: CAP-092"""
+class Cap092Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-092"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Protect itself
+    ID: CAP-092"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-092"}
+

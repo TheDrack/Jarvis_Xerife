@@ -705,3 +705,6 @@ Se não for possível auto-correção, explique o motivo.
         # This is where you'd implement more sophisticated parsing
         logger.info("Error type not yet supported for automatic fixing")
         return None
+
+# Nexus Compatibility
+GatewayLlmAdapter = GatewayLLMCommandAdapter

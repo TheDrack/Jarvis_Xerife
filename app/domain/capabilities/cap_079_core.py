@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Automatically reinvest resources
-ID: CAP-079"""
+class Cap079Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-079"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Automatically reinvest resources
+    ID: CAP-079"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-079"}
+

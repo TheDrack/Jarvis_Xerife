@@ -113,3 +113,6 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+# Nexus Compatibility
+Config = Settings

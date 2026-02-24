@@ -73,3 +73,6 @@ class TTSAdapter(VoiceProvider):
             True if TTS services are available
         """
         return self._pyttsx3_available and self.engine is not None
+
+# Nexus Compatibility
+TtsAdapter = TTSAdapter

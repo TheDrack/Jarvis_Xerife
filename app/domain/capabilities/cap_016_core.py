@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Explicitly recognize existing capabilities
-ID: CAP-016"""
+class Cap016Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-016"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Explicitly recognize existing capabilities
+    ID: CAP-016"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-016"}
+

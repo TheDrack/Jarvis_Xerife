@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Maintain continuous alignment with user
-ID: CAP-099"""
+class Cap099Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-099"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Maintain continuous alignment with user
+    ID: CAP-099"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-099"}
+

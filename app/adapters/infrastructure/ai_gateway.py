@@ -738,3 +738,6 @@ class AIGateway:
         raise ValueError(
             f"Rate limit reached on {failed_provider.value} and no fallback provider available"
         )
+
+# Nexus Compatibility
+AiGateway = LLMProvider

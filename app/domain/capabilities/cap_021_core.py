@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Map impact of one capability over others
-ID: CAP-021"""
+class Cap021Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-021"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Map impact of one capability over others
+    ID: CAP-021"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-021"}
+

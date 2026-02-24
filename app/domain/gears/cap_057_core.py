@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Rollback partially completed executions
-ID: CAP-057"""
+class Cap057Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-057"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Rollback partially completed executions
+    ID: CAP-057"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-057"}
+

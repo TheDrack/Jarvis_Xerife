@@ -24,3 +24,6 @@ class AudioAdapter:
     def get_diarization(self, path):
         # Identifica os turnos de fala
         return self.diarization_pipeline(path)
+
+# Nexus Compatibility
+AudioEngine = AudioAdapter

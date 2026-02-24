@@ -210,3 +210,6 @@ _config_valid = LLMConfig.validate_config()
 if _config_valid:
     logger.info("LLM configuration validated successfully")
     logger.debug(f"LLM config: {LLMConfig.get_config_summary()}")
+
+# Nexus Compatibility
+LlmConfig = LLMConfig

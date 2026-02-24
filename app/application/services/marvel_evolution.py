@@ -411,3 +411,6 @@ Estamos {percentage:.1f}% mais próximos do Xerife Marvel.
             logger.warning(f"Skill {skill_number} failed Metabolismo: {passed}/{total} tests passed")
         
         return success
+
+# Nexus Compatibility
+MarvelEvolution = MarvelEvolutionService

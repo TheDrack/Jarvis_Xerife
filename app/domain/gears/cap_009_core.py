@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Maintain history of technical decisions
-ID: CAP-009"""
+class Cap009Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-009"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Maintain history of technical decisions
+    ID: CAP-009"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-009"}
+

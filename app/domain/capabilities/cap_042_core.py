@@ -1,30 +1,35 @@
+class Cap042Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    if context is None:
-        context = {}
 
-    # Carregar dependências
-    from app.domain.capabilities.cap_041_core import execute as cap_041_execute
+    def execute(context=None):
+        if context is None:
+            context = {}
 
-    # Simular consequências sistêmicas
-    def simulate_systemic_consequences(action):
-        # Prever efeitos em longo prazo
-        long_term_effects = []
+        # Carregar dependências
+        from app.domain.capabilities.cap_041_core import execute as cap_041_execute
 
-        # Iterar sobre todas as entidades afetadas
-        for entity in context['entities']:
-            # Prever efeitos da ação na entidade
-            effects = cap_041_execute({'action': action, 'entity': entity})
+        # Simular consequências sistêmicas
+        def simulate_systemic_consequences(action):
+            # Prever efeitos em longo prazo
+            long_term_effects = []
 
-            # Adicionar efeitos à lista de efeitos em longo prazo
-            long_term_effects.extend(effects)
+            # Iterar sobre todas as entidades afetadas
+            for entity in context['entities']:
+                # Prever efeitos da ação na entidade
+                effects = cap_041_execute({'action': action, 'entity': entity})
 
-        return long_term_effects
+                # Adicionar efeitos à lista de efeitos em longo prazo
+                long_term_effects.extend(effects)
 
-    # Executar simulação
-    action = context.get('action')
-    if action:
-        systemic_consequences = simulate_systemic_consequences(action)
-        return systemic_consequences
-    else:
-        return 'Ação não definida'
+            return long_term_effects
+
+        # Executar simulação
+        action = context.get('action')
+        if action:
+            systemic_consequences = simulate_systemic_consequences(action)
+            return systemic_consequences
+        else:
+            return 'Ação não definida'
+

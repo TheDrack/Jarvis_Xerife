@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Maintain history of completed objectives
-ID: CAP-008"""
+class Cap008Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-008"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Maintain history of completed objectives
+    ID: CAP-008"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-008"}
+

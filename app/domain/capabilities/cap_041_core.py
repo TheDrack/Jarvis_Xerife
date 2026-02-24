@@ -1,23 +1,28 @@
+class Cap041Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    if context is None:
-        context = {}
-    # Obter o código alterado
-    altered_code = context.get('altered_code')
 
-    # Executar testes virtuais
-    virtual_trials = context.get('virtual_trials')
+    def execute(context=None):
+        if context is None:
+            context = {}
+        # Obter o código alterado
+        altered_code = context.get('altered_code')
 
-    # Prever consequências técnicas
-    technical_consequences = predict_technical_consequences(altered_code, virtual_trials)
+        # Executar testes virtuais
+        virtual_trials = context.get('virtual_trials')
 
-    # Retornar as consequências técnicas
-    return technical_consequences
+        # Prever consequências técnicas
+        technical_consequences = predict_technical_consequences(altered_code, virtual_trials)
 
-def predict_technical_consequences(altered_code, virtual_trials):
-    # Lógica para prever as consequências técnicas
-    # ...
-    return {
-        'code_consequences': [],
-        'hardware_consequences': []
-    }
+        # Retornar as consequências técnicas
+        return technical_consequences
+
+    def predict_technical_consequences(altered_code, virtual_trials):
+        # Lógica para prever as consequências técnicas
+        # ...
+        return {
+            'code_consequences': [],
+            'hardware_consequences': []
+        }
+

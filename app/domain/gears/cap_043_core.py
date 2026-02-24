@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Evaluate failure risk
-ID: CAP-043"""
+class Cap043Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-043"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Evaluate failure risk
+    ID: CAP-043"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-043"}
+

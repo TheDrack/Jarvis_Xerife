@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Orchestrate multiple agents simultaneously
-ID: CAP-050"""
+class Cap050Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-050"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Orchestrate multiple agents simultaneously
+    ID: CAP-050"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-050"}
+

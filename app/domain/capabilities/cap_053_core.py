@@ -1,27 +1,32 @@
+class Cap053Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # Verificar se o contexto é válido
-    if context is None:
-        raise ValueError('Contexto inválido')
 
-        # Definir as prioridades dos processos
-        priorities = {
-            'vital': 1,
-            'secondary': 2
-        }
+    def execute(context=None):
+        # Verificar se o contexto é válido
+        if context is None:
+            raise ValueError('Contexto inválido')
 
-        # Obter os processos do contexto
-        processes = context.get('processes', [])
+            # Definir as prioridades dos processos
+            priorities = {
+                'vital': 1,
+                'secondary': 2
+            }
 
-        # Ordenar os processos por prioridade
-        sorted_processes = sorted(processes, key=lambda x: priorities.get(x.get('priority', 'secondary')))
+            # Obter os processos do contexto
+            processes = context.get('processes', [])
 
-        # Executar os processos em ordem de prioridade
-        for process in sorted_processes:
-            # Alocar recursos do sistema para o processo
-            allocate_system_resources(process)
+            # Ordenar os processos por prioridade
+            sorted_processes = sorted(processes, key=lambda x: priorities.get(x.get('priority', 'secondary')))
 
-            # Executar o processo
-            execute_process(process)
+            # Executar os processos em ordem de prioridade
+            for process in sorted_processes:
+                # Alocar recursos do sistema para o processo
+                allocate_system_resources(process)
 
-        return True
+                # Executar o processo
+                execute_process(process)
+
+            return True
+

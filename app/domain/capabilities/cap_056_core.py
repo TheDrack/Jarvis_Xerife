@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Interrupt problematic executions
-ID: CAP-056"""
+class Cap056Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-056"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Interrupt problematic executions
+    ID: CAP-056"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-056"}
+

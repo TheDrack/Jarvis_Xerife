@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Learn from human feedback
-ID: CAP-065"""
+class Cap065Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-065"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Learn from human feedback
+    ID: CAP-065"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-065"}
+

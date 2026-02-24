@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Learn from recurring failures
-ID: CAP-061"""
+class Cap061Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-061"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Learn from recurring failures
+    ID: CAP-061"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-061"}
+

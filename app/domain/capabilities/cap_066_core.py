@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Learn from systemic impact
-ID: CAP-066"""
+class Cap066Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-066"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Learn from systemic impact
+    ID: CAP-066"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-066"}
+

@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Simulate systemic consequences before action
-ID: CAP-042"""
+class Cap042Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-042"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Simulate systemic consequences before action
+    ID: CAP-042"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-042"}
+

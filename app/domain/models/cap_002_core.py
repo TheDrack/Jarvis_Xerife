@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Classify capabilities by status: nonexistent, partial, complete
-ID: CAP-002"""
+class Cap002Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-002"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Classify capabilities by status: nonexistent, partial, complete
+    ID: CAP-002"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-002"}
+

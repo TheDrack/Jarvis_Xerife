@@ -1,6 +1,11 @@
-# -*- coding: utf-8 -*-
-'''CAPABILITY: Delegate tasks based on specialization'''
+class Cap051Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # Template gerado pelo Crystallizer
-    return {'status': 'active', 'id': 'CAP-051'}
+    # -*- coding: utf-8 -*-
+    '''CAPABILITY: Delegate tasks based on specialization'''
+
+    def execute(context=None):
+        # Template gerado pelo Crystallizer
+        return {'status': 'active', 'id': 'CAP-051'}
+

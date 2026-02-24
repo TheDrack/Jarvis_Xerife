@@ -1,6 +1,11 @@
-# -*- coding: utf-8 -*-
-'''CAPABILITY: Simulate systemic consequences before action'''
+class Cap042Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # Template gerado pelo Crystallizer
-    return {'status': 'active', 'id': 'CAP-042'}
+    # -*- coding: utf-8 -*-
+    '''CAPABILITY: Simulate systemic consequences before action'''
+
+    def execute(context=None):
+        # Template gerado pelo Crystallizer
+        return {'status': 'active', 'id': 'CAP-042'}
+

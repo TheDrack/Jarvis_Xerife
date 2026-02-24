@@ -1,6 +1,11 @@
-# -*- coding: utf-8 -*-
-'''CAPABILITY: Learn from systemic impact'''
+class Cap066Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # Template gerado pelo Crystallizer
-    return {'status': 'active', 'id': 'CAP-066'}
+    # -*- coding: utf-8 -*-
+    '''CAPABILITY: Learn from systemic impact'''
+
+    def execute(context=None):
+        # Template gerado pelo Crystallizer
+        return {'status': 'active', 'id': 'CAP-066'}
+

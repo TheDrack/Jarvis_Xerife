@@ -349,3 +349,6 @@ class PersistentBrowserManager:
                         
         except Exception as e:
             logger.error(f"Error cleaning recordings: {e}")
+
+# Nexus Compatibility
+BrowserManager = PersistentBrowserManager

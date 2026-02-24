@@ -475,3 +475,6 @@ class EnhancedCapabilityManager:
                 "updated": updated_capabilities,
                 "llm_powered": True
             }
+
+# Nexus Compatibility
+LlmCapabilityDetector = LLMCapabilityDetector

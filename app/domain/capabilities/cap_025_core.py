@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Detect silent regressions
-ID: CAP-025"""
+class Cap025Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-025"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Detect silent regressions
+    ID: CAP-025"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-025"}
+

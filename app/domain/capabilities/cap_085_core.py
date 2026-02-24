@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Detect dangerous decision loops
-ID: CAP-085"""
+class Cap085Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-085"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Detect dangerous decision loops
+    ID: CAP-085"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-085"}
+

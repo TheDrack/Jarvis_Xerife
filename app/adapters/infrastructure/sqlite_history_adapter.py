@@ -303,3 +303,6 @@ class SQLiteHistoryAdapter(HistoryProvider):
         except Exception as e:
             logger.error(f"Error updating command status: {e}")
             return False
+
+# Nexus Compatibility
+SqliteHistoryAdapter = Interaction

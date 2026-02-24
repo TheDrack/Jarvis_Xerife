@@ -375,3 +375,6 @@ Provide specific guidance for GitHub Agents to address this issue:
         
         logger.info(f"Repository context saved to {output_file}")
         return output_file
+
+# Nexus Compatibility
+CopilotContextProvider = GitHubCopilotContextProvider

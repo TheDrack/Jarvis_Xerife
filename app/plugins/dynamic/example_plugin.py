@@ -39,3 +39,6 @@ class PluginCapability:
 if __name__ == "__main__":
     # This runs if the plugin is executed directly
     print(hello_jarvis())
+
+# Nexus Compatibility
+ExamplePlugin = PluginCapability

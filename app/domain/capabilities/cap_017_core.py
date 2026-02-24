@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Explicitly recognize missing capabilities
-ID: CAP-017"""
+class Cap017Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-017"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Explicitly recognize missing capabilities
+    ID: CAP-017"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-017"}
+

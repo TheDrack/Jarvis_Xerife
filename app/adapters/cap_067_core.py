@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Learn from computational cost
-ID: CAP-067"""
+class Cap067Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-067"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Learn from computational cost
+    ID: CAP-067"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-067"}
+

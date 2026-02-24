@@ -255,3 +255,6 @@ def get_bridge_manager() -> LocalBridgeManager:
         _bridge_manager = LocalBridgeManager()
     
     return _bridge_manager
+
+# Nexus Compatibility
+LocalBridge = LocalBridgeManager

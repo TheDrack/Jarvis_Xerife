@@ -12,3 +12,6 @@ class Container:
             "CAP-033": cap_033_exec,
             "CAP-023": cap_023_exec,
             "CAP-002": cap_002_exec,}
+
+# Nexus Compatibility
+ModelsContainer = Container

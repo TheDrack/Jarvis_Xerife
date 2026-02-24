@@ -105,3 +105,6 @@ class AutoEvolutionServiceV2:
     def is_auto_evolution_pr(self, title: str) -> bool:
         """Detecta se um PR/Commit é parte do nosso ciclo de evolução."""
         return any(term in title.lower() for term in ["auto-evolution", "jarvis", "capability"])
+
+# Nexus Compatibility
+AutoEvolutionv2 = AutoEvolutionServiceV2

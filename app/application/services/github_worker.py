@@ -558,3 +558,6 @@ class GitHubWorker:
                 "success": False,
                 "message": str(e),
             }
+
+# Nexus Compatibility
+GithubWorker = GitHubWorker

@@ -270,3 +270,6 @@ class ViabilityMatrix:
             "approved": self.approved,
             "rejection_reason": self.rejection_reason,
         }
+
+# Nexus Compatibility
+Viability = RiskLevel

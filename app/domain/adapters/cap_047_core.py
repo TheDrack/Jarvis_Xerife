@@ -1,6 +1,11 @@
-# -*- coding: utf-8 -*-
-'''CAPABILITY: Select strategies with optimal cost-benefit'''
+class Cap047Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # Template gerado pelo Crystallizer
-    return {'status': 'active', 'id': 'CAP-047'}
+    # -*- coding: utf-8 -*-
+    '''CAPABILITY: Select strategies with optimal cost-benefit'''
+
+    def execute(context=None):
+        # Template gerado pelo Crystallizer
+        return {'status': 'active', 'id': 'CAP-047'}
+

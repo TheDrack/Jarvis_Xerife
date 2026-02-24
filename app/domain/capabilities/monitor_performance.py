@@ -37,3 +37,6 @@ data = 'path_to_your_data.csv'
 monitor = MonitorPerformanceDegradation(data)
 mse = monitor.monitor_performance()
 print(f'Mean Squared Error: {mse}}
+
+# Nexus Compatibility
+MonitorPerformance = MonitorPerformanceDegradation

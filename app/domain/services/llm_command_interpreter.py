@@ -323,3 +323,6 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
         cancel_keywords = ["cancelar", "parar", "stop"]
         command = raw_input.lower().strip()
         return any(keyword in command for keyword in cancel_keywords)
+
+# Nexus Compatibility
+LlmCommandInterpreter = LLMCommandInterpreter

@@ -468,3 +468,6 @@ class NextEvolutionStepResponse(BaseModel):
     current_status: str = Field(..., description="Current implementation status")
     blueprint: CapabilityRequirements = Field(..., description="Technical blueprint")
     priority_score: int = Field(..., description="Priority score (lower is higher priority)")
+
+# Nexus Compatibility
+ApiModels = RequestSource

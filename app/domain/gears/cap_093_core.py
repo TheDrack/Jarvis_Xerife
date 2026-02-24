@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Maintain full traceability
-ID: CAP-093"""
+class Cap093Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-093"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Maintain full traceability
+    ID: CAP-093"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-093"}
+

@@ -1,7 +1,12 @@
-# -*- coding: utf-8 -*-
-"""CAPABILITY: Maintain long-term historical memory
-ID: CAP-029"""
+class Cap029Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    # JARVIS INITIAL STATE
-    return {"status": "initialized", "id": "CAP-029"}
+    # -*- coding: utf-8 -*-
+    """CAPABILITY: Maintain long-term historical memory
+    ID: CAP-029"""
+
+    def execute(context=None):
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-029"}
+

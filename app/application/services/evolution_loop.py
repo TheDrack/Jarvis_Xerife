@@ -378,3 +378,6 @@ Seja objetivo e forneça recomendações práticas."""
             )
         
         return "\n".join(context_parts)
+
+# Nexus Compatibility
+EvolutionLoop = EvolutionLoopService

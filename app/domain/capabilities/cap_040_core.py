@@ -1,25 +1,30 @@
+class Cap040Core:
+    def __init__(self, *args, **kwargs):
+        pass
 
-def execute(context=None):
-    if context is None:
-        context = {}
 
-    # Carregar as estratégias disponíveis
-    strategies = context.get('strategies', [])
+    def execute(context=None):
+        if context is None:
+            context = {}
 
-    # Verificar se há estratégias disponíveis
-    if not strategies:
-        raise ValueError('Nenhuma estratégia disponível')
+        # Carregar as estratégias disponíveis
+        strategies = context.get('strategies', [])
 
-    # Inicializar o resultado
-    result = {}
+        # Verificar se há estratégias disponíveis
+        if not strategies:
+            raise ValueError('Nenhuma estratégia disponível')
 
-    # Avaliar cada estratégia
-    for strategy in strategies:
-        # Executar a estratégia
-        strategy_result = strategy.execute(context)
+        # Inicializar o resultado
+        result = {}
 
-        # Armazenar o resultado da estratégia
-        result[strategy.__name__] = strategy_result
+        # Avaliar cada estratégia
+        for strategy in strategies:
+            # Executar a estratégia
+            strategy_result = strategy.execute(context)
 
-    # Retornar o resultado
-    return result
+            # Armazenar o resultado da estratégia
+            result[strategy.__name__] = strategy_result
+
+        # Retornar o resultado
+        return result
+
