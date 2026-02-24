@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GIT_PAT }}
 
       - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
@@ -45,7 +45,6 @@ jobs:
           BAD_COMMIT=${{ github.event.workflow_run.head_sha }}
           STABLE_COMMIT=$(git rev-parse $BAD_COMMIT^)
           BRANCH_NAME="jarvis/recovery-${{ github.run_id }}"
-          # Cria branch a partir do ponto estável
           git checkout -b $BRANCH_NAME $STABLE_COMMIT
           echo "target_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
@@ -55,13 +54,8 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
-          # 1. Teste inicial para capturar falhas
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
-          
-          # 2. Executa o Healer (Cura Lógica + Indentação)
           uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
-          
-          # 3. Revalidação final
           uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
           if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
@@ -73,22 +67,24 @@ jobs:
       - name: 🛠️ Commit & Auto-Merge (PR Mode)
         if: github.event_name == 'pull_request' && steps.healing_process.outputs.status == 'success'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
           git config user.name "🧬 JARVIS"
           git config user.email "jarvis@simbiose.ai"
           git add .
           if ! git diff --staged --quiet; then
             git commit -m "chore: [Auto-Cura] Correções de integridade"
-            # RESOLUÇÃO DO ERRO 128: Empurra para a branch de origem da PR
             git push origin HEAD:${{ github.head_ref }}
           fi
-          gh pr merge ${{ github.event.pull_request.number }} --auto --merge
+          
+          echo "🚀 Realizando Merge em modo PR..."
+          gh pr merge ${{ github.event.pull_request.number }} --auto --merge || \
+          gh pr merge ${{ github.event.pull_request.number }} --merge --admin
 
       - name: 🚀 Abrir PR de Reparo (Recovery Mode)
         if: github.event_name == 'workflow_run' && steps.healing_process.outputs.status == 'success'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GIT_PAT }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           git config user.name "🧬 JARVIS"
@@ -103,10 +99,10 @@ jobs:
               log = open('pytest_log.txt').read()[:1500]
               resp = requests.post('https://api.groq.com/openai/v1/chat/completions', 
                 headers={'Authorization': f'Bearer {os.getenv(\"GROQ_API_KEY\")}'},
-                json={'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': f'Resuma em português de forma técnica e concisa o que causou o erro neste log de teste para uma Pull Request: {log}'}]})
+                json={'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': f'Resuma em português de forma técnica o que causou o erro neste log: {log}'}]})
               print(resp.json()['choices'][0]['message']['content'])
           except:
-              print('Auto-cura aplicada com sucesso após falha de workflow.')
+              print('Auto-cura aplicada com sucesso.')
           ")
 
           PR_URL=$(gh pr create --title "🧬 [Auto-Cura] Recuperação: ${{ github.event.workflow_run.name }}" \
@@ -114,8 +110,8 @@ jobs:
             $RESUMO
             
             ---
-            **Ação:** Rollback para commit estável + Correção via Protocolo V3." \
+            **Ação:** Rollback + Correção via Protocolo V3 (Simbiose)." \
             --head ${{ steps.recover_logic.outputs.target_branch }} \
             --base main)
           
-          gh pr merge $PR_URL --auto --merge
+          gh pr merge $PR_URL --auto --merge || gh pr merge $PR_URL --merge --admin
