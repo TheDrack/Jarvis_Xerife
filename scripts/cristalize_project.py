@@ -12,7 +12,7 @@ class ProjectCrystallizer:
 
     def crystallize(self):
         print("💎 [CRISTALIZADOR] Iniciando intervenção estrutural...")
-        
+
         for root, _, files in os.walk(self.base_path):
             # 1. Garantir __init__.py
             if "__init__.py" not in files:
@@ -28,7 +28,7 @@ class ProjectCrystallizer:
 
     def _fix_file_structure(self, file_path, file_id):
         expected_class = self._to_pascal_case(file_id)
-        
+
         with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
 
@@ -41,7 +41,7 @@ class ProjectCrystallizer:
         # Se existir uma classe com nome errado, tenta renomear
         # Caso contrário, encapsula o conteúdo
         class_match = re.search(r"class\s+([a-zA-Z0-9_]+)\b", content)
-        
+
         if class_match:
             old_class = class_match.group(1)
             new_content = content.replace(f"class {old_class}", f"class {expected_class}")
@@ -49,7 +49,7 @@ class ProjectCrystallizer:
             # Encapsulamento de funções soltas em um método 'execute'
             lines = content.split('\n')
             indented_content = "\n".join([f"    {line}" if line.strip() else line for line in lines])
-            
+
             new_content = (
                 f"class {expected_class}:\n"
                 f"    \"\"\"Classe auto-cristalizada pelo JARVIS\"\"\"\n"
