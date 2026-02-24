@@ -1,4 +1,4 @@
-name: "🧬 JARVIS: Homeostase e Auto-Cura V2"
+name: "🧬 JARVIS: Self Healing V3"
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: 🛰️ Checkout
-        uses: checkout@v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
@@ -48,9 +48,8 @@ jobs:
           uv run pytest --json-report --json-report-file=report.json || true
           
           if [ -f report.json ]; then
-            # Lógica Infalível: Se houver qualquer item em 'errors' ou summary > 0, dispara.
-            # Convertemos para um número inteiro simples via jq para o Bash comparar.
-            TOTAL_ANOMALIES=$(jq '[.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | add' report.json)
+            # Lógica Blindada: Garante que nulos virem 0 e soma tudo (falhas, erros de sumário e erros de coleção)
+            TOTAL_ANOMALIES=$(jq '([.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | map(select(. != null)) | add) // 0' report.json)
             
             echo "📊 Total de anomalias detectadas: $TOTAL_ANOMALIES"
             
@@ -61,7 +60,7 @@ jobs:
               echo "🔄 Revalidando integridade pós-cura..."
               uv run pytest --json-report --json-report-file=report_final.json || true
               
-              FINAL_COUNT=$(jq '[.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | add' report_final.json)
+              FINAL_COUNT=$(jq '([.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | map(select(. != null)) | add) // 0' report_final.json)
               if [ "$FINAL_COUNT" -eq 0 ]; then
                 echo "✅ Auto-cura bem sucedida."
                 echo "healed=true" >> $GITHUB_OUTPUT
@@ -75,7 +74,7 @@ jobs:
               echo "final_status=true" >> $GITHUB_OUTPUT
             fi
           else
-            echo "❌ Erro Fatal: report.json não foi gerado."
+            echo "❌ Erro Fatal: report.json não gerado."
             exit 1
           fi
 
