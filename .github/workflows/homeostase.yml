@@ -48,35 +48,37 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
-          # Gera o relatório. Se der erro na coleta, o JSON ainda é gerado com a chave 'errors'
           uv run pytest --json-report --json-report-file=report.json || true
           
-          # Verificação robusta de erros no JSON
           if [ -f report.json ]; then
+            # Puxa falhas, erros de coleta e itens na lista de erros explicitamente
             FAILED=$(jq '.summary.failed // 0' report.json)
-            ERRORS=$(jq '.summary.errors // 0' report.json)
-            TOTAL=$((FAILED + ERRORS))
+            COLLECT_ERRORS=$(jq '.summary.errors // 0' report.json)
+            # Verifica se a lista de erros não está vazia
+            LIST_ERRORS=$(jq '.errors | length' report.json)
+            
+            TOTAL=$((FAILED + COLLECT_ERRORS + LIST_ERRORS))
             
             if [ "$TOTAL" -gt 0 ]; then
-              echo "🚨 Problemas detectados: $TOTAL. Chamando Healer..."
+              echo "🚨 Problemas reais detectados ($TOTAL). Ativando Healer..."
               uv run python scripts/jarvis_healer.py --report report.json
               
               echo "🔄 Revalidando..."
               uv run pytest --json-report --json-report-file=report_final.json || true
+              FINAL_TOTAL=$(jq '(.summary.failed // 0) + (.summary.errors // 0) + (.errors | length)' report_final.json)
               
-              FINAL_ERRORS=$(jq '(.summary.failed // 0) + (.summary.errors // 0)' report_final.json)
-              if [ "$FINAL_ERRORS" -eq 0 ]; then
+              if [ "$FINAL_TOTAL" -eq 0 ]; then
                 echo "final_status=true" >> $GITHUB_OUTPUT
                 echo "healed=true" >> $GITHUB_OUTPUT
               else
                 echo "final_status=false" >> $GITHUB_OUTPUT
               fi
             else
-              echo "✅ Tudo limpo."
+              echo "✅ DNA Íntegro."
               echo "final_status=true" >> $GITHUB_OUTPUT
             fi
           else
-            echo "❌ Erro crítico: report.json não foi gerado."
+            echo "❌ Erro: report.json não gerado."
             exit 1
           fi
 
