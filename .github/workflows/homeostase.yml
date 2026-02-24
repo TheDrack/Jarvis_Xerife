@@ -1,20 +1,21 @@
-name: "🧬 JARVIS: Self Healing V3"
+name: "🧬 JARVIS: Homeostase e Auto-Cura V2"
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-    types: [opened, synchronize, reopened]
-  # Permite que outros workflows (como o de Build) chamem a auto-cura em caso de falha
+  # Ajuste do Gatilho: Escuta a conclusão de QUALQUER workflow do repositório
   workflow_run:
-    workflows: ["JARVIS: Cleanup and Refactor", "JARVIS: Build Executable"]
+    workflows: ["*"] 
     types: [completed]
 
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Evita loops infinitos de execuções automáticas e só roda se o anterior falhou (caso venha de workflow_run)
+    # Só executa se:
+    # 1. Não for um commit de auto-cura (evita loop)
+    # 2. Se vier de um workflow_run, o workflow anterior DEVE ter falhado
     if: |
       !contains(github.event.head_commit.message, '[Auto-Cura]') &&
       (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure')
@@ -34,11 +35,14 @@ jobs:
           enable-cache: true
           python-version: '3.11'
 
-      - name: 🔧 Instalação do DNA
+      - name: 🔧 Instalação do DNA (Dependências Completas)
         run: |
           uv venv --clear --python 3.11
-          # Instalando dependências necessárias para o metabolismo e testes
-          uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv pandas numpy scikit-learn
+          # Adicionadas todas as bibliotecas que causaram ModuleNotFoundError nos seus logs
+          uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv \
+                         fastapi[all] pydantic-settings cryptography python-jose[cryptography] \
+                         pandas numpy scikit-learn pytest-asyncio pyttsx3 pyautogui pyperclip \
+                         httpx python-multipart passlib[bcrypt] bcrypt
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
       - name: 🔄 Ciclo de Testes e Auto-Cura
@@ -47,30 +51,35 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
-          echo "🧪 Iniciando primeira bateria de testes..."
-          # Roda o pytest e gera o report.json. O '|| true' impede o crash prematuro do workflow.
+          echo "🧪 Iniciando bateria de testes e coleta..."
+          # Roda o pytest gerando o relatório mesmo em caso de erro catastrófico
           uv run pytest --json-report --json-report-file=report.json || true
           
-          # Verifica se existem falhas no report.json
-          if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" != "0" ]; then
-            echo "🚨 Falhas detectadas no DNA. Iniciando scripts/jarvis_healer.py..."
+          # Detecta Falhas (Testes que rodaram e falharam) e Erros (Falhas de import/coleção)
+          FAILED=$(jq '.summary.failed // 0' report.json)
+          ERRORS=$(jq '.summary.errors // 0' report.json)
+          TOTAL_ISSUES=$((FAILED + ERRORS))
+          
+          if [ -f report.json ] && [ "$TOTAL_ISSUES" -gt 0 ]; then
+            echo "🚨 Problemas detectados ($TOTAL_ISSUES). Ativando scripts/jarvis_healer.py..."
             
-            # Chama o seu script de cura passando o relatório gerado
+            # Executa a cura passando o relatório de erros
             uv run python scripts/jarvis_healer.py --report report.json
             
-            echo "🔄 Revalidando integridade após tentativa de cura..."
+            echo "🔄 Revalidando integridade pós-cura..."
             uv run pytest --json-report --json-report-file=report_final.json || true
             
-            if [ -f report_final.json ] && [ "$(jq '.summary.failed // 0' report_final.json)" == "0" ]; then
-              echo "✅ DNA Restaurado com sucesso."
-              echo "final_status=true" >> $GITHUB_OUTPUT
-              echo "healed=true" >> $GITHUB_OUTPUT
+            FINAL_ISSUES=$(jq '(.summary.failed // 0) + (.summary.errors // 0)' report_final.json)
+            if [ "$FINAL_ISSUES" -eq 0 ]; then
+               echo "✅ Cura bem sucedida!"
+               echo "final_status=true" >> $GITHUB_OUTPUT
+               echo "healed=true" >> $GITHUB_OUTPUT
             else
-              echo "❌ Auto-cura insuficiente. DNA permanece instável."
-              echo "final_status=false" >> $GITHUB_OUTPUT
+               echo "❌ Cura insuficiente. DNA instável."
+               echo "final_status=false" >> $GITHUB_OUTPUT
             fi
           else
-            echo "✅ DNA íntegro. Nenhuma intervenção necessária."
+            echo "✅ DNA íntegro. Homeostase mantida."
             echo "final_status=true" >> $GITHUB_OUTPUT
           fi
 
@@ -80,7 +89,7 @@ jobs:
           git config --local user.email "jarvis@simbiose.ai"
           git config --local user.name "🧬 JARVIS Homeostase"
           git add .
-          git commit -m "[Auto-Cura] Reparo genético aplicado via Healer"
+          git commit -m "[Auto-Cura] Correção estrutural e de DNA aplicada"
           git push
 
       - name: ✅ Auto-Merge
@@ -88,15 +97,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
-          echo "🫡 Homeostase atingida. Realizando integração..."
+          echo "🫡 Homeostase validada. Realizando merge automático..."
           gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch --admin || \
           gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
 
-      - name: 🚨 Escalação
+      - name: 🚨 Escalação Final
         if: steps.healing_process.outputs.final_status == 'false'
         run: |
-          echo "🚨 O DNA não atingiu a homeostase mesmo após tentativa de cura."
-          if [ -f report.json ]; then
-            jq '.tests[] | select(.outcome == "failed") | {nodeid, message: .call.crash.message}' report.json
-          fi
+          echo "🚨 Erro crítico: O sistema não conseguiu se auto-reparar."
           exit 1
