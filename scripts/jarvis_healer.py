@@ -1,72 +1,64 @@
 # -*- coding: utf-8 -*-
 import argparse
-import json
-import re
 import os
 import subprocess
+import re
 from pathlib import Path
 
-def force_reindent(file_path):
-    """Usa autopep8 para corrigir indentações de forma profissional."""
+def mass_reindent(directory_path):
+    """Aplica autopep8 em todos os arquivos .py do diretório para corrigir indentações."""
+    print(f"🧬 Iniciando limpeza em massa no diretório: {directory_path}")
     try:
-        print(f"  [🔧] Reindentando arquivo via autopep8: {file_path}")
-        # Comando para corrigir apenas indentação e erros de sintaxe básica
+        # Comando para corrigir identação de todos os arquivos .py recursivamente
         subprocess.run([
             "autopep8", 
             "--in-place", 
-            "--select=E1,E101,E11,E12,E122", 
-            str(file_path)
+            "--recursive",
+            "--aggressive",
+            "--select=E1,E101,E11,E12", 
+            str(directory_path)
         ], check=True)
         
-        # Pós-processamento manual para garantir que 'def' e 'import' estejam na coluna 0
-        content = file_path.read_text(encoding='utf-8')
-        new_content = re.sub(r'^[ \t]+(def |class |import |from )', r'\1', content, flags=re.M)
-        
-        if new_content != content:
-            file_path.write_text(new_content, encoding='utf-8')
-            
+        # Pós-processamento manual para garantir coluna 0 em keywords
+        for py_file in Path(directory_path).rglob("*.py"):
+            content = py_file.read_text(encoding='utf-8')
+            new_content = re.sub(r'^[ \t]+(def |class |import |from )', r'\1', content, flags=re.M)
+            if new_content != content:
+                py_file.write_text(new_content, encoding='utf-8')
         return True
     except Exception as e:
-        print(f"  [❌] Erro ao usar autopep8: {e}")
+        print(f"❌ Erro na cura em massa: {e}")
         return False
 
 def heal():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--report', required=True)
-    parser.add_argument('--log', required=True)
+    parser.add_argument('--report', required=False)
+    parser.add_argument('--log', required=False)
     args = parser.parse_args()
     
-    files_to_fix = set()
-
-    # 1. Busca no Log (IndentationError costuma dar o caminho exato)
-    if os.path.exists(args.log):
+    # 1. Alvos específicos baseados no log (Prioridade)
+    if args.log and os.path.exists(args.log):
         log_content = Path(args.log).read_text(encoding='utf-8')
         matches = re.findall(r'File "([^"]+\.py)"', log_content)
-        files_to_fix.update(matches)
+        for f in set(matches):
+            p = Path(f).absolute()
+            if p.exists() and ".venv" not in str(p):
+                print(f"🩹 Curando alvo específico: {p}")
+                # Aplicamos a cura no arquivo específico
+                subprocess.run(["autopep8", "--in-place", "--aggressive", str(p)])
 
-    # 2. Busca no JSON
-    if os.path.exists(args.report):
-        try:
-            with open(args.report, 'r', encoding='utf-8') as f:
-                report = json.load(f)
-                all_errors = report.get('errors', []) + report.get('tests', [])
-                for item in all_errors:
-                    if item.get('outcome') != 'passed':
-                        # Tenta achar caminho no nodeid ou na mensagem
-                        msg = str(item.get('longrepr', '')) + str(item.get('message', ''))
-                        path_match = re.search(r'([\w\-/]+\.py)', msg)
-                        if path_match:
-                            files_to_fix.add(path_match.group(1))
-        except: pass
-
-    for f_str in files_to_fix:
-        path = Path(f_str).absolute()
-        if not path.exists():
-            path = Path(os.getcwd()) / f_str
-
-        if path.exists() and path.is_file() and ".venv" not in str(path):
-            print(f"🧬 Iniciando cura profunda: {path}")
-            force_reindent(path)
+    # 2. CURA EM MASSA (O pulo do gato)
+    # Vamos varrer as pastas onde o JARVIS costuma ter problemas de indentação
+    target_dirs = [
+        "app/domain/capabilities",
+        "app/core",
+        "scripts"
+    ]
+    
+    for d in target_dirs:
+        dir_path = Path(os.getcwd()) / d
+        if dir_path.exists():
+            mass_reindent(dir_path)
 
 if __name__ == "__main__":
     heal()
