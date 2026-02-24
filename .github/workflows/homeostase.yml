@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: 🛰️ Checkout
-        uses: actions/checkout@v4
+        uses: checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
@@ -48,22 +48,20 @@ jobs:
           uv run pytest --json-report --json-report-file=report.json || true
           
           if [ -f report.json ]; then
-            # CAPTURA DE ERROS CRÍTICA: Soma testes falhos + erros de execução + erros de coleção/import
-            NUM_FAILED=$(jq '.summary.failed // 0' report.json)
-            NUM_ERRORS=$(jq '.summary.errors // 0' report.json)
-            LIST_ERRORS=$(jq '.errors | length' report.json)
+            # Lógica Infalível: Se houver qualquer item em 'errors' ou summary > 0, dispara.
+            # Convertemos para um número inteiro simples via jq para o Bash comparar.
+            TOTAL_ANOMALIES=$(jq '[.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | add' report.json)
             
-            TOTAL_FAILURES=$((NUM_FAILED + NUM_ERRORS + LIST_ERRORS))
-            echo "📊 Total de anomalias detectadas: $TOTAL_FAILURES"
+            echo "📊 Total de anomalias detectadas: $TOTAL_ANOMALIES"
             
-            if [ "$TOTAL_FAILURES" -gt 0 ]; then
+            if [ "$TOTAL_ANOMALIES" -gt 0 ]; then
               echo "🚨 Ativando Protocolo de Cura..."
               uv run python scripts/jarvis_healer.py --report report.json
               
               echo "🔄 Revalidando integridade pós-cura..."
               uv run pytest --json-report --json-report-file=report_final.json || true
               
-              FINAL_COUNT=$(jq '(.summary.failed // 0) + (.summary.errors // 0) + (.errors | length)' report_final.json)
+              FINAL_COUNT=$(jq '[.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | add' report_final.json)
               if [ "$FINAL_COUNT" -eq 0 ]; then
                 echo "✅ Auto-cura bem sucedida."
                 echo "healed=true" >> $GITHUB_OUTPUT
@@ -73,7 +71,7 @@ jobs:
                 echo "final_status=false" >> $GITHUB_OUTPUT
               fi
             else
-              echo "✅ DNA Íntegro. Nenhuma ação necessária."
+              echo "✅ DNA Íntegro."
               echo "final_status=true" >> $GITHUB_OUTPUT
             fi
           else
@@ -92,6 +90,4 @@ jobs:
 
       - name: 🚨 Escalação
         if: steps.healing_process.outputs.final_status == 'false'
-        run: |
-          echo "🚨 O sistema não conseguiu se auto-reparar automaticamente."
-          exit 1
+        run: exit 1
