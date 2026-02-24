@@ -19,7 +19,7 @@ jobs:
         run: python scripts/clean_legacy.py
 
       - name: Fix Build Paths
-        run: python scripts/fix_build_paths.py
+        run: python scripts/fix_build.py
 
       - name: Commit Changes
         run: |
