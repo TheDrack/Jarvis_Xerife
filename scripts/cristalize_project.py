@@ -11,7 +11,7 @@ class ProjectCrystallizer:
 
     def crystallize(self):
         print("💎 [CRISTALIZADOR] Iniciando Operação de Auto-Cura...")
-        
+
         for root, _, files in os.walk(self.base_path):
             if "__init__.py" not in files:
                 with open(os.path.join(root, "__init__.py"), "w", encoding="utf-8") as f:
@@ -25,7 +25,7 @@ class ProjectCrystallizer:
 
     def _fix_file(self, file_path, file_id):
         expected_class = self._to_pascal_case(file_id)
-        
+
         with open(file_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
@@ -36,7 +36,7 @@ class ProjectCrystallizer:
         # Busca classes reais definidas no arquivo
         # Ignora classes que são apenas aliases ou comentários
         found_classes = re.findall(r"^class\s+([a-zA-Z0-9_]+)", content, re.MULTILINE)
-        
+
         if found_classes:
             # Se a classe esperada já existe como uma definição real de classe, não faz nada
             if expected_class in found_classes:
@@ -48,7 +48,7 @@ class ProjectCrystallizer:
             # Se a classe esperada NÃO existe, mas outras existem, cria alias para a PRIMEIRA classe
             primary_class = found_classes[0]
             alias_line = f"{expected_class} = {primary_class}"
-            
+
             if alias_line not in content:
                 print(f"  [🔗] Linkando: {expected_class} -> {primary_class} em {file_id}.py")
                 with open(file_path, "w", encoding="utf-8") as f:
@@ -59,7 +59,7 @@ class ProjectCrystallizer:
         if content.strip() and not content.strip().startswith("class "):
             print(f"  [📦] Envelopando script: {file_id}.py")
             indented = "\n".join([f"    {l}" if l.strip() else l for l in content.split('\n')])
-            
+
             new_content = (
                 f"class {expected_class}:\n"
                 f"    def __init__(self, *args, **kwargs):\n"
