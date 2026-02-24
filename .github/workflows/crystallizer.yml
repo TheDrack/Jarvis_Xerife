@@ -26,23 +26,33 @@ jobs:
           enable-cache: true
           python-version: '3.11'
 
+      - name: 🏗️ Prepare Environment & Structural Crystallization
+        run: |
+          uv venv --clear --python 3.11
+          # Instalando dependências básicas para os scripts de manutenção
+          uv pip install requests sqlmodel pydantic python-dotenv
+          
+          echo "🛠️ Rodando Sanidade Estrutural (__init__.py e Classes)..."
+          uv run python scripts/cristalize_project.py
+
       - name: 🧠 Run Crystallizer Engine (Full Cycle)
         env:
           PYTHONPATH: ${{ github.workspace }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          uv venv --clear --python 3.11
-          uv pip install requests sqlmodel pydantic python-dotenv
-          
           uv run python - << 'PYCODE'
           import sys
+          import os
+          # Adiciona o workspace ao path para garantir que o Nexus encontre tudo
+          sys.path.append(os.getcwd())
+          
           from app.application.services.crystallization.crystallizer_engine import CrystallizerEngine
           
           try:
               print("💎 Iniciando Full Cycle do Crystallizer Engine...")
               engine = CrystallizerEngine()
               engine.run_full_cycle()
-              print("✨ Cristalização concluída.")
+              print("✨ Cristalização lógica concluída.")
           except Exception as e:
               print(f"❌ Erro: {e}")
               sys.exit(1)
@@ -55,22 +65,16 @@ jobs:
           git config --global user.name "Jarvis-Crystallizer"
           git config --global user.email "jarvis@bot.com"
           
-          # 1. Reconfigura URL para garantir permissão
           git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git
           
-          # 2. Adiciona as mudanças
-          git add data/master_crystal.json app/application/containers/*.py
+          # 1. Adiciona mudanças estruturais (feitos pelo script de cristalização)
+          # 2. Adiciona mudanças de lógica (feitos pelo Engine)
+          git add .
           
-          # 3. Se houver mudanças, faz o commit ANTES do pull
           if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "chore: [Crystallizer] DNA Mapping & Container Synchronization [Auto-Cura]"
-            
-            # 4. Agora sim, puxamos as mudanças do servidor integrando com as nossas
-            # O rebase agora funciona porque o nosso 'trabalho' já está commitado localmente
+            git commit -m "chore: [Crystallizer] DNA Mapping & Structural Synchronization [Auto-Cura]"
             git pull origin main --rebase
-            
-            # 5. Push final
             git push origin main
           else
-            echo "✅ DNA já está sincronizado e estável."
+            echo "✅ DNA e Estrutura já estão sincronizados e estáveis."
           fi
