@@ -1,4 +1,4 @@
-name: Build and Release Jarvis Installer
+name: 🖥️ Build and Release Jarvis Installer
 
 on:
   push:
