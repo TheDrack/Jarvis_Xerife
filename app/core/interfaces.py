@@ -6,3 +6,6 @@ class NexusComponent(ABC):
     @abstractmethod
     def execute(self, *args, **kwargs):
         pass
+
+# Nexus Compatibility
+Interfaces = NexusComponent
