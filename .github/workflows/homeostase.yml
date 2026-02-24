@@ -22,7 +22,7 @@ jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
     runs-on: ubuntu-latest
-    # Condição corrigida para evitar conflitos de indentação em múltiplas linhas
+    # O uso do >- garante que a string seja lida corretamente sem erros de quebra de linha
     if: >-
       github.event_name == 'pull_request' || 
       (github.event.workflow_run.conclusion == 'failure' && 
@@ -33,7 +33,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: 🛰️ Checkout
+      - name: 🛰️ Checkout (Full History)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -66,8 +66,11 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
+          # Executa testes e permite falha para o Healer atuar
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
+          
+          # Revalidação final para definir o status do Job
           uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
           if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
@@ -110,18 +113,4 @@ jobs:
           import os, requests
           try:
               log = open('pytest_log.txt').read()[:1500]
-              resp = requests.post('https://api.groq.com/openai/v1/chat/completions', 
-                headers={'Authorization': f'Bearer {os.getenv(\"GROQ_API_KEY\")}'},
-                json={'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': f'Resuma em português de forma técnica o que causou o erro neste log: {log}'}]})
-              print(resp.json()['choices'][0]['message']['content'])
-          except:
-              print('Auto-cura aplicada com sucesso.')
-          ")
-
-          PR_URL=$(gh pr create --title "🧬 [Auto-Cura] Recuperação: ${{ github.event.workflow_run.name }}" \
-            --body "### 📄 Diagnóstico Jarvis:
-            $RESUMO" \
-            --head ${{ steps.recover_logic.outputs.target_branch }} \
-            --base main)
-          
-          gh pr merge $PR_URL --auto --merge || gh pr merge $PR_URL --merge --admin
+              resp = requests.post('https://api.
