@@ -1,68 +1,64 @@
 # -*- coding: utf-8 -*-
-import argparse, json, sys, os, re
+import argparse
+import json
+import re
 from pathlib import Path
-from app.application.services.metabolism_core import MetabolismCore
 
 def structural_healing(file_path, error_msg):
-    content = file_path.read_text(encoding='utf-8')
-    new_content = content
-    
-    # Corrige Indentação (Remove espaços extras antes de def/class)
-    if "IndentationError" in error_msg:
-        print(f"  [!] Corrigindo indentação em {file_path}")
-        new_content = re.sub(r'^[ \t]+(def|class)', r'\1', new_content, flags=re.M)
-        # Se for na linha 2 especificamente como o log mostrou:
-        lines = new_content.splitlines()
-        if len(lines) > 1 and lines[1].startswith(' '):
-            lines[1] = lines[1].lstrip()
-        new_content = '\n'.join(lines)
-
-    if new_content != content:
-        file_path.write_text(new_content, encoding='utf-8')
-        return True
+    """Corrige erros de indentação e estrutura básica."""
+    try:
+        content = file_path.read_text(encoding='utf-8')
+        new_content = content
+        
+        # Correção agressiva de Indentação para imports e definições
+        if "IndentationError" in error_msg:
+            # Remove espaços/tabs no início de linhas que começam com palavras-chave core
+            new_content = re.sub(r'^[ \t]+(from|import|def|class)', r'\1', content, flags=re.M)
+        
+        if new_content != content:
+            file_path.write_text(new_content, encoding='utf-8')
+            return True
+    except Exception as e:
+        print(f"  [!] Erro ao acessar {file_path}: {e}")
     return False
 
 def heal():
     parser = argparse.ArgumentParser()
     parser.add_argument('--report', required=True)
     args = parser.parse_args()
-    core = MetabolismCore()
+    
     report_path = Path(args.report)
-    if not report_path.exists(): return 
+    if not report_path.exists():
+        print("❌ Relatório não encontrado.")
+        return
 
-    try:
-        report = json.loads(report_path.read_text(encoding='utf-8'))
-        # Pega erros de TESTE e erros de COLEÇÃO (import/syntax)
-        failed_items = report.get('tests', []) + report.get('errors', [])
+    with open(report_path, 'r', encoding='utf-8') as f:
+        report = json.load(f)
+
+    # Coleta issues de execução (tests) e de coleção (errors)
+    all_issues = report.get('tests', []) + report.get('errors', [])
+    
+    processed_files = set()
+
+    for issue in all_issues:
+        if issue.get('outcome') == 'passed':
+            continue
         
-        for item in failed_items:
-            if item.get('outcome') == 'passed': continue
-            
-            nodeid = item.get('nodeid', '')
-            file_to_fix = nodeid.split('::')[0] if '::' in nodeid else nodeid
-            # Pega a mensagem de erro onde quer que ela esteja no JSON
-            error_msg = str(item.get('longrepr', '')) or str(item.get('call', {}).get('longrepr', ''))
-            
-            path = Path(file_to_fix)
-            if not path.exists():
-                # Se o arquivo não existe, o problema pode ser o nome do módulo no import
-                print(f"  [?] Arquivo {file_to_fix} não existe. Verificando erro de módulo...")
-                continue
-
-            print(f"🧬 Tentando curar: {file_to_fix}")
-            if structural_healing(path, error_msg):
-                print(f"✅ Patch aplicado.")
+        # Extrai o caminho do arquivo do nodeid
+        nodeid = issue.get('nodeid', '')
+        file_str = nodeid.split('::')[0] if '::' in nodeid else nodeid
+        file_path = Path(file_str)
+        
+        # Pega a mensagem de erro (longrepr ou mensagem de erro de coleção)
+        error_msg = str(issue.get('longrepr', ''))
+        
+        if file_path.exists() and file_path.is_file() and file_path not in processed_files:
+            print(f"🧬 Analisando: {file_path}")
+            if structural_healing(file_path, error_msg):
+                print(f"✅ Patch estrutural aplicado em {file_path}")
+                processed_files.add(file_path)
             else:
-                # Se não for erro simples, vai para o LLM
-                current_code = path.read_text(encoding='utf-8')
-                sol = core.ask_jarvis("Corrija o código Python. Responda APENAS JSON: {'code': str, 'explanation': str}", 
-                                     f"ERRO: {error_msg}\nCÓDIGO:\n{current_code}")
-                if sol.get('code'):
-                    path.write_text(sol['code'], encoding='utf-8')
-                    print(f"🧠 Corrigido via LLM: {sol.get('explanation')}")
-
-    except Exception as e:
-        print(f"❌ Erro: {e}")
+                print(f"⚠️ Não foi possível aplicar patch automático em {file_path}")
 
 if __name__ == "__main__":
     heal()
