@@ -36,7 +36,7 @@ def print_chapter_status(chapter_data: dict):
     partial = chapter_data['partial']
     nonexistent = chapter_data['nonexistent']
     progress = chapter_data['progress_percentage']
-    
+
     # Color codes for terminal (works on most Unix terminals)
     GREEN = '\033[92m'
     YELLOW = '\033[93m'
@@ -44,7 +44,7 @@ def print_chapter_status(chapter_data: dict):
     BLUE = '\033[94m'
     RESET = '\033[0m'
     BOLD = '\033[1m'
-    
+
     print(f"\n{BOLD}{BLUE}{chapter_name}{RESET}")
     print(f"  Total Capabilities: {total}")
     print(f"  {GREEN}Complete: {complete}{RESET} | {YELLOW}Partial: {partial}{RESET} | {RED}Not Started: {nonexistent}{RESET}")
@@ -56,14 +56,14 @@ def main():
     print("=" * 70)
     print("          🤖 JARVIS SELF-AWARENESS EVOLUTION DASHBOARD 🤖")
     print("=" * 70)
-    
+
     # Initialize database and capability manager
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
     capability_manager = CapabilityManager(engine=db_adapter.engine)
-    
+
     # Get evolution progress
     progress = capability_manager.get_evolution_progress()
-    
+
     # Print overall status
     print(f"\n{'═' * 70}")
     print(f"  OVERALL EVOLUTION STATUS")
@@ -73,27 +73,27 @@ def main():
     print(f"  ⚠️  Partial: {progress['partial_capabilities']}")
     print(f"  ❌ Not Started: {progress['nonexistent_capabilities']}")
     print(f"\n  Overall Progress: {print_progress_bar(progress['overall_progress'], 50)}")
-    
+
     # Print chapter breakdown
     print(f"\n{'═' * 70}")
     print(f"  CHAPTER-BY-CHAPTER BREAKDOWN")
     print(f"{'═' * 70}")
-    
+
     for chapter in progress['chapters']:
         print_chapter_status(chapter)
-    
+
     # Get next evolution step
     print(f"\n{'═' * 70}")
     print(f"  NEXT EVOLUTION STEP")
     print(f"{'═' * 70}")
-    
+
     next_step = capability_manager.get_next_evolution_step()
     if next_step:
         print(f"\n  🎯 Priority Capability: {next_step['capability_name']}")
         print(f"  📖 Chapter: {next_step['chapter'].replace('_', ' ').title()}")
         print(f"  📊 Current Status: {next_step['current_status'].upper()}")
         print(f"  🔢 Priority Score: {next_step['priority_score']} (lower = higher priority)")
-        
+
         blueprint = next_step['blueprint']
         if blueprint.get('libraries'):
             print(f"\n  📚 Required Libraries: {', '.join(blueprint['libraries'])}")
@@ -106,7 +106,7 @@ def main():
             print(f"     {blueprint['blueprint']}")
     else:
         print("\n  ✨ All capabilities are either complete or have missing resources!")
-    
+
     print(f"\n{'═' * 70}\n")
 
 

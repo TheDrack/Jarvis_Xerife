@@ -28,20 +28,20 @@ from app.core.config import settings
 def example_pytest_integration():
     """
     Example: Log pytest results
-    
+
     This would typically be called from a CI/CD pipeline or
     pytest hook after test execution.
     """
     print("\n=== Example 1: Pytest Integration ===\n")
-    
+
     # Initialize services
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
     reward_adapter = RewardAdapter(engine=db_adapter.engine)
     evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
-    
+
     # Simulate test results
     print("Running pytest...")
-    
+
     # Example 1: All tests passed
     reward_id = evolution_service.log_pytest_result(
         passed=True,
@@ -49,7 +49,7 @@ def example_pytest_integration():
         metadata={'ci_run_id': 'example-123', 'branch': 'main'}
     )
     print(f"✅ Logged positive reward for passing tests (ID: {reward_id})")
-    
+
     # Example 2: Some tests failed
     reward_id = evolution_service.log_pytest_result(
         passed=False,
@@ -66,16 +66,16 @@ def example_pytest_integration():
 def example_deployment_integration():
     """
     Example: Log deployment results
-    
+
     This would typically be called from deployment scripts
     (e.g., render.yaml, GitHub Actions, etc.)
     """
     print("\n=== Example 2: Deployment Integration ===\n")
-    
+
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
     reward_adapter = RewardAdapter(engine=db_adapter.engine)
     evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
-    
+
     # Example 1: Successful deployment
     print("Deploying to production...")
     reward_id = evolution_service.log_deploy_result(
@@ -84,7 +84,7 @@ def example_deployment_integration():
         metadata={'environment': 'production', 'version': '1.2.3'}
     )
     print(f"✅ Logged positive reward for successful deployment (ID: {reward_id})")
-    
+
     # Example 2: Failed deployment
     print("\nDeploying to staging...")
     reward_id = evolution_service.log_deploy_result(
@@ -94,7 +94,7 @@ def example_deployment_integration():
         metadata={'environment': 'staging', 'version': '1.3.0-beta'}
     )
     print(f"❌ Logged negative reward for failed deployment (ID: {reward_id})")
-    
+
     # Example 3: Rollback scenario
     print("\nRolling back due to critical error...")
     reward_id = evolution_service.log_deploy_result(
@@ -110,16 +110,16 @@ def example_deployment_integration():
 def example_roadmap_progress():
     """
     Example: Log roadmap progress
-    
+
     This would be called when capability status changes or
     roadmap completion percentage increases.
     """
     print("\n=== Example 3: Roadmap Progress ===\n")
-    
+
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
     reward_adapter = RewardAdapter(engine=db_adapter.engine)
     evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
-    
+
     # Example 1: Roadmap progress increase
     print("Roadmap completion increased by 2.5%...")
     reward_id = evolution_service.log_roadmap_progress(
@@ -128,7 +128,7 @@ def example_roadmap_progress():
         metadata={'previous_progress': 45.0, 'new_progress': 47.5}
     )
     print(f"📈 Logged reward for roadmap progress (ID: {reward_id})")
-    
+
     # Example 2: Capability completion
     print("\nCapability completed: Voice Recognition...")
     reward_id = evolution_service.log_capability_update(
@@ -143,24 +143,24 @@ def example_roadmap_progress():
 def example_hud_login_status():
     """
     Example: Display status on HUD login
-    
+
     This would be called when a user logs into the HUD
     to show their current efficiency status.
     """
     print("\n=== Example 4: HUD Login Status ===\n")
-    
+
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
     reward_adapter = RewardAdapter(engine=db_adapter.engine)
     evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
-    
+
     print("User logged into HUD...")
-    
+
     # Get evolution status
     status = evolution_service.get_evolution_status(days=7)
-    
+
     # Display commander message
     print(f"\n{status['commander_message']}\n")
-    
+
     # Display key metrics
     print(f"📊 Efficiency Score: {status['efficiency_score']:+.1f} pontos")
     print(f"📈 Improvement: {status['improvement']:+.1f} pontos ({status['improvement_percentage']:+.1f}%)")
@@ -171,24 +171,24 @@ def example_hud_login_status():
 def example_policy_engine_analysis():
     """
     Example: Using the Policy Engine for analysis
-    
+
     This demonstrates using Llama 3.3-70b to analyze
     past performance and recommend improvements.
-    
+
     Note: Requires AI Gateway to be configured.
     """
     print("\n=== Example 5: Policy Engine Analysis ===\n")
-    
+
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
     reward_adapter = RewardAdapter(engine=db_adapter.engine)
-    
+
     # Note: In real usage, you would pass the ai_gateway instance
     # evolution_service = EvolutionLoopService(
     #     reward_provider=reward_adapter,
     #     ai_gateway=ai_gateway_instance
     # )
     evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
-    
+
     print("Policy Engine would analyze:")
     print("- Past 30 days of reward history")
     print("- Success/failure patterns")
@@ -204,18 +204,18 @@ def main():
     print("=" * 70)
     print("    JARVIS EVOLUTION LOOP - Integration Examples")
     print("=" * 70)
-    
+
     try:
         example_pytest_integration()
         example_deployment_integration()
         example_roadmap_progress()
         example_hud_login_status()
         example_policy_engine_analysis()
-        
+
         print("\n" + "=" * 70)
         print("All examples completed successfully!")
         print("=" * 70 + "\n")
-        
+
     except Exception as e:
         print(f"\n❌ Error running examples: {e}")
         import traceback

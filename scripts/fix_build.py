@@ -8,7 +8,7 @@ def fix_build_config():
     print("="*60)
 
     build_script = Path("build_config.py")
-    
+
     if not build_script.exists():
         print("[ERRO] build_config.py não encontrado na raiz.")
         return
@@ -19,7 +19,7 @@ def fix_build_config():
     # Procura por referências a main.py e atualiza para o novo caminho hexagonal
     old_main = "main.py"
     new_main = "app/application/services/main.py"
-    
+
     if old_main in content and new_main not in content:
         content = content.replace(f"'{old_main}'", f"'{new_main}'")
         content = content.replace(f'"{old_main}"', f'"{new_main}"')
@@ -46,7 +46,7 @@ def check_structure():
         "app/application/containers/hub.py",
         "app/domain/models/system_state.py"
     ]
-    
+
     for f in essential_files:
         if Path(f).exists():
             print(f"[VERIFICADO] Arquivo presente: {f}")
