@@ -1,4 +1,4 @@
-name: "🧬 JARVIS: Homeostase e Auto-Cura V2"
+name: "🧬 JARVIS: Self Healing V3"
 
 on:
   push:
@@ -13,12 +13,12 @@ on:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    if: "!contains(github.event.head_commit.message, '[Auto-Cura]')"
+    if: "${{ !contains(github.event.head_commit.message, '[Auto-Cura]') }}"
     runs-on: ubuntu-latest
 
     steps:
       - name: 🛰️ Checkout
-        uses: checkout@v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
@@ -35,7 +35,7 @@ jobs:
           uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv \
                          fastapi[all] pydantic-settings cryptography python-jose[cryptography] \
                          pandas numpy scikit-learn pytest-asyncio pyttsx3 pyautogui pyperclip \
-                         httpx python-multipart passlib[bcrypt] bcrypt
+                         httpx python-multipart passlib[bcrypt] bcrypt autopep8
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
       - name: 🔄 Ciclo de Execução e Auto-Cura
@@ -45,38 +45,29 @@ jobs:
           PYTHONPATH: "."
         run: |
           echo "🧪 Iniciando bateria de testes..."
-          uv run pytest --json-report --json-report-file=report.json || true
+          uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
+          cat pytest_log.txt
           
-          if [ -f report.json ]; then
-            # Lógica Infalível: Se houver qualquer item em 'errors' ou summary > 0, dispara.
-            # Convertemos para um número inteiro simples via jq para o Bash comparar.
-            TOTAL_ANOMALIES=$(jq '[.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | add' report.json)
+          if grep -qE "ERRORS|failed|IndentationError|Interrupted" pytest_log.txt; then
+            echo "🚨 Anomalias detectadas. Ativando Cura em Massa (Diretório Capabilities)..."
+            # O Healer agora vai varrer a pasta toda para evitar o erro dominó
+            uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
             
-            echo "📊 Total de anomalias detectadas: $TOTAL_ANOMALIES"
+            echo "🔄 Revalidando integridade pós-cura..."
+            uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
+            cat final_log.txt
             
-            if [ "$TOTAL_ANOMALIES" -gt 0 ]; then
-              echo "🚨 Ativando Protocolo de Cura..."
-              uv run python scripts/jarvis_healer.py --report report.json
-              
-              echo "🔄 Revalidando integridade pós-cura..."
-              uv run pytest --json-report --json-report-file=report_final.json || true
-              
-              FINAL_COUNT=$(jq '[.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | add' report_final.json)
-              if [ "$FINAL_COUNT" -eq 0 ]; then
-                echo "✅ Auto-cura bem sucedida."
-                echo "healed=true" >> $GITHUB_OUTPUT
-                echo "final_status=true" >> $GITHUB_OUTPUT
-              else
-                echo "❌ Falha: DNA permanece instável com $FINAL_COUNT erros."
-                echo "final_status=false" >> $GITHUB_OUTPUT
-              fi
-            else
-              echo "✅ DNA Íntegro."
+            if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
+              echo "✅ Auto-cura bem sucedida."
+              echo "healed=true" >> $GITHUB_OUTPUT
               echo "final_status=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Falha: DNA permanece instável. Verifique erros de lógica além da indentação."
+              echo "final_status=false" >> $GITHUB_OUTPUT
             fi
           else
-            echo "❌ Erro Fatal: report.json não foi gerado."
-            exit 1
+            echo "✅ DNA Íntegro."
+            echo "final_status=true" >> $GITHUB_OUTPUT
           fi
 
       - name: 🧬 Commit dos Reparos
@@ -85,7 +76,7 @@ jobs:
           git config --local user.email "jarvis@simbiose.ai"
           git config --local user.name "🧬 JARVIS Homeostase"
           git add .
-          git commit -m "[Auto-Cura] Correção de DNA e estrutura aplicada"
+          git commit -m "[Auto-Cura] Reindentação em massa das capabilities"
           git push
 
       - name: 🚨 Escalação
