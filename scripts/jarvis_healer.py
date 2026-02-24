@@ -22,15 +22,15 @@ def call_groq_healer(file_content, error_log):
     LOG: {error_log[-2000:]}
     CÓDIGO: {file_content}
     """
-
+    
     try:
         response = requests.post(GROQ_URL, 
-                                 headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-                                 json={
-                                     "model": "llama-3.3-70b-versatile",
-                                     "messages": [{"role": "user", "content": prompt}],
-                                     "temperature": 0.1
-                                 }, timeout=30)
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.1
+            }, timeout=30)
         return response.json()['choices'][0]['message']['content'].strip()
     except:
         return None
@@ -57,16 +57,14 @@ def heal():
         matches = re.findall(r'File "([^"]+\.py)"', error_context)
         target_files.update([Path(f).absolute() for f in matches if ".venv" not in f])
 
-    # 1. Cura Lógica
     for file_path in target_files:
         if file_path.exists():
             print(f"🩹 Corrigindo lógica: {file_path.name}")
             original = file_path.read_text(encoding='utf-8')
             fixed = call_groq_healer(original, error_context)
-            if fixed and ("def " in fixed or "class " in fixed):
+            if fixed and ("def " in fixed or "class " in fixed or "import " in fixed):
                 file_path.write_text(fixed, encoding='utf-8')
 
-    # 2. Cura Estrutural em Massa
     target_dirs = ["app/domain/capabilities", "app/core", "scripts"]
     for d in target_dirs:
         dir_path = Path(os.getcwd()) / d
