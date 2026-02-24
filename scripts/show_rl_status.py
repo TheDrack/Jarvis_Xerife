@@ -47,19 +47,19 @@ def print_metrics(status: dict):
     print("=" * 70)
     print("  EFFICIENCY METRICS")
     print("=" * 70)
-    
+
     efficiency = status['efficiency_score']
     improvement = status['improvement']
     success_rate = status['success_rate']
     total_actions = status['total_actions']
     period = status['period_days']
-    
+
     # Color codes
     GREEN = '\033[92m'
     YELLOW = '\033[93m'
     RED = '\033[91m'
     RESET = '\033[0m'
-    
+
     # Choose color based on improvement
     if improvement > 0:
         color = GREEN
@@ -67,7 +67,7 @@ def print_metrics(status: dict):
         color = RED
     else:
         color = YELLOW
-    
+
     print(f"\n  Período analisado: {period} dias")
     print(f"  Total de ações: {total_actions}")
     print(f"  Score de eficiência: {color}{efficiency:+.2f}{RESET} pontos")
@@ -81,11 +81,11 @@ def print_action_breakdown(stats: dict):
     print("=" * 70)
     print("  BREAKDOWN POR TIPO DE AÇÃO")
     print("=" * 70)
-    
+
     if not stats['by_action_type']:
         print("\n  Nenhuma ação registrada ainda.\n")
         return
-    
+
     print()
     for action_type, data in sorted(
         stats['by_action_type'].items(),
@@ -95,7 +95,7 @@ def print_action_breakdown(stats: dict):
         count = data['count']
         total_reward = data['total_reward']
         avg = total_reward / count if count > 0 else 0
-        
+
         # Choose emoji based on action type
         if 'pass' in action_type or 'success' in action_type or 'complete' in action_type:
             emoji = "✅"
@@ -103,7 +103,7 @@ def print_action_breakdown(stats: dict):
             emoji = "❌"
         else:
             emoji = "📊"
-        
+
         print(f"  {emoji} {action_type:20s}: {count:3d} ações, {total_reward:+8.1f} pts (avg: {avg:+6.2f})")
     print()
 
@@ -113,19 +113,19 @@ def print_recent_events(evolution_service: EvolutionLoopService, limit: int = 10
     print("=" * 70)
     print(f"  ÚLTIMOS {limit} EVENTOS")
     print("=" * 70)
-    
+
     recent_rewards = evolution_service.reward_provider.get_rewards(limit=limit)
-    
+
     if not recent_rewards:
         print("\n  Nenhum evento registrado ainda.\n")
         return
-    
+
     print()
     for reward in recent_rewards:
         action = reward['action_type']
         value = reward['reward_value']
         created = reward['created_at']
-        
+
         # Choose emoji and color
         if value > 0:
             emoji = "📈"
@@ -133,12 +133,12 @@ def print_recent_events(evolution_service: EvolutionLoopService, limit: int = 10
         else:
             emoji = "📉"
             color = '\033[91m'  # Red
-        
+
         reset = '\033[0m'
-        
+
         # Format timestamp
         time_str = created.strftime('%Y-%m-%d %H:%M:%S')
-        
+
         print(f"  {emoji} {time_str} | {action:20s} | {color}{value:+7.2f}{reset} pts")
     print()
 
@@ -154,28 +154,28 @@ def main():
         default=7,
         help='Number of days to analyze (default: 7)'
     )
-    
+
     args = parser.parse_args()
-    
+
     try:
         # Initialize adapters and services
         db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
         reward_adapter = RewardAdapter(engine=db_adapter.engine)
         evolution_service = EvolutionLoopService(reward_provider=reward_adapter)
-        
+
         # Get evolution status
         status = evolution_service.get_evolution_status(days=args.days)
-        
+
         # Print dashboard
         print_header()
         print_commander_status(status)
         print_metrics(status)
         print_action_breakdown(status['statistics'])
         print_recent_events(evolution_service, limit=10)
-        
+
         print("=" * 70)
         print()
-        
+
     except KeyboardInterrupt:
         print("\n\nInterrompido pelo usuário.")
         sys.exit(0)

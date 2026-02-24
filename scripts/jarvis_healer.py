@@ -22,15 +22,15 @@ def call_groq_healer(file_content, error_log):
     LOG: {error_log[-2000:]}
     CÓDIGO: {file_content}
     """
-    
+
     try:
         response = requests.post(GROQ_URL, 
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.1
-            }, timeout=30)
+                                 headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                                 json={
+                                     "model": "llama-3.3-70b-versatile",
+                                     "messages": [{"role": "user", "content": prompt}],
+                                     "temperature": 0.1
+                                 }, timeout=30)
         return response.json()['choices'][0]['message']['content'].strip()
     except:
         return None

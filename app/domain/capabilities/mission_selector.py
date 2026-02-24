@@ -19,7 +19,7 @@ class MissionSelector:
 
         self.sorted_objectives_by_systemic_impact_and_name = self.sort_by_systemic_impact_and_name()
 
-    
+
 
     def sort_by_systemic_impact(self) -> List[Dict]:
 
@@ -27,7 +27,7 @@ class MissionSelector:
 
         return sorted(self.objectives, key=lambda x: x['systemic_impact'], reverse=True)
 
-    
+
 
     def sort_by_name(self) -> List[Dict]:
 
@@ -35,7 +35,7 @@ class MissionSelector:
 
         return sorted(self.objectives, key=lambda x: x['name'])
 
-    
+
 
     def sort_by_systemic_impact_and_name(self) -> List[Dict]:
 
@@ -43,7 +43,7 @@ class MissionSelector:
 
         return sorted(self.objectives, key=lambda x: (x['systemic_impact'], x['name']), reverse=True)
 
-    
+
 
     def get_sorted_objectives(self, sort_type: str) -> List[Dict]:
 

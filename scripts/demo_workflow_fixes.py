@@ -21,7 +21,7 @@ def demo_metabolism_workflow():
     print()
     print("This workflow analyzes and applies mutations to the Jarvis DNA.")
     print()
-    
+
     print("STEP 1: Metabolism Analyzer (Mecânico Revisionador)")
     print("-" * 80)
     result = subprocess.run(
@@ -37,18 +37,18 @@ def demo_metabolism_workflow():
         text=True,
         cwd=PROJECT_ROOT
     )
-    
+
     print(f"Exit Code: {result.returncode}")
     print()
     print("Output (last 30 lines):")
     print("-" * 80)
     for line in result.stdout.split('\n')[-30:]:
         print(line)
-    
+
     print()
     print("✅ The analyzer now returns complete information even when escalating!")
     print()
-    
+
     print("STEP 2: Metabolism Mutator (Mecânico Consertador)")
     print("-" * 80)
     result = subprocess.run(
@@ -63,14 +63,14 @@ def demo_metabolism_workflow():
         text=True,
         cwd=PROJECT_ROOT
     )
-    
+
     print(f"Exit Code: {result.returncode}")
     print()
     print("Output (last 20 lines):")
     print("-" * 80)
     for line in result.stdout.split('\n')[-20:]:
         print(line)
-    
+
     print()
     print("✅ The mutator gracefully handles the missing Copilot integration!")
     print("✅ It creates a detailed marker file for manual implementation.")
@@ -85,10 +85,10 @@ def demo_auto_evolution_workflow():
     print()
     print("This workflow finds and attempts to implement missions from ROADMAP.md")
     print()
-    
+
     print("STEP 1: Check if PR should trigger evolution")
     print("-" * 80)
-    
+
     code = '''
 from app.application.services.auto_evolution import AutoEvolutionService
 
@@ -112,20 +112,20 @@ is_regular = service.is_auto_evolution_pr(
 print(f"Regular PR detection: {is_regular}")
 print("Result: SHOULD trigger evolution (continues the loop)")
 '''
-    
+
     result = subprocess.run(
         [sys.executable, '-c', code],
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT
     )
-    
+
     print(result.stdout)
     print()
-    
+
     print("STEP 2: Find next mission from ROADMAP")
     print("-" * 80)
-    
+
     code = '''
 from app.application.services.auto_evolution import AutoEvolutionService
 
@@ -148,14 +148,14 @@ if next_mission:
 else:
     print("No missions found - all complete!")
 '''
-    
+
     result = subprocess.run(
         [sys.executable, '-c', code],
         capture_output=True,
         text=True,
         cwd=PROJECT_ROOT
     )
-    
+
     print(result.stdout)
     print()
     print("✅ The workflow now returns complete information about the mission!")
@@ -169,15 +169,15 @@ def main():
     print("║" + " " * 15 + "JARVIS WORKFLOW FIXES DEMONSTRATION" + " " * 28 + "║")
     print("╚" + "=" * 78 + "╝")
     print()
-    
+
     demo_metabolism_workflow()
-    
+
     print()
     input("Press Enter to continue to Auto Evolution demo...")
     print()
-    
+
     demo_auto_evolution_workflow()
-    
+
     print()
     print("=" * 80)
     print("SUMMARY OF FIXES")

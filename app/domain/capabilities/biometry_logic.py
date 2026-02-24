@@ -20,7 +20,7 @@ class BiometryCapability:
             # Vincula a voz ao login ativo se for a primeira vez
             self.conhecidos[user_logado] = embedding
             return f"Perfil criado para {user_logado}"
-        
+
         # Lógica de visitantes recorrentes (Curiosidade)
         # ... (implementação de agrupamento conforme discutimos antes)
         return "Amostra processada"

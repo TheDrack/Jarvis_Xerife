@@ -24,7 +24,7 @@ class MetabolismAnalyzer:
         # Identifica se é uma evolução para ajustar o rigor, mas não ignora a segurança
         is_evolution = "DNA Mutated" in context or "Auto-Evolution" in context
         full_context = f"Instrução: {instruction}\nContexto: {context}"
-        
+
         if len(full_context) < self.min_context_length:
             return self._escalate(EscalationReason.INSUFFICIENT_INFORMATION)
 
