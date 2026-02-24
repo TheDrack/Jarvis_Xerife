@@ -34,13 +34,26 @@ jobs:
 
     - name: Install dependencies
       run: |
-        # Criamos o venv e instalamos tudo em um único bloco
         uv venv
-        uv pip install pyinstaller bcrypt==4.0.1 passlib[bcrypt]==1.7.4 -r requirements.txt
-    
+        # Instalando dependências explícitas + as do projeto
+        uv pip install pyinstaller bcrypt==4.0.1 passlib[bcrypt]==1.7.4
+        if (Test-Path "requirements.txt") { uv pip install -r requirements.txt }
+      shell: pwsh
+
+    - name: Debug Path (Verify main.py existence)
+      run: |
+        if (Test-Path "app/application/services/main.py") {
+          Write-Host "[OK] main.py found at app/application/services/main.py"
+        } else {
+          Write-Host "[ERROR] main.py NOT found! Check folder structure."
+          ls -Recurse
+          exit 1
+        }
+      shell: pwsh
+
     - name: Build executable with PyInstaller
       run: |
-        # Forçamos o uso do venv local para evitar erro de 'No virtual environment found'
+        # O uv run garante o uso do venv criado anteriormente
         uv run python build_config.py
     
     - name: Verify build
@@ -49,7 +62,7 @@ jobs:
           $item = Get-Item "dist\Jarvis_Installer.exe"
           Write-Host "✓ Executable built successfully: $($item.FullName)"
         } else {
-          Write-Host "✗ Executable not found"
+          Write-Host "✗ Executable not found in dist/"
           exit 1
         }
       shell: pwsh
