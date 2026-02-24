@@ -4,15 +4,7 @@ import os
 import json
 from typing import Any, Optional
 from threading import Lock
-from abc import ABC
 
-
-class NexusComponent(ABC):
-    """
-    Contrato base para qualquer módulo cristalizável pelo Nexus.
-    Não impõe métodos — apenas identidade arquitetural.
-    """
-    pass
 
 
 class JarvisNexus:
