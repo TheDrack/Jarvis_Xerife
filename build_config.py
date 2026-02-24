@@ -10,7 +10,7 @@ Usage:
     python build_config.py
 
 Or directly with PyInstaller:
-    pyinstaller --clean jarvis_installer.spec
+    pyinstaller --paths=. --clean jarvis_installer.spec
 """
 
 import sys
@@ -23,7 +23,7 @@ if hasattr(sys.stdout, 'buffer') and sys.stdout.encoding and sys.stdout.encoding
 
 # PyInstaller configuration
 APP_NAME = "Jarvis_Installer"
-SCRIPT_PATH = "main.py"
+SCRIPT_PATH = "app/application/services/main.py"
 ICON_PATH = None  # Set to your icon file path if available (e.g., "icon.ico")
 
 # Build directory
@@ -197,7 +197,7 @@ def build_executable():
     except ImportError:
         print("[X] PyInstaller not found. Installing...")
         import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller --paths=."])
         import PyInstaller.__main__
     
     # Clean up old build artifacts
