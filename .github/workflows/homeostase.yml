@@ -13,7 +13,7 @@ on:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    if: "!contains(github.event.head_commit.message, '[Auto-Cura]')"
+    if: "${{ !contains(github.event.head_commit.message, '[Auto-Cura]') }}"
     runs-on: ubuntu-latest
 
     steps:
@@ -48,8 +48,9 @@ jobs:
           uv run pytest --json-report --json-report-file=report.json || true
           
           if [ -f report.json ]; then
-            # Lógica Blindada: Garante que nulos virem 0 e soma tudo (falhas, erros de sumário e erros de coleção)
-            TOTAL_ANOMALIES=$(jq '([.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | map(select(. != null)) | add) // 0' report.json)
+            # Lógica Ultra-Resiliente: Soma falhas, erros de sumário E o tamanho da lista de erros de coleção.
+            # Se o sumário não existir (// 0), ele ainda conta os erros da lista .errors.
+            TOTAL_ANOMALIES=$(jq '((.summary.failed // 0) + (.summary.errors // 0) + (.errors | length // 0))' report.json)
             
             echo "📊 Total de anomalias detectadas: $TOTAL_ANOMALIES"
             
@@ -60,7 +61,7 @@ jobs:
               echo "🔄 Revalidando integridade pós-cura..."
               uv run pytest --json-report --json-report-file=report_final.json || true
               
-              FINAL_COUNT=$(jq '([.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | map(select(. != null)) | add) // 0' report_final.json)
+              FINAL_COUNT=$(jq '((.summary.failed // 0) + (.summary.errors // 0) + (.errors | length // 0))' report_final.json)
               if [ "$FINAL_COUNT" -eq 0 ]; then
                 echo "✅ Auto-cura bem sucedida."
                 echo "healed=true" >> $GITHUB_OUTPUT
