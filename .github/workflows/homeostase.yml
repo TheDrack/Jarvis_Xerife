@@ -1,24 +1,22 @@
-name: "🧬 JARVIS: Homeostase e Auto-Cura V2"
+name: "🧬 JARVIS: Self Healing V3"
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # Ajuste do Gatilho: Escuta a conclusão de QUALQUER workflow do repositório
+  # Permite rodar manualmente no botão "Run workflow"
+  workflow_dispatch: 
+  # Tenta ouvir outros workflows
   workflow_run:
-    workflows: ["*"] 
+    workflows: ["*"]
     types: [completed]
 
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Só executa se:
-    # 1. Não for um commit de auto-cura (evita loop)
-    # 2. Se vier de um workflow_run, o workflow anterior DEVE ter falhado
-    if: |
-      !contains(github.event.head_commit.message, '[Auto-Cura]') &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure')
+    # Só não roda se o commit for da própria auto-cura
+    if: "!contains(github.event.head_commit.message, '[Auto-Cura]')"
     runs-on: ubuntu-latest
 
     steps:
@@ -27,7 +25,6 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
 
       - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
@@ -35,74 +32,63 @@ jobs:
           enable-cache: true
           python-version: '3.11'
 
-      - name: 🔧 Instalação do DNA (Dependências Completas)
+      - name: 🔧 Instalação Flash do DNA
         run: |
           uv venv --clear --python 3.11
-          # Adicionadas todas as bibliotecas que causaram ModuleNotFoundError nos seus logs
+          # Instalação em bloco único para evitar conflitos de versão
           uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv \
                          fastapi[all] pydantic-settings cryptography python-jose[cryptography] \
                          pandas numpy scikit-learn pytest-asyncio pyttsx3 pyautogui pyperclip \
                          httpx python-multipart passlib[bcrypt] bcrypt
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
-      - name: 🔄 Ciclo de Testes e Auto-Cura
+      - name: 🔄 Ciclo de Execução
         id: healing_process
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
-          echo "🧪 Iniciando bateria de testes e coleta..."
-          # Roda o pytest gerando o relatório mesmo em caso de erro catastrófico
+          # Gera o relatório. Se der erro na coleta, o JSON ainda é gerado com a chave 'errors'
           uv run pytest --json-report --json-report-file=report.json || true
           
-          # Detecta Falhas (Testes que rodaram e falharam) e Erros (Falhas de import/coleção)
-          FAILED=$(jq '.summary.failed // 0' report.json)
-          ERRORS=$(jq '.summary.errors // 0' report.json)
-          TOTAL_ISSUES=$((FAILED + ERRORS))
-          
-          if [ -f report.json ] && [ "$TOTAL_ISSUES" -gt 0 ]; then
-            echo "🚨 Problemas detectados ($TOTAL_ISSUES). Ativando scripts/jarvis_healer.py..."
+          # Verificação robusta de erros no JSON
+          if [ -f report.json ]; then
+            FAILED=$(jq '.summary.failed // 0' report.json)
+            ERRORS=$(jq '.summary.errors // 0' report.json)
+            TOTAL=$((FAILED + ERRORS))
             
-            # Executa a cura passando o relatório de erros
-            uv run python scripts/jarvis_healer.py --report report.json
-            
-            echo "🔄 Revalidando integridade pós-cura..."
-            uv run pytest --json-report --json-report-file=report_final.json || true
-            
-            FINAL_ISSUES=$(jq '(.summary.failed // 0) + (.summary.errors // 0)' report_final.json)
-            if [ "$FINAL_ISSUES" -eq 0 ]; then
-               echo "✅ Cura bem sucedida!"
-               echo "final_status=true" >> $GITHUB_OUTPUT
-               echo "healed=true" >> $GITHUB_OUTPUT
+            if [ "$TOTAL" -gt 0 ]; then
+              echo "🚨 Problemas detectados: $TOTAL. Chamando Healer..."
+              uv run python scripts/jarvis_healer.py --report report.json
+              
+              echo "🔄 Revalidando..."
+              uv run pytest --json-report --json-report-file=report_final.json || true
+              
+              FINAL_ERRORS=$(jq '(.summary.failed // 0) + (.summary.errors // 0)' report_final.json)
+              if [ "$FINAL_ERRORS" -eq 0 ]; then
+                echo "final_status=true" >> $GITHUB_OUTPUT
+                echo "healed=true" >> $GITHUB_OUTPUT
+              else
+                echo "final_status=false" >> $GITHUB_OUTPUT
+              fi
             else
-               echo "❌ Cura insuficiente. DNA instável."
-               echo "final_status=false" >> $GITHUB_OUTPUT
+              echo "✅ Tudo limpo."
+              echo "final_status=true" >> $GITHUB_OUTPUT
             fi
           else
-            echo "✅ DNA íntegro. Homeostase mantida."
-            echo "final_status=true" >> $GITHUB_OUTPUT
+            echo "❌ Erro crítico: report.json não foi gerado."
+            exit 1
           fi
 
-      - name: 🧬 Commitar Reparo
+      - name: 🧬 Commit Auto-Cura
         if: steps.healing_process.outputs.healed == 'true'
         run: |
           git config --local user.email "jarvis@simbiose.ai"
           git config --local user.name "🧬 JARVIS Homeostase"
           git add .
-          git commit -m "[Auto-Cura] Correção estrutural e de DNA aplicada"
+          git commit -m "[Auto-Cura] Correção automática de DNA"
           git push
 
-      - name: ✅ Auto-Merge
-        if: steps.healing_process.outputs.final_status == 'true' && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GIT_PAT }}
-        run: |
-          echo "🫡 Homeostase validada. Realizando merge automático..."
-          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch --admin || \
-          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
-
-      - name: 🚨 Escalação Final
+      - name: 🚨 Falha Final
         if: steps.healing_process.outputs.final_status == 'false'
-        run: |
-          echo "🚨 Erro crítico: O sistema não conseguiu se auto-reparar."
-          exit 1
+        run: exit 1
