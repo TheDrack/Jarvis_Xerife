@@ -4,7 +4,6 @@ on:
   pull_request:
     branches: [main, master, develop]
   workflow_run:
-    # Monitora todos, mas o filtro interno cuidará apenas das falhas
     workflows: ["*"]
     types: [completed]
   workflow_dispatch:
@@ -13,8 +12,9 @@ jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
     runs-on: ubuntu-latest
+    
     # FILTRO DE ELITE: 
-    # 1. Roda sempre se for Pull Request.
+    # 1. Roda em Pull Request.
     # 2. Roda em workflow_run APENAS se o resultado for 'failure' E não for ele mesmo.
     if: >-
       github.event_name == 'pull_request' || 
@@ -59,43 +59,59 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
+          # Primeira tentativa e execução do Healer
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
+          
+          # Validação Final da Integridade
           uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
           if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
              echo "✅ Integridade validada."
-             exit 0
+             echo "status=success" >> $GITHUB_OUTPUT
           else
              echo "❌ DNA instável."
+             echo "status=failure" >> $GITHUB_OUTPUT
              exit 1
           fi
 
       - name: 🛠️ Commit & Merge (PR Mode)
-        if: always() && github.event_name == 'pull_request' && steps.healing_process.outputs.status == 'success'
+        if: github.event_name == 'pull_request' && steps.healing_process.outputs.status == 'success'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
           git config user.name "JARVIS"
           git config user.email "jarvis@simbiose.ai"
           git add .
+          
           if ! git diff --staged --quiet; then
             git commit -m "chore: auto-cura integridade"
             git push origin HEAD:${{ github.head_ref }}
+            
+            # Tenta merge automático; se falhar (ex: restrição de branch), usa merge admin
+            gh pr merge ${{ github.event.pull_request.number }} --auto --merge || \
+            gh pr merge ${{ github.event.pull_request.number }} --merge --admin
+          else
+            echo "Nenhuma alteração pendente. Pulando commit."
           fi
-          gh pr merge ${{ github.event.pull_request.number }} --auto --merge || gh pr merge ${{ github.event.pull_request.number }} --merge --admin
 
       - name: 🚀 Abrir PR de Reparo (Recovery Mode)
-        if: always() && github.event_name == 'workflow_run' && steps.healing_process.outputs.status == 'success'
+        if: github.event_name == 'workflow_run' && steps.healing_process.outputs.status == 'success'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
           git config user.name "JARVIS"
           git config user.email "jarvis@simbiose.ai"
           git add .
-          git commit -m "fix: restauração estável"
-          git push origin ${{ steps.recover_logic.outputs.target_branch }}
-          gh pr create --title "JARVIS Recuperação: ${{ github.event.workflow_run.name }}" \
-            --body "Auto-cura aplicada após falha crítica." \
-            --head ${{ steps.recover_logic.outputs.target_branch }} \
-            --base main --fill | xargs -I {} gh pr merge {} --auto --merge || gh pr merge --admin --merge
+          
+          if ! git diff --staged --quiet; then
+            git commit -m "fix: restauração estável pós-falha"
+            git push origin ${{ steps.recover_logic.outputs.target_branch }}
+            
+            PR_URL=$(gh pr create --title "JARVIS Recuperação: ${{ github.event.workflow_run.name }}" \
+              --body "Auto-cura aplicada após falha crítica no workflow anterior." \
+              --head ${{ steps.recover_logic.outputs.target_branch }} \
+              --base main)
+              
+            gh pr merge $PR_URL --auto --merge || gh pr merge $PR_URL --admin --merge
+          fi
