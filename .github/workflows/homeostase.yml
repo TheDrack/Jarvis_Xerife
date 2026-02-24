@@ -2,17 +2,21 @@ name: "🧬 JARVIS: Self Healing V3"
 
 on:
   pull_request:
-    branches: [ main, master, develop ]
+    branches:
+      - main
+      - master
+      - develop
   workflow_run:
     workflows: ["*"]
-    types: [completed]
+    types:
+      - completed
   workflow_dispatch:
 
 jobs:
   auto_bypass:
     name: "🛡️ Verificação de Gatilho"
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.name == '🧬 JARVIS: Self Healing V3'
+    if: ${{ github.event.workflow_run.name == '🧬 JARVIS: Self Healing V3' }}
     steps:
       - name: "Bypass de Auto-Gatilho"
         run: |
@@ -22,18 +26,20 @@ jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
     runs-on: ubuntu-latest
-    # O uso do >- garante que a string seja lida corretamente sem erros de quebra de linha
+    # Sintaxe de expressão explícita para evitar erro de parser
     if: >-
-      github.event_name == 'pull_request' || 
-      (github.event.workflow_run.conclusion == 'failure' && 
-       github.event.workflow_run.name != '🧬 JARVIS: Self Healing V3')
+      ${{ 
+        github.event_name == 'pull_request' || 
+        (github.event.workflow_run.conclusion == 'failure' && 
+         github.event.workflow_run.name != '🧬 JARVIS: Self Healing V3')
+      }}
     
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: 🛰️ Checkout (Full History)
+      - name: 🛰️ Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -66,11 +72,8 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
-          # Executa testes e permite falha para o Healer atuar
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
-          
-          # Revalidação final para definir o status do Job
           uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
           if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
