@@ -11,6 +11,7 @@ on:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
+    # Só executa se for PR OU se for falha de OUTRO workflow (evita loop no self-healing)
     if: >
       github.event_name == 'pull_request' || 
       (github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.name != '🧬 JARVIS: Self Healing V3')
@@ -21,7 +22,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: 🛰️ Checkout (Full History)
+      - name: 🛰️ Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -54,18 +55,28 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
+          # 1. Teste inicial (o '|| true' garante que o workflow continue mesmo se falhar)
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
+          
+          # 2. Executa o Healer
           uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
+          
+          # 3. Revalidação final
           uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
+          # 4. Verificação de Integridade
           if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
+             echo "✅ DNA Íntegro. Forçando Exit 0 para Badge verde."
              echo "status=success" >> $GITHUB_OUTPUT
+             exit 0
           else
+             echo "❌ DNA permanece instável."
              echo "status=failed" >> $GITHUB_OUTPUT
+             exit 1
           fi
 
       - name: 🛠️ Commit & Auto-Merge (PR Mode)
-        if: github.event_name == 'pull_request' && steps.healing_process.outputs.status == 'success'
+        if: always() && github.event_name == 'pull_request' && steps.healing_process.outputs.status == 'success'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
@@ -76,13 +87,11 @@ jobs:
             git commit -m "chore: [Auto-Cura] Correções de integridade"
             git push origin HEAD:${{ github.head_ref }}
           fi
-          
-          echo "🚀 Realizando Merge em modo PR..."
           gh pr merge ${{ github.event.pull_request.number }} --auto --merge || \
           gh pr merge ${{ github.event.pull_request.number }} --merge --admin
 
       - name: 🚀 Abrir PR de Reparo (Recovery Mode)
-        if: github.event_name == 'workflow_run' && steps.healing_process.outputs.status == 'success'
+        if: always() && github.event_name == 'workflow_run' && steps.healing_process.outputs.status == 'success'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -99,7 +108,7 @@ jobs:
               log = open('pytest_log.txt').read()[:1500]
               resp = requests.post('https://api.groq.com/openai/v1/chat/completions', 
                 headers={'Authorization': f'Bearer {os.getenv(\"GROQ_API_KEY\")}'},
-                json={'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': f'Resuma em português de forma técnica o que causou o erro neste log: {log}'}]})
+                json={'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': f'Resuma em português de forma técnica e concisa o que causou o erro neste log: {log}'}]})
               print(resp.json()['choices'][0]['message']['content'])
           except:
               print('Auto-cura aplicada com sucesso.')
@@ -107,10 +116,7 @@ jobs:
 
           PR_URL=$(gh pr create --title "🧬 [Auto-Cura] Recuperação: ${{ github.event.workflow_run.name }}" \
             --body "### 📄 Diagnóstico Jarvis:
-            $RESUMO
-            
-            ---
-            **Ação:** Rollback + Correção via Protocolo V3 (Simbiose)." \
+            $RESUMO" \
             --head ${{ steps.recover_logic.outputs.target_branch }} \
             --base main)
           
