@@ -7,4 +7,3 @@ def execute(context=None):
             return {'priority': 'high'}
         else:
             return {'priority': 'low'}
- 
