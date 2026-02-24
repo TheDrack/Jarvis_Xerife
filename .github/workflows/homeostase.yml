@@ -11,7 +11,6 @@ on:
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Executa se for PR OU se for uma falha de workflow (exceto ele mesmo)
     if: >
       github.event_name == 'pull_request' || 
       (github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.name != '🧬 JARVIS: Self Healing V3')
@@ -28,7 +27,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 📦 Setup UV & Python
+      - name: 📦 Setup UV
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -37,77 +36,85 @@ jobs:
       - name: 🔧 Instalação do DNA
         run: |
           uv venv --clear --python 3.11
-          uv pip install pytest pytest-json-report groq requests python-dotenv fastapi[all] pydantic-settings
-          # Adicione aqui demais dependências se necessário
+          uv pip install pytest pytest-json-report groq requests autopep8 python-dotenv
 
-      - name: 🔍 Lógica de Recuperação (Workflow Failure)
+      - name: 🔍 Modo de Recuperação (Workflow Failure)
         if: github.event_name == 'workflow_run'
         id: recover_logic
         run: |
-          echo "⚠️ Falha detectada no workflow: ${{ github.event.workflow_run.name }}"
-          
-          # 1. Identificar commit problemático e anterior
           BAD_COMMIT=${{ github.event.workflow_run.head_sha }}
           STABLE_COMMIT=$(git rev-parse $BAD_COMMIT^)
-          
-          # 2. Criar branch de reparo baseada no commit anterior (Rollback Seguro)
-          BRANCH_NAME="jarvis/fix-${{ github.event.workflow_run.run_number }}"
+          BRANCH_NAME="jarvis/recovery-${{ github.run_id }}"
           git checkout -b $BRANCH_NAME $STABLE_COMMIT
-          
-          # 3. Trazer os arquivos que falharam para tentativa de correção
-          # Aqui você pode customizar para buscar logs via API do GitHub se necessário
           echo "target_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          echo "mode=recovery" >> $GITHUB_OUTPUT
 
-      - name: 🔄 Ciclo de Execução e Auto-Cura
+      - name: 🔄 Ciclo de Auto-Cura e Testes
         id: healing_process
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PYTHONPATH: "."
         run: |
-          echo "🧪 Iniciando Diagnóstico..."
+          # 1. Teste inicial para capturar falhas
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           
-          if grep -qE "ERRORS|failed|IndentationError" pytest_log.txt; then
-            echo "🚨 Anomalias detectadas. Iniciando jarvis_healer.py..."
-            uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
-            
-            # Revalidação
-            uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
-            if ! grep -qE "ERRORS|failed" final_log.txt; then
-              echo "healed=true" >> $GITHUB_OUTPUT
-            fi
+          # 2. Executa o Healer (Cura Lógica + Resumo)
+          uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
+          
+          # 3. Revalidação final
+          uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
+          
+          if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
+             echo "status=success" >> $GITHUB_OUTPUT
           else
-            echo "✅ Tudo operacional."
+             echo "status=failed" >> $GITHUB_OUTPUT
           fi
 
-      - name: 🛠️ Aplicar Correções (PR Mode)
-        if: github.event_name == 'pull_request' && steps.healing_process.outputs.healed == 'true'
-        run: |
-          git config user.name "🧬 JARVIS Homeostase"
-          git config user.email "jarvis@simbiose.ai"
-          git add .
-          git commit -m "[Auto-Cura] Correções automáticas aplicadas na PR"
-          git push
-
-      - name: 🚀 Criar PR de Reparo (Recovery Mode)
-        if: github.event_name == 'workflow_run' && steps.recover_logic.outputs.mode == 'recovery'
+      - name: 🛠️ Commit & Auto-Merge (PR Mode)
+        if: github.event_name == 'pull_request' && steps.healing_process.outputs.status == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "🧬 JARVIS Homeostase"
+          git config user.name "🧬 JARVIS"
           git config user.email "jarvis@simbiose.ai"
           git add .
-          git commit -m "fix: Reparo automático para falha no workflow ${{ github.event.workflow_run.name }}"
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: [Auto-Cura] Correções de integridade"
+            git push
+          fi
+          gh pr merge ${{ github.event.pull_request.number }} --auto --merge
+
+      - name: 🚀 Abrir PR de Reparo (Recovery Mode)
+        if: github.event_name == 'workflow_run' && steps.healing_process.outputs.status == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          git config user.name "🧬 JARVIS"
+          git config user.email "jarvis@simbiose.ai"
+          git add .
+          git commit -m "fix: restauração estável e patch preventivo"
           git push origin ${{ steps.recover_logic.outputs.target_branch }}
           
-          gh pr create --title "🧬 [Auto-Cura] Reset & Fix: ${{ github.event.workflow_run.name }}" \
-            --body "### ⚠️ Falha Detectada
-            **Workflow:** ${{ github.event.workflow_run.name }}
-            **Log Original:** ${{ github.event.workflow_run.html_url }}
+          # Gera resumo dinâmico para o corpo da PR
+          RESUMO=$(uv run python -c "
+          import os, requests
+          try:
+              log = open('pytest_log.txt').read()[:1500]
+              resp = requests.post('https://api.groq.com/openai/v1/chat/completions', 
+                headers={'Authorization': f'Bearer {os.getenv(\"GROQ_API_KEY\")}'},
+                json={'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': f'Resuma em português de forma técnica e concisa o que causou o erro neste log de teste para uma Pull Request: {log}'}]})
+              print(resp.json()['choices'][0]['message']['content'])
+          except:
+              print('Auto-cura aplicada com sucesso após falha de workflow.')
+          ")
+
+          PR_URL=$(gh pr create --title "🧬 [Auto-Cura] Recuperação: ${{ github.event.workflow_run.name }}" \
+            --body "### 📄 Diagnóstico Jarvis:
+            $RESUMO
             
-            **Ação Realizada:**
-            1. O código foi revertido para o estado estável anterior.
-            2. O protocolo de auto-cura foi aplicado sobre a base estável para prevenir reincidência.
-            3. Esta PR isola a falha para revisão humana." \
+            ---
+            **Ação:** O sistema realizou rollback para o commit estável e aplicou correções preventivas." \
             --head ${{ steps.recover_logic.outputs.target_branch }} \
-            --base main
+            --base main)
+          
+          gh pr merge $PR_URL --auto --merge
