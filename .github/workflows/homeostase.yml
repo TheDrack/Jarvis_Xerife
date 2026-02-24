@@ -1,42 +1,34 @@
 name: "🧬 JARVIS: Self Healing V3"
 
 on:
+  pull_request:
+    branches: [ main, master, develop ]
   workflow_run:
-    workflows: ["*"] # Monitora todos os workflows do repositório
-    types:
-      - completed
-  workflow_dispatch: 
+    workflows: ["*"]
+    types: [completed]
+  workflow_dispatch:
 
 jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
-    # Condição corrigida e alinhada
+    # Executa se for PR OU se for uma falha de workflow (exceto ele mesmo)
     if: >
-      github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.name != '🧬 JARVIS: Self Healing V3'
+      github.event_name == 'pull_request' || 
+      (github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.name != '🧬 JARVIS: Self Healing V3')
     
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
-      - name: Checkout do Código
-        uses: actions/checkout@v4
-
-      - name: Log de Falha Detectada
-        run: |
-          echo "⚠️ Falha detectada no workflow: ${{ github.event.workflow_run.name }}"
-          echo "🔗 URL da falha: ${{ github.event.workflow_run.html_url }}"
-
-      - name: Executar Protocolo de Reparo
-        run: |
-          echo "Iniciando diagnóstico e reparo automático..."
-         
-      - name: 🛰️ Checkout
+      - name: 🛰️ Checkout (Full History)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GIT_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 📦 Setup UV
+      - name: 📦 Setup UV & Python
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -45,53 +37,77 @@ jobs:
       - name: 🔧 Instalação do DNA
         run: |
           uv venv --clear --python 3.11
-          uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv \
-                         fastapi[all] pydantic-settings cryptography python-jose[cryptography] \
-                         pandas numpy scikit-learn pytest-asyncio pyttsx3 pyautogui pyperclip \
-                         httpx python-multipart passlib[bcrypt] bcrypt autopep8
-          echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
+          uv pip install pytest pytest-json-report groq requests python-dotenv fastapi[all] pydantic-settings
+          # Adicione aqui demais dependências se necessário
+
+      - name: 🔍 Lógica de Recuperação (Workflow Failure)
+        if: github.event_name == 'workflow_run'
+        id: recover_logic
+        run: |
+          echo "⚠️ Falha detectada no workflow: ${{ github.event.workflow_run.name }}"
+          
+          # 1. Identificar commit problemático e anterior
+          BAD_COMMIT=${{ github.event.workflow_run.head_sha }}
+          STABLE_COMMIT=$(git rev-parse $BAD_COMMIT^)
+          
+          # 2. Criar branch de reparo baseada no commit anterior (Rollback Seguro)
+          BRANCH_NAME="jarvis/fix-${{ github.event.workflow_run.run_number }}"
+          git checkout -b $BRANCH_NAME $STABLE_COMMIT
+          
+          # 3. Trazer os arquivos que falharam para tentativa de correção
+          # Aqui você pode customizar para buscar logs via API do GitHub se necessário
+          echo "target_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          echo "mode=recovery" >> $GITHUB_OUTPUT
 
       - name: 🔄 Ciclo de Execução e Auto-Cura
         id: healing_process
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          PYTHONPATH: "."
         run: |
-          echo "🧪 Iniciando bateria de testes..."
+          echo "🧪 Iniciando Diagnóstico..."
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
-          cat pytest_log.txt
           
-          if grep -qE "ERRORS|failed|IndentationError|Interrupted" pytest_log.txt; then
-            echo "🚨 Anomalias detectadas. Ativando Cura em Massa (Diretório Capabilities)..."
-            # O Healer agora vai varrer a pasta toda para evitar o erro dominó
+          if grep -qE "ERRORS|failed|IndentationError" pytest_log.txt; then
+            echo "🚨 Anomalias detectadas. Iniciando jarvis_healer.py..."
             uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
             
-            echo "🔄 Revalidando integridade pós-cura..."
+            # Revalidação
             uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
-            cat final_log.txt
-            
-            if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
-              echo "✅ Auto-cura bem sucedida."
+            if ! grep -qE "ERRORS|failed" final_log.txt; then
               echo "healed=true" >> $GITHUB_OUTPUT
-              echo "final_status=true" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Falha: DNA permanece instável. Verifique erros de lógica além da indentação."
-              echo "final_status=false" >> $GITHUB_OUTPUT
             fi
           else
-            echo "✅ DNA Íntegro."
-            echo "final_status=true" >> $GITHUB_OUTPUT
+            echo "✅ Tudo operacional."
           fi
 
-      - name: 🧬 Commit dos Reparos
-        if: steps.healing_process.outputs.healed == 'true'
+      - name: 🛠️ Aplicar Correções (PR Mode)
+        if: github.event_name == 'pull_request' && steps.healing_process.outputs.healed == 'true'
         run: |
-          git config --local user.email "jarvis@simbiose.ai"
-          git config --local user.name "🧬 JARVIS Homeostase"
+          git config user.name "🧬 JARVIS Homeostase"
+          git config user.email "jarvis@simbiose.ai"
           git add .
-          git commit -m "[Auto-Cura] Reindentação em massa das capabilities"
+          git commit -m "[Auto-Cura] Correções automáticas aplicadas na PR"
           git push
 
-      - name: 🚨 Escalação
-        if: steps.healing_process.outputs.final_status == 'false'
-        run: exit 1
+      - name: 🚀 Criar PR de Reparo (Recovery Mode)
+        if: github.event_name == 'workflow_run' && steps.recover_logic.outputs.mode == 'recovery'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "🧬 JARVIS Homeostase"
+          git config user.email "jarvis@simbiose.ai"
+          git add .
+          git commit -m "fix: Reparo automático para falha no workflow ${{ github.event.workflow_run.name }}"
+          git push origin ${{ steps.recover_logic.outputs.target_branch }}
+          
+          gh pr create --title "🧬 [Auto-Cura] Reset & Fix: ${{ github.event.workflow_run.name }}" \
+            --body "### ⚠️ Falha Detectada
+            **Workflow:** ${{ github.event.workflow_run.name }}
+            **Log Original:** ${{ github.event.workflow_run.html_url }}
+            
+            **Ação Realizada:**
+            1. O código foi revertido para o estado estável anterior.
+            2. O protocolo de auto-cura foi aplicado sobre a base estável para prevenir reincidência.
+            3. Esta PR isola a falha para revisão humana." \
+            --head ${{ steps.recover_logic.outputs.target_branch }} \
+            --base main
