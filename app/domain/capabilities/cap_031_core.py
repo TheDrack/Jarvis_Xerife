@@ -2,10 +2,10 @@
 def execute(context=None):
     if context is None:
         context = {}
-    
+
     user_actions = context.get('user_actions', [])
     goals = []
-    
+
     for action in user_actions:
         if action['type'] == 'command':
             # Busca intenções por trás de comandos diretos
@@ -17,7 +17,7 @@ def execute(context=None):
             intention = infer_intention_from_behavior(action['behavior'])
             if intention:
                 goals.append(intention)
-    
+
     return {'goals': goals}
 
 def infer_intention_from_command(command):

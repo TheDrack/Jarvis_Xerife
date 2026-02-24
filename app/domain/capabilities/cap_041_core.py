@@ -4,13 +4,13 @@ def execute(context=None):
         context = {}
     # Obter o código alterado
     altered_code = context.get('altered_code')
-    
+
     # Executar testes virtuais
     virtual_trials = context.get('virtual_trials')
-    
+
     # Prever consequências técnicas
     technical_consequences = predict_technical_consequences(altered_code, virtual_trials)
-    
+
     # Retornar as consequências técnicas
     return technical_consequences
 
@@ -21,4 +21,3 @@ def predict_technical_consequences(altered_code, virtual_trials):
         'code_consequences': [],
         'hardware_consequences': []
     }
-   

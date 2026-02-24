@@ -44,18 +44,18 @@ def update_capability_status(cap_id: str, status="complete", cap_path="data/capa
     if not path.exists():
         print(f"⚠️ Alerta: {cap_path} não encontrado para atualização de status.")
         return False
-    
+
     try:
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        
+
         updated = False
         for cap in data.get('capabilities', []):
             if cap['id'] == cap_id:
                 cap['status'] = status
                 updated = True
                 break
-        
+
         if updated:
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
@@ -116,7 +116,7 @@ def evolve():
             target_file.parent.mkdir(parents=True, exist_ok=True)
             target_file.write_text(new_code, encoding='utf-8')
             print(f"✅ Sucesso: {target_file} mutado.")
-            
+
             # --- NOVA LÓGICA DE SINCRONIZAÇÃO ---
             # Se o arquivo foi mutado com sucesso, marcamos como complete
             update_capability_status(cap_id)
