@@ -4,21 +4,10 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-
 @dataclass
 class Mission:
     """
     Represents a serverless task execution mission sent to a Worker
-    
-    Attributes:
-        mission_id: Unique identifier for the mission
-        code: Python script to execute
-        requirements: List of Python package dependencies
-        browser_interaction: Whether the mission requires Playwright browser
-        keep_alive: Whether to persist the environment after execution
-        target_device_id: Optional target device ID for routing
-        timeout: Maximum execution time in seconds (default: 300)
-        metadata: Additional metadata for the mission
     """
     mission_id: str
     code: str
@@ -28,9 +17,8 @@ class Mission:
     target_device_id: Optional[int] = None
     timeout: int = 300
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert mission to dictionary for JSON serialization"""
         return {
             "mission_id": self.mission_id,
             "code": self.code,
@@ -41,10 +29,9 @@ class Mission:
             "timeout": self.timeout,
             "metadata": self.metadata,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Mission":
-        """Create mission from dictionary"""
         return cls(
             mission_id=data["mission_id"],
             code=data["code"],
@@ -56,21 +43,10 @@ class Mission:
             metadata=data.get("metadata", {}),
         )
 
-
 @dataclass
 class MissionResult:
     """
     Represents the result of a mission execution
-    
-    Attributes:
-        mission_id: ID of the executed mission
-        success: Whether execution was successful
-        stdout: Captured standard output
-        stderr: Captured standard error
-        exit_code: Exit code of the script
-        execution_time: Time taken to execute in seconds
-        error: Error message if execution failed
-        metadata: Additional metadata about the execution
     """
     mission_id: str
     success: bool
@@ -80,9 +56,8 @@ class MissionResult:
     execution_time: float = 0.0
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
-        """Convert result to dictionary for JSON serialization"""
         return {
             "mission_id": self.mission_id,
             "success": self.success,
@@ -93,10 +68,9 @@ class MissionResult:
             "error": self.error,
             "metadata": self.metadata,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MissionResult":
-        """Create result from dictionary"""
         return cls(
             mission_id=data["mission_id"],
             success=data["success"],
@@ -107,3 +81,5 @@ class MissionResult:
             error=data.get("error"),
             metadata=data.get("metadata", {}),
         )
+
+# O Nexus agora encontrará a classe 'Mission' diretamente pelo nome do arquivo.
