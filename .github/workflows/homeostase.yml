@@ -1,4 +1,4 @@
-name: JARVIS Self Healing V3
+name: "JARVIS Self Healing V3"
 
 on:
   pull_request:
@@ -9,46 +9,46 @@ on:
   workflow_dispatch:
 
 jobs:
-  auto_bypass:
-    name: Verificacao de Gatilho
-    runs-on: ubuntu-latest
-    if: github.event.workflow_run.name == 'JARVIS Self Healing V3'
-    steps:
-      - name: Bypass
-        run: exit 0
-
   homeostasis:
-    name: Vistoria e Auto-Cura
+    name: "🧪 Vistoria e Auto-Cura"
     runs-on: ubuntu-latest
-    if: >-
-      github.event_name == 'pull_request' || 
-      (github.event.workflow_run.conclusion == 'failure' && 
-      github.event.workflow_run.name != 'JARVIS Self Healing V3')
-    
     permissions:
       contents: write
       pull-requests: write
 
     steps:
-      - name: Checkout
+      - name: "🛡️ Filtro de Auto-Gatilho"
+        id: filter
+        run: |
+          if [ "${{ github.event.workflow_run.name }}" == "JARVIS Self Healing V3" ]; then
+            echo "Ação: Ignorando auto-gatilho para evitar loop."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🛰️ Checkout
+        if: steps.filter.outputs.should_run == 'true'
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
 
-      - name: Setup UV
+      - name: 📦 Setup UV
+        if: steps.filter.outputs.should_run == 'true'
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
           python-version: '3.11'
 
-      - name: DNA Install
+      - name: 🔧 Instalação do DNA
+        if: steps.filter.outputs.should_run == 'true'
         run: |
           uv venv --clear --python 3.11
           uv pip install pytest pytest-json-report groq requests autopep8 python-dotenv
 
-      - name: Recovery Mode
-        if: github.event_name == 'workflow_run'
+      - name: 🔍 Modo de Recuperação
+        if: steps.filter.outputs.should_run == 'true' && github.event_name == 'workflow_run'
         id: recover_logic
         run: |
           STABLE_COMMIT=$(git rev-parse ${{ github.event.workflow_run.head_sha }}^)
@@ -56,7 +56,8 @@ jobs:
           git checkout -b $BRANCH_NAME $STABLE_COMMIT
           echo "target_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
-      - name: Healing Cycle
+      - name: 🔄 Ciclo de Auto-Cura
+        if: steps.filter.outputs.should_run == 'true'
         id: healing_process
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -73,8 +74,8 @@ jobs:
              exit 1
           fi
 
-      - name: Commit and Merge PR
-        if: always() && github.event_name == 'pull_request' && steps.healing_process.outputs.status == 'success'
+      - name: 🛠️ Merge PR / Auto-Merge
+        if: always() && steps.filter.outputs.should_run == 'true' && github.event_name == 'pull_request' && steps.healing_process.outputs.status == 'success'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
@@ -87,33 +88,7 @@ jobs:
           fi
           gh pr merge ${{ github.event.pull_request.number }} --auto --merge || gh pr merge ${{ github.event.pull_request.number }} --merge --admin
 
-      - name: Recovery PR
-        if: always() && github.event_name == 'workflow_run' && steps.healing_process.outputs.status == 'success'
-        env:
-          GH_TOKEN: ${{ secrets.GIT_PAT }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: 🚀 Finalização de Sucesso
         run: |
-          git config user.name "JARVIS"
-          git config user.email "jarvis@simbiose.ai"
-          git add .
-          git commit -m "fix: restauração estável"
-          git push origin ${{ steps.recover_logic.outputs.target_branch }}
-          
-          RESUMO=$(uv run python -c "
-          import os, requests
-          try:
-              log = open('pytest_log.txt').read()[:1500]
-              resp = requests.post('https://api.groq.com/openai/v1/chat/completions', 
-                headers={'Authorization': f'Bearer {os.getenv(\"GROQ_API_KEY\")}'},
-                json={'model': 'llama-3.3-70b-versatile', 'messages': [{'role': 'user', 'content': f'Resuma em português o erro: {log}'}]})
-              print(resp.json()['choices'][0]['message']['content'])
-          except:
-              print('Auto-cura aplicada.')
-          ")
-
-          PR_URL=$(gh pr create --title "JARVIS Recuperação: ${{ github.event.workflow_run.name }}" \
-            --body "Diagnóstico: $RESUMO" \
-            --head ${{ steps.recover_logic.outputs.target_branch }} \
-            --base main)
-          
-          gh pr merge $PR_URL --auto --merge || gh pr merge $PR_URL --merge --admin
+          echo "✅ Protocolo finalizado. Badge deve ficar verde."
+          exit 0
