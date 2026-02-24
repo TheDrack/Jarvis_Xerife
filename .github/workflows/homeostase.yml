@@ -45,6 +45,7 @@ jobs:
           BAD_COMMIT=${{ github.event.workflow_run.head_sha }}
           STABLE_COMMIT=$(git rev-parse $BAD_COMMIT^)
           BRANCH_NAME="jarvis/recovery-${{ github.run_id }}"
+          # Cria branch a partir do ponto estável
           git checkout -b $BRANCH_NAME $STABLE_COMMIT
           echo "target_branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
@@ -57,7 +58,7 @@ jobs:
           # 1. Teste inicial para capturar falhas
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           
-          # 2. Executa o Healer (Cura Lógica + Resumo)
+          # 2. Executa o Healer (Cura Lógica + Indentação)
           uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
           
           # 3. Revalidação final
@@ -79,7 +80,8 @@ jobs:
           git add .
           if ! git diff --staged --quiet; then
             git commit -m "chore: [Auto-Cura] Correções de integridade"
-            git push
+            # RESOLUÇÃO DO ERRO 128: Empurra para a branch de origem da PR
+            git push origin HEAD:${{ github.head_ref }}
           fi
           gh pr merge ${{ github.event.pull_request.number }} --auto --merge
 
@@ -95,7 +97,6 @@ jobs:
           git commit -m "fix: restauração estável e patch preventivo"
           git push origin ${{ steps.recover_logic.outputs.target_branch }}
           
-          # Gera resumo dinâmico para o corpo da PR
           RESUMO=$(uv run python -c "
           import os, requests
           try:
@@ -113,7 +114,7 @@ jobs:
             $RESUMO
             
             ---
-            **Ação:** O sistema realizou rollback para o commit estável e aplicou correções preventivas." \
+            **Ação:** Rollback para commit estável + Correção via Protocolo V3." \
             --head ${{ steps.recover_logic.outputs.target_branch }} \
             --base main)
           
