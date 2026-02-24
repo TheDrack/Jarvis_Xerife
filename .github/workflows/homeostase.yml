@@ -1,0 +1,102 @@
+name: "🧬 JARVIS: Self Healing V3"
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    types: [opened, synchronize, reopened]
+  # Permite que outros workflows (como o de Build) chamem a auto-cura em caso de falha
+  workflow_run:
+    workflows: ["JARVIS: Cleanup and Refactor", "JARVIS: Build Executable"]
+    types: [completed]
+
+jobs:
+  homeostasis:
+    name: "🧪 Vistoria e Auto-Cura"
+    # Evita loops infinitos de execuções automáticas e só roda se o anterior falhou (caso venha de workflow_run)
+    if: |
+      !contains(github.event.head_commit.message, '[Auto-Cura]') &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'failure')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🛰️ Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GIT_PAT }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+
+      - name: 📦 Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: '3.11'
+
+      - name: 🔧 Instalação do DNA
+        run: |
+          uv venv --clear --python 3.11
+          # Instalando dependências necessárias para o metabolismo e testes
+          uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv pandas numpy scikit-learn
+          echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
+
+      - name: 🔄 Ciclo de Testes e Auto-Cura
+        id: healing_process
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PYTHONPATH: "."
+        run: |
+          echo "🧪 Iniciando primeira bateria de testes..."
+          # Roda o pytest e gera o report.json. O '|| true' impede o crash prematuro do workflow.
+          uv run pytest --json-report --json-report-file=report.json || true
+          
+          # Verifica se existem falhas no report.json
+          if [ -f report.json ] && [ "$(jq '.summary.failed // 0' report.json)" != "0" ]; then
+            echo "🚨 Falhas detectadas no DNA. Iniciando scripts/jarvis_healer.py..."
+            
+            # Chama o seu script de cura passando o relatório gerado
+            uv run python scripts/jarvis_healer.py --report report.json
+            
+            echo "🔄 Revalidando integridade após tentativa de cura..."
+            uv run pytest --json-report --json-report-file=report_final.json || true
+            
+            if [ -f report_final.json ] && [ "$(jq '.summary.failed // 0' report_final.json)" == "0" ]; then
+              echo "✅ DNA Restaurado com sucesso."
+              echo "final_status=true" >> $GITHUB_OUTPUT
+              echo "healed=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Auto-cura insuficiente. DNA permanece instável."
+              echo "final_status=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "✅ DNA íntegro. Nenhuma intervenção necessária."
+            echo "final_status=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🧬 Commitar Reparo
+        if: steps.healing_process.outputs.healed == 'true'
+        run: |
+          git config --local user.email "jarvis@simbiose.ai"
+          git config --local user.name "🧬 JARVIS Homeostase"
+          git add .
+          git commit -m "[Auto-Cura] Reparo genético aplicado via Healer"
+          git push
+
+      - name: ✅ Auto-Merge
+        if: steps.healing_process.outputs.final_status == 'true' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GIT_PAT }}
+        run: |
+          echo "🫡 Homeostase atingida. Realizando integração..."
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch --admin || \
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
+
+      - name: 🚨 Escalação
+        if: steps.healing_process.outputs.final_status == 'false'
+        run: |
+          echo "🚨 O DNA não atingiu a homeostase mesmo após tentativa de cura."
+          if [ -f report.json ]; then
+            jq '.tests[] | select(.outcome == "failed") | {nodeid, message: .call.crash.message}' report.json
+          fi
+          exit 1
