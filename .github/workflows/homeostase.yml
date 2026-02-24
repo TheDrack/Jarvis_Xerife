@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: 🛰️ Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
@@ -35,7 +35,7 @@ jobs:
           uv pip install pytest pytest-json-report pytest-cov sqlmodel groq requests python-dotenv \
                          fastapi[all] pydantic-settings cryptography python-jose[cryptography] \
                          pandas numpy scikit-learn pytest-asyncio pyttsx3 pyautogui pyperclip \
-                         httpx python-multipart passlib[bcrypt] bcrypt
+                         httpx python-multipart passlib[bcrypt] bcrypt autopep8
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
       - name: 🔄 Ciclo de Execução e Auto-Cura
@@ -46,10 +46,9 @@ jobs:
         run: |
           echo "🧪 Iniciando bateria de testes..."
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
-          cat pytest_log.txt
           
           if grep -qE "ERRORS|failed|IndentationError|Interrupted" pytest_log.txt; then
-            echo "🚨 Anomalias detectadas. Ativando Cura Agressiva..."
+            echo "🚨 Anomalias detectadas. Ativando Cura por Reestruturação..."
             uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
             
             echo "🔄 Revalidando integridade pós-cura..."
@@ -61,7 +60,7 @@ jobs:
               echo "healed=true" >> $GITHUB_OUTPUT
               echo "final_status=true" >> $GITHUB_OUTPUT
             else
-              echo "❌ Falha: DNA permanece instável."
+              echo "❌ Falha crítica: O DNA não aceitou a reestruturação automática."
               echo "final_status=false" >> $GITHUB_OUTPUT
             fi
           else
@@ -75,7 +74,7 @@ jobs:
           git config --local user.email "jarvis@simbiose.ai"
           git config --local user.name "🧬 JARVIS Homeostase"
           git add .
-          git commit -m "[Auto-Cura] DNA Sanitizado e Estruturado"
+          git commit -m "[Auto-Cura] Reindentação global via Autopep8"
           git push
 
       - name: 🚨 Escalação
