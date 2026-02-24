@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: 🛰️ Checkout
-        uses: actions/checkout@v4
+        uses: checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
@@ -38,41 +38,36 @@ jobs:
                          httpx python-multipart passlib[bcrypt] bcrypt
           echo "PYTHONPATH=$PYTHONPATH:$(pwd)" >> $GITHUB_ENV
 
-      - name: 💉 Vacina Preventiva (Sanitização)
-        run: |
-          echo "💉 Removendo identações inesperadas em arquivos core..."
-          # Remove espaços/tabs no início de linhas que começam com def ou class
-          find app/domain/capabilities/ -name "*.py" -exec sed -i 's/^[[:space:]]\+\(def \)/\1/' {} +
-          find app/domain/capabilities/ -name "*.py" -exec sed -i 's/^[[:space:]]\+\(class \)/\1/' {} +
-
       - name: 🔄 Ciclo de Execução e Auto-Cura
         id: healing_process
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
-          echo "🧪 Iniciando testes..."
+          echo "🧪 Iniciando bateria de testes..."
           uv run pytest --json-report --json-report-file=report.json || true
           
           if [ -f report.json ]; then
-            # Lógica robusta: detecta falhas, erros de sumário e erros de coleção (lista errors)
-            HAS_ERRORS=$(jq 'if ((.summary.errors // 0) > 0) or ((.errors | length) > 0) or ((.summary.failed // 0) > 0) then "true" else "false" end' report.json)
+            # Lógica Infalível: Se houver qualquer item em 'errors' ou summary > 0, dispara.
+            # Convertemos para um número inteiro simples via jq para o Bash comparar.
+            TOTAL_ANOMALIES=$(jq '[.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | add' report.json)
             
-            if [ "$HAS_ERRORS" == '"true"' ]; then
-              echo "🚨 Anomalias detectadas. Ativando Protocolo de Cura..."
+            echo "📊 Total de anomalias detectadas: $TOTAL_ANOMALIES"
+            
+            if [ "$TOTAL_ANOMALIES" -gt 0 ]; then
+              echo "🚨 Ativando Protocolo de Cura..."
               uv run python scripts/jarvis_healer.py --report report.json
               
-              echo "🔄 Revalidando integridade..."
+              echo "🔄 Revalidando integridade pós-cura..."
               uv run pytest --json-report --json-report-file=report_final.json || true
               
-              STILL_HAS_ERRORS=$(jq 'if ((.summary.errors // 0) > 0) or ((.errors | length) > 0) or ((.summary.failed // 0) > 0) then "true" else "false" end' report_final.json)
-              
-              if [ "$STILL_HAS_ERRORS" == '"false"' ]; then
+              FINAL_COUNT=$(jq '[.summary.failed // 0, .summary.errors // 0, (.errors | length // 0)] | add' report_final.json)
+              if [ "$FINAL_COUNT" -eq 0 ]; then
                 echo "✅ Auto-cura bem sucedida."
-                echo "final_status=true" >> $GITHUB_OUTPUT
                 echo "healed=true" >> $GITHUB_OUTPUT
+                echo "final_status=true" >> $GITHUB_OUTPUT
               else
-                echo "❌ Falha crítica: DNA permanece instável."
+                echo "❌ Falha: DNA permanece instável com $FINAL_COUNT erros."
                 echo "final_status=false" >> $GITHUB_OUTPUT
               fi
             else
@@ -80,7 +75,7 @@ jobs:
               echo "final_status=true" >> $GITHUB_OUTPUT
             fi
           else
-            echo "❌ Erro Fatal: Relatório não gerado."
+            echo "❌ Erro Fatal: report.json não foi gerado."
             exit 1
           fi
 
@@ -92,14 +87,6 @@ jobs:
           git add .
           git commit -m "[Auto-Cura] Correção de DNA e estrutura aplicada"
           git push
-
-      - name: ✅ Auto-Merge
-        if: steps.healing_process.outputs.final_status == 'true' && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ secrets.GIT_PAT }}
-        run: |
-          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch --admin || \
-          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
 
       - name: 🚨 Escalação
         if: steps.healing_process.outputs.final_status == 'false'
