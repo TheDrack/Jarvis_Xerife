@@ -17,7 +17,7 @@ def crystalize():
             if file.endswith(".py") and file != "__init__.py":
                 name_no_ext = file[:-3]
                 expected_class = "".join(x.capitalize() for x in name_no_ext.split("_"))
-                
+
                 with open(os.path.join(root, file), "r", encoding="utf-8") as f:
                     content = f.read()
                     if f"class {expected_class}" not in content:
