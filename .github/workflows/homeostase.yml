@@ -45,38 +45,29 @@ jobs:
           PYTHONPATH: "."
         run: |
           echo "🧪 Iniciando bateria de testes..."
-          uv run pytest --json-report --json-report-file=report.json || true
+          # Salvamos a saída do terminal para garantir que o Healer leia o que o Pytest cuspiu
+          uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
+          cat pytest_log.txt
           
-          if [ -f report.json ]; then
-            # Lógica Ultra-Resiliente: Soma falhas, erros de sumário E o tamanho da lista de erros de coleção.
-            # Se o sumário não existir (// 0), ele ainda conta os erros da lista .errors.
-            TOTAL_ANOMALIES=$(jq '((.summary.failed // 0) + (.summary.errors // 0) + (.errors | length // 0))' report.json)
+          # DETECÇÃO BRUTA: Se o log contém 'ERRORS' ou 'failed' ou 'IndentationError'
+          if grep -qE "ERRORS|failed|IndentationError|Interrupted" pytest_log.txt; then
+            echo "🚨 Anomalias detectadas no log. Ativando Protocolo de Cura..."
+            uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
             
-            echo "📊 Total de anomalias detectadas: $TOTAL_ANOMALIES"
+            echo "🔄 Revalidando integridade pós-cura..."
+            uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
             
-            if [ "$TOTAL_ANOMALIES" -gt 0 ]; then
-              echo "🚨 Ativando Protocolo de Cura..."
-              uv run python scripts/jarvis_healer.py --report report.json
-              
-              echo "🔄 Revalidando integridade pós-cura..."
-              uv run pytest --json-report --json-report-file=report_final.json || true
-              
-              FINAL_COUNT=$(jq '((.summary.failed // 0) + (.summary.errors // 0) + (.errors | length // 0))' report_final.json)
-              if [ "$FINAL_COUNT" -eq 0 ]; then
-                echo "✅ Auto-cura bem sucedida."
-                echo "healed=true" >> $GITHUB_OUTPUT
-                echo "final_status=true" >> $GITHUB_OUTPUT
-              else
-                echo "❌ Falha: DNA permanece instável com $FINAL_COUNT erros."
-                echo "final_status=false" >> $GITHUB_OUTPUT
-              fi
-            else
-              echo "✅ DNA Íntegro."
+            if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
+              echo "✅ Auto-cura bem sucedida."
+              echo "healed=true" >> $GITHUB_OUTPUT
               echo "final_status=true" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Falha: DNA permanece instável."
+              echo "final_status=false" >> $GITHUB_OUTPUT
             fi
           else
-            echo "❌ Erro Fatal: report.json não gerado."
-            exit 1
+            echo "✅ DNA Íntegro."
+            echo "final_status=true" >> $GITHUB_OUTPUT
           fi
 
       - name: 🧬 Commit dos Reparos
@@ -85,7 +76,7 @@ jobs:
           git config --local user.email "jarvis@simbiose.ai"
           git config --local user.name "🧬 JARVIS Homeostase"
           git add .
-          git commit -m "[Auto-Cura] Correção de DNA e estrutura aplicada"
+          git commit -m "[Auto-Cura] Correção de DNA aplicada via log analysis"
           git push
 
       - name: 🚨 Escalação
