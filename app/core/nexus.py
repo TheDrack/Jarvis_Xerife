@@ -33,7 +33,7 @@ class JarvisNexus:
         self._lock = Lock()
         self._cache = self._load_memory()   # Cache de caminhos (strings)
         self._instances = {}                # Cache de instâncias (Singletons)
-        
+
         logging.info(f"Iniciado na raiz: {self.base_dir}")
 
     def _load_memory(self) -> dict:
@@ -116,10 +116,10 @@ class JarvisNexus:
         target_id: str,
         hint: Optional[str]
     ) -> Optional[str]:
-        
+
         # Define onde começar a busca. Se hint for 'infrastructure', busca em 'app/infrastructure'
         search_root = os.path.join(self.base_dir, "app", hint) if hint else os.path.join(self.base_dir, "app")
-        
+
         logging.info(f"Iniciando discovery em: {search_root}")
         filename = f"{target_id}.py"
 
@@ -129,7 +129,7 @@ class JarvisNexus:
                 relative_path = os.path.relpath(root, self.base_dir)
                 module_dots = relative_path.replace(os.sep, ".")
                 full_module_path = f"{module_dots}.{target_id}"
-                
+
                 logging.info(f"Discovery ENCONTROU: {full_module_path}")
                 return full_module_path
 
