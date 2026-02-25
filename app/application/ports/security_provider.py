@@ -7,6 +7,10 @@ from typing import Optional
 
 
 class SecurityProvider(NexusComponent, ABC):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Interface for security and authentication operations"""
 
     @abstractmethod

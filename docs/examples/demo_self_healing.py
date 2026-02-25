@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
@@ -228,7 +229,11 @@ def demo_api_integration():
     code = '''
 import requests
 
-class JarvisSelfHealing:
+class JarvisSelfHealing(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     def __init__(self, api_base_url, token):
         self.base_url = api_base_url
         self.headers = {"Authorization": f"Bearer {token}"}

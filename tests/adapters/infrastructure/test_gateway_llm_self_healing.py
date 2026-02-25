@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Gateway LLM Adapter self-healing functionality"""
 
@@ -8,7 +9,11 @@ import pytest
 from app.adapters.infrastructure.gateway_llm_adapter import GatewayLLMCommandAdapter
 
 
-class TestGatewayLLMAdapterSelfHealing:
+class TestGatewayLLMAdapterSelfHealing(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for self-healing functionality in GatewayLLMCommandAdapter"""
 
     @pytest.fixture

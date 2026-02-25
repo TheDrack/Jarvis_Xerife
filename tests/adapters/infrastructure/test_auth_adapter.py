@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for AuthAdapter"""
 
@@ -14,7 +15,11 @@ def auth_adapter():
     return AuthAdapter()
 
 
-class TestPasswordHashing:
+class TestPasswordHashing(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Tests for password hashing functionality"""
 
     def test_hash_password(self, auth_adapter):
@@ -54,7 +59,11 @@ class TestPasswordHashing:
         assert auth_adapter.verify_password(password, hash2) is True
 
 
-class TestJWTTokens:
+class TestJWTTokens(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Tests for JWT token functionality"""
 
     def test_create_access_token(self, auth_adapter):
@@ -107,7 +116,11 @@ class TestJWTTokens:
         assert payload["sub"] == "testuser"
 
 
-class TestUserAuthentication:
+class TestUserAuthentication(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Tests for user authentication"""
 
     def test_authenticate_valid_user(self, auth_adapter):

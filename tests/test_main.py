@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for main.py cloud mode initialization"""
 
@@ -12,7 +13,11 @@ sys.modules['pyttsx3'] = MagicMock()
 sys.modules['speech_recognition'] = MagicMock()
 
 
-class TestMainCloudMode:
+class TestMainCloudMode(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for main.py cloud mode"""
 
     @patch('main.uvicorn.run')

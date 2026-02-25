@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for System Commands"""
 
@@ -13,7 +14,11 @@ sys.modules["pynput.keyboard"] = MagicMock()
 from app.actions.system_commands import CommandProcessor, SystemCommands, WebNavigator
 
 
-class TestSystemCommands:
+class TestSystemCommands(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for SystemCommands class"""
 
     @pytest.fixture
@@ -62,7 +67,11 @@ class TestSystemCommands:
             system_commands._pyautogui.click.assert_called_once_with(100, 200, button="left", clicks=1)
 
 
-class TestWebNavigator:
+class TestWebNavigator(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for WebNavigator class"""
 
     @pytest.fixture
@@ -85,7 +94,11 @@ class TestWebNavigator:
         web_navigator.sys_cmd.type_text.assert_called_once_with("test")
 
 
-class TestCommandProcessor:
+class TestCommandProcessor(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for CommandProcessor class"""
 
     @pytest.fixture

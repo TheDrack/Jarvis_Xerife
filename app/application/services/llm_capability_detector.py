@@ -381,7 +381,7 @@ Be conservative - only mark as "complete" if you see clear, working implementati
         return None
 
 
-class EnhancedCapabilityManager:
+class EnhancedCapabilityManager(NexusComponent):
     """
     Enhanced Capability Manager that uses LLM for capability detection.
     

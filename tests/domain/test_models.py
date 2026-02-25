@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Domain models"""
 
@@ -6,7 +7,11 @@ import pytest
 from app.domain.models import Command, CommandType, Intent, Response
 
 
-class TestIntent:
+class TestIntent(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for Intent model"""
 
     def test_create_intent(self):
@@ -40,7 +45,11 @@ class TestIntent:
             Intent(command_type=CommandType.TYPE_TEXT, confidence=-0.1)
 
 
-class TestCommand:
+class TestCommand(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for Command model"""
 
     def test_create_command(self):
@@ -65,7 +74,11 @@ class TestCommand:
         assert command.context == {}
 
 
-class TestResponse:
+class TestResponse(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for Response model"""
 
     def test_create_success_response(self):
@@ -108,7 +121,11 @@ class TestResponse:
         assert response.data["count"] == 5
 
 
-class TestCommandType:
+class TestCommandType(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for CommandType enum"""
 
     def test_command_types(self):

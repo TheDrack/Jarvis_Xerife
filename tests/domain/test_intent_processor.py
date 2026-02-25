@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Domain layer - Intent Processor"""
 
@@ -7,7 +8,11 @@ from app.domain.models import CommandType, Intent
 from app.domain.services import IntentProcessor
 
 
-class TestIntentProcessor:
+class TestIntentProcessor(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for IntentProcessor - pure business logic"""
 
     @pytest.fixture

@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Unit tests for CapabilityManager service"""
 
@@ -59,7 +60,11 @@ def sample_capabilities(test_engine):
         session.commit()
 
 
-class TestCapabilityManager:
+class TestCapabilityManager(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test suite for CapabilityManager"""
 
     def test_initialization(self, capability_manager):

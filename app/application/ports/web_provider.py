@@ -6,6 +6,10 @@ from abc import ABC, abstractmethod
 
 
 class WebProvider(NexusComponent, ABC):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """
     Port (interface) for web navigation and browser automation.
     Adapters must implement this interface.

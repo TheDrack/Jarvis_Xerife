@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for GitHub Adapter"""
 
@@ -10,7 +11,11 @@ import pytest
 from app.adapters.infrastructure.github_adapter import GitHubAdapter
 
 
-class TestGitHubAdapter:
+class TestGitHubAdapter(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for GitHubAdapter"""
 
     @pytest.fixture

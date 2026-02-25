@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Infrastructure layer - LLM Command Adapter"""
 
@@ -9,7 +10,11 @@ import pytest
 from app.domain.models import CommandType
 
 
-class TestLLMCommandAdapter:
+class TestLLMCommandAdapter(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for LLMCommandAdapter - Gemini API integration"""
 
     @pytest.fixture

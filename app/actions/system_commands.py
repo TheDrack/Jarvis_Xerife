@@ -141,7 +141,7 @@ class SystemCommands(NexusComponent):
         return None
 
 
-class WebNavigator:
+class WebNavigator(NexusComponent):
     """Handler for web navigation and browser automation"""
 
     def __init__(self, system_commands: SystemCommands) -> None:
@@ -187,7 +187,7 @@ class WebNavigator:
             self.sys_cmd.hotkey("ctrl", "enter")
 
 
-class CommandProcessor:
+class CommandProcessor(NexusComponent):
     """Process and route voice commands to appropriate actions"""
 
     def __init__(self, system_commands: SystemCommands, web_navigator: WebNavigator) -> None:

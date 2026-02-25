@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Container and headless mode detection"""
 
@@ -11,7 +12,11 @@ from app.adapters.infrastructure import DummyVoiceProvider
 from app.container import _is_headless_environment, create_edge_container
 
 
-class TestHeadlessEnvironment:
+class TestHeadlessEnvironment(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for headless environment detection and DummyVoiceProvider"""
 
     def test_headless_detection_with_pytest(self):

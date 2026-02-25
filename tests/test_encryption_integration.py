@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Integration test for the complete encryption flow"""
 
@@ -11,7 +12,11 @@ from app.core.config import Settings
 from app.core.encryption import decrypt_value, is_encrypted
 
 
-class TestEncryptionIntegration:
+class TestEncryptionIntegration(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Integration tests for the complete encryption workflow"""
 
     def test_complete_flow_setup_to_load(self, tmp_path):

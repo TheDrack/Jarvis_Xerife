@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for AI Gateway Gears System"""
 
@@ -8,7 +9,11 @@ import pytest
 from app.adapters.infrastructure.ai_gateway import AIGateway, LLMProvider, GroqGear
 
 
-class TestGroqGearsSystem:
+class TestGroqGearsSystem(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for Groq Gears System (Marcha Alta/Baixa)"""
 
     @pytest.fixture
@@ -197,7 +202,11 @@ class TestGroqGearsSystem:
         assert result["fallback_from"] == LLMProvider.GROQ.value
 
 
-class TestAutoRepairSystem:
+class TestAutoRepairSystem(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for Auto-Repair System"""
 
     @pytest.fixture
@@ -318,7 +327,11 @@ class TestAutoRepairSystem:
             await gateway.generate_completion(messages)
 
 
-class TestEnvironmentVariableConfiguration:
+class TestEnvironmentVariableConfiguration(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for environment variable configuration"""
 
     def test_groq_high_gear_from_env_var(self):

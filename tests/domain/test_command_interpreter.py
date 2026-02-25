@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Domain layer - Command Interpreter"""
 
@@ -7,7 +8,11 @@ from app.domain.models import CommandType
 from app.domain.services import CommandInterpreter
 
 
-class TestCommandInterpreter:
+class TestCommandInterpreter(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for CommandInterpreter - pure business logic"""
 
     @pytest.fixture

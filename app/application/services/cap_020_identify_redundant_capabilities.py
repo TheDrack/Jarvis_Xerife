@@ -12,7 +12,7 @@ class Capability(NexusComponent):
         self.name = name
         self.description = description
 
-class CAP020:
+class CAP020(NexusComponent):
     def __init__(self):
         self.capabilities = []
 

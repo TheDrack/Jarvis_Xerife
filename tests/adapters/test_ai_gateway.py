@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for AI Gateway"""
 
@@ -15,7 +16,11 @@ except ImportError:
 from app.adapters.infrastructure.ai_gateway import AIGateway, LLMProvider
 
 
-class TestAIGateway:
+class TestAIGateway(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for AI Gateway"""
 
     @pytest.fixture
@@ -263,7 +268,11 @@ class TestAIGateway:
         assert "parameters" in tools[0]["function"]
 
 
-class TestAIGatewayFallback:
+class TestAIGatewayFallback(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for AI Gateway fallback mechanism"""
 
     @pytest.fixture

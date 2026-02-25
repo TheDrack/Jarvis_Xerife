@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for SQLite History Adapter"""
 
@@ -11,7 +12,11 @@ from app.adapters.infrastructure.sqlite_history_adapter import (
 )
 
 
-class TestSQLiteHistoryAdapter:
+class TestSQLiteHistoryAdapter(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for SQLiteHistoryAdapter"""
 
     @pytest.fixture

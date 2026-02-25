@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Configuration"""
 
@@ -8,7 +9,11 @@ import pytest
 from app.core.config import Settings, settings
 
 
-class TestSettings:
+class TestSettings(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for Settings class"""
 
     def test_default_values(self):

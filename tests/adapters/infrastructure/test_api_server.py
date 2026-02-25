@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for API Server"""
 
@@ -11,7 +12,11 @@ from app.application.services import AssistantService
 from app.domain.models import Response
 
 
-class TestAPIServer:
+class TestAPIServer(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for FastAPI server"""
 
     @pytest.fixture
@@ -404,7 +409,11 @@ class TestAPIServer:
         assert "Internal server error" in response.json()["detail"]
 
 
-class TestJarvisDispatchEndpoint:
+class TestJarvisDispatchEndpoint(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for Jarvis repository_dispatch endpoint"""
 
     @pytest.fixture

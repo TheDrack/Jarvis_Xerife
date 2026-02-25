@@ -7,6 +7,10 @@ from typing import Optional
 
 
 class VoiceProvider(NexusComponent, ABC):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """
     Port (interface) for voice recognition and synthesis.
     Adapters must implement this interface.

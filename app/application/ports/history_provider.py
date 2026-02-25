@@ -8,6 +8,10 @@ from typing import Any, Dict, List, Optional
 
 
 class HistoryProvider(NexusComponent, ABC):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """
     Port (interface) for command history persistence.
     Adapters must implement this interface.

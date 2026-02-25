@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for configuration decryption functionality"""
 
@@ -11,7 +12,11 @@ import pytest
 from app.core.encryption import encrypt_value
 
 
-class TestConfigDecryption:
+class TestConfigDecryption(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for configuration loading with encrypted values"""
 
     def test_config_loads_encrypted_api_key(self, tmp_path):

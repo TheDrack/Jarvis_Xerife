@@ -8,6 +8,10 @@ from typing import List, Dict, Any, Optional
 
 
 class RewardProvider(NexusComponent, ABC):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """
     Port (interface) for the Reinforcement Learning reward system.
     

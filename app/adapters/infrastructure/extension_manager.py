@@ -7,7 +7,7 @@ from typing import List, Any, Dict
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ExtensionManager")
 
-class Extension(ABC):
+class Extension(NexusComponent, ABC):
     @abstractmethod
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Cada extensão recebe um contexto e pode modificá-lo."""

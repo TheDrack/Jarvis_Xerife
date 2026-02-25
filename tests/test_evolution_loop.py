@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Evolution Loop Service and Reinforcement Learning System"""
 
@@ -30,7 +31,11 @@ def evolution_service(reward_adapter):
     return EvolutionLoopService(reward_provider=reward_adapter)
 
 
-class TestEvolutionRewardModel:
+class TestEvolutionRewardModel(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test the EvolutionReward domain model."""
     
     def test_create_reward(self, test_engine):
@@ -68,7 +73,11 @@ class TestEvolutionRewardModel:
             assert isinstance(reward.created_at, datetime)
 
 
-class TestRewardAdapter:
+class TestRewardAdapter(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test the RewardAdapter implementation."""
     
     def test_log_reward(self, reward_adapter):
@@ -169,7 +178,11 @@ class TestRewardAdapter:
         assert efficiency['efficiency_score'] == 60.0
 
 
-class TestEvolutionLoopService:
+class TestEvolutionLoopService(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test the EvolutionLoopService."""
     
     def test_log_pytest_result_pass(self, evolution_service):
@@ -347,7 +360,11 @@ class TestEvolutionLoopService:
         assert "pytest_pass" in context or "deploy_success" in context
 
 
-class TestRewardValues:
+class TestRewardValues(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test reward value configurations."""
     
     def test_reward_constants(self):

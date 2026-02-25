@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Domain layer - Agent Service"""
 
@@ -5,7 +6,11 @@ from app.domain.models import CommandType
 from app.domain.services import AgentService
 
 
-class TestAgentService:
+class TestAgentService(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for AgentService - LLM function calling configuration"""
 
     def test_get_function_declarations(self):

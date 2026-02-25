@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for hardware-based encryption functionality"""
 
@@ -15,7 +16,11 @@ from app.core.encryption import (
 )
 
 
-class TestEncryption:
+class TestEncryption(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for encryption module"""
 
     def test_get_hardware_id_returns_consistent_value(self):

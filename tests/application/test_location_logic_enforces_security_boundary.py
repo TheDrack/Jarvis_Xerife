@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Contract tests for location-based security boundaries (geofencing)"""
 
@@ -29,7 +30,11 @@ def device_service(in_memory_db):
     return DeviceService(in_memory_db)
 
 
-class TestLocationLogicEnforcesSecurityBoundary:
+class TestLocationLogicEnforcesSecurityBoundary(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """
     Contract tests ensuring the system enforces security boundaries based on location.
     

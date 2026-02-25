@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Gateway LLM Adapter auto-repair security mechanism"""
 
@@ -10,7 +11,11 @@ import pytest
 from app.adapters.infrastructure.gateway_llm_adapter import GatewayLLMCommandAdapter
 
 
-class TestGatewayLLMAutoRepair:
+class TestGatewayLLMAutoRepair(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for auto-repair security mechanism in GatewayLLMCommandAdapter"""
 
     @pytest.fixture

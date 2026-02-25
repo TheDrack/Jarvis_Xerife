@@ -7,6 +7,10 @@ from typing import Optional
 
 
 class ActionProvider(NexusComponent, ABC):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """
     Port (interface) for system automation actions.
     Adapters must implement this interface.

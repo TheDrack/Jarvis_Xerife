@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
@@ -17,7 +18,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent / 'scripts'))
 from state_machine import SelfHealingStateMachine, State, FailureReason
 
 
-class TestErrorIdentification:
+class TestErrorIdentification(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test error identification logic"""
     
     def test_assertion_error_triggers_change_requested(self):
@@ -131,7 +136,11 @@ class TestErrorIdentification:
         assert machine.failure_reason == FailureReason.UNIDENTIFIED_ERROR
 
 
-class TestRepairCycle:
+class TestRepairCycle(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test repair cycle logic"""
     
     def test_initial_counter_is_zero(self):
@@ -223,7 +232,11 @@ class TestRepairCycle:
         assert machine.state == State.SUCCESS
 
 
-class TestStateStatus:
+class TestStateStatus(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test state status and reporting"""
     
     def test_get_status_change_requested(self):

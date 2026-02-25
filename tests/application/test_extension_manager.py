@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for ExtensionManager Service"""
 
@@ -9,7 +10,11 @@ import pytest
 from app.application.services import ExtensionManager
 
 
-class TestExtensionManager:
+class TestExtensionManager(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for ExtensionManager"""
 
     @pytest.fixture

@@ -25,7 +25,7 @@ from app.domain.models.viability import (
 logger = logging.getLogger(__name__)
 
 
-class BudgetExceededException(Exception):
+class BudgetExceededException(NexusComponent, Exception):
     """Exception raised when mission budget is exceeded"""
     
     def __init__(self, used: float, limit: float):

@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Integration tests for PersistentBrowserManager - Playwright integration
 
@@ -18,7 +19,11 @@ import pytest
 from app.application.services.browser_manager import PersistentBrowserManager
 
 
-class TestBrowserManagerIntegration:
+class TestBrowserManagerIntegration(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Integration test cases for PersistentBrowserManager"""
 
     @pytest.fixture
@@ -384,7 +389,11 @@ with sync_playwright() as playwright:
                     assert browser_manager.is_running()
 
 
-class TestBrowserManagerExtensionSupport:
+class TestBrowserManagerExtensionSupport(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Tests for browser extension management and complex automations"""
 
     @pytest.fixture

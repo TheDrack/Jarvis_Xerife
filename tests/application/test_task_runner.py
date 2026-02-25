@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for TaskRunner - Ephemeral script execution service"""
 
@@ -11,7 +12,11 @@ from app.application.services.task_runner import TaskRunner
 from app.domain.models.mission import Mission, MissionResult
 
 
-class TestTaskRunner:
+class TestTaskRunner(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for TaskRunner"""
 
     @pytest.fixture

@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Container LLM adapter initialization"""
 
@@ -9,7 +10,11 @@ import pytest
 from app.container import Container, create_edge_container
 
 
-class TestContainerLLMInitialization:
+class TestContainerLLMInitialization(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for LLM adapter initialization based on API key availability"""
 
     def test_container_enables_llm_when_api_key_provided(self):

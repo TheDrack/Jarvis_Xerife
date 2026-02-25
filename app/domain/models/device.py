@@ -45,7 +45,7 @@ class Device(NexusComponent, SQLModel, table=True):
     inherited_location: bool = False # Define se a localização vem de um vizinho
 
 
-class Capability(SQLModel, table=True):
+class Capability(NexusComponent, SQLModel, table=True):
     """
     SQLModel table for storing device capabilities.
     Each device can have multiple capabilities like camera access, bluetooth scanning, etc.
@@ -61,7 +61,7 @@ class Capability(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now, nullable=False)
 
 
-class CommandResult(SQLModel, table=True):
+class CommandResult(NexusComponent, SQLModel, table=True):
     """
     SQLModel table for storing command execution results from devices.
     This enables the feedback loop for distributed command execution.

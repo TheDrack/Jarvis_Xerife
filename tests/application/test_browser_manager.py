@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for PersistentBrowserManager - Playwright integration service"""
 
@@ -10,7 +11,11 @@ import pytest
 from app.application.services.browser_manager import PersistentBrowserManager
 
 
-class TestPersistentBrowserManager:
+class TestPersistentBrowserManager(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for PersistentBrowserManager"""
 
     @pytest.fixture

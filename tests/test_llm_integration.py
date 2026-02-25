@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for LLM-based command interpretation and capability detection"""
 
@@ -9,7 +10,11 @@ from app.application.services.llm_capability_detector import LLMCapabilityDetect
 from app.core.llm_config import LLMConfig, create_command_interpreter
 
 
-class TestLLMCommandInterpreter:
+class TestLLMCommandInterpreter(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Tests for LLM-based command interpreter"""
     
     @pytest.fixture
@@ -130,7 +135,11 @@ class TestLLMCommandInterpreter:
         assert not interpreter.is_cancel_command("escreva algo")
 
 
-class TestLLMCapabilityDetector:
+class TestLLMCapabilityDetector(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Tests for LLM-based capability detector"""
     
     @pytest.fixture
@@ -219,7 +228,11 @@ class TestLLMCapabilityDetector:
         assert "LLM analysis not available" in result["evidence"][0]
 
 
-class TestLLMConfig:
+class TestLLMConfig(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Tests for LLM configuration"""
     
     def test_config_validation(self):
@@ -274,7 +287,11 @@ class TestLLMConfig:
             assert isinstance(interpreter, CommandInterpreter)
 
 
-class TestIntegration:
+class TestIntegration(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Integration tests for LLM-based systems"""
     
     @pytest.mark.asyncio

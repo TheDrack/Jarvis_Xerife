@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Jarvis Engine"""
 
@@ -10,7 +11,11 @@ from app.core.config import settings
 from app.core.engine import JarvisEngine
 
 
-class TestJarvisEngine:
+class TestJarvisEngine(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for JarvisEngine class"""
 
     @pytest.fixture
@@ -122,7 +127,11 @@ class TestJarvisEngine:
         engine.speak.assert_called_with("Ação cancelada")
 
 
-class TestJarvisEngineIntegration:
+class TestJarvisEngineIntegration(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Integration tests for JarvisEngine"""
 
     @patch("pyttsx3.init")

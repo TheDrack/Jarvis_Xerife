@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Additional tests for the RLS security health check endpoint"""
 
@@ -21,7 +22,11 @@ TEST_TABLES_WITHOUT_RLS = [
 ]
 
 
-class TestHealthCheckRLS:
+class TestHealthCheckRLS(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for RLS security health checks"""
 
     @pytest.fixture

@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for DependencyManager Service"""
 
@@ -9,7 +10,11 @@ import pytest
 from app.application.services import DependencyManager
 
 
-class TestDependencyManager:
+class TestDependencyManager(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for DependencyManager"""
 
     @pytest.fixture

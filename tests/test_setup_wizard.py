@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Setup Wizard functionality"""
 
@@ -40,7 +41,11 @@ from app.adapters.infrastructure.setup_wizard import (
 )
 
 
-class TestSetupWizard:
+class TestSetupWizard(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for setup wizard functions"""
     
     def test_check_env_complete_missing_file(self, tmp_path):

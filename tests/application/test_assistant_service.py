@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Application layer - Assistant Service"""
 
@@ -10,7 +11,11 @@ from app.application.services import AssistantService, DependencyManager
 from app.domain.services import CommandInterpreter, IntentProcessor
 
 
-class TestAssistantService:
+class TestAssistantService(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for AssistantService with mocked ports"""
 
     @pytest.fixture
@@ -188,7 +193,11 @@ class TestAssistantService:
         assert service.dependency_manager is mock_dep_manager
 
 
-class TestAssistantServiceWithLLM:
+class TestAssistantServiceWithLLM(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Test cases for AssistantService with LLM-based conversational responses"""
 
     @pytest.fixture
