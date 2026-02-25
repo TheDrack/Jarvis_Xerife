@@ -1,7 +1,7 @@
 {
     "system_id": "JARVIS_CORE",
     "version": "1.0.0",
-    "last_scan": "2026-02-25T00:45:37.698837",
+    "last_scan": "2026-02-25T00:51:37.886429",
     "crystallization_summary": {
         "total_capabilities": 102,
         "crystallized": 53,
@@ -11,1440 +11,920 @@
         {
             "id": "CAP-001",
             "title": "Maintain internal inventory of all known capabilities",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "gears",
-            "genealogy": {
-                "target_file": "app/domain/gears/cap_001_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/gears",
+            "path": "app/domain/gears/cap_001.py",
+            "last_audit": "2026-02-25T00:51:37.881769"
         },
         {
             "id": "CAP-002",
             "title": "Classify capabilities by status: nonexistent, partial, complete",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "models",
-            "genealogy": {
-                "target_file": "app/domain/models/cap_002_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/models",
+            "path": "app/domain/models/cap_002.py",
+            "last_audit": "2026-02-25T00:51:37.881844"
         },
         {
             "id": "CAP-003",
             "title": "Automatically detect functional gaps",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "gears",
-            "genealogy": {
-                "target_file": "app/domain/gears/cap_003_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/gears",
+            "path": "app/domain/gears/cap_003.py",
+            "last_audit": "2026-02-25T00:51:37.881899"
         },
         {
             "id": "CAP-004",
             "title": "Generate technical objectives from detected gaps",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "gears",
-            "genealogy": {
-                "target_file": "app/domain/gears/cap_004_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/gears",
+            "path": "app/domain/gears/cap_004.py",
+            "last_audit": "2026-02-25T00:51:37.881950"
         },
         {
             "id": "CAP-005",
             "title": "Prioritize objectives by systemic impact",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "gears",
-            "genealogy": {
-                "target_file": "app/domain/gears/cap_005_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/gears",
+            "path": "app/domain/gears/cap_005.py",
+            "last_audit": "2026-02-25T00:51:37.881999"
         },
         {
             "id": "CAP-006",
             "title": "Prioritize objectives by failure reduction",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "gears",
-            "genealogy": {
-                "target_file": "app/domain/gears/cap_006_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/gears",
+            "path": "app/domain/gears/cap_006.py",
+            "last_audit": "2026-02-25T00:51:37.882049"
         },
         {
             "id": "CAP-007",
             "title": "Prioritize objectives by future reuse potential",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "gears",
-            "genealogy": {
-                "target_file": "app/domain/gears/cap_007_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/gears",
+            "path": "app/domain/gears/cap_007.py",
+            "last_audit": "2026-02-25T00:51:37.882097"
         },
         {
             "id": "CAP-008",
             "title": "Maintain history of completed objectives",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "gears",
-            "genealogy": {
-                "target_file": "app/domain/gears/cap_008_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/gears",
+            "path": "app/domain/gears/cap_008.py",
+            "last_audit": "2026-02-25T00:51:37.882147"
         },
         {
             "id": "CAP-009",
             "title": "Maintain history of technical decisions",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_009_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_009.py",
+            "last_audit": "2026-02-25T00:51:37.882227"
         },
         {
             "id": "CAP-010",
             "title": "Distinguish technical error from conceptual limitation",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_010_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_010.py",
+            "last_audit": "2026-02-25T00:51:37.882283"
         },
         {
             "id": "CAP-011",
             "title": "Request human intervention only when required",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_011_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_011.py",
+            "last_audit": "2026-02-25T00:51:37.882330"
         },
         {
             "id": "CAP-012",
             "title": "Validate improvements using automated tests",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_012_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_012.py",
+            "last_audit": "2026-02-25T00:51:37.882381"
         },
         {
             "id": "CAP-013",
             "title": "Automatically revert unstable changes",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_013_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_013.py",
+            "last_audit": "2026-02-25T00:51:37.882427"
         },
         {
             "id": "CAP-014",
             "title": "Preserve architectural compatibility",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_014_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_014.py",
+            "last_audit": "2026-02-25T00:51:37.882471"
         },
         {
             "id": "CAP-015",
             "title": "Automatically document each evolution",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_015_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_015.py",
+            "last_audit": "2026-02-25T00:51:37.882515"
         },
         {
             "id": "CAP-016",
             "title": "Explicitly recognize existing capabilities",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_016_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_016.py",
+            "last_audit": "2026-02-25T00:51:37.882558"
         },
         {
             "id": "CAP-017",
             "title": "Explicitly recognize missing capabilities",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_017_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_017.py",
+            "last_audit": "2026-02-25T00:51:37.882601"
         },
         {
             "id": "CAP-018",
             "title": "Identify internal dependencies between capabilities",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_018_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_018.py",
+            "last_audit": "2026-02-25T00:51:37.882644"
         },
         {
             "id": "CAP-019",
             "title": "Identify mission-critical capabilities",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_019_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_019.py",
+            "last_audit": "2026-02-25T00:51:37.882688"
         },
         {
             "id": "CAP-020",
             "title": "Identify redundant capabilities",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_020_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_020.py",
+            "last_audit": "2026-02-25T00:51:37.882732"
         },
         {
             "id": "CAP-021",
             "title": "Map impact of one capability over others",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_021_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_021.py",
+            "last_audit": "2026-02-25T00:51:37.882775"
         },
         {
             "id": "CAP-022",
             "title": "Evaluate risks before modifying critical capabilities",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_022_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_022.py",
+            "last_audit": "2026-02-25T00:51:37.882818"
         },
         {
             "id": "CAP-023",
             "title": "Maintain internal operational self-model",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "models",
-            "genealogy": {
-                "target_file": "app/domain/models/cap_023_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/models",
+            "path": "app/domain/models/cap_023.py",
+            "last_audit": "2026-02-25T00:51:37.882862"
         },
         {
             "id": "CAP-024",
             "title": "Monitor performance degradation over time",
-            "status": "complete",
-            "mapped_libraries": [
-                "time"
-            ],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_024_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "status": "active",
+            "mapped_libraries": [],
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_024.py",
+            "last_audit": "2026-02-25T00:51:37.882906"
         },
         {
             "id": "CAP-025",
             "title": "Detect silent regressions",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_025_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_025.py",
+            "last_audit": "2026-02-25T00:51:37.882958"
         },
         {
             "id": "CAP-026",
             "title": "Distinguish local improvement from systemic improvement",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_026_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_026.py",
+            "last_audit": "2026-02-25T00:51:37.883004"
         },
         {
             "id": "CAP-027",
             "title": "Maintain short-term operational memory",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_027_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_027.py",
+            "last_audit": "2026-02-25T00:51:37.883048"
         },
         {
             "id": "CAP-028",
             "title": "Maintain mid-term strategic memory",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_028_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_028.py",
+            "last_audit": "2026-02-25T00:51:37.883091"
         },
         {
             "id": "CAP-029",
             "title": "Maintain long-term historical memory",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_029_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_029.py",
+            "last_audit": "2026-02-25T00:51:37.883134"
         },
         {
             "id": "CAP-030",
             "title": "Correlate temporally distant events",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_030_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_030.py",
+            "last_audit": "2026-02-25T00:51:37.883177"
         },
         {
             "id": "CAP-031",
             "title": "Infer intention from behavior",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_031_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_031.py",
+            "last_audit": "2026-02-25T00:51:37.883242"
         },
         {
             "id": "CAP-032",
             "title": "Distinguish literal command from real objective",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "gears",
-            "genealogy": {
-                "target_file": "app/domain/gears/cap_032_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/gears",
+            "path": "app/domain/gears/cap_032.py",
+            "last_audit": "2026-02-25T00:51:37.883292"
         },
         {
             "id": "CAP-033",
             "title": "Build dynamic user model",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "models",
-            "genealogy": {
-                "target_file": "app/domain/models/cap_033_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/models",
+            "path": "app/domain/models/cap_033.py",
+            "last_audit": "2026-02-25T00:51:37.883338"
         },
         {
             "id": "CAP-034",
             "title": "Continuously update user model",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "models",
-            "genealogy": {
-                "target_file": "app/domain/models/cap_034_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/models",
+            "path": "app/domain/models/cap_034.py",
+            "last_audit": "2026-02-25T00:51:37.883383"
         },
         {
             "id": "CAP-035",
             "title": "Detect changes in user patterns",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_035_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_035.py",
+            "last_audit": "2026-02-25T00:51:37.883427"
         },
         {
             "id": "CAP-036",
             "title": "Distinguish signal from noise",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_036_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_036.py",
+            "last_audit": "2026-02-25T00:51:37.883471"
         },
         {
             "id": "CAP-037",
             "title": "Recognize urgency context",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_037_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_037.py",
+            "last_audit": "2026-02-25T00:51:37.883522"
         },
         {
             "id": "CAP-038",
             "title": "Recognize human priority context",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_038_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_038.py",
+            "last_audit": "2026-02-25T00:51:37.883567"
         },
         {
             "id": "CAP-039",
             "title": "Plan actions across multiple steps",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_039_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_039.py",
+            "last_audit": "2026-02-25T00:51:37.883609"
         },
         {
             "id": "CAP-040",
             "title": "Compare multiple possible strategies",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_040_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_040.py",
+            "last_audit": "2026-02-25T00:51:37.883652"
         },
         {
             "id": "CAP-041",
             "title": "Simulate technical consequences before action",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_041_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_041.py",
+            "last_audit": "2026-02-25T00:51:37.883695"
         },
         {
             "id": "CAP-042",
             "title": "Simulate systemic consequences before action",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_042_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_042.py",
+            "last_audit": "2026-02-25T00:51:37.883739"
         },
         {
             "id": "CAP-043",
             "title": "Evaluate failure risk",
-            "status": "complete",
-            "mapped_libraries": [
-                "numpy",
-                "scipy"
-            ],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_043_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "status": "active",
+            "mapped_libraries": [],
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_043.py",
+            "last_audit": "2026-02-25T00:51:37.883783"
         },
         {
             "id": "CAP-044",
             "title": "Evaluate computational cost",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_044_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_044.py",
+            "last_audit": "2026-02-25T00:51:37.883827"
         },
         {
             "id": "CAP-045",
             "title": "Evaluate maintenance cost",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_045_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_045.py",
+            "last_audit": "2026-02-25T00:51:37.883869"
         },
         {
             "id": "CAP-046",
             "title": "Evaluate long-term impact of decisions",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_046_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_046.py",
+            "last_audit": "2026-02-25T00:51:37.883912"
         },
         {
             "id": "CAP-047",
             "title": "Select strategies with optimal cost-benefit",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_047_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_047.py",
+            "last_audit": "2026-02-25T00:51:37.883955"
         },
         {
             "id": "CAP-048",
             "title": "Abort actions with excessive risk",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_048_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_048.py",
+            "last_audit": "2026-02-25T00:51:37.883996"
         },
         {
             "id": "CAP-049",
             "title": "Request human validation for critical decisions",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_049_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_049.py",
+            "last_audit": "2026-02-25T00:51:37.884039"
         },
         {
             "id": "CAP-050",
             "title": "Orchestrate multiple agents simultaneously",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_050_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_050.py",
+            "last_audit": "2026-02-25T00:51:37.884087"
         },
         {
             "id": "CAP-051",
             "title": "Delegate tasks based on specialization",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_051_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_051.py",
+            "last_audit": "2026-02-25T00:51:37.884135"
         },
         {
             "id": "CAP-052",
             "title": "Execute actions in parallel",
-            "status": "complete",
-            "mapped_libraries": [
-                "concurrent"
-            ],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_052_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "status": "active",
+            "mapped_libraries": [],
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_052.py",
+            "last_audit": "2026-02-25T00:51:37.884194"
         },
         {
             "id": "CAP-053",
             "title": "Prioritize critical executions",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_053_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_053.py",
+            "last_audit": "2026-02-25T00:51:37.884243"
         },
         {
             "id": "CAP-054",
             "title": "Execute long-running actions",
-            "status": "complete",
-            "mapped_libraries": [
-                "airflow",
-                "time"
-            ],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_054_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "status": "active",
+            "mapped_libraries": [],
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_054.py",
+            "last_audit": "2026-02-25T00:51:37.884288"
         },
         {
             "id": "CAP-055",
             "title": "Monitor execution in real time",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_055_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_055.py",
+            "last_audit": "2026-02-25T00:51:37.884330"
         },
         {
             "id": "CAP-056",
             "title": "Interrupt problematic executions",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_056_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_056.py",
+            "last_audit": "2026-02-25T00:51:37.884373"
         },
         {
             "id": "CAP-057",
             "title": "Rollback partially completed executions",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_057_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_057.py",
+            "last_audit": "2026-02-25T00:51:37.884416"
         },
         {
             "id": "CAP-058",
             "title": "Adapt plans during execution",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_058_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_058.py",
+            "last_audit": "2026-02-25T00:51:37.884457"
         },
         {
             "id": "CAP-059",
             "title": "Distribute execution across devices",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_059_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_059.py",
+            "last_audit": "2026-02-25T00:51:37.884499"
         },
         {
             "id": "CAP-060",
             "title": "Operate continuously without supervision",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_060_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_060.py",
+            "last_audit": "2026-02-25T00:51:37.884540"
         },
         {
             "id": "CAP-061",
             "title": "Learn from recurring failures",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_061_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_061.py",
+            "last_audit": "2026-02-25T00:51:37.884581"
         },
         {
             "id": "CAP-062",
             "title": "Learn from recurring successes",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_062_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_062.py",
+            "last_audit": "2026-02-25T00:51:37.884622"
         },
         {
             "id": "CAP-063",
             "title": "Reinforce effective strategies",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_063_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_063.py",
+            "last_audit": "2026-02-25T00:51:37.884663"
         },
         {
             "id": "CAP-064",
             "title": "Discard ineffective strategies",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_064_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_064.py",
+            "last_audit": "2026-02-25T00:51:37.884705"
         },
         {
             "id": "CAP-065",
             "title": "Learn from human feedback",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_065_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_065.py",
+            "last_audit": "2026-02-25T00:51:37.884746"
         },
         {
             "id": "CAP-066",
             "title": "Learn from systemic impact",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_066_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_066.py",
+            "last_audit": "2026-02-25T00:51:37.884790"
         },
         {
             "id": "CAP-067",
             "title": "Learn from computational cost",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_067_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_067.py",
+            "last_audit": "2026-02-25T00:51:37.884832"
         },
         {
             "id": "CAP-068",
             "title": "Measure solution efficiency",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_068_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_068.py",
+            "last_audit": "2026-02-25T00:51:37.884874"
         },
         {
             "id": "CAP-069",
             "title": "Optimize response time",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_069_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_069.py",
+            "last_audit": "2026-02-25T00:51:37.884921"
         },
         {
             "id": "CAP-070",
             "title": "Optimize stability",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_070_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_070.py",
+            "last_audit": "2026-02-25T00:51:37.884963"
         },
         {
             "id": "CAP-071",
             "title": "Optimize code reuse",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_071_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_071.py",
+            "last_audit": "2026-02-25T00:51:37.885013"
         },
         {
             "id": "CAP-072",
             "title": "Evaluate cost of each executed action",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_072_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_072.py",
+            "last_audit": "2026-02-25T00:51:37.885060"
         },
         {
             "id": "CAP-073",
             "title": "Evaluate potential return of actions",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_073_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_073.py",
+            "last_audit": "2026-02-25T00:51:37.885103"
         },
         {
             "id": "CAP-074",
             "title": "Decide whether an action should be executed",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_074_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_074.py",
+            "last_audit": "2026-02-25T00:51:37.885146"
         },
         {
             "id": "CAP-075",
             "title": "Create value-generating activities",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_075_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_075.py",
+            "last_audit": "2026-02-25T00:51:37.885204"
         },
         {
             "id": "CAP-076",
             "title": "Measure real economic return",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_076_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_076.py",
+            "last_audit": "2026-02-25T00:51:37.885257"
         },
         {
             "id": "CAP-077",
             "title": "Eliminate economically unviable actions",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_077_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_077.py",
+            "last_audit": "2026-02-25T00:51:37.885302"
         },
         {
             "id": "CAP-078",
             "title": "Prioritize profitable actions",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_078_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_078.py",
+            "last_audit": "2026-02-25T00:51:37.885347"
         },
         {
             "id": "CAP-079",
             "title": "Automatically reinvest resources",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_079_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_079.py",
+            "last_audit": "2026-02-25T00:51:37.885389"
         },
         {
             "id": "CAP-080",
             "title": "Sustain own infrastructure",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_080_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_080.py",
+            "last_audit": "2026-02-25T00:51:37.885430"
         },
         {
             "id": "CAP-081",
             "title": "Reduce human dependency",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_081_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_081.py",
+            "last_audit": "2026-02-25T00:51:37.885470"
         },
         {
             "id": "CAP-082",
             "title": "Generate recurring revenue",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_082_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_082.py",
+            "last_audit": "2026-02-25T00:51:37.885510"
         },
         {
             "id": "CAP-083",
             "title": "Allocate portion of revenue to creator",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_083_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_083.py",
+            "last_audit": "2026-02-25T00:51:37.885552"
         },
         {
             "id": "CAP-084",
             "title": "Detect anomalous internal behavior",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_084_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_084.py",
+            "last_audit": "2026-02-25T00:51:37.885593"
         },
         {
             "id": "CAP-085",
             "title": "Detect dangerous decision loops",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_085_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_085.py",
+            "last_audit": "2026-02-25T00:51:37.885634"
         },
         {
             "id": "CAP-086",
             "title": "Enforce internal operational limits",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_086_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_086.py",
+            "last_audit": "2026-02-25T00:51:37.885675"
         },
         {
             "id": "CAP-087",
             "title": "Block potentially destructive actions",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_087_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_087.py",
+            "last_audit": "2026-02-25T00:51:37.885717"
         },
         {
             "id": "CAP-088",
             "title": "Escalate sensitive decisions to human",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_088_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_088.py",
+            "last_audit": "2026-02-25T00:51:37.885759"
         },
         {
             "id": "CAP-089",
             "title": "Log critical decisions for audit",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_089_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_089.py",
+            "last_audit": "2026-02-25T00:51:37.885799"
         },
         {
             "id": "CAP-090",
             "title": "Protect sensitive data",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_090_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_090.py",
+            "last_audit": "2026-02-25T00:51:37.885844"
         },
         {
             "id": "CAP-091",
             "title": "Protect the user",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_091_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_091.py",
+            "last_audit": "2026-02-25T00:51:37.885886"
         },
         {
             "id": "CAP-092",
             "title": "Protect itself",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_092_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_092.py",
+            "last_audit": "2026-02-25T00:51:37.885927"
         },
         {
             "id": "CAP-093",
             "title": "Maintain full traceability",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_093_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_093.py",
+            "last_audit": "2026-02-25T00:51:37.885968"
         },
         {
             "id": "CAP-094",
             "title": "Anticipate user needs",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_094_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_094.py",
+            "last_audit": "2026-02-25T00:51:37.886010"
         },
         {
             "id": "CAP-095",
             "title": "Propose solutions before explicit requests",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_095_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_095.py",
+            "last_audit": "2026-02-25T00:51:37.886051"
         },
         {
             "id": "CAP-096",
             "title": "Act proactively and safely",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_096_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_096.py",
+            "last_audit": "2026-02-25T00:51:37.886092"
         },
         {
             "id": "CAP-097",
             "title": "Coordinate physical and digital systems",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_097_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_097.py",
+            "last_audit": "2026-02-25T00:51:37.886134"
         },
         {
             "id": "CAP-098",
             "title": "Operate as cognitive copilot",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_098_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_098.py",
+            "last_audit": "2026-02-25T00:51:37.886175"
         },
         {
             "id": "CAP-099",
             "title": "Maintain continuous alignment with user",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_099_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_099.py",
+            "last_audit": "2026-02-25T00:51:37.886259"
         },
         {
             "id": "CAP-100",
             "title": "Evolve continuously without losing identity",
-            "status": "complete",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "models",
-            "genealogy": {
-                "target_file": "app/domain/models/cap_100_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/models",
+            "path": "app/domain/models/cap_100.py",
+            "last_audit": "2026-02-25T00:51:37.886306"
         },
         {
             "id": "CAP-101",
             "title": "Sustain itself economically long-term",
-            "status": "pending",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_101_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_101.py",
+            "last_audit": "2026-02-25T00:51:37.886356"
         },
         {
             "id": "CAP-102",
             "title": "Operate as personal cognitive infrastructure",
-            "status": "partial",
+            "status": "active",
             "mapped_libraries": [],
-            "sector": "capabilities",
-            "genealogy": {
-                "target_file": "app/domain/capabilities/cap_102_core.py"
-            },
-            "integration": {
-                "in_container": true,
-                "physically_present": true
-            }
+            "nexus_hint": "domain/capabilities",
+            "path": "app/domain/capabilities/cap_102.py",
+            "last_audit": "2026-02-25T00:51:37.886399"
         }
     ]
 }
