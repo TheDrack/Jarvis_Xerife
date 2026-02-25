@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from typing import Set
+from typing import Set, Dict, Any
 from app.core.interfaces import Interfaces as NexusComponent
 
 
@@ -22,6 +22,7 @@ class Consolidator(NexusComponent):
         self.ignore_files: Set[str] = {
             ".env",
             "credentials.json",
+            self.output_file,
         }
 
         self.allowed_extensions: Set[str] = {
@@ -37,6 +38,22 @@ class Consolidator(NexusComponent):
         self.output_file = config.get(
             "output_file", self.output_file
         )
+
+        # Garante que o próprio output não seja reimportado
+        self.ignore_files.add(self.output_file)
+
+    def can_execute(self) -> bool:
+        return True
+
+    def execute(self, context: Dict[str, Any]):
+        """
+        Entry-point oficial do Nexus / Pipeline
+        """
+        return self.consolidate()
+
+    # ==========================
+    # Lógica interna (reutilizável)
+    # ==========================
 
     def consolidate(self) -> str:
         print(f"🔬 Consolidando projeto → {self.output_file}")
