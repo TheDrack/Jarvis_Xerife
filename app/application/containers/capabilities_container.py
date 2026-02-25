@@ -180,3 +180,6 @@ class Container:
             "CAP-011": cap_011_exec,
             "CAP-010": cap_010_exec,
             "CAP-009": cap_009_exec,}
+
+# Nexus Compatibility
+CapabilitiesContainer = Container
