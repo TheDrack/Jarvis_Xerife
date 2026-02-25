@@ -31,7 +31,7 @@ class ProjectCrystallizer:
 
         for root, dirs, files in os.walk(self.base_path):
             root_path = Path(root)
-            
+
             # Pula pastas protegidas (Core do sistema)
             if any(folder in root_path.parts for folder in self.ignore_folders):
                 continue
@@ -44,7 +44,7 @@ class ProjectCrystallizer:
             for file in files:
                 if not file.endswith(".py") or file in self.ignore_files:
                     continue
-                
+
                 self._fix_file(root_path / file)
 
         logger.info("✅ [CRISTALIZADOR] Estabilização concluída sem conflitos de MRO.")
@@ -65,13 +65,13 @@ class ProjectCrystallizer:
         # CENÁRIO: Classe correta já existe ou precisa de alias
         if found_classes:
             target_class = expected_class if expected_class in found_classes else found_classes[0]
-            
+
             # Se não for a classe esperada, cria o Alias de compatibilidade
             if target_class != expected_class:
                 alias_line = f"{expected_class} = {target_class}"
                 if alias_line not in content:
                     content = content.rstrip() + f"\n\n# Nexus Compatibility\n{alias_line}\n"
-            
+
             self._ensure_contract(file_path, content, target_class)
             return
 
@@ -79,7 +79,7 @@ class ProjectCrystallizer:
         if content.strip():
             logger.info(f"  [📦] Envelopando script: {file_path.name}")
             indented = "\n".join(f"        {line}" if line.strip() else line for line in content.splitlines())
-            
+
             new_content = (
                 f"from app.core.nexuscomponent import NexusComponent\n\n"
                 f"class {expected_class}(NexusComponent):\n"
@@ -113,7 +113,7 @@ class ProjectCrystallizer:
                     new_inheritance = f"(NexusComponent, {inheritance})"
                 else:
                     new_inheritance = "(NexusComponent)"
-                
+
                 new_def = f"class {class_name}{new_inheritance}:"
                 content = content.replace(full_def, new_def)
                 updated = True
@@ -124,7 +124,7 @@ class ProjectCrystallizer:
             # Insere logo após os dois pontos da classe
             class_idx = content.find(f"class {class_name}")
             colon_idx = content.find(":", class_idx) + 1
-            
+
             insert = (
                 f"\n    def execute(self, context: dict):\n"
                 f"        raise NotImplementedError(\"Implementação automática via Cristalizador\")\n"
