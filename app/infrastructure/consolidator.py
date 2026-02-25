@@ -2,21 +2,13 @@
 
 import os
 from typing import Set
+from app.core.nexus_component import NexusComponent
 
 
-class Consolidator:
-    """
-    Consolida o projeto em um único arquivo de texto,
-    preservando o caminho completo de cada arquivo.
-    """
+class Consolidator(NexusComponent):
+    def __init__(self):
+        self.output_file = "CORE_LOGIC_CONSOLIDATED.txt"
 
-    def __init__(
-        self,
-        output_file: str = "CORE_LOGIC_CONSOLIDATED.txt",
-    ):
-        self.output_file = output_file
-
-        # Filtros de segurança e foco
         self.ignore_dirs: Set[str] = {
             ".git",
             "venv",
@@ -28,7 +20,6 @@ class Consolidator:
         }
 
         self.ignore_files: Set[str] = {
-            self.output_file,
             ".env",
             "credentials.json",
         }
@@ -42,60 +33,41 @@ class Consolidator:
             ".sql",
         }
 
-    def consolidate(self) -> str:
-        """
-        Varre o repositório e gera um arquivo único
-        contendo todos os arquivos permitidos.
-        """
+    def configure(self, config: dict):
+        self.output_file = config.get(
+            "output_file", self.output_file
+        )
 
-        print(f"🔬 JARVIS: Iniciando consolidação em '{self.output_file}'...")
+    def consolidate(self) -> str:
+        print(f"🔬 Consolidando projeto → {self.output_file}")
 
         with open(self.output_file, "w", encoding="utf-8") as out:
-            # Cabeçalho de integridade
             out.write("### CONSOLIDAÇÃO DE SISTEMA - JARVIS ENTITY ###\n")
             out.write(f"### RAIZ: {os.getcwd()} ###\n\n")
 
             for root, dirs, files in os.walk("."):
-                # Remove diretórios ignorados (in-place)
                 dirs[:] = [d for d in dirs if d not in self.ignore_dirs]
 
-                for filename in files:
-                    file_path = os.path.join(root, filename)
-                    rel_path = os.path.relpath(file_path, ".")
+                for file in files:
+                    if not file.endswith(tuple(self.allowed_extensions)):
+                        continue
+                    if file in self.ignore_files:
+                        continue
 
-                    # Valida extensão e arquivos ignorados
-                    if (
-                        filename.endswith(tuple(self.allowed_extensions))
-                        and filename not in self.ignore_files
-                    ):
-                        out.write("\n" + "=" * 80 + "\n")
-                        out.write(f" FILE: {rel_path}\n")
-                        out.write("=" * 80 + "\n\n")
+                    path = os.path.join(root, file)
+                    rel = os.path.relpath(path, ".")
 
-                        try:
-                            with open(file_path, "r", encoding="utf-8") as content:
-                                out.write(content.read())
-                        except Exception as exc:
-                            out.write(
-                                f"[!] ERRO AO LER {rel_path}: {str(exc)}\n"
-                            )
+                    out.write("\n" + "=" * 80 + "\n")
+                    out.write(f" FILE: {rel}\n")
+                    out.write("=" * 80 + "\n\n")
 
-                        out.write(
-                            f"\n\n--- FIM DO ARQUIVO: {rel_path} ---\n"
-                        )
+                    try:
+                        with open(path, "r", encoding="utf-8") as f:
+                            out.write(f.read())
+                    except Exception as e:
+                        out.write(f"[ERRO] {e}\n")
 
-        print("✅ Consolidação finalizada com sucesso.")
+                    out.write(f"\n--- FIM DO ARQUIVO: {rel} ---\n")
+
+        print("✅ Consolidação concluída")
         return self.output_file
-
-
-# ==========================
-# Ponto de entrada (CI / CLI)
-# ==========================
-
-def main():
-    consolidator = Consolidator()
-    consolidator.consolidate()
-
-
-if __name__ == "__main__":
-    main()
