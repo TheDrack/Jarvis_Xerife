@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Action Provider Port - Interface for system automation"""
 
@@ -5,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 
-class ActionProvider(ABC):
+class ActionProvider(NexusComponent, ABC):
     """
     Port (interface) for system automation actions.
     Adapters must implement this interface.

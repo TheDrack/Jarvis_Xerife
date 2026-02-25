@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Extension Manager Service - Manages extensions and packages using uv"""
 
@@ -10,7 +11,10 @@ from typing import Dict, List, Optional, Set
 logger = logging.getLogger(__name__)
 
 
-class ExtensionManager:
+class ExtensionManager(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Service for managing extensions and installing packages on-demand using uv.
     Provides intelligent package management with pre-warming and background installation support.

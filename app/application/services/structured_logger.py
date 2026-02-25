@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 import json
 import logging
 
-class StructuredLogger:
+class StructuredLogger(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Wrapper for structured logging with context"""
     def __init__(self, logger_instance, **context):
         self.logger = logger_instance

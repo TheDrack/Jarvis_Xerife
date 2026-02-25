@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Device Management Service - Handles device registration and capability routing"""
 
@@ -14,7 +15,10 @@ from app.domain.models.device import Capability, Device
 logger = logging.getLogger(__name__)
 
 
-class DeviceService:
+class DeviceService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Service for managing devices and their capabilities in the distributed system.
     Handles device registration, status updates, and capability-based routing.

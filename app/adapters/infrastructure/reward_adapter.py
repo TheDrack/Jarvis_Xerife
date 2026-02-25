@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Reward Adapter - Database implementation of RewardProvider port"""
 
@@ -14,7 +15,10 @@ from app.domain.models.evolution_reward import EvolutionReward
 logger = logging.getLogger(__name__)
 
 
-class RewardAdapter(RewardProvider):
+class RewardAdapter(NexusComponent, RewardProvider):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Database implementation of the RewardProvider port.
     

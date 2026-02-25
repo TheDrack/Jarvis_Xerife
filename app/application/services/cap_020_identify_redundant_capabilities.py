@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 
 import json
 from typing import List, Dict
 
-class Capability:
+class Capability(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self, id: str, name: str, description: str):
         self.id = id
         self.name = name

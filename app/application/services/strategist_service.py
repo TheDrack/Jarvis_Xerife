@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """
 Xerife Strategist Service - Autonomous improvement proposal system with ROI analysis
@@ -34,7 +35,10 @@ class BudgetExceededException(Exception):
         super().__init__(message)
 
 
-class StrategistService:
+class StrategistService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Service for autonomous improvement proposals and RFC management.
     

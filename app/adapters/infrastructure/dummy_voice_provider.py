@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Dummy Voice Provider - Headless voice provider for testing and cloud environments"""
 
@@ -9,7 +10,10 @@ from app.application.ports import VoiceProvider
 logger = logging.getLogger(__name__)
 
 
-class DummyVoiceProvider(VoiceProvider):
+class DummyVoiceProvider(NexusComponent, VoiceProvider):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Dummy voice provider for environments without audio hardware.
     Used in tests, CI/CD, and cloud deployments (like Render).

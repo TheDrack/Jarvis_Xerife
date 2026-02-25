@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Voice Provider Port - Interface for voice input/output"""
 
@@ -5,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 
-class VoiceProvider(ABC):
+class VoiceProvider(NexusComponent, ABC):
     """
     Port (interface) for voice recognition and synthesis.
     Adapters must implement this interface.

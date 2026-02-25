@@ -1,8 +1,9 @@
+from app.core.nexuscomponent import NexusComponent
 
 from concurrent.futures import ThreadPoolExecutor
 from app.domain.capabilities import Capability
 
-class CAP052(Capability):
+class CAP052(NexusComponent, Capability):
     def __init__(self):
         super().__init__('CAP-052', 'Execute actions in parallel')
 

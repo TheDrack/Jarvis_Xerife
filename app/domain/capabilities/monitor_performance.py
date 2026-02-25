@@ -1,10 +1,14 @@
+from app.core.nexuscomponent import NexusComponent
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
 
-class MonitorPerformanceDegradation:
+class MonitorPerformanceDegradation(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self, data):
         self.data = data
 

@@ -1,4 +1,8 @@
-class WorkerPc:
+from app.core.nexuscomponent import NexusComponent
+class WorkerPc(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self, *args, **kwargs):
         pass
 

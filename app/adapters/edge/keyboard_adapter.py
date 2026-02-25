@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Keyboard Adapter - pynput implementation for keyboard control"""
 
@@ -9,7 +10,10 @@ from app.application.ports import ActionProvider
 logger = logging.getLogger(__name__)
 
 
-class KeyboardAdapter(ActionProvider):
+class KeyboardAdapter(NexusComponent, ActionProvider):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Edge adapter for keyboard control using pynput.
     Depends on system keyboard drivers.

@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """System Controller Port - Generic interface for system control"""
 
@@ -5,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 
-class SystemController(ABC):
+class SystemController(NexusComponent, ABC):
     """
     Port (interface) for generic system control operations.
     Adapters must implement this interface.

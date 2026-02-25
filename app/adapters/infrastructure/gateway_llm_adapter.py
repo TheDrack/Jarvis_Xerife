@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Enhanced LLM Command Adapter with AI Gateway integration
 
@@ -25,7 +26,10 @@ from app.domain.services.llm_command_interpreter import LLMCommandInterpreter
 logger = logging.getLogger(__name__)
 
 
-class GatewayLLMCommandAdapter:
+class GatewayLLMCommandAdapter(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Enhanced LLM Command Adapter that uses AI Gateway for intelligent provider routing.
     

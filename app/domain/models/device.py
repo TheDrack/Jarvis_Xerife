@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Device and Capability models for distributed orchestration"""
 
@@ -8,7 +9,10 @@ import json
 from sqlmodel import Field, SQLModel, Column, JSON
 
 
-class Device(SQLModel, table=True):
+class Device(NexusComponent, SQLModel, table=True):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     SQLModel table for storing registered devices in the distributed system.
     Devices can be mobile phones, desktops, IoT devices, or cloud instances.

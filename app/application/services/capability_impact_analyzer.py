@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 
 import networkx as nx
 from typing import Dict, List
 
-class CapabilityImpactAnalyzer:
+class CapabilityImpactAnalyzer(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self, capabilities: Dict[str, List[str]]):
         self.capabilities = capabilities
         self.graph = nx.DiGraph()

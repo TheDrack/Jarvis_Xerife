@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Dependency Manager Service - On-demand package installation"""
 
@@ -10,7 +11,10 @@ from typing import Dict, Optional
 logger = logging.getLogger(__name__)
 
 
-class DependencyManager:
+class DependencyManager(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Service for managing and installing dependencies on-demand.
     Checks if required libraries are available and installs them if needed.

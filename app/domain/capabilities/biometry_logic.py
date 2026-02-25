@@ -1,6 +1,10 @@
+from app.core.nexuscomponent import NexusComponent
 import torch
 
-class BiometryCapability:
+class BiometryCapability(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Validação, Identificação e Gestão de Memória Vocal."""
     def __init__(self, storage_path="memoria_vozes.pt"):
         self.storage_path = storage_path

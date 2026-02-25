@@ -1,4 +1,8 @@
-class VocalOrchestrator:
+from app.core.nexuscomponent import NexusComponent
+class VocalOrchestrator(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """O Loop de Orquestração que conecta o Áudio ao Core do JARVIS."""
     def __init__(self, adapter, capability):
         self.adapter = adapter

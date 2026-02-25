@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Viability Matrix and ROI models for Xerife Strategist module"""
 
@@ -7,7 +8,10 @@ from enum import Enum
 from typing import Any, Dict, Optional
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(NexusComponent, str, Enum):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Risk levels for technical changes"""
     LOW = "low"
     MEDIUM = "medium"

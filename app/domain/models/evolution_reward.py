@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Evolution Reward Model for Reinforcement Learning Module"""
 
@@ -8,7 +9,10 @@ from sqlmodel import Field, SQLModel, Column
 from sqlalchemy import JSON
 
 
-class EvolutionReward(SQLModel, table=True):
+class EvolutionReward(NexusComponent, SQLModel, table=True):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     SQLModel table for storing JARVIS evolution rewards.
     

@@ -1,4 +1,8 @@
-class BootstrapEdge:
+from app.core.nexuscomponent import NexusComponent
+class BootstrapEdge(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self, *args, **kwargs):
         pass
 

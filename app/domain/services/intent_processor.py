@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Intent Processor - Pure business logic for processing intents"""
 
@@ -7,7 +8,10 @@ from typing import Optional
 from app.domain.models import Command, CommandType, Intent, Response
 
 
-class IntentProcessor:
+class IntentProcessor(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Processes intents and creates commands.
     Pure Python, no dependencies on hardware or frameworks.

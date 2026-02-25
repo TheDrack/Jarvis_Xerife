@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """AI Gateway - Intelligent routing between multiple LLM providers
 
@@ -71,7 +72,10 @@ def count_tokens(text: str) -> int:
     return len(text) // 4
 
 
-class LLMProvider(str, Enum):
+class LLMProvider(NexusComponent, str, Enum):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Available LLM providers"""
     GROQ = "groq"
     GEMINI = "gemini"

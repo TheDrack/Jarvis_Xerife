@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Domain models - Core business entities"""
 
@@ -7,6 +8,9 @@ from typing import Any, Optional
 
 
 class CommandType(Enum):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Types of commands the assistant can handle"""
 
     TYPE_TEXT = "type_text"
@@ -35,7 +39,7 @@ class Intent:
 
 
 @dataclass
-class Command:
+class Command(NexusComponent):
     """Represents a command to be executed"""
 
     intent: Intent

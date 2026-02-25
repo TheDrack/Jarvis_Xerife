@@ -1,10 +1,11 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Web Provider Port - Interface for web navigation"""
 
 from abc import ABC, abstractmethod
 
 
-class WebProvider(ABC):
+class WebProvider(NexusComponent, ABC):
     """
     Port (interface) for web navigation and browser automation.
     Adapters must implement this interface.

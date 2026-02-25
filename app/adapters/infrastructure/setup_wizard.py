@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Setup Wizard for Jarvis Universal Installer
 
@@ -30,7 +31,10 @@ CLIPBOARD_CHECK_INTERVAL = 0.5  # Seconds between clipboard checks
 CLIPBOARD_TIMEOUT = 180  # Maximum time to wait for clipboard (3 minutes)
 
 # ANSI color codes for terminal UI
-class Colors:
+class Colors(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     OKCYAN = '\033[96m'

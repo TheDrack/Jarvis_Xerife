@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Automation Adapter - PyAutoGUI implementation for screen automation"""
 
@@ -10,7 +11,10 @@ from app.application.ports import ActionProvider
 logger = logging.getLogger(__name__)
 
 
-class AutomationAdapter(ActionProvider):
+class AutomationAdapter(NexusComponent, ActionProvider):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Edge adapter for system automation using PyAutoGUI.
     Depends on display server (X11, Wayland, etc.).

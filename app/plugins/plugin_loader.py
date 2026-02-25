@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """
 Dynamic Plugin Loader
@@ -17,7 +18,10 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 
-class PluginLoader:
+class PluginLoader(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Dynamically loads and manages JARVIS plugins.
     

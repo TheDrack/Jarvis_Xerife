@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Web Adapter - Browser automation implementation"""
 
@@ -9,7 +10,10 @@ from app.application.ports import ActionProvider, WebProvider
 logger = logging.getLogger(__name__)
 
 
-class WebAdapter(WebProvider):
+class WebAdapter(NexusComponent, WebProvider):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Adapter for web navigation using standard webbrowser module.
     Requires ActionProvider for page interaction.

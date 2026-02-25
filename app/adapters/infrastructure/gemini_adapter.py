@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Gemini LLM Adapter - Google Generative AI integration for command interpretation
 
@@ -22,7 +23,10 @@ from app.domain.services.agent_service import AgentService
 logger = logging.getLogger(__name__)
 
 
-class LLMCommandAdapter:
+class LLMCommandAdapter(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Adapter that uses Google Gemini API to interpret commands using Function Calling.
     Converts AI responses into Intent objects that IntentProcessor understands.

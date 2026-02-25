@@ -1,10 +1,14 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 import os
 import json
 import requests
 import re
 
-class MetabolismCore:
+class MetabolismCore(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self):
         self.url = "https://api.groq.com/openai/v1/chat/completions"
         self.api_key = os.getenv('GROQ_API_KEY')

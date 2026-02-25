@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """LLM-based Command Interpreter - Uses AI to identify commands with higher accuracy
 
@@ -15,7 +16,10 @@ from app.core.llm_config import LLMConfig
 logger = logging.getLogger(__name__)
 
 
-class LLMCommandInterpreter:
+class LLMCommandInterpreter(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Interprets raw text commands into structured Intents using LLM.
     Uses AI Gateway (Groq/Gemini) to understand user intent with higher accuracy

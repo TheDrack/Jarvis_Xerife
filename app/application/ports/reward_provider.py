@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Reward Provider Port - Interface for reward tracking in Reinforcement Learning"""
 
@@ -6,7 +7,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 
 
-class RewardProvider(ABC):
+class RewardProvider(NexusComponent, ABC):
     """
     Port (interface) for the Reinforcement Learning reward system.
     

@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Security Provider Interface - Port for authentication and authorization"""
 
@@ -5,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 
-class SecurityProvider(ABC):
+class SecurityProvider(NexusComponent, ABC):
     """Interface for security and authentication operations"""
 
     @abstractmethod

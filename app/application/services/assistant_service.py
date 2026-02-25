@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Assistant Service - Main use case orchestrator"""
 
@@ -17,7 +18,10 @@ from app.domain.services import CommandInterpreter, IntentProcessor
 logger = logging.getLogger(__name__)
 
 
-class AssistantService:
+class AssistantService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Main application service that orchestrates the assistant's behavior.
     Uses dependency injection for all external dependencies (ports).

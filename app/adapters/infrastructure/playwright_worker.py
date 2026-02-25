@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 
 import os
 import sys
@@ -5,7 +6,7 @@ import time
 from playwright.sync_api import sync_playwright
 from app.adapters.infrastructure.base_worker import BaseWorker
 
-class PlaywrightWorker(BaseWorker):
+class PlaywrightWorker(NexusComponent, BaseWorker):
     def __init__(self):
         super().__init__()
         self.playwright = None

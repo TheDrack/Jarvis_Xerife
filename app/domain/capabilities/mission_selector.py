@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 
 import sys
 
@@ -7,7 +8,10 @@ from typing import List, Dict
 
 
 
-class MissionSelector:
+class MissionSelector(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
 
     def __init__(self, objectives: List[Dict]):
 

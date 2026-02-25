@@ -1,8 +1,9 @@
+from app.core.nexuscomponent import NexusComponent
 from app.application.containers.hub import hub
 import torchaudio
 import logging
 
-class VocalOrchestrationService:
+class VocalOrchestrationService(NexusComponent):
     """
     Orquestrador que conecta a captura de áudio (Adapters) à 
     inteligência de reconhecimento (Capabilities).

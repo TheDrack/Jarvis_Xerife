@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """PersistentBrowserManager - Manages persistent Playwright browser instances"""
 
@@ -13,7 +14,10 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-class PersistentBrowserManager:
+class PersistentBrowserManager(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Manages a persistent Playwright browser instance for automation tasks.
     

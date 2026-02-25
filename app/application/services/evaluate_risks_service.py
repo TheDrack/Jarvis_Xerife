@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 
 import json
 from typing import Dict
 
-class EvaluateRisksService:
+class EvaluateRisksService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self):
         self.risks = {}
 

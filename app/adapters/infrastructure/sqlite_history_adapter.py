@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Database History Adapter - SQLModel implementation for command history persistence
 
@@ -20,7 +21,10 @@ from app.domain.models.capability import JarvisCapability
 logger = logging.getLogger(__name__)
 
 
-class Interaction(SQLModel, table=True):
+class Interaction(NexusComponent, SQLModel, table=True):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     SQLModel table for storing command interactions
     """

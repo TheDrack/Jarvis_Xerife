@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 import json
 from pathlib import Path
 from typing import List, Dict, Optional
 
-class AutoEvolutionServiceV2:
+class AutoEvolutionServiceV2(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Versão Evoluída: Migração de Roadmap Markdown para Inventário de Capacidades JSON.
     Localização: data/capabilities.json

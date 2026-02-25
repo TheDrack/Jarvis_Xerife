@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 
 import pandas as pd
 from typing import List
 
-class PrioritizerService:
+class PrioritizerService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self):
         pass
 

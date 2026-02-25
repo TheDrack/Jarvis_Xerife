@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 
 import logging
 from typing import Dict
 
-class TechnicalAnalysisService:
+class TechnicalAnalysisService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 

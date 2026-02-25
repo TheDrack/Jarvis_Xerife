@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """GitHub Adapter - Integration with GitHub API for self-healing automation
 
@@ -16,7 +17,10 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
-class GitHubAdapter:
+class GitHubAdapter(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Async adapter for GitHub API integration.
     

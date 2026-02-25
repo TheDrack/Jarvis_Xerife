@@ -1,4 +1,8 @@
-class IdentifyMissionCriticalCapabilities:
+from app.core.nexuscomponent import NexusComponent
+class IdentifyMissionCriticalCapabilities(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self, *args, **kwargs):
         pass
 

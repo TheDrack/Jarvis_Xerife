@@ -1,6 +1,10 @@
+from app.core.nexuscomponent import NexusComponent
 from app.domain.models.device import Device
 
-class LocationService:
+class LocationService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self, device_repository):
         self.repo = device_repository
 

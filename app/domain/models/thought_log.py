@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """ThoughtLog model for storing internal reasoning and self-healing cycles"""
 
@@ -15,7 +16,10 @@ class InteractionStatus(str, Enum):
     INTERNAL_MONOLOGUE = "internal_monologue"  # Internal reasoning, not shown to user
 
 
-class ThoughtLog(SQLModel, table=True):
+class ThoughtLog(NexusComponent, SQLModel, table=True):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     SQLModel table for storing Jarvis's internal reasoning process.
     Used for debugging, self-healing, and tracking problem-solving attempts.

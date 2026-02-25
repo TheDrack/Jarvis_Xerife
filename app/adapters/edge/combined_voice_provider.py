@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Combined Voice Provider - Combines TTS and Voice recognition"""
 
@@ -11,7 +12,10 @@ from app.application.ports import VoiceProvider
 logger = logging.getLogger(__name__)
 
 
-class CombinedVoiceProvider(VoiceProvider):
+class CombinedVoiceProvider(NexusComponent, VoiceProvider):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Combines TTS and Voice recognition adapters into a single provider.
     This is a convenience adapter for edge deployments.

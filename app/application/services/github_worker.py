@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """GitHubWorker - GitHub CLI integration for auto-evolution and CI/CD"""
 
@@ -11,7 +12,10 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
-class GitHubWorker:
+class GitHubWorker(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     GitHub CLI worker for development arms (auto-evolution).
     

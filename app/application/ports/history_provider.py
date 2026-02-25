@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """History Provider Port - Interface for command history persistence"""
 
@@ -6,7 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 
-class HistoryProvider(ABC):
+class HistoryProvider(NexusComponent, ABC):
     """
     Port (interface) for command history persistence.
     Adapters must implement this interface.

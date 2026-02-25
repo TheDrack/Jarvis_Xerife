@@ -1,10 +1,14 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Command Interpreter - Pure business logic for interpreting user commands"""
 
 from app.domain.models import CommandType, Intent
 
 
-class CommandInterpreter:
+class CommandInterpreter(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Interprets raw text commands into structured Intents.
     Pure Python, no dependencies on hardware or frameworks.

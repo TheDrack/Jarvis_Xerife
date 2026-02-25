@@ -1,7 +1,11 @@
+from app.core.nexuscomponent import NexusComponent
 from app.domain.models.device import Device
 import logging
 
-class SoldierShield:
+class SoldierShield(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Responsável pela defesa e integridade dos soldados recrutados."""
     
     def __init__(self):

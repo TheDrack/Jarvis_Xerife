@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """TTS Adapter - Text-to-speech implementation using pyttsx3"""
 
@@ -9,7 +10,10 @@ from app.application.ports import VoiceProvider
 logger = logging.getLogger(__name__)
 
 
-class TTSAdapter(VoiceProvider):
+class TTSAdapter(NexusComponent, VoiceProvider):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Edge adapter for text-to-speech using pyttsx3 library.
     Depends on system audio drivers.

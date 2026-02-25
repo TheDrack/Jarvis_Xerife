@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """
 Local Bridge - WebSocket Service for Local PC Connection
@@ -16,7 +17,10 @@ from fastapi import WebSocket, WebSocketDisconnect
 logger = logging.getLogger(__name__)
 
 
-class LocalBridgeManager:
+class LocalBridgeManager(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Manages WebSocket connections from local PCs and mobile devices.
     

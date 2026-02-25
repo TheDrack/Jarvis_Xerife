@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """JARVIS Capability Model for Self-Awareness Module"""
 
@@ -7,7 +8,10 @@ from typing import Optional
 from sqlmodel import Field, SQLModel
 
 
-class JarvisCapability(SQLModel, table=True):
+class JarvisCapability(NexusComponent, SQLModel, table=True):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     SQLModel table for storing JARVIS self-awareness capabilities.
     

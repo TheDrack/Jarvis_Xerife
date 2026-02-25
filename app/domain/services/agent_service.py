@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Agent Service - LLM-based agent logic using Function Calling"""
 
@@ -6,7 +7,10 @@ from typing import Any, Dict, List
 from app.domain.models import CommandType
 
 
-class AgentService:
+class AgentService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Service that defines the agent's capabilities using Function Calling.
     Maps ActionProvider methods to function definitions for LLM.

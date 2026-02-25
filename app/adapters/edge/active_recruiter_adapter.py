@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 import scapy.all as scapy
 from app.domain.models.device import Device
 from app.application.services.location_service import LocationService
 
-class ActiveRecruiterAdapter:
+class ActiveRecruiterAdapter(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """O braço ofensivo do JARVIS para expansão de rede."""
     
     def __init__(self, location_service: LocationService):

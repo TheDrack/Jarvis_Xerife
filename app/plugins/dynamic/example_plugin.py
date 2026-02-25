@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """
 Example Plugin: Hello JARVIS
@@ -26,7 +27,7 @@ def register():
 
 
 # You can define classes, functions, and any Python code here
-class PluginCapability:
+class PluginCapability(NexusComponent):
     """Example capability class"""
     
     def __init__(self):

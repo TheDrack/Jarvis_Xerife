@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """System commands and automation actions for Jarvis Assistant"""
 
@@ -11,7 +12,10 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-class SystemCommands:
+class SystemCommands(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Handler for system automation and interface control"""
 
     def __init__(self) -> None:

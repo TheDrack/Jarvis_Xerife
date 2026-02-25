@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """
 LLM-based Capability Detector - Uses AI to detect implemented capabilities
@@ -18,7 +19,10 @@ from app.core.llm_config import LLMConfig
 logger = logging.getLogger(__name__)
 
 
-class LLMCapabilityDetector:
+class LLMCapabilityDetector(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Detects implemented capabilities using LLM to analyze code semantics.
     

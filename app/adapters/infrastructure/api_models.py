@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Pydantic models for API request/response validation"""
 
@@ -7,7 +8,10 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
-class RequestSource(str, Enum):
+class RequestSource(NexusComponent, str, Enum):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Enumeration of request sources"""
     
     GITHUB_ACTIONS = "github_actions"  # Request from GitHub Actions workflow

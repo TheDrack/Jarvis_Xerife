@@ -1,4 +1,5 @@
-class Cap059Core:
+from app.core.nexuscomponent import NexusComponent
+class Cap059Core(NexusComponent):
     def __init__(self, *args, **kwargs):
         pass
 

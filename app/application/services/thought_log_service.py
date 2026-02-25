@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """ThoughtLogService - Manages internal reasoning logs and self-healing cycles"""
 
@@ -13,7 +14,10 @@ from app.domain.models.thought_log import InteractionStatus, ThoughtLog
 logger = logging.getLogger(__name__)
 
 
-class ThoughtLogService:
+class ThoughtLogService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Service for managing thought logs and implementing self-healing logic.
     

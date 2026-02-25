@@ -1,7 +1,11 @@
+from app.core.nexuscomponent import NexusComponent
 
 import logging
 
-class HumanInterventionService:
+class HumanInterventionService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 

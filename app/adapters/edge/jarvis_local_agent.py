@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
@@ -70,7 +71,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class JarvisLocalAgent:
+class JarvisLocalAgent(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     JARVIS Local Agent - Connects local PC to JARVIS cloud instance.
     

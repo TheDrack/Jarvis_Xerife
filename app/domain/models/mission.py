@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Mission models - Task execution payloads for distributed workers"""
 
@@ -5,7 +6,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 @dataclass
-class Mission:
+class Mission(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Represents a serverless task execution mission sent to a Worker
     """

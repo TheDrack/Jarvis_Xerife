@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Authentication Adapter - Implementation of SecurityProvider using JWT and bcrypt"""
 
@@ -35,7 +36,10 @@ FAKE_USERS_DB = {
 }
 
 
-class AuthAdapter(SecurityProvider):
+class AuthAdapter(NexusComponent, SecurityProvider):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Authentication adapter implementing JWT and password hashing"""
 
     def __init__(self):

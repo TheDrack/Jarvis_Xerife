@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 import logging, subprocess, sys, tempfile, time, shutil, os
 from pathlib import Path
 from app.domain.models.mission import Mission, MissionResult
@@ -5,7 +6,10 @@ from app.application.services.structured_logger import StructuredLogger
 
 logger = logging.getLogger(__name__)
 
-class TaskRunner:
+class TaskRunner(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     def __init__(self, cache_dir=None, use_venv=True, device_id="unknown", sandbox_mode=False, budget_cap_usd=None):
         self.use_venv, self.device_id, self.sandbox_mode = use_venv, device_id, sandbox_mode
         self.cache_dir = Path(cache_dir) if cache_dir else Path("cache/")

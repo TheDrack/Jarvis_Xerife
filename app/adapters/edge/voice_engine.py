@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Jarvis Voice Engine - Main voice recognition and synthesis engine"""
 
@@ -19,7 +20,10 @@ except ImportError:
 from app.core.config import settings
 
 
-class JarvisEngine:
+class JarvisEngine(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Main voice recognition and synthesis engine for Jarvis Assistant"""
 
     def __init__(self) -> None:

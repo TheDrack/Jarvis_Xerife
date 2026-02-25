@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """
 GitHub Copilot Integration for Repository Context
@@ -14,7 +15,10 @@ from typing import Dict, List, Optional, Any
 logger = logging.getLogger(__name__)
 
 
-class GitHubCopilotContextProvider:
+class GitHubCopilotContextProvider(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Provides repository context to GitHub Agents using LLM-based analysis.
     

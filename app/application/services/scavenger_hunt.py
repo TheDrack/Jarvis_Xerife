@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """
 API Key Scavenger Hunt Service
@@ -25,7 +26,10 @@ class APIKeyGuide:
     estimated_time: str  # e.g., "5 minutes"
 
 
-class ScavengerHunt:
+class ScavengerHunt(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Finds instructions for obtaining missing API keys.
     

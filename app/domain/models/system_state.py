@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 # --- CÓDIGO COMPLETO REESTRUTURADO ---
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 
-class SystemStatus(BaseModel):
+class SystemStatus(NexusComponent, BaseModel):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Setor: Domain/Models
     Responsabilidade: Definição estrutural do estado do Jarvis.

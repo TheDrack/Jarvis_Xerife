@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """
 Capability Manager - JARVIS Self-Awareness Module
@@ -29,7 +30,10 @@ from app.domain.models.capability import JarvisCapability
 logger = logging.getLogger(__name__)
 
 
-class CapabilityManager:
+class CapabilityManager(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Manages JARVIS self-awareness capabilities and evolution logic.
     

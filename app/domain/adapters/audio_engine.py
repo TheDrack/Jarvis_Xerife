@@ -1,8 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 import torchaudio
 from speechbrain.inference.speaker import SpeakerRecognition
 from pyannote.audio import Pipeline
 
-class AudioAdapter:
+class AudioAdapter(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """Ferramentas de IO e Processamento de Áudio. Sem lógica de negócio."""
     def __init__(self, hf_token):
         self.biometry_model = SpeakerRecognition.from_hparams(

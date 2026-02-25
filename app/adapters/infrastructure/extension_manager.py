@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 import logging
 from abc import ABC, abstractmethod
 from typing import List, Any, Dict
@@ -12,7 +13,7 @@ class Extension(ABC):
         """Cada extensão recebe um contexto e pode modificá-lo."""
         pass
 
-class ExtensionManager:
+class ExtensionManager(NexusComponent):
     def __init__(self):
         self.extensions: List[Extension] = []
 

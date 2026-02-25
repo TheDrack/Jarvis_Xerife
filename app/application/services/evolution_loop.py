@@ -1,3 +1,4 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Evolution Loop Service - Reinforcement Learning routine for JARVIS evolution"""
 
@@ -10,7 +11,10 @@ from app.application.ports.reward_provider import RewardProvider
 logger = logging.getLogger(__name__)
 
 
-class EvolutionLoopService:
+class EvolutionLoopService(NexusComponent):
+    def execute(self, context: dict):
+        raise NotImplementedError("Implementação automática via Cristalizador")
+
     """
     Service for managing JARVIS evolution through Reinforcement Learning.
     
