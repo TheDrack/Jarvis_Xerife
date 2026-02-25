@@ -3,8 +3,9 @@ import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from app.core.nexuscomponent import NexusComponent
 
-class DriveUploader:
+class DriveUploader(NexusComponent):
     def __init__(self):
         self.scopes = ['https://www.googleapis.com/auth/drive']
         raw_json = os.environ.get('G_JSON') or os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
