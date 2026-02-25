@@ -1,11 +1,14 @@
 name: "☁️ Sync JARVIS to Google Drive"
+
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+
     steps:
       - name: 🛰️ Checkout Code
         uses: actions/checkout@v4
@@ -13,23 +16,38 @@ jobs:
       - name: 📦 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: "3.13"
 
       - name: 🔧 Install Dependencies
         run: |
+          set -e
           python -m pip install --upgrade pip
-          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+          pip install \
+            google-api-python-client \
+            google-auth-httplib2 \
+            google-auth-oauthlib \
+            pyyaml
 
-      - name: ☁️ Consolidate and Upload
+      - name: ☁️ Run JARVIS Pipeline (Consolidate + Upload)
         env:
           G_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-          PYTHONPATH: ${{ github.workspace }}
         run: |
-          # 🎯 Ajustado para o caminho: app/infrastructure/consolidator.py
-          if [ -f "app/infrastructure/consolidator.py" ]; then
-            python app/infrastructure/consolidator.py
+          set -e
+
+          echo "📁 Workspace: $(pwd)"
+          echo "🐍 Python: $(python --version)"
+
+          # Garante que o pacote 'app' é resolvível
+          export PYTHONPATH="$(pwd)"
+
+          PIPELINE_RUNNER="app/runtime/pipeline_runner.py"
+
+          if [ -f "$PIPELINE_RUNNER" ]; then
+            echo "🚀 Executando pipeline JARVIS..."
+            python "$PIPELINE_RUNNER"
+            echo "✅ Pipeline executado com sucesso."
           else
-            echo "❌ Erro: consolidator.py não encontrado em app/infrastructure/"
+            echo "❌ Erro: pipeline_runner.py não encontrado em app/runtime/"
             exit 1
           fi
