@@ -2,7 +2,7 @@
 
 import os
 from typing import Set, Dict, Any
-from app.core.interfaces import Interfaces as NexusComponent
+from app.core.nexuscomponent import NexusComponent
 
 
 class Consolidator(NexusComponent):
