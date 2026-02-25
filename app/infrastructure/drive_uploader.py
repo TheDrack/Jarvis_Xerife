@@ -1,4 +1,5 @@
 import os
+import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -6,11 +7,25 @@ from googleapiclient.http import MediaFileUpload
 class DriveUploader:
     def __init__(self):
         self.scopes = ['https://www.googleapis.com/auth/drive']
-        # Puxa o JSON das secrets do GitHub Actions
-        self.service_account_info = eval(os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON'))
+        
+        # O GitHub Action está enviando como 'G_JSON' conforme seu log
+        raw_json = os.environ.get('G_JSON') or os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+        
+        if not raw_json:
+            raise ValueError("❌ ERRO: Variável de ambiente G_JSON não encontrada!")
+
+        try:
+            # Tenta carregar como JSON puro primeiro, se falhar usa eval
+            self.service_account_info = json.loads(raw_json)
+        except:
+            self.service_account_info = eval(raw_json)
+            
         self.folder_id = os.environ.get('DRIVE_FOLDER_ID')
 
-    def execute(self, file_path):
+    def execute(self, context):
+        # O contexto recebe o path do arquivo gerado pelo consolidator
+        file_path = context if isinstance(context, str) else context.get('result')
+        
         creds = service_account.Credentials.from_service_account_info(
             self.service_account_info, scopes=self.scopes
         )
@@ -24,24 +39,21 @@ class DriveUploader:
         media = MediaFileUpload(file_path, resumable=True)
 
         try:
-            # O segredo está em supportsAllDrives=True se for pasta compartilhada
-            # E garantir que o upload seja feito para a pasta onde você é dono
+            print(f"[INFO] ☁️ Subindo {file_path} para o Drive...")
             request = service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields='id',
-                supportsAllDrives=True 
+                supportsAllDrives=True
             )
             
             response = None
             while response is None:
                 status, response = request.next_chunk()
-                if status:
-                    print(f"[INFO] Upload {int(status.progress() * 100)}%")
-
-            print(f"✅ [NEXUS] Upload concluído! ID: {response.get('id')}")
+            
+            print(f"✅ [NEXUS] Sucesso! ID: {response.get('id')}")
             return response.get('id')
 
         except Exception as e:
-            print(f"❌ Erro no upload: {e}")
+            print(f"💥 ERRO NO UPLOAD: {str(e)}")
             raise e
