@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import importlib
 import logging
 import os
@@ -5,6 +7,7 @@ import json
 from typing import Any, Optional
 from threading import Lock
 
+from app.core.nexus_component import NexusComponent
 
 
 class JarvisNexus:
@@ -14,7 +17,7 @@ class JarvisNexus:
             os.path.dirname(os.path.abspath(__file__))
         )
 
-        # Memória persistente (JSON por enquanto)
+        # Memória persistente (JSON)
         self.memory_file = os.path.join(
             self.base_dir, "core/nexus_memory.json"
         )
@@ -63,13 +66,6 @@ class JarvisNexus:
         hint_path: Optional[str] = None,
         singleton: bool = True
     ) -> Optional[Any]:
-        """
-        Resolve e cristaliza um componente pelo ID lógico.
-
-        target_id : nome do arquivo/classe (ex: 'llm_reasoning')
-        hint_path : caminho opcional para restringir discovery
-        singleton : controla cache de instância
-        """
 
         # 1️⃣ Retorna instância viva se existir
         if singleton and target_id in self._instances:
@@ -126,9 +122,6 @@ class JarvisNexus:
         target_id: str,
         hint: Optional[str]
     ) -> Optional[str]:
-        """
-        Varre o sistema para localizar o módulo correspondente ao target_id.
-        """
 
         search_root = (
             os.path.join(self.base_dir, hint)
