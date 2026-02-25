@@ -7,29 +7,45 @@ from googleapiclient.http import MediaFileUpload
 class DriveUploader:
     def __init__(self):
         self.scopes = ['https://www.googleapis.com/auth/drive']
-        
-        # O GitHub Action está enviando como 'G_JSON' conforme seu log
+        # Prioriza G_JSON conforme log do seu Runner
         raw_json = os.environ.get('G_JSON') or os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
         
         if not raw_json:
-            raise ValueError("❌ ERRO: Variável de ambiente G_JSON não encontrada!")
+            raise ValueError("❌ Variável G_JSON ou GOOGLE_SERVICE_ACCOUNT_JSON não definida.")
 
         try:
-            # Tenta carregar como JSON puro primeiro, se falhar usa eval
             self.service_account_info = json.loads(raw_json)
-        except:
+        except Exception:
             self.service_account_info = eval(raw_json)
             
         self.folder_id = os.environ.get('DRIVE_FOLDER_ID')
 
     def execute(self, context):
-        # O contexto recebe o path do arquivo gerado pelo consolidator
-        file_path = context if isinstance(context, str) else context.get('result')
+        # --- Lógica de extração do path (Blindagem contra NoneType) ---
+        file_path = None
         
+        if isinstance(context, str):
+            file_path = context
+        elif isinstance(context, dict):
+            # Tenta chaves comuns que o seu pipeline_runner pode estar usando
+            file_path = context.get('result') or context.get('file_path') or context.get('output')
+
+        if not file_path:
+            # Fallback manual: se o consolidator gerou o arquivo, ele deve estar na raiz
+            fallback = "CORE_LOGIC_CONSOLIDATED.txt"
+            if os.path.exists(fallback):
+                file_path = fallback
+                print(f"[WARN] Contexto vazio. Usando fallback: {fallback}")
+            else:
+                raise ValueError(f"❌ Erro: file_path não encontrado no contexto: {context}")
+
+        # --- Autenticação e Upload ---
         creds = service_account.Credentials.from_service_account_info(
             self.service_account_info, scopes=self.scopes
         )
-        service = build('drive', 'v3', credentials=creds)
+        
+        # 'discoveryServiceUrl' e 'static_discovery' evitam o erro de file_cache do log
+        service = build('drive', 'v3', credentials=creds, static_discovery=False)
 
         file_metadata = {
             'name': os.path.basename(file_path),
@@ -39,7 +55,7 @@ class DriveUploader:
         media = MediaFileUpload(file_path, resumable=True)
 
         try:
-            print(f"[INFO] ☁️ Subindo {file_path} para o Drive...")
+            print(f"[INFO] 📡 Enviando para o Drive: {file_metadata['name']}")
             request = service.files().create(
                 body=file_metadata,
                 media_body=media,
@@ -50,10 +66,12 @@ class DriveUploader:
             response = None
             while response is None:
                 status, response = request.next_chunk()
-            
-            print(f"✅ [NEXUS] Sucesso! ID: {response.get('id')}")
+                if status:
+                    print(f"[INFO] Progresso: {int(status.progress() * 100)}%")
+
+            print(f"✅ [NEXUS] Upload finalizado com sucesso. ID: {response.get('id')}")
             return response.get('id')
 
         except Exception as e:
-            print(f"💥 ERRO NO UPLOAD: {str(e)}")
+            print(f"💥 ERRO CRÍTICO NO UPLOAD: {str(e)}")
             raise e
