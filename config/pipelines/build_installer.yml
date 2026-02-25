@@ -3,8 +3,3 @@ components:
     id: pyinstaller_builder
     hint_path: infrastructure
     singleton: true
-
-  release_publisher:
-    id: github_release
-    hint_path: infrastructure
-    singleton: true
