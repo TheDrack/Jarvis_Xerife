@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import yaml
-from app.core.jarvis_nexus import nexus
+from app.core.nexus import nexus
 
 
 def run_pipeline(config_path: str):
