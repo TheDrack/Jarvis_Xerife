@@ -2,7 +2,7 @@
 
 import os
 from typing import Set
-from app.core.interfaces import Interfaces
+from app.core.interfaces import Interfaces as NexusComponent
 
 
 class Consolidator(NexusComponent):
