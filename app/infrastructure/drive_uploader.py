@@ -2,11 +2,13 @@
 
 import os
 import json
+from typing import Dict, Any
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-from app.core.interfaces import Interfaces as NexusComponent 
+from app.core.interfaces import Interfaces as NexusComponent
 
 
 class DriveUploader(NexusComponent):
@@ -20,6 +22,7 @@ class DriveUploader(NexusComponent):
             config.get("credentials_json")
             or os.getenv("G_JSON")
         )
+
         self.folder_id = (
             config.get("folder_id")
             or os.getenv("DRIVE_FOLDER_ID")
@@ -32,6 +35,24 @@ class DriveUploader(NexusComponent):
             raise RuntimeError("DRIVE_FOLDER_ID não definido")
 
         self._authenticate()
+
+    def can_execute(self) -> bool:
+        return self.service is not None
+
+    def execute(self, context: Dict[str, Any]):
+        """
+        Entry-point oficial do Nexus / Pipeline
+        """
+        artifact = context.get("artifacts", {}).get("consolidate")
+
+        if not artifact:
+            raise RuntimeError("Nenhum artefato encontrado para upload")
+
+        return self.upload(artifact)
+
+    # ==========================
+    # Lógica interna (reutilizável)
+    # ==========================
 
     def _authenticate(self):
         info = json.loads(self.credentials_json)
