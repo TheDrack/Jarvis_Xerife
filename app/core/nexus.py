@@ -7,7 +7,7 @@ import json
 from typing import Any, Optional
 from threading import Lock
 
-from app.core.nexus_component import NexusComponent
+from app.core.nexuscomponent import NexusComponent
 
 
 class JarvisNexus:
