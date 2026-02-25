@@ -8,3 +8,6 @@ class Cap-001(NexusComponent):
     """
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-001'}
+
+# Nexus Compatibility
+Cap001 = Cap

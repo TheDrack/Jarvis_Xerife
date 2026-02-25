@@ -1,7 +1,7 @@
 {
     "system_id": "JARVIS_CORE",
     "version": "1.0.0",
-    "last_scan": "2026-02-25T00:51:37.886429",
+    "last_scan": "2026-02-25T00:51:51.951824",
     "crystallization_summary": {
         "total_capabilities": 102,
         "crystallized": 53,
@@ -15,7 +15,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/gears",
             "path": "app/domain/gears/cap_001.py",
-            "last_audit": "2026-02-25T00:51:37.881769"
+            "last_audit": "2026-02-25T00:51:51.947170"
         },
         {
             "id": "CAP-002",
@@ -24,7 +24,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/models",
             "path": "app/domain/models/cap_002.py",
-            "last_audit": "2026-02-25T00:51:37.881844"
+            "last_audit": "2026-02-25T00:51:51.947238"
         },
         {
             "id": "CAP-003",
@@ -33,7 +33,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/gears",
             "path": "app/domain/gears/cap_003.py",
-            "last_audit": "2026-02-25T00:51:37.881899"
+            "last_audit": "2026-02-25T00:51:51.947293"
         },
         {
             "id": "CAP-004",
@@ -42,7 +42,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/gears",
             "path": "app/domain/gears/cap_004.py",
-            "last_audit": "2026-02-25T00:51:37.881950"
+            "last_audit": "2026-02-25T00:51:51.947363"
         },
         {
             "id": "CAP-005",
@@ -51,7 +51,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/gears",
             "path": "app/domain/gears/cap_005.py",
-            "last_audit": "2026-02-25T00:51:37.881999"
+            "last_audit": "2026-02-25T00:51:51.947413"
         },
         {
             "id": "CAP-006",
@@ -60,7 +60,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/gears",
             "path": "app/domain/gears/cap_006.py",
-            "last_audit": "2026-02-25T00:51:37.882049"
+            "last_audit": "2026-02-25T00:51:51.947460"
         },
         {
             "id": "CAP-007",
@@ -69,7 +69,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/gears",
             "path": "app/domain/gears/cap_007.py",
-            "last_audit": "2026-02-25T00:51:37.882097"
+            "last_audit": "2026-02-25T00:51:51.947506"
         },
         {
             "id": "CAP-008",
@@ -78,7 +78,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/gears",
             "path": "app/domain/gears/cap_008.py",
-            "last_audit": "2026-02-25T00:51:37.882147"
+            "last_audit": "2026-02-25T00:51:51.947556"
         },
         {
             "id": "CAP-009",
@@ -87,7 +87,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_009.py",
-            "last_audit": "2026-02-25T00:51:37.882227"
+            "last_audit": "2026-02-25T00:51:51.947605"
         },
         {
             "id": "CAP-010",
@@ -96,7 +96,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_010.py",
-            "last_audit": "2026-02-25T00:51:37.882283"
+            "last_audit": "2026-02-25T00:51:51.947652"
         },
         {
             "id": "CAP-011",
@@ -105,7 +105,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_011.py",
-            "last_audit": "2026-02-25T00:51:37.882330"
+            "last_audit": "2026-02-25T00:51:51.947698"
         },
         {
             "id": "CAP-012",
@@ -114,7 +114,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_012.py",
-            "last_audit": "2026-02-25T00:51:37.882381"
+            "last_audit": "2026-02-25T00:51:51.947749"
         },
         {
             "id": "CAP-013",
@@ -123,7 +123,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_013.py",
-            "last_audit": "2026-02-25T00:51:37.882427"
+            "last_audit": "2026-02-25T00:51:51.947795"
         },
         {
             "id": "CAP-014",
@@ -132,7 +132,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_014.py",
-            "last_audit": "2026-02-25T00:51:37.882471"
+            "last_audit": "2026-02-25T00:51:51.947843"
         },
         {
             "id": "CAP-015",
@@ -141,7 +141,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_015.py",
-            "last_audit": "2026-02-25T00:51:37.882515"
+            "last_audit": "2026-02-25T00:51:51.947889"
         },
         {
             "id": "CAP-016",
@@ -150,7 +150,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_016.py",
-            "last_audit": "2026-02-25T00:51:37.882558"
+            "last_audit": "2026-02-25T00:51:51.947933"
         },
         {
             "id": "CAP-017",
@@ -159,7 +159,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_017.py",
-            "last_audit": "2026-02-25T00:51:37.882601"
+            "last_audit": "2026-02-25T00:51:51.947976"
         },
         {
             "id": "CAP-018",
@@ -168,7 +168,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_018.py",
-            "last_audit": "2026-02-25T00:51:37.882644"
+            "last_audit": "2026-02-25T00:51:51.948019"
         },
         {
             "id": "CAP-019",
@@ -177,7 +177,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_019.py",
-            "last_audit": "2026-02-25T00:51:37.882688"
+            "last_audit": "2026-02-25T00:51:51.948062"
         },
         {
             "id": "CAP-020",
@@ -186,7 +186,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_020.py",
-            "last_audit": "2026-02-25T00:51:37.882732"
+            "last_audit": "2026-02-25T00:51:51.948106"
         },
         {
             "id": "CAP-021",
@@ -195,7 +195,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_021.py",
-            "last_audit": "2026-02-25T00:51:37.882775"
+            "last_audit": "2026-02-25T00:51:51.948150"
         },
         {
             "id": "CAP-022",
@@ -204,7 +204,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_022.py",
-            "last_audit": "2026-02-25T00:51:37.882818"
+            "last_audit": "2026-02-25T00:51:51.948193"
         },
         {
             "id": "CAP-023",
@@ -213,7 +213,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/models",
             "path": "app/domain/models/cap_023.py",
-            "last_audit": "2026-02-25T00:51:37.882862"
+            "last_audit": "2026-02-25T00:51:51.948239"
         },
         {
             "id": "CAP-024",
@@ -222,7 +222,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_024.py",
-            "last_audit": "2026-02-25T00:51:37.882906"
+            "last_audit": "2026-02-25T00:51:51.948288"
         },
         {
             "id": "CAP-025",
@@ -231,7 +231,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_025.py",
-            "last_audit": "2026-02-25T00:51:37.882958"
+            "last_audit": "2026-02-25T00:51:51.948373"
         },
         {
             "id": "CAP-026",
@@ -240,7 +240,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_026.py",
-            "last_audit": "2026-02-25T00:51:37.883004"
+            "last_audit": "2026-02-25T00:51:51.948428"
         },
         {
             "id": "CAP-027",
@@ -249,7 +249,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_027.py",
-            "last_audit": "2026-02-25T00:51:37.883048"
+            "last_audit": "2026-02-25T00:51:51.948473"
         },
         {
             "id": "CAP-028",
@@ -258,7 +258,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_028.py",
-            "last_audit": "2026-02-25T00:51:37.883091"
+            "last_audit": "2026-02-25T00:51:51.948517"
         },
         {
             "id": "CAP-029",
@@ -267,7 +267,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_029.py",
-            "last_audit": "2026-02-25T00:51:37.883134"
+            "last_audit": "2026-02-25T00:51:51.948560"
         },
         {
             "id": "CAP-030",
@@ -276,7 +276,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_030.py",
-            "last_audit": "2026-02-25T00:51:37.883177"
+            "last_audit": "2026-02-25T00:51:51.948604"
         },
         {
             "id": "CAP-031",
@@ -285,7 +285,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_031.py",
-            "last_audit": "2026-02-25T00:51:37.883242"
+            "last_audit": "2026-02-25T00:51:51.948647"
         },
         {
             "id": "CAP-032",
@@ -294,7 +294,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/gears",
             "path": "app/domain/gears/cap_032.py",
-            "last_audit": "2026-02-25T00:51:37.883292"
+            "last_audit": "2026-02-25T00:51:51.948696"
         },
         {
             "id": "CAP-033",
@@ -303,7 +303,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/models",
             "path": "app/domain/models/cap_033.py",
-            "last_audit": "2026-02-25T00:51:37.883338"
+            "last_audit": "2026-02-25T00:51:51.948741"
         },
         {
             "id": "CAP-034",
@@ -312,7 +312,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/models",
             "path": "app/domain/models/cap_034.py",
-            "last_audit": "2026-02-25T00:51:37.883383"
+            "last_audit": "2026-02-25T00:51:51.948786"
         },
         {
             "id": "CAP-035",
@@ -321,7 +321,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_035.py",
-            "last_audit": "2026-02-25T00:51:37.883427"
+            "last_audit": "2026-02-25T00:51:51.948830"
         },
         {
             "id": "CAP-036",
@@ -330,7 +330,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_036.py",
-            "last_audit": "2026-02-25T00:51:37.883471"
+            "last_audit": "2026-02-25T00:51:51.948873"
         },
         {
             "id": "CAP-037",
@@ -339,7 +339,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_037.py",
-            "last_audit": "2026-02-25T00:51:37.883522"
+            "last_audit": "2026-02-25T00:51:51.948914"
         },
         {
             "id": "CAP-038",
@@ -348,7 +348,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_038.py",
-            "last_audit": "2026-02-25T00:51:37.883567"
+            "last_audit": "2026-02-25T00:51:51.948961"
         },
         {
             "id": "CAP-039",
@@ -357,7 +357,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_039.py",
-            "last_audit": "2026-02-25T00:51:37.883609"
+            "last_audit": "2026-02-25T00:51:51.949005"
         },
         {
             "id": "CAP-040",
@@ -366,7 +366,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_040.py",
-            "last_audit": "2026-02-25T00:51:37.883652"
+            "last_audit": "2026-02-25T00:51:51.949048"
         },
         {
             "id": "CAP-041",
@@ -375,7 +375,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_041.py",
-            "last_audit": "2026-02-25T00:51:37.883695"
+            "last_audit": "2026-02-25T00:51:51.949092"
         },
         {
             "id": "CAP-042",
@@ -384,7 +384,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_042.py",
-            "last_audit": "2026-02-25T00:51:37.883739"
+            "last_audit": "2026-02-25T00:51:51.949135"
         },
         {
             "id": "CAP-043",
@@ -393,7 +393,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_043.py",
-            "last_audit": "2026-02-25T00:51:37.883783"
+            "last_audit": "2026-02-25T00:51:51.949177"
         },
         {
             "id": "CAP-044",
@@ -402,7 +402,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_044.py",
-            "last_audit": "2026-02-25T00:51:37.883827"
+            "last_audit": "2026-02-25T00:51:51.949218"
         },
         {
             "id": "CAP-045",
@@ -411,7 +411,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_045.py",
-            "last_audit": "2026-02-25T00:51:37.883869"
+            "last_audit": "2026-02-25T00:51:51.949260"
         },
         {
             "id": "CAP-046",
@@ -420,7 +420,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_046.py",
-            "last_audit": "2026-02-25T00:51:37.883912"
+            "last_audit": "2026-02-25T00:51:51.949317"
         },
         {
             "id": "CAP-047",
@@ -429,7 +429,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_047.py",
-            "last_audit": "2026-02-25T00:51:37.883955"
+            "last_audit": "2026-02-25T00:51:51.949366"
         },
         {
             "id": "CAP-048",
@@ -438,7 +438,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_048.py",
-            "last_audit": "2026-02-25T00:51:37.883996"
+            "last_audit": "2026-02-25T00:51:51.949411"
         },
         {
             "id": "CAP-049",
@@ -447,7 +447,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_049.py",
-            "last_audit": "2026-02-25T00:51:37.884039"
+            "last_audit": "2026-02-25T00:51:51.949455"
         },
         {
             "id": "CAP-050",
@@ -456,7 +456,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_050.py",
-            "last_audit": "2026-02-25T00:51:37.884087"
+            "last_audit": "2026-02-25T00:51:51.949498"
         },
         {
             "id": "CAP-051",
@@ -465,7 +465,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_051.py",
-            "last_audit": "2026-02-25T00:51:37.884135"
+            "last_audit": "2026-02-25T00:51:51.949546"
         },
         {
             "id": "CAP-052",
@@ -474,7 +474,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_052.py",
-            "last_audit": "2026-02-25T00:51:37.884194"
+            "last_audit": "2026-02-25T00:51:51.949590"
         },
         {
             "id": "CAP-053",
@@ -483,7 +483,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_053.py",
-            "last_audit": "2026-02-25T00:51:37.884243"
+            "last_audit": "2026-02-25T00:51:51.949632"
         },
         {
             "id": "CAP-054",
@@ -492,7 +492,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_054.py",
-            "last_audit": "2026-02-25T00:51:37.884288"
+            "last_audit": "2026-02-25T00:51:51.949675"
         },
         {
             "id": "CAP-055",
@@ -501,7 +501,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_055.py",
-            "last_audit": "2026-02-25T00:51:37.884330"
+            "last_audit": "2026-02-25T00:51:51.949717"
         },
         {
             "id": "CAP-056",
@@ -510,7 +510,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_056.py",
-            "last_audit": "2026-02-25T00:51:37.884373"
+            "last_audit": "2026-02-25T00:51:51.949765"
         },
         {
             "id": "CAP-057",
@@ -519,7 +519,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_057.py",
-            "last_audit": "2026-02-25T00:51:37.884416"
+            "last_audit": "2026-02-25T00:51:51.949813"
         },
         {
             "id": "CAP-058",
@@ -528,7 +528,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_058.py",
-            "last_audit": "2026-02-25T00:51:37.884457"
+            "last_audit": "2026-02-25T00:51:51.949857"
         },
         {
             "id": "CAP-059",
@@ -537,7 +537,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_059.py",
-            "last_audit": "2026-02-25T00:51:37.884499"
+            "last_audit": "2026-02-25T00:51:51.949899"
         },
         {
             "id": "CAP-060",
@@ -546,7 +546,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_060.py",
-            "last_audit": "2026-02-25T00:51:37.884540"
+            "last_audit": "2026-02-25T00:51:51.949941"
         },
         {
             "id": "CAP-061",
@@ -555,7 +555,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_061.py",
-            "last_audit": "2026-02-25T00:51:37.884581"
+            "last_audit": "2026-02-25T00:51:51.949983"
         },
         {
             "id": "CAP-062",
@@ -564,7 +564,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_062.py",
-            "last_audit": "2026-02-25T00:51:37.884622"
+            "last_audit": "2026-02-25T00:51:51.950025"
         },
         {
             "id": "CAP-063",
@@ -573,7 +573,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_063.py",
-            "last_audit": "2026-02-25T00:51:37.884663"
+            "last_audit": "2026-02-25T00:51:51.950067"
         },
         {
             "id": "CAP-064",
@@ -582,7 +582,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_064.py",
-            "last_audit": "2026-02-25T00:51:37.884705"
+            "last_audit": "2026-02-25T00:51:51.950113"
         },
         {
             "id": "CAP-065",
@@ -591,7 +591,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_065.py",
-            "last_audit": "2026-02-25T00:51:37.884746"
+            "last_audit": "2026-02-25T00:51:51.950158"
         },
         {
             "id": "CAP-066",
@@ -600,7 +600,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_066.py",
-            "last_audit": "2026-02-25T00:51:37.884790"
+            "last_audit": "2026-02-25T00:51:51.950201"
         },
         {
             "id": "CAP-067",
@@ -609,7 +609,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_067.py",
-            "last_audit": "2026-02-25T00:51:37.884832"
+            "last_audit": "2026-02-25T00:51:51.950243"
         },
         {
             "id": "CAP-068",
@@ -618,7 +618,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_068.py",
-            "last_audit": "2026-02-25T00:51:37.884874"
+            "last_audit": "2026-02-25T00:51:51.950285"
         },
         {
             "id": "CAP-069",
@@ -627,7 +627,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_069.py",
-            "last_audit": "2026-02-25T00:51:37.884921"
+            "last_audit": "2026-02-25T00:51:51.950345"
         },
         {
             "id": "CAP-070",
@@ -636,7 +636,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_070.py",
-            "last_audit": "2026-02-25T00:51:37.884963"
+            "last_audit": "2026-02-25T00:51:51.950392"
         },
         {
             "id": "CAP-071",
@@ -645,7 +645,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_071.py",
-            "last_audit": "2026-02-25T00:51:37.885013"
+            "last_audit": "2026-02-25T00:51:51.950440"
         },
         {
             "id": "CAP-072",
@@ -654,7 +654,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_072.py",
-            "last_audit": "2026-02-25T00:51:37.885060"
+            "last_audit": "2026-02-25T00:51:51.950485"
         },
         {
             "id": "CAP-073",
@@ -663,7 +663,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_073.py",
-            "last_audit": "2026-02-25T00:51:37.885103"
+            "last_audit": "2026-02-25T00:51:51.950529"
         },
         {
             "id": "CAP-074",
@@ -672,7 +672,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_074.py",
-            "last_audit": "2026-02-25T00:51:37.885146"
+            "last_audit": "2026-02-25T00:51:51.950572"
         },
         {
             "id": "CAP-075",
@@ -681,7 +681,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_075.py",
-            "last_audit": "2026-02-25T00:51:37.885204"
+            "last_audit": "2026-02-25T00:51:51.950614"
         },
         {
             "id": "CAP-076",
@@ -690,7 +690,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_076.py",
-            "last_audit": "2026-02-25T00:51:37.885257"
+            "last_audit": "2026-02-25T00:51:51.950656"
         },
         {
             "id": "CAP-077",
@@ -699,7 +699,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_077.py",
-            "last_audit": "2026-02-25T00:51:37.885302"
+            "last_audit": "2026-02-25T00:51:51.950698"
         },
         {
             "id": "CAP-078",
@@ -708,7 +708,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_078.py",
-            "last_audit": "2026-02-25T00:51:37.885347"
+            "last_audit": "2026-02-25T00:51:51.950741"
         },
         {
             "id": "CAP-079",
@@ -717,7 +717,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_079.py",
-            "last_audit": "2026-02-25T00:51:37.885389"
+            "last_audit": "2026-02-25T00:51:51.950783"
         },
         {
             "id": "CAP-080",
@@ -726,7 +726,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_080.py",
-            "last_audit": "2026-02-25T00:51:37.885430"
+            "last_audit": "2026-02-25T00:51:51.950825"
         },
         {
             "id": "CAP-081",
@@ -735,7 +735,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_081.py",
-            "last_audit": "2026-02-25T00:51:37.885470"
+            "last_audit": "2026-02-25T00:51:51.950867"
         },
         {
             "id": "CAP-082",
@@ -744,7 +744,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_082.py",
-            "last_audit": "2026-02-25T00:51:37.885510"
+            "last_audit": "2026-02-25T00:51:51.950908"
         },
         {
             "id": "CAP-083",
@@ -753,7 +753,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_083.py",
-            "last_audit": "2026-02-25T00:51:37.885552"
+            "last_audit": "2026-02-25T00:51:51.950949"
         },
         {
             "id": "CAP-084",
@@ -762,7 +762,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_084.py",
-            "last_audit": "2026-02-25T00:51:37.885593"
+            "last_audit": "2026-02-25T00:51:51.950991"
         },
         {
             "id": "CAP-085",
@@ -771,7 +771,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_085.py",
-            "last_audit": "2026-02-25T00:51:37.885634"
+            "last_audit": "2026-02-25T00:51:51.951044"
         },
         {
             "id": "CAP-086",
@@ -780,7 +780,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_086.py",
-            "last_audit": "2026-02-25T00:51:37.885675"
+            "last_audit": "2026-02-25T00:51:51.951086"
         },
         {
             "id": "CAP-087",
@@ -789,7 +789,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_087.py",
-            "last_audit": "2026-02-25T00:51:37.885717"
+            "last_audit": "2026-02-25T00:51:51.951128"
         },
         {
             "id": "CAP-088",
@@ -798,7 +798,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_088.py",
-            "last_audit": "2026-02-25T00:51:37.885759"
+            "last_audit": "2026-02-25T00:51:51.951170"
         },
         {
             "id": "CAP-089",
@@ -807,7 +807,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_089.py",
-            "last_audit": "2026-02-25T00:51:37.885799"
+            "last_audit": "2026-02-25T00:51:51.951218"
         },
         {
             "id": "CAP-090",
@@ -816,7 +816,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_090.py",
-            "last_audit": "2026-02-25T00:51:37.885844"
+            "last_audit": "2026-02-25T00:51:51.951268"
         },
         {
             "id": "CAP-091",
@@ -825,7 +825,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_091.py",
-            "last_audit": "2026-02-25T00:51:37.885886"
+            "last_audit": "2026-02-25T00:51:51.951327"
         },
         {
             "id": "CAP-092",
@@ -834,7 +834,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_092.py",
-            "last_audit": "2026-02-25T00:51:37.885927"
+            "last_audit": "2026-02-25T00:51:51.951375"
         },
         {
             "id": "CAP-093",
@@ -843,7 +843,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_093.py",
-            "last_audit": "2026-02-25T00:51:37.885968"
+            "last_audit": "2026-02-25T00:51:51.951418"
         },
         {
             "id": "CAP-094",
@@ -852,7 +852,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_094.py",
-            "last_audit": "2026-02-25T00:51:37.886010"
+            "last_audit": "2026-02-25T00:51:51.951461"
         },
         {
             "id": "CAP-095",
@@ -861,7 +861,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_095.py",
-            "last_audit": "2026-02-25T00:51:37.886051"
+            "last_audit": "2026-02-25T00:51:51.951504"
         },
         {
             "id": "CAP-096",
@@ -870,7 +870,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_096.py",
-            "last_audit": "2026-02-25T00:51:37.886092"
+            "last_audit": "2026-02-25T00:51:51.951546"
         },
         {
             "id": "CAP-097",
@@ -879,7 +879,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_097.py",
-            "last_audit": "2026-02-25T00:51:37.886134"
+            "last_audit": "2026-02-25T00:51:51.951590"
         },
         {
             "id": "CAP-098",
@@ -888,7 +888,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_098.py",
-            "last_audit": "2026-02-25T00:51:37.886175"
+            "last_audit": "2026-02-25T00:51:51.951632"
         },
         {
             "id": "CAP-099",
@@ -897,7 +897,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_099.py",
-            "last_audit": "2026-02-25T00:51:37.886259"
+            "last_audit": "2026-02-25T00:51:51.951680"
         },
         {
             "id": "CAP-100",
@@ -906,7 +906,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/models",
             "path": "app/domain/models/cap_100.py",
-            "last_audit": "2026-02-25T00:51:37.886306"
+            "last_audit": "2026-02-25T00:51:51.951726"
         },
         {
             "id": "CAP-101",
@@ -915,7 +915,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_101.py",
-            "last_audit": "2026-02-25T00:51:37.886356"
+            "last_audit": "2026-02-25T00:51:51.951769"
         },
         {
             "id": "CAP-102",
@@ -924,7 +924,7 @@
             "mapped_libraries": [],
             "nexus_hint": "domain/capabilities",
             "path": "app/domain/capabilities/cap_102.py",
-            "last_audit": "2026-02-25T00:51:37.886399"
+            "last_audit": "2026-02-25T00:51:51.951811"
         }
     ]
 }
