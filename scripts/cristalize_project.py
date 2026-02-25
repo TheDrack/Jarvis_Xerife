@@ -40,7 +40,7 @@ class ProjectCrystallizer:
         backup_dir.mkdir(exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         archive = backup_dir / f"checkpoint_{ts}.tar.gz"
-        
+
         count = 0
         with tarfile.open(archive, "w:gz") as tar:
             for f in self.base_path.rglob("*.py"):
@@ -60,17 +60,17 @@ class ProjectCrystallizer:
         try:
             old_code = file_path.read_text(encoding="utf-8")
             if not old_code.strip(): return False
-            
+
             module = cst.parse_module(old_code)
-            
+
             # 1. Verificar se precisa de modificação para evitar re-processamento inútil
             has_nexus = "NexusComponent" in old_code
-            
+
             # Transformações
             wrapper = cst.MetadataWrapper(module)
             # (Aqui rodariam os Transformers já definidos no passo anterior)
             # Para brevidade, assumimos a lógica de transformação do V5.2 aqui
-            
+
             # Se o código final for igual ao inicial, ignore
             # new_code = ... (resultado do transform)
             # if old_code == new_code: return False
@@ -83,17 +83,17 @@ class ProjectCrystallizer:
 
     def crystallize(self):
         if not self.dry_run: self._create_checkpoint()
-        
+
         logger.info(f"⚡ Protocolo JARVIS V5.3 | Ativo")
         count = 0
         for py_file in self.base_path.rglob("*.py"):
             if any(part in self.forbidden_dirs for part in py_file.parts): continue
             if py_file.name in self.ignore_files: continue
-            
+
             # Lógica de correção (reutilizando seus transformers)
             if self._fix_file(py_file):
                 count += 1
-        
+
         logger.info(f"🏁 Ciclo concluído. {count} arquivos cristalizados.")
 
 if __name__ == "__main__":
