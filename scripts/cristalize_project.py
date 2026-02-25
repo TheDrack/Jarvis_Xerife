@@ -18,7 +18,7 @@ class ProjectCrystallizer:
     def __init__(self, dry_run: bool = False):
         self.base_path = Path(".").resolve()
         self.dry_run = dry_run
-        
+
         # PROTEÇÃO: Diretórios e arquivos base
         self.forbidden_dirs = {
             ".git", ".venv", "venv", "__pycache__", 
@@ -27,7 +27,7 @@ class ProjectCrystallizer:
         self.ignore_files = {
             "__init__.py", "nexus.py", "cristalize_project.py", "nexuscomponent.py"
         }
-        
+
         self.nexus_import = "from app.core.nexuscomponent import NexusComponent"
         self.target_parent = "NexusComponent"
 
@@ -36,7 +36,7 @@ class ProjectCrystallizer:
         backup_dir.mkdir(exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         archive = backup_dir / f"checkpoint_{ts}.tar.gz"
-        
+
         with tarfile.open(archive, "w:gz") as tar:
             for f in self.base_path.rglob("*.py"):
                 if not any(part in self.forbidden_dirs for part in f.parts):
@@ -69,7 +69,7 @@ class ProjectCrystallizer:
         # 3. Injeção de Herança via Regex (Apenas no início da linha para evitar métodos internos)
         # Transforma: class Nome:  -> class Nome(NexusComponent):
         new_code = re.sub(r'^class\s+(\w+)\s*:', rf'class \1({self.target_parent}):', new_code, flags=re.MULTILINE)
-        
+
         # Transforma: class Nome(Base): -> class Nome(NexusComponent, Base):
         # Evita duplicar se NexusComponent já estiver lá
         new_code = re.sub(rf'^class\s+(\w+)\s*\((?!.*{self.target_parent})', rf'class \1({self.target_parent}, ', new_code, flags=re.MULTILINE)
@@ -84,18 +84,18 @@ class ProjectCrystallizer:
     def run(self):
         if not self.dry_run:
             self._create_checkpoint()
-            
+
         logger.info(f"⚡ Protocolo JARVIS V5.7 | Estabilização de Sintaxe")
         count = 0
-        
+
         for py_file in self.base_path.rglob("*.py"):
             if any(part in self.forbidden_dirs for part in py_file.parts): continue
             if py_file.name in self.ignore_files: continue
-            
+
             try:
                 old_code = py_file.read_text(encoding="utf-8")
                 new_code = self._apply_crystal_logic(old_code)
-                
+
                 if old_code != new_code:
                     # Validação pré-escrita
                     try:
