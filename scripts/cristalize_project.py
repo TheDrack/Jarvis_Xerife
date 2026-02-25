@@ -26,7 +26,7 @@ class ProjectCrystallizer:
             "backups", "scripts", ".github", "core",
             "crystallization"  # PROTEÇÃO CRÍTICA: Impede de quebrar o próprio motor
         }
-        
+
         # Arquivos específicos ignorados
         self.ignore_files = {
             "__init__.py", "nexus.py", "cristalize_project.py", 
