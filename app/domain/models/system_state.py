@@ -1,12 +1,16 @@
+# --- CÓDIGO COMPLETO REESTRUTURADO ---
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 
 class SystemStatus(BaseModel):
-    """Apenas a definição do que é o estado do sistema."""
+    """
+    Setor: Domain/Models
+    Responsabilidade: Definição estrutural do estado do Jarvis.
+    """
     is_active: bool = True
     current_mission: Optional[str] = None
+    metabolic_rate: float = Field(default=1.0, description="Nível de carga do sistema")
     resources: Dict[str, Any] = Field(default_factory=dict)
-    metabolic_rate: float = 1.0
 
-# Nexus Compatibility
-SystemState = SystemStatus
+    class Config:
+        frozen = False # Permite mutabilidade controlada pelo StateManager
