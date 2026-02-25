@@ -31,7 +31,7 @@ class NexusExecuteTransformer(cst.CSTTransformer):
         # FILTRO DE DNA: Não cristalizar Enums ou Dataclasses puras
         decorators = [str(d.decorator.value if hasattr(d.decorator, "value") else "") for d in updated_node.decorators]
         is_data_structure = any(d in ["dataclass", "enum.Enum", "Enum"] for d in decorators)
-        
+
         if is_data_structure:
             return updated_node
 
@@ -40,7 +40,7 @@ class NexusExecuteTransformer(cst.CSTTransformer):
             (isinstance(b.value, cst.Name) and b.value.value == self.target_parent)
             for b in bases
         )
-        
+
         if not is_already_child:
             bases.insert(0, cst.Arg(value=cst.Name(self.target_parent)))
 
@@ -55,7 +55,7 @@ class NexusExecuteTransformer(cst.CSTTransformer):
                 body=cst.IndentedBlock(body=[cst.SimpleStatementLine([cst.Pass()])]),
             )
             body.append(execute_meth)
-            
+
         return updated_node.with_changes(bases=tuple(bases), body=updated_node.body.with_changes(body=tuple(body)))
 
 # =========================
@@ -91,9 +91,9 @@ class ProjectCrystallizer:
         try:
             old_code = file_path.read_text(encoding="utf-8")
             if not self._should_process(old_code): return False
-            
+
             module = cst.parse_module(old_code)
-            
+
             # Inserir import se não houver
             if "NexusComponent" not in old_code:
                 # Lógica simples de inserção no topo
@@ -104,7 +104,7 @@ class ProjectCrystallizer:
             # Aplicar Transformação de Classe
             transformer = NexusExecuteTransformer("NexusComponent")
             new_tree = module.visit(transformer)
-            
+
             new_code = new_tree.code
             if old_code == new_code: return False
 
