@@ -19,19 +19,19 @@ class ProjectCrystallizer:
     def __init__(self, dry_run: bool = False):
         self.base_path = Path(".").resolve()
         self.dry_run = dry_run
-        
+
         # PROTEÇÃO: Pastas que o cristalizador não deve tocar
         self.forbidden_dirs = {
             ".git", ".venv", "venv", "__pycache__", 
             "backups", "scripts", ".github", "core"
         }
-        
+
         # Arquivos específicos para ignorar
         self.ignore_files = {
             "__init__.py", "nexus.py", "cristalize_project.py",
             "nexuscomponent.py" # Proteção extra para o arquivo base
         }
-        
+
         self.nexus_import = "from app.core.nexuscomponent import NexusComponent"
         self.target_parent = "NexusComponent"
 
@@ -41,7 +41,7 @@ class ProjectCrystallizer:
         backup_dir.mkdir(exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         archive = backup_dir / f"checkpoint_{ts}.tar.gz"
-        
+
         with tarfile.open(archive, "w:gz") as tar:
             for f in self.base_path.rglob("*.py"):
                 if not any(part in self.forbidden_dirs for part in f.parts):
@@ -53,19 +53,19 @@ class ProjectCrystallizer:
         # Não processar se não houver definição de classe
         if "class " not in code:
             return False
-        
+
         # Ignorar DataStructures puras (Dataclasses e Enums)
         # Isso evita injetar NexusComponent em modelos de dados simples
         if "@dataclass" in code or "(Enum)" in code or "(enum.Enum)" in code:
             return False
-            
+
         return True
 
     def _apply_crystal_logic(self, code: str) -> str:
         """Aplica as transformações estruturais via manipulação de texto segura."""
         lines = code.splitlines()
         modified = False
-        
+
         # 1. Garantir o Import do NexusComponent
         if "from app.core.nexuscomponent import NexusComponent" not in code:
             # Insere após o __future__ ou no topo
@@ -75,7 +75,7 @@ class ProjectCrystallizer:
                     insert_pos = i + 1
             lines.insert(insert_pos, self.nexus_import)
             modified = True
-            
+
         # 2. Garantir Herança e Método Execute
         new_lines = []
         for line in lines:
@@ -115,23 +115,23 @@ class ProjectCrystallizer:
     def run(self):
         if not self.dry_run:
             self._create_checkpoint()
-            
+
         logger.info(f"⚡ Iniciando Cristalização DNA V5.5 [Modo: {'DRY' if self.dry_run else 'LIVE'}]")
         count = 0
-        
+
         for py_file in self.base_path.rglob("*.py"):
             # Filtros de exclusão
             if any(part in self.forbidden_dirs for part in py_file.parts): continue
             if py_file.name in self.ignore_files: continue
-            
+
             try:
                 old_code = py_file.read_text(encoding="utf-8")
-                
+
                 if not self._should_process(py_file, old_code):
                     continue
-                    
+
                 new_code = self._apply_crystal_logic(old_code)
-                
+
                 if old_code != new_code:
                     if self.dry_run:
                         logger.info(f"🔍 [DRY-RUN] Alteração detectada em: {py_file.name}")
