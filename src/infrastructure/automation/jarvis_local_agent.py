@@ -1,3 +1,4 @@
+# --- CÓDIGO COMPLETO REESTRUTURADO ---
 import os
 from app.core.nexus import nexus
 from app.core.interfaces import NexusComponent
@@ -5,32 +6,26 @@ from app.core.interfaces import NexusComponent
 class JarvisLocalAgent(NexusComponent):
     """
     Setor: Infrastructure/Automation
-    Responsabilidade: Orquestrar a execução local recebida via Cloud.
+    Responsabilidade: Ponte de comando entre Cloud e Hardware Local.
     """
     def __init__(self):
-        self.hardware = nexus.resolve("hardware_controller", hint_path="infrastructure/automation")
-        self.socket = nexus.resolve("socket_client", hint_path="infrastructure/network")
-        self.api_key = os.getenv("API_KEY_LOCAL")
+        # O Nexus resolve as dependências de hardware e rede
+        self.hardware = nexus.resolve("hardware_controller")
+        self.network = nexus.resolve("socket_client")
+        self.auth_key = os.getenv("API_KEY_LOCAL")
 
-    def execute(self, payload: dict):
-        """
-        Recebe comandos da Cloud e delega para o hardware.
-        """
-        command = payload.get("command")
-        params = payload.get("params", {})
-
+    def execute(self, task_payload: dict):
+        """Executa comandos delegados"""
         if not self.hardware:
-            return {"error": "HardwareController não cristalizado"}
+            return {"status": "error", "reason": "Hardware Controller não disponível"}
 
-        # Delegando a ação real para o componente especializado
-        result = self.hardware.execute(command, params)
+        action = task_payload.get("action")
+        params = task_payload.get("params", {})
+
+        # Delegação certeira
+        result = self.hardware.execute(action, params)
         
-        if self.socket:
-            self.socket.execute("send", {"event": "command_result", "data": result})
-        
+        if self.network:
+            self.network.execute("emit", {"event": "task_complete", "data": result})
+            
         return result
-
-if __name__ == "__main__":
-    # Inicialização direta via Nexus
-    agent = nexus.resolve("jarvis_local_agent")
-    agent.execute({"command": "screenshot"})
