@@ -1,0 +1,12 @@
+components:
+  consolidator:
+    id: consolidator
+    hint_path: infrastructure
+    singleton: true
+    config:
+      output_file: CORE_LOGIC_CONSOLIDATED.txt
+
+  drive_uploader:
+    id: drive_uploader
+    hint_path: infrastructure
+    singleton: true

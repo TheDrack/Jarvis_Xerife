@@ -19,28 +19,28 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: Checkout code
+    - name: 🛰️ Checkout code
       uses: actions/checkout@v4
       with:
         token: ${{ github.token }}
 
-    - name: Set up uv
+    - name: 📦 Set up uv
       uses: astral-sh/setup-uv@v5
       with:
         enable-cache: true
 
-    - name: Set up Python
+    - name: 🐍 Set up Python
       run: uv python install 3.13
 
-    - name: Install dependencies
+    - name: 🔧 Install dependencies
       run: |
         uv venv
-        # Instalando dependências explícitas + as do projeto
+        # Dependências explícitas + projeto
         uv pip install pyinstaller bcrypt==4.0.1 passlib[bcrypt]==1.7.4
         if (Test-Path "requirements.txt") { uv pip install -r requirements.txt }
       shell: pwsh
 
-    - name: Debug Path (Verify main.py existence)
+    - name: 🔍 Debug Path (Verify main.py existence)
       run: |
         if (Test-Path "app/application/services/main.py") {
           Write-Host "[OK] main.py found at app/application/services/main.py"
@@ -51,12 +51,36 @@ jobs:
         }
       shell: pwsh
 
-    - name: Build executable with PyInstaller
+    # 🚀 AQUI é a mudança arquitetural
+    - name: 🧠 Run JARVIS Pipeline (Build Installer)
+      env:
+        # Intenção do pipeline (GERENTE → SUPERVISOR)
+        PIPELINE: build_installer
+
+        # (opcional) modo estrito
+        PIPELINE_STRICT: "true"
+
       run: |
-        # O uv run garante o uso do venv criado anteriormente
-        uv run python build_config.py
-    
-    - name: Verify build
+        Write-Host "📁 Workspace: $(Get-Location)"
+        Write-Host "🐍 Python:"
+        uv run python --version
+        Write-Host "🧠 Pipeline selecionado: $env:PIPELINE"
+
+        # Garante que o pacote 'app' é resolvível
+        $env:PYTHONPATH = "$(Get-Location)"
+
+        $PIPELINE_RUNNER = "app/runtime/pipeline_runner.py"
+
+        if (Test-Path $PIPELINE_RUNNER) {
+          Write-Host "🚀 Executando pipeline JARVIS..."
+          uv run python $PIPELINE_RUNNER
+          Write-Host "✅ Pipeline executado com sucesso."
+        } else {
+          Write-Host "❌ Erro: pipeline_runner.py não encontrado em app/runtime/"
+          exit 1
+        }
+
+    - name: ✅ Verify build
       run: |
         if (Test-Path "dist\Jarvis_Installer.exe") {
           $item = Get-Item "dist\Jarvis_Installer.exe"
@@ -67,7 +91,7 @@ jobs:
         }
       shell: pwsh
 
-    - name: Upload artifact
+    - name: 📦 Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: Jarvis_Installer
@@ -76,7 +100,7 @@ jobs:
         if-no-files-found: error
         compression-level: 6
 
-    - name: Create Release (on tag)
+    - name: 🏷️ Create Release (on tag)
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
