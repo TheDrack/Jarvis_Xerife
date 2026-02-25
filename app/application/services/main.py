@@ -1,50 +1,15 @@
-class Main:
-    def __init__(self, *args, **kwargs):
-        pass
+import asyncio
+from app.core.nexus import nexus
 
-    import os
-    import logging
-    import uvicorn
-    from app.adapters.infrastructure.api_server import create_api_server
-    from app.container import create_edge_container
-    from app.core.config import settings
-
-    # Import plugin loader for auto-extensibility
-    from app.plugins.plugin_loader import load_plugins
-
-    logger = logging.getLogger(__name__)
-
-    def start_cloud():
-        """Inicializa o Jarvis em modo API para o Render/Nuvem"""
+async def jarvis_boot():
+    print("[SYSTEM] Iniciando Protocolo de Simbiose...")
     
-        # Auto-load dynamic plugins for extensibility
-        try:
-            loaded_plugins = load_plugins()
-            logger.info(f"🔌 Loaded {len(loaded_plugins)} dynamic plugin(s)")
-        except Exception as e:
-            logger.warning(f"Plugin loading failed: {e}")
+    # O Nexus carrega o que for preciso sob demanda
+    orchestrator = nexus.resolve("central_orchestrator", hint_path="domain/orchestration")
     
-        # Usa o Container para instanciar o AssistantService com todas as dependências
-        # Note: create_edge_container will auto-enable LLM if API key is available
-        container = create_edge_container(
-            wake_word=settings.wake_word,
-            language=settings.language,
-        )
-    
-        # Obtém a instância configurada do AssistantService
-        assistant_service = container.assistant_service
-    
-        # Cria a aplicação FastAPI com o serviço
-        app = create_api_server(assistant_service)
-    
-        port = int(os.getenv("PORT", 8000))
-        print(f"🚀 Jarvis Online na Nuvem - Porta {port}")
-        uvicorn.run(app, host="0.0.0.0", port=port)
+    if orchestrator:
+        result = orchestrator.execute("Verificar integridade do sistema e reportar.")
+        print(f"[JARVIS]: {result}")
 
-    if __name__ == "__main__":
-        if os.getenv("PORT"):
-            start_cloud()
-        else:
-            from app.bootstrap_edge import main
-            main()
-
+if __name__ == "__main__":
+    asyncio.run(jarvis_boot())
