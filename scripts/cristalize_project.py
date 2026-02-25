@@ -93,7 +93,7 @@ class ProjectCrystallizer:
         # CENÁRIO 3: Código solto (Script). Envelopa em uma classe NexusComponent.
         if content.strip():
             logger.info(f"  [📦] Envelopando script: {file_path.name}")
-            
+
             # Melhoria: Indentação segura preservando linhas vazias
             indented = "\n".join(
                 f"        {line}" if line.strip() else line
