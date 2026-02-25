@@ -7,18 +7,24 @@ from app.core.nexuscomponent import NexusComponent
 
 class DriveUploader(NexusComponent):
     """
-    Componente Nexus responsável pelo upload de artefatos para o Google Drive.
-    Contorna limitações de quota de Service Accounts usando supportsAllDrives.
+    Componente Nexus para upload no Google Drive.
+    Satisfaz o contrato Nexus com execute() e configure().
     """
     
     def __init__(self):
         super().__init__()
         self.scopes = ['https://www.googleapis.com/auth/drive']
-        
-        # Resgate da credencial via Secret (G_JSON ou GOOGLE_SERVICE_ACCOUNT_JSON)
+        self.service_account_info = None
+        self.folder_id = None
+
+    def configure(self, config: dict = None):
+        """
+        Implementação obrigatória do contrato NexusComponent.
+        Carrega credenciais e configurações de ambiente.
+        """
         raw_json = os.environ.get('G_JSON') or os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
         if not raw_json:
-            raise ValueError("❌ [NEXUS] Credenciais da Service Account não encontradas (G_JSON).")
+            raise ValueError("❌ [NEXUS] G_JSON não encontrado nas variáveis de ambiente.")
 
         try:
             self.service_account_info = json.loads(raw_json)
@@ -26,16 +32,19 @@ class DriveUploader(NexusComponent):
             self.service_account_info = eval(raw_json)
 
         self.folder_id = os.environ.get('DRIVE_FOLDER_ID')
+        print(f"[INFO] ⚙️ [NEXUS] DriveUploader configurado para Folder: {self.folder_id}")
 
     def execute(self, context):
         """
-        Método OBRIGATÓRIO para integração com o Pipeline Runner.
-        Realiza o upload do arquivo consolidado.
+        Executa o upload do arquivo consolidado.
         """
-        # Extração do caminho do arquivo do contexto ou fallback direto
+        # Garante que as configs foram carregadas (caso o runner não chame configure)
+        if not self.service_account_info:
+            self.configure()
+
+        # Resolução do path do arquivo
         file_path = self._resolve_path(context)
         
-        # Autenticação
         creds = service_account.Credentials.from_service_account_info(
             self.service_account_info, scopes=self.scopes
         )
@@ -49,7 +58,7 @@ class DriveUploader(NexusComponent):
         media = MediaFileUpload(file_path, resumable=True)
 
         try:
-            print(f"[INFO] 📡 [NEXUS] Enviando {file_path} para o Drive...")
+            print(f"[INFO] 📡 [NEXUS] Iniciando upload: {file_metadata['name']}")
             
             request = service.files().create(
                 body=file_metadata,
@@ -61,29 +70,24 @@ class DriveUploader(NexusComponent):
             response = None
             while response is None:
                 status, response = request.next_chunk()
-                if status:
-                    print(f"[INFO] ☁️ Upload: {int(status.progress() * 100)}%")
-
-            print(f"✅ [NEXUS] Upload finalizado com sucesso. ID: {response.get('id')}")
+            
+            print(f"✅ [NEXUS] Sucesso no Drive! ID: {response.get('id')}")
             return response.get('id')
 
         except Exception as e:
             if "storageQuotaExceeded" in str(e):
-                print("💥 ERRO DE COTA: Service Accounts têm 0 bytes em drives pessoais.")
-                print("💡 DICA: Use um 'Shared Drive' para ignorar esse limite.")
+                print("💥 ERRO DE COTA: Conta de serviço limitada a 0 bytes em drives pessoais.")
             raise e
 
     def _resolve_path(self, context):
-        """Helper interno para limpar o execute e garantir o path do arquivo."""
-        path = None
-        if isinstance(context, str):
-            path = context
-        elif isinstance(context, dict):
+        """Helper para capturar o path do arquivo gerado anteriormente."""
+        path = context if isinstance(context, str) else None
+        if isinstance(context, dict):
             path = context.get('result') or context.get('file_path')
             
         fallback = "CORE_LOGIC_CONSOLIDATED.txt"
-        if not path or not os.path.exists(str(path)):
-            if os.path.exists(fallback):
-                return fallback
-            raise FileNotFoundError(f"❌ [NEXUS] Arquivo não encontrado para upload: {path}")
-        return path
+        final_path = path or fallback
+        
+        if not os.path.exists(str(final_path)):
+            raise FileNotFoundError(f"❌ [NEXUS] Arquivo não localizado: {final_path}")
+        return final_path
