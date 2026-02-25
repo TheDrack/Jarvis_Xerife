@@ -1,3 +1,68 @@
+# app/infrastructure/drive_uploader.py
+# -*- coding: utf-8 -*-
+
+import os
+import json
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+from app.core.nexuscomponent import NexusComponent
+
+class DriveUploader(NexusComponent):
+    def __init__(self):
+        self.service = None
+
+    def _authenticate(self):
+        g_json = os.getenv("G_JSON")
+        if not g_json:
+            raise RuntimeError("❌ Variável G_JSON não encontrada no ambiente.")
+
+        try:
+            info = json.loads(g_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                info, scopes=["https://www.googleapis.com/auth/drive.file"]
+            )
+            self.service = build("drive", "v3", credentials=credentials, cache_discovery=False)
+        except Exception as e:
+            raise RuntimeError(f"❌ Falha na autenticação Google: {e}")
+
+    def execute(self, context: dict):
+        # BUSCA O ARTEFATO: Tenta as duas chaves possíveis (do YAML ou do ID)
+        file_path = context.get("artifacts", {}).get("consolidator")
+        
+        if not file_path:
+             # Fallback caso a chave no YAML seja 'consolidate'
+            file_path = context.get("artifacts", {}).get("consolidate")
+
+        print(f"📡 Verificando artefato para upload: {file_path}")
+
+        if not file_path or not os.path.exists(file_path):
+            raise FileNotFoundError(f"❌ O arquivo '{file_path}' não existe. O Consolidator falhou ou a chave no YAML está errada.")
+
+        self._authenticate()
+        folder_id = os.getenv("DRIVE_FOLDER_ID")
+
+        if not folder_id:
+            raise RuntimeError("❌ DRIVE_FOLDER_ID não configurado.")
+
+        metadata = {
+            "name": os.path.basename(file_path),
+            "parents": [folder_id],
+        }
+
+        media = MediaFileUpload(file_path, mimetype="text/plain", resumable=True)
+
+        print(f"☁️ Enviando para o Drive (Pasta: {folder_id})...")
+        
+        try:
+            request = self.service.files().create(body=metadata, media_body=media, fields="id")
+            file = request.execute()
+            drive_id = file.get("id")
+            print(f"✅ Upload concluído com sucesso! Drive ID: {drive_id}")
+            return drive_id
+        except Exception as e:
+            print(f"❌ Erro durante o upload: {e}")
+            raise e
 # -*- coding: utf-8 -*-
 
 import os
