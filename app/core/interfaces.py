@@ -28,6 +28,3 @@ class NexusComponent(ABC):
         """
         pass
 
-
-# Alias de compatibilidade (caso algum loader antigo use esse nome)
-Interfaces = NexusComponent
