@@ -1,10 +1,11 @@
+# config/pipelines/sync_drive.yml
 components:
-  consolidator:
+  consolidator: # Chave de artefato
     id: consolidator
     hint_path: infrastructure
     singleton: true
     config:
-      output_file: CORE_LOGIC_CONSOLIDATED.txt
+      output_file: "CORE_LOGIC_CONSOLIDATED.txt"
 
   drive_uploader:
     id: drive_uploader
