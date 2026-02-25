@@ -19,93 +19,90 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - name: 🛰️ Checkout code
-      uses: actions/checkout@v4
-      with:
-        token: ${{ github.token }}
+      - name: 🛰️ Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ github.token }}
 
-    - name: 📦 Set up uv
-      uses: astral-sh/setup-uv@v5
-      with:
-        enable-cache: true
+      - name: 📦 Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
 
-    - name: 🐍 Set up Python
-      run: uv python install 3.13
+      - name: 🐍 Set up Python
+        run: uv python install 3.13
 
-    - name: 🔧 Install dependencies
-      run: |
-        uv venv
-        # Dependências explícitas + projeto
-        uv pip install pyinstaller bcrypt==4.0.1 passlib[bcrypt]==1.7.4
-        if (Test-Path "requirements.txt") { uv pip install -r requirements.txt }
-      shell: pwsh
+      - name: 🔧 Install dependencies
+        run: |
+          uv venv
+          # Dependências explícitas + projeto
+          uv pip install pyinstaller bcrypt==4.0.1 passlib[bcrypt]==1.7.4
+          if (Test-Path "requirements.txt") { uv pip install -r requirements.txt }
+        shell: pwsh
 
-    - name: 🔍 Debug Path (Verify main.py existence)
-      run: |
-        if (Test-Path "app/application/services/main.py") {
-          Write-Host "[OK] main.py found at app/application/services/main.py"
-        } else {
-          Write-Host "[ERROR] main.py NOT found! Check folder structure."
-          ls -Recurse
-          exit 1
-        }
-      shell: pwsh
+      - name: 🔍 Debug Path (Verify main.py existence)
+        run: |
+          if (Test-Path "app/application/services/main.py") {
+            Write-Host "[OK] main.py found at app/application/services/main.py"
+          } else {
+            Write-Host "[ERROR] main.py NOT found! Check folder structure."
+            ls -Recurse
+            exit 1
+          }
+        shell: pwsh
 
-    # 🚀 AQUI é a mudança arquitetural
-    - name: 🧠 Run JARVIS Pipeline (Build Installer)
-      env:
-        # Intenção do pipeline (GERENTE → SUPERVISOR)
-        PIPELINE: build_installer
+      # 🔑 AQUI entra o mesmo padrão do pipeline funcional
+      - name: 🧠 Run JARVIS Pipeline (Build Installer)
+        env:
+          PIPELINE: build_installer
+          PIPELINE_STRICT: "true"
 
-        # (opcional) modo estrito
-        PIPELINE_STRICT: "true"
+        run: |
+          Write-Host "📁 Workspace: $(Get-Location)"
+          Write-Host "🐍 Python:"
+          uv run python --version
+          Write-Host "🧠 Pipeline selecionado: $env:PIPELINE"
 
-      run: |
-        Write-Host "📁 Workspace: $(Get-Location)"
-        Write-Host "🐍 Python:"
-        uv run python --version
-        Write-Host "🧠 Pipeline selecionado: $env:PIPELINE"
+          # Garante que o pacote 'app' é resolvível
+          $env:PYTHONPATH = "$(Get-Location)"
 
-        # Garante que o pacote 'app' é resolvível
-        $env:PYTHONPATH = "$(Get-Location)"
+          $PIPELINE_RUNNER = "app/runtime/pipeline_runner.py"
 
-        $PIPELINE_RUNNER = "app/runtime/pipeline_runner.py"
+          if (Test-Path $PIPELINE_RUNNER) {
+            Write-Host "🚀 Executando pipeline JARVIS..."
+            uv run python $PIPELINE_RUNNER
+            Write-Host "✅ Pipeline executado com sucesso."
+          } else {
+            Write-Host "❌ Erro: pipeline_runner.py não encontrado em app/runtime/"
+            exit 1
+          }
 
-        if (Test-Path $PIPELINE_RUNNER) {
-          Write-Host "🚀 Executando pipeline JARVIS..."
-          uv run python $PIPELINE_RUNNER
-          Write-Host "✅ Pipeline executado com sucesso."
-        } else {
-          Write-Host "❌ Erro: pipeline_runner.py não encontrado em app/runtime/"
-          exit 1
-        }
+      - name: ✅ Verify build
+        run: |
+          if (Test-Path "dist\Jarvis_Installer.exe") {
+            $item = Get-Item "dist\Jarvis_Installer.exe"
+            Write-Host "✓ Executable built successfully: $($item.FullName)"
+          } else {
+            Write-Host "✗ Executable not found in dist/"
+            exit 1
+          }
+        shell: pwsh
 
-    - name: ✅ Verify build
-      run: |
-        if (Test-Path "dist\Jarvis_Installer.exe") {
-          $item = Get-Item "dist\Jarvis_Installer.exe"
-          Write-Host "✓ Executable built successfully: $($item.FullName)"
-        } else {
-          Write-Host "✗ Executable not found in dist/"
-          exit 1
-        }
-      shell: pwsh
+      - name: 📦 Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jarvis_Installer
+          path: dist/Jarvis_Installer.exe
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 6
 
-    - name: 📦 Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Jarvis_Installer
-        path: dist/Jarvis_Installer.exe
-        retention-days: 30
-        if-no-files-found: error
-        compression-level: 6
-
-    - name: 🏷️ Create Release (on tag)
-      if: startsWith(github.ref, 'refs/tags/v')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: dist/Jarvis_Installer.exe
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
+      - name: 🏷️ Create Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/Jarvis_Installer.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
