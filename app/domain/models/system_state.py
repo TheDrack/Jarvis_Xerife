@@ -14,3 +14,6 @@ class SystemStatus(BaseModel):
 
     class Config:
         frozen = False # Permite mutabilidade controlada pelo StateManager
+
+# Nexus Compatibility
+SystemState = SystemStatus
