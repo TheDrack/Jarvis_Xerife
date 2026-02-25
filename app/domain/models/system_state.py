@@ -7,3 +7,6 @@ class SystemStatus(BaseModel):
     current_mission: Optional[str] = None
     resources: Dict[str, Any] = Field(default_factory=dict)
     metabolic_rate: float = 1.0
+
+# Nexus Compatibility
+SystemState = SystemStatus
