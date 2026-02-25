@@ -18,7 +18,7 @@ class ProjectCrystallizer:
     def __init__(self, dry_run: bool = False):
         self.base_path = Path(".").resolve()
         self.dry_run = dry_run
-        
+
         # PROTEÇÃO: Diretórios e arquivos que nunca devem ser alterados
         self.forbidden_dirs = {
             ".git", ".venv", "venv", "__pycache__", 
@@ -27,7 +27,7 @@ class ProjectCrystallizer:
         self.ignore_files = {
             "__init__.py", "nexus.py", "cristalize_project.py", "nexuscomponent.py"
         }
-        
+
         self.nexus_import = "from app.core.nexuscomponent import NexusComponent"
         self.target_parent = "NexusComponent"
 
@@ -36,7 +36,7 @@ class ProjectCrystallizer:
         backup_dir.mkdir(exist_ok=True)
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         archive = backup_dir / f"checkpoint_{ts}.tar.gz"
-        
+
         with tarfile.open(archive, "w:gz") as tar:
             for f in self.base_path.rglob("*.py"):
                 if not any(part in self.forbidden_dirs for part in f.parts):
@@ -57,7 +57,7 @@ class ProjectCrystallizer:
     def _apply_crystal_logic(self, code: str) -> str:
         lines = code.splitlines()
         modified = False
-        
+
         # 1. Verificar se o arquivo contém uma classe válida para cristalização
         if "class " not in code or self._is_blacklisted_structure(code):
             return code
@@ -70,7 +70,7 @@ class ProjectCrystallizer:
                     insert_pos = i + 1
             lines.insert(insert_pos, self.nexus_import)
             modified = True
-            
+
         # 3. Injeção de Herança e Método Execute
         new_lines = []
         for line in lines:
@@ -97,18 +97,18 @@ class ProjectCrystallizer:
     def run(self):
         if not self.dry_run:
             self._create_checkpoint()
-            
+
         logger.info(f"⚡ Ciclo de Cristalização DNA V5.6")
         count = 0
-        
+
         for py_file in self.base_path.rglob("*.py"):
             if any(part in self.forbidden_dirs for part in py_file.parts): continue
             if py_file.name in self.ignore_files: continue
-            
+
             try:
                 old_code = py_file.read_text(encoding="utf-8")
                 new_code = self._apply_crystal_logic(old_code)
-                
+
                 if old_code != new_code:
                     py_file.write_text(new_code, encoding="utf-8")
                     logger.info(f"✨ Cristalizado: {py_file.name}")
