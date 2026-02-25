@@ -2,7 +2,7 @@ import subprocess
 from pathlib import Path
 
 
-class PyInstallerBuilder:
+class PyinstallerBuilder:
     """
     Worker responsável por gerar o instalador do Jarvis.
     """
