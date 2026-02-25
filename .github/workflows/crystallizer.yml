@@ -29,10 +29,12 @@ jobs:
       - name: 🏗️ Prepare Environment & Structural Crystallization
         run: |
           uv venv --clear --python 3.11
-          # Instalando dependências básicas para os scripts de manutenção
-          uv pip install requests sqlmodel pydantic python-dotenv
+          # Adicionado libcst para evitar o ModuleNotFoundError
+          uv pip install requests sqlmodel pydantic python-dotenv libcst
           
           echo "🛠️ Rodando Sanidade Estrutural (__init__.py e Classes)..."
+          # Garantindo que o diretório atual está no path
+          export PYTHONPATH=$PYTHONPATH:$(pwd)
           uv run python scripts/cristalize_project.py
 
       - name: 🧠 Run Crystallizer Engine (Full Cycle)
@@ -43,7 +45,6 @@ jobs:
           uv run python - << 'PYCODE'
           import sys
           import os
-          # Adiciona o workspace ao path para garantir que o Nexus encontre tudo
           sys.path.append(os.getcwd())
           
           from app.application.services.crystallization.crystallizer_engine import CrystallizerEngine
@@ -67,8 +68,6 @@ jobs:
           
           git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git
           
-          # 1. Adiciona mudanças estruturais (feitos pelo script de cristalização)
-          # 2. Adiciona mudanças de lógica (feitos pelo Engine)
           git add .
           
           if [ -n "$(git status --porcelain)" ]; then
