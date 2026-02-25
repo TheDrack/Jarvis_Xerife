@@ -8,6 +8,7 @@ Demonstrates the new capabilities:
 2. Common filename detection (case-insensitive)
 3. Clear API key error messages
 """
+from app.core.nexuscomponent import NexusComponent
 
 import os
 import sys

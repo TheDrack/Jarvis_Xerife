@@ -4,6 +4,7 @@
 Setor: Project Root
 Responsabilidade: Metadados de instalação.
 """
+from app.core.nexuscomponent import NexusComponent
 from setuptools import setup, find_packages
 from pathlib import Path
 
