@@ -1,8 +1,9 @@
 import subprocess
 from pathlib import Path
+from app.core.nexus import NexusComponent
 
 
-class PyinstallerBuilder:
+class PyinstallerBuilder(NexusComponent):
     """
     Worker responsável por gerar o instalador do Jarvis.
     """
