@@ -7,44 +7,26 @@ from googleapiclient.http import MediaFileUpload
 class DriveUploader:
     def __init__(self):
         self.scopes = ['https://www.googleapis.com/auth/drive']
-        # Prioriza G_JSON conforme log do seu Runner
         raw_json = os.environ.get('G_JSON') or os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
         
         if not raw_json:
-            raise ValueError("❌ Variável G_JSON ou GOOGLE_SERVICE_ACCOUNT_JSON não definida.")
+            raise ValueError("❌ Variável G_JSON não definida.")
 
         try:
             self.service_account_info = json.loads(raw_json)
-        except Exception:
+        except:
             self.service_account_info = eval(raw_json)
             
         self.folder_id = os.environ.get('DRIVE_FOLDER_ID')
 
     def execute(self, context):
-        # --- Lógica de extração do path (Blindagem contra NoneType) ---
-        file_path = None
+        file_path = context if isinstance(context, str) else "CORE_LOGIC_CONSOLIDATED.txt"
         
-        if isinstance(context, str):
-            file_path = context
-        elif isinstance(context, dict):
-            # Tenta chaves comuns que o seu pipeline_runner pode estar usando
-            file_path = context.get('result') or context.get('file_path') or context.get('output')
-
-        if not file_path:
-            # Fallback manual: se o consolidator gerou o arquivo, ele deve estar na raiz
-            fallback = "CORE_LOGIC_CONSOLIDATED.txt"
-            if os.path.exists(fallback):
-                file_path = fallback
-                print(f"[WARN] Contexto vazio. Usando fallback: {fallback}")
-            else:
-                raise ValueError(f"❌ Erro: file_path não encontrado no contexto: {context}")
-
-        # --- Autenticação e Upload ---
         creds = service_account.Credentials.from_service_account_info(
             self.service_account_info, scopes=self.scopes
         )
         
-        # 'discoveryServiceUrl' e 'static_discovery' evitam o erro de file_cache do log
+        # static_discovery=False evita logs desnecessários
         service = build('drive', 'v3', credentials=creds, static_discovery=False)
 
         file_metadata = {
@@ -55,23 +37,26 @@ class DriveUploader:
         media = MediaFileUpload(file_path, resumable=True)
 
         try:
-            print(f"[INFO] 📡 Enviando para o Drive: {file_metadata['name']}")
+            print(f"[INFO] 📡 Tentando upload forçado via Service Account...")
+            
+            # Aqui está o ajuste: usamos supportsAllDrives e tentamos criar o arquivo
             request = service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields='id',
-                supportsAllDrives=True
+                supportsAllDrives=True, # Essencial para permissões externas
+                ignoreDefaultVisibility=True # Tenta evitar conflito de visibilidade
             )
             
             response = None
             while response is None:
                 status, response = request.next_chunk()
-                if status:
-                    print(f"[INFO] Progresso: {int(status.progress() * 100)}%")
-
-            print(f"✅ [NEXUS] Upload finalizado com sucesso. ID: {response.get('id')}")
+            
+            print(f"✅ [NEXUS] Upload com sucesso! ID: {response.get('id')}")
             return response.get('id')
 
         except Exception as e:
-            print(f"💥 ERRO CRÍTICO NO UPLOAD: {str(e)}")
+            if "storageQuotaExceeded" in str(e):
+                print("⚠️ [ALERTA] A Service Account ainda está batendo na cota zero.")
+                print("💡 AÇÃO NECESSÁRIA: No Google Drive, mova a pasta de destino para dentro de um 'Drive Compartilhado' (Shared Drive) ou use uma conta de usuário real via OAuth2.")
             raise e
