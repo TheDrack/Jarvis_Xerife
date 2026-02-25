@@ -12,8 +12,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger("Crystallizer")
 
 class CrystallizerEngine:
+    """
+    Motor de Cristalização JARVIS.
+    Responsável por transmutar capacidades em arquivos físicos e mapear o DNA do sistema.
+    """
     def __init__(self, cap_path="data/capabilities.json", crystal_path="data/master_crystal.json"):
-        # Foco em dados e setores do domínio
+        # Caminhos base
         self.paths = {
             "caps": Path(cap_path),
             "crystal": Path(crystal_path),
@@ -28,6 +32,7 @@ class CrystallizerEngine:
         self.source_capabilities = caps_data.get('capabilities', []) if caps_data else []
 
     def _load_json(self, path: Path):
+        """Carregamento seguro de JSON."""
         if path.exists():
             try:
                 with open(path, 'r', encoding='utf-8') as f:
@@ -43,7 +48,6 @@ class CrystallizerEngine:
         libs = set()
         try:
             content = file_path.read_text(encoding='utf-8')
-            # Regex robusta para imports globais
             patterns = [r'^\s*import\s+([a-zA-Z0-9_]+)', r'^\s*from\s+([a-zA-Z0-9_]+)']
             for pattern in patterns:
                 matches = re.findall(pattern, content, re.MULTILINE)
@@ -89,7 +93,7 @@ class CrystallizerEngine:
 
             if not target_path.exists():
                 target_dir.mkdir(parents=True, exist_ok=True)
-                # Formata o nome da classe (ex: neural_network -> NeuralNetwork)
+                # Formata o nome da classe
                 class_name = "".join(word.capitalize() for word in cap['id'].replace('-', '_').split("_"))
 
                 content = (
@@ -122,15 +126,15 @@ class CrystallizerEngine:
         logger.info(f"🔮 Master Crystal atualizado: {self.paths['crystal']}")
 
     def _init_crystal(self):
-        return {"system_id": "JARVIS_CORE", "version": "3.1.0 (Nexus Stable)", "registry": []}
+        return {"system_id": "JARVIS_CORE", "version": "3.1.0", "registry": []}
 
     def run_full_cycle(self):
-        """Ciclo completo de vida sem dependências obsoletas."""
+        """Ciclo completo de vida."""
         logger.info("🚀 Iniciando Ciclo de Cristalização Nexus V3.1...")
         self.transmute()
         self.audit_and_link()
         self._save_crystal()
-        logger.info("✅ Ciclo completo. O Nexus está operacional.")
+        logger.info("✅ Ciclo completo.")
 
 if __name__ == "__main__":
     CrystallizerEngine().run_full_cycle()
