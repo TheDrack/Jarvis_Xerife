@@ -1,136 +1,65 @@
-from app.core.nexuscomponent import NexusComponent
+# -*- coding: utf-8 -*-
+import os
+import yaml
+import logging
+import sys
+from typing import Dict, Any
 
-class PipelineRunner(NexusComponent):
-    def execute(self, context: dict):
-        import os
-        import yaml
-        import logging
-        from typing import Dict, Any
+# Forçar log no console
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
-        from app.core.nexus import nexus
+from app.core.nexus import nexus
 
+def run_pipeline(pipeline_name: str, strict: bool = False):
+    logging.info(f"🚀 INICIANDO RUNNER: {pipeline_name} (Strict: {strict})")
+    
+    config_path = os.path.join("config", "pipelines", f"{pipeline_name}.yml")
+    if not os.path.exists(config_path):
+        logging.error(f"❌ YAML não encontrado: {config_path}")
+        return
 
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s [%(levelname)s] %(message)s",
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    context = {"artifacts": {}, "metadata": {"pipeline": pipeline_name}, "env": dict(os.environ)}
+    components = config.get("components", {})
+
+    for name, meta in components.items():
+        logging.info(f"🔍 Tentando resolver: {name} (ID: {meta['id']})")
+        
+        instance = nexus.resolve(
+            target_id=meta["id"],
+            hint_path=meta.get("hint_path"),
+            singleton=meta.get("singleton", True),
         )
 
+        if not instance:
+            msg = f"❌ Falha crítica: Componente {name} não resolvido pelo Nexus!"
+            if strict: raise RuntimeError(msg)
+            continue
 
-        def load_pipeline_config(pipeline_name: str) -> Dict[str, Any]:
-            """
-            Resolve o caminho do YAML do pipeline a partir do nome lógico.
-            """
-            config_path = os.path.join("config", "pipelines", f"{pipeline_name}.yml")
+        logging.info(f"⚙️ Executando: {name}...")
+        try:
+            # Passando config do YAML para o componente
+            if hasattr(instance, "configure") and "config" in meta:
+                instance.configure(meta["config"])
 
-            if not os.path.exists(config_path):
-                raise FileNotFoundError(f"Pipeline config not found: {config_path}")
+            result = instance.execute(context)
+            logging.info(f"✅ {name} finalizado. Resultado: {result}")
+            
+            if result:
+                context["artifacts"][name] = result
+        except Exception as e:
+            logging.error(f"💥 ERRO EM {name}: {e}")
+            if strict: raise e
 
-            with open(config_path, "r", encoding="utf-8") as f:
-                return yaml.safe_load(f)
+    logging.info("🏁 PIPELINE FINALIZADO")
 
-
-        def build_initial_context(pipeline_name: str) -> Dict[str, Any]:
-            """
-            Cria o contexto inicial compartilhado entre os componentes.
-            """
-            return {
-                "artifacts": {},
-                "metadata": {
-                    "pipeline": pipeline_name,
-                    "intent": pipeline_name,
-                },
-                "env": dict(os.environ),
-            }
-
-
-        def run_pipeline(
-            pipeline_name: str,
-            strict: bool = False,
-        ) -> Dict[str, Any]:
-            """
-            Pipeline Runner (Supervisor):
-
-            - Executa componentes declarados no YAML
-            - Tolerante a falhas (modo não-strict)
-            - Compartilha contexto entre workers
-            """
-
-            logging.info(f"[PIPELINE] Starting pipeline: {pipeline_name}")
-
-            config = load_pipeline_config(pipeline_name)
-            context = build_initial_context(pipeline_name)
-
-            components = config.get("components", {})
-            if not components:
-                logging.warning("[PIPELINE] No components declared")
-                return context
-
-            for name, meta in components.items():
-                logging.info(f"[PIPELINE] Resolving component: {name}")
-
-                instance = nexus.resolve(
-                    target_id=meta["id"],
-                    hint_path=meta.get("hint_path"),
-                    singleton=meta.get("singleton", True),
-                )
-
-                if not instance:
-                    msg = f"[PIPELINE] Component '{name}' not found"
-                    if strict:
-                        raise RuntimeError(msg)
-                    logging.warning(msg)
-                    continue
-
-                # Configuração opcional
-                if hasattr(instance, "configure") and "config" in meta:
-                    logging.info(f"[PIPELINE] Configuring '{name}'")
-                    instance.configure(meta["config"])
-
-                # Guarda opcional de execução
-                if hasattr(instance, "can_execute"):
-                    try:
-                        if not instance.can_execute(context):
-                            logging.info(
-                                f"[PIPELINE] Skipping '{name}' (can_execute=False)"
-                            )
-                            continue
-                    except TypeError:
-                        # Compatibilidade com can_execute() sem argumentos
-                        if not instance.can_execute():
-                            logging.info(
-                                f"[PIPELINE] Skipping '{name}' (can_execute=False)"
-                            )
-                            continue
-
-                # Execução protegida
-                try:
-                    logging.info(f"[PIPELINE] Executing '{name}'")
-                    result = instance.execute(context)
-
-                    if result is not None:
-                        context["artifacts"][name] = result
-
-                except Exception as e:
-                    logging.exception(f"[PIPELINE] Error in '{name}': {e}")
-                    if strict:
-                        raise
-
-            logging.info(f"[PIPELINE] Finished pipeline: {pipeline_name}")
-            return context
-
-
-        if __name__ == "__main__":
-            pipeline_name = os.getenv("PIPELINE")
-
-            if not pipeline_name:
-                raise RuntimeError(
-                    "Environment variable PIPELINE not set. "
-                    "Example: PIPELINE=sync_drive"
-                )
-
-            strict_mode = os.getenv("PIPELINE_STRICT", "false").lower() == "true"
-
-            run_pipeline(
-                pipeline_name=pipeline_name,
-                strict=strict_mode,
-            )
+if __name__ == "__main__":
+    p_name = os.getenv("PIPELINE")
+    s_mode = os.getenv("PIPELINE_STRICT", "false").lower() == "true"
+    run_pipeline(p_name, s_mode)
