@@ -15,7 +15,7 @@ class MetabolismManager(NexusComponent):
 
         if last_error and component_in_error:
             self.failure_counter[component_in_error] = self.failure_counter.get(component_in_error, 0) + 1
-            
+
             print(f"[METABOLISMO]: Detectada falha no componente {component_in_error}. Tentativa {self.failure_counter[component_in_error]}/{self.max_failures}")
 
             if self.failure_counter[component_in_error] >= self.max_failures:
@@ -24,5 +24,5 @@ class MetabolismManager(NexusComponent):
                 self.failure_counter[component_in_error] = 0
                 context["metadata"]["last_error"] = None
                 context["metadata"]["recovery_triggered"] = True
-        
+
         return context

@@ -10,7 +10,7 @@ class ContextMemory(NexusComponent):
 
     def execute(self, context: dict):
         history = self._load_history()
-        
+
         # Adiciona a entrada atual ao histórico
         history.append({
             "user": context["metadata"].get("user_input"),
