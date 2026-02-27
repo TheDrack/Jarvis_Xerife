@@ -1,24 +1,41 @@
-from app.core.nexuscomponent import NexusComponent
-class Main(NexusComponent):
-    def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+import os
+import json
+from app.core.nexus import JarvisNexus
 
-    def __init__(self, *args, **kwargs):
-        pass
-
-    import asyncio
-    from app.core.nexus import nexus
-
-    async def jarvis_boot():
-        print("[SYSTEM] Iniciando Protocolo de Simbiose...")
+def bootstrap():
+    # 1. Instanciar o Nexus (O coração do projeto)
+    nexus = JarvisNexus()
     
-        # O Nexus carrega o que for preciso sob demanda
-        orchestrator = nexus.resolve("central_orchestrator", hint_path="domain/orchestration")
+    # 2. Carregar o registro de componentes (conforme o data/nexus_registry.json anterior)
+    # Aqui o Nexus descobre onde estão os Gears, Adapters e Services
+    with open("data/nexus_registry.json", "r") as f:
+        registry = json.load(f)
     
-        if orchestrator:
-            result = orchestrator.execute("Verificar integridade do sistema e reportar.")
-            print(f"[JARVIS]: {result}")
+    # 3. Registrar componentes dinamicamente no Nexus
+    for name, path in registry["components"].items():
+        # O NexusComponent é instanciado e configurado aqui
+        # (Assumindo que seu JarvisNexus já faz o import dinâmico)
+        nexus.register_component(name, path)
 
-    if __name__ == "__main__":
-        asyncio.run(jarvis_boot())
+    # 4. Preparar o Contexto Inicial (Protocolo JARVIS)
+    context = {
+        "env": os.environ,
+        "artifacts": {},
+        "metadata": {
+            "user_input": input("Senhor, qual a sua ordem? "),
+            "session_id": "jarvis_session_001"
+        }
+    }
 
+    # 5. Executar o Orquestrador (Application Service)
+    # Ele é quem conhece a ordem de execução dos Gears e Soldados
+    orchestrator = nexus.get_component("orchestrator")
+    orchestrator.configure(nexus) # Passa o Nexus para ele buscar os outros
+    
+    final_context = orchestrator.execute(context)
+
+    # 6. Saída para a Interface
+    print(f"\n[JARVIS]: {final_context['artifacts'].get('final_speech')}")
+
+if __name__ == "__main__":
+    bootstrap()
