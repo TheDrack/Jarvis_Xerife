@@ -1,0 +1,11 @@
+{
+  "components": {
+    "cognitive_router": "app.domain.gears.cognitive_router.CognitiveRouter",
+    "llm_engine": "app.domain.gears.llm_engine.LLMEngine",
+    "system_executor": "app.infrastructure.adapters.system_executor.SystemExecutor",
+    "orchestrator": "app.application.services.orchestrator_service.JARVISOrchestrator",
+    "context_memory": "app.domain.capabilities.context_memory.ContextMemory",
+    "interface_bridge": "app.application.services.interface_bridge.InterfaceBridge",
+    "audit_logger": "app.infrastructure.adapters.audit_logger.AuditLogger"
+  }
+}

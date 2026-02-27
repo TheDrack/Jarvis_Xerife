@@ -8,16 +8,18 @@ from pathlib import Path
 from typing import Dict, Any, List
 
 # Configuração de Log JARVIS
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - [%(levelname)s] - %(message)s'
+)
 logger = logging.getLogger("Crystallizer")
 
 class CrystallizerEngine:
     """
-    Motor de Cristalização JARVIS.
-    Responsável por transmutar capacidades em arquivos físicos e mapear o DNA do sistema.
+    Motor de Cristalização JARVIS V3.2.
+    Responsável por transmutar capacidades em arquivos físicos seguindo as regras de destino.
     """
     def __init__(self, cap_path="data/capabilities.json", crystal_path="data/master_crystal.json"):
-        # Caminhos base
         self.paths = {
             "caps": Path(cap_path),
             "crystal": Path(crystal_path),
@@ -27,12 +29,11 @@ class CrystallizerEngine:
         # Inicialização do Crystal (Bússola do Sistema)
         self.master_crystal = self._load_json(self.paths["crystal"]) or self._init_crystal()
 
-        # Carregamento das intenções/capacidades
+        # Carregamento das capacidades
         caps_data = self._load_json(self.paths["caps"])
         self.source_capabilities = caps_data.get('capabilities', []) if caps_data else []
 
     def _load_json(self, path: Path):
-        """Carregamento seguro de JSON."""
         if path.exists():
             try:
                 with open(path, 'r', encoding='utf-8') as f:
@@ -41,51 +42,31 @@ class CrystallizerEngine:
                 logger.error(f"❌ Erro ao ler JSON {path}: {e}")
         return None
 
-    def _extract_libraries(self, file_path: Path) -> List[str]:
-        """Auto-Sensing: Extrai bibliotecas raiz para o DNA do Crystal."""
-        if not file_path.exists():
-            return []
-        libs = set()
-        try:
-            content = file_path.read_text(encoding='utf-8')
-            patterns = [r'^\s*import\s+([a-zA-Z0-9_]+)', r'^\s*from\s+([a-zA-Z0-9_]+)']
-            for pattern in patterns:
-                matches = re.findall(pattern, content, re.MULTILINE)
-                for lib in matches:
-                    ignored = ['app', 'json', 're', 'os', 'sys', 'pathlib', 'typing', 'datetime', 'logging', 'abc']
-                    if lib not in ignored:
-                        libs.add(lib)
-        except Exception as e:
-            logger.error(f"❌ Erro no scan de {file_path.name}: {e}")
-        return sorted(list(libs))
+    def _map_target(self, cap: Dict[str, Any]) -> str:
+        """
+        Mapeia o setor de destino baseado nas Regras de Cristalização (Palavras-chave).
+        """
+        title = cap.get('title', '').lower()
+        id_cap = cap.get('id', '').lower()
+        search_blob = f"{title} {id_cap}"
 
-    def audit_and_link(self):
-        """Mapeia o DNA e atualiza o Registro do Master Crystal para o Nexus."""
-        new_registry = []
-        for cap in self.source_capabilities:
-            cap_id = cap['id']
-            target_dir = self._map_target(cap)
-            target_file_name = f"{cap_id.lower().replace('-', '_')}.py"
-            target_path = Path(target_dir) / target_file_name
+        # 1. ADAPTERS (Hardware, IO, Externos)
+        if any(x in search_blob for x in ["pyautogui", "keyboard", "click", "press", "os", "file", "drive", "sqlite", "requests"]):
+            return "app/infrastructure/adapters"
 
-            sector = "domain/gears" if "gears" in str(target_path) else \
-                     "domain/models" if "models" in str(target_path) else "domain/capabilities"
+        # 2. DOMAIN GEARS (Raciocínio, LLMs, Seleção de Potência)
+        if any(x in search_blob for x in ["llm", "reasoning", "cognitive", "router", "selector", "marcha", "potencia"]):
+            return "app/domain/gears"
 
-            detected_libs = self._extract_libraries(target_path)
+        # 3. APPLICATION SERVICES (Orquestração, Fluxo, Pontes)
+        if any(x in search_blob for x in ["flow", "orchestration", "loop", "bridge", "service", "sync"]):
+            return "app/application/services"
 
-            new_registry.append({
-                "id": cap_id,
-                "title": cap.get('title'),
-                "status": "active" if target_path.exists() else "pending",
-                "mapped_libraries": detected_libs,
-                "nexus_hint": sector,
-                "path": str(target_path).replace("\\", "/"),
-                "last_audit": datetime.now().isoformat()
-            })
-        self.master_crystal["registry"] = new_registry
+        # 4. DOMAIN CAPABILITIES (Regras de Negócio e Validação)
+        return "app/domain/capabilities"
 
     def transmute(self):
-        """Garante a existência física seguindo o padrão NexusComponent."""
+        """Garante a existência física seguindo o contrato NexusComponent aprimorado."""
         for cap in self.source_capabilities:
             target_dir = Path(self._map_target(cap))
             target_file = f"{cap['id'].lower().replace('-', '_')}.py"
@@ -93,7 +74,8 @@ class CrystallizerEngine:
 
             if not target_path.exists():
                 target_dir.mkdir(parents=True, exist_ok=True)
-                # Formata o nome da classe
+                
+                # Formatação do nome da Classe (CamelCase)
                 class_name = "".join(word.capitalize() for word in cap['id'].replace('-', '_').split("_"))
 
                 content = (
@@ -102,39 +84,60 @@ class CrystallizerEngine:
                     f"class {class_name}(NexusComponent):\n"
                     "    \"\"\"\n"
                     f"    Capacidade: {cap.get('title')}\n"
-                    "    Gerado automaticamente pelo CrystallizerEngine\n"
-                    "    \"\"\"\n"
+                    "    ID: {cap['id']}\n"
+                    "    Setor: {target_dir}\n"
+                    "    \"\"\"\n\n"
+                    "    def __init__(self):\n"
+                    "        super().__init__()\n"
+                    "        # Padrões iniciais do componente\n"
+                    "        self.active = True\n\n"
+                    "    def configure(self, config: dict = None):\n"
+                    "        \"\"\"Opcional: Configuração via Pipeline YAML\"\"\"\n"
+                    "        if config:\n"
+                    "            pass\n\n"
                     "    def execute(self, context: dict = None):\n"
-                    f"        return {{'status': 'active', 'id': '{cap['id']}'}}\n"
+                    "        \"\"\"Execução lógica principal\"\"\"\n"
+                    f"        print('🚀 Executando {class_name}...')\n"
+                    f"        return {{'status': 'success', 'id': '{cap['id']}'}}\n"
                 )
                 target_path.write_text(content, encoding='utf-8')
-                logger.info(f"💎 Cristalizado: {target_file}")
+                logger.info(f"💎 Cristalizado: {target_path}")
 
-    def _map_target(self, cap: Dict[str, Any]) -> str:
-        """Mapeia o setor de destino no domínio."""
-        title = cap.get('title', '').lower()
-        if any(x in title for x in ["inventory", "gap", "objective", "neural"]): return "app/domain/gears"
-        if any(x in title for x in ["classify", "model", "entity"]): return "app/domain/models"
-        return "app/domain/capabilities"
+    def audit_and_link(self):
+        """Mapeia o DNA e atualiza o Registro para o Nexus."""
+        new_registry = []
+        for cap in self.source_capabilities:
+            cap_id = cap['id']
+            target_dir = self._map_target(cap)
+            target_file_name = f"{cap_id.lower().replace('-', '_')}.py"
+            target_path = Path(target_dir) / target_file_name
+
+            new_registry.append({
+                "id": cap_id,
+                "title": cap.get('title'),
+                "status": "active" if target_path.exists() else "pending",
+                "path": str(target_path).replace("\\", "/"),
+                "sector": target_dir.split("/")[-1],
+                "last_audit": datetime.now().isoformat()
+            })
+        self.master_crystal["registry"] = new_registry
 
     def _save_crystal(self):
-        """Persiste o Master Crystal."""
         self.master_crystal["last_scan"] = datetime.now().isoformat()
         self.paths["crystal"].parent.mkdir(parents=True, exist_ok=True)
         with open(self.paths["crystal"], 'w', encoding='utf-8') as f:
             json.dump(self.master_crystal, f, indent=4, ensure_ascii=False)
-        logger.info(f"🔮 Master Crystal atualizado: {self.paths['crystal']}")
+        logger.info(f"🔮 Master Crystal atualizado.")
 
     def _init_crystal(self):
-        return {"system_id": "JARVIS_CORE", "version": "3.1.0", "registry": []}
+        return {"system_id": "JARVIS_CORE", "version": "3.2.0", "registry": []}
 
     def run_full_cycle(self):
-        """Ciclo completo de vida."""
-        logger.info("🚀 Iniciando Ciclo de Cristalização Nexus V3.1...")
+        logger.info("🚀 Iniciando Ciclo de Cristalização Nexus...")
         self.transmute()
         self.audit_and_link()
         self._save_crystal()
-        logger.info("✅ Ciclo completo.")
+        logger.info("✅ DNA Cristalizado e Sincronizado.")
 
 if __name__ == "__main__":
     CrystallizerEngine().run_full_cycle()

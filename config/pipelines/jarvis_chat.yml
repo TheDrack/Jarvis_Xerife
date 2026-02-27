@@ -1,0 +1,12 @@
+components:
+  router:
+    id: "cognitive_router"
+    config:
+      maestro_model: "openai/gpt-4o-mini"
+  engine:
+    id: "llm_engine"
+    config:
+      fleet:
+        CONVERSA: ["openai/gpt-4o-mini"]
+        INTERNET: ["perplexity/pplx-70b-online"]
+        CODIGO: ["anthropic/claude-3-5-sonnet-20240620"]
