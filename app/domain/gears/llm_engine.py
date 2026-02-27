@@ -1,31 +1,32 @@
-import json
+# -*- coding: utf-8 -*-
+from app.core.nexuscomponent import NexusComponent
 import litellm
-from app.core.nexus import NexusComponent
 
-class LLMEngine(NexusComponent):
-    def configure(self, config_path="config/llm_fleet.json"):
-        with open(config_path, 'r') as f:
-            self.settings = json.load(f)
+class LlmEngine(NexusComponent):
+    def __init__(self):
+        self.fleet = {
+            "CONVERSA": ["openai/gpt-4o-mini"],
+            "CODIGO": ["anthropic/claude-3-5-sonnet-20240620"],
+            "INTERNET": ["perplexity/pplx-70b-online"]
+        }
 
-    def can_execute(self, context: dict):
-        return not context["metadata"].get("trigger_automation", False)
+    def configure(self, config: dict = None):
+        if config and "fleet" in config:
+            self.fleet.update(config["fleet"])
 
     def execute(self, context: dict):
+        if context["metadata"].get("marcha") == "AUTOMACAO":
+            return context
+
         marcha = context["metadata"].get("marcha", "CONVERSA")
-        prompt = context["metadata"].get("prompt_reformulado", context["metadata"]["user_input"])
-        modelos = self.settings["frota"].get(marcha, self.settings["frota"]["CONVERSA"])
+        modelos = self.fleet.get(marcha, self.fleet["CONVERSA"])
+        prompt = context["metadata"].get("user_input")
 
         for modelo in modelos:
             try:
-                res = litellm.completion(
-                    model=modelo,
-                    messages=[{"role": "user", "content": prompt}],
-                    timeout=30
-                )
+                res = litellm.completion(model=modelo, messages=[{"role": "user", "content": prompt}])
                 context["artifacts"]["llm_response"] = res.choices[0].message.content
-                context["metadata"]["executor_real"] = modelo
                 return context
-            except Exception as e:
-                context["metadata"]["last_error"] = str(e)
+            except Exception:
                 continue
         return context
