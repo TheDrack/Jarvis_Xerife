@@ -1,13 +1,24 @@
-# config/pipelines/sync_drive.yml
+# JARVIS Pipeline: Sincronização e Backup de DNA
 components:
-  consolidator: # Chave de artefato
-    id: consolidator
-    hint_path: infrastructure
-    singleton: true
-    config:
-      output_file: "CORE_LOGIC_CONSOLIDATED.txt"
+  consolidator:
+    id: "consolidator"
+    hint_path: "infrastructure"
 
   drive_uploader:
-    id: drive_uploader
-    hint_path: infrastructure
+    id: "drive_uploader"
+    hint_path: "infrastructure"
     singleton: true
+    # Se o Google Drive falhar (cota), o pipeline CONTINUA para o Telegram/Gist
+    config:
+      strict_mode: false 
+
+  telegram_backup:
+    id: "telegram_uploader"
+    hint_path: "infrastructure/adapters"
+    config:
+      token: "${{ secrets.TELEGRAM_TOKEN }}"
+      chat_id: "${{ secrets.TELEGRAM_CHAT_ID }}"
+
+  gist_backup:
+    id: "gist_uploader"
+    hint_path: "infrastructure/adapters"
