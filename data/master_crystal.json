@@ -1,7 +1,7 @@
 {
     "system_id": "JARVIS_CORE",
     "version": "1.0.0",
-    "last_scan": "2026-02-27T19:52:56.176807",
+    "last_scan": "2026-02-27T19:53:10.913427",
     "crystallization_summary": {
         "total_capabilities": 102,
         "crystallized": 53,
@@ -14,7 +14,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_001.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175395"
+            "last_audit": "2026-02-27T19:53:10.911737"
         },
         {
             "id": "CAP-002",
@@ -22,7 +22,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_002.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175426"
+            "last_audit": "2026-02-27T19:53:10.911768"
         },
         {
             "id": "CAP-003",
@@ -30,7 +30,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_003.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175450"
+            "last_audit": "2026-02-27T19:53:10.911792"
         },
         {
             "id": "CAP-004",
@@ -38,7 +38,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_004.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175470"
+            "last_audit": "2026-02-27T19:53:10.911815"
         },
         {
             "id": "CAP-005",
@@ -46,7 +46,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_005.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175496"
+            "last_audit": "2026-02-27T19:53:10.911838"
         },
         {
             "id": "CAP-006",
@@ -54,7 +54,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_006.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175518"
+            "last_audit": "2026-02-27T19:53:10.911861"
         },
         {
             "id": "CAP-007",
@@ -62,7 +62,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_007.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175538"
+            "last_audit": "2026-02-27T19:53:10.911885"
         },
         {
             "id": "CAP-008",
@@ -70,7 +70,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_008.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175561"
+            "last_audit": "2026-02-27T19:53:10.911911"
         },
         {
             "id": "CAP-009",
@@ -78,7 +78,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_009.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175582"
+            "last_audit": "2026-02-27T19:53:10.911934"
         },
         {
             "id": "CAP-010",
@@ -86,7 +86,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_010.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175603"
+            "last_audit": "2026-02-27T19:53:10.911956"
         },
         {
             "id": "CAP-011",
@@ -94,7 +94,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_011.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175626"
+            "last_audit": "2026-02-27T19:53:10.911979"
         },
         {
             "id": "CAP-012",
@@ -102,7 +102,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_012.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175640"
+            "last_audit": "2026-02-27T19:53:10.912002"
         },
         {
             "id": "CAP-013",
@@ -110,7 +110,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_013.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175655"
+            "last_audit": "2026-02-27T19:53:10.912023"
         },
         {
             "id": "CAP-014",
@@ -118,7 +118,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_014.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175668"
+            "last_audit": "2026-02-27T19:53:10.912042"
         },
         {
             "id": "CAP-015",
@@ -126,7 +126,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_015.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175686"
+            "last_audit": "2026-02-27T19:53:10.912065"
         },
         {
             "id": "CAP-016",
@@ -134,7 +134,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_016.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175700"
+            "last_audit": "2026-02-27T19:53:10.912085"
         },
         {
             "id": "CAP-017",
@@ -142,7 +142,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_017.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175712"
+            "last_audit": "2026-02-27T19:53:10.912103"
         },
         {
             "id": "CAP-018",
@@ -150,7 +150,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_018.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175725"
+            "last_audit": "2026-02-27T19:53:10.912121"
         },
         {
             "id": "CAP-019",
@@ -158,7 +158,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_019.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175738"
+            "last_audit": "2026-02-27T19:53:10.912138"
         },
         {
             "id": "CAP-020",
@@ -166,7 +166,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_020.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175751"
+            "last_audit": "2026-02-27T19:53:10.912156"
         },
         {
             "id": "CAP-021",
@@ -174,7 +174,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_021.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175762"
+            "last_audit": "2026-02-27T19:53:10.912173"
         },
         {
             "id": "CAP-022",
@@ -182,7 +182,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_022.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175801"
+            "last_audit": "2026-02-27T19:53:10.912191"
         },
         {
             "id": "CAP-023",
@@ -190,7 +190,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_023.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175818"
+            "last_audit": "2026-02-27T19:53:10.912208"
         },
         {
             "id": "CAP-024",
@@ -198,7 +198,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_024.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175832"
+            "last_audit": "2026-02-27T19:53:10.912226"
         },
         {
             "id": "CAP-025",
@@ -206,7 +206,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_025.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175844"
+            "last_audit": "2026-02-27T19:53:10.912243"
         },
         {
             "id": "CAP-026",
@@ -214,7 +214,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_026.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175857"
+            "last_audit": "2026-02-27T19:53:10.912261"
         },
         {
             "id": "CAP-027",
@@ -222,7 +222,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_027.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175869"
+            "last_audit": "2026-02-27T19:53:10.912279"
         },
         {
             "id": "CAP-028",
@@ -230,7 +230,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_028.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175881"
+            "last_audit": "2026-02-27T19:53:10.912301"
         },
         {
             "id": "CAP-029",
@@ -238,7 +238,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_029.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175893"
+            "last_audit": "2026-02-27T19:53:10.912319"
         },
         {
             "id": "CAP-030",
@@ -246,7 +246,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_030.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175908"
+            "last_audit": "2026-02-27T19:53:10.912336"
         },
         {
             "id": "CAP-031",
@@ -254,7 +254,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_031.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175921"
+            "last_audit": "2026-02-27T19:53:10.912374"
         },
         {
             "id": "CAP-032",
@@ -262,7 +262,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_032.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175941"
+            "last_audit": "2026-02-27T19:53:10.912398"
         },
         {
             "id": "CAP-033",
@@ -270,7 +270,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_033.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175957"
+            "last_audit": "2026-02-27T19:53:10.912416"
         },
         {
             "id": "CAP-034",
@@ -278,7 +278,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_034.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175970"
+            "last_audit": "2026-02-27T19:53:10.912435"
         },
         {
             "id": "CAP-035",
@@ -286,7 +286,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_035.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175985"
+            "last_audit": "2026-02-27T19:53:10.912459"
         },
         {
             "id": "CAP-036",
@@ -294,7 +294,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_036.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.175997"
+            "last_audit": "2026-02-27T19:53:10.912478"
         },
         {
             "id": "CAP-037",
@@ -302,7 +302,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_037.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176009"
+            "last_audit": "2026-02-27T19:53:10.912495"
         },
         {
             "id": "CAP-038",
@@ -310,7 +310,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_038.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176020"
+            "last_audit": "2026-02-27T19:53:10.912513"
         },
         {
             "id": "CAP-039",
@@ -318,7 +318,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_039.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176031"
+            "last_audit": "2026-02-27T19:53:10.912530"
         },
         {
             "id": "CAP-040",
@@ -326,7 +326,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_040.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176042"
+            "last_audit": "2026-02-27T19:53:10.912546"
         },
         {
             "id": "CAP-041",
@@ -334,7 +334,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_041.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176054"
+            "last_audit": "2026-02-27T19:53:10.912563"
         },
         {
             "id": "CAP-042",
@@ -342,7 +342,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_042.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176067"
+            "last_audit": "2026-02-27T19:53:10.912582"
         },
         {
             "id": "CAP-043",
@@ -350,7 +350,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_043.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176079"
+            "last_audit": "2026-02-27T19:53:10.912599"
         },
         {
             "id": "CAP-044",
@@ -358,7 +358,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_044.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176090"
+            "last_audit": "2026-02-27T19:53:10.912614"
         },
         {
             "id": "CAP-045",
@@ -366,7 +366,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_045.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176101"
+            "last_audit": "2026-02-27T19:53:10.912630"
         },
         {
             "id": "CAP-046",
@@ -374,7 +374,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_046.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176113"
+            "last_audit": "2026-02-27T19:53:10.912650"
         },
         {
             "id": "CAP-047",
@@ -382,7 +382,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_047.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176123"
+            "last_audit": "2026-02-27T19:53:10.912670"
         },
         {
             "id": "CAP-048",
@@ -390,7 +390,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_048.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176135"
+            "last_audit": "2026-02-27T19:53:10.912694"
         },
         {
             "id": "CAP-049",
@@ -398,7 +398,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_049.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176146"
+            "last_audit": "2026-02-27T19:53:10.912708"
         },
         {
             "id": "CAP-050",
@@ -406,7 +406,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_050.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176158"
+            "last_audit": "2026-02-27T19:53:10.912721"
         },
         {
             "id": "CAP-051",
@@ -414,7 +414,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_051.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176170"
+            "last_audit": "2026-02-27T19:53:10.912733"
         },
         {
             "id": "CAP-052",
@@ -422,7 +422,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_052.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176182"
+            "last_audit": "2026-02-27T19:53:10.912746"
         },
         {
             "id": "CAP-053",
@@ -430,7 +430,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_053.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176193"
+            "last_audit": "2026-02-27T19:53:10.912763"
         },
         {
             "id": "CAP-054",
@@ -438,7 +438,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_054.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176208"
+            "last_audit": "2026-02-27T19:53:10.912778"
         },
         {
             "id": "CAP-055",
@@ -446,7 +446,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_055.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176220"
+            "last_audit": "2026-02-27T19:53:10.912789"
         },
         {
             "id": "CAP-056",
@@ -454,7 +454,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_056.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176232"
+            "last_audit": "2026-02-27T19:53:10.912801"
         },
         {
             "id": "CAP-057",
@@ -462,7 +462,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_057.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176243"
+            "last_audit": "2026-02-27T19:53:10.912813"
         },
         {
             "id": "CAP-058",
@@ -470,7 +470,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_058.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176254"
+            "last_audit": "2026-02-27T19:53:10.912825"
         },
         {
             "id": "CAP-059",
@@ -478,7 +478,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_059.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176264"
+            "last_audit": "2026-02-27T19:53:10.912836"
         },
         {
             "id": "CAP-060",
@@ -486,7 +486,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_060.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176276"
+            "last_audit": "2026-02-27T19:53:10.912849"
         },
         {
             "id": "CAP-061",
@@ -494,7 +494,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_061.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176288"
+            "last_audit": "2026-02-27T19:53:10.912861"
         },
         {
             "id": "CAP-062",
@@ -502,7 +502,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_062.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176303"
+            "last_audit": "2026-02-27T19:53:10.912874"
         },
         {
             "id": "CAP-063",
@@ -510,7 +510,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_063.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176316"
+            "last_audit": "2026-02-27T19:53:10.912886"
         },
         {
             "id": "CAP-064",
@@ -518,7 +518,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_064.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176328"
+            "last_audit": "2026-02-27T19:53:10.912905"
         },
         {
             "id": "CAP-065",
@@ -526,7 +526,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_065.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176340"
+            "last_audit": "2026-02-27T19:53:10.912917"
         },
         {
             "id": "CAP-066",
@@ -534,7 +534,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_066.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176351"
+            "last_audit": "2026-02-27T19:53:10.912930"
         },
         {
             "id": "CAP-067",
@@ -542,7 +542,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_067.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176362"
+            "last_audit": "2026-02-27T19:53:10.912940"
         },
         {
             "id": "CAP-068",
@@ -550,7 +550,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_068.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176373"
+            "last_audit": "2026-02-27T19:53:10.912952"
         },
         {
             "id": "CAP-069",
@@ -558,7 +558,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_069.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176385"
+            "last_audit": "2026-02-27T19:53:10.912963"
         },
         {
             "id": "CAP-070",
@@ -566,7 +566,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_070.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176396"
+            "last_audit": "2026-02-27T19:53:10.912975"
         },
         {
             "id": "CAP-071",
@@ -574,7 +574,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_071.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176407"
+            "last_audit": "2026-02-27T19:53:10.912989"
         },
         {
             "id": "CAP-072",
@@ -582,7 +582,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_072.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176417"
+            "last_audit": "2026-02-27T19:53:10.913000"
         },
         {
             "id": "CAP-073",
@@ -590,7 +590,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_073.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176429"
+            "last_audit": "2026-02-27T19:53:10.913012"
         },
         {
             "id": "CAP-074",
@@ -598,7 +598,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_074.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176443"
+            "last_audit": "2026-02-27T19:53:10.913026"
         },
         {
             "id": "CAP-075",
@@ -606,7 +606,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_075.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176455"
+            "last_audit": "2026-02-27T19:53:10.913038"
         },
         {
             "id": "CAP-076",
@@ -614,7 +614,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_076.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176469"
+            "last_audit": "2026-02-27T19:53:10.913050"
         },
         {
             "id": "CAP-077",
@@ -622,7 +622,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_077.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176481"
+            "last_audit": "2026-02-27T19:53:10.913062"
         },
         {
             "id": "CAP-078",
@@ -630,7 +630,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_078.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176494"
+            "last_audit": "2026-02-27T19:53:10.913074"
         },
         {
             "id": "CAP-079",
@@ -638,7 +638,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_079.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176506"
+            "last_audit": "2026-02-27T19:53:10.913086"
         },
         {
             "id": "CAP-080",
@@ -646,7 +646,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_080.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176517"
+            "last_audit": "2026-02-27T19:53:10.913098"
         },
         {
             "id": "CAP-081",
@@ -654,7 +654,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_081.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176531"
+            "last_audit": "2026-02-27T19:53:10.913110"
         },
         {
             "id": "CAP-082",
@@ -662,7 +662,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_082.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176542"
+            "last_audit": "2026-02-27T19:53:10.913121"
         },
         {
             "id": "CAP-083",
@@ -670,7 +670,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_083.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176554"
+            "last_audit": "2026-02-27T19:53:10.913132"
         },
         {
             "id": "CAP-084",
@@ -678,7 +678,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_084.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176565"
+            "last_audit": "2026-02-27T19:53:10.913144"
         },
         {
             "id": "CAP-085",
@@ -686,7 +686,7 @@
             "status": "active",
             "path": "app/application/services/cap_085.py",
             "sector": "services",
-            "last_audit": "2026-02-27T19:52:56.176576"
+            "last_audit": "2026-02-27T19:53:10.913156"
         },
         {
             "id": "CAP-086",
@@ -694,7 +694,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_086.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176588"
+            "last_audit": "2026-02-27T19:53:10.913167"
         },
         {
             "id": "CAP-087",
@@ -702,7 +702,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_087.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176601"
+            "last_audit": "2026-02-27T19:53:10.913179"
         },
         {
             "id": "CAP-088",
@@ -710,7 +710,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_088.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176612"
+            "last_audit": "2026-02-27T19:53:10.913190"
         },
         {
             "id": "CAP-089",
@@ -718,7 +718,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_089.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176623"
+            "last_audit": "2026-02-27T19:53:10.913201"
         },
         {
             "id": "CAP-090",
@@ -726,7 +726,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_090.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176635"
+            "last_audit": "2026-02-27T19:53:10.913213"
         },
         {
             "id": "CAP-091",
@@ -734,7 +734,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_091.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176646"
+            "last_audit": "2026-02-27T19:53:10.913224"
         },
         {
             "id": "CAP-092",
@@ -742,7 +742,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_092.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176658"
+            "last_audit": "2026-02-27T19:53:10.913236"
         },
         {
             "id": "CAP-093",
@@ -750,7 +750,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_093.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176672"
+            "last_audit": "2026-02-27T19:53:10.913250"
         },
         {
             "id": "CAP-094",
@@ -758,7 +758,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_094.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176687"
+            "last_audit": "2026-02-27T19:53:10.913263"
         },
         {
             "id": "CAP-095",
@@ -766,7 +766,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_095.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176697"
+            "last_audit": "2026-02-27T19:53:10.913276"
         },
         {
             "id": "CAP-096",
@@ -774,7 +774,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_096.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176709"
+            "last_audit": "2026-02-27T19:53:10.913288"
         },
         {
             "id": "CAP-097",
@@ -782,7 +782,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_097.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176721"
+            "last_audit": "2026-02-27T19:53:10.913301"
         },
         {
             "id": "CAP-098",
@@ -790,7 +790,7 @@
             "status": "active",
             "path": "app/domain/gears/cap_098.py",
             "sector": "gears",
-            "last_audit": "2026-02-27T19:52:56.176732"
+            "last_audit": "2026-02-27T19:53:10.913312"
         },
         {
             "id": "CAP-099",
@@ -798,7 +798,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_099.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176744"
+            "last_audit": "2026-02-27T19:53:10.913324"
         },
         {
             "id": "CAP-100",
@@ -806,7 +806,7 @@
             "status": "active",
             "path": "app/infrastructure/adapters/cap_100.py",
             "sector": "adapters",
-            "last_audit": "2026-02-27T19:52:56.176754"
+            "last_audit": "2026-02-27T19:53:10.913335"
         },
         {
             "id": "CAP-101",
@@ -814,7 +814,7 @@
             "status": "active",
             "path": "app/domain/capabilities/cap_101.py",
             "sector": "capabilities",
-            "last_audit": "2026-02-27T19:52:56.176766"
+            "last_audit": "2026-02-27T19:53:10.913382"
         },
         {
             "id": "CAP-102",
@@ -822,7 +822,7 @@
             "status": "active",
             "path": "app/domain/gears/cap_102.py",
             "sector": "gears",
-            "last_audit": "2026-02-27T19:52:56.176792"
+            "last_audit": "2026-02-27T19:53:10.913410"
         }
     ]
 }
