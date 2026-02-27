@@ -1,0 +1,15 @@
+{
+  "maestro": {
+    "model": "openai/gpt-4o-mini",
+    "temperature": 0,
+    "prompt_system": "Você é o Maestro do JARVIS. Sua função é triagem. Analise o input e responda no formato: MARCHA: [CODIGO, INTERNET, CONVERSA, AUTOMACAO] | PROMPT_OTIMIZADO: <texto_tecnico>"
+  },
+  "frota": {
+    "CONVERSA": ["openai/gpt-3.5-turbo", "groq/llama3-8b"],
+    "INTERNET": ["perplexity/pplx-70b-online", "google/gemini-1.5-flash"],
+    "CODIGO": ["anthropic/claude-3-5-sonnet-20240620", "openai/gpt-4o"]
+  },
+  "automacao": {
+    "gatilhos": ["tirar foto", "print", "digite", "aperte", "abra o navegador", "pesquise no google"]
+  }
+}
