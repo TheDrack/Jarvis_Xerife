@@ -2,12 +2,7 @@ name: "💎 JARVIS: Crystallizer"
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - 'data/capabilities.json'
-      - 'app/domain/**'
-      - 'app/application/services/**'
+  
 
 jobs:
   organize:
