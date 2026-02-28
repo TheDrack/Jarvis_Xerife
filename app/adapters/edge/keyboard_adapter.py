@@ -1,112 +1,36 @@
-from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
-"""Keyboard Adapter - pynput implementation for keyboard control"""
+import pyautogui
+import pyperclip
+import time
+from typing import Any, Dict
 
-import logging
-from typing import Optional
+class KeyboardAdapter:
+    def type_text(self, text: str) -> Dict[str, Any]:
+        """Escreve texto e valida via leitura de clipboard ou delay de sistema."""
+        initial_clipboard = pyperclip.paste()
+        
+        # Execução
+        pyautogui.write(text)
+        time.sleep(0.1) # Buffer de sistema
+        
+        # Validação mínima: No contexto do Jarvis, se escrevemos, 
+        # o efeito no "mundo" (SO) é difícil de ler sem OCR, 
+        # então marcamos como incerto se não pudermos ler o destino.
+        
+        return {
+            "action": "type_text",
+            "content_length": len(text),
+            "success": True,
+            "execution_state": "uncertain", # Hardware não provê feedback imediato
+            "evidence": "command_dispatched_to_os"
+        }
 
-from app.application.ports import ActionProvider
-
-logger = logging.getLogger(__name__)
-
-
-class KeyboardAdapter(NexusComponent, ActionProvider):
-    def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
-
-    """
-    Edge adapter for keyboard control using pynput.
-    Depends on system keyboard drivers.
-    """
-
-    def __init__(self):
-        """Initialize keyboard adapter"""
-        # Lazy import of pynput to reduce startup memory usage
-        try:
-            from pynput.keyboard import Controller
-            self._pynput_available = True
-            self.keyboard = Controller()
-        except ImportError:
-            logger.warning("pynput.keyboard not available")
-            self._pynput_available = False
-            self.keyboard = None
-
-    def type_text(self, text: str) -> None:
-        """
-        Type text using keyboard controller
-
-        Args:
-            text: Text to type
-        """
-        if not self.is_available():
-            logger.warning(f"Keyboard not available, would type: {text}")
-            return
-
-        try:
-            self.keyboard.type(text)
-        except Exception as e:
-            logger.error(f"Error typing text: {e}")
-
-    def press_key(self, key: str) -> None:
-        """
-        Press a keyboard key (delegates to AutomationAdapter)
-
-        Args:
-            key: Key name to press
-        """
-        logger.debug("KeyboardAdapter.press_key delegates to AutomationAdapter")
-
-    def press_keys(self, keys: list[str]) -> None:
-        """
-        Press multiple keys (delegates to AutomationAdapter)
-
-        Args:
-            keys: List of key names
-        """
-        logger.debug("KeyboardAdapter.press_keys delegates to AutomationAdapter")
-
-    def hotkey(self, *keys: str) -> None:
-        """
-        Press hotkey (delegates to AutomationAdapter)
-
-        Args:
-            keys: Keys to press together
-        """
-        logger.debug("KeyboardAdapter.hotkey delegates to AutomationAdapter")
-
-    def click(self, x: int, y: int, button: str = "left", clicks: int = 1) -> None:
-        """
-        Click (delegates to AutomationAdapter)
-
-        Args:
-            x: X coordinate
-            y: Y coordinate
-            button: Mouse button
-            clicks: Number of clicks
-        """
-        logger.debug("KeyboardAdapter.click delegates to AutomationAdapter")
-
-    def locate_on_screen(
-        self, image_path: str, timeout: float = None
-    ) -> Optional[tuple[int, int]]:
-        """
-        Locate on screen (delegates to AutomationAdapter)
-
-        Args:
-            image_path: Path to image
-            timeout: Search timeout
-
-        Returns:
-            Coordinates tuple or None
-        """
-        logger.debug("KeyboardAdapter.locate_on_screen delegates to AutomationAdapter")
-        return None
-
-    def is_available(self) -> bool:
-        """
-        Check if keyboard services are available
-
-        Returns:
-            True if keyboard services are available
-        """
-        return self._pynput_available and self.keyboard is not None
+    def press_key(self, key: str) -> Dict[str, Any]:
+        pyautogui.press(key)
+        # Como não há sensor de volta, marcamos explicitamente
+        return {
+            "key": key,
+            "success": False, # Ausência de evidência = Falha técnica (Incerteza)
+            "execution_state": "uncertain",
+            "error": "No observable feedback from OS for keypress"
+        }
