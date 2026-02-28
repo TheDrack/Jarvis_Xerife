@@ -13,7 +13,7 @@ components:
       strict_mode: false 
 
   telegram_backup:
-    id: "telegram_uploader"
+    id: "telegram_adapter"
     hint_path: "infrastructure/adapters"
     config:
       token: "${{ secrets.TELEGRAM_TOKEN }}"
