@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-Repo Lifecycle Governance — SELF HEALING MODE
+Repo Lifecycle Governance — RUNTIME SAFE SELF HEALING
 
-- Descongela automaticamente qualquer coisa estrutural
-- Descongela módulos usados (AST + Nexus)
-- Congela apenas código de produção morto
-- Nunca falha pipeline
+- Runtime nunca congela
+- Entry points nunca congelam
+- Auto-unfreeze de erros passados
+- Freeze só em código realmente morto
 """
 
 import ast
@@ -34,11 +34,21 @@ STRUCTURAL_DIRS = {
     "dags",
     "scripts",
     ".github",
+    "runtime",          # 🚨 CRÍTICO
 }
 
 PROTECTED_FILES = {
     "setup.py",
     "build_config.py",
+}
+
+RUNTIME_KEYWORDS = {
+    "runner",
+    "pipeline",
+    "bootstrap",
+    "main",
+    "cli",
+    "worker",
 }
 
 NEXUS_MEMORY_FILES = [
@@ -55,7 +65,11 @@ def log(msg: str):
 
 def is_entrypoint(py: Path) -> bool:
     try:
-        return 'if __name__ == "__main__"' in py.read_text(encoding="utf-8")
+        txt = py.read_text(encoding="utf-8")
+        return (
+            'if __name__ == "__main__"' in txt
+            or any(k in py.name.lower() for k in RUNTIME_KEYWORDS)
+        )
     except Exception:
         return False
 
@@ -104,14 +118,8 @@ def scan_nexus_usage() -> Set[str]:
 
 
 def discover_used_modules() -> Set[str]:
-    ast_used = scan_ast_usage()
-    nexus_used = scan_nexus_usage()
-    used = ast_used | nexus_used
-
-    log(f"[DISCOVERY] AST used: {len(ast_used)}")
-    log(f"[DISCOVERY] Nexus used: {len(nexus_used)}")
+    used = scan_ast_usage() | scan_nexus_usage()
     log(f"[DISCOVERY] TOTAL used: {len(used)}")
-
     return used
 
 # =============================================================================
@@ -156,18 +164,18 @@ def freeze(py: Path):
 
 def main():
     log("=" * 80)
-    log("Repo Lifecycle Governance — SELF HEALING")
+    log("Repo Lifecycle Governance — RUNTIME SAFE")
     log("=" * 80)
 
     used = discover_used_modules()
     changes = 0
 
-    # 1️⃣ UNFREEZE estrutural obrigatório
+    # 1️⃣ UNFREEZE estrutural
     for folder in (FROZEN_CAPS, FROZEN_MODULES):
         if not folder.exists():
             continue
         for py in folder.glob("*.py"):
-            if is_structural(py):
+            if is_structural(py) or is_entrypoint(py):
                 unfreeze(py)
                 changes += 1
 
