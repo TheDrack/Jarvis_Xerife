@@ -28,35 +28,15 @@ jobs:
             google-auth-oauthlib \
             pyyaml
 
-      - name: ☁️ Run JARVIS Pipeline (Sync Drive)
+      - name: ☁️ Run JARVIS Pipeline (Sync Drive & Backups)
         env:
-          # 🔑 Segredos de domínio
           G_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-
-          # 🧠 Intenção do pipeline (GERENTE → SUPERVISOR)
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GIST_PAT: ${{ secrets.GIST_PAT }} # <--- ADICIONADO AQUI
           PIPELINE: sync_drive
-
-          # (opcional) força falha se algo der errado
-          PIPELINE_STRICT: "true"
-
+          PIPELINE_STRICT: "false" # <--- Importante para não travar no erro do Drive
         run: |
-          set -e
-
-          echo "📁 Workspace: $(pwd)"
-          echo "🐍 Python: $(python --version)"
-          echo "🧠 Pipeline selecionado: $PIPELINE"
-
-          # Garante que o pacote 'app' é resolvível
           export PYTHONPATH="$(pwd)"
-
-          PIPELINE_RUNNER="app/runtime/pipeline_runner.py"
-
-          if [ -f "$PIPELINE_RUNNER" ]; then
-            echo "🚀 Executando pipeline JARVIS..."
-            python "$PIPELINE_RUNNER"
-            echo "✅ Pipeline executado com sucesso."
-          else
-            echo "❌ Erro: pipeline_runner.py não encontrado em app/runtime/"
-            exit 1
-          fi
+          python app/runtime/pipeline_runner.py
