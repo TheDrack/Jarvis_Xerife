@@ -1,19 +1,10 @@
-name: Capability Governance (Freeze / Unfreeze)
+name: Repo Lifecycle Governance
 
 on:
   workflow_dispatch:
-    inputs:
-      mode:
-        description: "Modo de execução (audit ou govern)"
-        required: true
-        default: "govern"
-        type: choice
-        options:
-          - audit
-          - govern
 
 jobs:
-  capability-governance:
+  governance:
     runs-on: ubuntu-latest
 
     steps:
@@ -27,70 +18,19 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install minimal dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # Dependências opcionais — não falhar se não existirem
-          pip install sqlmodel || true
-
-      - name: Run Capability Lifecycle Governance
+      - name: Run repository lifecycle governance
         env:
-          MODE: ${{ inputs.mode }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
           echo "========================================"
-          echo " Jarvis Capability Lifecycle Governance"
-          echo " Mode: $MODE"
+          echo " Repo Lifecycle Governance"
           echo "========================================"
 
-          python scripts/architecture_and_cap_governance.py
-          STATUS=$?
+          python scripts/repo_lifecycle_governance.py
 
-          echo "Exit code returned: $STATUS"
-
-          # 0  -> OK
-          if [ "$STATUS" -eq 0 ]; then
-            echo "✓ Governança estável"
-            exit 0
-          fi
-
-          # 10 -> Warning arquitetural (tolerável)
-          if [ "$STATUS" -eq 10 ]; then
-            echo "⚠️ Warning arquitetural tolerado"
-            exit 0
-          fi
-
-          # 20 -> Mudanças aplicadas (freeze/unfreeze)
-          if [ "$STATUS" -eq 20 ]; then
-            echo "🔁 Mudanças aplicadas no repositório"
-
-            if [ "$MODE" = "audit" ]; then
-              echo "Audit mode: não bloqueando pipeline"
-              exit 0
-            fi
-
-            echo "Govern mode: reexecução necessária"
-            exit 1
-          fi
-
-          # Qualquer outro código → falha dura
-          echo "❌ Falha inesperada"
-          exit 1
-
-      - name: Create Pull Request with governance changes
-        if: failure() && inputs.mode == 'govern'
-        uses: peter-evans/create-pull-request@v6
+      - name: Commit and merge maintenance changes
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          branch: governance/capability-lifecycle
-          title: "chore(governance): auto freeze/unfreeze capabilities"
-          body: |
-            Este PR foi gerado automaticamente pelo sistema de governança.
-
-            Ações realizadas:
-            - Descongelamento de capabilities em uso
-            - Congelamento de capabilities não utilizadas
-
-            Após o merge, reexecute o workflow para validar estado limpo.
-          commit-message: "chore(governance): auto freeze/unfreeze capabilities"
-          delete-branch: false
-          draft: false
+          commit_message: "chore(governance): auto freeze/unfreeze repository modules"
+          branch: main
+          push_options: --force
