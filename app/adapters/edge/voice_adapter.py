@@ -1,109 +1,39 @@
-from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
-"""Voice Adapter - Speech recognition implementation using Google Speech API"""
-
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
+from app.core.nexus import nexus
+from app.core.nexuscomponent import NexusComponent
 
-from app.application.ports import VoiceProvider
-
-logger = logging.getLogger(__name__)
-
-
-class VoiceAdapter(NexusComponent, VoiceProvider):
-    def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
-
+class VoiceAdapter(NexusComponent):
     """
-    Edge adapter for voice recognition using SpeechRecognition library.
-    Depends on microphone hardware and Google Speech API.
+    Adaptador de Voz (STT/TTS).
+    Gerencia a interface de áudio do JARVIS através do Nexus.
     """
 
-    def __init__(
-        self,
-        language: str = "pt-BR",
-        ambient_noise_adjustment: bool = True,
-    ):
+    def __init__(self):
+        super().__init__()
+        # REGRA: Resolve o logger central para manter a ciência dos eventos
+        self.logger = nexus.resolve("structured_logger")
+        self.active = True
+
+    def execute(self, context: Optional[Dict[str, Any]] = None) -> Any:
         """
-        Initialize voice adapter
-
-        Args:
-            language: Language code for recognition
-            ambient_noise_adjustment: Whether to adjust for ambient noise
+        Interface única de execução.
+        Se receber 'text', processa fala. Caso contrário, processa escuta.
         """
-        # Lazy import of speech_recognition to reduce startup memory usage
-        try:
-            import speech_recognition as sr
-            self._sr = sr
-            self._speech_recognition_available = True
-            self.recognizer = sr.Recognizer()
-        except ImportError:
-            logger.warning("speech_recognition module not available")
-            self._sr = None
-            self._speech_recognition_available = False
-            self.recognizer = None
+        if context and "text" in context:
+            return self.speak(context["text"])
+        return self.listen()
 
-        self.language = language
-        self.ambient_noise_adjustment = ambient_noise_adjustment
+    def speak(self, text: str) -> bool:
+        """Converte texto em saída de áudio."""
+        self.logger.execute({"level": "info", "message": f"🔊 Saída de Voz: {text}"})
+        # Aqui o código será expandido com o motor específico (ex: pyttsx3)
+        print(f"[JARVIS VOICE]: {text}")
+        return True
 
-    def speak(self, text: str) -> None:
-        """
-        This adapter only handles recognition, not synthesis.
-        Use TTSAdapter for text-to-speech.
-
-        Args:
-            text: Text to be spoken (ignored)
-        """
-        logger.debug("VoiceAdapter.speak called but not implemented (use TTSAdapter)")
-
-    def listen(self, timeout: Optional[float] = None) -> Optional[str]:
-        """
-        Listen for voice input and convert to text
-
-        Args:
-            timeout: Maximum time to wait for speech (seconds)
-
-        Returns:
-            Recognized text or None if recognition failed
-        """
-        if not self.is_available():
-            logger.error("Voice recognition not available")
-            return None
-
-        try:
-            with self._sr.Microphone() as source:
-                if self.ambient_noise_adjustment:
-                    self.recognizer.adjust_for_ambient_noise(source)
-
-                audio = self.recognizer.listen(source, timeout=timeout)
-
-                # Try to recognize with show_all first to check if anything was detected
-                result = self.recognizer.recognize_google(
-                    audio, language=self.language, show_all=True
-                )
-
-                if result:
-                    # Get the best match
-                    command = self.recognizer.recognize_google(audio, language=self.language)
-                    return command.lower()
-                return None
-
-        except self._sr.WaitTimeoutError:
-            return None
-        except self._sr.UnknownValueError:
-            return None
-        except self._sr.RequestError as e:
-            logger.error(f"Could not request results from Google Speech Recognition: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"Unexpected error in voice recognition: {e}")
-            return None
-
-    def is_available(self) -> bool:
-        """
-        Check if voice services are available
-
-        Returns:
-            True if voice services are available
-        """
-        return self._speech_recognition_available and self.recognizer is not None
+    def listen(self) -> str:
+        """Captura áudio e converte em texto (STT)."""
+        self.logger.execute({"level": "info", "message": "👂 Escutando ambiente..."})
+        # Simulação de captura de áudio
+        return ""
