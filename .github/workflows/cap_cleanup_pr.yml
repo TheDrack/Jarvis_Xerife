@@ -1,62 +1,23 @@
-name: Architecture & Capability Governance
+- name: Architecture & Capability Governance
+  env:
+    MODE: ${{ inputs.mode }}
+    PYTHONPATH: ${{ github.workspace }}
+  run: |
+    python scripts/architecture_and_cap_governance.py
+    STATUS=$?
 
-on:
-  workflow_dispatch:
-    inputs:
-      mode:
-        description: "Modo de execução"
-        required: true
-        default: "govern"
-        type: choice
-        options:
-          - audit
-          - govern
+    echo "Governance exit code: $STATUS"
 
-jobs:
-  governance:
-    runs-on: ubuntu-latest
+    # WARNING arquitetural tolerado em govern
+    if [ "$MODE" = "govern" ] && [ "$STATUS" -eq 10 ]; then
+      echo "⚠️ Arquitetura com warning tolerado"
+      exit 0
+    fi
 
-    steps:
-      - name: Checkout do repositório
-        uses: actions/checkout@v4
+    # OK total
+    if [ "$STATUS" -eq 0 ]; then
+      exit 0
+    fi
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Instalar dependências mínimas
-        run: |
-          python -m pip install --upgrade pip
-          pip install requests
-
-      - name: Rodar validação e governança (arquitetura tolerante)
-        env:
-          MODE: ${{ inputs.mode }}
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          python scripts/architecture_and_cap_governance.py || \
-          if [ "$MODE" = "audit" ]; then exit 0; else exit 1; fi
-
-      - name: Upload relatório de caps mortos
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dead-caps-report
-          path: dead_caps.txt
-
-      - name: Criar Pull Request de governança
-        if: inputs.mode == 'govern'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          base: main
-          branch: governance/capabilities
-          title: "Architecture governance: capability lifecycle sync"
-          body: |
-            Governança automática aplicada:
-
-            - 🧊 Congela capabilities não utilizadas
-            - 🔥 Ressuscita caps que voltaram a ser chamadas
-            - 🧠 Análise Nexus-aware
-            - ⚠️ Smoke test arquitetural tolerante a infra
-          commit-message: "chore(governance): sync capability lifecycle"
+    # Falha real
+    exit 1
