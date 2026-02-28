@@ -1,61 +1,56 @@
 # -*- coding: utf-8 -*-
 import requests
 import os
+import re
 from app.core.nexuscomponent import NexusComponent
 
 class TelegramUploader(NexusComponent):
     """
-    DNA Transfer: Telegram Adapter v3.1 (Fix 404)
+    DNA Transfer: Telegram Adapter v4.0 (Atomic Fix)
     Protocolo de Simbiose: Resolução Incondicional.
     """
     
     def execute(self, context: dict):
-        # 1. Localização do arquivo consolidado
         file_path = context.get("artifacts", {}).get("consolidator")
         
-        # 2. Resgate e Limpeza Incondicional das Chaves
-        token = os.getenv("TELEGRAM_TOKEN", "").strip()
-        chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+        # 1. Resgate e Limpeza Extrema
+        raw_token = os.getenv("TELEGRAM_TOKEN", "").strip()
+        chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip().replace('"', '').replace("'", "")
 
-        if not file_path or not os.path.exists(file_path):
-            print(f"⚠️ [TELEGRAM] Arquivo ausente: {file_path}")
-            return context
-
-        if not token or not chat_id:
-            print("❌ [TELEGRAM] Erro: TELEGRAM_TOKEN ou TELEGRAM_CHAT_ID não definidos nos Secrets.")
-            return context
-
-        # 3. Deep Logging (Sem expor o token inteiro por segurança)
-        print(f"📡 [TELEGRAM] Bot verificado. Alvo ID: '{chat_id}'")
+        # 2. Normalização do Token (Remove 'bot' se o usuário tiver colocado no Secret)
+        # O Telegram exige a URL: https://api.telegram.org/bot<TOKEN>/...
+        token_limpo = re.sub(r'^bot', '', raw_token, flags=re.IGNORECASE)
         
-        # 4. Construção da URL e Envio
-        # A URL deve ser EXATAMENTE assim. Note que 'bot' + token não tem barra entre eles.
-        url = f"https://api.telegram.org/bot{token}/sendDocument"
+        if not file_path or not os.path.exists(file_path):
+            print(f"⚠️ [TELEGRAM] Arquivo não encontrado no path: {file_path}")
+            return context
 
+        # 3. Construção de Rota Segura
+        url = f"https://api.telegram.org/bot{token_limpo}/sendDocument"
+        
+        print(f"📡 [NEXUS] Iniciando transmissão para ID: {chat_id}")
+        
         try:
             with open(file_path, 'rb') as f:
                 payload = {
                     'chat_id': chat_id, 
-                    'caption': f"🧬 DNA JARVIS ATUALIZADO\n🚀 Run: {os.getenv('GITHUB_RUN_NUMBER', 'Local')}"
+                    'caption': "🧬 **DNA JARVIS ATUALIZADO**\n✅ Integridade: 100%",
+                    'parse_mode': 'Markdown'
                 }
-                files = {
-                    'document': (os.path.basename(file_path), f)
-                }
+                files = {'document': (os.path.basename(file_path), f)}
                 
-                # Usando POST com multipart/form-data
+                # Execução do POST
                 response = requests.post(url, data=payload, files=files, timeout=30)
                 
                 if response.status_code == 200:
-                    print("✅ [TELEGRAM] DNA entregue com sucesso ao Xerife!")
+                    print("✅ [TELEGRAM] Protocolo concluído: DNA entregue.")
                 else:
-                    print(f"❌ [TELEGRAM] Falha Crítica: {response.status_code}")
-                    print(f"📝 Resposta da API: {response.text}")
-                    
-                    # Verificação de erro comum de ID
-                    if "-" not in chat_id and len(chat_id) > 10:
-                        print("💡 DICA: IDs de grupos/canais costumam começar com '-' (ex: -100...). Verifique seu Secret.")
+                    # Se der 404 aqui, o Token no Secret está definitivamente incorreto/incompleto
+                    print(f"❌ [TELEGRAM] Falha na API ({response.status_code})")
+                    print(f"📝 Retorno: {response.text}")
+                    print(f"💡 DICA: Verifique se o Secret TELEGRAM_TOKEN no GitHub não possui caracteres extras.")
 
         except Exception as e:
-            print(f"💥 [TELEGRAM] Erro de conexão: {e}")
+            print(f"💥 [TELEGRAM] Erro de infraestrutura: {e}")
 
         return context
