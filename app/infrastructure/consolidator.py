@@ -13,7 +13,7 @@ class Consolidator(NexusComponent):
         print(f"🔬 [NEXUS] Iniciando Consolidação Estruturada: {datetime.now()}")
 
         # Configurações de Filtro
-        ignored_dirs = {'.git', '__pycache__', '.venv', 'dist', 'build', '.github', 'node_modules', 'venv'}
+        ignored_dirs = {'__pycache__', '.venv', 'dist', 'build', 'node_modules', 'venv'}
         relevant_extensions = (".py", ".yml", ".yaml", ".json", ".sql", ".dockerfile", "Dockerfile", ".env.example")
         
         try:
