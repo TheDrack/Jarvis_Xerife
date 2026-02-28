@@ -30,18 +30,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Rodar validação e governança de arquitetura
+      - name: Rodar validação e governança (com PYTHONPATH correto)
         env:
           MODE: ${{ inputs.mode }}
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           python scripts/architecture_and_cap_governance.py
 
       - name: Upload relatório de caps mortos
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: dead-caps-report
           path: dead_caps.txt
-        if: always()
 
       - name: Criar Pull Request de governança
         if: inputs.mode == 'govern'
@@ -51,14 +52,12 @@ jobs:
           branch: governance/capabilities
           title: "Architecture governance: capability lifecycle sync"
           body: |
-            Este PR aplica **governança automática de capabilities**:
+            Governança automática de capabilities:
 
-            - 🔥 Ressuscita caps congelados que voltaram a ser usados
-            - 🧊 Congela caps realmente mortos
-            - 🧠 Uso detectado via Nexus + análise global
-            - 🛡️ Arquitetura validada antes da mutação
-            - 🚫 Core, Scripts, Tests e GitHub ignorados
+            - 🧊 Congela caps mortos
+            - 🔥 Ressuscita caps usados
+            - 🧠 Análise Nexus-aware
+            - 🚫 Core, Scripts e infra ignorados
 
-            Gerado automaticamente via GitHub Actions.
+            Gerado automaticamente.
           commit-message: "chore(governance): sync capability lifecycle"
-          labels: architecture,governance,tech-debt
