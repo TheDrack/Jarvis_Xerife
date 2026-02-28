@@ -1,29 +1,36 @@
-from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Agent Service - LLM-based agent logic using Function Calling"""
 
-from typing import Any, Dict, List
-
+from typing import Any, Dict, List, Optional
+from app.core.nexus import nexus
+from app.core.nexuscomponent import NexusComponent
 from app.domain.models import CommandType
 
-
 class AgentService(NexusComponent):
-    def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
-
     """
     Service that defines the agent's capabilities using Function Calling.
     Maps ActionProvider methods to function definitions for LLM.
     """
+
+    def __init__(self):
+        super().__init__()
+        # REGRA: Resolve o logger para manter a ciência das operações do Xerife
+        self.logger = nexus.resolve("structured_logger")
+
+    def execute(self, context: Optional[Dict[str, Any]] = None) -> Any:
+        """
+        Retorna as definições de capacidades e instruções para o LLMCommandAdapter.
+        """
+        return {
+            "functions": self.get_function_declarations(),
+            "instruction": self.get_system_instruction()
+        }
 
     @staticmethod
     def get_function_declarations() -> List[Dict[str, Any]]:
         """
         Get function declarations for the LLM to use.
         These represent the ActionProvider capabilities.
-
-        Returns:
-            List of function declarations in Gemini function calling format
         """
         return [
             {
@@ -32,10 +39,7 @@ class AgentService(NexusComponent):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "text": {
-                            "type": "string",
-                            "description": "O texto a ser digitado",
-                        }
+                        "text": {"type": "string", "description": "O texto a ser digitado"}
                     },
                     "required": ["text"],
                 },
@@ -46,10 +50,7 @@ class AgentService(NexusComponent):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "key": {
-                            "type": "string",
-                            "description": "Nome da tecla a ser pressionada (ex: 'enter', 'tab', 'escape', 'space')",
-                        }
+                        "key": {"type": "string", "description": "Nome da tecla a ser pressionada (ex: 'enter', 'tab', 'escape', 'space')"}
                     },
                     "required": ["key"],
                 },
@@ -57,10 +58,7 @@ class AgentService(NexusComponent):
             {
                 "name": "open_browser",
                 "description": "Abre o navegador web usando um atalho de teclado. Use quando o usuário pedir para abrir o navegador ou internet.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                },
+                "parameters": {"type": "object", "properties": {}},
             },
             {
                 "name": "open_url",
@@ -68,10 +66,7 @@ class AgentService(NexusComponent):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "url": {
-                            "type": "string",
-                            "description": "A URL a ser aberta (será adicionado https:// se necessário)",
-                        }
+                        "url": {"type": "string", "description": "A URL a ser aberta (será adicionado https:// se necessário)"}
                     },
                     "required": ["url"],
                 },
@@ -82,24 +77,18 @@ class AgentService(NexusComponent):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "search_text": {
-                            "type": "string",
-                            "description": "O texto a ser procurado na página",
-                        }
+                        "search_text": {"type": "string", "description": "O texto a ser procurado na página"}
                     },
                     "required": ["search_text"],
                 },
             },
             {
                 "name": "report_issue",
-                "description": "Cria uma Issue no GitHub para rastreamento manual de problemas. IMPORTANTE: Use APENAS para reportar bugs/problemas que precisam de atenção humana. Para correções de código automáticas, o sistema deve usar o endpoint /v1/jarvis/dispatch que envia para GitHub Agents, NÃO este comando.",
+                "description": "Cria uma Issue no GitHub para rastreamento manual de problemas. IMPORTANTE: Use APENAS para reportar bugs/problemas que precisam de atenção humana.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "issue_description": {
-                            "type": "string",
-                            "description": "Descrição do problema a ser reportado",
-                        }
+                        "issue_description": {"type": "string", "description": "Descrição do problema a ser reportado"}
                     },
                     "required": ["issue_description"],
                 },
@@ -108,15 +97,7 @@ class AgentService(NexusComponent):
 
     @staticmethod
     def map_function_to_command_type(function_name: str) -> CommandType:
-        """
-        Map a function name to a CommandType.
-
-        Args:
-            function_name: Name of the function called by the LLM
-
-        Returns:
-            Corresponding CommandType
-        """
+        """Map a function name to a CommandType."""
         function_to_command = {
             "type_text": CommandType.TYPE_TEXT,
             "press_key": CommandType.PRESS_KEY,
@@ -129,13 +110,7 @@ class AgentService(NexusComponent):
 
     @staticmethod
     def get_system_instruction() -> str:
-        """
-        Get the system instruction for the LLM.
-        Defines the personality and behavior of the "Xerife" assistant as an orchestrator.
-
-        Returns:
-            System instruction text
-        """
+        """Returns the personality and behavior of the 'Xerife' assistant."""
         return """Xerife - Engenheiro de Campo. Direto, técnico, zero fluff.
 
 PROIBIDO:
