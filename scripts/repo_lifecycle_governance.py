@@ -2,20 +2,18 @@
 # -*- coding: utf-8 -*-
 
 """
-Repo Lifecycle Governance
+Repo Lifecycle Governance — SELF HEALING MODE
 
-- Escopo: repositório inteiro
-- Congela qualquer módulo morto
-- Descongela automaticamente quando voltar a ser usado
-- Caps separados de outros módulos
-- Nunca falha por manutenção
+- Descongela automaticamente qualquer coisa estrutural
+- Descongela módulos usados (AST + Nexus)
+- Congela apenas código de produção morto
+- Nunca falha pipeline
 """
 
-import os
-import sys
 import ast
 import json
 import shutil
+import sys
 from pathlib import Path
 from typing import Set
 
@@ -29,41 +27,45 @@ FROZEN_ROOT = REPO_ROOT / "_frozen"
 FROZEN_CAPS = FROZEN_ROOT / "caps"
 FROZEN_MODULES = FROZEN_ROOT / "modules"
 
-EXCLUDED_DIRS = {
-    ".git",
-    ".github",
+STRUCTURAL_DIRS = {
+    "tests",
+    "docs",
+    "migrations",
+    "dags",
     "scripts",
-    "core",
-    "__pycache__",
-    "_frozen",
-    "venv",
-    ".venv",
+    ".github",
+}
+
+PROTECTED_FILES = {
+    "setup.py",
+    "build_config.py",
 }
 
 NEXUS_MEMORY_FILES = [
     REPO_ROOT / "nexus_memory.json",
-    REPO_ROOT / "app" / "domain" / "capabilities" / ".nexus_memory.json",
 ]
 
 # =============================================================================
-# UTIL
+# UTILS
 # =============================================================================
 
 def log(msg: str):
     print(msg)
 
 
-def is_excluded(path: Path) -> bool:
-    return any(part in EXCLUDED_DIRS for part in path.parts)
+def is_entrypoint(py: Path) -> bool:
+    try:
+        return 'if __name__ == "__main__"' in py.read_text(encoding="utf-8")
+    except Exception:
+        return False
 
 
 def ensure_dirs():
     FROZEN_CAPS.mkdir(parents=True, exist_ok=True)
     FROZEN_MODULES.mkdir(parents=True, exist_ok=True)
 
-
 # =============================================================================
-# DISCOVERY — USO REAL
+# DISCOVERY
 # =============================================================================
 
 def parse_imports(py: Path) -> Set[str]:
@@ -84,8 +86,6 @@ def parse_imports(py: Path) -> Set[str]:
 def scan_ast_usage() -> Set[str]:
     used = set()
     for py in REPO_ROOT.rglob("*.py"):
-        if is_excluded(py):
-            continue
         for imp in parse_imports(py):
             used.add(imp)
     return used
@@ -97,8 +97,7 @@ def scan_nexus_usage() -> Set[str]:
         if file.exists():
             try:
                 data = json.loads(file.read_text(encoding="utf-8"))
-                for key in data.keys():
-                    used.add(key)
+                used |= set(data.keys())
             except Exception:
                 pass
     return used
@@ -115,43 +114,41 @@ def discover_used_modules() -> Set[str]:
 
     return used
 
-
 # =============================================================================
-# INVENTÁRIO
+# GOVERNANCE RULES
 # =============================================================================
 
-def list_repo_modules() -> Set[Path]:
-    modules = set()
-    for py in REPO_ROOT.rglob("*.py"):
-        if is_excluded(py):
-            continue
-        if py.name == "__init__.py":
-            continue
-        modules.add(py)
-    return modules
+def is_structural(py: Path) -> bool:
+    return any(part in STRUCTURAL_DIRS for part in py.parts)
 
+
+def eligible_for_freeze(py: Path) -> bool:
+    if is_structural(py):
+        return False
+    if py.name in PROTECTED_FILES:
+        return False
+    if is_entrypoint(py):
+        return False
+    return True
 
 # =============================================================================
 # FREEZE / UNFREEZE
 # =============================================================================
 
+def unfreeze(py: Path):
+    dst = REPO_ROOT / py.name
+    if not dst.exists():
+        shutil.move(py, dst)
+        log(f"🔥 UNFROZEN: {py.name}")
+
+
 def freeze(py: Path):
     ensure_dirs()
-
-    target_dir = FROZEN_CAPS if py.name.startswith("cap_") else FROZEN_MODULES
-    dst = target_dir / py.name
-
+    target = FROZEN_CAPS if py.name.startswith("cap_") else FROZEN_MODULES
+    dst = target / py.name
     if not dst.exists():
         shutil.move(py, dst)
         log(f"🧊 FROZEN: {py.relative_to(REPO_ROOT)}")
-
-
-def unfreeze(py: Path, original_parent: Path):
-    dst = original_parent / py.name
-    if not dst.exists():
-        shutil.move(py, dst)
-        log(f"🔥 UNFROZEN: {dst.relative_to(REPO_ROOT)}")
-
 
 # =============================================================================
 # MAIN
@@ -159,27 +156,34 @@ def unfreeze(py: Path, original_parent: Path):
 
 def main():
     log("=" * 80)
-    log("Repo Lifecycle Governance — Freeze / Unfreeze Global")
+    log("Repo Lifecycle Governance — SELF HEALING")
     log("=" * 80)
 
     used = discover_used_modules()
-    repo_modules = list_repo_modules()
-
     changes = 0
 
-    # --- UNFREEZE ---
-    for frozen_dir in (FROZEN_CAPS, FROZEN_MODULES):
-        if not frozen_dir.exists():
+    # 1️⃣ UNFREEZE estrutural obrigatório
+    for folder in (FROZEN_CAPS, FROZEN_MODULES):
+        if not folder.exists():
             continue
-        for py in frozen_dir.glob("*.py"):
-            name = py.stem
-            if name in used:
-                # tenta restaurar na raiz original (mesmo nível)
-                unfreeze(py, REPO_ROOT)
+        for py in folder.glob("*.py"):
+            if is_structural(py):
+                unfreeze(py)
                 changes += 1
 
-    # --- FREEZE ---
-    for py in repo_modules:
+    # 2️⃣ UNFREEZE por uso real
+    for folder in (FROZEN_CAPS, FROZEN_MODULES):
+        if not folder.exists():
+            continue
+        for py in folder.glob("*.py"):
+            if py.stem in used:
+                unfreeze(py)
+                changes += 1
+
+    # 3️⃣ FREEZE seguro
+    for py in REPO_ROOT.rglob("*.py"):
+        if not eligible_for_freeze(py):
+            continue
         if py.stem not in used:
             freeze(py)
             changes += 1
@@ -189,7 +193,6 @@ def main():
     log("Governança concluída sem falhas")
     log("-" * 80)
 
-    # Nunca falha por manutenção
     sys.exit(0)
 
 
