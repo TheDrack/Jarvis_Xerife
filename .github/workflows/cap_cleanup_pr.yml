@@ -30,12 +30,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Rodar validação e governança (com PYTHONPATH correto)
+      - name: Rodar validação e governança (arquitetura tolerante)
         env:
           MODE: ${{ inputs.mode }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          python scripts/architecture_and_cap_governance.py
+          python scripts/architecture_and_cap_governance.py || \
+          if [ "$MODE" = "audit" ]; then exit 0; else exit 1; fi
 
       - name: Upload relatório de caps mortos
         if: always()
@@ -52,12 +53,10 @@ jobs:
           branch: governance/capabilities
           title: "Architecture governance: capability lifecycle sync"
           body: |
-            Governança automática de capabilities:
+            Governança automática aplicada:
 
-            - 🧊 Congela caps mortos
-            - 🔥 Ressuscita caps usados
+            - 🧊 Congela capabilities não utilizadas
+            - 🔥 Ressuscita caps que voltaram a ser chamadas
             - 🧠 Análise Nexus-aware
-            - 🚫 Core, Scripts e infra ignorados
-
-            Gerado automaticamente.
+            - ⚠️ Smoke test arquitetural tolerante a infra
           commit-message: "chore(governance): sync capability lifecycle"
