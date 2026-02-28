@@ -1,19 +1,19 @@
-name: Capabilities Cleanup PR (Manual)
+name: Architecture & Capability Governance
 
 on:
   workflow_dispatch:
     inputs:
-      action:
-        description: "O que fazer"
+      mode:
+        description: "Modo de execução"
         required: true
-        default: "freeze"
+        default: "govern"
         type: choice
         options:
           - audit
-          - freeze
+          - govern
 
 jobs:
-  cleanup:
+  governance:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,27 +25,40 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Rodar auditoria de capabilities
+      - name: Instalar dependências mínimas
         run: |
-          python scripts/cap_audit.py
+          python -m pip install --upgrade pip
+          pip install requests
 
-      - name: Congelar capabilities mortas
-        if: inputs.action == 'freeze'
+      - name: Rodar validação e governança de arquitetura
+        env:
+          MODE: ${{ inputs.mode }}
         run: |
-          python scripts/freeze_dead_caps.py
+          python scripts/architecture_and_cap_governance.py
 
-      - name: Criar Pull Request
-        if: inputs.action == 'freeze'
+      - name: Upload relatório de caps mortos
+        uses: actions/upload-artifact@v4
+        with:
+          name: dead-caps-report
+          path: dead_caps.txt
+        if: always()
+
+      - name: Criar Pull Request de governança
+        if: inputs.mode == 'govern'
         uses: peter-evans/create-pull-request@v6
         with:
           base: main
-          branch: cleanup/capabilities
-          title: "Freeze unused capabilities"
+          branch: governance/capabilities
+          title: "Architecture governance: capability lifecycle sync"
           body: |
-            Capabilities não utilizadas foram movidas para `_frozen/`.
+            Este PR aplica **governança automática de capabilities**:
 
-            - Auditoria automática via GitHub Actions
-            - Nenhuma capability ativa foi removida
-            - Código preservado para referência histórica
-          commit-message: "chore: freeze unused capabilities"
-          labels: cleanup,tech-debt
+            - 🔥 Ressuscita caps congelados que voltaram a ser usados
+            - 🧊 Congela caps realmente mortos
+            - 🧠 Uso detectado via Nexus + análise global
+            - 🛡️ Arquitetura validada antes da mutação
+            - 🚫 Core, Scripts, Tests e GitHub ignorados
+
+            Gerado automaticamente via GitHub Actions.
+          commit-message: "chore(governance): sync capability lifecycle"
+          labels: architecture,governance,tech-debt
