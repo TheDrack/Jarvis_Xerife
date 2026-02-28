@@ -6,51 +6,61 @@ from app.core.nexuscomponent import NexusComponent
 
 class TelegramUploader(NexusComponent):
     """
-    DNA Transfer: Telegram Adapter v4.0 (Atomic Fix)
-    Protocolo de Simbiose: Resolução Incondicional.
+    DNA Transfer: Telegram Adapter v5.0 (Final Handshake)
+    Foco exclusivo na resolução do erro 404.
     """
     
     def execute(self, context: dict):
         file_path = context.get("artifacts", {}).get("consolidator")
         
-        # 1. Resgate e Limpeza Extrema
-        raw_token = os.getenv("TELEGRAM_TOKEN", "").strip()
+        # 1. Limpeza de ambiente (Removendo qualquer lixo de aspas ou espaços)
+        raw_token = os.getenv("TELEGRAM_TOKEN", "").strip().replace('"', '').replace("'", "")
         chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip().replace('"', '').replace("'", "")
 
-        # 2. Normalização do Token (Remove 'bot' se o usuário tiver colocado no Secret)
-        # O Telegram exige a URL: https://api.telegram.org/bot<TOKEN>/...
-        token_limpo = re.sub(r'^bot', '', raw_token, flags=re.IGNORECASE)
+        # 2. Normalização do Token (Garantindo que não comece com 'bot' duplicado)
+        token = re.sub(r'^bot', '', raw_token, flags=re.IGNORECASE)
         
-        if not file_path or not os.path.exists(file_path):
-            print(f"⚠️ [TELEGRAM] Arquivo não encontrado no path: {file_path}")
+        if not token:
+            print("❌ [TELEGRAM] Erro Crítico: TELEGRAM_TOKEN está vazio nos Secrets!")
             return context
 
-        # 3. Construção de Rota Segura
-        url = f"https://api.telegram.org/bot{token_limpo}/sendDocument"
+        base_url = f"https://api.telegram.org/bot{token}"
         
-        print(f"📡 [NEXUS] Iniciando transmissão para ID: {chat_id}")
-        
+        # --- TESTE DE CONEXÃO (HANDSHAKE) ---
+        print(f"📡 [NEXUS] Validando Token com a API do Telegram...")
         try:
-            with open(file_path, 'rb') as f:
-                payload = {
-                    'chat_id': chat_id, 
-                    'caption': "🧬 **DNA JARVIS ATUALIZADO**\n✅ Integridade: 100%",
-                    'parse_mode': 'Markdown'
-                }
-                files = {'document': (os.path.basename(file_path), f)}
-                
-                # Execução do POST
-                response = requests.post(url, data=payload, files=files, timeout=30)
-                
-                if response.status_code == 200:
-                    print("✅ [TELEGRAM] Protocolo concluído: DNA entregue.")
-                else:
-                    # Se der 404 aqui, o Token no Secret está definitivamente incorreto/incompleto
-                    print(f"❌ [TELEGRAM] Falha na API ({response.status_code})")
-                    print(f"📝 Retorno: {response.text}")
-                    print(f"💡 DICA: Verifique se o Secret TELEGRAM_TOKEN no GitHub não possui caracteres extras.")
-
+            test_resp = requests.get(f"{base_url}/getMe", timeout=10)
+            if test_resp.status_code != 200:
+                print(f"⚠️ [TELEGRAM] Token Inválido! API retornou {test_resp.status_code}")
+                print(f"📝 Detalhe: {test_resp.text}")
+                print("💡 AÇÃO: Gere um novo token no @BotFather usando /revoke")
+                return context
+            else:
+                bot_info = test_resp.json().get('result', {})
+                print(f"✅ [TELEGRAM] Bot Identificado: @{bot_info.get('username')}")
         except Exception as e:
-            print(f"💥 [TELEGRAM] Erro de infraestrutura: {e}")
+            print(f"💥 [TELEGRAM] Falha de rede no handshake: {e}")
+            return context
 
+        # --- ENVIO DO ARQUIVO ---
+        if file_path and os.path.exists(file_path):
+            print(f"📤 [TELEGRAM] Enviando DNA para o Chat ID: {chat_id}")
+            try:
+                with open(file_path, 'rb') as f:
+                    payload = {
+                        'chat_id': chat_id, 
+                        'caption': "🧬 **JARVIS ONLINE**\nStatus: Sistema Operacional",
+                        'parse_mode': 'Markdown'
+                    }
+                    files = {'document': f}
+                    
+                    send_resp = requests.post(f"{base_url}/sendDocument", data=payload, files=files, timeout=30)
+                    
+                    if send_resp.status_code == 200:
+                        print("🚀 [TELEGRAM] Transmissão concluída com sucesso!")
+                    else:
+                        print(f"❌ [TELEGRAM] Falha no envio: {send_resp.text}")
+            except Exception as e:
+                print(f"💥 [TELEGRAM] Erro no upload: {e}")
+        
         return context
