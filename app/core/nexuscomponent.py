@@ -13,7 +13,6 @@ class NexusComponent(ABC):
     - executa sua função principal via execute()
     """
 
-    @abstractmethod
     def configure(self, config: Dict[str, Any]) -> None:
         """
         Recebe configuração declarada no pipeline.yml.
