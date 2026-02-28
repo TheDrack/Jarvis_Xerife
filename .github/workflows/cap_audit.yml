@@ -1,0 +1,49 @@
+name: Capabilities Audit (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Modo de execução (audit | dry-run | enforce)"
+        required: true
+        default: "audit"
+      python-version:
+        description: "Versão do Python"
+        required: false
+        default: "3.11"
+
+jobs:
+  cap-audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Instalar dependências mínimas
+        run: |
+          python -m pip install --upgrade pip
+          pip install ripgrep
+
+      - name: Rodar auditoria de capabilities
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          echo "========================================"
+          echo " Jarvis Capabilities Audit"
+          echo " Mode: $MODE"
+          echo "========================================"
+
+          python scripts/cap_audit.py
+
+      - name: Resumo final
+        run: |
+          echo ""
+          echo "========================================"
+          echo " Auditoria finalizada"
+          echo "========================================"
