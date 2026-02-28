@@ -1,0 +1,51 @@
+name: Capabilities Cleanup PR (Manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "O que fazer"
+        required: true
+        default: "freeze"
+        type: choice
+        options:
+          - audit
+          - freeze
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Rodar auditoria de capabilities
+        run: |
+          python scripts/cap_audit.py
+
+      - name: Congelar capabilities mortas
+        if: inputs.action == 'freeze'
+        run: |
+          python scripts/freeze_dead_caps.py
+
+      - name: Criar Pull Request
+        if: inputs.action == 'freeze'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          base: main
+          branch: cleanup/capabilities
+          title: "Freeze unused capabilities"
+          body: |
+            Capabilities não utilizadas foram movidas para `_frozen/`.
+
+            - Auditoria automática via GitHub Actions
+            - Nenhuma capability ativa foi removida
+            - Código preservado para referência histórica
+          commit-message: "chore: freeze unused capabilities"
+          labels: cleanup,tech-debt
