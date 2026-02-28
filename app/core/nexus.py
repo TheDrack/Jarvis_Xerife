@@ -69,7 +69,7 @@ class JarvisNexus:
             return self._instances[target_id]
 
         module_path = self._cache.get(target_id)
-        
+
         # Se não está no cache, faz discovery e marca como mutado
         if not module_path:
             module_path = self._perform_discovery(target_id, hint_path)
@@ -85,7 +85,7 @@ class JarvisNexus:
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
             clazz = getattr(module, class_name)
             instance = clazz()
-            
+
             if singleton:
                 self._instances[target_id] = instance
             return instance
