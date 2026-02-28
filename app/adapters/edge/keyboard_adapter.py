@@ -1,10 +1,15 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 import pyautogui
 import pyperclip
 import time
 from typing import Any, Dict
 
-class KeyboardAdapter:
+class KeyboardAdapter(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     def type_text(self, text: str) -> Dict[str, Any]:
         """Escreve texto e valida via leitura de clipboard ou delay de sistema."""
         initial_clipboard = pyperclip.paste()

@@ -1,10 +1,15 @@
+from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 import logging
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-class AssistantService:
+class AssistantService(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     def __init__(self, executor, intent_processor, strategist=None):
         self.executor = executor
         self.intent_processor = intent_processor

@@ -1,7 +1,12 @@
+from app.core.nexuscomponent import NexusComponent
 import requests
 import logging
 
-class HttpClient:
+class HttpClient(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
     """Motor central de requisições do JARVIS."""
     def __init__(self, base_url: str = "", default_headers: dict = None):
         self.base_url = base_url
