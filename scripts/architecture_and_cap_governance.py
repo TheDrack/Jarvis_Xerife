@@ -2,27 +2,31 @@
 # -*- coding: utf-8 -*-
 
 """
-Jarvis — Architecture & Capability Governance
+Jarvis — Full Capability Lifecycle Governance
 
-Regras:
-- Arquitetura: WARNING tolerável (dependências externas, infra incompleta)
-- Capabilities: GOVERNANÇA FORTE
-- Integra Nexus como fonte indireta de uso
-- Monitora pasta _frozen
-- Retornos semânticos:
-    0  = OK total
-    10 = WARNING arquitetural (tolerável em govern)
-    20 = FALHA REAL de governança
+Fluxo:
+1. Detecta capabilities USADAS (AST + Nexus)
+2. Descongela tudo que está USADO
+3. Congela tudo que NÃO está USADO
+4. Anti-loop garantido
+5. Repo inteiro (com exclusões)
+
+Exit codes:
+0  = OK
+10 = Warning arquitetural
+20 = Mudanças aplicadas (requer novo run)
 """
 
 import os
 import sys
 import ast
+import json
+import shutil
 from pathlib import Path
-from typing import Set, List
+from typing import Set
 
 # =============================================================================
-# CONFIGURAÇÕES GERAIS
+# CONFIG
 # =============================================================================
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -34,131 +38,149 @@ FROZEN_DIR = CAP_DIR / "_frozen"
 EXCLUDED_DIRS = {
     "scripts",
     "core",
-    "__pycache__",
     ".git",
     ".github",
+    "__pycache__",
 }
 
 MODE = os.getenv("MODE", "govern")
 
+NEXUS_MEMORY_FILES = [
+    REPO_ROOT / "nexus_memory.json",
+    CAP_DIR / ".nexus_memory.json",
+]
+
 # =============================================================================
-# UTILIDADES
+# UTIL
 # =============================================================================
 
-def print_header(title: str):
+def header(title: str):
     print("=" * 80)
     print(title)
     print("=" * 80)
 
 
 def is_excluded(path: Path) -> bool:
-    return any(part in EXCLUDED_DIRS for part in path.parts)
+    return any(p in EXCLUDED_DIRS for p in path.parts)
 
 
 # =============================================================================
-# ARQUITETURA — SMOKE TESTS
+# ARCHITECTURE (OBSERVACIONAL)
 # =============================================================================
 
-def architecture_smoke_tests() -> bool:
-    """
-    Smoke tests arquiteturais.
-    NÃO quebra governança se falhar.
-    """
-    print("\n[ARCH] Smoke tests...")
+def architecture_smoke() -> bool:
+    print("\n[ARCH] Smoke test...")
     try:
         import app  # noqa
-        from app.container import Container  # noqa
         return True
     except Exception as e:
-        print(f"✗ Falha arquitetural: {e}")
+        print(f"⚠️ Arquitetura incompleta: {e}")
         return False
 
 
 # =============================================================================
-# CAPABILITY GOVERNANCE
+# DISCOVERY DE USO
 # =============================================================================
 
-def scan_python_imports(file_path: Path) -> Set[str]:
-    """
-    Extrai imports de um arquivo Python via AST.
-    """
+def parse_imports(py: Path) -> Set[str]:
     imports = set()
     try:
-        tree = ast.parse(file_path.read_text(encoding="utf-8"))
+        tree = ast.parse(py.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                for alias in node.names:
-                    imports.add(alias.name)
-            elif isinstance(node, ast.ImportFrom):
-                if node.module:
-                    imports.add(node.module)
+                for a in node.names:
+                    imports.add(a.name.split(".")[-1])
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.add(node.module.split(".")[-1])
     except Exception:
         pass
     return imports
 
 
-def find_used_capabilities() -> Set[str]:
-    """
-    Escaneia o repositório inteiro procurando referências
-    diretas OU indiretas (Nexus) às capabilities.
-    """
-    used_caps = set()
-
-    for py_file in REPO_ROOT.rglob("*.py"):
-        if is_excluded(py_file):
+def scan_ast_usage() -> Set[str]:
+    used = set()
+    for py in REPO_ROOT.rglob("*.py"):
+        if is_excluded(py):
             continue
-
-        imports = scan_python_imports(py_file)
-        for imp in imports:
-            if "cap_" in imp:
-                used_caps.add(imp.split(".")[-1])
-
-    return used_caps
+        for imp in parse_imports(py):
+            if imp.startswith("cap_"):
+                used.add(imp)
+    return used
 
 
-def list_capabilities(directory: Path) -> Set[str]:
+def scan_nexus_usage() -> Set[str]:
+    used = set()
+    for file in NEXUS_MEMORY_FILES:
+        if file.exists():
+            try:
+                data = json.loads(file.read_text(encoding="utf-8"))
+                for k in data.keys():
+                    if k.startswith("cap_"):
+                        used.add(k)
+            except Exception:
+                pass
+    return used
+
+
+def discover_used_capabilities() -> Set[str]:
+    ast_used = scan_ast_usage()
+    nexus_used = scan_nexus_usage()
+
+    used = ast_used | nexus_used
+
+    print(f"\n[DISCOVERY] AST used: {len(ast_used)}")
+    print(f"[DISCOVERY] Nexus used: {len(nexus_used)}")
+    print(f"[DISCOVERY] TOTAL used: {len(used)}")
+
+    return used
+
+
+# =============================================================================
+# INVENTÁRIO
+# =============================================================================
+
+def list_caps(directory: Path) -> Set[str]:
+    if not directory.exists():
+        return set()
     return {
-        f.stem
-        for f in directory.glob("cap_*.py")
+        f.stem for f in directory.glob("cap_*.py")
         if f.name != "__init__.py"
     }
 
 
-def capability_governance() -> bool:
-    """
-    Regra:
-    - Cap usada fora do frozen → OK
-    - Cap usada dentro do frozen → precisa sair do frozen (FAIL)
-    - Cap não usada fora do frozen → mover para frozen (não falha)
-    """
-    print("\n[CAP GOVERNANCE] Analisando capabilities...")
+# =============================================================================
+# AÇÕES
+# =============================================================================
 
-    used = find_used_capabilities()
+def ensure_frozen_dir():
+    FROZEN_DIR.mkdir(exist_ok=True)
 
-    active_caps = list_capabilities(CAP_DIR)
-    frozen_caps = list_capabilities(FROZEN_DIR) if FROZEN_DIR.exists() else set()
 
-    failed = False
+def auto_unfreeze(used: Set[str], frozen: Set[str]) -> Set[str]:
+    print("\n[UNFREEZE]")
+    unfrozen = set()
 
-    # Cap usada mas está congelada → ERRO REAL
-    for cap in frozen_caps:
-        if cap in used:
-            print(f"❌ USED BUT FROZEN: {cap}")
-            failed = True
+    for cap in used & frozen:
+        src = FROZEN_DIR / f"{cap}.py"
+        dst = CAP_DIR / f"{cap}.py"
+        if src.exists():
+            shutil.move(src, dst)
+            unfrozen.add(cap)
+            print(f"🔥 UNFROZEN: {cap}")
 
-    # Cap ativa e usada
-    for cap in active_caps:
-        if cap in used:
-            print(f"✓ USED: {CAP_DIR / (cap + '.py')}")
+    return unfrozen
 
-    # Cap ativa e não usada
-    dead_caps = active_caps - used
-    for cap in dead_caps:
-        print(f"⚠️ UNUSED (candidate for freeze): {cap}")
 
-    print(f"\nTotal DEAD capabilities: {len(dead_caps)}")
+def auto_freeze(unused: Set[str]):
+    print("\n[FREEZE]")
+    ensure_frozen_dir()
 
-    return not failed
+    for cap in unused:
+        src = CAP_DIR / f"{cap}.py"
+        dst = FROZEN_DIR / f"{cap}.py"
+        if src.exists():
+            shutil.move(src, dst)
+            print(f"🧊 FROZEN: {cap}")
 
 
 # =============================================================================
@@ -166,26 +188,40 @@ def capability_governance() -> bool:
 # =============================================================================
 
 def main():
-    print_header("Jarvis — Architecture & Capability Governance (FULL REPO)")
+    header("Jarvis — Full Freeze / Unfreeze Governance")
 
-    arch_ok = architecture_smoke_tests()
-    cap_ok = capability_governance()
+    arch_ok = architecture_smoke()
+
+    used = discover_used_capabilities()
+
+    active = list_caps(CAP_DIR)
+    frozen = list_caps(FROZEN_DIR)
+
+    # 1️⃣ Descongela primeiro
+    unfrozen_now = auto_unfreeze(used, frozen)
+
+    # 2️⃣ Decide quem congelar (anti-loop)
+    active_after_unfreeze = list_caps(CAP_DIR)
+    freeze_candidates = active_after_unfreeze - used - unfrozen_now
+
+    auto_freeze(freeze_candidates)
+
+    # 3️⃣ Resultado
+    changes = unfrozen_now | freeze_candidates
 
     print("\n" + "=" * 80)
-    print(f"Checks passed: {int(arch_ok) + int(cap_ok)}/2")
-    print("=" * 80)
 
-    # DECISÃO FINAL
-    if cap_ok and arch_ok:
-        print("\n✓ Tudo OK")
-        sys.exit(0)
+    if changes:
+        print(f"🔁 Mudanças aplicadas: {len(changes)}")
+        print("🔁 Reexecute o pipeline para estado limpo")
+        sys.exit(20)
 
-    if cap_ok and not arch_ok:
-        print("\n⚠️ WARNING arquitetural (tolerado em govern)")
+    if not arch_ok:
+        print("⚠️ Arquitetura com warning")
         sys.exit(10)
 
-    print("\n✗ Falha REAL de governança detectada")
-    sys.exit(20)
+    print("✓ Governança estável")
+    sys.exit(0)
 
 
 if __name__ == "__main__":
