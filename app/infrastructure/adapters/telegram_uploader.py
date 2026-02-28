@@ -4,44 +4,35 @@ import os
 from app.core.nexuscomponent import NexusComponent
 
 class TelegramUploader(NexusComponent):
-    """
-    Adapter de Infraestrutura: Envia o DNA consolidado via Bot do Telegram.
-    """
-    def __init__(self):
-        super().__init__()
-        self.token = os.getenv("TELEGRAM_TOKEN")
-        self.chat_id = os.getenv("TELEGRAM_CHAT_ID")
-
-    def configure(self, config: dict = None):
-        if config:
-            self.token = config.get("token", self.token)
-            self.chat_id = config.get("chat_id", self.chat_id)
-
     def execute(self, context: dict):
-        # Busca o caminho do arquivo gerado pelo consolidator nos artifacts
         file_path = context["artifacts"].get("consolidator")
-        
+        token = os.getenv("TELEGRAM_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
         if not file_path or not os.path.exists(file_path):
             print("⚠️ [TELEGRAM] Arquivo de DNA não encontrado para envio.")
             return context
 
-        if not self.token or not self.chat_id:
-            print("❌ [TELEGRAM] Credenciais ausentes (TELEGRAM_TOKEN/CHAT_ID).")
+        if not token or not chat_id:
+            print("⚠️ [TELEGRAM] Credenciais ausentes (Token/ChatID).")
             return context
 
-        url = f"https://api.telegram.org/bot{self.token}/sendDocument"
+        print(f"📡 [TELEGRAM] Enviando DNA para o Xerife...")
         
         try:
-            with open(file_path, 'rb') as f:
-                payload = {'chat_id': self.chat_id, 'caption': "🧬 JARVIS: DNA Consolidado Atualizado"}
-                files = {'document': f}
-                res = requests.post(url, data=payload, files=files, timeout=30)
+            # URL corrigida para o método sendDocument
+            url = f"https://api.telegram.org/bot{token}/sendDocument"
             
+            with open(file_path, 'rb') as f:
+                files = {'document': f}
+                data = {'chat_id': chat_id, 'caption': f"🧬 DNA JARVIS ATUALIZADO\nRun: {os.getenv('GITHUB_RUN_NUMBER')}"}
+                res = requests.post(url, data=data, files=files)
+
             if res.status_code == 200:
-                print("📤 [TELEGRAM] DNA enviado com sucesso ao Senhor.")
+                print("✅ [TELEGRAM] DNA entregue com sucesso!")
             else:
-                print(f"⚠️ [TELEGRAM] Falha no envio: {res.text}")
+                print(f"⚠️ [TELEGRAM] Falha no envio: {res.status_code} - {res.text}")
         except Exception as e:
             print(f"💥 [TELEGRAM] Erro crítico: {e}")
-            
+
         return context
