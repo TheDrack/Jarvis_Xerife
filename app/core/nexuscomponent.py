@@ -1,28 +1,20 @@
-#app.core.nexuscomponent.py
+# -*- coding: utf-8 -*-
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
-
 class NexusComponent(ABC):
     """
-    Interface obrigatória para componentes descobertos pelo Jarvis Nexus.
-
-    Todo componente:
-    - é instanciado pelo Nexus
-    - recebe configuração via configure()
-    - executa sua função principal via execute()
+    Interface do DNA JARVIS. 
+    O 'configure' é opcional. O 'execute' é obrigatório.
     """
 
     def configure(self, config: Dict[str, Any]) -> None:
-        """
-        Recebe configuração declarada no pipeline.yml.
-        Deve preparar o estado interno do componente.
-        """
+        """Implementação padrão vazia (Opcional)."""
         pass
 
     @abstractmethod
-    def execute(self, *args, **kwargs) -> Any:
+    def execute(self, context: Dict[str, Any] = None) -> Any:
         """
-        Executa a lógica principal do componente.
+        Executa a lógica principal recebendo o contexto do Pipeline.
         """
         pass
