@@ -1,41 +1,54 @@
+# -*- coding: utf-8 -*-
+"""
+JARVIS - Ponto de Entrada Principal (Ignição)
+Seguindo o Protocolo de Simbiose: "Operamos como um só."
+"""
+
 import os
-import json
-from app.core.nexus import JarvisNexus
+import sys
+from app.core.nexus import nexus
 
 def bootstrap():
-    # 1. Instanciar o Nexus (O coração do projeto)
-    nexus = JarvisNexus()
-    
-    # 2. Carregar o registro de componentes (conforme o data/nexus_registry.json anterior)
-    # Aqui o Nexus descobre onde estão os Gears, Adapters e Services
-    with open("data/nexus_registry.json", "r") as f:
-        registry = json.load(f)
-    
-    # 3. Registrar componentes dinamicamente no Nexus
-    for name, path in registry["components"].items():
-        # O NexusComponent é instanciado e configurado aqui
-        # (Assumindo que seu JarvisNexus já faz o import dinâmico)
-        nexus.register_component(name, path)
+    """
+    Prepara a carga e o destino. 
+    O Nexus fornece o veículo (Componentes) e o trajeto (Orquestração).
+    """
+    print("\n" + "="*50)
+    print("  JARVIS - PROTOCOLO DE IGNIÇÃO INICIADO")
+    print("="*50)
 
-    # 4. Preparar o Contexto Inicial (Protocolo JARVIS)
-    context = {
-        "env": os.environ,
-        "artifacts": {},
-        "metadata": {
-            "user_input": input("Senhor, qual a sua ordem? "),
-            "session_id": "jarvis_session_001"
+    try:
+        # 1. Resolver o Orquestrador (Isso dispara o discovery automático do Nexus)
+        # O Nexus já sabe olhar no seu disco e no Gist para achar o orchestrator_service.
+        orchestrator = nexus.resolve("orchestrator_service")
+        
+        # 2. Capturar Ordem Inicial
+        user_order = input("\n👤 Senhor, qual a sua ordem? ")
+
+        # 3. Preparar Contexto de Execução
+        context = {
+            "input_text": user_order,
+            "metadata": {
+                "session_id": "jarvis_session_001",
+                "timestamp": time.time() if 'time' in sys.modules else None
+            }
         }
-    }
 
-    # 5. Executar o Orquestrador (Application Service)
-    # Ele é quem conhece a ordem de execução dos Gears e Soldados
-    orchestrator = nexus.get_component("orchestrator")
-    orchestrator.configure(nexus) # Passa o Nexus para ele buscar os outros
-    
-    final_context = orchestrator.execute(context)
+        # 4. Execução Incondicional
+        # O Orquestrador resolve internamente o Assistant, LLM e ActionProvider via Nexus.
+        result = orchestrator.execute(context)
 
-    # 6. Saída para a Interface
-    print(f"\n[JARVIS]: {final_context['artifacts'].get('final_speech')}")
+        # 5. Saída e Sincronização
+        if result.get("success"):
+            # O Nexus salva qualquer alteração no DNA (Gist) automaticamente antes de fechar
+            nexus.commit_memory()
+            print(f"\n🤖 [JARVIS]: {result.get('result', 'Missão cumprida.')}")
+        else:
+            print(f"\n💥 [ERRO]: {result.get('error')}")
+
+    except Exception as e:
+        print(f"❌ FALHA CRÍTICA NO BOOTSTRAP: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     bootstrap()
