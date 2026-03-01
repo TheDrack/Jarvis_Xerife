@@ -23,7 +23,6 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    # Contexto inicial
     context = {"artifacts": {}, "metadata": {"pipeline": pipeline_name}, "env": dict(os.environ)}
     components = config.get("components", {})
 
@@ -38,25 +37,23 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
         )
 
         if not instance:
-            logging.error(f"❌ Falha crítica: Componente {name} (ID: {target_id}) não resolvido!")
-            if strict: raise RuntimeError(f"Não resolveu {target_id}")
+            msg = f"❌ Falha crítica: Componente {name} (ID: {target_id}) não resolvido!"
+            if strict: raise RuntimeError(msg)
             continue
 
         logging.info(f"⚙️ Executando: {name}...")
         try:
-            # Configuração
-            if hasattr(instance, "configure"):
-                instance.configure(meta.get("config", {}))
+            if hasattr(instance, "configure") and "config" in meta:
+                instance.configure(meta["config"])
 
-            # Execução
-            if hasattr(instance, "execute"):
-                result = instance.execute(context)
-                logging.info(f"✅ {name} finalizado.")
-                if result:
-                    context["artifacts"][name] = result
-                    context["result"] = result
-            else:
-                logging.warning(f"⚠️ {name} não possui método execute().")
+            # O contexto é passado para o método execute da sua classe
+            result = instance.execute(context)
+            logging.info(f"✅ {name} finalizado.")
+
+            if result:
+                context["artifacts"][name] = result
+                # Mantém compatibilidade com o drive_uploader que busca context['result']
+                context["result"] = result 
 
         except Exception as e:
             logging.error(f"💥 ERRO EM {name}: {e}")
