@@ -1,7 +1,9 @@
 name: 🚀 JARVIS Integrated Evolution
+# ⚠️ AUTO-EVOLUÇÃO PAUSADA: Repositório em reorganização estrutural.
+# Reativar apenas quando a estrutura estiver estabilizada.
 
 on:
-  workflow_dispatch: # Evolução agora é um ato de vontade manual
+  workflow_dispatch: # Evolução é um ato de vontade manual - PAUSADO
 
 permissions:
   contents: write
