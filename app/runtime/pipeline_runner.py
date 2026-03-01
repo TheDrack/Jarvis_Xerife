@@ -3,9 +3,7 @@ import os
 import yaml
 import logging
 import sys
-from typing import Dict, Any
 
-# Forçar log no console
 logging.basicConfig(
     level=logging.INFO,
     format="[%(levelname)s] %(message)s",
@@ -25,12 +23,11 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    # Contexto genérico conforme sua implementação original
+    # Contexto inicial
     context = {"artifacts": {}, "metadata": {"pipeline": pipeline_name}, "env": dict(os.environ)}
     components = config.get("components", {})
 
     for name, meta in components.items():
-        # Usa o ID definido no meta do YAML para resolver no Nexus
         target_id = meta.get("id")
         logging.info(f"🔍 Tentando resolver: {name} (ID: {target_id})")
 
@@ -41,28 +38,25 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
         )
 
         if not instance:
-            msg = f"❌ Falha crítica: Componente {name} (ID: {target_id}) não resolvido pelo Nexus!"
-            if strict: raise RuntimeError(msg)
-            logging.error(msg)
+            logging.error(f"❌ Falha crítica: Componente {name} (ID: {target_id}) não resolvido!")
+            if strict: raise RuntimeError(f"Não resolveu {target_id}")
             continue
 
         logging.info(f"⚙️ Executando: {name}...")
         try:
-            # 1. Configuração (Se houver bloco 'config' no YAML para este componente)
+            # Configuração
             if hasattr(instance, "configure"):
                 instance.configure(meta.get("config", {}))
 
-            # 2. Execução (Interface NexusComponent)
+            # Execução
             if hasattr(instance, "execute"):
                 result = instance.execute(context)
-                logging.info(f"✅ {name} finalizado. Resultado: {result}")
-                
+                logging.info(f"✅ {name} finalizado.")
                 if result:
                     context["artifacts"][name] = result
-                    # Atualiza o contexto para o próximo componente (opcional, dependendo do uso)
-                    context["result"] = result 
+                    context["result"] = result
             else:
-                logging.warning(f"⚠️ {name} instanciado, mas não possui método execute().")
+                logging.warning(f"⚠️ {name} não possui método execute().")
 
         except Exception as e:
             logging.error(f"💥 ERRO EM {name}: {e}")
@@ -72,9 +66,5 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
 
 if __name__ == "__main__":
     p_name = os.getenv("PIPELINE")
-    if not p_name:
-        logging.error("❌ Variável de ambiente PIPELINE não definida.")
-        sys.exit(1)
-        
     s_mode = os.getenv("PIPELINE_STRICT", "false").lower() == "true"
     run_pipeline(p_name, s_mode)
