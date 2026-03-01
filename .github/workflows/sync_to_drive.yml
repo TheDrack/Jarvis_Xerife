@@ -2,9 +2,6 @@ name: "☁️ Sync JARVIS to Google Drive"
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
   sync:
