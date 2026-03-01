@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os, re
 from app.core.nexuscomponent import NexusComponent
-from app.infrastructure.network.http_client import HttpClient
+from app.adapters.infrastructure.http_client import HttpClient
 
 class TelegramAdapter(NexusComponent):
     """

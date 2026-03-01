@@ -854,5 +854,125 @@
   "cap_034_core.py": {
     "original_path": "app/domain/models/cap_034_core.py",
     "type": "capability"
+  },
+  "infrastructure/gemini_adapter.py": {
+    "original_path": "app/infrastructure/gemini_adapter.py",
+    "type": "infrastructure"
+  },
+  "infrastructure/voice_adapter.py": {
+    "original_path": "app/infrastructure/voice_adapter.py",
+    "type": "infrastructure"
+  },
+  "infrastructure/llm_command_adapter.py": {
+    "original_path": "app/infrastructure/llm_command_adapter.py",
+    "type": "infrastructure"
+  },
+  "infrastructure/action_provider.py": {
+    "original_path": "app/infrastructure/action_provider.py",
+    "type": "infrastructure"
+  },
+  "infrastructure/drive_uploader.py": {
+    "original_path": "app/infrastructure/drive_uploader.py",
+    "type": "infrastructure"
+  },
+  "infrastructure/jarvis_local_agent.py": {
+    "original_path": "app/infrastructure/automation/jarvis_local_agent.py",
+    "type": "infrastructure"
+  },
+  "domain_adapters/audio_engine.py": {
+    "original_path": "app/domain/adapters/audio_engine.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_026_core.py": {
+    "original_path": "app/domain/adapters/cap_026_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_039_core.py": {
+    "original_path": "app/domain/adapters/cap_039_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_040_core.py": {
+    "original_path": "app/domain/adapters/cap_040_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_042_core.py": {
+    "original_path": "app/domain/adapters/cap_042_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_044_core.py": {
+    "original_path": "app/domain/adapters/cap_044_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_045_core.py": {
+    "original_path": "app/domain/adapters/cap_045_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_047_core.py": {
+    "original_path": "app/domain/adapters/cap_047_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_059_core.py": {
+    "original_path": "app/domain/adapters/cap_059_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_066_core.py": {
+    "original_path": "app/domain/adapters/cap_066_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_067_core.py": {
+    "original_path": "app/domain/adapters/cap_067_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_072_core.py": {
+    "original_path": "app/domain/adapters/cap_072_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_095_core.py": {
+    "original_path": "app/domain/adapters/cap_095_core.py",
+    "type": "capability"
+  },
+  "domain_adapters/cap_097_core.py": {
+    "original_path": "app/domain/adapters/cap_097_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_039_core.py": {
+    "original_path": "app/adapters/cap_039_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_040_core.py": {
+    "original_path": "app/adapters/cap_040_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_044_core.py": {
+    "original_path": "app/adapters/cap_044_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_047_core.py": {
+    "original_path": "app/adapters/cap_047_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_059_core.py": {
+    "original_path": "app/adapters/cap_059_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_062_core.py": {
+    "original_path": "app/adapters/cap_062_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_067_core.py": {
+    "original_path": "app/adapters/cap_067_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_072_core.py": {
+    "original_path": "app/adapters/cap_072_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_077_core.py": {
+    "original_path": "app/adapters/cap_077_core.py",
+    "type": "capability"
+  },
+  "orphan_caps/cap_095_core.py": {
+    "original_path": "app/adapters/cap_095_core.py",
+    "type": "capability"
   }
 }
