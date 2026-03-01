@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 """Infrastructure adapters for external services"""
 
-# Import SQLiteHistoryAdapter (always available with core dependencies)
-from .sqlite_history_adapter import SQLiteHistoryAdapter
-
-# Import DummyVoiceProvider (always available, no dependencies)
+# Import DummyVoiceProvider (sempre disponível, sem dependências)
 from .dummy_voice_provider import DummyVoiceProvider
 
-# Optional imports that require additional dependencies
+# Importação Protegida do SQLiteHistoryAdapter (Evita erro se SQLAlchemy não existir)
+try:
+    from .sqlite_history_adapter import SQLiteHistoryAdapter
+except ImportError:
+    SQLiteHistoryAdapter = None
+
+# Optional imports
 try:
     from .gemini_adapter import LLMCommandAdapter
 except ImportError:
@@ -29,9 +32,11 @@ try:
 except ImportError:
     create_api_server = None
 
-__all__ = ["SQLiteHistoryAdapter", "DummyVoiceProvider"]
+# Lista de exportação dinâmica
+__all__ = ["DummyVoiceProvider"]
 
-# Add optional exports if available
+if SQLiteHistoryAdapter is not None:
+    __all__.append("SQLiteHistoryAdapter")
 if LLMCommandAdapter is not None:
     __all__.append("LLMCommandAdapter")
 if AIGateway is not None:
