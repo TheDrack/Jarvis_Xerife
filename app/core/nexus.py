@@ -9,21 +9,29 @@ import urllib.parse
 import traceback
 from typing import Any, Optional
 
+class CloudMock:
+    """Objeto dinâmico que aceita qualquer chamada de método para evitar quebras em Cloud."""
+    def __getattr__(self, name):
+        def method(*args, **kwargs):
+            logging.info(f"☁️ [NEXUS-MOCK] Chamada simulada em Cloud: {name}({args}, {kwargs})")
+            return None
+        return method
+
 class JarvisNexus:
     def __init__(self):
         self.base_dir = os.path.abspath(os.getcwd())
         self.gist_id = "23d15b3f9d010179ace501a79c78608f"
         self._cache = self._load_remote_memory()
         self._instances = {}
+        # Detecta se está no Render ou ambiente sem terminal interativo
+        self.is_cloud = os.getenv("RENDER") == "true" or not sys.stdin.isatty()
 
     def _load_remote_memory(self) -> dict:
-        """Carrega a memória do Gist usando urllib (nativo) para evitar dependência do requests."""
         url = f"https://gist.githubusercontent.com/TheDrack/{self.gist_id}/raw/nexus_memory.json"
         try:
             with urllib.request.urlopen(url, timeout=5) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode('utf-8'))
-                    # Limpeza de caminhos absolutos ou sujos do cache
                     return {k: v.split("Jarvis_Xerife.")[-1] for k, v in data.items()}
                 return {}
         except Exception:
@@ -41,7 +49,6 @@ class JarvisNexus:
             if singleton: self._instances[target_id] = instance
             return instance
 
-        # Busca Omnisciente
         logging.info(f"🔍 [NEXUS] Buscando '{target_id}' em todo o projeto...")
         module_path = self._perform_omniscient_discovery(target_id)
 
@@ -56,30 +63,34 @@ class JarvisNexus:
         return None
 
     def _perform_omniscient_discovery(self, target_id: str) -> Optional[str]:
-        """Localiza o arquivo e retorna o caminho de importação Python válido."""
         target_file = f"{target_id}.py"
         for root, _, files in os.walk(self.base_dir):
             if any(x in root for x in [".git", "__pycache__", ".frozen", "venv", ".venv"]): continue
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
-                if rel_path == ".": return target_id
-
-                # Converte o caminho do SO (folder/sub) para notação Python (folder.sub)
                 parts = rel_path.split(os.sep)
-                if parts[0] == os.path.basename(self.base_dir):
-                    parts = parts[1:]
-
-                module_path = ".".join(parts)
-                return f"{module_path}.{target_id}"
+                
+                # Normalização de caminhos para pacotes Python
+                if parts[0] == "." or parts[0] == "":
+                    module_path = target_id
+                else:
+                    module_path = ".".join(parts) + f".{target_id}"
+                
+                # Se o caminho começar com 'app.', removemos redundância se houver
+                return module_path
         return None
 
     def _instantiate(self, target_id: str, module_path: str) -> Optional[Any]:
-        try:
-            if module_path in sys.modules:
-                importlib.reload(sys.modules[module_path])
+        # PROTOCOLO DE SIMBIOSE: Desvio de Hardware em Cloud
+        if self.is_cloud and ("adapters.edge" in module_path or "keyboard" in target_id):
+            logging.warning(f"🛡️ [NEXUS] Desvio de Hardware ativo para '{target_id}'. Retornando CloudMock.")
+            return CloudMock()
 
+        try:
+            # Tenta importar o módulo
             module = importlib.import_module(module_path)
-            # Nome da Classe: snake_case -> PascalCase
+            
+            # PascalCase para o nome da classe
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
 
             if not hasattr(module, class_name):
@@ -88,13 +99,18 @@ class JarvisNexus:
 
             clazz = getattr(module, class_name)
             return clazz()
+            
+        except ImportError as e:
+            if self.is_cloud:
+                logging.warning(f"⚠️ [NEXUS] Dependência ausente ({e.name}) em Cloud. Usando Mock para {target_id}.")
+                return CloudMock()
+            raise e
         except Exception:
             logging.error(f"💥 [NEXUS] Erro crítico ao instanciar {module_path}:")
             logging.error(traceback.format_exc())
             return None
 
     def _update_dna(self, target_id: str, module_path: str):
-        """Atualiza o Gist remotamente usando urllib (PATCH)."""
         self._cache[target_id] = module_path
         token = os.getenv("GIST_PAT")
         if not token: return
