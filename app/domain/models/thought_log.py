@@ -16,7 +16,7 @@ class InteractionStatus(str, Enum):
     INTERNAL_MONOLOGUE = "internal_monologue"  # Internal reasoning, not shown to user
 
 
-class ThoughtLog(SQLModel, table=True):
+class ThoughtLog(NexusComponent, SQLModel, table=True):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

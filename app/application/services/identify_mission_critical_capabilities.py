@@ -20,7 +20,8 @@ def identify_mission_critical_capabilities():
 
     return critical_capabilities
 
-# Executa a função
-critical_capabilities = identify_mission_critical_capabilities()
-print(json.dumps(critical_capabilities, indent=4, ensure_ascii=False))
+if __name__ == "__main__":
+    # Executa a função apenas quando o módulo é executado diretamente
+    critical_capabilities = identify_mission_critical_capabilities()
+    print(json.dumps(critical_capabilities, indent=4, ensure_ascii=False))
 

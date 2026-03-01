@@ -21,7 +21,7 @@ from app.domain.models.capability import JarvisCapability
 logger = logging.getLogger(__name__)
 
 
-class Interaction(SQLModel, table=True):
+class Interaction(NexusComponent, SQLModel, table=True):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

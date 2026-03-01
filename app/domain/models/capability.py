@@ -8,7 +8,7 @@ from typing import Optional
 from sqlmodel import Field, SQLModel
 
 
-class JarvisCapability(SQLModel, table=True):
+class JarvisCapability(NexusComponent, SQLModel, table=True):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 
