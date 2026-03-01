@@ -1,126 +1,168 @@
+import os
 import ast
 import json
 import shutil
 from pathlib import Path
 
-ROOT = Path(".").resolve()
-FROZEN_ROOT = ROOT / "frozen"
-CAPS_FROZEN = FROZEN_ROOT / "caps"
-MODULES_FROZEN = FROZEN_ROOT / "modules"
-INDEX_FILE = FROZEN_ROOT / "frozen_index.json"
+REPO_ROOT = Path(".").resolve()
 
-PROTECTED_PATHS = [
+FROZEN_ROOT = REPO_ROOT / ".frozen"
+FROZEN_CAPS = FROZEN_ROOT / "caps"
+FROZEN_OTHERS = FROZEN_ROOT / "others"
+FROZEN_INDEX = FROZEN_ROOT / "frozen_index.json"
+
+IMMUTABLE_PATHS = [
     "app/core",
     "app/runtime",
     "app/bootstrap",
     "tests",
-    "scripts"
+    "docs",
+    "scripts",
+    "dags",
+    "__init__.py",
+    "setup.py",
+    "build_config.py",
 ]
 
-CAP_IDENTIFIER = "cap_"
+CAPABILITY_MARKERS = [
+    "/capabilities/",
+    "/gears/",
+]
 
-# ------------------ UTILS ------------------
+# ---------------------------------------------------------------------
 
-def is_protected(path: Path) -> bool:
-    return any(str(path).startswith(p) for p in PROTECTED_PATHS)
+def is_immutable(rel_path: str) -> bool:
+    return any(rel_path.startswith(p) or rel_path == p for p in IMMUTABLE_PATHS)
+
+def is_capability(rel_path: str) -> bool:
+    return (
+        any(m in rel_path for m in CAPABILITY_MARKERS)
+        or Path(rel_path).name.startswith("cap_")
+    )
 
 def load_index():
-    if INDEX_FILE.exists():
-        return json.loads(INDEX_FILE.read_text())
-    return {}
+    if not FROZEN_INDEX.exists():
+        return {}
+    return json.loads(FROZEN_INDEX.read_text())
 
 def save_index(index):
     FROZEN_ROOT.mkdir(exist_ok=True)
-    INDEX_FILE.write_text(json.dumps(index, indent=2))
+    FROZEN_CAPS.mkdir(exist_ok=True)
+    FROZEN_OTHERS.mkdir(exist_ok=True)
+    FROZEN_INDEX.write_text(json.dumps(index, indent=2))
 
-# ------------------ DISCOVERY ------------------
+# ---------------------------------------------------------------------
 
-def discover_used_files():
+def discover_used_modules():
     used = set()
 
-    for py in ROOT.rglob("*.py"):
-        if "frozen" in py.parts:
+    for py in REPO_ROOT.rglob("*.py"):
+        rel = str(py.relative_to(REPO_ROOT))
+
+        if is_immutable(rel):
             continue
 
         try:
-            tree = ast.parse(py.read_text())
+            tree = ast.parse(py.read_text(encoding="utf-8"))
         except Exception:
             continue
 
         for node in ast.walk(tree):
-            if isinstance(node, (ast.Import, ast.ImportFrom)):
-                module = (
-                    node.module.split(".")[0]
-                    if isinstance(node, ast.ImportFrom) and node.module
-                    else None
-                )
-                if module:
-                    used.add(module)
+            if isinstance(node, ast.Import):
+                for n in node.names:
+                    used.add(n.name.split(".")[0])
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                used.add(node.module.split(".")[0])
 
     return used
 
-# ------------------ FREEZE / UNFREEZE ------------------
+# ---------------------------------------------------------------------
 
-def freeze_file(path: Path, index):
-    if is_protected(path):
+def freeze_file(rel_path: str, index: dict):
+    src = REPO_ROOT / rel_path
+    name = src.name
+
+    if is_capability(rel_path):
+        dst = FROZEN_CAPS / name
+        ftype = "capability"
+    else:
+        dst = FROZEN_OTHERS / name
+        ftype = "other"
+
+    if dst.exists():
         return
 
-    rel = str(path)
-    if rel in index:
-        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src), str(dst))
 
-    target_dir = CAPS_FROZEN if CAP_IDENTIFIER in path.name else MODULES_FROZEN
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    frozen_path = target_dir / path.name
-    shutil.move(str(path), frozen_path)
-
-    index[rel] = {
-        "original_path": rel,
-        "frozen_path": str(frozen_path),
-        "type": "capability" if CAP_IDENTIFIER in path.name else "module"
+    index[name] = {
+        "original_path": rel_path,
+        "type": ftype,
     }
 
-    print(f"🧊 FROZEN: {rel}")
+    print(f"🧊 FROZEN: {rel_path}")
 
-def unfreeze_file(entry, index):
-    frozen = Path(entry["frozen_path"])
-    original = Path(entry["original_path"])
+# ---------------------------------------------------------------------
 
-    original.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(frozen), original)
+def unfreeze_used(index: dict, used_modules: set):
+    restored = []
 
-    print(f"🔥 UNFROZEN: {original}")
-    index.pop(entry["original_path"])
+    for name, meta in list(index.items()):
+        original = REPO_ROOT / meta["original_path"]
+        frozen_path = (
+            FROZEN_CAPS / name
+            if meta["type"] == "capability"
+            else FROZEN_OTHERS / name
+        )
 
-# ------------------ MAIN ------------------
+        if not frozen_path.exists():
+            continue
+
+        module_name = Path(name).stem
+        if module_name in used_modules:
+            original.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(frozen_path), str(original))
+            restored.append(name)
+            del index[name]
+            print(f"🔥 UNFROZEN: {name}")
+
+    return restored
+
+# ---------------------------------------------------------------------
 
 def main():
-    CAPS_FROZEN.mkdir(parents=True, exist_ok=True)
-    MODULES_FROZEN.mkdir(parents=True, exist_ok=True)
+    print("=" * 80)
+    print("Repo Lifecycle Governance — SAFE MODE")
+    print("=" * 80)
 
     index = load_index()
-    used_modules = discover_used_files()
+    used = discover_used_modules()
 
-    # UNFREEZE
-    for entry in list(index.values()):
-        name = Path(entry["original_path"]).stem
-        if name in used_modules:
-            unfreeze_file(entry, index)
+    print(f"[DISCOVERY] TOTAL used: {len(used)}")
 
-    # FREEZE
-    for py in ROOT.rglob("*.py"):
-        if "frozen" in py.parts:
-            continue
-        if is_protected(py):
+    unfreeze_used(index, used)
+
+    for py in REPO_ROOT.rglob("*.py"):
+        rel = str(py.relative_to(REPO_ROOT))
+
+        # 🚫 REGRA ABSOLUTA
+        if is_immutable(rel):
             continue
 
-        if py.stem not in used_modules:
-            freeze_file(py, index)
+        if not is_capability(rel):
+            continue
+
+        name = py.stem
+        if name not in used:
+            freeze_file(rel, index)
 
     save_index(index)
 
-    print("Governança concluída com memória arquitetural.")
+    print("-" * 80)
+    print("Governança concluída sem falhas")
+    print("-" * 80)
+
+# ---------------------------------------------------------------------
 
 if __name__ == "__main__":
     main()
