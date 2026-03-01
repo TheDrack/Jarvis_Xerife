@@ -22,9 +22,31 @@ class JarvisNexus:
         # ID do seu Gist de Backup
         self.gist_id = "23d15b3f9d010179ace501a79c78608f" 
         self._lock = Lock()
-        self._cache = self._load_remote_memory() # Carrega do Gist
+        # Seed from local registry first, then merge with Gist (Gist takes precedence)
+        local = self._load_local_registry()
+        remote = self._load_remote_memory()
+        self._cache = {**local, **remote}
         self._instances = {}
-        self._mutated = False # Flag para evitar writes desnecessários
+        # Mark mutated if local has entries not yet in the Gist
+        self._mutated = bool(set(local.keys()) - set(remote.keys()))
+
+    def _load_local_registry(self) -> dict:
+        """Lê o nexus_registry.json local como semente inicial."""
+        registry_path = os.path.join(self.base_dir, "data", "nexus_registry.json")
+        try:
+            with open(registry_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            components = data.get("components", {})
+            # Convert "module.path.ClassName" → "module.path" (cache stores module path only)
+            cache = {}
+            for cid, full_path in components.items():
+                parts = full_path.rsplit(".", 1)
+                cache[cid] = parts[0] if len(parts) == 2 else full_path
+            logging.info("📋 Registry local carregado como semente.")
+            return cache
+        except Exception as e:
+            logging.warning(f"⚠️ Falha ao ler registry local: {e}")
+            return {}
 
     def _load_remote_memory(self) -> dict:
         """Tenta ler o mapa de componentes do Gist Raw."""
@@ -35,8 +57,23 @@ class JarvisNexus:
                 logging.info("📡 Memória remota sincronizada via Gist.")
                 return res.json()
         except:
-            logging.warning("⚠️ Falha ao acessar Gist. Usando discovery local.")
+            logging.warning("⚠️ Falha ao acessar Gist. Usando registry local.")
         return {}
+
+    def _update_local_registry(self):
+        """Atualiza o nexus_registry.json para refletir o estado atual do cache."""
+        registry_path = os.path.join(self.base_dir, "data", "nexus_registry.json")
+        components = {}
+        for cid, module_path in self._cache.items():
+            class_name = "".join(word.capitalize() for word in cid.split("_"))
+            components[cid] = f"{module_path}.{class_name}"
+        data = {"components": components}
+        try:
+            with open(registry_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            logging.info("📋 Registry local (nexus_registry.json) atualizado.")
+        except Exception as e:
+            logging.error(f"💥 Erro ao atualizar registry local: {e}")
 
     def commit_memory(self):
         """Persiste todas as novas descobertas no Gist em uma única chamada."""
@@ -61,6 +98,7 @@ class JarvisNexus:
             if res.status_code == 200:
                 logging.info("✅ Memória Nexus atualizada no Gist.")
                 self._mutated = False
+                self._update_local_registry()
         except Exception as e:
             logging.error(f"💥 Erro ao salvar memória: {e}")
 
