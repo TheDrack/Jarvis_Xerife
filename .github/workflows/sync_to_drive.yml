@@ -21,13 +21,14 @@ jobs:
 
       - name: 🔧 Install Dependencies
         run: |
-          set -e
-          python -m pip install --upgrade pip
           pip install \
             google-api-python-client \
             google-auth-httplib2 \
             google-auth-oauthlib \
-            pyyaml
+            pyyaml \
+            requests
+
+    
 
       - name: ☁️ Run JARVIS Pipeline (Sync Drive & Backups)
         env:
