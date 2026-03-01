@@ -13,38 +13,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python dependencies
-# Use edge requirements for full local deployment
 COPY requirements/edge.txt requirements/core.txt requirements/
 RUN pip install --no-cache-dir --user -r requirements/edge.txt
 
 # Stage 2: Edge Runtime (with hardware support)
 FROM python:3.11-slim as edge
 
-# Install runtime dependencies for audio and GUI
+# Install runtime dependencies for audio, GUI and GitHub CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     portaudio19-dev \
     libportaudio2 \
     libasound2 \
+    curl \
+    ca-certificates \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y gh \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
-
-# Copy Python dependencies from builder
 COPY --from=builder /root/.local /root/.local
-
-# Copy application code
 COPY app/ ./app/
 COPY main.py .
 
-# Make sure scripts in .local are usable
 ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1
-
-# Create necessary directories
 RUN mkdir -p data logs
-
-# Run the assistant
 CMD ["python", "main.py"]
 
 # Stage 3: Cloud Runtime (headless, no hardware dependencies)
@@ -52,25 +47,32 @@ FROM python:3.11-slim as cloud
 
 WORKDIR /app
 
+# Install GitHub CLI and other system utilities
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    gnupg \
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+    && apt-get update && apt-get install -y gh \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install uv for faster dependency installation
 RUN pip install --no-cache-dir uv
 
-# Copy requirements first for better layer caching
-# This layer will be cached unless requirements change
+# Copy requirements first
 COPY requirements/core.txt requirements/
 
-# Install dependencies using uv (much faster than pip)
-# Using --system flag to install in system Python (no venv needed in container)
+# Install dependencies using uv
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system -r requirements/core.txt
 
 # Install LLM dependencies separately
-# This allows caching of core deps even if LLM deps change
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system google-generativeai groq tiktoken
 
-# Copy application code (only domain, application, and infrastructure adapters)
-# These layers change more frequently, so they come after dependencies
+# Copy application code
 COPY app/domain/ ./app/domain/
 COPY app/application/ ./app/application/
 COPY app/adapters/infrastructure/ ./app/adapters/infrastructure/
@@ -78,19 +80,15 @@ COPY app/core/config.py ./app/core/config.py
 COPY app/core/__init__.py ./app/core/__init__.py
 COPY app/container.py ./app/container.py
 COPY serve.py ./serve.py
-
-# Copy static files for PWA support (manifest, icons, service worker)
 COPY static/ ./static/
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
-
-# Create necessary directories
 RUN mkdir -p data logs
 
-# Health check to verify the service is running
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/health').read()" || exit 1
 
-# Start the API server with Uvicorn
+# Start the API server
 CMD ["python", "serve.py"]
