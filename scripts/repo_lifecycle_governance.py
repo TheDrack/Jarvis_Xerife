@@ -48,21 +48,21 @@ def find_file_in_frozen(target_name):
 def unfreeze_used(index: dict, used_modules: set):
     print("🔥 [ACTION] Iniciando Resgate em Deep-Freeze...")
     restored_count = 0
-    
+
     for key_name, meta in list(index.items()):
         # Nome base do arquivo (ex: drive_uploader.py)
         file_name = os.path.basename(key_name)
         stem = Path(file_name).stem
-        
+
         # Critérios de match: se o nome, o stem ou a chave do índice aparecem nos usados
         if any(m in used_modules for m in [file_name, stem, key_name]):
             # BUSCA GLOBAL RECURSIVA dentro de .frozen
             found_path = find_file_in_frozen(file_name)
-            
+
             if found_path:
                 dest = REPO_ROOT / meta["original_path"]
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                
+
                 shutil.move(str(found_path), str(dest))
                 del index[key_name]
                 print(f"✅ [UNFROZEN] {file_name} -> {meta['original_path']}")
@@ -80,7 +80,7 @@ def unfreeze_used(index: dict, used_modules: set):
                     restored_count += 1
                 else:
                     print(f"⚠️ [NOT FOUND IN FROZEN] {file_name} (Deveria estar em .frozen/)")
-    
+
     if restored_count == 0:
         print("ℹ️ Nenhum arquivo pendente para descongelamento foi localizado fisicamente.")
 
@@ -88,7 +88,7 @@ def main():
     print("="*60 + "\nJARVIS REPO GOVERNANCE - RECURSIVE RECOVERY\n" + "="*60)
     index = load_index()
     used = discover_used_modules()
-    
+
     unfreeze_used(index, used)
 
     # Limpeza: remove pastas vazias em .frozen após o unfreeze
