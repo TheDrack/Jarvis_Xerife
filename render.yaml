@@ -7,27 +7,28 @@ services:
     name: jarvis-api
     env: python
     region: oregon
-    plan: free  # Change to 'starter' or higher for production
+    plan: free
     buildCommand: |
-      # Install uv for faster dependency management
       pip install uv
-      
-      # Install dependencies with uv (much faster than pip)
-      # Using cache mount will speed up subsequent builds
       uv pip install --system -r requirements/prod-cloud.txt
-      
-      # Install LLM dependencies
       uv pip install google-generativeai groq tiktoken
+    
+    # Alterado para garantir que o script de serviço use as configs de nuvem
     startCommand: python serve.py
-    
-    # Auto-deploy from main branch
+
     branch: main
-    
-    # Health check configuration
     healthCheckPath: /health
-    
-    # Environment variables
+
     envVars:
+      # --- CONFIGURAÇÕES CRÍTICAS PARA O TELEGRAM ---
+      - key: RENDER
+        value: true
+      - key: TELEGRAM_TOKEN
+        sync: false # Defina o valor no Dashboard do Render
+      - key: TELEGRAM_CHAT_ID
+        sync: false # Defina o valor no Dashboard do Render
+      
+      # --- CONFIGURAÇÕES DE AMBIENTE ---
       - key: PORT
         value: 10000
       - key: PYTHONUNBUFFERED
@@ -38,28 +39,26 @@ services:
         value: pt-BR
       - key: WAKE_WORD
         value: jarvis
-      
-      # Database URL (connects to PostgreSQL service below)
+
+      # Database URL
       - key: DATABASE_URL
         fromDatabase:
           name: jarvis-db
           property: connectionString
-      
-      # API Keys (set these in Render Dashboard)
+
+      # API Keys
       - key: GEMINI_API_KEY
-        sync: false  # Allows manual override in dashboard
+        sync: false
       - key: GROQ_API_KEY
         sync: false
       - key: SECRET_KEY
-        generateValue: true  # Auto-generate secure secret
-      
-      # Optional configs
+        generateValue: true
+
       - key: USE_LLM
         value: true
       - key: API_HOST
         value: 0.0.0.0
-    
-    # Disk for persistent storage
+
     disk:
       name: jarvis-data
       mountPath: /app/data
@@ -69,7 +68,6 @@ services:
 databases:
   - name: jarvis-db
     databaseName: jarvis
-    plan: free  # Change to 'starter' or higher for production
+    plan: free
     region: oregon
-    # PostgreSQL 15
-    ipAllowList: []  # Empty means accessible from all Render services
+    ipAllowList: []
