@@ -2,39 +2,38 @@ name: Repo Lifecycle Governance
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
-  lifecycle-governance:
+  governance:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Configure PYTHONPATH
-        run: |
-          echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
-
-      - name: Repo Lifecycle Governance (Freeze / Unfreeze)
+      - name: Repo Lifecycle Governance
+        env:
+          PIPELINE_STRICT: "false"
         run: |
           echo "========================================"
           echo " Repo Lifecycle Governance"
           echo "========================================"
           python scripts/repo_lifecycle_governance.py
 
-      - name: Show frozen index (debug)
-        if: always()
+      - name: Commit frozen changes (no PR, no merge)
         run: |
-          if [ -f frozen/frozen_index.json ]; then
-            echo "---- frozen_index.json ----"
-            cat frozen/frozen_index.json
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git config user.name "governance-bot"
+            git config user.email "governance@bot"
+            git add .
+            git commit -m "chore: lifecycle governance (freeze/unfreeze)"
+            git push
           else
-            echo "No frozen index found"
+            echo "No changes to commit"
           fi
