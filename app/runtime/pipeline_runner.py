@@ -11,7 +11,9 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
     logging.info(f"🚀 INICIANDO RUNNER: {pipeline_name}")
     
     config_path = os.path.join("config", "pipelines", f"{pipeline_name}.yml")
-    if not os.path.exists(config_path): return
+    if not os.path.exists(config_path):
+        logging.error(f"❌ Pipeline {pipeline_name} não encontrado em {config_path}")
+        return
 
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
@@ -21,12 +23,13 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
 
     for name, meta in components.items():
         t_id = meta.get("id")
-        logging.info(f"🔍 Resolvendo: {name} (ID: {t_id})")
+        logging.info(f"🔍 Resolvendo componente: {name} (ID: {t_id})")
 
         instance = nexus.resolve(target_id=t_id, hint_path=meta.get("hint_path"))
 
         if not instance:
-            if strict: raise RuntimeError(f"Falha em {t_id}")
+            logging.error(f"❌ Falha ao obter instância de {t_id}")
+            if strict: raise RuntimeError(f"Pipeline interrompido: {t_id}")
             continue
 
         try:
@@ -34,17 +37,20 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
                 instance.configure(meta["config"])
 
             logging.info(f"⚙️ Executando: {name}...")
+            # Chamada do execute passando o context para o Consolidator
             result = instance.execute(context)
             
             if result:
                 context["result"] = result
                 context["artifacts"][name] = result
-                logging.info(f"✅ {name} OK.")
+                logging.info(f"✅ {name} finalizado com sucesso.")
         except Exception as e:
-            logging.error(f"💥 ERRO EM {name}: {e}")
+            logging.error(f"💥 ERRO NA EXECUÇÃO DE {name}: {e}")
             if strict: raise e
 
-    logging.info("🏁 FINALIZADO")
+    logging.info("🏁 PIPELINE FINALIZADO")
 
 if __name__ == "__main__":
-    run_pipeline(os.getenv("PIPELINE"), os.getenv("PIPELINE_STRICT", "false").lower() == "true")
+    p_name = os.getenv("PIPELINE")
+    s_strict = os.getenv("PIPELINE_STRICT", "false").lower() == "true"
+    run_pipeline(p_name, s_strict)
