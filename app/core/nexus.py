@@ -4,7 +4,8 @@ import logging
 import os
 import json
 import sys
-import requests
+import urllib.request
+import urllib.parse
 import traceback
 from typing import Any, Optional
 
@@ -16,15 +17,17 @@ class JarvisNexus:
         self._instances = {}
 
     def _load_remote_memory(self) -> dict:
+        """Carrega a memória do Gist usando urllib (nativo) para evitar dependência do requests."""
         url = f"https://gist.githubusercontent.com/TheDrack/{self.gist_id}/raw/nexus_memory.json"
         try:
-            res = requests.get(url, timeout=5)
-            if res.status_code == 200:
-                data = res.json()
-                # Limpeza de cache sujo que contenha o prefixo do diretório do runner
-                return {k: v.split("Jarvis_Xerife.")[-1] for k, v in data.items()}
+            with urllib.request.urlopen(url, timeout=5) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode('utf-8'))
+                    # Limpeza de caminhos absolutos ou sujos do cache
+                    return {k: v.split("Jarvis_Xerife.")[-1] for k, v in data.items()}
+                return {}
+        except Exception:
             return {}
-        except: return {}
 
     def resolve(self, target_id: str, hint_path: Optional[str] = None, singleton: bool = True) -> Optional[Any]:
         if singleton and target_id in self._instances:
@@ -38,6 +41,7 @@ class JarvisNexus:
             if singleton: self._instances[target_id] = instance
             return instance
 
+        # Busca Omnisciente
         logging.info(f"🔍 [NEXUS] Buscando '{target_id}' em todo o projeto...")
         module_path = self._perform_omniscient_discovery(target_id)
 
@@ -52,31 +56,30 @@ class JarvisNexus:
         return None
 
     def _perform_omniscient_discovery(self, target_id: str) -> Optional[str]:
+        """Localiza o arquivo e retorna o caminho de importação Python válido."""
         target_file = f"{target_id}.py"
         for root, _, files in os.walk(self.base_dir):
-            if any(x in root for x in [".git", "__pycache__", ".frozen", "venv"]): continue
+            if any(x in root for x in [".git", "__pycache__", ".frozen", "venv", ".venv"]): continue
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 if rel_path == ".": return target_id
-
-                # Transforma o caminho do SO em caminho de módulo Python (ex: app/core -> app.core)
+                
+                # Converte o caminho do SO (folder/sub) para notação Python (folder.sub)
                 parts = rel_path.split(os.sep)
-                # Filtra se por acaso o caminho começar com o nome da pasta raiz
                 if parts[0] == os.path.basename(self.base_dir):
                     parts = parts[1:]
-
+                
                 module_path = ".".join(parts)
                 return f"{module_path}.{target_id}"
         return None
 
     def _instantiate(self, target_id: str, module_path: str) -> Optional[Any]:
         try:
-            # Garante que o módulo seja recarregado se necessário
             if module_path in sys.modules:
                 importlib.reload(sys.modules[module_path])
-
+            
             module = importlib.import_module(module_path)
-            # Converte snake_case para PascalCase (ex: drive_uploader -> DriveUploader)
+            # Nome da Classe: snake_case -> PascalCase
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
 
             if not hasattr(module, class_name):
@@ -91,13 +94,29 @@ class JarvisNexus:
             return None
 
     def _update_dna(self, target_id: str, module_path: str):
+        """Atualiza o Gist remotamente usando urllib (PATCH)."""
         self._cache[target_id] = module_path
         token = os.getenv("GIST_PAT")
         if not token: return
+        
+        url = f"https://api.github.com/gists/{self.gist_id}"
+        payload = json.dumps({
+            "files": {
+                "nexus_memory.json": {
+                    "content": json.dumps(self._cache, indent=4)
+                }
+            }
+        }).encode('utf-8')
+        
+        req = urllib.request.Request(url, data=payload, method='PATCH')
+        req.add_header("Authorization", f"token {token}")
+        req.add_header("Content-Type", "application/json")
+        
         try:
-            requests.patch(f"https://api.github.com/gists/{self.gist_id}", 
-                           json={"files": {"nexus_memory.json": {"content": json.dumps(self._cache, indent=4)}}},
-                           headers={"Authorization": f"token {token}"}, timeout=10)
-        except: pass
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    logging.info(f"🧬 [NEXUS] DNA atualizado para '{target_id}'")
+        except Exception as e:
+            logging.warning(f"⚠️ [NEXUS] Falha ao sincronizar DNA: {e}")
 
 nexus = JarvisNexus()
