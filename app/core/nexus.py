@@ -28,7 +28,7 @@ class JarvisNexus:
 
         module_path = self._cache.get(target_id)
         instance = self._instantiate(target_id, module_path) if module_path else None
-        
+
         if instance:
             logging.info(f"🧠 [NEXUS] '{target_id}' resolvido via DNA.")
             if singleton: self._instances[target_id] = instance
@@ -37,7 +37,7 @@ class JarvisNexus:
         # Busca Omnisciente
         logging.info(f"🔍 [NEXUS] Buscando '{target_id}' em todo o projeto...")
         module_path = self._perform_omniscient_discovery(target_id)
-        
+
         if module_path:
             logging.info(f"🎯 [NEXUS] LOCALIZADO: {module_path}. Tentando instanciar...")
             instance = self._instantiate(target_id, module_path)
@@ -45,7 +45,7 @@ class JarvisNexus:
                 self._update_dna(target_id, module_path)
                 if singleton: self._instances[target_id] = instance
                 return instance
-        
+
         return None
 
     def _perform_omniscient_discovery(self, target_id: str) -> Optional[str]:
@@ -65,11 +65,11 @@ class JarvisNexus:
             if module_path in sys.modules: del sys.modules[module_path]
             module = importlib.import_module(module_path)
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
-            
+
             if not hasattr(module, class_name):
                 logging.error(f"❌ [NEXUS] Classe {class_name} não existe em {module_path}")
                 return None
-                
+
             clazz = getattr(module, class_name)
             return clazz()
         except Exception:
@@ -84,8 +84,8 @@ class JarvisNexus:
         if not token: return
         try:
             requests.patch(f"https://api.github.com/gists/{self.gist_id}", 
-                json={"files": {"nexus_memory.json": {"content": json.dumps(self._cache, indent=4)}}},
-                headers={"Authorization": f"token {token}"}, timeout=10)
+                           json={"files": {"nexus_memory.json": {"content": json.dumps(self._cache, indent=4)}}},
+                           headers={"Authorization": f"token {token}"}, timeout=10)
         except: pass
 
 nexus = JarvisNexus()
