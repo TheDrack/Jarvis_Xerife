@@ -12,7 +12,7 @@ class JarvisNexus:
         # Base dir absoluta
         self.base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         self.gist_id = "23d15b3f9d010179ace501a79c78608f"
-        
+
         # Sincronização
         self._cache = self._load_remote_memory()
         self._instances = {}
@@ -34,12 +34,12 @@ class JarvisNexus:
         if not instance:
             logging.info(f"🔍 [NEXUS] '{target_id}' não mapeado. Iniciando busca exaustiva...")
             module_path = self._perform_discovery(target_id)
-            
+
             if module_path:
                 self._cache[target_id] = module_path
                 self.commit_memory() # Salva no Gist para a próxima rodada
                 instance = self._instantiate(target_id, module_path)
-            
+
         if instance and singleton:
             self._instances[target_id] = instance
         return instance
