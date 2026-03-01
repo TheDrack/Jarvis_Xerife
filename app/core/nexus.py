@@ -19,7 +19,11 @@ class JarvisNexus:
         url = f"https://gist.githubusercontent.com/TheDrack/{self.gist_id}/raw/nexus_memory.json"
         try:
             res = requests.get(url, timeout=5)
-            return res.json() if res.status_code == 200 else {}
+            if res.status_code == 200:
+                data = res.json()
+                # Limpeza de cache sujo que contenha o prefixo do diretório do runner
+                return {k: v.split("Jarvis_Xerife.")[-1] for k, v in data.items()}
+            return {}
         except: return {}
 
     def resolve(self, target_id: str, hint_path: Optional[str] = None, singleton: bool = True) -> Optional[Any]:
@@ -34,7 +38,6 @@ class JarvisNexus:
             if singleton: self._instances[target_id] = instance
             return instance
 
-        # Busca Omnisciente
         logging.info(f"🔍 [NEXUS] Buscando '{target_id}' em todo o projeto...")
         module_path = self._perform_omniscient_discovery(target_id)
 
@@ -51,19 +54,29 @@ class JarvisNexus:
     def _perform_omniscient_discovery(self, target_id: str) -> Optional[str]:
         target_file = f"{target_id}.py"
         for root, _, files in os.walk(self.base_dir):
-            if any(x in root for x in [".git", "__pycache__", ".frozen"]): continue
+            if any(x in root for x in [".git", "__pycache__", ".frozen", "venv"]): continue
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 if rel_path == ".": return target_id
-                # Remove prefixos indesejados para garantir importação limpa
-                clean_path = rel_path.replace("Jarvis_Xerife/", "").replace("Jarvis_Xerife", "")
-                return f"{clean_path.strip('/').replace(os.sep, '.')}.{target_id}".lstrip(".")
+                
+                # Transforma o caminho do SO em caminho de módulo Python (ex: app/core -> app.core)
+                parts = rel_path.split(os.sep)
+                # Filtra se por acaso o caminho começar com o nome da pasta raiz
+                if parts[0] == os.path.basename(self.base_dir):
+                    parts = parts[1:]
+                
+                module_path = ".".join(parts)
+                return f"{module_path}.{target_id}"
         return None
 
     def _instantiate(self, target_id: str, module_path: str) -> Optional[Any]:
         try:
-            if module_path in sys.modules: del sys.modules[module_path]
+            # Garante que o módulo seja recarregado se necessário
+            if module_path in sys.modules:
+                importlib.reload(sys.modules[module_path])
+            
             module = importlib.import_module(module_path)
+            # Converte snake_case para PascalCase (ex: drive_uploader -> DriveUploader)
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
 
             if not hasattr(module, class_name):
@@ -73,7 +86,6 @@ class JarvisNexus:
             clazz = getattr(module, class_name)
             return clazz()
         except Exception:
-            # REVELAÇÃO DA VERDADE: Mostra o erro de importação real no log
             logging.error(f"💥 [NEXUS] Erro crítico ao instanciar {module_path}:")
             logging.error(traceback.format_exc())
             return None
