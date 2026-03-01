@@ -335,10 +335,6 @@
     "original_path": "app/domain/capabilities/cap_024_core.py",
     "type": "capability"
   },
-  "mission_selector.py": {
-    "original_path": "app/domain/missions/mission_selector.py",
-    "type": "other"
-  },
   "cap_072_core.py": {
     "original_path": "app/domain/capabilities/cap_072_core.py",
     "type": "capability"
@@ -550,81 +546,5 @@
   "orphan_caps/cap_095_core.py": {
     "original_path": "app/adapters/cap_095_core.py",
     "type": "capability"
-  },
-  "technical_analysis_service.py": {
-    "original_path": "app/application/services/technical_analysis_service.py",
-    "type": "other"
-  },
-  "evaluate_risks_service.py": {
-    "original_path": "app/application/services/evaluate_risks_service.py",
-    "type": "other"
-  },
-  "human_intervention_service.py": {
-    "original_path": "app/application/services/human_intervention_service.py",
-    "type": "other"
-  },
-  "capability_impact_analyzer.py": {
-    "original_path": "app/application/services/capability_impact_analyzer.py",
-    "type": "other"
-  },
-  "prioritizer_service.py": {
-    "original_path": "app/application/services/prioritizer_service.py",
-    "type": "other"
-  },
-  "vocal_orchestration_service.py": {
-    "original_path": "app/application/services/vocal_orchestration_service.py",
-    "type": "other"
-  },
-  "human_intervention.py": {
-    "original_path": "app/application/communication/human_intervention.py",
-    "type": "other"
-  },
-  "context_manager.py": {
-    "original_path": "app/domain/context/context_manager.py",
-    "type": "other"
-  },
-  "vocal_orchestrator.py": {
-    "original_path": "app/domain/services/vocal_orchestrator.py",
-    "type": "other"
-  },
-  "soldier_shield.py": {
-    "original_path": "app/domain/services/soldier_shield.py",
-    "type": "other"
-  },
-  "central_orchestrator.py": {
-    "original_path": "app/domain/orchestration/central_orchestrator.py",
-    "type": "other"
-  },
-  "performance_analyzer.py": {
-    "original_path": "app/domain/analysis/performance_analyzer.py",
-    "type": "other"
-  },
-  "playwright_worker.py": {
-    "original_path": "app/adapters/infrastructure/playwright_worker.py",
-    "type": "other"
-  },
-  "socket_client.py": {
-    "original_path": "app/adapters/infrastructure/socket_client.py",
-    "type": "other"
-  },
-  "reward_logger.py": {
-    "original_path": "app/adapters/infrastructure/reward_logger.py",
-    "type": "other"
-  },
-  "active_recruiter_adapter.py": {
-    "original_path": "app/adapters/edge/active_recruiter_adapter.py",
-    "type": "other"
-  },
-  "voice_engine.py": {
-    "original_path": "app/adapters/edge/voice_engine.py",
-    "type": "other"
-  },
-  "plugin_loader.py": {
-    "original_path": "app/plugins/plugin_loader.py",
-    "type": "other"
-  },
-  "example_plugin.py": {
-    "original_path": "app/plugins/dynamic/example_plugin.py",
-    "type": "other"
   }
 }
