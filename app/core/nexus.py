@@ -63,12 +63,12 @@ class JarvisNexus:
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 if rel_path == ".": return target_id
-                
+
                 # Converte o caminho do SO (folder/sub) para notação Python (folder.sub)
                 parts = rel_path.split(os.sep)
                 if parts[0] == os.path.basename(self.base_dir):
                     parts = parts[1:]
-                
+
                 module_path = ".".join(parts)
                 return f"{module_path}.{target_id}"
         return None
@@ -77,7 +77,7 @@ class JarvisNexus:
         try:
             if module_path in sys.modules:
                 importlib.reload(sys.modules[module_path])
-            
+
             module = importlib.import_module(module_path)
             # Nome da Classe: snake_case -> PascalCase
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
@@ -98,7 +98,7 @@ class JarvisNexus:
         self._cache[target_id] = module_path
         token = os.getenv("GIST_PAT")
         if not token: return
-        
+
         url = f"https://api.github.com/gists/{self.gist_id}"
         payload = json.dumps({
             "files": {
@@ -107,11 +107,11 @@ class JarvisNexus:
                 }
             }
         }).encode('utf-8')
-        
+
         req = urllib.request.Request(url, data=payload, method='PATCH')
         req.add_header("Authorization", f"token {token}")
         req.add_header("Content-Type", "application/json")
-        
+
         try:
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status == 200:

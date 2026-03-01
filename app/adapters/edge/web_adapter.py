@@ -10,7 +10,7 @@ from app.application.ports import ActionProvider, WebProvider
 logger = logging.getLogger(__name__)
 
 
-class WebAdapter(NexusComponent, WebProvider):
+class WebAdapter(WebProvider):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

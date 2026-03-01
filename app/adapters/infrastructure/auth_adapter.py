@@ -36,7 +36,7 @@ FAKE_USERS_DB = {
 }
 
 
-class AuthAdapter(NexusComponent, SecurityProvider):
+class AuthAdapter(SecurityProvider):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

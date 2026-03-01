@@ -10,7 +10,7 @@ from app.application.ports import VoiceProvider
 logger = logging.getLogger(__name__)
 
 
-class TTSAdapter(NexusComponent, VoiceProvider):
+class TTSAdapter(VoiceProvider):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

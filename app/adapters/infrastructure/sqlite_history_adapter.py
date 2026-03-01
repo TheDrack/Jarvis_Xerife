@@ -43,7 +43,7 @@ class Interaction(NexusComponent, SQLModel, table=True):
     processed_at: Optional[datetime] = Field(default=None, nullable=True)
 
 
-class SQLiteHistoryAdapter(NexusComponent, HistoryProvider):
+class SQLiteHistoryAdapter(HistoryProvider):
     """
     Database implementation of the HistoryProvider port.
     Uses SQLModel for ORM and supports multiple database backends (SQLite, PostgreSQL, etc.).

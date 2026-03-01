@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
-class RequestSource(NexusComponent, str, Enum):
+class RequestSource(str, Enum):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

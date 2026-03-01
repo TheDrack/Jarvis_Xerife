@@ -8,7 +8,7 @@ from enum import Enum
 from typing import Any, Dict, Optional
 
 
-class RiskLevel(NexusComponent, str, Enum):
+class RiskLevel(str, Enum):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

@@ -11,7 +11,7 @@ from app.application.ports import ActionProvider
 logger = logging.getLogger(__name__)
 
 
-class AutomationAdapter(NexusComponent, ActionProvider):
+class AutomationAdapter(ActionProvider):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 
