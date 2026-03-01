@@ -2,8 +2,6 @@ name: Repo Lifecycle Governance
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 jobs:
   governance:
