@@ -19,11 +19,17 @@ The project follows **Hexagonal Architecture** (Ports and Adapters):
 
 ## Dependency Injection (Nexus)
 
-All active components must be registered in the **Nexus** DI container (`app/core/nexus.py`). Use `nexus.resolve("component_name")` to instantiate components. Components not in use go into `.frozen/`.
+The **Nexus** (`app/core/nexus.py`) is a dynamic DI container. Use `nexus.resolve("component_name")` to instantiate any component by its snake_case name — no direct import needed. It discovers components by:
+
+1. Checking a remote DNA/Gist cache (`nexus_memory.json`) for previously resolved paths.
+2. Walking the project filesystem to find `{component_name}.py` and auto-deriving the module path.
+3. Instantiating the PascalCase class that matches the component name (e.g. `"audit_logger"` → `AuditLogger`).
+
+Components must implement `NexusComponent` (defined in `app/core/nexuscomponent.py`), which requires an `execute(context)` method returning evidence of effect. Components not in active use go into `.frozen/`.
 
 ## Code Style
 
-- **Language**: Python 3.12+
+- **Language**: Python 3.9+
 - **Formatter**: Black (100 character line length)
 - **Imports**: isort
 - **Type hints**: Required on all public functions and classes
@@ -52,8 +58,8 @@ make test-fast     # Run tests without coverage
 
 ## Environment
 
-- Copy `.env.example` to `.env` and fill in: `USER_ID`, `ASSISTANT_NAME`, `GEMINI_API_KEY`, `DATABASE_URL`
-- Cloud deployment: Render (API mode). Set `RENDER=true` or `PYTHON_ENV=production`.
+- Copy `.env.example` to `.env` and fill in the required keys (e.g. `USER_ID`, `ASSISTANT_NAME`, `SECRET_KEY`, `GROQ_API_KEY`, `GOOGLE_API_KEY` or `GEMINI_API_KEY`, `DATABASE_URL`).
+- Cloud deployment: Render (API mode). Set `RENDER=true`.
 - Edge deployment: local device with microphone/hardware.
 
 ## Contributing Guidelines
