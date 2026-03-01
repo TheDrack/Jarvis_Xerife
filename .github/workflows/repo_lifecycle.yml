@@ -1,0 +1,40 @@
+name: Repo Lifecycle Governance
+
+on:
+  workflow_dispatch:
+
+jobs:
+  lifecycle-governance:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure PYTHONPATH
+        run: |
+          echo "PYTHONPATH=$(pwd)" >> $GITHUB_ENV
+
+      - name: Repo Lifecycle Governance (Freeze / Unfreeze)
+        run: |
+          echo "========================================"
+          echo " Repo Lifecycle Governance"
+          echo "========================================"
+          python scripts/repo_lifecycle_governance.py
+
+      - name: Show frozen index (debug)
+        if: always()
+        run: |
+          if [ -f frozen/frozen_index.json ]; then
+            echo "---- frozen_index.json ----"
+            cat frozen/frozen_index.json
+          else
+            echo "No frozen index found"
+          fi
