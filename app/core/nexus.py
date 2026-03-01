@@ -58,13 +58,13 @@ class JarvisNexus:
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 if rel_path == ".": return target_id
-                
+
                 # Transforma o caminho do SO em caminho de módulo Python (ex: app/core -> app.core)
                 parts = rel_path.split(os.sep)
                 # Filtra se por acaso o caminho começar com o nome da pasta raiz
                 if parts[0] == os.path.basename(self.base_dir):
                     parts = parts[1:]
-                
+
                 module_path = ".".join(parts)
                 return f"{module_path}.{target_id}"
         return None
@@ -74,7 +74,7 @@ class JarvisNexus:
             # Garante que o módulo seja recarregado se necessário
             if module_path in sys.modules:
                 importlib.reload(sys.modules[module_path])
-            
+
             module = importlib.import_module(module_path)
             # Converte snake_case para PascalCase (ex: drive_uploader -> DriveUploader)
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
