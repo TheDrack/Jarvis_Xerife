@@ -10,7 +10,6 @@ from typing import Any, Optional
 
 class JarvisNexus:
     def __init__(self):
-        # Base dir para o GitHub Actions
         self.base_dir = os.path.abspath(os.getcwd())
         self.gist_id = "23d15b3f9d010179ace501a79c78608f"
         self._cache = self._load_remote_memory()
@@ -29,25 +28,16 @@ class JarvisNexus:
 
         module_path = self._cache.get(target_id)
         instance = self._instantiate(target_id, module_path) if module_path else None
-        
+
         if instance:
             logging.info(f"🧠 [NEXUS] '{target_id}' resolvido via DNA.")
             if singleton: self._instances[target_id] = instance
             return instance
 
-        logging.info(f"🔍 [NEXUS] Buscando '{target_id}'...")
-
-        if hint_path:
-            hint_module = f"{hint_path.strip('/').replace('/', '.')}.{target_id}"
-            logging.info(f"🔎 [NEXUS] Tentando Hint: {hint_module}")
-            instance = self._instantiate(target_id, hint_module)
-            if instance:
-                self._update_dna(target_id, hint_module)
-                if singleton: self._instances[target_id] = instance
-                return instance
-
-        # Varredura Global
+        # Busca Omnisciente
+        logging.info(f"🔍 [NEXUS] Buscando '{target_id}' em todo o projeto...")
         module_path = self._perform_omniscient_discovery(target_id)
+
         if module_path:
             logging.info(f"🎯 [NEXUS] LOCALIZADO: {module_path}. Tentando instanciar...")
             instance = self._instantiate(target_id, module_path)
@@ -55,8 +45,6 @@ class JarvisNexus:
                 self._update_dna(target_id, module_path)
                 if singleton: self._instances[target_id] = instance
                 return instance
-            else:
-                logging.error(f"❌ [NEXUS] Arquivo encontrado em {module_path}, mas a INSTANCIAÇÃO falhou. Verifique o código do componente.")
 
         return None
 
@@ -67,7 +55,7 @@ class JarvisNexus:
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 if rel_path == ".": return target_id
-                # Remove prefixo Jarvis_Xerife se o rel_path o incluir erroneamente
+                # Remove prefixos indesejados para garantir importação limpa
                 clean_path = rel_path.replace("Jarvis_Xerife/", "").replace("Jarvis_Xerife", "")
                 return f"{clean_path.strip('/').replace(os.sep, '.')}.{target_id}".lstrip(".")
         return None
@@ -77,11 +65,17 @@ class JarvisNexus:
             if module_path in sys.modules: del sys.modules[module_path]
             module = importlib.import_module(module_path)
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
+
+            if not hasattr(module, class_name):
+                logging.error(f"❌ [NEXUS] Classe {class_name} não existe em {module_path}")
+                return None
+
             clazz = getattr(module, class_name)
             return clazz()
-        except Exception as e:
-            # LOG CRÍTICO: Mostra por que o Python não conseguiu carregar o arquivo achado
-            logging.debug(f"DEBUG: Falha ao carregar {module_path}: {str(e)}")
+        except Exception:
+            # REVELAÇÃO DA VERDADE: Mostra o erro de importação real no log
+            logging.error(f"💥 [NEXUS] Erro crítico ao instanciar {module_path}:")
+            logging.error(traceback.format_exc())
             return None
 
     def _update_dna(self, target_id: str, module_path: str):
@@ -90,8 +84,8 @@ class JarvisNexus:
         if not token: return
         try:
             requests.patch(f"https://api.github.com/gists/{self.gist_id}", 
-                json={"files": {"nexus_memory.json": {"content": json.dumps(self._cache, indent=4)}}},
-                headers={"Authorization": f"token {token}"}, timeout=10)
+                           json={"files": {"nexus_memory.json": {"content": json.dumps(self._cache, indent=4)}}},
+                           headers={"Authorization": f"token {token}"}, timeout=10)
         except: pass
 
 nexus = JarvisNexus()
