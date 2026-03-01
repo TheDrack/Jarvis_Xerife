@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 from app.core.nexuscomponent import NexusComponent
 
-class Cap045(NexusComponent):
+class Cap100(NexusComponent):
     """
-    Capacidade: Evaluate maintenance cost
-    ID: {cap['id']}
-    Setor: {target_dir}
+    Capacidade: Evolve continuously without losing identity
+    ID: CAP-100
+    Setor: domain/capabilities
     """
 
     def __init__(self):
@@ -20,5 +20,5 @@ class Cap045(NexusComponent):
 
     def execute(self, context: dict = None):
         """Execução lógica principal"""
-        print('🚀 Executando Cap045...')
-        return {'status': 'success', 'id': 'CAP-045'}
+        print('🚀 Executando Cap100...')
+        return {'status': 'success', 'id': 'CAP-100'}
