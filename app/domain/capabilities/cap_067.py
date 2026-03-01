@@ -1,13 +1,24 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexuscomponent import NexusComponent
 
-class Cap-067(NexusComponent):
+class Cap067(NexusComponent):
     """
     Capacidade: Learn from computational cost
-    Gerado automaticamente pelo CrystallizerEngine
+    ID: CAP-067
+    Setor: domain/capabilities
     """
-    def execute(self, context=None):
-        return {'status': 'active', 'id': 'CAP-067'}
 
-# Nexus Compatibility
-Cap067 = Cap
+    def __init__(self):
+        super().__init__()
+        # Padrões iniciais do componente
+        self.active = True
+
+    def configure(self, config: dict = None):
+        """Opcional: Configuração via Pipeline YAML"""
+        if config:
+            pass
+
+    def execute(self, context: dict = None):
+        """Execução lógica principal"""
+        print('🚀 Executando Cap067...')
+        return {'status': 'success', 'id': 'CAP-067'}

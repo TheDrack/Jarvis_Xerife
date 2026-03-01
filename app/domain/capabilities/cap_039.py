@@ -1,13 +1,24 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexuscomponent import NexusComponent
 
-class Cap-039(NexusComponent):
+class Cap039(NexusComponent):
     """
     Capacidade: Plan actions across multiple steps
-    Gerado automaticamente pelo CrystallizerEngine
+    ID: CAP-039
+    Setor: domain/capabilities
     """
-    def execute(self, context=None):
-        return {'status': 'active', 'id': 'CAP-039'}
 
-# Nexus Compatibility
-Cap039 = Cap
+    def __init__(self):
+        super().__init__()
+        # Padrões iniciais do componente
+        self.active = True
+
+    def configure(self, config: dict = None):
+        """Opcional: Configuração via Pipeline YAML"""
+        if config:
+            pass
+
+    def execute(self, context: dict = None):
+        """Execução lógica principal"""
+        print('🚀 Executando Cap039...')
+        return {'status': 'success', 'id': 'CAP-039'}

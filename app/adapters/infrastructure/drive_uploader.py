@@ -18,8 +18,8 @@ class DriveUploader(NexusComponent):
             raise ValueError("❌ [NEXUS] G_JSON ausente.")
         try:
             self.service_account_info = json.loads(raw_json)
-        except:
-            self.service_account_info = eval(raw_json)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"❌ [NEXUS] G_JSON inválido: {e}")
         
         self.folder_id = os.environ.get('DRIVE_FOLDER_ID', '').strip().replace('"', '').replace("'", "")
 

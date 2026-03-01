@@ -1,13 +1,24 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexuscomponent import NexusComponent
 
-class Cap-047(NexusComponent):
+class Cap047(NexusComponent):
     """
     Capacidade: Select strategies with optimal cost-benefit
-    Gerado automaticamente pelo CrystallizerEngine
+    ID: CAP-047
+    Setor: domain/capabilities
     """
-    def execute(self, context=None):
-        return {'status': 'active', 'id': 'CAP-047'}
 
-# Nexus Compatibility
-Cap047 = Cap
+    def __init__(self):
+        super().__init__()
+        # Padrões iniciais do componente
+        self.active = True
+
+    def configure(self, config: dict = None):
+        """Opcional: Configuração via Pipeline YAML"""
+        if config:
+            pass
+
+    def execute(self, context: dict = None):
+        """Execução lógica principal"""
+        print('🚀 Executando Cap047...')
+        return {'status': 'success', 'id': 'CAP-047'}
