@@ -9,7 +9,7 @@ from sqlmodel import Field, SQLModel, Column
 from sqlalchemy import JSON
 
 
-class EvolutionReward(NexusComponent, SQLModel, table=True):
+class EvolutionReward(SQLModel, table=True):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

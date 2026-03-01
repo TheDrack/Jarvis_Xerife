@@ -15,7 +15,7 @@ from app.domain.models.evolution_reward import EvolutionReward
 logger = logging.getLogger(__name__)
 
 
-class RewardAdapter(NexusComponent, RewardProvider):
+class RewardAdapter(RewardProvider):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

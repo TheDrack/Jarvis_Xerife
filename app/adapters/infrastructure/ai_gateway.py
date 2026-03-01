@@ -72,7 +72,7 @@ def count_tokens(text: str) -> int:
     return len(text) // 4
 
 
-class LLMProvider(NexusComponent, str, Enum):
+class LLMProvider(str, Enum):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 
