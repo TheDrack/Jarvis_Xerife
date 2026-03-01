@@ -9,12 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-#### Documentation
-- Updated installation documentation to reflect simplified build process
-- Enhanced README.md with clearer installation options (Installer Executable, Python, Manual)
-- Improved INSTALLER_README.md with detailed build instructions and troubleshooting
-- Emphasized the ease of using the standalone executable installer
-- Added notes about PyInstaller onefile mode and automated GitHub Actions builds
+#### Refactoring Estrutural (2026-03-01)
+- Consolidado `app/infrastructure/adapters/` em `app/adapters/infrastructure/` (pasta única)
+- Removido `app/domain/adapters/` – adaptadores não pertencem ao domínio
+- Removido `app/app/` – diretório aninhado incorreto
+- Removido `app/adapters/cap_*_core.py` (root) – movidos para `.frozen/orphan_caps/`
+- `action_provider.py` movido para `app/adapters/infrastructure/`
+- Auto-evolução **PAUSADA** enquanto estrutura é reorganizada
+- Documentação completamente reescrita (docs/ limpa e recriada)
+- README atualizado com status atual e estrutura correta
+- `data/nexus_registry.json` atualizado com novos caminhos dos componentes
 
 ## [1.0.0] - 2024-02-05
 

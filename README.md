@@ -1,298 +1,161 @@
-# Jarvis - Intelligent Voice Assistant & Distributed Automation Platform
+# JARVIS – Plataforma de Assistente e Automação Distribuída
 
 [![🧬 JARVIS: PyTest e Auto-Cura](https://github.com/TheDrack/Jarvis_Xerife/actions/workflows/homeostase.yml/badge.svg?branch=main)](https://github.com/TheDrack/Jarvis_Xerife/actions/workflows/homeostase.yml)
-[![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+> Assistente de voz distribuído com orquestração multi-dispositivo, integração com LLMs e arquitetura hexagonal.
 
-> **Jarvis evolved beyond a simple voice assistant** - It's now a distributed orchestration platform that intelligently coordinates multiple devices ("Soldiers") based on their capabilities, location, and network proximity.
+---
 
-## 🎯 What is Jarvis?
+## 🎯 O que é o JARVIS?
 
-Jarvis is a **cloud-native voice assistant** with distributed device orchestration that:
+O JARVIS é uma plataforma de automação e assistência que:
 
-- 🧠 **Intelligently routes commands** to the right device based on capabilities, location, and network
-- 🎤 **Understands voice commands** in Brazilian Portuguese with Google Speech Recognition
-- 🤖 **Self-heals** using AI to automatically fix bugs and update documentation
-- 🌐 **Scales horizontally** - Run on multiple devices (PCs, phones, Raspberry Pi, IoT)
-- 🏗️ **Built with Hexagonal Architecture** - Clean, testable, and cloud-ready
-- ⚡ **Multi-tier AI system** - Uses Groq (Llama) for speed and Gemini for complex tasks
+- 🧠 **Interpreta comandos** em português usando LLMs (Groq/Gemini)
+- 🎤 **Reconhece voz** com Google Speech Recognition
+- 🌐 **Orquestra múltiplos dispositivos** (PC, celular, IoT) por capacidade e proximidade
+- 🔧 **Auto-repara erros** via GitHub Copilot (self-healing)
+- 🏗️ **Arquitetura Hexagonal** – domínio puro, testável e cloud-ready
+- 🧬 **Nexus** – container de injeção de dependência com discovery automático
 
-### Real-World Example
+---
 
-> "Jarvis, tire uma selfie" 
-> - If you're traveling: Uses your phone's camera
-> - If you're home: Routes to your local PC or tablet
+## ⚙️ Status Atual
 
-> "Jarvis, ligue a TV"
-> - Routes to the IR-capable device in the same room
-> - Confirms before routing to distant devices (>50km)
+| Componente | Status |
+|---|---|
+| API REST (FastAPI) | ✅ Ativo |
+| Nexus (DI) | ✅ Ativo |
+| Adaptadores LLM (Groq, Gemini) | ✅ Ativo |
+| Reconhecimento de voz | ✅ Ativo |
+| Orquestração de dispositivos | ✅ Ativo |
+| Auto-Evolução | ⏸️ **PAUSADA** |
+| Reorganização estrutural | 🔧 Em andamento |
 
-## ✨ Key Features
+> Auto-evolução está **pausada** enquanto a estrutura do repositório é reorganizada.
 
-### 🎯 Intelligent Device Orchestration
-- **Capability-based routing** - Knows which devices can do what
-- **3-tier proximity hierarchy**:
-  1. Same device (if capable)
-  2. Same network/WiFi
-  3. GPS proximity (<1km, <50km)
-- **Conflict validation** - Confirms cross-network or distant commands
+---
 
-### 🤖 AI-Powered Intelligence
-- **Multi-tier LLM system** (Gears):
-  - High Gear: Llama-3.3-70b (Groq) - Fast & economical
-  - Low Gear: Llama-3.1-8b (Groq) - Fallback for rate limits
-  - Cannon Shot: Gemini-1.5-Pro - Complex reasoning
-- **LLM-based identification** - Replaces keyword matching with AI understanding
-- **Natural language understanding** with context awareness
-- **Gemini AI integration** for complex command interpretation
-- **GitHub Copilot integration** - Provides repository context to GitHub Agents
+## 🗂️ Estrutura do Projeto
 
-### 🔧 Self-Healing & Auto-Evolution
-- **Metabolism Flow** - Biological-inspired DNA mutation control system
-- **Auto-Evolution System** - Self-improvement based on ROADMAP with Reinforcement Learning
-- **Marvel Evolution System** - **NEW:** 9 advanced skills to reach J.A.R.V.I.S. Marvel level
-- **Automatic bug fixing** using GitHub Copilot (Mecânico Consertador)
-- **Metabolic analysis** with intelligent escalation (Mecânico Revisionador)
-- **CI/CD failure detection** and auto-repair
-- **Pull Request generation** for proposed fixes
-- **State machine** for autonomous error handling with 3-cycle limit
-- **Reinforcement Learning** - Rewards/punishments guide evolution decisions
-- **Commander escalation** for complex decisions requiring human judgment
+```
+app/
+├── core/               # Nexus, configuração, criptografia
+├── domain/             # Lógica de negócio (modelos, serviços, LLM gears)
+├── application/        # Casos de uso e portas (interfaces)
+│   ├── ports/          # Contratos dos adaptadores
+│   └── services/       # Orquestrador, assistente, etc.
+├── adapters/
+│   ├── edge/           # Hardware (voz, teclado, automação)
+│   └── infrastructure/ # Cloud (LLM, DB, GitHub, API)
+├── plugins/            # Plugins dinâmicos
+└── runtime/            # Pipeline runner declarativo
 
-### 🏗️ Architecture & Deployment
-- **Hexagonal Architecture** - Clean domain logic, testable
-- **Cloud-ready** - Core runs headless without hardware
-- **REST API** - FastAPI with OAuth2 authentication
-- **Docker support** - PostgreSQL & containerized deployment
-- **97-100% domain test coverage**
+.frozen/                # Código inativo (aguardando uso ou descarte)
+config/                 # Configurações de LLM e pipelines
+data/                   # Registry Nexus, capabilities, regras
+docs/                   # Documentação
+tests/                  # Testes automatizados
+```
 
-## 🚀 Quick Start
+---
 
-### Option 1: Installer (Windows - Recommended for Users)
+## 🚀 Como Executar
 
-1. Download `Jarvis_Installer.exe` from [Releases](../../releases)
-2. Run the installer
-3. Follow the Setup Wizard
-4. Done! 🎉
-
-### Option 2: Python Installation (Developers)
+### Modo Cloud (API REST)
 
 ```bash
-# Clone the repository
-git clone https://github.com/TheDrack/python
-cd python
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
+# Instalar dependências
 pip install -r requirements.txt
 
-# Run setup wizard
-python main.py
+# Configurar variáveis de ambiente
+cp .env.example .env
+# edite .env com suas chaves de API
+
+# Iniciar servidor
+python -m app.application.services.serve
+# ou
+uvicorn app.adapters.infrastructure.api_server:app --reload
 ```
 
-The **Setup Wizard** will guide you through:
-- 🎭 Choosing your assistant name (Jarvis, Friday, Ultron, etc.)
-- 🔑 Configuring Gemini API key
-- 🗄️ Setting up the database (SQLite/PostgreSQL)
-- 💾 Generating encrypted `.env` file
-
-### Option 3: Docker (Production)
+### Docker
 
 ```bash
-# Start with Docker Compose (includes PostgreSQL)
 docker-compose up --build
-
-# Access API at http://localhost:8000
-# Web interface at http://localhost:8000
+# API disponível em http://localhost:8000
 ```
 
-## 🌐 Web Interface
-
-Access the **Stark Industries-themed web interface** at `http://localhost:8000`:
-
-- 🔐 Secure login with OAuth2
-- 🎤 Voice commands via Web Speech API
-- 💻 Direct command execution
-- ⚡ Real-time feedback
-- 🔒 Auto-logout (30min inactivity)
-
-Default credentials: `admin` / `admin123`
-
-## 📖 Documentation
-
-### Getting Started
-- [Installation Guide](docs/guides/INSTALLER_README.md) - Detailed setup instructions
-- [Local Setup](docs/guides/LOCAL_SETUP.md) - Development environment setup
-- [Quick Start - Self-Healing](docs/guides/SELF_HEALING_QUICK_START.md) - Auto-correction setup
-- [Metabolism Flow](docs/architecture/METABOLISM_FLOW.md) - **NEW:** Biological-inspired DNA mutation system
-
-### Architecture & Design
-- [Hexagonal Architecture](docs/architecture/ARCHITECTURE.md) - System design
-- [Device Orchestration](docs/architecture/DEVICE_ORCHESTRATION.md) - Multi-device coordination
-- [Self-Healing System](docs/architecture/SELF_HEALING_ARCHITECTURE.md) - Auto-correction architecture
-- [Metabolism Flow](docs/architecture/METABOLISM_FLOW.md) - **NEW:** DNA mutation control system
-
-### API & Integration
-- [REST API Documentation](docs/api/API_README.md) - API reference
-- [LLM Integration](docs/api/LLM_INTEGRATION.md) - AI integration guide
-- [AI Gateway](docs/api/AI_GATEWAY.md) - Gateway architecture
-
-### Deployment
-- [Production Deployment](docs/deployment/DEPLOYMENT.md) - Deploy to production
-- [Distributed Mode](docs/guides/DISTRIBUTED_MODE.md) - Multi-device setup
-- [Render Deployment](docs/guides/RENDER_QUICKSTART.md) - Cloud deployment
-
-### Advanced Features
-- [Gears System](docs/GEARS_SYSTEM.md) - Multi-tier LLM system
-- [Xerife Strategist](docs/XERIFE_STRATEGIST.md) - Autonomous decision-making
-- [Extensibility](docs/development/EXTENSIBILITY.md) - Extending Jarvis
-
-📚 **[Full Documentation Index](docs/README.md)** - Complete documentation listing
-
-## 🎯 Voice Commands
-
-```
-"xerife escreva [texto]"     - Type text
-"xerife aperte [tecla]"      - Press a key  
-"xerife internet"            - Open browser
-"xerife site [url]"          - Open website
-"xerife tire uma selfie"     - Take a photo (routes to device with camera)
-"xerife ligue a TV"          - Control TV (routes to IR device)
-"fechar"                     - Exit assistant
-```
-
-## 🛠️ Development
-
-### Project Structure
-
-```
-.
-├── app/
-│   ├── domain/              # Business logic (pure Python)
-│   ├── application/         # Use cases and ports
-│   ├── adapters/            # Infrastructure implementations
-│   │   ├── edge/            # Hardware adapters
-│   │   └── infrastructure/  # Cloud/API adapters
-│   └── container.py         # Dependency injection
-├── docs/                    # 📚 All documentation
-├── tests/                   # Test suite (97-100% domain coverage)
-├── scripts/                 # Utility scripts
-└── requirements/            # Modular dependencies
-```
-
-### Running Tests
+### Modo Edge (dispositivo local)
 
 ```bash
-# Run all tests
-pytest
+python app/bootstrap_edge.py
+```
 
-# Run with coverage
-pytest --cov=app tests/
+---
 
-# Run domain tests only (no hardware!)
+## 🧬 Nexus – Sistema de Instanciação
+
+O **Nexus** é o container de DI do JARVIS. Todo componente ativo deve ser registrado:
+
+```python
+from app.core.nexus import nexus
+
+# Resolve e instancia um componente
+component = nexus.resolve("audit_logger")
+component.execute(context)
+```
+
+Componentes não utilizados ficam em `.frozen/` até serem necessários.
+
+→ Veja [docs/NEXUS.md](docs/NEXUS.md) para detalhes.
+
+---
+
+## 🧊 Política Frozen
+
+Arquivos em `.frozen/` são código preservado mas inativo.  
+Para reativar: mova para `app/`, registre no Nexus, documente.
+
+---
+
+## 🧪 Testes
+
+```bash
+# Instalar dependências de dev
+pip install -r requirements/dev.txt
+
+# Executar testes do domínio (sem hardware)
 pytest tests/domain/ -v
+
+# Executar todos os testes
+pytest tests/ -v
 ```
 
-### Code Quality
+---
 
-```bash
-# Format code
-black app/ tests/
+## 📖 Documentação
 
-# Type checking
-mypy app/
+| Documento | Descrição |
+|---|---|
+| [docs/STATUS.md](docs/STATUS.md) | Situação atual do projeto |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitetura do sistema |
+| [docs/NEXUS.md](docs/NEXUS.md) | Sistema de injeção de dependência |
+| [docs/ARQUIVO_MAP.md](docs/ARQUIVO_MAP.md) | Mapa de todos os arquivos ativos |
+| [padrão_estrutural.md](padrão_estrutural.md) | Padrão de pipelines e arquitetura |
 
-# Linting
-flake8 app/ tests/
-```
+---
 
-## 🗺️ Roadmap
+## 🤝 Contribuindo
 
-### ✅ Current (Q1 2026)
-- [x] Hexagonal Architecture refactoring
-- [x] Self-healing with GitHub Copilot
-- [x] Multi-tier LLM system (Gears)
-- [x] Device orchestration
-- [ ] Stabilize TaskRunner with ephemeral environments
-- [ ] Playwright integration
+Veja [CONTRIBUTING.md](CONTRIBUTING.md) para diretrizes.
 
-### 📅 Next (Q2-Q3 2026)
-- [ ] Enhanced voice interface
-- [ ] Wake word detection (offline)
-- [ ] Device monitoring dashboard
-- [ ] Real-time WebSocket support
+---
 
-### 🤔 Future (Q4 2026+)
-- [ ] Local AI models (TinyLLM)
-- [ ] Mobile app
-- [ ] Home Assistant integration
-- [ ] Extension marketplace
+## 📄 Licença
 
-📖 **[Full Roadmap](docs/ROADMAP.md)** - Detailed project roadmap
-
-## 🤝 Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Quick Contribution Guide
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`pytest`)
-5. Submit a Pull Request
-
-## 📊 Project Stats
-
-- **Architecture**: Hexagonal (Ports & Adapters)
-- **Test Coverage**: 97-100% (domain layer)
-- **Languages**: Python 3.11+, Portuguese (pt-BR)
-- **AI Models**: Groq (Llama 3.3 70b, Llama 3.1 8b), Gemini 1.5 Pro
-- **Deployment**: Docker, Render, Local
-
-## 🙏 Acknowledgments
-
-- **Google Gemini** - AI integration
-- **Groq** - Fast LLM inference
-- **GitHub Copilot** - Self-healing automation
-- **FastAPI** - REST API framework
-
-## 📚 Documentation
-
-- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute
-- **[API Documentation](docs/api/API_README.md)** - REST API reference
-- **[LLM Integration](docs/api/LLM_INTEGRATION.md)** - Multi-tier LLM system
-- **[Auto-Evolution System](docs/AUTO_EVOLUTION_SYSTEM.md)** - Self-improvement with RL
-- **[Marvel Evolution System](docs/MARVEL_ROADMAP.md)** - **NEW:** 9 advanced Marvel-level skills
-- **[Reinforcement Learning](docs/RL_EVOLUTION_MODULE.md)** - Reward system documentation
-- **[Full Roadmap](docs/ROADMAP.md)** - Detailed project roadmap
-- **[Architecture Decision Records](docs/README.md)** - Design decisions
-- **[Changelog](CHANGELOG.md)** - Version history
-
-## 📄 License
-
-This project is provided as-is for educational and personal use. See [LICENSE](LICENSE) for details.
-
-## 📞 Support
-
-- 📖 [Documentation](docs/README.md)
-- 🐛 [Report Issues](../../issues)
-- 💬 [Discussions](../../discussions)
-- 📧 [Contact](mailto:your-email@example.com)
+MIT – veja [LICENSE](LICENSE).
 
 ---
 
 **Made with ❤️ by the Jarvis Team**
-
-> "Sometimes you gotta run before you can walk." - Tony Stark
-
-## 🧬 Painel de Evolução JARVIS
-> **Status do DNA:** Estável | **Nível de Inteligência:** 61.9 IQ
-
-| Data | Missão | Tokens | Custo Est. | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| 2026-02-19 | functional_upgrade | 417 | $0.000292 | ✅ |
