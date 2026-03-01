@@ -4,8 +4,10 @@ class Cap099Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    '''CAPABILITY: Maintain continuous alignment with user
-    DEPENDS ON: ['CAP-032']'''
+    """CAPABILITY: Maintain continuous alignment with user
+    ID: CAP-099"""
+
     def execute(context=None):
-        return {'status': 'active', 'id': 'CAP-099'}
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-099"}
 

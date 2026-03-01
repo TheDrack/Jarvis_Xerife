@@ -4,8 +4,10 @@ class Cap050Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    '''CAPABILITY: Orchestrate multiple agents simultaneously
-    DEPENDS ON: []'''
+    """CAPABILITY: Orchestrate multiple agents simultaneously
+    ID: CAP-050"""
+
     def execute(context=None):
-        return {'status': 'active', 'id': 'CAP-050'}
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-050"}
 

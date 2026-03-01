@@ -4,8 +4,10 @@ class Cap093Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    '''CAPABILITY: Maintain full traceability
-    DEPENDS ON: ['CAP-089']'''
+    """CAPABILITY: Maintain full traceability
+    ID: CAP-093"""
+
     def execute(context=None):
-        return {'status': 'active', 'id': 'CAP-093'}
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-093"}
 

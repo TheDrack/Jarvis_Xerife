@@ -4,8 +4,10 @@ class Cap010Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    '''CAPABILITY: Distinguish technical error from conceptual limitation
-    DEPENDS ON: []'''
+    """CAPABILITY: Distinguish technical error from conceptual limitation
+    ID: CAP-010"""
+
     def execute(context=None):
-        return {'status': 'active', 'id': 'CAP-010'}
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-010"}
 

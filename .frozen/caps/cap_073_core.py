@@ -4,10 +4,9 @@ class Cap073Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    """CAPABILITY: Evaluate potential return of actions
-    ID: CAP-073"""
+    '''CAPABILITY: Evaluate potential return of actions'''
 
     def execute(context=None):
-        # JARVIS INITIAL STATE
-        return {"status": "initialized", "id": "CAP-073"}
+        # Template gerado pelo Crystallizer
+        return {'status': 'active', 'id': 'CAP-073'}
 

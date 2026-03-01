@@ -4,10 +4,8 @@ class Cap023Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    """CAPABILITY: Maintain internal operational self-model
-    ID: CAP-023"""
-
+    '''CAPABILITY: Maintain internal operational self-model
+    DEPENDS ON: []'''
     def execute(context=None):
-        # JARVIS INITIAL STATE
-        return {"status": "initialized", "id": "CAP-023"}
+        return {'status': 'active', 'id': 'CAP-023'}
 

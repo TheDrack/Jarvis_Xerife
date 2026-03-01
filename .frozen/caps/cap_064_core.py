@@ -4,8 +4,10 @@ class Cap064Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    '''CAPABILITY: Discard ineffective strategies
-    DEPENDS ON: ['CAP-061']'''
+    """CAPABILITY: Discard ineffective strategies
+    ID: CAP-064"""
+
     def execute(context=None):
-        return {'status': 'active', 'id': 'CAP-064'}
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-064"}
 

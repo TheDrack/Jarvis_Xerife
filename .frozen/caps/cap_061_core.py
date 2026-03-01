@@ -4,8 +4,10 @@ class Cap061Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    '''CAPABILITY: Learn from recurring failures
-    DEPENDS ON: ['CAP-008']'''
+    """CAPABILITY: Learn from recurring failures
+    ID: CAP-061"""
+
     def execute(context=None):
-        return {'status': 'active', 'id': 'CAP-061'}
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-061"}
 

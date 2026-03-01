@@ -4,8 +4,10 @@ class Cap029Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    '''CAPABILITY: Maintain long-term historical memory
-    DEPENDS ON: []'''
+    """CAPABILITY: Maintain long-term historical memory
+    ID: CAP-029"""
+
     def execute(context=None):
-        return {'status': 'active', 'id': 'CAP-029'}
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-029"}
 

@@ -4,9 +4,10 @@ class Cap002Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    '''CAPABILITY: Classify capabilities by status: nonexistent, partial, complete'''
+    """CAPABILITY: Classify capabilities by status: nonexistent, partial, complete
+    ID: CAP-002"""
 
     def execute(context=None):
-        # Template gerado pelo Crystallizer
-        return {'status': 'active', 'id': 'CAP-002'}
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-002"}
 

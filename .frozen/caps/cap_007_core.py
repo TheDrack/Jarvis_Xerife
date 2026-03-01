@@ -4,10 +4,8 @@ class Cap007Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    """CAPABILITY: Prioritize objectives by future reuse potential
-    ID: CAP-007"""
-
+    '''CAPABILITY: Prioritize objectives by future reuse potential
+    DEPENDS ON: ['CAP-004']'''
     def execute(context=None):
-        # JARVIS INITIAL STATE
-        return {"status": "initialized", "id": "CAP-007"}
+        return {'status': 'active', 'id': 'CAP-007'}
 

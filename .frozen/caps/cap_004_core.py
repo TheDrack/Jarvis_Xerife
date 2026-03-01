@@ -4,10 +4,8 @@ class Cap004Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    """CAPABILITY: Generate technical objectives from detected gaps
-    ID: CAP-004"""
-
+    '''CAPABILITY: Generate technical objectives from detected gaps
+    DEPENDS ON: ['CAP-003']'''
     def execute(context=None):
-        # JARVIS INITIAL STATE
-        return {"status": "initialized", "id": "CAP-004"}
+        return {'status': 'active', 'id': 'CAP-004'}
 

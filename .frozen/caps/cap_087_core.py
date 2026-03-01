@@ -4,8 +4,10 @@ class Cap087Core(NexusComponent):
         pass
 
     # -*- coding: utf-8 -*-
-    '''CAPABILITY: Block potentially destructive actions
-    DEPENDS ON: ['CAP-043']'''
+    """CAPABILITY: Block potentially destructive actions
+    ID: CAP-087"""
+
     def execute(context=None):
-        return {'status': 'active', 'id': 'CAP-087'}
+        # JARVIS INITIAL STATE
+        return {"status": "initialized", "id": "CAP-087"}
 
