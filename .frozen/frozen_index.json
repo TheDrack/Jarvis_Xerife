@@ -1,0 +1,858 @@
+{
+  "cap_067.py": {
+    "original_path": "app/infrastructure/adapters/cap_067.py",
+    "type": "capability"
+  },
+  "cap_095.py": {
+    "original_path": "app/infrastructure/adapters/cap_095.py",
+    "type": "capability"
+  },
+  "cap_039.py": {
+    "original_path": "app/infrastructure/adapters/cap_039.py",
+    "type": "capability"
+  },
+  "cap_100.py": {
+    "original_path": "app/infrastructure/adapters/cap_100.py",
+    "type": "capability"
+  },
+  "cap_040.py": {
+    "original_path": "app/infrastructure/adapters/cap_040.py",
+    "type": "capability"
+  },
+  "cap_044.py": {
+    "original_path": "app/infrastructure/adapters/cap_044.py",
+    "type": "capability"
+  },
+  "cap_059.py": {
+    "original_path": "app/infrastructure/adapters/cap_059.py",
+    "type": "capability"
+  },
+  "cap_047.py": {
+    "original_path": "app/infrastructure/adapters/cap_047.py",
+    "type": "capability"
+  },
+  "cap_045.py": {
+    "original_path": "app/infrastructure/adapters/cap_045.py",
+    "type": "capability"
+  },
+  "cap_072.py": {
+    "original_path": "app/infrastructure/adapters/cap_072.py",
+    "type": "capability"
+  },
+  "cap_085.py": {
+    "original_path": "app/application/services/cap_085.py",
+    "type": "capability"
+  },
+  "cap_020_identify_redundant_capabilities.py": {
+    "original_path": "app/application/services/cap_020_identify_redundant_capabilities.py",
+    "type": "capability"
+  },
+  "cap_093.py": {
+    "original_path": "app/domain/capabilities/cap_093.py",
+    "type": "capability"
+  },
+  "cap_061.py": {
+    "original_path": "app/domain/capabilities/cap_061.py",
+    "type": "capability"
+  },
+  "cap_079.py": {
+    "original_path": "app/domain/capabilities/cap_079.py",
+    "type": "capability"
+  },
+  "cap_092_core.py": {
+    "original_path": "app/domain/capabilities/cap_092_core.py",
+    "type": "capability"
+  },
+  "cap_055.py": {
+    "original_path": "app/domain/capabilities/cap_055.py",
+    "type": "capability"
+  },
+  "cap_058.py": {
+    "original_path": "app/domain/capabilities/cap_058.py",
+    "type": "capability"
+  },
+  "cap_041_core.py": {
+    "original_path": "app/domain/capabilities/cap_041_core.py",
+    "type": "capability"
+  },
+  "cap_088.py": {
+    "original_path": "app/domain/capabilities/cap_088.py",
+    "type": "capability"
+  },
+  "cap_078.py": {
+    "original_path": "app/domain/capabilities/cap_078.py",
+    "type": "capability"
+  },
+  "cap_018_core.py": {
+    "original_path": "app/domain/capabilities/cap_018_core.py",
+    "type": "capability"
+  },
+  "cap_084.py": {
+    "original_path": "app/domain/capabilities/cap_084.py",
+    "type": "capability"
+  },
+  "cap_073.py": {
+    "original_path": "app/domain/capabilities/cap_073.py",
+    "type": "capability"
+  },
+  "cap_035_core.py": {
+    "original_path": "app/domain/capabilities/cap_035_core.py",
+    "type": "capability"
+  },
+  "cap_101_core.py": {
+    "original_path": "app/domain/capabilities/cap_101_core.py",
+    "type": "capability"
+  },
+  "cap_070.py": {
+    "original_path": "app/domain/capabilities/cap_070.py",
+    "type": "capability"
+  },
+  "cap_071_core.py": {
+    "original_path": "app/domain/capabilities/cap_071_core.py",
+    "type": "capability"
+  },
+  "cap_012.py": {
+    "original_path": "app/domain/capabilities/cap_012.py",
+    "type": "capability"
+  },
+  "cap_011_core.py": {
+    "original_path": "app/domain/capabilities/cap_011_core.py",
+    "type": "capability"
+  },
+  "cap_016_core.py": {
+    "original_path": "app/domain/capabilities/cap_016_core.py",
+    "type": "capability"
+  },
+  "cap_029.py": {
+    "original_path": "app/domain/capabilities/cap_029.py",
+    "type": "capability"
+  },
+  "cap_101.py": {
+    "original_path": "app/domain/capabilities/cap_101.py",
+    "type": "capability"
+  },
+  "cap_064.py": {
+    "original_path": "app/domain/capabilities/cap_064.py",
+    "type": "capability"
+  },
+  "cap_061_core.py": {
+    "original_path": "app/domain/capabilities/cap_061_core.py",
+    "type": "capability"
+  },
+  "cap_055_core.py": {
+    "original_path": "app/domain/capabilities/cap_055_core.py",
+    "type": "capability"
+  },
+  "cap_022_core.py": {
+    "original_path": "app/domain/capabilities/cap_022_core.py",
+    "type": "capability"
+  },
+  "cap_063.py": {
+    "original_path": "app/domain/capabilities/cap_063.py",
+    "type": "capability"
+  },
+  "cap_015_core.py": {
+    "original_path": "app/domain/capabilities/cap_015_core.py",
+    "type": "capability"
+  },
+  "cap_054_core.py": {
+    "original_path": "app/domain/capabilities/cap_054_core.py",
+    "type": "capability"
+  },
+  "cap_094_core.py": {
+    "original_path": "app/domain/capabilities/cap_094_core.py",
+    "type": "capability"
+  },
+  "cap_019.py": {
+    "original_path": "app/domain/capabilities/cap_019.py",
+    "type": "capability"
+  },
+  "cap_054.py": {
+    "original_path": "app/domain/capabilities/cap_054.py",
+    "type": "capability"
+  },
+  "cap_076.py": {
+    "original_path": "app/domain/capabilities/cap_076.py",
+    "type": "capability"
+  },
+  "cap_065.py": {
+    "original_path": "app/domain/capabilities/cap_065.py",
+    "type": "capability"
+  },
+  "cap_097_core.py": {
+    "original_path": "app/domain/capabilities/cap_097_core.py",
+    "type": "capability"
+  },
+  "cap_102_core.py": {
+    "original_path": "app/domain/capabilities/cap_102_core.py",
+    "type": "capability"
+  },
+  "output_validator.py": {
+    "original_path": "app/domain/capabilities/output_validator.py",
+    "type": "capability"
+  },
+  "cap_074_core.py": {
+    "original_path": "app/domain/capabilities/cap_074_core.py",
+    "type": "capability"
+  },
+  "cap_049_core.py": {
+    "original_path": "app/domain/capabilities/cap_049_core.py",
+    "type": "capability"
+  },
+  "cap_050_core.py": {
+    "original_path": "app/domain/capabilities/cap_050_core.py",
+    "type": "capability"
+  },
+  "cap_081.py": {
+    "original_path": "app/domain/capabilities/cap_081.py",
+    "type": "capability"
+  },
+  "cap_027_core.py": {
+    "original_path": "app/domain/capabilities/cap_027_core.py",
+    "type": "capability"
+  },
+  "cap_098_core.py": {
+    "original_path": "app/domain/capabilities/cap_098_core.py",
+    "type": "capability"
+  },
+  "cap_022.py": {
+    "original_path": "app/domain/capabilities/cap_022.py",
+    "type": "capability"
+  },
+  "cap_026_core.py": {
+    "original_path": "app/domain/capabilities/cap_026_core.py",
+    "type": "capability"
+  },
+  "cap_060_core.py": {
+    "original_path": "app/domain/capabilities/cap_060_core.py",
+    "type": "capability"
+  },
+  "cap_090.py": {
+    "original_path": "app/domain/capabilities/cap_090.py",
+    "type": "capability"
+  },
+  "cap_048.py": {
+    "original_path": "app/domain/capabilities/cap_048.py",
+    "type": "capability"
+  },
+  "cap_086_core.py": {
+    "original_path": "app/domain/capabilities/cap_086_core.py",
+    "type": "capability"
+  },
+  "cap_009_core.py": {
+    "original_path": "app/domain/capabilities/cap_009_core.py",
+    "type": "capability"
+  },
+  "cap_039_core.py": {
+    "original_path": "app/domain/capabilities/cap_039_core.py",
+    "type": "capability"
+  },
+  "cap_034.py": {
+    "original_path": "app/domain/capabilities/cap_034.py",
+    "type": "capability"
+  },
+  "cap_040_core.py": {
+    "original_path": "app/domain/capabilities/cap_040_core.py",
+    "type": "capability"
+  },
+  "cap_069.py": {
+    "original_path": "app/domain/capabilities/cap_069.py",
+    "type": "capability"
+  },
+  "cap_021.py": {
+    "original_path": "app/domain/capabilities/cap_021.py",
+    "type": "capability"
+  },
+  "cap_059_core.py": {
+    "original_path": "app/domain/capabilities/cap_059_core.py",
+    "type": "capability"
+  },
+  "cap_056_core.py": {
+    "original_path": "app/domain/capabilities/cap_056_core.py",
+    "type": "capability"
+  },
+  "cap_080_core.py": {
+    "original_path": "app/domain/capabilities/cap_080_core.py",
+    "type": "capability"
+  },
+  "cap_030.py": {
+    "original_path": "app/domain/capabilities/cap_030.py",
+    "type": "capability"
+  },
+  "metabolism_manager.py": {
+    "original_path": "app/domain/capabilities/metabolism_manager.py",
+    "type": "capability"
+  },
+  "cap_083.py": {
+    "original_path": "app/domain/capabilities/cap_083.py",
+    "type": "capability"
+  },
+  "cap_013_core.py": {
+    "original_path": "app/domain/capabilities/cap_013_core.py",
+    "type": "capability"
+  },
+  "cap_007.py": {
+    "original_path": "app/domain/capabilities/cap_007.py",
+    "type": "capability"
+  },
+  "cap_089.py": {
+    "original_path": "app/domain/capabilities/cap_089.py",
+    "type": "capability"
+  },
+  "cap_028.py": {
+    "original_path": "app/domain/capabilities/cap_028.py",
+    "type": "capability"
+  },
+  "cap_017_core.py": {
+    "original_path": "app/domain/capabilities/cap_017_core.py",
+    "type": "capability"
+  },
+  "cap_096_core.py": {
+    "original_path": "app/domain/capabilities/cap_096_core.py",
+    "type": "capability"
+  },
+  "cap_043_core.py": {
+    "original_path": "app/domain/capabilities/cap_043_core.py",
+    "type": "capability"
+  },
+  "cap_099_core.py": {
+    "original_path": "app/domain/capabilities/cap_099_core.py",
+    "type": "capability"
+  },
+  "cap_003.py": {
+    "original_path": "app/domain/capabilities/cap_003.py",
+    "type": "capability"
+  },
+  "cap_002.py": {
+    "original_path": "app/domain/capabilities/cap_002.py",
+    "type": "capability"
+  },
+  "cap_093_core.py": {
+    "original_path": "app/domain/capabilities/cap_093_core.py",
+    "type": "capability"
+  },
+  "cap_075_core.py": {
+    "original_path": "app/domain/capabilities/cap_075_core.py",
+    "type": "capability"
+  },
+  "cap_009.py": {
+    "original_path": "app/domain/capabilities/cap_009.py",
+    "type": "capability"
+  },
+  "cap_010_core.py": {
+    "original_path": "app/domain/capabilities/cap_010_core.py",
+    "type": "capability"
+  },
+  "cap_049.py": {
+    "original_path": "app/domain/capabilities/cap_049.py",
+    "type": "capability"
+  },
+  "cap_078_core.py": {
+    "original_path": "app/domain/capabilities/cap_078_core.py",
+    "type": "capability"
+  },
+  "cap_013.py": {
+    "original_path": "app/domain/capabilities/cap_013.py",
+    "type": "capability"
+  },
+  "cap_064_core.py": {
+    "original_path": "app/domain/capabilities/cap_064_core.py",
+    "type": "capability"
+  },
+  "cap_063_core.py": {
+    "original_path": "app/domain/capabilities/cap_063_core.py",
+    "type": "capability"
+  },
+  "cap_016.py": {
+    "original_path": "app/domain/capabilities/cap_016.py",
+    "type": "capability"
+  },
+  "cap_060.py": {
+    "original_path": "app/domain/capabilities/cap_060.py",
+    "type": "capability"
+  },
+  "cap_071.py": {
+    "original_path": "app/domain/capabilities/cap_071.py",
+    "type": "capability"
+  },
+  "biometry_logic.py": {
+    "original_path": "app/domain/capabilities/biometry_logic.py",
+    "type": "capability"
+  },
+  "cap_077_core.py": {
+    "original_path": "app/domain/capabilities/cap_077_core.py",
+    "type": "capability"
+  },
+  "cap_001.py": {
+    "original_path": "app/domain/capabilities/cap_001.py",
+    "type": "capability"
+  },
+  "cap_070_core.py": {
+    "original_path": "app/domain/capabilities/cap_070_core.py",
+    "type": "capability"
+  },
+  "__init__.py": {
+    "original_path": "app/domain/capabilities/__init__.py",
+    "type": "capability"
+  },
+  "cap_041.py": {
+    "original_path": "app/domain/capabilities/cap_041.py",
+    "type": "capability"
+  },
+  "cap_087_core.py": {
+    "original_path": "app/domain/capabilities/cap_087_core.py",
+    "type": "capability"
+  },
+  "cap_004_core.py": {
+    "original_path": "app/domain/capabilities/cap_004_core.py",
+    "type": "capability"
+  },
+  "cap_010.py": {
+    "original_path": "app/domain/capabilities/cap_010.py",
+    "type": "capability"
+  },
+  "cap_045_core.py": {
+    "original_path": "app/domain/capabilities/cap_045_core.py",
+    "type": "capability"
+  },
+  "cap_081_core.py": {
+    "original_path": "app/domain/capabilities/cap_081_core.py",
+    "type": "capability"
+  },
+  "cap_082.py": {
+    "original_path": "app/domain/capabilities/cap_082.py",
+    "type": "capability"
+  },
+  "cap_092.py": {
+    "original_path": "app/domain/capabilities/cap_092.py",
+    "type": "capability"
+  },
+  "cap_102.py": {
+    "original_path": "app/domain/capabilities/cap_102.py",
+    "type": "capability"
+  },
+  "cap_015.py": {
+    "original_path": "app/domain/capabilities/cap_015.py",
+    "type": "capability"
+  },
+  "cap_062.py": {
+    "original_path": "app/domain/capabilities/cap_062.py",
+    "type": "capability"
+  },
+  "cap_017.py": {
+    "original_path": "app/domain/capabilities/cap_017.py",
+    "type": "capability"
+  },
+  "cap_005.py": {
+    "original_path": "app/domain/capabilities/cap_005.py",
+    "type": "capability"
+  },
+  "cap_079_core.py": {
+    "original_path": "app/domain/capabilities/cap_079_core.py",
+    "type": "capability"
+  },
+  "cap_066_core.py": {
+    "original_path": "app/domain/capabilities/cap_066_core.py",
+    "type": "capability"
+  },
+  "cap_031.py": {
+    "original_path": "app/domain/capabilities/cap_031.py",
+    "type": "capability"
+  },
+  "cap_086.py": {
+    "original_path": "app/domain/capabilities/cap_086.py",
+    "type": "capability"
+  },
+  "cap_084_core.py": {
+    "original_path": "app/domain/capabilities/cap_084_core.py",
+    "type": "capability"
+  },
+  "cap_032.py": {
+    "original_path": "app/domain/capabilities/cap_032.py",
+    "type": "capability"
+  },
+  "cap_051.py": {
+    "original_path": "app/domain/capabilities/cap_051.py",
+    "type": "capability"
+  },
+  "cap_026.py": {
+    "original_path": "app/domain/capabilities/cap_026.py",
+    "type": "capability"
+  },
+  "cap_098.py": {
+    "original_path": "app/domain/capabilities/cap_098.py",
+    "type": "capability"
+  },
+  "cap_033.py": {
+    "original_path": "app/domain/capabilities/cap_033.py",
+    "type": "capability"
+  },
+  "cap_020.py": {
+    "original_path": "app/domain/capabilities/cap_020.py",
+    "type": "capability"
+  },
+  "cap_047_core.py": {
+    "original_path": "app/domain/capabilities/cap_047_core.py",
+    "type": "capability"
+  },
+  "cap_020_core.py": {
+    "original_path": "app/domain/capabilities/cap_020_core.py",
+    "type": "capability"
+  },
+  "cap_075.py": {
+    "original_path": "app/domain/capabilities/cap_075.py",
+    "type": "capability"
+  },
+  "cap_025_core.py": {
+    "original_path": "app/domain/capabilities/cap_025_core.py",
+    "type": "capability"
+  },
+  "cap_019_core.py": {
+    "original_path": "app/domain/capabilities/cap_019_core.py",
+    "type": "capability"
+  },
+  "cap_042.py": {
+    "original_path": "app/domain/capabilities/cap_042.py",
+    "type": "capability"
+  },
+  "cap_053_core.py": {
+    "original_path": "app/domain/capabilities/cap_053_core.py",
+    "type": "capability"
+  },
+  "cap_018.py": {
+    "original_path": "app/domain/capabilities/cap_018.py",
+    "type": "capability"
+  },
+  "cap_046_core.py": {
+    "original_path": "app/domain/capabilities/cap_046_core.py",
+    "type": "capability"
+  },
+  "cap_080.py": {
+    "original_path": "app/domain/capabilities/cap_080.py",
+    "type": "capability"
+  },
+  "cap_067_core.py": {
+    "original_path": "app/domain/capabilities/cap_067_core.py",
+    "type": "capability"
+  },
+  "cap_085_core.py": {
+    "original_path": "app/domain/capabilities/cap_085_core.py",
+    "type": "capability"
+  },
+  "cap_014_core.py": {
+    "original_path": "app/domain/capabilities/cap_014_core.py",
+    "type": "capability"
+  },
+  "cap_042_core.py": {
+    "original_path": "app/domain/capabilities/cap_042_core.py",
+    "type": "capability"
+  },
+  "cap_069_core.py": {
+    "original_path": "app/domain/capabilities/cap_069_core.py",
+    "type": "capability"
+  },
+  "cap_090_core.py": {
+    "original_path": "app/domain/capabilities/cap_090_core.py",
+    "type": "capability"
+  },
+  "cap_052.py": {
+    "original_path": "app/domain/capabilities/cap_052.py",
+    "type": "capability"
+  },
+  "cap_077.py": {
+    "original_path": "app/domain/capabilities/cap_077.py",
+    "type": "capability"
+  },
+  "context_memory.py": {
+    "original_path": "app/domain/capabilities/context_memory.py",
+    "type": "capability"
+  },
+  "cap_008.py": {
+    "original_path": "app/domain/capabilities/cap_008.py",
+    "type": "capability"
+  },
+  "cap_068.py": {
+    "original_path": "app/domain/capabilities/cap_068.py",
+    "type": "capability"
+  },
+  "cap_053.py": {
+    "original_path": "app/domain/capabilities/cap_053.py",
+    "type": "capability"
+  },
+  "cap_031_core.py": {
+    "original_path": "app/domain/capabilities/cap_031_core.py",
+    "type": "capability"
+  },
+  "cap_088_core.py": {
+    "original_path": "app/domain/capabilities/cap_088_core.py",
+    "type": "capability"
+  },
+  "cap_043.py": {
+    "original_path": "app/domain/capabilities/cap_043.py",
+    "type": "capability"
+  },
+  "cap_006.py": {
+    "original_path": "app/domain/capabilities/cap_006.py",
+    "type": "capability"
+  },
+  "cap_035.py": {
+    "original_path": "app/domain/capabilities/cap_035.py",
+    "type": "capability"
+  },
+  "cap_062_core.py": {
+    "original_path": "app/domain/capabilities/cap_062_core.py",
+    "type": "capability"
+  },
+  "cap_091.py": {
+    "original_path": "app/domain/capabilities/cap_091.py",
+    "type": "capability"
+  },
+  "cap_023.py": {
+    "original_path": "app/domain/capabilities/cap_023.py",
+    "type": "capability"
+  },
+  "cap_096.py": {
+    "original_path": "app/domain/capabilities/cap_096.py",
+    "type": "capability"
+  },
+  "cap_074.py": {
+    "original_path": "app/domain/capabilities/cap_074.py",
+    "type": "capability"
+  },
+  "cap_038_core.py": {
+    "original_path": "app/domain/capabilities/cap_038_core.py",
+    "type": "capability"
+  },
+  "cap_057_core.py": {
+    "original_path": "app/domain/capabilities/cap_057_core.py",
+    "type": "capability"
+  },
+  "cap_021_core.py": {
+    "original_path": "app/domain/capabilities/cap_021_core.py",
+    "type": "capability"
+  },
+  "cap_050.py": {
+    "original_path": "app/domain/capabilities/cap_050.py",
+    "type": "capability"
+  },
+  "cap_007_core.py": {
+    "original_path": "app/domain/capabilities/cap_007_core.py",
+    "type": "capability"
+  },
+  "cap_014.py": {
+    "original_path": "app/domain/capabilities/cap_014.py",
+    "type": "capability"
+  },
+  "cap_036_core.py": {
+    "original_path": "app/domain/capabilities/cap_036_core.py",
+    "type": "capability"
+  },
+  "cap_091_core.py": {
+    "original_path": "app/domain/capabilities/cap_091_core.py",
+    "type": "capability"
+  },
+  "cap_028_core.py": {
+    "original_path": "app/domain/capabilities/cap_028_core.py",
+    "type": "capability"
+  },
+  "cap_065_core.py": {
+    "original_path": "app/domain/capabilities/cap_065_core.py",
+    "type": "capability"
+  },
+  "cap_029_core.py": {
+    "original_path": "app/domain/capabilities/cap_029_core.py",
+    "type": "capability"
+  },
+  "cap_076_core.py": {
+    "original_path": "app/domain/capabilities/cap_076_core.py",
+    "type": "capability"
+  },
+  "cap_087.py": {
+    "original_path": "app/domain/capabilities/cap_087.py",
+    "type": "capability"
+  },
+  "cap_011.py": {
+    "original_path": "app/domain/capabilities/cap_011.py",
+    "type": "capability"
+  },
+  "cap_012_core.py": {
+    "original_path": "app/domain/capabilities/cap_012_core.py",
+    "type": "capability"
+  },
+  "cap_003_core.py": {
+    "original_path": "app/domain/capabilities/cap_003_core.py",
+    "type": "capability"
+  },
+  "cap_099.py": {
+    "original_path": "app/domain/capabilities/cap_099.py",
+    "type": "capability"
+  },
+  "cap_037.py": {
+    "original_path": "app/domain/capabilities/cap_037.py",
+    "type": "capability"
+  },
+  "cap_089_core.py": {
+    "original_path": "app/domain/capabilities/cap_089_core.py",
+    "type": "capability"
+  },
+  "cap_005_core.py": {
+    "original_path": "app/domain/capabilities/cap_005_core.py",
+    "type": "capability"
+  },
+  "cap_024_core.py": {
+    "original_path": "app/domain/capabilities/cap_024_core.py",
+    "type": "capability"
+  },
+  "mission_selector.py": {
+    "original_path": "app/domain/capabilities/mission_selector.py",
+    "type": "capability"
+  },
+  "cap_056.py": {
+    "original_path": "app/domain/capabilities/cap_056.py",
+    "type": "capability"
+  },
+  "cap_072_core.py": {
+    "original_path": "app/domain/capabilities/cap_072_core.py",
+    "type": "capability"
+  },
+  "cap_097.py": {
+    "original_path": "app/domain/capabilities/cap_097.py",
+    "type": "capability"
+  },
+  "monitor_performance.py": {
+    "original_path": "app/domain/capabilities/monitor_performance.py",
+    "type": "capability"
+  },
+  "cap_051_core.py": {
+    "original_path": "app/domain/capabilities/cap_051_core.py",
+    "type": "capability"
+  },
+  "cap_058_core.py": {
+    "original_path": "app/domain/capabilities/cap_058_core.py",
+    "type": "capability"
+  },
+  "cap_046.py": {
+    "original_path": "app/domain/capabilities/cap_046.py",
+    "type": "capability"
+  },
+  "cap_038.py": {
+    "original_path": "app/domain/capabilities/cap_038.py",
+    "type": "capability"
+  },
+  "cap_066.py": {
+    "original_path": "app/domain/capabilities/cap_066.py",
+    "type": "capability"
+  },
+  "cap_025.py": {
+    "original_path": "app/domain/capabilities/cap_025.py",
+    "type": "capability"
+  },
+  "cap_004.py": {
+    "original_path": "app/domain/capabilities/cap_004.py",
+    "type": "capability"
+  },
+  "cap_037_core.py": {
+    "original_path": "app/domain/capabilities/cap_037_core.py",
+    "type": "capability"
+  },
+  "cap_068_core.py": {
+    "original_path": "app/domain/capabilities/cap_068_core.py",
+    "type": "capability"
+  },
+  "cap_057.py": {
+    "original_path": "app/domain/capabilities/cap_057.py",
+    "type": "capability"
+  },
+  "cap_024.py": {
+    "original_path": "app/domain/capabilities/cap_024.py",
+    "type": "capability"
+  },
+  "cap_030_core.py": {
+    "original_path": "app/domain/capabilities/cap_030_core.py",
+    "type": "capability"
+  },
+  "cap_048_core.py": {
+    "original_path": "app/domain/capabilities/cap_048_core.py",
+    "type": "capability"
+  },
+  "cap_027.py": {
+    "original_path": "app/domain/capabilities/cap_027.py",
+    "type": "capability"
+  },
+  "cap_044_core.py": {
+    "original_path": "app/domain/capabilities/cap_044_core.py",
+    "type": "capability"
+  },
+  "cap_095_core.py": {
+    "original_path": "app/domain/capabilities/cap_095_core.py",
+    "type": "capability"
+  },
+  "cap_094.py": {
+    "original_path": "app/domain/capabilities/cap_094.py",
+    "type": "capability"
+  },
+  "cap_083_core.py": {
+    "original_path": "app/domain/capabilities/cap_083_core.py",
+    "type": "capability"
+  },
+  "cap_073_core.py": {
+    "original_path": "app/domain/capabilities/cap_073_core.py",
+    "type": "capability"
+  },
+  "cap_052_core.py": {
+    "original_path": "app/domain/capabilities/cap_052_core.py",
+    "type": "capability"
+  },
+  "cap_082_core.py": {
+    "original_path": "app/domain/capabilities/cap_082_core.py",
+    "type": "capability"
+  },
+  "cap_036.py": {
+    "original_path": "app/domain/capabilities/cap_036.py",
+    "type": "capability"
+  },
+  "cognitive_router.py": {
+    "original_path": "app/domain/gears/cognitive_router.py",
+    "type": "capability"
+  },
+  "cap_032_core.py": {
+    "original_path": "app/domain/gears/cap_032_core.py",
+    "type": "capability"
+  },
+  "llm_engine.py": {
+    "original_path": "app/domain/gears/llm_engine.py",
+    "type": "capability"
+  },
+  "cap_002_core.py": {
+    "original_path": "app/domain/gears/cap_002_core.py",
+    "type": "capability"
+  },
+  "cap_023_core.py": {
+    "original_path": "app/domain/gears/cap_023_core.py",
+    "type": "capability"
+  },
+  "cap_006_core.py": {
+    "original_path": "app/domain/gears/cap_006_core.py",
+    "type": "capability"
+  },
+  "cap_001_core.py": {
+    "original_path": "app/domain/gears/cap_001_core.py",
+    "type": "capability"
+  },
+  "cap_008_core.py": {
+    "original_path": "app/domain/gears/cap_008_core.py",
+    "type": "capability"
+  },
+  "cap_033_core.py": {
+    "original_path": "app/domain/models/cap_033_core.py",
+    "type": "capability"
+  },
+  "cap_100_core.py": {
+    "original_path": "app/domain/models/cap_100_core.py",
+    "type": "capability"
+  },
+  "cap_034_core.py": {
+    "original_path": "app/domain/models/cap_034_core.py",
+    "type": "capability"
+  }
+}
