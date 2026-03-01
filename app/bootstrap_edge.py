@@ -6,8 +6,8 @@ import logging
 import sys
 
 from app.adapters.infrastructure.setup_wizard import check_env_complete, run_setup_wizard
-from app.container import create_edge_container
 from app.core.config import settings
+from app.core.nexus import nexus
 
 # Configure logging
 logging.basicConfig(
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     """
     Main entry point for Edge deployment.
-    Initializes the assistant with hardware-dependent adapters.
+    Resolves services via JarvisNexus with hardware-dependent adapters.
     """
     # Check if setup is required
     if not check_env_complete():
@@ -43,7 +43,6 @@ def main() -> None:
         import importlib
         from app.core import config
         importlib.reload(config)
-        # Use the reloaded settings
         current_settings = config.settings
         logger.info("Setup completed successfully, starting assistant...")
     else:
@@ -53,34 +52,39 @@ def main() -> None:
     logger.info(f"Wake word: {current_settings.wake_word}")
     logger.info(f"Language: {current_settings.language}")
 
-    # Log user info if available
     if current_settings.assistant_name:
         logger.info(f"Assistant name: {current_settings.assistant_name}")
     if current_settings.user_id:
         logger.info(f"User ID: {current_settings.user_id}")
 
-    # Create container with edge adapters
-    container = create_edge_container(
-        wake_word=current_settings.wake_word,
-        language=current_settings.language,
-    )
-
-    # Get the assistant service
-    assistant = container.assistant_service
+    # Resolve assistant service via JarvisNexus
+    assistant = nexus.resolve("assistant_service")
+    if assistant is None:
+        logger.error("JarvisNexus could not resolve 'assistant_service' - aborting startup")
+        sys.exit(1)
 
     # Check adapter availability
-    if not assistant.voice.is_available():
-        logger.warning("Voice recognition not available - running in limited mode")
+    try:
+        if hasattr(assistant, "voice") and not assistant.voice.is_available():
+            logger.warning("Voice recognition not available - running in limited mode")
+    except Exception as e:
+        logger.warning(f"Could not check voice availability: {e}")
 
-    if not assistant.action.is_available():
-        logger.warning("Action automation not available - running in limited mode")
+    try:
+        if hasattr(assistant, "action") and not assistant.action.is_available():
+            logger.warning("Action automation not available - running in limited mode")
+    except Exception as e:
+        logger.warning(f"Could not check action availability: {e}")
 
     # Start the assistant
     try:
         assistant.start()
     except KeyboardInterrupt:
         logger.info("Received keyboard interrupt")
-        assistant.stop()
+        try:
+            assistant.stop()
+        except Exception:
+            pass
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)

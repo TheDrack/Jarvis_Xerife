@@ -14,9 +14,8 @@ import sys
 import time
 
 from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
-from app.application.services import AssistantService
-from app.container import create_edge_container
 from app.core.config import settings
+from app.core.nexus import nexus
 
 # Configure logging
 logging.basicConfig(
@@ -41,16 +40,11 @@ def main() -> None:
     logger.info(f"Wake word: {settings.wake_word}")
     logger.info(f"Language: {settings.language}")
 
-    # Create container with edge adapters (includes PyAutoGUI support)
-    use_llm = os.getenv("USE_LLM", "false").lower() in ("true", "1", "yes")
-    container = create_edge_container(
-        wake_word=settings.wake_word,
-        language=settings.language,
-        use_llm=use_llm,
-    )
-
-    # Get the assistant service
-    assistant = container.assistant_service
+    # Resolve assistant service via JarvisNexus
+    assistant = nexus.resolve("assistant_service")
+    if assistant is None:
+        logger.error("JarvisNexus could not resolve 'assistant_service' - aborting worker")
+        sys.exit(1)
 
     # Initialize database adapter
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
@@ -94,7 +88,6 @@ def main() -> None:
                             logger.warning(f"Command {pending_command['id']} failed: {response.message}")
 
                     except Exception as e:
-                        # Handle execution errors
                         error_msg = f"Error executing command: {str(e)}"
                         logger.error(error_msg, exc_info=True)
                         db_adapter.update_command_status(
@@ -104,10 +97,8 @@ def main() -> None:
                             response_text=error_msg,
                         )
                 else:
-                    # No pending commands, log less frequently
                     pass
 
-                # Sleep to avoid overloading the database
                 time.sleep(poll_interval)
 
             except KeyboardInterrupt:
@@ -115,7 +106,6 @@ def main() -> None:
                 break
             except Exception as e:
                 logger.error(f"Error in worker loop: {e}", exc_info=True)
-                # Continue running even if there's an error
                 time.sleep(2)
 
     except KeyboardInterrupt:

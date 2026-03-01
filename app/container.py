@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Dependency Injection Container for Jarvis Assistant.
-Provides factory functions for creating configured service containers.
+Nexus-backed compatibility shim for Jarvis service resolution.
+
+Service instantiation is owned by JarvisNexus (app.core.nexus).
+This module exposes _is_headless_environment(), Container, and
+create_edge_container() for backward compatibility with existing tests
+and scripts that import from app.container.
 """
 
 import os
@@ -9,6 +13,7 @@ import sys
 from typing import Optional
 
 from app.core.config import settings
+from app.core.nexus import nexus
 
 
 def _is_headless_environment() -> bool:
@@ -24,22 +29,16 @@ def _is_headless_environment() -> bool:
     Returns:
         True if the environment is headless/cloud, False otherwise.
     """
-    # Running under pytest
     if "pytest" in sys.modules:
         return True
-    # CI/CD environment
     if os.environ.get("CI"):
         return True
-    # GitHub Actions
     if os.environ.get("GITHUB_ACTIONS"):
         return True
-    # Render cloud platform
     if os.environ.get("RENDER"):
         return True
-    # Heroku (DYNO is always set on Heroku dynos)
     if os.environ.get("DYNO"):
         return True
-    # Railway
     if os.environ.get("RAILWAY_ENVIRONMENT"):
         return True
     return False
@@ -47,8 +46,11 @@ def _is_headless_environment() -> bool:
 
 class Container:
     """
-    Dependency injection container for Jarvis services.
-    Auto-enables LLM when a valid API key is available.
+    Thin compatibility wrapper around JarvisNexus.
+
+    All service resolution is delegated to nexus.resolve().
+    Kept for backward compatibility with tests and scripts that
+    reference Container directly.
     """
 
     def __init__(
@@ -64,38 +66,26 @@ class Container:
         # Auto-enable LLM when an API key is available
         self.use_llm = use_llm or bool(self.gemini_api_key)
 
-        self._assistant_service = None
-        self._extension_manager = None
-        self._voice_provider = None
-
     @property
     def voice_provider(self):
-        if self._voice_provider is None:
-            if _is_headless_environment():
-                from app.adapters.infrastructure.dummy_voice_provider import DummyVoiceProvider
-                self._voice_provider = DummyVoiceProvider()
-            else:
-                try:
-                    from app.adapters.edge.combined_voice_provider import CombinedVoiceProvider
-                    self._voice_provider = CombinedVoiceProvider()
-                except Exception:
-                    from app.adapters.infrastructure.dummy_voice_provider import DummyVoiceProvider
-                    self._voice_provider = DummyVoiceProvider()
-        return self._voice_provider
+        if _is_headless_environment():
+            from app.adapters.infrastructure.dummy_voice_provider import DummyVoiceProvider
+            return DummyVoiceProvider()
+        resolved = nexus.resolve("voice_adapter")
+        if resolved is None:
+            from app.adapters.infrastructure.dummy_voice_provider import DummyVoiceProvider
+            return DummyVoiceProvider()
+        return resolved
 
     @property
     def assistant_service(self):
-        if self._assistant_service is None:
-            from app.application.services import AssistantService
-            self._assistant_service = AssistantService()
-        return self._assistant_service
+        """Resolve via JarvisNexus. Returns None if the service cannot be located."""
+        return nexus.resolve("assistant_service")
 
     @property
     def extension_manager(self):
-        if self._extension_manager is None:
-            from app.application.services import ExtensionManager
-            self._extension_manager = ExtensionManager()
-        return self._extension_manager
+        """Resolve via JarvisNexus. Returns None if the service cannot be located."""
+        return nexus.resolve("extension_manager")
 
 
 # Alias for backward compatibility
@@ -108,7 +98,7 @@ def create_edge_container(
     use_llm: bool = False,
 ) -> Container:
     """
-    Create and configure a container for edge deployment.
+    Create a Nexus-backed Container.
 
     Args:
         wake_word: Wake word for voice activation.
@@ -117,10 +107,11 @@ def create_edge_container(
                  Will be auto-enabled when an API key is available.
 
     Returns:
-        Configured Container instance.
+        Container that delegates service resolution to JarvisNexus.
     """
     return Container(
         wake_word=wake_word,
         language=language,
         use_llm=use_llm,
     )
+

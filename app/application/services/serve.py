@@ -4,8 +4,7 @@
 Jarvis Voice Assistant - API Server Entry Point
 
 Starts the FastAPI server for headless control interface.
-This entry point initializes the assistant service with edge container
-and exposes it via REST API for remote control.
+Service resolution is handled by JarvisNexus (app.core.nexus).
 """
 
 import logging
@@ -15,8 +14,8 @@ import sys
 import uvicorn
 
 from app.adapters.infrastructure import create_api_server
-from app.container import create_edge_container
 from app.core.config import settings
+from app.core.nexus import nexus
 
 # Configure logging
 logging.basicConfig(
@@ -34,40 +33,32 @@ logger = logging.getLogger(__name__)
 def main() -> None:
     """
     Main entry point for API server.
-    Initializes the assistant service and starts the FastAPI server.
+    Resolves services via JarvisNexus and starts the FastAPI server.
     """
     logger.info("Starting Jarvis Assistant API Server (Headless Mode)")
     logger.info(f"Wake word: {settings.wake_word}")
     logger.info(f"Language: {settings.language}")
 
     # Headless safety: Set environment variables to prevent GUI windows
-    # This prevents PyAutoGUI and other libraries from showing error dialogs
     os.environ["DISPLAY"] = os.environ.get("DISPLAY", "")
     if not os.environ.get("DISPLAY"):
         logger.info("Running in headless mode (no DISPLAY set)")
 
-    # Create container with edge adapters
-    # Note: USE_LLM environment variable is optional
-    # If not set, LLM will be auto-enabled when API key is available
     use_llm = os.getenv("USE_LLM", "").lower() in ("true", "1", "yes")
     if not use_llm and settings.gemini_api_key:
         logger.info("USE_LLM not set but API key available - LLM will be auto-enabled")
 
-    container = create_edge_container(
-        wake_word=settings.wake_word,
-        language=settings.language,
-        use_llm=use_llm,
-    )
+    # Resolve services via JarvisNexus
+    assistant = nexus.resolve("assistant_service")
+    if assistant is None:
+        logger.error("JarvisNexus could not resolve 'assistant_service' - aborting startup")
+        sys.exit(1)
 
-    # Get the assistant service
-    assistant = container.assistant_service
-
-    # Get the extension manager
-    extension_manager = container.extension_manager
+    extension_manager = nexus.resolve("extension_manager")
 
     # Check adapter availability (but don't fail - API can still work)
     try:
-        if hasattr(assistant.voice, "is_available") and not assistant.voice.is_available():
+        if hasattr(assistant, "voice") and hasattr(assistant.voice, "is_available") and not assistant.voice.is_available():
             logger.warning(
                 "Voice recognition not available - API will work but voice features may be limited"
             )
@@ -75,7 +66,7 @@ def main() -> None:
         logger.warning(f"Could not check voice availability: {e}")
 
     try:
-        if hasattr(assistant.action, "is_available") and not assistant.action.is_available():
+        if hasattr(assistant, "action") and hasattr(assistant.action, "is_available") and not assistant.action.is_available():
             logger.warning(
                 "Action automation not available - "
                 "API will work but automation may be limited"
