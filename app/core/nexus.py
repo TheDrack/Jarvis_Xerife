@@ -12,7 +12,7 @@ class JarvisNexus:
         # Base dir absoluta (raiz do projeto)
         self.base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         self.gist_id = "23d15b3f9d010179ace501a79c78608f"
-        
+
         # Sincronização de DNA
         self._cache = self._load_remote_memory()
         self._instances = {}
@@ -35,13 +35,13 @@ class JarvisNexus:
         if not instance:
             logging.info(f"🔍 [NEXUS] '{target_id}' não mapeado. Iniciando Varredura Omnisciente...")
             module_path = self._perform_omniscient_discovery(target_id)
-            
+
             if module_path:
                 instance = self._instantiate(target_id, module_path)
                 if instance:
                     self._cache[target_id] = module_path
                     self.commit_memory() # Persiste imediatamente
-            
+
         if instance and singleton:
             self._instances[target_id] = instance
         return instance
@@ -53,10 +53,10 @@ class JarvisNexus:
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 parts = rel_path.split(os.sep)
-                
+
                 # LIMPEZA CRÍTICA: Remove 'Jarvis_Xerife' ou '.' do início do path de importação
                 if parts[0] in ["Jarvis_Xerife", ".", ""]: parts = parts[1:]
-                
+
                 module_path = ".".join(parts) + f".{target_id}"
                 return module_path.lstrip(".")
         return None
