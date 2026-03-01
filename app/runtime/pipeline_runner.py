@@ -4,21 +4,14 @@ import yaml
 import logging
 import sys
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 from app.core.nexus import nexus
 
 def run_pipeline(pipeline_name: str, strict: bool = False):
-    logging.info(f"🚀 INICIANDO RUNNER: {pipeline_name} (Strict: {strict})")
-
+    logging.info(f"🚀 INICIANDO RUNNER: {pipeline_name}")
+    
     config_path = os.path.join("config", "pipelines", f"{pipeline_name}.yml")
-    if not os.path.exists(config_path):
-        logging.error(f"❌ YAML não encontrado: {config_path}")
-        return
+    if not os.path.exists(config_path): return
 
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
@@ -27,41 +20,31 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
     components = config.get("components", {})
 
     for name, meta in components.items():
-        target_id = meta.get("id")
-        logging.info(f"🔍 Tentando resolver: {name} (ID: {target_id})")
+        t_id = meta.get("id")
+        logging.info(f"🔍 Resolvendo: {name} (ID: {t_id})")
 
-        instance = nexus.resolve(
-            target_id=target_id,
-            hint_path=meta.get("hint_path"),
-            singleton=meta.get("singleton", True),
-        )
+        instance = nexus.resolve(target_id=t_id, hint_path=meta.get("hint_path"))
 
         if not instance:
-            msg = f"❌ Falha crítica: Componente {name} (ID: {target_id}) não resolvido!"
-            if strict: raise RuntimeError(msg)
+            if strict: raise RuntimeError(f"Falha em {t_id}")
             continue
 
-        logging.info(f"⚙️ Executando: {name}...")
         try:
             if hasattr(instance, "configure") and "config" in meta:
                 instance.configure(meta["config"])
 
-            # O contexto é passado para o método execute da sua classe
+            logging.info(f"⚙️ Executando: {name}...")
             result = instance.execute(context)
-            logging.info(f"✅ {name} finalizado.")
-
+            
             if result:
+                context["result"] = result
                 context["artifacts"][name] = result
-                # Mantém compatibilidade com o drive_uploader que busca context['result']
-                context["result"] = result 
-
+                logging.info(f"✅ {name} OK.")
         except Exception as e:
             logging.error(f"💥 ERRO EM {name}: {e}")
             if strict: raise e
 
-    logging.info("🏁 PIPELINE FINALIZADO")
+    logging.info("🏁 FINALIZADO")
 
 if __name__ == "__main__":
-    p_name = os.getenv("PIPELINE")
-    s_mode = os.getenv("PIPELINE_STRICT", "false").lower() == "true"
-    run_pipeline(p_name, s_mode)
+    run_pipeline(os.getenv("PIPELINE"), os.getenv("PIPELINE_STRICT", "false").lower() == "true")
