@@ -21,7 +21,7 @@ class JarvisNexus:
         self.base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.gist_id = "23d15b3f9d010179ace501a79c78608f" 
         self._lock = Lock()
-        
+
         # Prioridade: Gist (Remote Memory) -> Se falhar, tenta Local
         remote = self._load_remote_memory()
         if remote:
@@ -30,7 +30,7 @@ class JarvisNexus:
         else:
             self._cache = self._load_local_registry()
             logging.warning("⚠️ Gist inacessível. Usando registro local como fallback.")
-            
+
         self._instances = {}
         self._mutated = False
 
@@ -69,7 +69,7 @@ class JarvisNexus:
         for cid, module_path in self._cache.items():
             class_name = "".join(word.capitalize() for word in cid.split("_"))
             components[cid] = f"{module_path}.{class_name}"
-        
+
         data = {
             "info": "Este arquivo é apenas para visualização local. A verdade reside no Gist.",
             "components": components
@@ -93,7 +93,7 @@ class JarvisNexus:
         url = f"https://api.github.com/gists/{self.gist_id}"
         headers = {"Authorization": f"token {token}"}
         payload = {"files": {"nexus_memory.json": {"content": json.dumps(self._cache, indent=4)}}}
-        
+
         try:
             res = requests.patch(url, json=payload, headers=headers)
             if res.status_code == 200:
@@ -118,7 +118,7 @@ class JarvisNexus:
         if not instance:
             logging.info(f"🔍 '{target_id}' não encontrado ou defasado. Iniciando busca exaustiva...")
             module_path = self._perform_discovery(target_id, hint_path)
-            
+
             if module_path:
                 logging.info(f"✨ Localizado: {module_path}. Atualizando registros...")
                 self._cache[target_id] = module_path
@@ -140,7 +140,7 @@ class JarvisNexus:
             # Força o reload para garantir que não estamos pegando cache de importação antigo
             if module_path in sys.modules:
                 importlib.reload(sys.modules[module_path])
-            
+
             module = importlib.import_module(module_path)
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
             clazz = getattr(module, class_name)
@@ -150,7 +150,7 @@ class JarvisNexus:
 
     def _perform_discovery(self, target_id: str, hint: Optional[str]) -> Optional[str]:
         filename = f"{target_id}.py"
-        
+
         # 1. Busca com Hint
         if hint:
             logging.info(f"🔎 Buscando com hint em 'app/{hint}'...")
@@ -163,7 +163,7 @@ class JarvisNexus:
 
     def _search_in_folder(self, start_dir: str, filename: str) -> Optional[str]:
         if not os.path.exists(start_dir): return None
-        
+
         for root, _, files in os.walk(start_dir):
             if filename in files:
                 relative_path = os.path.relpath(root, self.base_dir)
