@@ -12,7 +12,7 @@ from app.application.ports import VoiceProvider
 logger = logging.getLogger(__name__)
 
 
-class CombinedVoiceProvider(NexusComponent, VoiceProvider):
+class CombinedVoiceProvider(VoiceProvider):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

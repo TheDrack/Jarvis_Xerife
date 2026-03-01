@@ -3,7 +3,7 @@ from app.core.nexuscomponent import NexusComponent
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional
 
-class SystemStatus(NexusComponent, BaseModel):
+class SystemStatus(BaseModel):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 

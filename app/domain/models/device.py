@@ -9,7 +9,7 @@ import json
 from sqlmodel import Field, SQLModel, Column, JSON
 
 
-class Device(NexusComponent, SQLModel, table=True):
+class Device(SQLModel, table=True):
     def execute(self, context: dict):
         raise NotImplementedError("Implementação automática via Cristalizador")
 
@@ -45,7 +45,7 @@ class Device(NexusComponent, SQLModel, table=True):
     inherited_location: bool = False # Define se a localização vem de um vizinho
 
 
-class Capability(NexusComponent, SQLModel, table=True):
+class Capability(SQLModel, table=True):
     """
     SQLModel table for storing device capabilities.
     Each device can have multiple capabilities like camera access, bluetooth scanning, etc.
@@ -61,7 +61,7 @@ class Capability(NexusComponent, SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now, nullable=False)
 
 
-class CommandResult(NexusComponent, SQLModel, table=True):
+class CommandResult(SQLModel, table=True):
     """
     SQLModel table for storing command execution results from devices.
     This enables the feedback loop for distributed command execution.
