@@ -52,7 +52,7 @@ class JarvisNexus:
         # 3. Varredura Global (Omnisciente)
         logging.info(f"🌐 [NEXUS] Iniciando Varredura Global em: {self.base_dir}")
         module_path = self._perform_omniscient_discovery(target_id)
-        
+
         if module_path:
             logging.info(f"🎯 [NEXUS] LOCALIZADO: {module_path}")
             instance = self._instantiate(target_id, module_path)
