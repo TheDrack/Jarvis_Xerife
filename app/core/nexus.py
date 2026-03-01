@@ -69,13 +69,13 @@ class JarvisNexus:
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 parts = rel_path.split(os.sep)
-                
+
                 # Normalização de caminhos para pacotes Python
                 if parts[0] == "." or parts[0] == "":
                     module_path = target_id
                 else:
                     module_path = ".".join(parts) + f".{target_id}"
-                
+
                 # Se o caminho começar com 'app.', removemos redundância se houver
                 return module_path
         return None
@@ -89,7 +89,7 @@ class JarvisNexus:
         try:
             # Tenta importar o módulo
             module = importlib.import_module(module_path)
-            
+
             # PascalCase para o nome da classe
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
 
@@ -99,7 +99,7 @@ class JarvisNexus:
 
             clazz = getattr(module, class_name)
             return clazz()
-            
+
         except ImportError as e:
             if self.is_cloud:
                 logging.warning(f"⚠️ [NEXUS] Dependência ausente ({e.name}) em Cloud. Usando Mock para {target_id}.")
