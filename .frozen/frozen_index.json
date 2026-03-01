@@ -427,28 +427,8 @@
     "original_path": "app/domain/models/cap_034_core.py",
     "type": "capability"
   },
-  "infrastructure/gemini_adapter.py": {
-    "original_path": "app/infrastructure/gemini_adapter.py",
-    "type": "infrastructure"
-  },
-  "infrastructure/voice_adapter.py": {
-    "original_path": "app/infrastructure/voice_adapter.py",
-    "type": "infrastructure"
-  },
   "infrastructure/llm_command_adapter.py": {
     "original_path": "app/infrastructure/llm_command_adapter.py",
-    "type": "infrastructure"
-  },
-  "infrastructure/action_provider.py": {
-    "original_path": "app/infrastructure/action_provider.py",
-    "type": "infrastructure"
-  },
-  "infrastructure/drive_uploader.py": {
-    "original_path": "app/infrastructure/drive_uploader.py",
-    "type": "infrastructure"
-  },
-  "infrastructure/jarvis_local_agent.py": {
-    "original_path": "app/infrastructure/automation/jarvis_local_agent.py",
     "type": "infrastructure"
   },
   "domain_adapters/audio_engine.py": {
