@@ -12,79 +12,26 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Configurações de Wake-up e Polling
-_RENDER_WAKE_TIMEOUT = 120
-_RENDER_WAKE_POLL_INTERVAL = 5
-_RETRY_DELAY_409 = 10  # Segundos para esperar em caso de conflito 409
-
-_RENDER_WAKING_MESSAGE = (
-    "⏳ *Acordando o sistema...* O servidor está inicializando, aguarde um momento. "
-    "Sua mensagem será respondida assim que estiver pronto."
-)
-
 class TelegramAdapter(NexusComponent):
     """
-    JARVIS Telegram Command Center
-    Interface otimizada para Cloud com tratamento de concorrência e resiliência.
+    JARVIS Telegram Adapter - Versão Thread-Safe e Resiliente.
     """
 
     def __init__(self):
         super().__init__()
-        # Normalização do Token
+        # Lock para evitar que múltiplas threads iniciem o polling simultaneamente
+        self._lock = threading.Lock()
+        
         raw_token = os.getenv("TELEGRAM_TOKEN") or settings.telegram_token
-        if not raw_token:
-            logger.warning("⚠️ [TELEGRAM] Token não encontrado no ambiente ou settings.")
-            self.token = None
-        else:
-            self.token = re.sub(r"^bot", "", raw_token, flags=re.IGNORECASE)
-            
+        self.token = re.sub(r"^bot", "", raw_token, flags=re.IGNORECASE) if raw_token else None
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
         base_url = f"https://api.telegram.org/bot{self.token}" if self.token else ""
         self.http = HttpClient(base_url=base_url)
 
         self._polling: bool = False
-        self._polling_thread: Optional[threading.Thread] = None
         self._update_offset: int = 0
         self._render_url: Optional[str] = os.getenv("RENDER_URL", "").strip() or None
-
-    # ------------------------------------------------------------------
-    # Render wake-up helpers
-    # ------------------------------------------------------------------
-
-    def _is_render_available(self) -> bool:
-        if not self._render_url:
-            return True
-        try:
-            import urllib.request
-            req = urllib.request.Request(
-                f"{self._render_url.rstrip('/')}/health",
-                headers={"User-Agent": "JARVIS-Telegram/1.0"},
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                return resp.status < 500
-        except Exception:
-            return False
-
-    def _wake_render(self, chat_id: Any) -> bool:
-        if not self._render_url:
-            return True
-
-        logger.info("🌅 [TELEGRAM] Detectado estado 'sleeping'. Acordando instância...")
-        self.send_message(_RENDER_WAKING_MESSAGE, chat_id=chat_id)
-
-        deadline = time.time() + _RENDER_WAKE_TIMEOUT
-        while time.time() < deadline:
-            if self._is_render_available():
-                logger.info("✅ [TELEGRAM] Instância ativa.")
-                return True
-            time.sleep(_RENDER_WAKE_POLL_INTERVAL)
-
-        logger.error("❌ [TELEGRAM] Timeout ao acordar Render.")
-        return False
-
-    # ------------------------------------------------------------------
-    # Core API Methods
-    # ------------------------------------------------------------------
 
     def send_message(self, text: str, chat_id: Any = None) -> Any:
         effective_chat_id = str(chat_id) if chat_id is not None else self.chat_id
@@ -101,118 +48,89 @@ class TelegramAdapter(NexusComponent):
             return None
 
     def get_updates(self, offset: int = 0, timeout: int = 20) -> list:
-        """Busca atualizações com suporte a tratamento de erro 409."""
-        if not self.token:
-            return []
+        if not self.token: return []
         try:
             response = self.http.request(
-                "GET",
-                "/getUpdates",
+                "GET", "/getUpdates",
                 params={"offset": offset, "timeout": timeout},
             )
-            
             if response.status_code == 200:
                 return response.json().get("result", [])
-            
-            if response.status_code == 409:
-                logger.warning(f"⚠️ [TELEGRAM] Conflito (409). Outra instância está ativa. Aguardando {_RETRY_DELAY_409}s...")
-                time.sleep(_RETRY_DELAY_409)
-            else:
-                logger.error(f"❌ [TELEGRAM] Erro API: {response.status_code} - {response.text}")
-            
+            elif response.status_code == 409:
+                logger.warning("⚠️ Conflito 409 (Telegram Polling). Aguardando liberação...")
+                time.sleep(10)
             return []
         except Exception as e:
-            logger.error(f"❌ [TELEGRAM] Falha na conexão de updates: {e}")
-            time.sleep(5) # Delay de segurança para falhas de rede
+            logger.error(f"❌ Erro getUpdates: {e}")
+            time.sleep(5)
             return []
 
     def handle_update(self, update: Dict[str, Any], callback: Optional[Callable] = None) -> None:
         message = update.get("message") or update.get("edited_message")
-        if not message or not callback:
-            return
+        if not message or not callback: return
 
         text = message.get("text", "").strip()
         chat_id = message.get("chat", {}).get("id")
-        if not text or not chat_id:
-            return
-
-        # Lógica de Wake-up (se configurado)
-        if self._render_url and not self._is_render_available():
-            if not self._wake_render(chat_id):
-                return
+        if not text or not chat_id: return
 
         try:
-            # Executa o comando via AssistantService
-            result = callback(text, str(chat_id))
-            if result:
-                self.send_message(str(result), chat_id=str(chat_id))
+            response = callback(text, str(chat_id))
+            if response:
+                # Se o retorno for um objeto de resposta complexo, extraímos a mensagem
+                final_text = response.message if hasattr(response, 'message') else str(response)
+                self.send_message(final_text, chat_id=str(chat_id))
         except Exception as e:
-            logger.error(f"💥 Erro no processamento do callback: {e}")
+            logger.error(f"💥 Erro processando update: {e}")
 
-    # ------------------------------------------------------------------
-    # Threading / Lifecycle
-    # ------------------------------------------------------------------
+    def start_polling(self, callback: Optional[Callable] = None, interval: float = 1.0) -> None:
+        """Inicia o polling com proteção contra chamadas duplicadas."""
+        with self._lock:
+            if self._polling:
+                # Mudado para DEBUG para não inundar os logs se houver chamadas extras
+                logger.debug("ℹ️ [TELEGRAM] Polling já está em execução. Ignorando.")
+                return
+            self._polling = True
 
-    def start_polling(self, callback: Optional[Callable] = None, interval: float = 0.5) -> None:
-        """Inicia o loop de escuta em thread protegida."""
-        if self._polling:
-            logger.info("ℹ️ [TELEGRAM] Polling já está em execução.")
-            return
-            
-        if not self.token:
-            logger.error("❌ [TELEGRAM] Impossível iniciar polling: Token nulo.")
-            return
-
-        self._polling = True
-        self._polling_thread = threading.Thread(
-            target=self._poll_loop,
-            args=(callback, interval),
-            daemon=True,
-            name="JARVIS_Telegram_Thread"
-        )
-        self._polling_thread.start()
-        logger.info(f"🔄 [TELEGRAM] Polling iniciado (Offset Inicial: {self._update_offset})")
-
-    def _poll_loop(self, callback: Optional[Callable], interval: float) -> None:
-        """Loop resiliente com gerenciamento de offset."""
-        while self._polling:
-            try:
-                updates = self.get_updates(offset=self._update_offset)
-                for update in updates:
-                    self._update_offset = update["update_id"] + 1
-                    self.handle_update(update, callback=callback)
-                
-                if interval > 0:
+        logger.info("🔄 [TELEGRAM] Iniciando loop de polling...")
+        
+        def _poll_loop():
+            while self._polling:
+                try:
+                    updates = self.get_updates(offset=self._update_offset)
+                    for update in updates:
+                        self._update_offset = update["update_id"] + 1
+                        self.handle_update(update, callback=callback)
                     time.sleep(interval)
-            except Exception as e:
-                logger.error(f"🚨 [TELEGRAM] Erro crítico no poll_loop: {e}")
-                time.sleep(10) # Recuperação de desastre
+                except Exception as e:
+                    logger.error(f"🚨 [TELEGRAM] Erro no loop: {e}")
+                    time.sleep(10)
+
+        t = threading.Thread(target=_poll_loop, daemon=True, name="TelegramPollLoop")
+        t.start()
 
     def stop_polling(self) -> None:
-        logger.info("🛑 [TELEGRAM] Parando polling...")
-        self._polling = False
-        if self._polling_thread:
-            self._polling_thread.join(timeout=5)
+        with self._lock:
+            self._polling = False
+        logger.info("🛑 [TELEGRAM] Polling parado.")
 
     def execute(self, context: dict) -> dict:
-        """Integração Nexus para envio de artefatos."""
+        """Integração Nexus para envio de arquivos."""
         file_path = (context or {}).get("artifacts", {}).get("consolidator")
         if file_path:
-            self.send_document(file_path, caption="📦 Relatório Consolidado JARVIS")
+            # Envia via chat_id padrão definido no ambiente
+            self.send_document(file_path, caption="📦 Jarvis Update")
         return context
 
-    def send_document(self, file_path: str, caption: Optional[str] = None, chat_id: Any = None) -> Any:
-        if not os.path.exists(file_path):
-            return None
-        effective_chat_id = str(chat_id) if chat_id is not None else self.chat_id
+    def send_document(self, file_path: str, caption: str = "", chat_id: Any = None) -> Any:
+        if not os.path.exists(file_path): return None
+        chat_id = chat_id or self.chat_id
         try:
             with open(file_path, "rb") as f:
                 return self.http.request(
-                    "POST", 
-                    "/sendDocument", 
-                    files={"document": f}, 
-                    data={"chat_id": effective_chat_id, "caption": caption or ""}
+                    "POST", "/sendDocument",
+                    files={"document": f},
+                    data={"chat_id": chat_id, "caption": caption}
                 )
         except Exception as e:
-            logger.error(f"❌ Erro ao enviar documento: {e}")
+            logger.error(f"❌ Erro documento: {e}")
             return None
