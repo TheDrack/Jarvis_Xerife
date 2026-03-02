@@ -2,17 +2,17 @@
 """LLM Service - Wraps Google Gemini AI for conversational responses"""
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 from google import genai
 
-from app.core.config import settings
 from app.core.nexuscomponent import NexusComponent
 
 logger = logging.getLogger(__name__)
 
 
-class LLMService(NexusComponent):
+class LlmService(NexusComponent):
     """
     Serviço de IA que usa o Google Gemini para gerar respostas conversacionais.
     Utilizado pelo IntentProcessor para responder a comandos desconhecidos.
@@ -20,9 +20,9 @@ class LLMService(NexusComponent):
 
     def __init__(self) -> None:
         super().__init__()
-        api_key = settings.gemini_api_key
+        api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("GEMINI_API_KEY must be configured in settings")
+            raise ValueError("GEMINI_API_KEY must be configured")
         self.client = genai.Client(api_key=api_key)
         self.model_name = "gemini-2.0-flash"
 
@@ -56,4 +56,4 @@ class LLMService(NexusComponent):
             return ""
         except Exception as e:
             logger.error(f"Erro ao gerar resposta do LLM para prompt '{prompt[:80]}...': {e}")
-            raise
+            return "Desculpe, ocorreu um erro ao processar sua solicitação. Tente novamente mais tarde."
