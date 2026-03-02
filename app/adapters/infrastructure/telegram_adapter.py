@@ -14,19 +14,64 @@ logger = logging.getLogger(__name__)
 
 class TelegramAdapter(NexusComponent):
     """
-    JARVIS Telegram Command Center v7.0
-    Interface bidirecional: envia mensagens/arquivos E recebe comandos do Telegram.
+    JARVIS Telegram Command Center v7.1
+    Interface bidirecional: envia mensagens/arquivos E recebe comandos.
+    Suporta Polling (Local) e Webhooks (Cloud/Render) para acordar o serviço.
     """
 
     def __init__(self):
+        super().__init__()
         token = os.getenv("TELEGRAM_TOKEN", "").strip()
-        # Normalização de segurança contra erro 404
+        # Normalização de segurança contra erro 404 (remove prefixo 'bot' se houver)
         self.token = re.sub(r"^bot", "", token, flags=re.IGNORECASE)
         self.chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
         self.http = HttpClient(base_url=f"https://api.telegram.org/bot{self.token}")
+        
         self._polling = False
         self._polling_thread: Optional[threading.Thread] = None
         self._update_offset: int = 0
+
+    # ------------------------------------------------------------------
+    # Configuração de Webhook (Essencial para o Render)
+    # ------------------------------------------------------------------
+
+    def set_webhook(self, url: str) -> bool:
+        """
+        Configura a URL para o Telegram enviar mensagens via POST.
+        Isso permite que o Render 'acorde' ao receber um comando.
+        """
+        if not self.token:
+            logger.error("❌ [TELEGRAM] Token não configurado. Impossível definir Webhook.")
+            return False
+
+        # Define a rota que criaremos no api_server.py
+        webhook_url = f"{url.rstrip('/')}/v1/telegram/webhook"
+        
+        try:
+            logger.info(f"🔗 [TELEGRAM] Configurando Webhook: {webhook_url}")
+            resp = self.http.request(
+                "POST",
+                "/setWebhook",
+                json={"url": webhook_url},
+            )
+            if resp and resp.status_code == 200:
+                logger.info("✅ [TELEGRAM] Webhook ativado com sucesso.")
+                return True
+            
+            logger.error(f"❌ [TELEGRAM] Falha ao setar Webhook. Status: {resp.status_code if resp else 'N/A'}")
+            return False
+        except Exception as e:
+            logger.error(f"💥 [TELEGRAM] Erro ao configurar Webhook: {e}")
+            return False
+
+    def delete_webhook(self) -> bool:
+        """Remove o webhook (útil para voltar ao modo Polling)"""
+        try:
+            resp = self.http.request("POST", "/deleteWebhook")
+            return resp.status_code == 200 if resp else False
+        except Exception as e:
+            logger.error(f"💥 [TELEGRAM] Erro ao deletar Webhook: {e}")
+            return False
 
     # ------------------------------------------------------------------
     # Outbound (Jarvis → Telegram)
@@ -70,31 +115,9 @@ class TelegramAdapter(NexusComponent):
     # Inbound (Telegram → Jarvis)
     # ------------------------------------------------------------------
 
-    def get_updates(self, offset: int = 0, timeout: int = 0) -> List[dict]:
-        """Obtém atualizações pendentes da API do Telegram."""
-        try:
-            resp = self.http.request(
-                "GET",
-                "/getUpdates",
-                params={"offset": offset, "timeout": timeout},
-            )
-            if resp and resp.status_code == 200:
-                data = resp.json()
-                return data.get("result", [])
-        except Exception as e:
-            logger.error(f"💥 [TELEGRAM] Erro ao obter atualizações: {e}")
-        return []
-
     def handle_update(self, update: dict, callback: Optional[Callable[[str, str], Optional[str]]] = None) -> Optional[str]:
         """
-        Processa uma atualização recebida do Telegram.
-
-        Args:
-            update: Dicionário de atualização da API do Telegram.
-            callback: Função opcional que recebe (text, chat_id) e retorna resposta.
-
-        Returns:
-            Texto da resposta enviada, ou None.
+        Processa uma atualização vinda do Polling OU do Webhook.
         """
         message = update.get("message") or update.get("edited_message")
         if not message:
@@ -111,9 +134,10 @@ class TelegramAdapter(NexusComponent):
         response_text: Optional[str] = None
         if callback:
             try:
+                # O callback geralmente é assistant_service.process_command
                 response_text = callback(text, chat_id)
             except Exception as e:
-                logger.error(f"💥 [TELEGRAM] Erro no callback: {e}")
+                logger.error(f"💥 [TELEGRAM] Erro no callback de processamento: {e}")
                 response_text = f"Erro ao processar comando: {e}"
 
         if response_text:
@@ -122,26 +146,34 @@ class TelegramAdapter(NexusComponent):
         return response_text
 
     # ------------------------------------------------------------------
-    # Polling loop
+    # Polling loop (Modo Local)
     # ------------------------------------------------------------------
+
+    def get_updates(self, offset: int = 0, timeout: int = 0) -> List[dict]:
+        """Obtém atualizações via Polling."""
+        try:
+            resp = self.http.request(
+                "GET",
+                "/getUpdates",
+                params={"offset": offset, "timeout": timeout},
+            )
+            if resp and resp.status_code == 200:
+                data = resp.json()
+                return data.get("result", [])
+        except Exception as e:
+            logger.error(f"💥 [TELEGRAM] Erro ao obter atualizações: {e}")
+        return []
 
     def start_polling(
         self,
         callback: Optional[Callable[[str, str], Optional[str]]] = None,
         interval: float = 2.0,
     ) -> None:
-        """
-        Inicia o loop de polling em segundo plano.
-
-        Args:
-            callback: Função chamada com (text, chat_id) para cada mensagem recebida.
-                      Deve retornar a resposta em texto, ou None.
-            interval: Intervalo em segundos entre cada consulta.
-        """
+        """Inicia polling (desativa webhook automaticamente para não conflitar)"""
         if self._polling:
-            logger.warning("⚠️ [TELEGRAM] Polling já está em execução.")
             return
 
+        self.delete_webhook() # Telegram não permite Polling e Webhook ativos ao mesmo tempo
         self._polling = True
         self._polling_thread = threading.Thread(
             target=self._poll_loop,
@@ -150,58 +182,23 @@ class TelegramAdapter(NexusComponent):
             name="TelegramPollingThread",
         )
         self._polling_thread.start()
-        logger.info("🔄 [TELEGRAM] Polling iniciado.")
+        logger.info("🔄 [TELEGRAM] Polling iniciado (Modo Local).")
 
-    def stop_polling(self) -> None:
-        """Para o loop de polling."""
-        self._polling = False
-        if self._polling_thread and self._polling_thread.is_alive():
-            self._polling_thread.join(timeout=5)
-        logger.info("🛑 [TELEGRAM] Polling encerrado.")
-
-    def _poll_loop(
-        self,
-        callback: Optional[Callable[[str, str], Optional[str]]],
-        interval: float,
-    ) -> None:
-        """Loop interno de polling (executado em thread separada)."""
+    def _poll_loop(self, callback: Optional[Callable[[str, str], Optional[str]]], interval: float) -> None:
         while self._polling:
             updates = self.get_updates(offset=self._update_offset)
             for update in updates:
-                update_id = update.get("update_id", 0)
-                self._update_offset = update_id + 1
-                try:
-                    self.handle_update(update, callback=callback)
-                except Exception as e:
-                    logger.error(f"💥 [TELEGRAM] Erro ao processar update {update_id}: {e}")
+                self._update_offset = update.get("update_id", 0) + 1
+                self.handle_update(update, callback=callback)
             time.sleep(interval)
 
     # ------------------------------------------------------------------
-    # NexusComponent pipeline entry-point
+    # Nexus Pipeline
     # ------------------------------------------------------------------
 
     def execute(self, context: dict) -> dict:
-        """
-        Ponto de entrada do Pipeline Nexus.
-        Extrai o consolidado e envia via Telegram.
-        """
+        """Ponto de entrada para envio de logs/consolidado via Nexus."""
         file_path = context.get("artifacts", {}).get("consolidator")
-
-        logger.info("📡 [TELEGRAM] Iniciando transmissão via NexusAdapter...")
-
-        try:
-            resp = self.send_document(
-                file_path,
-                "🧬 **DNA JARVIS CONSOLIDADO**\n📦 *Backup via TelegramAdapter*",
-            )
-
-            if resp and resp.status_code == 200:
-                logger.info("✅ [TELEGRAM] Transmissão concluída com sucesso.")
-            else:
-                status = resp.status_code if resp else "Sem Resposta"
-                logger.warning(f"❌ [TELEGRAM] Falha no envio. Status: {status}")
-
-        except Exception as e:
-            logger.error(f"💥 [TELEGRAM] Erro na execução do componente: {e}")
-
+        if file_path:
+            self.send_document(file_path, "🧬 **DNA JARVIS CONSOLIDADO**")
         return context
