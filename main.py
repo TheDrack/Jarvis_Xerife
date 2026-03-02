@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Jarvis Assistant - Main Entry Point (Hybrid Cloud/Edge deployment)
-Corrigido para ativar Telegram Bidirecional em Cloud (Render).
+Corrigido para ativar Telegram Bidirecional vinculado ao AssistantService.
 """
 
 import os
@@ -26,44 +26,59 @@ def is_running_on_cloud():
         not sys.stdin.isatty()
     )
 
-def start_telegram_polling():
-    """Inicializa o adaptador do Telegram para escuta ativa (bidirecional)"""
+def start_telegram_bidirectional(assistant):
+    """
+    Inicializa o polling do Telegram e vincula ao AssistantService.
+    """
     try:
-        # Resolve o adaptador de infraestrutura do Telegram via Nexus ou Container
         telegram = nexus.resolve("telegram_adapter")
-        if telegram and hasattr(telegram, 'start_polling'):
+        if telegram:
+            # Esta função serve como ponte entre o Telegram e o Jarvis
+            def telegram_callback(text, chat_id):
+                logging.info(f"📩 Telegram recebido: {text}")
+                # Processa o comando usando o AssistantService corrigido
+                # O chat_id é ignorado aqui pois o adapter já usa o default ou o remetente
+                response = assistant.process_command(text)
+                
+                # Retorna o resultado para o adapter enviar de volta
+                if response.get("success"):
+                    # Se o resultado for um dicionário complexo, pegamos o campo 'result'
+                    res = response.get("result", "Comando executado.")
+                    return str(res)
+                return f"Erro: {response.get('error', 'Desconhecido')}"
+
             logging.info("📡 [TELEGRAM] Iniciando escuta ativa (Polling)...")
-            telegram.start_polling()
+            telegram.start_polling(callback=telegram_callback)
         else:
-            logging.warning("⚠️ [TELEGRAM] Adaptador não encontrado ou não suporta polling.")
+            logging.warning("⚠️ [TELEGRAM] Adaptador não encontrado no Nexus.")
     except Exception as e:
         logging.error(f"❌ [TELEGRAM] Erro ao iniciar polling: {e}")
 
 def start_cloud_service():
     """
-    Inicialização robusta para Cloud (Render/API).
-    Inicia o Telegram em background e a API em foreground.
+    Inicialização robusta para Cloud.
     """
     print("=" * 60)
     print("🤖 JARVIS ASSISTANT - CLOUD MODE ACTIVE")
     print("=" * 60)
 
-    # 1. Cria o container e resolve dependências
+    # 1. Cria o container e resolve o assistente
     container = create_edge_container(
         wake_word=settings.wake_word,
         language=settings.language,
     )
-
     assistant = container.assistant_service
+    
+    # 2. Configura a API
     app = create_api_server(assistant)
 
-    # 2. DISPARO DO TELEGRAM (THREAD SEPARADA)
-    # Se houver Token configurado, iniciamos a escuta bidirecional
+    # 3. DISPARO DO TELEGRAM (Thread Separada)
     if os.getenv("TELEGRAM_TOKEN"):
-        telegram_thread = threading.Thread(target=start_telegram_polling, daemon=True)
-        telegram_thread.start()
+        # Passamos a instância do assistente para a ponte do Telegram
+        t = threading.Thread(target=start_telegram_bidirectional, args=(assistant,), daemon=True)
+        t.start()
 
-    # 3. Inicialização do Servidor Web (Bloqueante)
+    # 4. Servidor Web
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("PORT", os.getenv("API_PORT", "10000")))
 
