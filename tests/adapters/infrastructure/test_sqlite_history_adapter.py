@@ -376,3 +376,133 @@ class TestSQLiteHistoryAdapter(NexusComponent):
         pending = adapter.get_next_pending_command()
         assert pending is None
 
+
+
+class TestHiveMindMemory(NexusComponent):
+
+    def execute(self, context: dict):
+        """Execução automática JARVIS."""
+        pass
+    """Tests for cross-channel hive mind memory (channel field + get_recent_hive_history)."""
+
+    @pytest.fixture
+    def adapter(self):
+        return SQLiteHistoryAdapter(database_url="sqlite:///:memory:")
+
+    def test_save_interaction_with_channel(self, adapter):
+        """Interaction saved with channel field is returned in history with that channel."""
+        adapter.save_interaction(
+            user_input="oi jarvis",
+            command_type="chat",
+            parameters={},
+            success=True,
+            response_text="Olá!",
+            channel="telegram",
+        )
+        history = adapter.get_recent_history(limit=1)
+        assert len(history) == 1
+        assert history[0]["channel"] == "telegram"
+
+    def test_default_channel_is_api(self, adapter):
+        """When channel is not specified, it defaults to 'api'."""
+        adapter.save_interaction(
+            user_input="status",
+            command_type="unknown",
+            parameters={},
+            success=True,
+            response_text="OK",
+        )
+        history = adapter.get_recent_history(limit=1)
+        assert history[0]["channel"] == "api"
+
+    def test_get_recent_hive_history_returns_all_channels(self, adapter):
+        """get_recent_hive_history returns successful interactions from every channel."""
+        adapter.save_interaction(
+            user_input="abrir browser",
+            command_type="open_browser",
+            parameters={},
+            success=True,
+            response_text="Browser aberto",
+            channel="api",
+        )
+        adapter.save_interaction(
+            user_input="qual o tempo?",
+            command_type="chat",
+            parameters={},
+            success=True,
+            response_text="Não sei",
+            channel="telegram",
+        )
+        history = adapter.get_recent_hive_history(limit=10)
+        channels = {item["channel"] for item in history}
+        assert "api" in channels
+        assert "telegram" in channels
+
+    def test_get_recent_hive_history_excludes_failures(self, adapter):
+        """Failed interactions are excluded from the hive context."""
+        adapter.save_interaction(
+            user_input="erro",
+            command_type="unknown",
+            parameters={},
+            success=False,
+            response_text="Erro",
+            channel="api",
+        )
+        history = adapter.get_recent_hive_history(limit=10)
+        assert all(item["user_input"] != "erro" for item in history)
+
+    def test_get_recent_hive_history_respects_limit(self, adapter):
+        """get_recent_hive_history respects the limit parameter."""
+        for i in range(10):
+            adapter.save_interaction(
+                user_input=f"cmd {i}",
+                command_type="unknown",
+                parameters={},
+                success=True,
+                response_text=f"ok {i}",
+                channel="api" if i % 2 == 0 else "telegram",
+            )
+        history = adapter.get_recent_hive_history(limit=5)
+        assert len(history) == 5
+
+    def test_get_recent_hive_history_returns_empty_on_no_data(self, adapter):
+        """Returns empty list when no successful interactions exist."""
+        history = adapter.get_recent_hive_history()
+        assert history == []
+
+    def test_schema_migration_adds_channel_column(self, tmp_path):
+        """_migrate_schema adds 'channel' column to an existing table that lacks it."""
+        from sqlalchemy import create_engine, text
+
+        db_path = str(tmp_path / "legacy.db")
+        url = f"sqlite:///{db_path}"
+        # Create a legacy table WITHOUT the channel column
+        engine = create_engine(url, echo=False)
+        with engine.begin() as conn:
+            conn.execute(text(
+                """CREATE TABLE interactions (
+                    id INTEGER PRIMARY KEY,
+                    timestamp DATETIME NOT NULL,
+                    user_input VARCHAR NOT NULL,
+                    command_type VARCHAR NOT NULL,
+                    parameters VARCHAR NOT NULL DEFAULT '{}',
+                    success BOOLEAN NOT NULL DEFAULT 0,
+                    response_text VARCHAR NOT NULL DEFAULT '',
+                    status VARCHAR NOT NULL DEFAULT 'pending',
+                    processed_at DATETIME
+                )"""
+            ))
+        engine.dispose()
+
+        # Now open with the adapter — migration should add 'channel'
+        adapter = SQLiteHistoryAdapter(database_url=url)
+        adapter.save_interaction(
+            user_input="migrated",
+            command_type="chat",
+            parameters={},
+            success=True,
+            response_text="ok",
+            channel="telegram",
+        )
+        history = adapter.get_recent_history(limit=1)
+        assert history[0]["channel"] == "telegram"

@@ -305,3 +305,91 @@ class TestExecute:
         adapter.http.request.side_effect = Exception("err")
         result = adapter.execute(context)
         assert result == context
+
+
+# ---------------------------------------------------------------------------
+# Render wake-up logic
+# ---------------------------------------------------------------------------
+
+class TestRenderWakeUp:
+    @pytest.fixture
+    def adapter_with_render(self):
+        with patch.dict(
+            os.environ,
+            {"TELEGRAM_TOKEN": "testtoken", "TELEGRAM_CHAT_ID": "99", "RENDER_URL": "https://jarvis.onrender.com"},
+        ):
+            with patch("app.adapters.infrastructure.telegram_adapter.HttpClient") as MockHttp:
+                MockHttp.return_value = MagicMock()
+                a = TelegramAdapter()
+                yield a
+
+    def test_render_url_loaded_from_env(self, adapter_with_render):
+        assert adapter_with_render._render_url == "https://jarvis.onrender.com"
+
+    def test_no_render_url_means_always_available(self, adapter):
+        assert adapter._render_url is None
+        assert adapter._is_render_available() is True
+
+    def test_is_render_available_returns_true_on_success(self, adapter_with_render):
+        import urllib.request
+        mock_resp = MagicMock()
+        mock_resp.__enter__ = lambda s: s
+        mock_resp.__exit__ = Mock(return_value=False)
+        mock_resp.status = 200
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            assert adapter_with_render._is_render_available() is True
+
+    def test_is_render_available_returns_false_on_error(self, adapter_with_render):
+        with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
+            assert adapter_with_render._is_render_available() is False
+
+    def test_wake_render_sends_waking_message_then_succeeds(self, adapter_with_render):
+        adapter_with_render.send_message = Mock()
+        adapter_with_render._is_render_available = Mock(side_effect=[False, False, True])
+        with patch("time.sleep"):
+            result = adapter_with_render._wake_render(chat_id="99")
+        assert result is True
+        adapter_with_render.send_message.assert_called_once()
+        assert "Acordando" in adapter_with_render.send_message.call_args[0][0]
+
+    def test_wake_render_returns_false_on_timeout(self, adapter_with_render):
+        adapter_with_render.send_message = Mock()
+        adapter_with_render._is_render_available = Mock(return_value=False)
+        # Override timeout to be very short for the test
+        with patch("app.adapters.infrastructure.telegram_adapter._RENDER_WAKE_TIMEOUT", 0):
+            with patch("time.sleep"):
+                result = adapter_with_render._wake_render(chat_id="99")
+        assert result is False
+
+    def test_handle_update_skips_wake_when_no_render_url(self, adapter):
+        """When RENDER_URL is not set, no wake-up logic runs."""
+        callback = Mock(return_value="ok")
+        adapter.send_message = Mock()
+        adapter._is_render_available = Mock()
+        update = _make_update("status")
+        adapter.handle_update(update, callback=callback)
+        adapter._is_render_available.assert_not_called()
+
+    def test_handle_update_wakes_render_when_unavailable(self, adapter_with_render):
+        """When Render is down, sends waking message and waits."""
+        callback = Mock(return_value="result")
+        adapter_with_render.send_message = Mock()
+        adapter_with_render._is_render_available = Mock(side_effect=[False, True])
+        adapter_with_render._wake_render = Mock(return_value=True)
+        update = _make_update("status")
+        adapter_with_render.handle_update(update, callback=callback)
+        adapter_with_render._wake_render.assert_called_once()
+        callback.assert_called_once()
+
+    def test_handle_update_aborts_if_render_never_wakes(self, adapter_with_render):
+        """When Render never wakes up, no callback is called and error message is sent."""
+        callback = Mock(return_value="result")
+        adapter_with_render.send_message = Mock()
+        adapter_with_render._is_render_available = Mock(return_value=False)
+        adapter_with_render._wake_render = Mock(return_value=False)
+        update = _make_update("status")
+        result = adapter_with_render.handle_update(update, callback=callback)
+        callback.assert_not_called()
+        adapter_with_render.send_message.assert_called_once()
+        assert result is None
+

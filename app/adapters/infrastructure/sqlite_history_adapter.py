@@ -42,6 +42,7 @@ class Interaction(NexusComponent, SQLModel, table=True):
     response_text: str = Field(default="", nullable=False)
     status: str = Field(default="pending", nullable=False)  # pending, completed, failed
     processed_at: Optional[datetime] = Field(default=None, nullable=True)
+    channel: str = Field(default="api", nullable=False)  # interface channel: api, telegram, etc.
 
 
 class SQLiteHistoryAdapter(HistoryProvider):
@@ -91,7 +92,40 @@ class SQLiteHistoryAdapter(HistoryProvider):
         
         # Create tables
         SQLModel.metadata.create_all(self.engine)
+
+        # Apply incremental schema migrations (add new columns to existing tables)
+        self._migrate_schema()
+
         logger.info(f"Database tables initialized successfully")
+
+    def _migrate_schema(self) -> None:
+        """
+        Apply additive schema migrations to ensure existing databases stay current.
+        Safe to run on every startup — only adds missing columns, never removes data.
+        """
+        from sqlalchemy import text, inspect
+
+        migrations = [
+            # column_name, DDL to add it (SQLite + PostgreSQL compatible)
+            ("channel", "ALTER TABLE interactions ADD COLUMN channel VARCHAR NOT NULL DEFAULT 'api'"),
+        ]
+
+        try:
+            inspector = inspect(self.engine)
+            if "interactions" not in inspector.get_table_names():
+                return  # Fresh database; create_all already handled it
+
+            existing_columns = {col["name"] for col in inspector.get_columns("interactions")}
+            with self.engine.begin() as conn:
+                for column_name, ddl in migrations:
+                    if column_name not in existing_columns:
+                        try:
+                            conn.execute(text(ddl))
+                            logger.info(f"Schema migration applied: added column '{column_name}' to interactions")
+                        except Exception as col_err:
+                            logger.warning(f"Could not add column '{column_name}': {col_err}")
+        except Exception as e:
+            logger.debug(f"Schema migration check skipped: {e}")
 
     def save_interaction(
         self,
@@ -101,6 +135,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
         success: bool,
         response_text: str,
         timestamp: Optional[datetime] = None,
+        channel: str = "api",
     ) -> None:
         """
         Save a command interaction to the database
@@ -112,6 +147,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
             success: Whether command succeeded
             response_text: Response message
             timestamp: Timestamp of the interaction (defaults to now)
+            channel: Interface channel that generated this interaction (api, telegram, etc.)
         """
         try:
             with Session(self.engine) as session:
@@ -122,10 +158,11 @@ class SQLiteHistoryAdapter(HistoryProvider):
                     parameters=json.dumps(parameters),
                     success=success,
                     response_text=response_text,
+                    channel=channel,
                 )
                 session.add(interaction)
                 session.commit()
-                logger.debug(f"Saved interaction: {user_input} -> {command_type}")
+                logger.debug(f"Saved interaction: {user_input} -> {command_type} (channel={channel})")
         except Exception as e:
             logger.error(f"Error saving interaction: {e}")
 
@@ -155,11 +192,49 @@ class SQLiteHistoryAdapter(HistoryProvider):
                             "parameters": json.loads(interaction.parameters),
                             "success": interaction.success,
                             "response_text": interaction.response_text,
+                            "channel": interaction.channel,
                         }
                     )
                 return history
         except Exception as e:
             logger.error(f"Error getting recent history: {e}")
+            return []
+
+    def get_recent_hive_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Get recent interactions from ALL channels (hive mind memory).
+        Returns cross-channel context for the assistant to maintain awareness
+        of all conversations regardless of interface.
+
+        Args:
+            limit: Maximum number of recent interactions to return
+
+        Returns:
+            List of recent interactions across all channels, ordered newest first
+        """
+        try:
+            with Session(self.engine) as session:
+                statement = (
+                    select(Interaction)
+                    .where(Interaction.success == True)  # noqa: E712
+                    .order_by(Interaction.timestamp.desc())
+                    .limit(limit)
+                )
+                results = session.exec(statement).all()
+
+                history = []
+                for interaction in results:
+                    history.append(
+                        {
+                            "channel": interaction.channel,
+                            "user_input": interaction.user_input,
+                            "response_text": interaction.response_text,
+                            "timestamp": interaction.timestamp.isoformat(),
+                        }
+                    )
+                return history
+        except Exception as e:
+            logger.error(f"Error getting hive history: {e}")
             return []
 
     def get_most_frequent_commands(self, limit: int = 10) -> List[Dict[str, Any]]:
