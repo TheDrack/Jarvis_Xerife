@@ -1,26 +1,25 @@
-from app.core.nexuscomponent import NexusComponent
+# -*- coding: utf-8 -*-
 import requests
 import logging
+import time
 
-class HttpClient(NexusComponent):
+logger = logging.getLogger("HttpClient")
 
-    def execute(self, context: dict):
-        """Execução automática JARVIS."""
-        pass
-    """Motor central de requisições do JARVIS."""
-    def __init__(self, base_url: str = "", default_headers: dict = None):
-        self.base_url = base_url
-        self.headers = default_headers or {}
-        self.logger = logging.getLogger("HttpClient")
+class HttpClient:
+    def __init__(self, base_url: str = ""):
+        self.base_url = base_url.rstrip('/')
+        self.session = requests.Session()
 
     def request(self, method: str, endpoint: str, **kwargs):
-        url = f"{self.base_url}{endpoint}" if not endpoint.startswith("http") else endpoint
+        url = f"{self.base_dir}{endpoint}" if endpoint.startswith('/') else f"{self.base_url}/{endpoint}"
+        
         try:
-            response = requests.request(method, url, headers=self.headers, timeout=30, **kwargs)
-            response.raise_for_status()
+            response = self.session.request(method, url, **kwargs)
+            # Se for 409, não levantamos exceção aqui, deixamos o Adapter tratar
+            if response.status_code != 409:
+                response.raise_for_status()
             return response
         except requests.exceptions.RequestException as e:
-            self.logger.error(f"❌ Erro na requisição {method} {url}: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                return e.response
+            if not (hasattr(e.response, 'status_code') and e.response.status_code == 409):
+                logger.error(f"❌ Erro na requisição {method} {url}: {e}")
             raise e
