@@ -29,23 +29,28 @@ def is_running_on_cloud():
 def start_telegram_bidirectional(assistant):
     """
     Inicializa o polling do Telegram e vincula ao AssistantService.
+    Utiliza a mesma lógica de chatbot da interface de API — mesmo Jarvis para todos os canais.
     """
     try:
         telegram = nexus.resolve("telegram_adapter")
         if telegram:
-            # Esta função serve como ponte entre o Telegram e o Jarvis
+            # Ponte entre o Telegram e o Jarvis — idêntica à lógica do endpoint /v1/message
             def telegram_callback(text, chat_id):
                 logging.info(f"📩 Telegram recebido: {text}")
-                # Processa o comando usando o AssistantService corrigido
-                # O chat_id é ignorado aqui pois o adapter já usa o default ou o remetente
-                response = assistant.process_command(text)
-                
-                # Retorna o resultado para o adapter enviar de volta
-                if response.get("success"):
-                    # Se o resultado for um dicionário complexo, pegamos o campo 'result'
-                    res = response.get("result", "Comando executado.")
-                    return str(res)
-                return f"Erro: {response.get('error', 'Desconhecido')}"
+                # Usa process_command com channel="telegram" para hive mind e contexto unificado
+                response = assistant.process_command(text, channel="telegram")
+
+                # Normaliza o retorno — suporta tanto Response (objeto) quanto dict legado
+                if hasattr(response, "success"):
+                    if response.success:
+                        return response.message or "Comando executado."
+                    return f"Erro: {response.error or 'Desconhecido'}"
+                # Fallback para dicionário (compatibilidade)
+                if isinstance(response, dict):
+                    if response.get("success"):
+                        return str(response.get("result") or response.get("message", "Comando executado."))
+                    return f"Erro: {response.get('error', 'Desconhecido')}"
+                return str(response)
 
             logging.info("📡 [TELEGRAM] Iniciando escuta ativa (Polling)...")
             telegram.start_polling(callback=telegram_callback)

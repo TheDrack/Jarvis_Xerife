@@ -12,12 +12,23 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# How long to wait for Render to wake up (seconds)
+_RENDER_WAKE_TIMEOUT = 120
+# Interval between Render availability checks (seconds)
+_RENDER_WAKE_POLL_INTERVAL = 5
+# "Waking up" notification message
+_RENDER_WAKING_MESSAGE = (
+    "⏳ *Acordando o sistema...* O servidor está inicializando, aguarde um momento. "
+    "Sua mensagem será respondida assim que estiver pronto."
+)
+
 
 class TelegramAdapter(NexusComponent):
     """
     JARVIS Telegram Command Center
     Interface bidirecional corrigida para Webhook e Polling.
     Utiliza HttpClient internamente para todas as chamadas à API do Telegram.
+    Inclui lógica de "wake up" do Render quando o servidor está dormindo.
     """
 
     def __init__(self):
@@ -33,6 +44,54 @@ class TelegramAdapter(NexusComponent):
         self._polling: bool = False
         self._polling_thread: Optional[threading.Thread] = None
         self._update_offset: int = 0
+
+        # URL do Render para wake-up (opcional)
+        self._render_url: Optional[str] = os.getenv("RENDER_URL", "").strip() or None
+
+    # ------------------------------------------------------------------
+    # Render wake-up helpers
+    # ------------------------------------------------------------------
+
+    def _is_render_available(self) -> bool:
+        """Verifica se o servidor Render está acessível."""
+        if not self._render_url:
+            return True  # Sem Render configurado, assume disponível
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                f"{self._render_url.rstrip('/')}/health",
+                headers={"User-Agent": "JARVIS-Telegram/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return resp.status < 500
+        except Exception:
+            return False
+
+    def _wake_render(self, chat_id: Any) -> bool:
+        """
+        Acorda o Render enviando um ping e notificando o usuário.
+
+        Returns:
+            True se o Render ficou disponível dentro do timeout, False caso contrário.
+        """
+        if not self._render_url:
+            return True
+
+        logger.info("🌅 [TELEGRAM] Render parece estar dormindo. Iniciando wake-up...")
+        self.send_message(_RENDER_WAKING_MESSAGE, chat_id=chat_id)
+
+        deadline = time.time() + _RENDER_WAKE_TIMEOUT
+        while time.time() < deadline:
+            if self._is_render_available():
+                logger.info("✅ [TELEGRAM] Render acordou com sucesso.")
+                return True
+            logger.debug("⏳ [TELEGRAM] Aguardando Render inicializar...")
+            time.sleep(_RENDER_WAKE_POLL_INTERVAL)
+
+        logger.error("❌ [TELEGRAM] Render não respondeu dentro do timeout.")
+        return False
+
+    # ------------------------------------------------------------------
 
     def set_webhook(self, base_url: str) -> bool:
         """Configura o Webhook no Telegram para o Render."""
@@ -105,7 +164,11 @@ class TelegramAdapter(NexusComponent):
             return []
 
     def handle_update(self, update: Dict[str, Any], callback: Optional[Callable] = None) -> Optional[str]:
-        """Processa uma atualização recebida do Webhook ou Polling."""
+        """
+        Processa uma atualização recebida do Webhook ou Polling.
+        Quando RENDER_URL está configurado e o servidor está dormindo,
+        acorda o Render antes de processar a mensagem.
+        """
         message = update.get("message") or update.get("edited_message")
         if not message:
             return None
@@ -120,6 +183,15 @@ class TelegramAdapter(NexusComponent):
             return None
 
         logger.info(f"📩 [TELEGRAM] Mensagem de {chat_id}: {text}")
+
+        # Acorda o Render se necessário antes de processar
+        if self._render_url and not self._is_render_available():
+            if not self._wake_render(chat_id):
+                self.send_message(
+                    "❌ Não foi possível inicializar o sistema. Tente novamente em instantes.",
+                    chat_id=str(chat_id),
+                )
+                return None
 
         try:
             callback_result = callback(text, str(chat_id))
@@ -169,3 +241,4 @@ class TelegramAdapter(NexusComponent):
         if file_path:
             self.send_document(file_path)
         return context
+

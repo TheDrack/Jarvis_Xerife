@@ -189,7 +189,7 @@ class TestAPIServer(NexusComponent):
         assert data["success"] is True
         assert data["message"] == "Command executed"
         assert data["data"] == {"result": "ok"}
-        service.async_process_command.assert_called_once_with("escreva hello", request_metadata=ANY)
+        service.async_process_command.assert_called_once_with("escreva hello", channel="api", request_metadata=ANY)
 
     def test_execute_command_failure(self, client, auth_token):
         """Test failed command execution"""
