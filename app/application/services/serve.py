@@ -27,21 +27,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def setup_telegram_webhook():
-    """Configura o Webhook se estiver no Render"""
-    render_url = os.getenv("RENDER_EXTERNAL_URL") # Variável automática do Render
+    """
+    Configura o Webhook utilizando a URL externa do Render.
+    Esta função faz a ponte para que o Telegram 'acorde' o Jarvis.
+    """
+    # URL: https://jarvis-api-c47i.onrender.com (Configurada no painel do Render)
+    render_url = os.getenv("RENDER_EXTERNAL_URL") 
+    
     if render_url:
         telegram = nexus.resolve("telegram_adapter")
         if telegram and hasattr(telegram, 'set_webhook'):
+            # O adapter envia o comando /setWebhook para o Telegram
             success = telegram.set_webhook(render_url)
             if success:
                 logger.info(f"✅ Telegram Webhook configurado: {render_url}/v1/telegram/webhook")
             else:
-                logger.error("❌ Falha ao configurar Webhook no Telegram")
+                logger.error("❌ Falha ao configurar Webhook no Telegram. Verifique o Token.")
+    else:
+        logger.warning("⚠️ RENDER_EXTERNAL_URL não definida. O serviço operará sem Webhook passivo.")
 
 def main() -> None:
+    """
+    Main entry point. Inicializa o Nexus, configura o Webhook e sobe o servidor Uvicorn.
+    """
     logger.info("Starting Jarvis Assistant API Server (Headless Mode)")
-    
-    # Resolve serviços via JarvisNexus
+
+    # Resolve serviços vitais via JarvisNexus
     assistant = nexus.resolve("assistant_service")
     if assistant is None:
         logger.error("JarvisNexus could not resolve 'assistant_service' - aborting startup")
@@ -49,17 +60,17 @@ def main() -> None:
 
     extension_manager = nexus.resolve("extension_manager")
 
-    # --- INJEÇÃO DO WEBHOOK ---
-    # Tenta configurar o webhook antes de subir o servidor
+    # --- EXECUÇÃO DO PROTOCOLO DE DESPERTAR ---
     setup_telegram_webhook()
 
-    # Create FastAPI application
+    # Criação do servidor FastAPI (deve conter a rota /v1/telegram/webhook)
     app = create_api_server(assistant, extension_manager)
 
+    # Definição de Host e Porta (Padrão Render: 10000)
     host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
+    port = int(os.getenv("PORT", os.getenv("API_PORT", "10000")))
 
-    logger.info(f"Starting server on {host}:{port}")
+    logger.info(f"🚀 Jarvis online em {host}:{port}")
 
     uvicorn.run(
         app,
