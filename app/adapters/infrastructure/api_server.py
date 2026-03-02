@@ -170,14 +170,11 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
     )
 
     @app.post("/v1/telegram/webhook")
-    async def telegram_webhook(update: dict):
+    async def telegram_webhook(data: dict, background_tasks: BackgroundTasks):
         """Receive Telegram updates and process them via the telegram_adapter."""
         telegram = nexus.resolve("telegram_adapter")
-
-        async def callback(text: str) -> None:
-            await assistant_service.process_command(text)
-
-        asyncio.create_task(asyncio.to_thread(telegram.handle_update, update, callback))
+        assistant = nexus.resolve("assistant_service")
+        background_tasks.add_task(telegram.handle_update, data, assistant.process_command)
         return {"ok": True}
 
     # Mount static files for PWA support (manifest, service worker, icons)
