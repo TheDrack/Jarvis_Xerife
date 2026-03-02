@@ -1,33 +1,61 @@
-from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Intent Processor - Pure business logic for processing intents"""
 
+import logging
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any, Dict
 
 from app.domain.models import Command, CommandType, Intent, Response
+from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import nexus
 
+logger = logging.getLogger(__name__)
 
 class IntentProcessor(NexusComponent):
-    def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
-
     """
     Processes intents and creates commands.
-    Pure Python, no dependencies on hardware or frameworks.
+    Conecta a intenção do usuário à ação final ou resposta da IA.
     """
 
+    def __init__(self):
+        super().__init__()
+        # Resolve o serviço de IA para respostas de conversação
+        self.llm = nexus.resolve("llm_service")
+
+    def execute(self, context: dict) -> Any:
+        """
+        Ponto de entrada chamado pelo AssistantService.
+        Resolve o erro 'Cristalizador' processando o contexto recebido.
+        """
+        intent = context.get("intent")
+        
+        if not intent:
+            return "Erro: Intenção não encontrada no contexto."
+
+        # Se for uma Intent estruturada do domínio
+        if hasattr(intent, 'command_type'):
+            # Se for uma dúvida ou comando desconhecido, usamos o LLM
+            if intent.command_type == CommandType.UNKNOWN:
+                return self._process_with_llm(intent.raw_input)
+            
+            # Se for um comando de ação (Digitar, Abrir URL, etc)
+            return self.create_command(intent, context)
+
+        # Fallback para texto bruto
+        return self._process_with_llm(str(intent))
+
+    def _process_with_llm(self, text: str) -> str:
+        """Gera resposta via Gemini se disponível"""
+        if self.llm:
+            try:
+                return self.llm.generate(text)
+            except Exception as e:
+                logger.error(f"Erro no LLM: {e}")
+                return f"Desculpe, tive um problema técnico: {str(e)}"
+        return f"Recebi sua mensagem: '{text}', mas meu motor de IA não está carregado."
+
     def create_command(self, intent: Intent, context: Optional[dict] = None) -> Command:
-        """
-        Create a Command from an Intent
-
-        Args:
-            intent: The intent to process
-            context: Optional context information
-
-        Returns:
-            Command object ready for execution
-        """
+        """Cria um objeto Command pronto para execução"""
         return Command(
             intent=intent,
             timestamp=datetime.now().isoformat(),
@@ -35,84 +63,27 @@ class IntentProcessor(NexusComponent):
         )
 
     def validate_intent(self, intent: Intent) -> Response:
-        """
-        Validate an intent before processing
-
-        Args:
-            intent: Intent to validate
-
-        Returns:
-            Response indicating validation result
-        """
-        # Check for unknown commands
+        """Valida a intenção antes do processamento"""
         if intent.command_type == CommandType.UNKNOWN:
             return Response(
                 success=False,
-                message=f"Unknown command: {intent.raw_input}",
+                message=f"Comando desconhecido: {intent.raw_input}",
                 error="UNKNOWN_COMMAND",
             )
-
-        # Validate required parameters based on command type
-        validation_result = self._validate_parameters(intent)
-        if not validation_result.success:
-            return validation_result
-
-        return Response(success=True, message="Intent is valid")
+        return self._validate_parameters(intent)
 
     def _validate_parameters(self, intent: Intent) -> Response:
-        """
-        Validate parameters for specific command types
+        """Valida parâmetros obrigatórios para cada tipo de comando"""
+        params = intent.parameters
+        if intent.command_type == CommandType.TYPE_TEXT and not params.get("text"):
+            return Response(success=False, message="Texto é obrigatório", error="MISSING_PARAMETER")
+        
+        if intent.command_type == CommandType.OPEN_URL and not params.get("url"):
+            return Response(success=False, message="URL é obrigatória", error="MISSING_PARAMETER")
 
-        Args:
-            intent: Intent to validate
-
-        Returns:
-            Response indicating validation result
-        """
-        if intent.command_type == CommandType.TYPE_TEXT:
-            if not intent.parameters.get("text"):
-                return Response(
-                    success=False,
-                    message="Text parameter is required for type command",
-                    error="MISSING_PARAMETER",
-                )
-
-        elif intent.command_type == CommandType.PRESS_KEY:
-            if not intent.parameters.get("key"):
-                return Response(
-                    success=False,
-                    message="Key parameter is required for press command",
-                    error="MISSING_PARAMETER",
-                )
-
-        elif intent.command_type == CommandType.OPEN_URL:
-            if not intent.parameters.get("url"):
-                return Response(
-                    success=False,
-                    message="URL parameter is required for open URL command",
-                    error="MISSING_PARAMETER",
-                )
-
-        elif intent.command_type == CommandType.SEARCH_ON_PAGE:
-            if not intent.parameters.get("search_text"):
-                return Response(
-                    success=False,
-                    message="Search text parameter is required",
-                    error="MISSING_PARAMETER",
-                )
-
-        return Response(success=True, message="Parameters are valid")
+        return Response(success=True, message="Parâmetros válidos")
 
     def should_provide_feedback(self, command_type: CommandType) -> bool:
-        """
-        Determine if voice feedback should be provided for a command
-
-        Args:
-            command_type: Type of command
-
-        Returns:
-            True if voice feedback should be provided
-        """
-        # Some commands might not need voice feedback
+        """Define se o comando deve ter resposta por voz/texto"""
         silent_commands = {CommandType.TYPE_TEXT, CommandType.PRESS_KEY}
         return command_type not in silent_commands
