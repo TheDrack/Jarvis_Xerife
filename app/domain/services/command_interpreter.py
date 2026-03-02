@@ -7,7 +7,8 @@ from app.domain.models import CommandType, Intent
 
 class CommandInterpreter(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        text = context.get("text", "") if context else ""
+        return self.interpret(text)
 
     """
     Interprets raw text commands into structured Intents.
