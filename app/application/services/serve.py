@@ -1,17 +1,14 @@
-
 # -*- coding: utf-8 -*-
 """
 Jarvis Voice Assistant - API Server Entry Point
-
-Starts the FastAPI server for headless control interface.
-Service resolution is handled by JarvisNexus (app.core.nexus).
+Modificado para suportar Telegram Webhook (Modo Cloud/Render)
 """
 
 import logging
 import os
 import sys
-
 import uvicorn
+import asyncio
 
 from app.adapters.infrastructure import create_api_server
 from app.core.config import settings
@@ -29,26 +26,22 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+def setup_telegram_webhook():
+    """Configura o Webhook se estiver no Render"""
+    render_url = os.getenv("RENDER_EXTERNAL_URL") # Variável automática do Render
+    if render_url:
+        telegram = nexus.resolve("telegram_adapter")
+        if telegram and hasattr(telegram, 'set_webhook'):
+            success = telegram.set_webhook(render_url)
+            if success:
+                logger.info(f"✅ Telegram Webhook configurado: {render_url}/v1/telegram/webhook")
+            else:
+                logger.error("❌ Falha ao configurar Webhook no Telegram")
 
 def main() -> None:
-    """
-    Main entry point for API server.
-    Resolves services via JarvisNexus and starts the FastAPI server.
-    """
     logger.info("Starting Jarvis Assistant API Server (Headless Mode)")
-    logger.info(f"Wake word: {settings.wake_word}")
-    logger.info(f"Language: {settings.language}")
-
-    # Headless safety: Set environment variables to prevent GUI windows
-    os.environ["DISPLAY"] = os.environ.get("DISPLAY", "")
-    if not os.environ.get("DISPLAY"):
-        logger.info("Running in headless mode (no DISPLAY set)")
-
-    use_llm = os.getenv("USE_LLM", "").lower() in ("true", "1", "yes")
-    if not use_llm and settings.gemini_api_key:
-        logger.info("USE_LLM not set but API key available - LLM will be auto-enabled")
-
-    # Resolve services via JarvisNexus
+    
+    # Resolve serviços via JarvisNexus
     assistant = nexus.resolve("assistant_service")
     if assistant is None:
         logger.error("JarvisNexus could not resolve 'assistant_service' - aborting startup")
@@ -56,36 +49,18 @@ def main() -> None:
 
     extension_manager = nexus.resolve("extension_manager")
 
-    # Check adapter availability (but don't fail - API can still work)
-    try:
-        if hasattr(assistant, "voice") and hasattr(assistant.voice, "is_available") and not assistant.voice.is_available():
-            logger.warning(
-                "Voice recognition not available - API will work but voice features may be limited"
-            )
-    except Exception as e:
-        logger.warning(f"Could not check voice availability: {e}")
-
-    try:
-        if hasattr(assistant, "action") and hasattr(assistant.action, "is_available") and not assistant.action.is_available():
-            logger.warning(
-                "Action automation not available - "
-                "API will work but automation may be limited"
-            )
-    except Exception as e:
-        logger.warning(f"Could not check action availability: {e}")
+    # --- INJEÇÃO DO WEBHOOK ---
+    # Tenta configurar o webhook antes de subir o servidor
+    setup_telegram_webhook()
 
     # Create FastAPI application
     app = create_api_server(assistant, extension_manager)
 
-    # Get server configuration from environment
-    # Render uses PORT, but support API_PORT for backward compatibility
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
 
     logger.info(f"Starting server on {host}:{port}")
-    logger.info(f"API Documentation available at http://localhost:{port}/docs")
 
-    # Start uvicorn server
     uvicorn.run(
         app,
         host=host,
@@ -93,7 +68,6 @@ def main() -> None:
         log_level="info",
         access_log=True,
     )
-
 
 if __name__ == "__main__":
     try:
@@ -104,4 +78,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
-
