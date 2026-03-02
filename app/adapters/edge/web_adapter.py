@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 
 class WebAdapter(WebProvider):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """
     Adapter for web navigation using standard webbrowser module.

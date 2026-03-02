@@ -9,9 +9,6 @@ from pydantic import BaseModel, Field
 
 
 class RequestSource(str, Enum):
-    def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
-
     """Enumeration of request sources"""
     
     GITHUB_ACTIONS = "github_actions"  # Request from GitHub Actions workflow

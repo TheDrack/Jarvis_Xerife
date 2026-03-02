@@ -38,7 +38,8 @@ FAKE_USERS_DB = {
 
 class AuthAdapter(SecurityProvider):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """Authentication adapter implementing JWT and password hashing"""
 

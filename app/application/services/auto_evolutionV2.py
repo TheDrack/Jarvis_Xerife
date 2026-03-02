@@ -2,10 +2,13 @@ from app.core.nexuscomponent import NexusComponent
 import json
 from pathlib import Path
 from typing import List, Dict, Optional
+import logging
+logger = logging.getLogger(__name__)
 
 class AutoEvolutionServiceV2(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """
     Versão Evoluída: Migração de Roadmap Markdown para Inventário de Capacidades JSON.

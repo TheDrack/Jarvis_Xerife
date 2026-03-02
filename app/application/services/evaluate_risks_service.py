@@ -2,10 +2,13 @@ from app.core.nexuscomponent import NexusComponent
 
 import json
 from typing import Dict
+import logging
+logger = logging.getLogger(__name__)
 
 class EvaluateRisksService(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     def __init__(self):
         self.risks = {}
@@ -29,7 +32,8 @@ class EvaluateRisksService(NexusComponent):
     def get_risks(self) -> Dict:
         return self.risks
 
-# Exemplo de uso
-service = EvaluateRisksService()
-result = service.evaluate_risks('critical', 'high')
-print(json.dumps(result, indent=4))
+if __name__ == "__main__":
+    # Exemplo de uso
+    service = EvaluateRisksService()
+    result = service.evaluate_risks('critical', 'high')
+    print(json.dumps(result, indent=4))

@@ -9,9 +9,6 @@ from typing import Any, Dict, Optional
 
 
 class RiskLevel(str, Enum):
-    def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
-
     """Risk levels for technical changes"""
     LOW = "low"
     MEDIUM = "medium"

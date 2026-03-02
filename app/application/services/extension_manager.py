@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 class ExtensionManager(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """
     Service for managing extensions and installing packages on-demand using uv.
