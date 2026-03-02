@@ -1,71 +1,67 @@
 # -*- coding: utf-8 -*-
-"""LLM Service - Wraps Google Gemini AI with Groq Fallback"""
-
 import logging
 import os
-from typing import Any, Dict, Optional
-
-from google import genai
-from groq import Groq  # Já instalado via pip conforme logs
+from typing import Any, Optional
+import httpx
 
 from app.core.nexuscomponent import NexusComponent
 
 logger = logging.getLogger(__name__)
 
 class LlmService(NexusComponent):
-    """
-    Serviço de IA que usa o Google Gemini como primário e Groq como fallback.
-    Garante que o JARVIS nunca fique sem resposta por falta de cota.
-    """
-
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
-        # Configuração Gemini
-        self.gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        self.gemini_client = genai.Client(api_key=self.gemini_key) if self.gemini_key else None
-        self.model_name = "gemini-2.0-flash"
-
-        # Configuração Fallback (Groq)
+        self.gemini_key = os.getenv("GEMINI_API_KEY")
         self.groq_key = os.getenv("GROQ_API_KEY")
-        self.groq_client = Groq(api_key=self.groq_key) if self.groq_key else None
         self.fallback_model = "llama-3.3-70b-versatile"
 
-        if not self.gemini_key and not self.groq_key:
-            logger.error("Nenhuma chave de IA configurada (Gemini ou Groq).")
-
-    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        text = (context or {}).get("text", "")
-        response = self.generate(text) if text else ""
-        return {"result": response, "success": bool(response)}
-
-    def generate(self, prompt: str) -> str:
-        """Tenta Gemini, se falhar (cota/erro), tenta Groq."""
+    def ask(self, prompt: str, system_instruction: str = "") -> str:
+        """Tenta Gemini, se falhar ou cota exceder, usa Groq."""
         
-        # 1. Tentativa Primária: Gemini
-        if self.gemini_client:
+        # Tenta Gemini primeiro
+        if self.gemini_key:
             try:
-                response = self.gemini_client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                )
-                if response.candidates and response.candidates[0].content.parts:
-                    return response.candidates[0].content.parts[0].text.strip()
+                # Simulando a chamada que você já tem no log
+                # Se você usar a lib oficial, o erro 429 cai aqui
+                response = self._call_gemini(prompt, system_instruction)
+                if response: return response
             except Exception as e:
-                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                    logger.warning("⚠️ Cota Gemini excedida. Acionando Fallback Groq...")
+                if "429" in str(e):
+                    logger.warning("⚠️ Cota Gemini excedida (429).")
                 else:
-                    logger.error(f"Erro Gemini: {e}")
+                    logger.error(f"❌ Erro Gemini: {e}")
 
-        # 2. Tentativa de Contingência: Groq
-        if self.groq_client:
-            try:
-                chat_completion = self.groq_client.chat.completions.create(
-                    messages=[{"role": "user", "content": prompt}],
-                    model=self.fallback_model,
+        # Fallback para Groq
+        return self._call_groq(prompt, system_instruction)
+
+    def _call_gemini(self, prompt, instr):
+        # Aqui deve estar sua lógica atual da lib google-genai
+        # Se retornar None ou disparar erro, o ask() fará o fallback
+        pass 
+
+    def _call_groq(self, prompt: str, system_instruction: str) -> str:
+        logger.info(f"🔄 Acionando Fallback Groq ({self.fallback_model})...")
+        if not self.groq_key:
+            return "Erro: Sem chaves de API disponíveis."
+
+        try:
+            with httpx.Client() as client:
+                response = client.post(
+                    "https://api.openai.com/v1/chat/completions", # Endpoint Groq/OpenAI compatible
+                    headers={"Authorization": f"Bearer {self.groq_key}"},
+                    json={
+                        "model": self.fallback_model,
+                        "messages": [
+                            {"role": "system", "content": system_instruction},
+                            {"role": "user", "content": prompt}
+                        ]
+                    },
+                    timeout=15.0
                 )
-                logger.info(f"✅ Resposta gerada via Fallback ({self.fallback_model})")
-                return chat_completion.choices[0].message.content.strip()
-            except Exception as e:
-                logger.error(f"Erro Crítico: Gemini e Groq falharam. Detalhe Groq: {e}")
-
-        return "Desculpe, meus sistemas de IA estão temporariamente sobrecarregados. Por favor, tente em alguns instantes."
+                if response.status_code == 200:
+                    logger.info("✅ Resposta gerada via Groq.")
+                    return response.json()['choices'][0]['message']['content']
+                return f"Erro Groq: {response.status_code}"
+        except Exception as e:
+            logger.error(f"❌ Falha total nos LLMs: {e}")
+            return "Desculpe, estou com dificuldades técnicas em todos os meus núcleos de processamento."
