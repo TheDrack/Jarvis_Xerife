@@ -1687,7 +1687,7 @@
                         const lon = position.coords.longitude.toFixed(4);
                         document.getElementById('locationValue').textContent = `${lat}, ${lon}`;
 
-                        // Update spatial orientation (will only update map if displacement > 50m)
+                        // Update spatial orientation (will only update map if displacement > 100m)
                         updateSpatialOrientation(position.coords.latitude, position.coords.longitude);
                     },
                     (error) => {

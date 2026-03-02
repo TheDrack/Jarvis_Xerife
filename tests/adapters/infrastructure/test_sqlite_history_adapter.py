@@ -378,11 +378,7 @@ class TestSQLiteHistoryAdapter(NexusComponent):
 
 
 
-class TestHiveMindMemory(NexusComponent):
-
-    def execute(self, context: dict):
-        """Execução automática JARVIS."""
-        pass
+class TestHiveMindMemory:
     """Tests for cross-channel hive mind memory (channel field + get_recent_hive_history)."""
 
     @pytest.fixture
