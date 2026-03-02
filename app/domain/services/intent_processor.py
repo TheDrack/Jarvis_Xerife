@@ -2,7 +2,8 @@
 """Intent Processor Dinâmico - Delega execução via Nexus"""
 
 import logging
-from app.core.nexus import nexus
+from typing import Any
+from app.core.nexus import nexus, CloudMock
 from app.core.nexuscomponent import NexusComponent
 from app.domain.models import CommandType
 

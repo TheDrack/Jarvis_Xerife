@@ -16,6 +16,7 @@ class CommandType(Enum):
     OPEN_URL = "open_url"
     SEARCH_ON_PAGE = "search_on_page"
     REPORT_ISSUE = "report_issue"
+    RUN_WORKFLOW = "run_workflow"
     CHAT = "chat"
     UNKNOWN = "unknown"
 
