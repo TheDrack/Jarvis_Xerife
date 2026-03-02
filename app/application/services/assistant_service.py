@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import asyncio
 from typing import Optional, Dict, Any
 from app.core.nexus import nexus
 from app.core.nexuscomponent import NexusComponent
@@ -16,18 +17,20 @@ class AssistantService(NexusComponent):
     def __init__(self):
         super().__init__()
         # REGRA: Se o componente existe, o Nexus resolve. 
-        # Não criamos 'new CommandInterpreter()' aqui.
         self.interpreter = nexus.resolve("command_interpreter")
         self.intent_processor = nexus.resolve("intent_processor")
-        
+
         # Opcional: Resolve adaptadores de saída se necessário
         self.voice = nexus.resolve("voice_adapter")
+        
+        # Correção para o erro de Status da API
+        self.is_running = True
 
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Any:
         """Executa a lógica principal do assistente baseada no contexto."""
         if not context or "command" not in context:
             return {"success": False, "error": "Nenhum comando fornecido."}
-        
+
         return self.process_command(context["command"])
 
     def process_command(self, text: str) -> Dict[str, Any]:
@@ -36,13 +39,13 @@ class AssistantService(NexusComponent):
         """
         try:
             logging.info(f"🎙️ Processando comando: {text}")
-            
+
             # 1. Interpreta o comando usando a instância única
             intent = self.interpreter.execute({"text": text})
-            
+
             # 2. Processa a intenção
             result = self.intent_processor.execute({"intent": intent})
-            
+
             return {
                 "success": True,
                 "intent": intent,
@@ -51,6 +54,13 @@ class AssistantService(NexusComponent):
         except Exception as e:
             logging.error(f"💥 Erro ao processar comando: {e}")
             return {"success": False, "error": str(e)}
+
+    async def async_process_command(self, text: str) -> Dict[str, Any]:
+        """
+        Versão assíncrona para compatibilidade com o API Server.
+        Envelopa o processamento síncrono em uma thread para não bloquear o loop.
+        """
+        return await asyncio.to_thread(self.process_command, text)
 
     def on_event(self, event_type: str, data: Any) -> None:
         """Reage a eventos globais disparados pelo Nexus."""
