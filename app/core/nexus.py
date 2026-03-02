@@ -24,7 +24,7 @@ class CloudMock:
             logging.debug(f"☁️ [NEXUS-MOCK] {self._target_id}.{name} chamado em Cloud.")
             return None
         return method
-    
+
     def __bool__(self):
         return False # Permite verificações 'if not adapter'
 
@@ -35,10 +35,10 @@ class JarvisNexus:
         self._instances: Dict[str, Any] = {}
         self._resolving: set = set() # Proteção contra recursão infinita
         self._lock = threading.Lock()
-        
+
         # Detecta ambiente Cloud
         self.is_cloud = os.getenv("RENDER") == "true" or not sys.stdin.isatty()
-        
+
         # Cache inicial
         self._cache = self._load_remote_memory()
 
@@ -67,7 +67,7 @@ class JarvisNexus:
             if target_id in self._resolving:
                 logger.error(f"🔄 [NEXUS] Loop de dependência detectado para '{target_id}'!")
                 return None
-            
+
             self._resolving.add(target_id)
 
         try:
@@ -88,7 +88,7 @@ class JarvisNexus:
             if instance and singleton:
                 with self._lock:
                     self._instances[target_id] = instance
-            
+
             return instance
 
         finally:
@@ -101,20 +101,20 @@ class JarvisNexus:
         for root, _, files in os.walk(self.base_dir):
             if any(x in root for x in [".git", "__pycache__", "venv", ".venv", "tests"]):
                 continue
-            
+
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 # Converte caminho de diretório para notação de pacote Python
                 if rel_path == ".":
                     return target_id
-                
+
                 package_path = rel_path.replace(os.sep, ".")
                 return f"{package_path}.{target_id}"
         return None
 
     def _instantiate(self, target_id: str, module_path: str) -> Optional[Any]:
         """Cria a instância da classe, tratando desvios de Hardware em Cloud."""
-        
+
         # Protocolo de Simbiose: Bloqueio de hardware local em nuvem
         hardware_keywords = ["keyboard", "audio", "camera", "gpio", "edge_adapter"]
         if self.is_cloud and any(key in target_id or key in module_path for key in hardware_keywords):
@@ -168,7 +168,7 @@ class JarvisNexus:
                 req = urllib.request.Request(url, data=payload, method='PATCH')
                 req.add_header("Authorization", f"token {token}")
                 req.add_header("Content-Type", "application/json")
-                
+
                 with urllib.request.urlopen(req, timeout=10) as response:
                     if response.status == 200:
                         logger.info(f"🧬 [NEXUS] DNA atualizado: '{target_id}'")
