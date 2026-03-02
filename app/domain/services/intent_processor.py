@@ -1,57 +1,36 @@
 # -*- coding: utf-8 -*-
-"""Intent Processor - Pure business logic with safe LLM handling"""
+"""Intent Processor Dinâmico - Delega execução via Nexus"""
 
 import logging
-from datetime import datetime
-from typing import Optional, Any, Dict
-
-from app.domain.models import Command, CommandType, Intent, Response
-from app.core.nexuscomponent import NexusComponent
 from app.core.nexus import nexus
+from app.core.nexuscomponent import NexusComponent
+from app.domain.models import CommandType
 
 logger = logging.getLogger(__name__)
 
 class IntentProcessor(NexusComponent):
-    def __init__(self):
-        super().__init__()
-        # Inicialização tardia para garantir que o Nexus já carregou o serviço
-        self._llm = None
-
-    @property
-    def llm(self):
-        if self._llm is None:
-            self._llm = nexus.resolve("llm_service")
-        return self._llm
-
     def execute(self, context: dict) -> Any:
         intent = context.get("intent")
-        if not intent:
-            return "Erro: Intenção não identificada."
+        if not intent: return "Erro: Intenção nula."
 
-        # Se for um objeto Intent (do parser)
-        if hasattr(intent, 'command_type'):
-            if intent.command_type == CommandType.UNKNOWN:
-                return self._process_with_llm(intent.raw_input)
-            return self.create_command(intent, context)
+        # Pega o tipo do comando (ex: SYNC_TO_DRIVE)
+        cmd_type = intent.command_type if hasattr(intent, 'command_type') else CommandType.UNKNOWN
+        
+        # Converte o enum SYNC_TO_DRIVE para o ID do componente no Nexus: "sync_to_drive"
+        target_id = cmd_type.name.lower() if hasattr(cmd_type, 'name') else str(cmd_type).lower()
 
-        # Se for apenas texto (fallback direto)
-        return self._process_with_llm(str(intent))
+        # TENTA RESOLUÇÃO DINÂMICA VIA NEXUS
+        # O Nexus vai varrer o projeto procurando por sync_to_drive.py
+        executor = nexus.resolve(target_id)
+
+        if executor and not isinstance(executor, CloudMock):
+            logger.info(f"⚡ Executando componente dinâmico: {target_id}")
+            result = executor.execute(intent.parameters)
+            return result.get("message") if isinstance(result, dict) else result
+
+        # Fallback para LLM se o executor não for encontrado ou for Mock em Cloud
+        return self._process_with_llm(intent.raw_input if hasattr(intent, 'raw_input') else str(intent))
 
     def _process_with_llm(self, text: str) -> str:
-        """Gera resposta via LLM Service (com suporte a fallback interno)"""
-        service = self.llm
-        if service:
-            try:
-                return service.generate(text)
-            except Exception as e:
-                logger.error(f"Falha fatal no processamento LLM: {e}")
-                return "Estou com dificuldades técnicas para processar isso agora."
-        
-        return f"Recebi: '{text}', mas meu módulo de inteligência não foi carregado."
-
-    def create_command(self, intent: Intent, context: Optional[dict] = None) -> Command:
-        return Command(
-            intent=intent,
-            timestamp=datetime.now().isoformat(),
-            context=context or {},
-        )
+        llm = nexus.resolve("llm_service")
+        return llm.generate(text) if llm else "IA indisponível."
