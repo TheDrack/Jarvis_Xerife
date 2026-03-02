@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """FastAPI Server for Headless Control Interface"""
 
+import asyncio
 import logging
 from datetime import datetime
 import platform
 from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -50,6 +51,7 @@ from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdap
 from app.application.services import AssistantService, ExtensionManager
 from app.application.services.device_service import DeviceService
 from app.core.config import settings
+from app.core.nexus import nexus
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +168,17 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         docs_url=None,  # Disable default docs
         redoc_url=None,  # Disable redoc
     )
+
+    @app.post("/v1/telegram/webhook")
+    async def telegram_webhook(update: dict):
+        """Receive Telegram updates and process them via the telegram_adapter."""
+        telegram = nexus.resolve("telegram_adapter")
+
+        async def callback(text: str) -> None:
+            await assistant_service.process_command(text)
+
+        asyncio.create_task(asyncio.to_thread(telegram.handle_update, update, callback))
+        return {"ok": True}
 
     # Mount static files for PWA support (manifest, service worker, icons)
     static_path = Path(__file__).parent.parent.parent.parent / "static"
