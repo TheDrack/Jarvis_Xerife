@@ -24,6 +24,16 @@ class CommandInterpreter(NexusComponent):
         """
         self.wake_word = wake_word
         self._command_patterns = {
+            # GitHub workflow / flow commands (longer patterns first for precedence)
+            "rodar workflow": CommandType.RUN_WORKFLOW,
+            "executar workflow": CommandType.RUN_WORKFLOW,
+            "acionar workflow": CommandType.RUN_WORKFLOW,
+            "rodar fluxo": CommandType.RUN_WORKFLOW,
+            "executar fluxo": CommandType.RUN_WORKFLOW,
+            "acionar fluxo": CommandType.RUN_WORKFLOW,
+            "workflow": CommandType.RUN_WORKFLOW,
+            "fluxo": CommandType.RUN_WORKFLOW,
+            # Standard commands
             "escreva": CommandType.TYPE_TEXT,
             "digite": CommandType.TYPE_TEXT,
             "aperte": CommandType.PRESS_KEY,
@@ -133,6 +143,9 @@ class CommandInterpreter(NexusComponent):
         elif command_type == CommandType.REPORT_ISSUE:
             # Extract context from the command
             return {"issue_description": param, "context": full_command}
+
+        elif command_type == CommandType.RUN_WORKFLOW:
+            return {"workflow_name": param, "event_type": "jarvis_order"}
 
         return {"param": param}
 
