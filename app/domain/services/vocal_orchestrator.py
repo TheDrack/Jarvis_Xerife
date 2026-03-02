@@ -1,7 +1,10 @@
 from app.core.nexuscomponent import NexusComponent
+import logging
+logger = logging.getLogger(__name__)
 class VocalOrchestrator(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """O Loop de Orquestração que conecta o Áudio ao Core do JARVIS."""
     def __init__(self, adapter, capability):

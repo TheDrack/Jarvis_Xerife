@@ -32,7 +32,8 @@ logger = logging.getLogger(__name__)
 
 class CapabilityManager(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """
     Manages JARVIS self-awareness capabilities and evolution logic.

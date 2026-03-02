@@ -8,9 +8,6 @@ from typing import Any, Optional
 
 
 class CommandType(Enum):
-    def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
-
     """Types of commands the assistant can handle"""
 
     TYPE_TEXT = "type_text"

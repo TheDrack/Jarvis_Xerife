@@ -1,10 +1,12 @@
 from app.core.nexuscomponent import NexusComponent
 from app.domain.models.device import Device
 import logging
+logger = logging.getLogger(__name__)
 
 class SoldierShield(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """Responsável pela defesa e integridade dos soldados recrutados."""
     

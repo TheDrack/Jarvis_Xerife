@@ -1,4 +1,6 @@
 from app.core.nexuscomponent import NexusComponent
+import logging
+logger = logging.getLogger(__name__)
 # -*- coding: utf-8 -*-
 """Jarvis Voice Engine - Main voice recognition and synthesis engine"""
 
@@ -22,7 +24,8 @@ from app.core.config import settings
 
 class JarvisEngine(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """Main voice recognition and synthesis engine for Jarvis Assistant"""
 

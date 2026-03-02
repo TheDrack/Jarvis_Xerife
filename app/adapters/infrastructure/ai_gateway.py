@@ -73,9 +73,6 @@ def count_tokens(text: str) -> int:
 
 
 class LLMProvider(str, Enum):
-    def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
-
     """Available LLM providers"""
     GROQ = "groq"
     GEMINI = "gemini"

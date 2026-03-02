@@ -2,10 +2,13 @@ from app.core.nexuscomponent import NexusComponent
 
 import networkx as nx
 from typing import Dict, List
+import logging
+logger = logging.getLogger(__name__)
 
 class CapabilityImpactAnalyzer(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     def __init__(self, capabilities: Dict[str, List[str]]):
         self.capabilities = capabilities

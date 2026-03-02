@@ -1,4 +1,6 @@
 from app.core.nexuscomponent import NexusComponent
+import logging
+logger = logging.getLogger(__name__)
 # -*- coding: utf-8 -*-
 """Evolution Reward Model for Reinforcement Learning Module"""
 
@@ -11,7 +13,8 @@ from sqlalchemy import JSON
 
 class EvolutionReward(NexusComponent, SQLModel, table=True):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """
     SQLModel table for storing JARVIS evolution rewards.

@@ -4,10 +4,13 @@ import os
 import json
 import requests
 import re
+import logging
+logger = logging.getLogger(__name__)
 
 class MetabolismCore(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     def __init__(self):
         self.url = "https://api.groq.com/openai/v1/chat/completions"

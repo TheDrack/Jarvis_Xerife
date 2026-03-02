@@ -33,7 +33,8 @@ CLIPBOARD_TIMEOUT = 180  # Maximum time to wait for clipboard (3 minutes)
 # ANSI color codes for terminal UI
 class Colors(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'

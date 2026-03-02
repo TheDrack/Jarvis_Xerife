@@ -3934,7 +3934,8 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
 class ApiServer:
     """Nexus component wrapper for backward compatibility."""
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     def __init__(self, *args, **kwargs):
         pass

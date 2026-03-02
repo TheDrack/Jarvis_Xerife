@@ -2,10 +2,13 @@ from app.core.nexuscomponent import NexusComponent
 import scapy.all as scapy
 from app.domain.models.device import Device
 from app.application.services.location_service import LocationService
+import logging
+logger = logging.getLogger(__name__)
 
 class ActiveRecruiterAdapter(NexusComponent):
     def execute(self, context: dict):
-        raise NotImplementedError("Implementação automática via Cristalizador")
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     """O braço ofensivo do JARVIS para expansão de rede."""
     
