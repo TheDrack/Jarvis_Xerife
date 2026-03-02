@@ -9,11 +9,18 @@ services:
     region: oregon
     plan: free
     buildCommand: |
+      # Instalação do GitHub CLI (gh) para o github_worker
+      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+      chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+      apt update && apt install gh -y
+      
+      # Instalação de dependências Python
       pip install uv
       uv pip install --system -r requirements/prod-cloud.txt
       uv pip install google-generativeai groq tiktoken
     
-    # Alterado para garantir que o script de serviço use as configs de nuvem
+    # Comando de início
     startCommand: python serve.py
 
     branch: main
@@ -24,10 +31,14 @@ services:
       - key: RENDER
         value: true
       - key: TELEGRAM_TOKEN
-        sync: false # Defina o valor no Dashboard do Render
+        sync: false 
       - key: TELEGRAM_CHAT_ID
-        sync: false # Defina o valor no Dashboard do Render
-      
+        sync: false 
+
+      # --- CONFIGURAÇÕES DO GITHUB (CORREÇÃO DO ERRO) ---
+      - key: GITHUB_PAT
+        sync: false # Gere um Personal Access Token no GitHub e insira no Dashboard
+
       # --- CONFIGURAÇÕES DE AMBIENTE ---
       - key: PORT
         value: 10000
