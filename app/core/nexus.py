@@ -18,11 +18,11 @@ class JarvisNexus:
         self.gist_id = "23d15b3f9d010179ace501a79c78608f"
         self._instances: Dict[str, Any] = {}
         self._lock = threading.Lock()
-        
+
         # Garante que a raiz do projeto esteja sempre no topo do path
         if self.base_dir not in sys.path:
             sys.path.insert(0, self.base_dir)
-            
+
         self._cache = self._load_remote_memory()
 
     def _load_remote_memory(self) -> dict:
@@ -44,7 +44,7 @@ class JarvisNexus:
                 return self._instances[target_id]
 
         instance = None
-        
+
         # 1. TENTATIVA VIA HINT PATH (Alta Prioridade)
         if hint_path:
             clean_hint = hint_path.replace("/", ".").replace("\\", ".").strip(".")
@@ -69,7 +69,7 @@ class JarvisNexus:
         if instance and singleton:
             with self._lock:
                 self._instances[target_id] = instance
-        
+
         return instance
 
     def _perform_omniscient_discovery(self, target_id: str) -> Optional[str]:
@@ -78,7 +78,7 @@ class JarvisNexus:
         for root, dirs, files in os.walk(self.base_dir):
             # Ignora pastas irrelevantes para performance
             dirs[:] = [d for d in dirs if d not in {'.git', '__pycache__', 'venv', '.venv', 'dist', 'build'}]
-            
+
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 if rel_path == ".":
@@ -94,15 +94,15 @@ class JarvisNexus:
                 module = importlib.reload(sys.modules[module_path])
             else:
                 module = importlib.import_module(module_path)
-            
+
             # Estratégia de busca de classe:
             # 1. PascalCase (drive_uploader -> DriveUploader)
             # 2. Nome idêntico ao arquivo
             # 3. Primeira classe que encontrar no módulo
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
-            
+
             clazz = getattr(module, class_name, None) or getattr(module, target_id, None)
-            
+
             if not clazz:
                 # Fallback: Varre o módulo por qualquer classe definida lá
                 import inspect
@@ -122,7 +122,7 @@ class JarvisNexus:
         self._cache[target_id] = module_path
         token = os.getenv("GIST_PAT")
         if not token: return
-        
+
         def _async_update():
             try:
                 url = f"https://api.github.com/gists/{self.gist_id}"
@@ -134,7 +134,7 @@ class JarvisNexus:
                 req.add_header("Content-Type", "application/json")
                 urllib.request.urlopen(req, timeout=10)
             except: pass
-            
+
         threading.Thread(target=_async_update, daemon=True).start()
 
 nexus = JarvisNexus()
