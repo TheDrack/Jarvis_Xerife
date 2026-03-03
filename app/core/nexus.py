@@ -89,7 +89,16 @@ class JarvisNexus:
         )
 
     def _resolve_with_timeout(self, target_id: str, hint_path: Optional[str] = None) -> Any:
-        """Try to instantiate the component, enforcing a wall-clock timeout."""
+        """
+        Try to instantiate the component, enforcing a wall-clock timeout.
+
+        Note: The worker thread is marked as a *daemon* thread so it does not
+        prevent process exit.  If it times out, it may continue running in the
+        background and eventually complete its work — this is intentional:
+        the thread cannot be forcibly cancelled in CPython.  Any side effects
+        it produces (e.g. populating ``_instances``) are benign because the
+        successfully resolved instance is cached on first use.
+        """
         import threading
 
         result: Dict[str, Any] = {"instance": None}

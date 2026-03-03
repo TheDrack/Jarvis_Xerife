@@ -116,7 +116,7 @@ class MetabolismStateMachine:
     ENVIRONMENT_ERRORS = [
         'PermissionError',
         'PermissionDenied',
-        r'FileNotFoundError(?!.*module)',  # external file, not Python module
+        r'FileNotFoundError:.*No such file or directory',  # external file (path in message)
         'IsADirectoryError',
         'NotADirectoryError',
         'OSError: \\[Errno',
