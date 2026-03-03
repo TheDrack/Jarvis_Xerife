@@ -1,11 +1,13 @@
 {
-  "components": {
-    "cognitive_router": "app.domain.gears.cognitive_router.CognitiveRouter",
-    "llm_engine": "app.domain.gears.llm_engine.LLMEngine",
-    "system_executor": "app.adapters.infrastructure.system_executor.SystemExecutor",
-    "orchestrator": "app.application.services.orchestrator_service.JARVISOrchestrator",
-    "context_memory": "app.domain.capabilities.context_memory.ContextMemory",
-    "interface_bridge": "app.application.services.interface_bridge.InterfaceBridge",
-    "audit_logger": "app.adapters.infrastructure.audit_logger.AuditLogger"
-  }
+    "cognitive_router": "app.domain.gears.cognitive_router",
+    "llm_engine": "app.domain.gears.llm_engine",
+    "system_executor": "app.adapters.infrastructure.system_executor",
+    "orchestrator": "app.application.services.orchestrator_service",
+    "context_memory": "app.domain.capabilities.context_memory",
+    "interface_bridge": "app.application.services.interface_bridge",
+    "audit_logger": "app.adapters.infrastructure.audit_logger",
+    "consolidator": "app.adapters.infrastructure.consolidator",
+    "telegram_adapter": "app.adapters.infrastructure.telegram_adapter",
+    "gist_uploader": "app.adapters.infrastructure.gist_uploader",
+    "drive_uploader": "app.adapters.infrastructure.drive_uploader"
 }
