@@ -10,6 +10,12 @@ from typing import Any, Optional, Dict
 
 logger = logging.getLogger(__name__)
 
+
+class CloudMock:
+    """Sentinel class to identify placeholder/stub executors vs real implementations."""
+    pass
+
+
 class JarvisNexus:
     def __init__(self):
         # 1. Configuração de Caminhos Absolutos
@@ -20,13 +26,13 @@ class JarvisNexus:
         # 2. Configurações de Memória (Nuvem e Local)
         self.gist_id = "23d15b3f9d010179ace501a79c78608f"
         self.local_registry_path = os.path.join(self.base_dir, "data", "nexus_registry.json")
-        
+
         # Garante que a pasta 'data' existe para o registro local
         os.makedirs(os.path.dirname(self.local_registry_path), exist_ok=True)
 
         self._instances: Dict[str, Any] = {}
         self._lock = threading.Lock()
-        
+
         # Carrega a memória inicial (Gist > Local)
         self.discovery_cache = self._initialize_memory()
 
@@ -37,12 +43,12 @@ class JarvisNexus:
             logger.info("🌐 [NEXUS] Memória sincronizada via Gist.")
             self._sync_to_local(gist_data)
             return gist_data
-        
+
         local_data = self._load_local_registry()
         if local_data:
             logger.info("📂 [NEXUS] Usando registro local (Emergência/Dev).")
             return local_data
-            
+
         return {}
 
     def _load_remote_gist(self) -> Optional[dict]:
@@ -78,12 +84,12 @@ class JarvisNexus:
                 return self._instances[target_id]
 
         instance = None
-        
+
         # 1. TENTA VIA MEMÓRIA (Gist/Local)
         if target_id in self.discovery_cache:
             path = self.discovery_cache[target_id]
             instance = self._instantiate(target_id, path)
-            
+
             # Se o código mudou de lugar (path antigo falhou), limpa a memória
             if not instance:
                 logger.warning(f"⚠️ [NEXUS] '{target_id}' não encontrado em {path}. Invalidando memória...")
@@ -93,7 +99,7 @@ class JarvisNexus:
         if not instance:
             logger.info(f"🔍 [NEXUS] Executando Busca Geral para: '{target_id}'")
             module_path = self._perform_omniscient_discovery(target_id)
-            
+
             if module_path:
                 instance = self._instantiate(target_id, module_path)
                 if instance:
@@ -115,7 +121,7 @@ class JarvisNexus:
             # Ignora pastas de sistema e dados para performance
             if any(x in root for x in [".git", "__pycache__", "venv", ".venv", "data"]):
                 continue
-            
+
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
                 import_path = rel_path.replace(os.sep, ".")
@@ -128,13 +134,13 @@ class JarvisNexus:
             # Força recarregamento se necessário
             if module_path in sys.modules:
                 importlib.reload(sys.modules[module_path])
-            
+
             module = importlib.import_module(module_path)
-            
+
             # Tenta classe em PascalCase (ex: IntentProcessor) ou idêntica (intent_processor)
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
             clazz = getattr(module, class_name, None) or getattr(module, target_id, None)
-            
+
             if not clazz:
                 # Fallback: primeira classe definida no arquivo
                 import inspect
@@ -142,7 +148,7 @@ class JarvisNexus:
                     if obj.__module__ == module_path:
                         clazz = obj
                         break
-            
+
             if clazz:
                 logger.info(f"⚡ [NEXUS] '{target_id}' instanciado via '{module_path}'")
                 return clazz()
