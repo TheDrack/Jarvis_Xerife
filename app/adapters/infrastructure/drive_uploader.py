@@ -1,70 +1,106 @@
+# -*- coding: utf-8 -*-
 import os
-import json
-from google.oauth2 import service_account
+import logging
+from typing import Any, Optional
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from google.oauth2 import service_account
 from app.core.nexuscomponent import NexusComponent
 
+logger = logging.getLogger(__name__)
+
 class DriveUploader(NexusComponent):
+    """
+    Adapter de Infraestrutura para Google Drive.
+    Suporta Service Accounts e Shared Drives para backup de DNA.
+    """
     def __init__(self):
         super().__init__()
         self.scopes = ['https://www.googleapis.com/auth/drive']
-        self.service_account_info = None
-        self.folder_id = None
+        self.folder_id = os.getenv("DRIVE_FOLDER_ID")
+        self.service_account_info = os.getenv("G_JSON") # JSON da Service Account
+        self.service = None
+        self.config_data = {}
 
-    def configure(self, config: dict = None):
-        raw_json = os.environ.get('G_JSON') or os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
-        if not raw_json:
-            raise ValueError("❌ [NEXUS] G_JSON ausente.")
-        try:
-            self.service_account_info = json.loads(raw_json)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"❌ [NEXUS] G_JSON inválido: {e}")
+    def configure(self, config: dict):
+        self.config_data = config
+
+    def _get_service(self):
+        if self.service:
+            return self.service
         
-        self.folder_id = os.environ.get('DRIVE_FOLDER_ID', '').strip().replace('"', '').replace("'", "")
-
-    def execute(self, context):
         if not self.service_account_info:
-            self.configure()
-
-        file_path = self._resolve_path(context)
-        creds = service_account.Credentials.from_service_account_info(
-            self.service_account_info, scopes=self.scopes
-        )
-        service = build('drive', 'v3', credentials=creds, static_discovery=False)
-
-        file_metadata = {
-            'name': os.path.basename(file_path),
-            'parents': [self.folder_id]
-        }
-
-        # MediaFileUpload simples (não-resumable) para forçar bypass de buffer de quota
-        media = MediaFileUpload(file_path, resumable=False)
+            logger.error("❌ [DRIVE] G_JSON (Service Account) não configurado.")
+            return None
 
         try:
-            print(f"[INFO] 📡 [NEXUS] Tentando upload para pasta com link aberto...")
-            
-            # Adicionando 'keepRevisionForever' e 'supportsAllDrives'
-            file = service.files().create(
+            import json
+            info = json.loads(self.service_account_info)
+            creds = service_account.Credentials.from_service_account_info(info, scopes=self.scopes)
+            self.service = build('drive', 'v3', credentials=creds, cache_discovery=False)
+            return self.service
+        except Exception as e:
+            logger.error(f"💥 [DRIVE] Falha na autenticação: {e}")
+            return None
+
+    def execute(self, context: dict) -> dict:
+        """
+        Executa o upload para o Google Drive.
+        Lida com o dicionário de contexto do Nexus de forma resiliente.
+        """
+        # 1. Extração segura do caminho do arquivo
+        res_data = context.get("result", {})
+        file_path = None
+        
+        if isinstance(res_data, dict):
+            file_path = res_data.get("file_path")
+        
+        if not file_path:
+            cons_art = context.get("artifacts", {}).get("consolidator", {})
+            if isinstance(cons_art, dict):
+                file_path = cons_art.get("file_path")
+
+        # 2. Validações Iniciais
+        if not file_path or not os.path.exists(file_path):
+            logger.error(f"❌ [DRIVE] Arquivo não encontrado no contexto: {file_path}")
+            return context
+
+        service = self._get_service()
+        if not service:
+            return context
+
+        try:
+            file_name = os.path.basename(file_path)
+            logger.info(f"📡 [DRIVE] Tentando upload de: {file_name}")
+
+            file_metadata = {
+                'name': file_name,
+                'parents': [self.folder_id] if self.folder_id else []
+            }
+
+            media = MediaFileUpload(file_path, mimetype='text/plain', resumable=True)
+
+            # 3. Execução do Upload (Suporta Shared Drives via supportsAllDrives)
+            request = service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields='id',
                 supportsAllDrives=True
-            ).execute()
-
-            print(f"✅ [NEXUS] Upload realizado com sucesso! ID: {file.get('id')}")
-            return file.get('id')
-
+            )
+            
+            response = request.execute()
+            file_id = response.get('id')
+            
+            if file_id:
+                logger.info(f"✅ [DRIVE] Upload concluído! ID: {file_id}")
+                context["artifacts"]["drive_uploader"] = {"status": "success", "id": file_id}
+                # Atualiza o result para o próximo componente saber que o Drive funcionou
+                context["result"] = {"status": "success", "file_path": file_path, "drive_id": file_id}
+            
         except Exception as e:
-            if "storageQuotaExceeded" in str(e):
-                print("💥 [NEXUS] Google ainda recusa a cota da Service Account.")
-                print("💡 A única forma sem Shared Drive é usar OAuth2 de usuário (Refresh Token) em vez de Service Account.")
-            raise e
+            logger.error(f"💥 [DRIVE] Erro durante o upload: {e}")
+            # Se falhar, não raise se strict_mode for False (tratado pelo runner)
+            if self.config_data.get("strict_mode") is True:
+                raise e
 
-    def _resolve_path(self, context):
-        path = context if isinstance(context, str) else None
-        if isinstance(context, dict): path = context.get('result')
-        fallback = "CORE_LOGIC_CONSOLIDATED.txt"
-        final = path or fallback
-        if not os.path.exists(str(final)): raise FileNotFoundError(f"Arquivo {final} não existe.")
-        return final
+        return context
