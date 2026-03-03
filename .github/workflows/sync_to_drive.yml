@@ -2,6 +2,9 @@ name: "☁️ Sync JARVIS to Google Drive"
 
 on:
   workflow_dispatch:
+  # ADICIONADO: O receptor para o comando do Jarvis
+  repository_dispatch:
+    types: [jarvis_order]
 
 jobs:
   sync:
@@ -22,9 +25,7 @@ jobs:
             google-api-python-client \
             google-auth-httplib2 \
             google-auth-oauthlib \
-            pyyaml \
-
-    
+            pyyaml
 
       - name: ☁️ Run JARVIS Pipeline (Sync Drive & Backups)
         env:
@@ -32,9 +33,9 @@ jobs:
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          GIST_PAT: ${{ secrets.GIST_PAT }} # <--- ADICIONADO AQUI
+          GIST_PAT: ${{ secrets.GIST_PAT }}
           PIPELINE: sync_drive
-          PIPELINE_STRICT: "false" # <--- Importante para não travar no erro do Drive
+          PIPELINE_STRICT: "false"
         run: |
           export PYTHONPATH="$(pwd)"
           python app/runtime/pipeline_runner.py
