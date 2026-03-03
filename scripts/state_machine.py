@@ -62,9 +62,18 @@ class State(Enum):
     FAILED_LIMIT = "FAILED_LIMIT"
 
 
+class ErrorCategory(Enum):
+    """Category of the detected error for differentiated handling"""
+    CODE_ERROR = "Erro de Código"
+    ENVIRONMENT_ERROR = "Erro de Ambiente"
+    INFRASTRUCTURE_ERROR = "Erro de Infra"
+    UNKNOWN_ERROR = "Erro Desconhecido"
+
+
 class FailureReason(Enum):
     """Reasons for COMMANDER_NEEDED / NEEDS_HUMAN state"""
     INFRASTRUCTURE_FAILURE = "Falha de Infra"
+    ENVIRONMENT_FAILURE = "Falha de Ambiente"
     UNIDENTIFIED_ERROR = "Erro não identificado"
     BUSINESS_DECISION = "Decisão de negócio necessária"
     ARCHITECTURAL_JUDGMENT = "Julgamento arquitetural necessário"
@@ -94,13 +103,25 @@ class MetabolismStateMachine:
         mutation_type: Type of DNA mutation being attempted
     """
 
-    # Error patterns that can be auto-fixed
+    # Error patterns that can be auto-fixed (Code Errors)
     AUTO_FIXABLE_ERRORS = [
         'AssertionError',
         'ImportError',
         'NameError',
         'SyntaxError',
         'LogicError',
+    ]
+
+    # Environment error patterns: log and pause instead of mutating code
+    ENVIRONMENT_ERRORS = [
+        'PermissionError',
+        'PermissionDenied',
+        r'FileNotFoundError:.*No such file or directory',  # external file (path in message)
+        'IsADirectoryError',
+        'NotADirectoryError',
+        'OSError: \\[Errno',
+        'No such file or directory',
+        'Access is denied',
     ]
 
     # Infrastructure error patterns that need human intervention
@@ -131,12 +152,18 @@ class MetabolismStateMachine:
         self.escalation_reason: Optional[FailureReason] = None
         self.mutation_type: Optional[MutationType] = None
         self.error_type: Optional[str] = None
+        self.error_category: Optional[ErrorCategory] = None
 
         logger.info(f"🧬 Metabolism State Machine initialized - Max cycles: {limit}")
 
     def identify_error(self, error_message: str, traceback: Optional[str] = None) -> State:
         """
         Identify error type and set the appropriate metabolic state.
+
+        Differentiates between:
+        - Code Errors (auto-fixable): AssertionError, ImportError, etc.
+        - Environment Errors (log and pause): PermissionError, FileNotFoundError from external paths.
+        - Infrastructure Errors (human needed): Timeout, ConnectionError, HTTP errors.
 
         Args:
             error_message: The error message
@@ -151,31 +178,46 @@ class MetabolismStateMachine:
         # Reset state-specific fields before classification
         self.escalation_reason = None
         self.error_type = None
+        self.error_category = None
         self.mutation_type = MutationType.CORRECTION
 
-        # Check for auto-fixable errors (DNA mutations we can handle)
+        # Check for auto-fixable Code Errors (DNA mutations we can handle)
         for error_type in self.AUTO_FIXABLE_ERRORS:
             if re.search(error_type, full_error, re.IGNORECASE):
-                # Use legacy state for backward compatibility
                 self.state = State.CHANGE_REQUESTED
                 self.error_type = error_type
+                self.error_category = ErrorCategory.CODE_ERROR
                 logger.info(f"✓ DNA mutation identified: {error_type} -> State: CHANGE_REQUESTED")
+                return self.state
+
+        # Check for Environment Errors (log and pause — do NOT mutate code)
+        for env_pattern in self.ENVIRONMENT_ERRORS:
+            if re.search(env_pattern, full_error, re.IGNORECASE):
+                self.state = State.NEEDS_HUMAN
+                self.escalation_reason = FailureReason.ENVIRONMENT_FAILURE
+                self.error_type = env_pattern
+                self.error_category = ErrorCategory.ENVIRONMENT_ERROR
+                logger.warning(
+                    f"🌍 Environment error detected: {env_pattern} -> "
+                    f"State: NEEDS_HUMAN (Erro de Ambiente). "
+                    f"System will log and pause instead of mutating code."
+                )
                 return self.state
 
         # Check for infrastructure errors (requires COMMANDER)
         for error_pattern in self.INFRASTRUCTURE_ERRORS:
             if re.search(error_pattern, full_error, re.IGNORECASE):
-                # Use legacy state for backward compatibility
                 self.state = State.NEEDS_HUMAN
                 self.escalation_reason = FailureReason.INFRASTRUCTURE_FAILURE
                 self.error_type = error_pattern
+                self.error_category = ErrorCategory.INFRASTRUCTURE_ERROR
                 logger.warning(f"⚠ Infrastructure error detected: {error_pattern} -> State: NEEDS_HUMAN (Falha de Infra)")
                 return self.state
 
         # Unknown error type (requires COMMANDER review)
-        # Use legacy state for backward compatibility
         self.state = State.NEEDS_HUMAN
         self.escalation_reason = FailureReason.UNIDENTIFIED_ERROR
+        self.error_category = ErrorCategory.UNKNOWN_ERROR
         logger.warning(f"⚠ Unidentified error -> State: NEEDS_HUMAN (Erro não identificado)")
         return self.state
 

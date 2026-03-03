@@ -19,6 +19,13 @@ from app.bootstrap_edge import main as edge_main
 from app.core.config import settings
 from app.core.nexus import nexus
 
+# Proactive core (Overwatch Daemon)
+try:
+    from scripts.overwatch_daemon import OverwatchDaemon
+    _OVERWATCH_AVAILABLE = True
+except ImportError:
+    _OVERWATCH_AVAILABLE = False
+
 # Configuração de Log otimizada
 logging.basicConfig(
     level=logging.INFO,
@@ -84,6 +91,14 @@ def bootstrap_background_services():
 
             # 3. Início do Loop de Interface
             def telegram_callback(text, chat_id):
+                if _OVERWATCH_AVAILABLE:
+                    # Notify Overwatch that the user is active
+                    try:
+                        overwatch = nexus.resolve("overwatch_daemon")
+                        if overwatch is not None:
+                            overwatch.notify_activity()
+                    except Exception:
+                        pass
                 return assistant.process_command(text, channel="telegram")
 
             telegram.start_polling(callback=telegram_callback)
@@ -92,6 +107,15 @@ def bootstrap_background_services():
 
     except Exception as e:
         logger.error(f"❌ [BOOTSTRAP] Erro fatal na thread de serviços: {e}")
+
+    # 4. Inicia o Núcleo Proativo (Overwatch Daemon) — independente do Telegram
+    if _OVERWATCH_AVAILABLE:
+        try:
+            daemon = OverwatchDaemon()
+            daemon.start()
+            logger.info("[PROACTIVE_CORE] OverwatchDaemon ativo em background.")
+        except Exception as e:
+            logger.warning(f"[PROACTIVE_CORE] Falha ao iniciar OverwatchDaemon: {e}")
 
 def start_cloud_service():
     print("=" * 60)

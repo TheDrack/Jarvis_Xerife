@@ -61,6 +61,8 @@ comp.execute(context)
 | `context_memory` | `ContextMemory` | `app/domain/capabilities/context_memory.py` |
 | `interface_bridge` | `InterfaceBridge` | `app/application/services/interface_bridge.py` |
 | `audit_logger` | `AuditLogger` | `app/adapters/infrastructure/audit_logger.py` |
+| `vector_memory_adapter` | `VectorMemoryAdapter` | `app/adapters/infrastructure/vector_memory_adapter.py` |
+| `vision_adapter` | `VisionAdapter` | `app/adapters/infrastructure/vision_adapter.py` |
 
 > **Nota:** `context_memory` ainda está em `app/domain/capabilities/` – pendente de revisão.
 
@@ -75,6 +77,28 @@ nexus.resolve("meu_componente", hint_path="adapters/infrastructure")
 ```
 
 O parâmetro `hint_path` acelera a busca limitando o diretório.
+
+---
+
+## Circuit Breaker
+
+O Nexus possui um mecanismo de Circuit Breaker embutido para proteger o sistema de travamentos causados por componentes lentos ou indisponíveis.
+
+**Comportamento:**
+- Se a instanciação de um componente demorar mais de **2 segundos**, o circuito é aberto.
+- Enquanto o circuito estiver aberto (**60 segundos**), `nexus.resolve()` retorna imediatamente um `CloudMock`.
+- Após 60 segundos, o circuito fecha e a próxima chamada tenta instanciar novamente.
+
+**`CloudMock`** é um absorvedor transparente: aceita qualquer chamada de método sem erro, permitindo que o sistema continue operando em modo degradado.
+
+```python
+from app.core.nexus import nexus, CloudMock
+
+component = nexus.resolve("algum_componente")
+if isinstance(component, CloudMock):
+    # componente indisponível — modo fallback
+    pass
+```
 
 ---
 

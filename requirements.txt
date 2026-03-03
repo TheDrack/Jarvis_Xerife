@@ -41,3 +41,9 @@ psycopg2-binary>=2.9.0  # PostgreSQL driver for production deployments
 # - PyAutoGUI, pynput, pyperclip (hardware automation - use edge.txt if needed)
 # - pandas, openpyxl (data analysis - use edge.txt if needed)
 # All imports of these libraries in the code are optional with try/except blocks
+
+# Vector memory (optional - lightweight local vector store)
+# When faiss-cpu is not installed, VectorMemoryAdapter falls back to pure-Python
+# cosine-similarity over an in-memory list (slower but fully functional).
+numpy>=1.24.0
+faiss-cpu>=1.7.4

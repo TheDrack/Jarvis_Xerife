@@ -3,8 +3,16 @@
 
 from .action_provider import ActionProvider
 from .history_provider import HistoryProvider
+from .memory_provider import MemoryProvider
 from .system_controller import SystemController
 from .voice_provider import VoiceProvider
 from .web_provider import WebProvider
 
-__all__ = ["VoiceProvider", "ActionProvider", "WebProvider", "SystemController", "HistoryProvider"]
+__all__ = [
+    "VoiceProvider",
+    "ActionProvider",
+    "WebProvider",
+    "SystemController",
+    "HistoryProvider",
+    "MemoryProvider",
+]

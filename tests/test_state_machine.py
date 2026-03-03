@@ -15,7 +15,7 @@ from pathlib import Path
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent / 'scripts'))
 
-from state_machine import SelfHealingStateMachine, State, FailureReason
+from state_machine import SelfHealingStateMachine, State, FailureReason, ErrorCategory
 
 
 class TestErrorIdentification(NexusComponent):
@@ -134,6 +134,35 @@ class TestErrorIdentification(NexusComponent):
         
         assert state == State.NEEDS_HUMAN
         assert machine.failure_reason == FailureReason.UNIDENTIFIED_ERROR
+
+    def test_permission_error_triggers_environment_error(self):
+        """PermissionError should be classified as ENVIRONMENT_ERROR — do not mutate code."""
+        machine = SelfHealingStateMachine()
+        error = "PermissionError: [Errno 13] Permission denied: '/etc/passwd'"
+
+        state = machine.identify_error(error)
+
+        assert state == State.NEEDS_HUMAN
+        assert machine.error_category == ErrorCategory.ENVIRONMENT_ERROR
+        assert machine.escalation_reason == FailureReason.ENVIRONMENT_FAILURE
+
+    def test_file_not_found_external_triggers_environment_error(self):
+        """External FileNotFoundError should pause auto-fixer, not mutate code."""
+        machine = SelfHealingStateMachine()
+        error = "FileNotFoundError: [Errno 2] No such file or directory: '/data/config.yaml'"
+
+        state = machine.identify_error(error)
+
+        assert state == State.NEEDS_HUMAN
+        assert machine.error_category == ErrorCategory.ENVIRONMENT_ERROR
+
+    def test_code_error_category(self):
+        """Auto-fixable errors should be classified as CODE_ERROR category."""
+        machine = SelfHealingStateMachine()
+        state = machine.identify_error("ImportError: cannot import name 'foo'")
+
+        assert state == State.CHANGE_REQUESTED
+        assert machine.error_category == ErrorCategory.CODE_ERROR
 
 
 class TestRepairCycle(NexusComponent):

@@ -27,6 +27,7 @@ class AssistantService(NexusComponent):
         self._history_adapter = None
         self._memory_manager = None
         self._field_vision = None
+        self._vector_memory = None
         self.is_running = True
         self._health_check_task: Optional[asyncio.Task] = None
 
@@ -59,6 +60,12 @@ class AssistantService(NexusComponent):
         if self._field_vision is None:
             self._field_vision = nexus.resolve("field_vision")
         return self._field_vision
+
+    def _get_vector_memory(self):
+        """Resolve o adaptador de memória vetorial sob demanda (lazy loading)."""
+        if self._vector_memory is None:
+            self._vector_memory = nexus.resolve("vector_memory_adapter")
+        return self._vector_memory
 
     def start_health_check(self) -> None:
         """Inicia o loop de verificação de saúde em background (non-blocking)."""
@@ -190,7 +197,25 @@ class AssistantService(NexusComponent):
                 logger.error(f"❌ {error_msg}")
                 return Response(success=False, message=error_msg, error="INIT_FAILURE")
 
-            # 2. Recupera contexto de memória semântica de longo prazo
+            # 2a. Recupera contexto da memória VETORIAL (últimos 30 dias)
+            vector_context_lines: List[str] = []
+            try:
+                vec_mem = self._get_vector_memory()
+                if vec_mem is not None:
+                    similar = vec_mem.query_similar(text, top_k=3, days_back=30)
+                    if similar:
+                        vector_context_lines = [
+                            f"- [{ev.get('timestamp', '')}] {ev.get('text', '')} (score={ev.get('score', 0):.2f})"
+                            for ev in similar
+                        ]
+                        logger.debug(
+                            "🧠 [VECTOR_MEMORY] %d contexto(s) semelhante(s) recuperado(s)",
+                            len(similar),
+                        )
+            except Exception as e:
+                logger.debug(f"Vector memory query unavailable: {e}")
+
+            # 2b. Recupera contexto de memória semântica de longo prazo
             memory_context_lines: List[str] = []
             try:
                 memory_manager = self._get_memory_manager()
@@ -207,9 +232,10 @@ class AssistantService(NexusComponent):
 
             # 3. Interpreta o comando, injetando memória de contexto quando disponível
             interpret_ctx: Dict[str, Any] = {"text": text}
-            if memory_context_lines:
+            all_context_lines = vector_context_lines + memory_context_lines
+            if all_context_lines:
                 interpret_ctx["system_prompt_extra"] = (
-                    "### MEMÓRIA DE CONTEXTO ###\n" + "\n".join(memory_context_lines)
+                    "### MEMÓRIA DE CONTEXTO ###\n" + "\n".join(all_context_lines)
                 )
             intent = interpreter.execute(interpret_ctx)
 
@@ -221,13 +247,29 @@ class AssistantService(NexusComponent):
                 success=True,
                 message=str(result) if result else "Comando executado com sucesso.",
                 data={
-                    "intent": str(intent), 
-                    "result": result, 
+                    "intent": str(intent),
+                    "result": result,
                     "command_type": getattr(intent, 'type', 'unknown') if intent else "unknown"
                 },
             )
 
-            # 6. Persiste na memória semântica de longo prazo
+            # 6a. Vetoriza e armazena comando + resposta na memória vetorial
+            try:
+                vec_mem = self._get_vector_memory()
+                if vec_mem is not None:
+                    vec_mem.store_event(
+                        text,
+                        metadata={"role": "user", "channel": channel},
+                    )
+                    vec_mem.store_event(
+                        response.message,
+                        metadata={"role": "assistant", "channel": channel},
+                    )
+                    logger.debug("🧠 [VECTOR_MEMORY] Comando e resposta vetorizados e armazenados.")
+            except Exception as e:
+                logger.debug(f"Failed to store in vector memory: {e}")
+
+            # 6b. Persiste na memória semântica de longo prazo
             try:
                 self._get_memory_manager().store_interaction(text, response.message)
             except Exception as e:
