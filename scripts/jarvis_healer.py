@@ -47,6 +47,8 @@ def heal():
     parser = argparse.ArgumentParser()
     parser.add_argument('--report', required=False)
     parser.add_argument('--log', required=False)
+    parser.add_argument('--production-log', required=False,
+                        help='Log de erro de produção enviado pelo Field Vision via workflow_dispatch')
     args = parser.parse_args()
 
     error_context = ""
@@ -56,6 +58,15 @@ def heal():
         error_context = Path(args.log).read_text(encoding='utf-8')
         matches = re.findall(r'File "([^"]+\.py)"', error_context)
         target_files.update([Path(f).absolute() for f in matches if ".venv" not in f])
+
+    # Incorpora o log de produção vindo do Field Vision ao contexto de erro
+    production_log_path = getattr(args, 'production_log', None)
+    if production_log_path and os.path.exists(production_log_path):
+        production_log_content = Path(production_log_path).read_text(encoding='utf-8')
+        print(f"🧬 [Healer] Log de produção recebido do Field Vision ({len(production_log_content)} chars).")
+        error_context = f"=== LOG DE PRODUÇÃO (Field Vision) ===\n{production_log_content}\n\n{error_context}"
+        prod_matches = re.findall(r'File "([^"]+\.py)"', production_log_content)
+        target_files.update([Path(f).absolute() for f in prod_matches if ".venv" not in f])
 
     for file_path in target_files:
         if file_path.exists():

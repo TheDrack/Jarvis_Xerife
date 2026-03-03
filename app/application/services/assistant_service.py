@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
-import logging
 import asyncio
-from typing import Optional, Dict, Any, List
+import logging
+from typing import Any, Dict, List, Optional
+
 from app.core.nexus import nexus
 from app.core.nexuscomponent import NexusComponent
 from app.domain.models import Response
 
 logger = logging.getLogger(__name__)
+
+_HEALTH_CHECK_INTERVAL = 300  # 5 minutos
 
 class AssistantService(NexusComponent):
     """
@@ -23,7 +26,9 @@ class AssistantService(NexusComponent):
         self._voice = None
         self._history_adapter = None
         self._memory_manager = None
+        self._field_vision = None
         self.is_running = True
+        self._health_check_task: Optional[asyncio.Task] = None
 
     def _get_interpreter(self):
         """Garante a resolução do interpretador mesmo após o boot."""
@@ -48,6 +53,86 @@ class AssistantService(NexusComponent):
         if self._memory_manager is None:
             self._memory_manager = nexus.resolve("memory_manager")
         return self._memory_manager
+
+    def _get_field_vision(self):
+        """Resolve o monitor de integridade (Field Vision) sob demanda (lazy loading)."""
+        if self._field_vision is None:
+            self._field_vision = nexus.resolve("field_vision")
+        return self._field_vision
+
+    def start_health_check(self) -> None:
+        """Inicia o loop de verificação de saúde em background (non-blocking)."""
+        try:
+            loop = asyncio.get_running_loop()
+            self._health_check_task = loop.create_task(self._health_check_loop())
+            logger.info("👁️ [AssistantService] Health check loop iniciado em background.")
+        except RuntimeError:
+            logger.debug("👁️ [AssistantService] Nenhum event loop ativo para iniciar health check.")
+
+    async def _health_check_loop(self) -> None:
+        """
+        👁️ Loop de homeostase proativa que roda a cada 5 minutos.
+
+        Fluxo: FieldVision (Detecta) → Memory (Contextualiza) → GitHub Action (Cura) → Telegram (Notifica).
+        """
+        logger.info("👁️ [HealthCheck] Loop de homeostase iniciado.")
+        while self.is_running:
+            await asyncio.sleep(_HEALTH_CHECK_INTERVAL)
+            try:
+                await self._run_health_check()
+            except Exception as exc:
+                logger.error(f"💥 [HealthCheck] Erro no ciclo de homeostase: {exc}")
+
+    async def _run_health_check(self) -> None:
+        """Executa um único ciclo de verificação de saúde."""
+        logger.info("👁️ [HealthCheck] Iniciando varredura de sinais vitais…")
+        field_vision = self._get_field_vision()
+        if not field_vision:
+            logger.debug("👁️ [HealthCheck] FieldVision indisponível no Nexus.")
+            return
+
+        result = await asyncio.to_thread(field_vision.scan_vitals)
+        action = result.get("action", "none")
+
+        if action == "none":
+            return  # Tudo normal, sem notificação
+
+        msg = self._build_health_notification(result)
+        await self._notify(msg)
+
+    def _build_health_notification(self, result: Dict[str, Any]) -> str:
+        """Constrói a mensagem de notificação baseada no resultado da varredura."""
+        action = result.get("action", "unknown")
+        snippet = result.get("error_snippet", "")
+        if action == "memory_resolved":
+            return (
+                "🧠 *JARVIS Health Check*\n"
+                f"Anomalia detectada nos logs e resolvida pela memória semântica "
+                f"({result.get('known_solutions', 0)} solução(ões) encontrada(s))."
+            )
+        if action == "workflow_dispatched":
+            return (
+                "🧬 *JARVIS Self-Healing Ativado*\n"
+                "Erros críticos detectados nos logs. Workflow de auto-cura disparado.\n"
+                f"```\n{snippet[:300]}\n```"
+            )
+        if action == "dispatch_failed":
+            return (
+                "⚠️ *JARVIS Health Check – Falha no Disparo*\n"
+                "Erros críticos detectados, mas o workflow de auto-cura não pôde ser acionado.\n"
+                f"```\n{snippet[:300]}\n```"
+            )
+        return f"👁️ *JARVIS Health Check*\nAção executada: `{action}`."
+
+    async def _notify(self, message: str) -> None:
+        """Envia notificação via NotificationService (Telegram/WhatsApp/Discord)."""
+        try:
+            notification_service = nexus.resolve("notification_service")
+            if notification_service and hasattr(notification_service, "broadcast_startup"):
+                await asyncio.to_thread(notification_service.broadcast_startup, message)
+                logger.info("📨 [HealthCheck] Notificação enviada com sucesso.")
+        except Exception as exc:
+            logger.debug(f"📨 [HealthCheck] Falha ao enviar notificação: {exc}")
 
     def _get_hive_context(self, limit: int = 5) -> List[Dict[str, Any]]:
         """Recupera o histórico recente de TODOS os canais (hive mind)."""
