@@ -7,6 +7,11 @@ on:
     workflows: ["*"]
     types: [completed]
   workflow_dispatch:
+    inputs:
+      error_log:
+        description: 'Log de erro da produção (enviado pelo Field Vision)'
+        required: false
+        default: ''
 
 jobs:
   homeostasis:
@@ -77,7 +82,14 @@ jobs:
           PYTHONPATH: "."
         run: |
           uv run pytest --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
-          uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt
+          
+          PRODUCTION_LOG_ARG=""
+          if [[ -n "${{ github.event.inputs.error_log }}" ]]; then
+            echo "${{ github.event.inputs.error_log }}" > production_error.log
+            PRODUCTION_LOG_ARG="--production-log production_error.log"
+          fi
+          
+          uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt $PRODUCTION_LOG_ARG
           
           uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
