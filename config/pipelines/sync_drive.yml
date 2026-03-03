@@ -2,11 +2,11 @@
 components:
   consolidator:
     id: "consolidator"
-    hint_path: "app/adapters/infrastructure"
+    hint_path: "adapters/infrastructure"
 
   drive_uploader:
     id: "drive_uploader"
-    hint_path: "app/adapters/infrastructure"
+    hint_path: "adapters/infrastructure"
     singleton: true
     # Se o Google Drive falhar (cota), o pipeline CONTINUA para o Telegram/Gist
     config:
@@ -14,7 +14,7 @@ components:
 
   telegram_backup:
     id: "telegram_adapter"
-    hint_path: "app/adapters/infrastructure"
+    hint_path: "adapters/infrastructure"
     config:
       action: "upload_backup"
       token: "${{ secrets.TELEGRAM_TOKEN }}"
@@ -22,4 +22,4 @@ components:
 
   gist_backup:
     id: "gist_uploader"
-    hint_path: "app/adapters/infrastructure"
+    hint_path: "adapters/infrastructure"
