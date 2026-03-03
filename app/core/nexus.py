@@ -20,20 +20,19 @@ class CloudMock:
 
     def __getattr__(self, name):
         def method(*args, **kwargs):
-            # Log apenas em DEBUG para não poluir o Render
             logging.debug(f"☁️ [NEXUS-MOCK] {self._target_id}.{name} chamado em Cloud.")
             return None
         return method
 
     def __bool__(self):
-        return False # Permite verificações 'if not adapter'
+        return False 
 
 class JarvisNexus:
     def __init__(self):
         self.base_dir = os.path.abspath(os.getcwd())
         self.gist_id = "23d15b3f9d010179ace501a79c78608f"
         self._instances: Dict[str, Any] = {}
-        self._resolving: set = set() # Proteção contra recursão infinita
+        self._resolving: set = set() 
         self._lock = threading.Lock()
 
         # Detecta ambiente Cloud
@@ -46,24 +45,24 @@ class JarvisNexus:
         """Carrega o DNA do Gist com tratamento de erro robusto."""
         url = f"https://gist.githubusercontent.com/TheDrack/{self.gist_id}/raw/nexus_memory.json"
         try:
-            # Bypass cache do urllib para garantir DNA atualizado
             req = urllib.request.Request(url, headers={'Cache-Control': 'no-cache'})
             with urllib.request.urlopen(req, timeout=7) as response:
                 if response.status == 200:
                     data = json.loads(response.read().decode('utf-8'))
-                    # Normaliza caminhos (remove prefixos legados se houver)
                     return {k: v.split("Jarvis_Xerife.")[-1] for k, v in data.items()}
         except Exception as e:
             logger.warning(f"⚠️ [NEXUS] DNA remoto indisponível: {e}. Usando descoberta local.")
         return {}
 
-    def resolve(self, target_id: str, singleton: bool = True) -> Optional[Any]:
-        """Resolve uma dependência garantindo thread-safety e evitando loops."""
+    def resolve(self, target_id: str, singleton: bool = True, hint_path: Optional[str] = None) -> Optional[Any]:
+        """
+        Resolve uma dependência. 
+        hint_path: Caminho sugerido pelo chamador para acelerar a localização.
+        """
         with self._lock:
             if singleton and target_id in self._instances:
                 return self._instances[target_id]
 
-            # Proteção contra loop: se já estamos tentando resolver este ID, aborte
             if target_id in self._resolving:
                 logger.error(f"🔄 [NEXUS] Loop de dependência detectado para '{target_id}'!")
                 return None
@@ -72,7 +71,8 @@ class JarvisNexus:
 
         try:
             instance = None
-            module_path = self._cache.get(target_id)
+            # Ordem de prioridade: 1. hint_path | 2. Cache Gist | 3. Discovery
+            module_path = hint_path or self._cache.get(target_id)
 
             if module_path:
                 instance = self._instantiate(target_id, module_path)
@@ -104,7 +104,6 @@ class JarvisNexus:
 
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
-                # Converte caminho de diretório para notação de pacote Python
                 if rel_path == ".":
                     return target_id
 
@@ -114,25 +113,30 @@ class JarvisNexus:
 
     def _instantiate(self, target_id: str, module_path: str) -> Optional[Any]:
         """Cria a instância da classe, tratando desvios de Hardware em Cloud."""
+        
+        # Correção de caminhos que podem vir com extensões .py do hint_path
+        if module_path.endswith(".py"):
+            module_path = module_path[:-3].replace("/", ".").replace("\\", ".")
 
-        # Protocolo de Simbiose: Bloqueio de hardware local em nuvem
         hardware_keywords = ["keyboard", "audio", "camera", "gpio", "edge_adapter"]
         if self.is_cloud and any(key in target_id or key in module_path for key in hardware_keywords):
             logger.info(f"🛡️ [NEXUS] Hardware Bypass: '{target_id}' -> CloudMock.")
             return CloudMock(target_id)
 
         try:
-            # Garante que o sys.path contenha o base_dir
             if self.base_dir not in sys.path:
                 sys.path.insert(0, self.base_dir)
 
             module = importlib.import_module(module_path)
-            # CamelCase: telegram_adapter -> TelegramAdapter
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
 
             if not hasattr(module, class_name):
-                logger.error(f"❌ [NEXUS] Classe '{class_name}' não encontrada em {module_path}")
-                return None
+                # Tenta fallback para nome da classe igual ao target_id (case sensitive) se CamelCase falhar
+                if hasattr(module, target_id):
+                    class_name = target_id
+                else:
+                    logger.error(f"❌ [NEXUS] Classe '{class_name}' não encontrada em {module_path}")
+                    return None
 
             clazz = getattr(module, class_name)
             return clazz()
@@ -175,7 +179,6 @@ class JarvisNexus:
             except Exception as e:
                 logger.warning(f"⚠️ [NEXUS] Erro ao sincronizar DNA Gist: {e}")
 
-        # Atualiza em background para não travar a resolução principal
         threading.Thread(target=_async_update, daemon=True).start()
 
 # Instância Global Única
