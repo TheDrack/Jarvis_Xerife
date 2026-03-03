@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class LlmService(NexusComponent):
     """
     Serviço de Linguagem (LLM) com suporte a Fallback Automático.
-    Implementa o método execute para conformidade com o Nexus.
+    Implementa o método execute e chat para conformidade com o Nexus e IntentProcessor.
     """
 
     def __init__(self):
@@ -20,17 +20,18 @@ class LlmService(NexusComponent):
         self.groq_key = os.getenv("GROQ_API_KEY")
         self.fallback_model = "llama-3.3-70b-versatile"
 
+    def chat(self, prompt: str, system_instruction: str = "Você é o Jarvis, um assistente técnico e eficiente.") -> str:
+        """Interface oficial de conversação usada pelo IntentProcessor."""
+        return self.ask(prompt, system_instruction)
+
     def ask(self, prompt: str, system_instruction: str = "") -> str:
-        """Interface principal para chamadas de texto."""
-        # Tenta Gemini primeiro (Assumindo que você usa a lib genai em outro lugar do código)
-        # Se houver erro de cota (429), o fallback é acionado.
+        """Interface principal para chamadas de texto com Fallback Gemini -> Groq."""
         try:
-            # Lógica simplificada de detecção de cota
             if not self.gemini_key:
                 raise ValueError("Gemini Key ausente")
             
-            # Aqui entraria sua chamada original ao Gemini. 
-            # Se ela falhar, o bloco except captura e vai para o Groq.
+            # Nota: Implementação do Gemini deve ser inserida aqui se disponível.
+            # Por enquanto, mantendo o fluxo para o Groq como provedor funcional.
             return self._call_groq(prompt, system_instruction) 
         except Exception as e:
             logger.warning(f"⚠️ Falha no provedor primário, tentando Groq: {e}")
@@ -42,7 +43,7 @@ class LlmService(NexusComponent):
             return "Erro: Nenhuma chave de API configurada para LLM."
 
         logger.info(f"🔄 Gerando resposta via Groq ({self.fallback_model})...")
-        
+
         try:
             with httpx.Client() as client:
                 response = client.post(
@@ -61,7 +62,7 @@ class LlmService(NexusComponent):
                     },
                     timeout=20.0
                 )
-                
+
                 if response.status_code == 200:
                     return response.json()['choices'][0]['message']['content']
                 else:
@@ -72,18 +73,16 @@ class LlmService(NexusComponent):
             return "Sistemas de linguagem offline. Verifique as conexões de API."
 
     def execute(self, context: dict) -> dict:
-        """
-        Implementação obrigatória do NexusComponent.
-        Permite que o LLM seja usado dentro de Workflows.
-        """
-        prompt = context.get("prompt")
+        """Permite que o LLM seja usado dentro de Workflows via Nexus."""
+        prompt = context.get("prompt") or context.get("data")
         system = context.get("system_instruction", "Você é o Jarvis, um assistente técnico e eficiente.")
-        
+
         if prompt:
-            response = self.ask(prompt, system)
+            # Se prompt for um dict (vindo de parâmetros), tenta extrair a mensagem
+            text = prompt if isinstance(prompt, str) else str(prompt)
+            response = self.chat(text, system)
             context["llm_response"] = response
-            # Se o contexto pedir para atualizar a mensagem final
-            if context.get("update_message"):
+            if context.get("update_message") or "message" not in context:
                 context["message"] = response
-        
+
         return context

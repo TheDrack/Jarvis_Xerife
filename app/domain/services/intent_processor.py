@@ -28,10 +28,10 @@ class IntentProcessor(NexusComponent):
             logger.warning("⚠️ [PROCESSOR] Recebida intenção nula.")
             return "Erro: Intenção não fornecida ao processador."
 
-        # 1. Extração do ID do componente alvo (Ex: CommandType.TYPE_TEXT -> 'type_text')
+        # 1. Extração do ID do componente alvo
         cmd_type = getattr(intent, 'command_type', CommandType.UNKNOWN)
-        
-        # Normaliza o ID para busca no Nexus (snake_case do Enum)
+
+        # Normaliza o ID para busca no Nexus
         if hasattr(cmd_type, 'name'):
             target_id = cmd_type.name.lower()
         else:
@@ -39,48 +39,52 @@ class IntentProcessor(NexusComponent):
 
         logger.info(f"🎯 [PROCESSOR] Buscando executor para: '{target_id}'")
 
-        # 2. RESOLUÇÃO DINÂMICA VIA NEXUS (A busca física no repositório)
-        # Se você criou 'app/capabilities/sync_to_drive.py', o Nexus o encontrará aqui.
+        # 2. RESOLUÇÃO DINÂMICA VIA NEXUS
         executor = nexus.resolve(target_id)
 
-        # 3. Execução do Executor Encontrado
+        # 3. Execução do Executor Encontrado (Se não for Mock)
         if executor and not isinstance(executor, CloudMock):
             try:
                 logger.info(f"⚡ [PROCESSOR] Executando componente dinâmico: {target_id}")
-                
-                # Prepara parâmetros (garante que seja um dict)
+
                 params = getattr(intent, 'parameters', {})
                 if not isinstance(params, dict):
                     params = {"data": params}
 
-                # Executa o componente (deve ter método execute)
                 result = executor.execute(params)
-                
-                # Normalização do retorno para string
+
                 if isinstance(result, dict):
-                    return result.get("message", "Comando executado sem mensagem de retorno.")
+                    return result.get("message", "Comando executado com sucesso.")
                 return str(result)
-            
+
             except Exception as e:
                 logger.error(f"💥 [PROCESSOR] Falha ao executar {target_id}: {e}")
-                return f"Erro na execução do componente {target_id}: {str(e)}"
-
-        # 4. FALLBACK PARA IA (Se o executor físico não existir ou for Mock)
-        logger.info(f"🤖 [PROCESSOR] Executor '{target_id}' não encontrado. Delegando para LLM...")
+                # Fallback para IA em caso de erro no executor físico
+        
+        # 4. FALLBACK PARA IA (Executores desconhecidos, Mocks ou Falhas)
+        logger.info(f"🤖 [PROCESSOR] Redirecionando para LLM (Motivo: {target_id})...")
         raw_text = getattr(intent, 'raw_input', str(intent))
         return self._process_with_llm(raw_text)
 
     def _process_with_llm(self, text: str) -> str:
-        """
-        Utiliza o LLM (Gemini/Groq) como cérebro de reserva.
-        """
+        """Utiliza o LLM como cérebro de reserva."""
         try:
+            # Tenta resolver o serviço de IA
             llm = nexus.resolve("llm_service") or nexus.resolve("ai_gateway")
-            if llm:
-                # Se for o gateway, ele usa o método generate ou chat
-                return llm.generate(text) if hasattr(llm, 'generate') else str(llm.chat(text))
+            
+            if llm and not isinstance(llm, CloudMock):
+                # Tenta os métodos conhecidos por ordem de preferência
+                if hasattr(llm, 'chat'):
+                    return llm.chat(text)
+                elif hasattr(llm, 'ask'):
+                    return llm.ask(text)
+                elif hasattr(llm, 'generate'):
+                    return llm.generate(text)
+                elif hasattr(llm, 'execute'):
+                    res = llm.execute({"prompt": text})
+                    return res.get("message") or res.get("llm_response", str(res))
+            
             return "IA indisponível no momento para processar este comando."
         except Exception as e:
             logger.error(f"❌ [PROCESSOR] Erro no fallback de IA: {e}")
             return "Falha crítica na comunicação com o cérebro de reserva (LLM)."
-
