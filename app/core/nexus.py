@@ -10,6 +10,12 @@ from typing import Any, Optional, Dict
 
 logger = logging.getLogger(__name__)
 
+
+class CloudMock:
+    """Sentinel class to identify placeholder/stub executors vs real implementations."""
+    pass
+
+
 class JarvisNexus:
     def __init__(self):
         # 1. Configuração de Caminhos Absolutos
