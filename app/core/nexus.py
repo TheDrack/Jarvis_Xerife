@@ -42,7 +42,7 @@ class JarvisNexus:
         # 3. Busca Global (Cura via Varredura de Disco)
         logger.info(f"🔍 [NEXUS] Iniciando varredura em disco para localizar '{target_id}'...")
         instance, real_path = self._global_search_with_path(target_id)
-        
+
         if instance:
             if hint_path or stored_path:
                 logger.error(f"🚨 [NEXUS] CORREÇÃO: '{target_id}' achado em '{real_path}' (Diferente do esperado).")
@@ -62,7 +62,7 @@ class JarvisNexus:
             # Normaliza: 'app/services/file.py' -> 'app.services.file'
             clean_path = module_path.replace("/", ".").replace("\\", ".").replace(".py", "")
             if clean_path.startswith("."): clean_path = clean_path[1:]
-            
+
             module = importlib.import_module(clean_path)
             norm_target = target_id.replace("_", "").lower()
 
@@ -87,7 +87,7 @@ class JarvisNexus:
                         # Converte o caminho do arquivo em caminho de módulo Python
                         relative_path = os.path.relpath(os.path.join(root, file), os.getcwd())
                         module_path = relative_path.replace(os.sep, ".").replace(".py", "")
-                        
+
                         instance = self._instantiate_from_path(module_path, target_id)
                         if instance:
                             return instance, module_path
