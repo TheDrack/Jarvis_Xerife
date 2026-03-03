@@ -7,9 +7,9 @@ import sys
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 from app.core.nexus import nexus
 
-def run_pipeline(pipeline_name: str, strict: bool = False):
+def run_pipeline(pipeline_name: str, global_strict: bool = False):
     logging.info(f"🚀 INICIANDO RUNNER: {pipeline_name}")
-    
+
     config_path = os.path.join("config", "pipelines", f"{pipeline_name}.yml")
     if not os.path.exists(config_path):
         logging.error(f"❌ Pipeline {pipeline_name} não encontrado em {config_path}")
@@ -18,39 +18,58 @@ def run_pipeline(pipeline_name: str, strict: bool = False):
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    context = {"artifacts": {}, "metadata": {"pipeline": pipeline_name}, "env": dict(os.environ)}
+    context = {
+        "artifacts": {}, 
+        "metadata": {"pipeline": pipeline_name}, 
+        "env": dict(os.environ), 
+        "result": {}
+    }
     components = config.get("components", {})
 
     for name, meta in components.items():
         t_id = meta.get("id")
-        logging.info(f"🔍 Resolvendo componente: {name} (ID: {t_id})")
+        # Define se este passo específico é obrigatório (prioriza o YAML, depois o global)
+        component_config = meta.get("config", {})
+        is_strict = component_config.get("strict_mode", global_strict)
 
+        logging.info(f"🔍 Resolvendo componente: {name} (ID: {t_id})")
         instance = nexus.resolve(target_id=t_id, hint_path=meta.get("hint_path"))
 
         if not instance:
-            logging.error(f"❌ Falha ao obter instância de {t_id}")
-            if strict: raise RuntimeError(f"Pipeline interrompido: {t_id}")
+            msg = f"❌ Falha crítica: Instância de {t_id} não encontrada."
+            if is_strict: raise RuntimeError(msg)
+            logging.error(msg)
             continue
 
         try:
-            if hasattr(instance, "configure") and "config" in meta:
-                instance.configure(meta["config"])
+            if hasattr(instance, "configure"):
+                instance.configure(component_config)
 
             logging.info(f"⚙️ Executando: {name}...")
-            # Chamada do execute passando o context para o Consolidator
-            result = instance.execute(context)
             
-            if result:
-                context["result"] = result
-                context["artifacts"][name] = result
-                logging.info(f"✅ {name} finalizado com sucesso.")
+            # Execução do componente
+            updated_context = instance.execute(context)
+
+            # Validação do retorno para não corromper o pipeline
+            if isinstance(updated_context, dict):
+                context = updated_context
+                logging.info(f"✅ {name} finalizado.")
+            else:
+                logging.warning(f"⚠️ {name} retornou tipo {type(updated_context)}. Mantendo contexto anterior.")
+
         except Exception as e:
             logging.error(f"💥 ERRO NA EXECUÇÃO DE {name}: {e}")
-            if strict: raise e
+            if is_strict:
+                logging.error("🛑 Strict Mode Ativo: Interrompendo pipeline.")
+                raise e
+            
+            # Se não for strict, limpa o result para o próximo componente não tentar ler lixo
+            context["result"] = {"error": str(e), "source": name}
+            logging.warning(f"⚠️ {name} falhou, mas o pipeline continua (Strict: False).")
 
     logging.info("🏁 PIPELINE FINALIZADO")
 
 if __name__ == "__main__":
     p_name = os.getenv("PIPELINE")
-    s_strict = os.getenv("PIPELINE_STRICT", "false").lower() == "true"
-    run_pipeline(p_name, s_strict)
+    g_strict = os.getenv("PIPELINE_STRICT", "false").lower() == "true"
+    run_pipeline(p_name, g_strict)
