@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import logging
+import re
 from datetime import datetime
 from app.core.nexuscomponent import NexusComponent
 
@@ -17,150 +18,123 @@ DOCS_ORDER = [
     "docs/ARQUIVO_MAP.md",
 ]
 
-
 class Consolidator(NexusComponent):
     """
-    Componente de Simbiose: Unifica o repositório com Documentação, Mapa de Árvore
-    e Conteúdo de Código para otimização de contexto em LLMs.
-
-    Estrutura do documento gerado:
-        1. Cabeçalho + instruções de leitura para IA
-        2. Documentação setorizada (README, arquitetura, Nexus, mapa de arquivos)
-        3. Árvore de diretórios
-        4. Conteúdo dos arquivos de código/config
+    Componente de Simbiose Evoluído: Unifica o repositório com metadados estruturais.
+    Implementa mapeamento de dependências e análise de camadas para otimização de LLMs.
     """
 
     def __init__(self):
         super().__init__()
         self.output_file = "CORE_LOGIC_CONSOLIDATED.txt"
+        self.component_map = {} # Nome -> Path para cross-reference
+
+    def _get_layer_info(self, path: str) -> str:
+        """Define a responsabilidade arquitetural baseada no path."""
+        path_lower = path.lower()
+        if "app/core" in path_lower:
+            return "CORE (Motor do Sistema/Nexus): Infraestrutura crítica e DI."
+        if "app/domain" in path_lower:
+            return "DOMAIN (Regras de Negócio): Lógica pura, independente de IO."
+        if "app/application" in path_lower:
+            return "APPLICATION (Casos de Uso): Orquestração e Portas (Interfaces)."
+        if "app/adapters" in path_lower:
+            return "ADAPTERS (Infraestrutura/IO): Implementações externas (GitHub, APIs, Hardware)."
+        return "CONFIG/SUPPORT: Arquivos de configuração ou suporte."
+
+    def _extract_dependencies(self, content: str) -> list:
+        """Detecta chamadas ao Nexus e imports internos."""
+        deps = re.findall(r'nexus\.resolve\(["\']([^"\']+)["\']\)', content)
+        return sorted(list(set(deps)))
 
     def _write_doc_section(self, out, base_dir: str) -> None:
-        """Inclui os arquivos de documentação setorizados no início do consolidado."""
-        out.write("=" * 100 + "\n")
+        """Inclui os arquivos de documentação setorizados."""
+        out.write("\n" + "=" * 100 + "\n")
         out.write("SEÇÃO 1 — DOCUMENTAÇÃO DO PROJETO\n")
-        out.write(
-            "Esta seção contém a documentação humana do repositório: visão geral, arquitetura,\n"
-            "padrões obrigatórios, mapa de componentes e status atual.\n"
-            "Leia esta seção primeiro para entender o projeto antes de analisar o código-fonte.\n"
-        )
         out.write("=" * 100 + "\n\n")
 
         for rel_path in DOCS_ORDER:
             abs_path = os.path.join(base_dir, rel_path)
-            if not os.path.isfile(abs_path):
-                continue
-            label = rel_path.replace("\\", "/")
-            out.write(f"\n{'─' * 80}\n")
-            out.write(f"DOC: {label}\n")
-            out.write(f"{'─' * 80}\n")
+            if not os.path.isfile(abs_path): continue
+            out.write(f"\n{'─' * 80}\nDOC: {rel_path.replace('\\', '/')}\n{'─' * 80}\n")
             try:
                 with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
-                    content = f.read()
-                    out.write(content if content.strip() else "[DOCUMENTO VAZIO]")
-            except Exception as doc_error:
-                out.write(f"[ERRO AO LER DOCUMENTO: {doc_error}]")
+                    out.write(f.read() or "[DOCUMENTO VAZIO]")
+            except Exception as e:
+                out.write(f"[ERRO AO LER: {e}]")
             out.write("\n")
 
     def execute(self, context: dict) -> dict:
-        """
-        Executa a consolidação e retorna o contexto atualizado com o caminho do arquivo.
-        """
-        print(f"🔬 [NEXUS] Iniciando Consolidação Estruturada: {datetime.now()}")
+        print(f"🧬 [NEXUS] Iniciando Consolidação Simbiótica: {datetime.now()}")
 
-        # Configurações de Filtro
-        ignored_dirs = {
-            '.git', '__pycache__', '.venv', 'dist', 'build',
-            'node_modules', 'venv', '.github',
-        }
-        relevant_extensions = (
-            ".py", ".yml", ".yaml", ".json", ".sql",
-            ".dockerfile", "Dockerfile", ".env.example",
-        )
+        ignored_dirs = {'.git', '__pycache__', '.venv', 'dist', 'build', 'node_modules', '.github'}
+        relevant_extensions = (".py", ".yml", ".yaml", ".json", ".sql", ".dockerfile", "Dockerfile")
 
         try:
-            # Garante caminho absoluto para evitar erros de localização em Cloud
             file_path = os.path.abspath(self.output_file)
             base_dir = os.getcwd()
 
             with open(file_path, "w", encoding="utf-8") as out:
-                # 1. CABEÇALHO DE CONTEXTO PARA IA
+                # 1. CABEÇALHO DE ALTA FIDELIDADE
                 out.write("=" * 100 + "\n")
-                out.write("PROJETO: JARVIS ASSISTANT — REPOSITÓRIO CONSOLIDADO\n")
-                out.write(f"DATA DA EXTRAÇÃO: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
-                out.write(
-                    f"PIPELINE ORIGEM: {context.get('metadata', {}).get('pipeline', 'N/A')}\n"
-                )
-                out.write(
-                    "OBJETIVO: Fornecer contexto completo, autodidático e estruturado do\n"
-                    "repositório para que uma IA possa compreender arquitetura, padrões e\n"
-                    "código sem conhecimento prévio.\n"
-                    "\n"
-                    "COMO LER ESTE DOCUMENTO:\n"
-                    "  1. Seção 1 — Documentação: leia para entender propósito, arquitetura\n"
-                    "     e padrões.\n"
-                    "  2. Seção 2 — Árvore: veja a organização física dos arquivos.\n"
-                    "  3. Seção 3 — Código: analise os arquivos-fonte e de configuração.\n"
-                )
+                out.write("JARVIS ASSISTANT - CONTEXTO SIMBIÓTICO DE ALTO NÍVEL\n")
+                out.write(f"TIMESTAMP: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
+                out.write("PADRÃO: Arquitetura Hexagonal + Nexus DI\n")
                 out.write("=" * 100 + "\n\n")
 
-                # 2. DOCUMENTAÇÃO SETORIZADA
+                # 2. DOCUMENTAÇÃO
                 self._write_doc_section(out, base_dir)
 
-                # 3. MAPA DA ÁRVORE DE DIRETÓRIOS
+                # 3. ESTRUTURA E MAPA DE COMPONENTES
                 out.write("\n" + "=" * 100 + "\n")
-                out.write("SEÇÃO 2 — ESTRUTURA DO PROJETO (TREE)\n")
+                out.write("SEÇÃO 2 — ESTRUTURA E MAPA DE COMPONENTES\n")
                 out.write("=" * 100 + "\n")
+                
+                all_files = []
                 for root, dirs, files in os.walk("."):
                     dirs[:] = [d for d in dirs if d not in ignored_dirs]
-                    level = root.replace('.', '').count(os.sep)
-                    indent = ' ' * 4 * level
-                    out.write(f"{indent}{os.path.basename(root)}/\n")
-                    sub_indent = ' ' * 4 * (level + 1)
-
-                    # Ordenação para manter consistência no Gist
                     for f in sorted(files):
                         if f.endswith(relevant_extensions) and f != self.output_file:
-                            out.write(f"{sub_indent}📄 {f}\n")
+                            full_path = os.path.join(root, f)
+                            all_files.append(full_path)
+                            # Adiciona árvore textual simplificada
+                            level = root.replace('.', '').count(os.sep)
+                            out.write(f"{' ' * 4 * level}📄 {full_path}\n")
 
-                # 4. CONTEÚDO DOS ARQUIVOS DE CÓDIGO/CONFIG
+                # 4. CONTEÚDO ANALÍTICO
                 out.write("\n" + "=" * 100 + "\n")
-                out.write("SEÇÃO 3 — CONTEÚDO DOS ARQUIVOS CONSOLIDADOS\n")
+                out.write("SEÇÃO 3 — CÓDIGO FONTE COM ANÁLISE DE DEPENDÊNCIAS\n")
                 out.write("=" * 100 + "\n")
 
-                for root, dirs, files in os.walk("."):
-                    dirs[:] = [d for d in dirs if d not in ignored_dirs]
-                    for file in sorted(files):
-                        if file.endswith(relevant_extensions) and file != self.output_file:
-                            path = os.path.join(root, file)
+                for path in all_files:
+                    try:
+                        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                            content = f.read()
 
-                            out.write(f"\n\nFILE_PATH: {path}\n")
-                            out.write(f"FILE_NAME: {file}\n")
-                            out.write("-" * 50 + "\n")
+                        layer = self._get_layer_info(path)
+                        deps = self._extract_dependencies(content)
 
-                            try:
-                                with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                                    content = f.read()
-                                    out.write(content if content.strip() else "[ARQUIVO VAZIO]")
-                            except Exception as file_error:
-                                out.write(f"[ERRO AO LER ARQUIVO: {file_error}]")
+                        out.write(f"\n\n{'#' * 80}\n")
+                        out.write(f"ARQUIVO: {path}\n")
+                        out.write(f"CAMADA: {layer}\n")
+                        if deps:
+                            out.write(f"DEPENDÊNCIAS NEXUS: {', '.join(deps)}\n")
+                        out.write(f"{'-' * 80}\n\n")
+                        
+                        out.write(content if content.strip() else "[ARQUIVO VAZIO]")
+                        out.write(f"\n\n{'#' * 80}\n")
 
-                            out.write(f"\n\n{'#'*70}\n")
+                    except Exception as e:
+                        out.write(f"\n[ERRO CRÍTICO NO ARQUIVO {path}: {e}]\n")
 
             print(f"✅ [NEXUS] Consolidação técnica finalizada: {file_path}")
-
-            # ATUALIZAÇÃO DO CONTEXTO: Fundamental para que Telegram/Gist funcionem
-            res_payload = {
-                "status": "success",
-                "file_path": file_path,
-                "timestamp": datetime.now().isoformat()
-            }
-
+            
+            res_payload = {"status": "success", "file_path": file_path, "timestamp": datetime.now().isoformat()}
             context["result"] = res_payload
             context["artifacts"]["consolidator"] = res_payload
 
             return context
 
         except Exception as e:
-            print(f"💥 [CONSOLIDATOR] Erro Crítico: {e}")
-            # Em caso de erro, o pipeline decide se para ou segue via strict_mode no runner
+            print(f"💥 [CONSOLIDATOR] Falha na Homeostase do arquivo: {e}")
             raise e
