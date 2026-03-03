@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Jarvis Assistant - Main Entry Point (Cloud/Edge)
-Versão Protegida contra Loop de Instanciação e Conflito 409.
+Versão 2026.03: Proteção contra gargalo de Health Check e Varredura Nexus.
 """
 
 import os
@@ -11,17 +11,18 @@ import uvicorn
 import threading
 import logging
 import time
+from fastapi import FastAPI
 
+# Imports de configuração e servidor
 from app.adapters.infrastructure import create_api_server
 from app.bootstrap_edge import main as edge_main
-from app.container import create_edge_container
 from app.core.config import settings
 from app.core.nexus import nexus
 
-# Configuração de Log para visibilidade no Render
+# Configuração de Log otimizada para Cloud
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -32,64 +33,75 @@ def is_running_on_cloud():
         not sys.stdin.isatty()
     )
 
-def start_telegram_safe(assistant):
+def bootstrap_background_services(api_assistant_placeholder):
     """
-    Inicializa o Telegram garantindo que não haja conflitos de inicialização rápida.
+    THREAD ISOLADA: Realiza a varredura pesada do Nexus e ativa o Telegram
+    sem travar o loop principal da API (evita falha de Health Check).
     """
-    # Delay de segurança para o Render encerrar instâncias antigas (Evita 409)
+    logger.info("🧵 [BOOTSTRAP] Iniciando varredura dinâmica do Nexus...")
+    
+    # Delay de segurança para o Render estabilizar instâncias (evita 409 Conflict)
     if os.getenv("RENDER") == "true":
-        logger.info("⏳ [CLOUD] Aguardando 8s para estabilização de rede/instância...")
         time.sleep(8)
 
     try:
+        # O Nexus faz a varredura física (os.walk) aqui. 
+        # Como está em thread, a API já está respondendo /health no Render.
+        assistant = nexus.resolve("assistant_service")
         telegram = nexus.resolve("telegram_adapter")
-        if telegram:
+
+        if assistant and telegram:
+            logger.info("✅ [NEXUS] Ecossistema localizado. Ativando Polling...")
+            
             def telegram_callback(text, chat_id):
-                # Ponte direta para o processamento do Jarvis
+                # Ponte dinâmica: processa o comando via assistente resolvido pelo Nexus
                 return assistant.process_command(text, channel="telegram")
 
-            logger.info("📡 [TELEGRAM] Solicitando início de polling...")
             telegram.start_polling(callback=telegram_callback)
         else:
-            logger.warning("⚠️ [TELEGRAM] Adaptador não encontrado no Nexus.")
+            logger.error("⚠️ [NEXUS] Erro crítico: Falha ao localizar Assistant ou Telegram.")
+            
     except Exception as e:
-        logger.error(f"❌ [TELEGRAM] Falha fatal na thread: {e}")
+        logger.error(f"❌ [BOOTSTRAP] Erro fatal na thread de serviços: {e}")
 
 def start_cloud_service():
     print("=" * 60)
-    print("🤖 JARVIS ASSISTANT - MODO CLOUD ATIVO")
+    print("🤖 JARVIS ASSISTANT - MODO CLOUD ATIVO (API + NEXUS)")
     print("=" * 60)
 
-    # 1. Singleton do Container e Assistente
+    # 1. Cria a API Server imediatamente.
+    # Passamos um objeto de proxy ou o container básico apenas para rotas web.
+    # A inteligência pesada de busca fica para a thread de bootstrap.
+    from app.container import create_edge_container
     container = create_edge_container(
         wake_word=settings.wake_word,
         language=settings.language,
     )
-    assistant = container.assistant_service
+    
+    # Inicia o servidor com o assistente do container (fallback rápido)
+    app = create_api_server(container.assistant_service)
 
-    # 2. Configura a API
-    app = create_api_server(assistant)
+    # 2. DISPARO DO BOOTSTRAP DINÂMICO (Isolado)
+    # Aqui o Nexus fará o papel de buscador sem travar a porta 10000.
+    t = threading.Thread(
+        target=bootstrap_background_services, 
+        args=(container.assistant_service,),
+        daemon=True,
+        name="JarvisDynamicDiscovery"
+    )
+    t.start()
 
-    # 3. Disparo do Telegram em thread única nomeada
-    if os.getenv("TELEGRAM_TOKEN"):
-        t = threading.Thread(
-            target=start_telegram_safe, 
-            args=(assistant,), 
-            daemon=True,
-            name="TelegramServiceThread"
-        )
-        t.start()
-        logger.info("🧵 Thread do Telegram disparada.")
-
-    # 4. Servidor Web
+    # 3. Execução do Servidor Web
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("PORT", 10000))
 
-    logger.info(f"🚀 Uvicorn iniciando em {host}:{port}")
-    uvicorn.run(app, host=host, port=port, log_level="info", access_log=True)
+    logger.info(f"🚀 [SERVER] Uvicorn subindo em {host}:{port}")
+    # access_log=False reduz I/O de disco no Render, melhorando a performance.
+    uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
 
 if __name__ == "__main__":
     if is_running_on_cloud():
         start_cloud_service()
     else:
+        # Modo Local/Edge (Bootstrap original)
         edge_main()
