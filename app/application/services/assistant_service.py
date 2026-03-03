@@ -22,6 +22,7 @@ class AssistantService(NexusComponent):
         self._intent_processor = nexus.resolve("intent_processor")
         self._voice = None
         self._history_adapter = None
+        self._memory_manager = None
         self.is_running = True
 
     def _get_interpreter(self):
@@ -41,6 +42,12 @@ class AssistantService(NexusComponent):
         if self._history_adapter is None:
             self._history_adapter = nexus.resolve("sqlite_history_adapter")
         return self._history_adapter
+
+    def _get_memory_manager(self):
+        """Resolve o gerenciador de memória semântica sob demanda (lazy loading)."""
+        if self._memory_manager is None:
+            self._memory_manager = nexus.resolve("memory_manager")
+        return self._memory_manager
 
     def _get_hive_context(self, limit: int = 5) -> List[Dict[str, Any]]:
         """Recupera o histórico recente de TODOS os canais (hive mind)."""
@@ -98,13 +105,33 @@ class AssistantService(NexusComponent):
                 logger.error(f"❌ {error_msg}")
                 return Response(success=False, message=error_msg, error="INIT_FAILURE")
 
-            # 2. Interpreta o comando (Proteção contra NoneType .execute)
-            intent = interpreter.execute({"text": text})
+            # 2. Recupera contexto de memória semântica de longo prazo
+            memory_context_lines: List[str] = []
+            try:
+                memory_manager = self._get_memory_manager()
+                relevant = memory_manager.get_relevant_context(text)
+                if relevant:
+                    memory_context_lines = [
+                        f"- [{item.get('timestamp', '')}] Usuário: {item.get('user', '')} | "
+                        f"JARVIS: {item.get('jarvis', '')}"
+                        for item in relevant
+                    ]
+                    logger.debug(f"🧠 [MEMORY] {len(relevant)} interação(ões) relevante(s) recuperada(s)")
+            except Exception as e:
+                logger.debug(f"Memory context unavailable: {e}")
 
-            # 3. Processa a intenção
+            # 3. Interpreta o comando, injetando memória de contexto quando disponível
+            interpret_ctx: Dict[str, Any] = {"text": text}
+            if memory_context_lines:
+                interpret_ctx["system_prompt_extra"] = (
+                    "### MEMÓRIA DE CONTEXTO ###\n" + "\n".join(memory_context_lines)
+                )
+            intent = interpreter.execute(interpret_ctx)
+
+            # 4. Processa a intenção
             result = intent_processor.execute({"intent": intent})
 
-            # 4. Constrói a resposta unificada
+            # 5. Constrói a resposta unificada
             response = Response(
                 success=True,
                 message=str(result) if result else "Comando executado com sucesso.",
@@ -115,7 +142,13 @@ class AssistantService(NexusComponent):
                 },
             )
 
-            # 5. Persiste na memória compartilhada
+            # 6. Persiste na memória semântica de longo prazo
+            try:
+                self._get_memory_manager().store_interaction(text, response.message)
+            except Exception as e:
+                logger.debug(f"Failed to store in semantic memory: {e}")
+
+            # 7. Persiste na memória compartilhada
             self._save_to_hive(text, response, channel=channel)
             return response
 
