@@ -16,8 +16,11 @@ O JARVIS é uma plataforma de automação e assistência que:
 - 🎤 **Reconhece voz** com Google Speech Recognition
 - 🌐 **Orquestra múltiplos dispositivos** (PC, celular, IoT) por capacidade e proximidade
 - 🔧 **Auto-repara erros** via GitHub Copilot (self-healing)
+- 💾 **Memória biográfica vetorial** – recorda interações dos últimos 30 dias (FAISS)
+- 👁️ **Visão computacional** – descreve o contexto visual atual via Gemini 1.5 Flash
+- 🔭 **Núcleo Proativo (Overwatch)** – monitora CPU/RAM, contexto e inatividade do usuário
 - 🏗️ **Arquitetura Hexagonal** – domínio puro, testável e cloud-ready
-- 🧬 **Nexus** – container de injeção de dependência com discovery automático
+- 🧬 **Nexus** – container de injeção de dependência com discovery automático e Circuit Breaker
 
 ---
 
@@ -26,12 +29,14 @@ O JARVIS é uma plataforma de automação e assistência que:
 | Componente | Status |
 |---|---|
 | API REST (FastAPI) | ✅ Ativo |
-| Nexus (DI) | ✅ Ativo |
+| Nexus (DI + Circuit Breaker) | ✅ Ativo |
 | Adaptadores LLM (Groq, Gemini) | ✅ Ativo |
 | Reconhecimento de voz | ✅ Ativo |
 | Orquestração de dispositivos | ✅ Ativo |
+| **Memória Vetorial (FAISS)** | ✅ **Ativo** |
+| **Visão Computacional (Gemini Flash)** | ✅ **Ativo** |
+| **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** |
 | Auto-Evolução | ⏸️ **PAUSADA** |
-| Reorganização estrutural | 🔧 Em andamento |
 
 > Auto-evolução está **pausada** enquanto a estrutura do repositório é reorganizada.
 

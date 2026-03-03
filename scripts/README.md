@@ -1,12 +1,54 @@
-# Auto-Fixer Scripts
+# Scripts – JARVIS Utilitários e Daemons
 
-This directory contains scripts for the Jarvis Self-Healing System.
+This directory contains scripts for the Jarvis Self-Healing System and the Proactive Core.
 
 ## Overview
 
-The auto-fixer system is part of Jarvis's self-healing architecture, enabling automatic detection, analysis, and correction of code errors using AI.
+The scripts are part of Jarvis's self-healing and proactive architecture, enabling automatic detection, analysis, and correction of code errors as well as background system monitoring.
 
 ## Scripts
+
+### overwatch_daemon.py
+
+Background daemon that implements the **JARVIS Proactive Core** (`[PROACTIVE_CORE]`).
+
+**Features:**
+- Monitors CPU and RAM usage (alerts if > 85%)
+- Detects changes in `data/context.json`
+- After 30 min of user inactivity, uses `VisionAdapter` to verify presence and suggests pending calendar tasks
+- Uses `nexus.resolve()` to access `vision_adapter`, `telegram_adapter` and `voice_provider`
+- All proactive log lines prefixed with `[PROACTIVE_CORE]`
+
+**Usage (standalone):**
+
+```bash
+python scripts/overwatch_daemon.py
+```
+
+**Embedded (started automatically in `main.py`):**
+
+```python
+from scripts.overwatch_daemon import OverwatchDaemon
+daemon = OverwatchDaemon()
+daemon.start()  # non-blocking daemon thread
+```
+
+**Environment Variables:**
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `TELEGRAM_CHAT_ID` | No | Telegram chat ID for proactive notifications |
+| `GEMINI_API_KEY` | No | Required only for VisionAdapter (inactivity check) |
+
+**Thresholds (configurable via constructor):**
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `cpu_threshold` | 85% | CPU% above which a warning is sent |
+| `ram_threshold` | 85% | RAM% above which a warning is sent |
+| `inactivity_timeout` | 1800 s | Seconds before vision-based presence check |
+
+---
 
 ### auto_fixer_logic.py
 

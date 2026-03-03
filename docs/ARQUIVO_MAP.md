@@ -96,6 +96,7 @@
 |---|---|
 | `action_provider.py` | Interface para execução de ações de UI (digitar, pressionar tecla, abrir URL). |
 | `history_provider.py` | Interface para acesso ao histórico de comandos. |
+| `memory_provider.py` | Interface para memória vetorial/biográfica (`store_event`, `query_similar`, `clear`). |
 | `reward_provider.py` | Interface para registro de recompensas/punições do RL. |
 | `security_provider.py` | Interface para validação de segurança e autenticação. |
 | `system_controller.py` | Interface para controle do sistema operacional. |
@@ -106,7 +107,7 @@
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `assistant_service.py` | Serviço principal do assistente – processa entrada do usuário end-to-end. |
+| `assistant_service.py` | Serviço principal do assistente – processa entrada do usuário end-to-end. Integra memória vetorial (últimos 30 dias) e memória semântica de longo prazo. |
 | `auto_evolutionV2.py` | Lógica de auto-evolução (Versão 2) – gerencia missões e mutations. **PAUSADA.** |
 | `browser_manager.py` | Gerencia sessões de navegador (Playwright). |
 | `capability_impact_analyzer.py` | Analisa impacto de uma capability antes de ativá-la. |
@@ -200,6 +201,8 @@
 | `sqlite_history_adapter.py` | Histório de comandos em SQLite. Implementa `HistoryProvider`. |
 | `system_executor.py` | Executa automações de sistema (screenshot, digitar, abrir URL). Registrado no Nexus. |
 | `telegram_adapter.py` | Notificações e interação via Telegram. |
+| `vector_memory_adapter.py` | Memória biográfica vetorial (FAISS + fallback puro-Python). Implementa `MemoryProvider`. Registrado no Nexus. |
+| `vision_adapter.py` | Visão computacional via Gemini 1.5 Flash – captura screenshot/webcam e gera descrição contextual. Registrado no Nexus. |
 
 ---
 
@@ -244,7 +247,8 @@ Inicializa o modo edge (dispositivo local) – carrega adaptadores de voz, tecla
 | `data/capabilities.json` | Capabilities disponíveis com metadados. |
 | `data/architecture_rules.yml` | Regras de arquitetura validadas automaticamente. |
 | `migrations/*.sql` | Migrations do banco de dados. |
-| `scripts/` | Scripts utilitários (análise, estado, cristalização). |
+| `scripts/` | Scripts utilitários (análise, estado, cristalização, auto-cura, daemon proativo). |
+| `scripts/overwatch_daemon.py` | Daemon proativo (background): monitora CPU/RAM, `data/context.json` e inatividade do usuário. Todas as ações prefixadas `[PROACTIVE_CORE]`. |
 | `Makefile` | Comandos utilitários (`make test`, `make lint`, etc.). |
 | `Dockerfile` / `docker-compose.yml` | Containerização para deploy em cloud. |
 | `render.yaml` | Configuração de deploy no Render. |

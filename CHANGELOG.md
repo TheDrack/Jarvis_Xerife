@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Núcleo Proativo Multimodal com Memória Permanente (2026-03-03)
+
+**Fase 1 – Estabilização de Infraestrutura**
+- `app/core/nexus.py`: Adicionado `CloudMock` – absorvedor transparente injetado automaticamente quando um componente falha. Corrige `ImportError` em `intent_processor.py` (`from app.core.nexus import CloudMock`).
+- `app/core/nexus.py`: Implementado **Circuit Breaker** no `JarvisNexus.resolve()`: timeout de 2 s abre o circuito, `CloudMock` retornado por 60 s, após o qual o circuito fecha e a instanciação é tentada novamente.
+- `scripts/state_machine.py`: Novo `ErrorCategory` enum. `identify_error()` agora distingue `ENVIRONMENT_ERROR` (`PermissionError`, `FileNotFoundError: No such file or directory`, `OSError`, etc.) de `CODE_ERROR` — erros de ambiente pausam o sistema sem mutar código.
+- `scripts/auto_fixer_logic.py`: Importa e usa `ErrorCategory`; `run_with_state_machine()` registra e pausa em erros de ambiente em vez de tentar auto-correção.
+
+**Fase 2 – Memória Biográfica Vetorial**
+- `app/application/ports/memory_provider.py`: Nova porta `MemoryProvider` com métodos `store_event()`, `query_similar()` e `clear()`.
+- `app/adapters/infrastructure/vector_memory_adapter.py`: Adaptador `VectorMemoryAdapter` – armazena eventos como vetores (FAISS com fallback puro-Python offline). Registrado no Nexus como `vector_memory_adapter`.
+- `app/application/services/assistant_service.py`: `process_command()` consulta a memória vetorial (últimos 30 dias) antes de cada resposta e armazena comando + resposta do LLM como vetores após cada interação.
+- `requirements.txt`: Adicionadas dependências `numpy>=1.24.0` e `faiss-cpu>=1.7.4`.
+
+**Fase 3 – Expansão Sensorial (Visão Computacional)**
+- `app/adapters/infrastructure/vision_adapter.py`: Adaptador `VisionAdapter` – captura screenshot silencioso (mss/Pillow) ou frame de webcam (OpenCV) e envia ao **Gemini 1.5 Flash** com o prompt *"Descreva o contexto atual do usuário em 1 frase"*. Registrado no Nexus como `vision_adapter`.
+
+**Fase 4 – Overwatch Daemon (Núcleo Proativo)**
+- `scripts/overwatch_daemon.py`: Daemon de background `OverwatchDaemon` – monitora CPU/RAM, mudanças em `data/context.json` e inatividade do usuário (30 min). Após inatividade, usa `VisionAdapter` para verificar presença e sugere tarefa pendente do calendário. Todas as ações prefixadas `[PROACTIVE_CORE]`.
+- `main.py`: `bootstrap_background_services()` inicia o `OverwatchDaemon` automaticamente; cada comando Telegram chama `notify_activity()` para reiniciar o timer de inatividade.
+
+**Infraestrutura e Documentação**
+- `data/nexus_registry.json`: `vector_memory_adapter` e `vision_adapter` registrados.
+- `docs/NEXUS.md`: Tabela de componentes atualizada; seção de Circuit Breaker adicionada.
+- `docs/ARQUIVO_MAP.md`: Todos os novos arquivos documentados.
+- `docs/STATUS.md`: Status dos novos componentes ativos; seções de memória vetorial, visão e Overwatch Daemon.
+- `scripts/README.md`: Documentação do `overwatch_daemon.py`.
+
 ### Changed
 
 #### Refactoring Estrutural (2026-03-01)

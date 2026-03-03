@@ -9,5 +9,7 @@
     "consolidator": "app.adapters.infrastructure.consolidator",
     "telegram_adapter": "app.adapters.infrastructure.telegram_adapter",
     "gist_uploader": "app.adapters.infrastructure.gist_uploader",
-    "drive_uploader": "app.adapters.infrastructure.drive_uploader"
+    "drive_uploader": "app.adapters.infrastructure.drive_uploader",
+    "vector_memory_adapter": "app.adapters.infrastructure.vector_memory_adapter",
+    "vision_adapter": "app.adapters.infrastructure.vision_adapter"
 }
