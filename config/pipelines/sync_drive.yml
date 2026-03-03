@@ -14,7 +14,7 @@ components:
 
   telegram_backup:
     id: "telegram_adapter"
-    hint_path: "infrastructure/adapters"
+    hint_path: "infrastructure"
     config:
       action: "upload_backup"
       token: "${{ secrets.TELEGRAM_TOKEN }}"
