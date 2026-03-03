@@ -5,181 +5,120 @@ import os
 import json
 import sys
 import urllib.request
-import urllib.parse
-import traceback
 import threading
+import traceback
 from typing import Any, Optional, Dict
 
-# Configuração de logging
 logger = logging.getLogger(__name__)
-
-class CloudMock:
-    """Objeto dinâmico que aceita qualquer chamada de método para evitar quebras em Cloud."""
-    def __init__(self, target_id: str):
-        self._target_id = target_id
-
-    def __getattr__(self, name):
-        def method(*args, **kwargs):
-            logging.debug(f"☁️ [NEXUS-MOCK] {self._target_id}.{name} chamado em Cloud.")
-            return None
-        return method
-
-    def __bool__(self):
-        return False 
 
 class JarvisNexus:
     def __init__(self):
         self.base_dir = os.path.abspath(os.getcwd())
         self.gist_id = "23d15b3f9d010179ace501a79c78608f"
         self._instances: Dict[str, Any] = {}
-        self._resolving: set = set() 
         self._lock = threading.Lock()
-
-        # Detecta ambiente Cloud
-        self.is_cloud = os.getenv("RENDER") == "true" or not sys.stdin.isatty()
-
-        # Cache inicial
+        self.is_cloud = os.getenv("GITHUB_ACTIONS") == "true" or os.getenv("RENDER") == "true"
         self._cache = self._load_remote_memory()
 
     def _load_remote_memory(self) -> dict:
-        """Carrega o DNA do Gist com tratamento de erro robusto."""
         url = f"https://gist.githubusercontent.com/TheDrack/{self.gist_id}/raw/nexus_memory.json"
         try:
             req = urllib.request.Request(url, headers={'Cache-Control': 'no-cache'})
-            with urllib.request.urlopen(req, timeout=7) as response:
-                if response.status == 200:
-                    data = json.loads(response.read().decode('utf-8'))
-                    return {k: v.split("Jarvis_Xerife.")[-1] for k, v in data.items()}
-        except Exception as e:
-            logger.warning(f"⚠️ [NEXUS] DNA remoto indisponível: {e}. Usando descoberta local.")
-        return {}
+            with urllib.request.urlopen(req, timeout=5) as response:
+                return json.loads(response.read().decode('utf-8'))
+        except:
+            return {}
 
     def resolve(self, target_id: str, singleton: bool = True, hint_path: Optional[str] = None) -> Optional[Any]:
         """
-        Resolve uma dependência. 
-        hint_path: Caminho sugerido pelo chamador para acelerar a localização.
+        Resolve o componente priorizando o hint_path fornecido pelo Pipeline.
         """
         with self._lock:
             if singleton and target_id in self._instances:
                 return self._instances[target_id]
 
-            if target_id in self._resolving:
-                logger.error(f"🔄 [NEXUS] Loop de dependência detectado para '{target_id}'!")
-                return None
+        instance = None
+        
+        # 1. TENTATIVA VIA HINT PATH (ALTA PRIORIDADE)
+        if hint_path:
+            # Normaliza: adapters/infrastructure -> app.adapters.infrastructure.target_id
+            clean_hint = hint_path.replace("/", ".").replace("\\", ".").strip(".")
+            # Tenta com prefixo 'app.' e sem ele
+            potential_paths = [
+                f"app.{clean_hint}.{target_id}",
+                f"{clean_hint}.{target_id}"
+            ]
+            
+            for path in potential_paths:
+                instance = self._instantiate(target_id, path)
+                if instance:
+                    logger.info(f"📍 [NEXUS] '{target_id}' resolvido via Hint: {path}")
+                    break
 
-            self._resolving.add(target_id)
+        # 2. TENTATIVA VIA CACHE/DNA
+        if not instance and target_id in self._cache:
+            instance = self._instantiate(target_id, self._cache[target_id])
 
-        try:
-            instance = None
-            # Ordem de prioridade: 1. hint_path | 2. Cache Gist | 3. Discovery
-            module_path = hint_path or self._cache.get(target_id)
-
+        # 3. TENTATIVA VIA DISCOVERY (ULTIMO RECURSO)
+        if not instance:
+            logger.info(f"🔍 [NEXUS] Hint falhou ou ausente. Iniciando Discovery para '{target_id}'...")
+            module_path = self._perform_omniscient_discovery(target_id)
             if module_path:
                 instance = self._instantiate(target_id, module_path)
+                if instance:
+                    self._update_dna(target_id, module_path)
 
-            if not instance:
-                logger.info(f"🔍 [NEXUS] Buscando '{target_id}' via Omniscient Discovery...")
-                module_path = self._perform_omniscient_discovery(target_id)
-                if module_path:
-                    instance = self._instantiate(target_id, module_path)
-                    if instance:
-                        self._update_dna(target_id, module_path)
-
-            if instance and singleton:
-                with self._lock:
-                    self._instances[target_id] = instance
-
-            return instance
-
-        finally:
+        if instance and singleton:
             with self._lock:
-                self._resolving.discard(target_id)
+                self._instances[target_id] = instance
+        
+        return instance
 
     def _perform_omniscient_discovery(self, target_id: str) -> Optional[str]:
-        """Localiza o arquivo no projeto e converte para path de módulo Python."""
         target_file = f"{target_id}.py"
-        for root, _, files in os.walk(self.base_dir):
-            if any(x in root for x in [".git", "__pycache__", "venv", ".venv", "tests"]):
-                continue
-
+        for root, dirs, files in os.walk(self.base_dir):
+            if any(x in root for x in [".git", "__pycache__", "venv", ".venv"]): continue
             if target_file in files:
                 rel_path = os.path.relpath(root, self.base_dir)
-                if rel_path == ".":
-                    return target_id
-
-                package_path = rel_path.replace(os.sep, ".")
-                return f"{package_path}.{target_id}"
+                if rel_path == ".": return target_id
+                return f"{rel_path.replace(os.sep, '.')}.{target_id}"
         return None
 
     def _instantiate(self, target_id: str, module_path: str) -> Optional[Any]:
-        """Cria a instância da classe, tratando desvios de Hardware em Cloud."""
-        
-        # Correção de caminhos que podem vir com extensões .py do hint_path
-        if module_path.endswith(".py"):
-            module_path = module_path[:-3].replace("/", ".").replace("\\", ".")
-
-        hardware_keywords = ["keyboard", "audio", "camera", "gpio", "edge_adapter"]
-        if self.is_cloud and any(key in target_id or key in module_path for key in hardware_keywords):
-            logger.info(f"🛡️ [NEXUS] Hardware Bypass: '{target_id}' -> CloudMock.")
-            return CloudMock(target_id)
-
         try:
+            # Garante que o diretório base está no path
             if self.base_dir not in sys.path:
                 sys.path.insert(0, self.base_dir)
-
+            
             module = importlib.import_module(module_path)
+            # Tenta converter snake_case para PascalCase (drive_uploader -> DriveUploader)
             class_name = "".join(word.capitalize() for word in target_id.split("_"))
-
-            if not hasattr(module, class_name):
-                # Tenta fallback para nome da classe igual ao target_id (case sensitive) se CamelCase falhar
-                if hasattr(module, target_id):
-                    class_name = target_id
-                else:
-                    logger.error(f"❌ [NEXUS] Classe '{class_name}' não encontrada em {module_path}")
-                    return None
-
-            clazz = getattr(module, class_name)
-            return clazz()
-
-        except ImportError as e:
-            if self.is_cloud:
-                logger.warning(f"⚠️ [NEXUS] Dependência '{e.name}' ausente em Cloud. Mockando {target_id}.")
-                return CloudMock(target_id)
-            logger.error(f"❌ [NEXUS] Erro de importação em {module_path}: {e}")
+            
+            clazz = getattr(module, class_name, None) or getattr(module, target_id, None)
+            
+            if clazz:
+                return clazz()
             return None
         except Exception:
-            logger.error(f"💥 [NEXUS] Erro crítico ao instanciar {target_id}:\n{traceback.format_exc()}")
             return None
 
     def _update_dna(self, target_id: str, module_path: str):
-        """Sincroniza o novo caminho com o Gist remoto."""
         self._cache[target_id] = module_path
         token = os.getenv("GIST_PAT")
-        if not token or not self.gist_id:
-            return
-
+        if not token: return
+        
         def _async_update():
             try:
                 url = f"https://api.github.com/gists/{self.gist_id}"
                 payload = json.dumps({
-                    "files": {
-                        "nexus_memory.json": {
-                            "content": json.dumps(self._cache, indent=4)
-                        }
-                    }
+                    "files": {"nexus_memory.json": {"content": json.dumps(self._cache, indent=4)}}
                 }).encode('utf-8')
-
                 req = urllib.request.Request(url, data=payload, method='PATCH')
                 req.add_header("Authorization", f"token {token}")
                 req.add_header("Content-Type", "application/json")
-
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    if response.status == 200:
-                        logger.info(f"🧬 [NEXUS] DNA atualizado: '{target_id}'")
-            except Exception as e:
-                logger.warning(f"⚠️ [NEXUS] Erro ao sincronizar DNA Gist: {e}")
-
+                urllib.request.urlopen(req, timeout=10)
+            except: pass
+            
         threading.Thread(target=_async_update, daemon=True).start()
 
-# Instância Global Única
 nexus = JarvisNexus()
