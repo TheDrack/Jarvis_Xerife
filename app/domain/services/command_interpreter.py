@@ -1,30 +1,36 @@
-from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
-"""Command Interpreter - Pure business logic for interpreting user commands"""
+"""
+Command Interpreter - Pure business logic for interpreting user commands.
+Integrado ao ecossistema Nexus para resolução dinâmica.
+"""
 
+from app.core.nexuscomponent import NexusComponent
 from app.domain.models import CommandType, Intent
+from app.core.config import settings
+import logging
 
+logger = logging.getLogger(__name__)
 
 class CommandInterpreter(NexusComponent):
-    def execute(self, context: dict):
-        text = context.get("text", "") if context else ""
-        return self.interpret(text)
-
     """
-    Interprets raw text commands into structured Intents.
-    Pure Python, no dependencies on hardware or frameworks.
+    Interpreta comandos de texto bruto em Intents estruturados.
+    Lógica pura, sem dependências de hardware ou frameworks externos.
     """
 
-    def __init__(self, wake_word: str = "xerife"):
+    def __init__(self, wake_word: str = None):
         """
-        Initialize the command interpreter
-
+        Inicializa o interpretador de comandos.
+        
         Args:
-            wake_word: The wake word to filter out from commands
+            wake_word: A palavra de ativação para filtrar dos comandos.
+                       Se None, busca 'xerife' ou a config do sistema.
         """
-        self.wake_word = wake_word
+        super().__init__()
+        self.wake_word = wake_word or getattr(settings, "wake_word", "xerife").lower()
+        
+        # Mapeamento de padrões para tipos de comando
         self._command_patterns = {
-            # GitHub workflow / flow commands (longer patterns first for precedence)
+            # GitHub workflow / flow commands
             "rodar workflow": CommandType.RUN_WORKFLOW,
             "executar workflow": CommandType.RUN_WORKFLOW,
             "acionar workflow": CommandType.RUN_WORKFLOW,
@@ -49,49 +55,53 @@ class CommandInterpreter(NexusComponent):
             "issue": CommandType.REPORT_ISSUE,
         }
 
+    def execute(self, context: dict) -> Intent:
+        """
+        Ponto de entrada para o AssistantService.
+        
+        Args:
+            context: Dicionário contendo pelo menos a chave 'text'.
+        """
+        if not context or not isinstance(context, dict):
+            logger.warning("⚠️ [INTERPRETER] Contexto inválido recebido.")
+            return self.interpret("")
+            
+        text = context.get("text", "")
+        return self.interpret(text)
+
     def interpret(self, raw_input: str) -> Intent:
         """
-        Interpret a raw text command into a structured Intent
-
-        Args:
-            raw_input: Raw text from voice or text input
-
-        Returns:
-            Intent object with command type and parameters
+        Converte entrada bruta em um objeto Intent estruturado.
         """
-        # Normalize input
+        if not raw_input:
+            return Intent(command_type=CommandType.UNKNOWN, parameters={}, raw_input="", confidence=0.0)
+
+        # Normalização
         command = raw_input.lower().strip()
 
-        # Remove wake word if present (handle both with and without space)
+        # Remoção da Wake Word
         if self.wake_word in command:
             command = command.replace(self.wake_word, "").strip()
-            # Also remove from raw_input to preserve casing
+            # Preserva casing do original para parâmetros sensíveis
             raw_input_lower = raw_input.lower()
             wake_pos = raw_input_lower.find(self.wake_word)
             if wake_pos != -1:
-                # Extract everything after the wake word
                 raw_input = raw_input[wake_pos + len(self.wake_word):].strip()
 
-        # Parse command
+        # Busca por padrões
         for pattern, command_type in self._command_patterns.items():
             if pattern in command:
-                # Extract parameter by removing the pattern
-                param = command.replace(f"{pattern} ", "").strip()
-                
-                # For REPORT_ISSUE, preserve original casing from raw_input
+                # Extração de parâmetros
+                param = command.replace(pattern, "", 1).strip()
+
+                # Preservação de Case para Report de Issues
                 if command_type == CommandType.REPORT_ISSUE:
-                    # Find the pattern in raw_input (case-insensitive)
                     raw_lower = raw_input.lower()
                     pattern_pos = raw_lower.find(pattern)
                     if pattern_pos != -1:
-                        # Extract everything after the pattern and any trailing space
                         param_start = pattern_pos + len(pattern)
-                        # Skip any whitespace after the pattern
-                        while param_start < len(raw_input) and raw_input[param_start].isspace():
-                            param_start += 1
                         param = raw_input[param_start:].strip()
 
-                # Build parameters based on command type
                 parameters = self._build_parameters(command_type, param, command)
 
                 return Intent(
@@ -101,7 +111,7 @@ class CommandInterpreter(NexusComponent):
                     confidence=1.0,
                 )
 
-        # Unknown command
+        # Comando não reconhecido
         return Intent(
             command_type=CommandType.UNKNOWN,
             parameters={"raw_command": command},
@@ -110,69 +120,23 @@ class CommandInterpreter(NexusComponent):
         )
 
     def _build_parameters(self, command_type: CommandType, param: str, full_command: str) -> dict:
-        """
-        Build parameters dictionary based on command type
-
-        Args:
-            command_type: Type of command
-            param: Extracted parameter from command
-            full_command: Full command string
-
-        Returns:
-            Dictionary of parameters
-        """
-        if command_type == CommandType.TYPE_TEXT:
-            return {"text": param}
-
-        elif command_type == CommandType.PRESS_KEY:
-            return {"key": param}
-
-        elif command_type == CommandType.OPEN_BROWSER:
-            return {}
-
-        elif command_type == CommandType.OPEN_URL:
-            # Add https:// if not present
-            url = param
-            if url and not url.startswith("http"):
-                url = f"https://{url}"
-            return {"url": url}
-
-        elif command_type == CommandType.SEARCH_ON_PAGE:
-            return {"search_text": param}
-
-        elif command_type == CommandType.REPORT_ISSUE:
-            # Extract context from the command
-            return {"issue_description": param, "context": full_command}
-
-        elif command_type == CommandType.RUN_WORKFLOW:
-            return {"workflow_name": param, "event_type": "jarvis_order"}
-
-        return {"param": param}
+        """Constrói o dicionário de parâmetros baseado no tipo."""
+        handlers = {
+            CommandType.TYPE_TEXT: lambda: {"text": param},
+            CommandType.PRESS_KEY: lambda: {"key": param},
+            CommandType.OPEN_BROWSER: lambda: {},
+            CommandType.OPEN_URL: lambda: {"url": param if param.startswith("http") else f"https://{param}"},
+            CommandType.SEARCH_ON_PAGE: lambda: {"search_text": param},
+            CommandType.REPORT_ISSUE: lambda: {"issue_description": param, "context": full_command},
+            CommandType.RUN_WORKFLOW: lambda: {"workflow_name": param, "event_type": "jarvis_order"}
+        }
+        
+        return handlers.get(command_type, lambda: {"param": param})()
 
     def is_exit_command(self, raw_input: str) -> bool:
-        """
-        Check if the input is an exit command
-
-        Args:
-            raw_input: Raw text input
-
-        Returns:
-            True if it's an exit command
-        """
         exit_keywords = ["fechar", "sair", "encerrar", "tchau"]
-        command = raw_input.lower().strip()
-        return any(keyword in command for keyword in exit_keywords)
+        return any(k in raw_input.lower() for k in exit_keywords)
 
     def is_cancel_command(self, raw_input: str) -> bool:
-        """
-        Check if the input is a cancel command
-
-        Args:
-            raw_input: Raw text input
-
-        Returns:
-            True if it's a cancel command
-        """
         cancel_keywords = ["cancelar", "parar", "stop"]
-        command = raw_input.lower().strip()
-        return any(keyword in command for keyword in cancel_keywords)
+        return any(k in raw_input.lower() for k in cancel_keywords)
