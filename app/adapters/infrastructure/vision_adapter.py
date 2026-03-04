@@ -8,9 +8,9 @@ user is looking at / doing right now.
 Implements :class:`app.core.nexuscomponent.NexusComponent`.
 """
 
-import base64
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from app.core.nexuscomponent import NexusComponent
@@ -22,6 +22,10 @@ _VISION_MODEL = "gemini-1.5-flash"
 
 # Prompt sent together with the image
 _DESCRIBE_PROMPT = "Descreva o contexto atual do usuário em 1 frase."
+
+
+class ExternalVisionNotAllowedError(PermissionError):
+    """Raised when external image upload is attempted without consent."""
 
 
 class VisionAdapter(NexusComponent):
@@ -37,6 +41,10 @@ class VisionAdapter(NexusComponent):
         api_key: Google Gemini API key (defaults to ``GEMINI_API_KEY`` env var).
         use_webcam: When True, capture from the default webcam instead of screenshot.
         vision_model: Gemini model to use (default: ``gemini-1.5-flash``).
+        allow_external_vision: Master switch for external image uploads.
+            Defaults to ``False``; must be set ``True`` **and** ``user_consent``
+            must also be ``True`` before any image is sent externally.
+        user_consent: Explicit per-session user consent for image uploads.
     """
 
     def __init__(
@@ -44,10 +52,15 @@ class VisionAdapter(NexusComponent):
         api_key: Optional[str] = None,
         use_webcam: bool = False,
         vision_model: str = _VISION_MODEL,
+        allow_external_vision: bool = False,
+        user_consent: bool = False,
     ) -> None:
         self._api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         self._use_webcam = use_webcam
         self._vision_model = vision_model
+        self.allow_external_vision: bool = allow_external_vision
+        self.user_consent: bool = user_consent
+        self._audit_log: list = []
 
     # ------------------------------------------------------------------
     # NexusComponent interface
@@ -140,18 +153,59 @@ class VisionAdapter(NexusComponent):
             logger.warning("📷 [VisionAdapter] Erro ao capturar webcam: %s", e)
             return None
 
+    def _check_external_upload_consent(self, image_source: str = "screenshot") -> None:
+        """Verify that both the configuration flag and user consent are set.
+
+        Args:
+            image_source: Human-readable description of the image origin.
+
+        Raises:
+            ExternalVisionNotAllowedError: When ``allow_external_vision`` or
+                ``user_consent`` is ``False``.
+        """
+        if not self.allow_external_vision or not self.user_consent:
+            self._record_audit(image_source, allowed=False)
+            raise ExternalVisionNotAllowedError(
+                "Envio externo de imagem bloqueado: "
+                "allow_external_vision e user_consent devem ser True."
+            )
+        self._record_audit(image_source, allowed=True)
+
+    def _record_audit(self, image_source: str, allowed: bool) -> None:
+        """Append an audit record (no image data stored)."""
+        entry = {
+            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+            "image_source": image_source,
+            "allowed": allowed,
+        }
+        self._audit_log.append(entry)
+        level = logging.INFO if allowed else logging.WARNING
+        logger.log(
+            level,
+            "🔍 [VisionAdapter] Audit: source=%s allowed=%s ts=%s",
+            image_source,
+            allowed,
+            entry["timestamp"],
+        )
+
     def _analyze_with_gemini(self, image_bytes: bytes, prompt: str) -> Optional[str]:
-        """Send *image_bytes* to Gemini and return the text response."""
+        """Send *image_bytes* to Gemini and return the text response.
+
+        Raises:
+            ExternalVisionNotAllowedError: When external upload is not permitted.
+        """
         if not self._api_key:
             logger.error("❌ [VisionAdapter] GEMINI_API_KEY não configurada.")
             return None
+
+        image_source = "webcam" if self._use_webcam else "screenshot"
+        self._check_external_upload_consent(image_source)
 
         try:
             from google import genai
             from google.genai import types
 
             client = genai.Client(api_key=self._api_key)
-            image_b64 = base64.b64encode(image_bytes).decode("utf-8")
             response = client.models.generate_content(
                 model=self._vision_model,
                 contents=[
@@ -167,6 +221,8 @@ class VisionAdapter(NexusComponent):
             description = response.text.strip() if response.text else None
             logger.info("👁️ [VisionAdapter] Contexto visual: %s", description)
             return description
+        except ExternalVisionNotAllowedError:
+            raise
         except Exception as e:
             logger.error("❌ [VisionAdapter] Erro ao analisar imagem com Gemini: %s", e)
             return None
