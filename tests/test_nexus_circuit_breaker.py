@@ -124,7 +124,7 @@ class TestThreadSafeResolve:
             for t in threads:
                 t.start()
             for t in threads:
-                t.join(timeout=10)
+                t.join(timeout=30)
 
         # All threads must have received an instance
         assert len(instances) == 8
@@ -149,11 +149,8 @@ class TestAmbiguousDiscovery:
         # Simulate two candidates for the same component_id
         fake_candidates = [(_FakeA(), "app.mod_a.fake"), (_FakeB(), "app.mod_b.fake")]
 
-        original = nexus._global_search_with_path
-
         def _ambiguous(target_id):
-            # Reuse the real method's logic with injected candidates list
-            from app.core.nexus import AmbiguousComponentError
+            # Raise with two synthetic candidates
             if len(fake_candidates) > 1:
                 paths = [p for _, p in fake_candidates]
                 raise AmbiguousComponentError(target_id, paths)

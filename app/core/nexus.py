@@ -42,6 +42,8 @@ _CIRCUIT_BREAKER_RESET = float(os.getenv("NEXUS_CIRCUIT_RESET", "60.0"))
 _NEXUS_IMPORT_TIMEOUT = float(os.getenv("NEXUS_IMPORT_TIMEOUT", "1.0"))
 _NEXUS_INSTANTIATE_TIMEOUT = float(os.getenv("NEXUS_INSTANTIATE_TIMEOUT", "1.0"))
 _NEXUS_STRICT_MODE = os.getenv("NEXUS_STRICT_MODE", "false").lower() == "true"
+# Extra margin added to _CIRCUIT_BREAKER_TIMEOUT when a waiter thread blocks on a Future
+_WAITER_TIMEOUT_MARGIN = 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +91,9 @@ class CloudMock:
         def _noop(*args, **kwargs):
             self._call_count += 1
             record = {"method": name, "args": args, "kwargs": kwargs}
-            self._last_calls = (self._last_calls + [record])[-10:]
+            self._last_calls.append(record)
+            if len(self._last_calls) > 10:
+                self._last_calls = self._last_calls[-10:]
             logger.warning(
                 f"☁️ [CloudMock] '{self._component_id}.{name}' chamado no fallback "
                 f"(componente real indisponível).",
@@ -267,7 +271,7 @@ class JarvisNexus:
         # --- Wait branch: another thread is building ---
         if not am_builder:
             try:
-                return pending_future.result(timeout=_CIRCUIT_BREAKER_TIMEOUT + 1)
+                return pending_future.result(timeout=_CIRCUIT_BREAKER_TIMEOUT + _WAITER_TIMEOUT_MARGIN)
             except Exception:
                 return CloudMock(target_id)
 
@@ -319,7 +323,9 @@ class JarvisNexus:
                 return instance
 
         # 2. Registered path (DNA / local cache)
-        stored_path = self._cache.get(target_id) or self._path_map.get(target_id)
+        stored_path = self._cache.get(target_id)
+        if stored_path is None:
+            stored_path = self._path_map.get(target_id)
         if stored_path:
             instance = self._instantiate_from_path(stored_path, target_id)
             if instance:
@@ -438,7 +444,7 @@ class JarvisNexus:
             for component_id, path in data.get("components", {}).items():
                 parts = path.rsplit(".", 1)
                 # Strip trailing ClassName if the last segment starts with uppercase
-                if len(parts) == 2 and parts[1][:1].isupper():
+                if len(parts) == 2 and parts[1] and parts[1][0].isupper():
                     result[component_id] = parts[0]
                 else:
                     result[component_id] = path
@@ -522,7 +528,7 @@ class JarvisNexus:
             except Exception as err:
                 logger.error(f"[NEXUS] Gist patch attempt {attempt + 1} exception: {err}.")
             if attempt < 2:
-                time.sleep(0.1 * (2 ** attempt))  # 0.1s, 0.2s
+                time.sleep(0.1 * (2 ** attempt))  # 0.1s then 0.2s before the 2nd and 3rd tries
 
         logger.error("[NEXUS] All gist patch attempts failed; _mutated remains True.")
 
