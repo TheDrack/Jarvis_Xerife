@@ -73,6 +73,9 @@ class VectorMemoryAdapter(MemoryProvider):
     search, otherwise falls back to brute-force cosine similarity over an
     in-memory list.
 
+    Integrates with :class:`~app.application.privacy.pii_redactor.PiiRedactor`
+    via ``nexus.resolve("pii_redactor")`` to sanitize all text before indexing.
+
     Args:
         dim: Dimensionality of the internal vectors (default: 256).
     """
@@ -80,6 +83,7 @@ class VectorMemoryAdapter(MemoryProvider):
     def __init__(self, dim: int = _VECTOR_DIM) -> None:
         self._dim = dim
         self._events: List[Dict[str, Any]] = []
+        self._pii_redactor = None  # resolved lazily via Nexus
 
         if _FAISS_AVAILABLE:
             self._index = faiss.IndexFlatL2(dim)
@@ -87,6 +91,16 @@ class VectorMemoryAdapter(MemoryProvider):
         else:
             self._index = None
             logger.info("ℹ️ [VectorMemory] Usando fallback puro-Python.")
+
+    def _get_pii_redactor(self):
+        """Resolve PiiRedactor via Nexus (lazy loading)."""
+        if self._pii_redactor is None:
+            try:
+                from app.core.nexus import nexus
+                self._pii_redactor = nexus.resolve("pii_redactor")
+            except Exception as exc:  # pragma: no cover
+                logger.warning("⚠️ [VectorMemory] PiiRedactor indisponível: %s", exc)
+        return self._pii_redactor
 
     # ------------------------------------------------------------------
     # NexusComponent interface
@@ -110,15 +124,24 @@ class VectorMemoryAdapter(MemoryProvider):
         metadata: Optional[Dict[str, Any]] = None,
         timestamp: Optional[datetime] = None,
     ) -> str:
-        """Encode *text* and persist it."""
+        """Sanitize *text* for PII then encode and persist it."""
+        # Sanitize PII before indexing (mandatory: no raw PII in the vector index)
+        pii_redactor = self._get_pii_redactor()
+        if pii_redactor is not None and hasattr(pii_redactor, "sanitize"):
+            safe_text = pii_redactor.sanitize(text)
+            if safe_text != text:
+                logger.debug("🛡️ [VectorMemory] PII redactada antes de indexar.")
+        else:
+            safe_text = text
+
         event_id = str(uuid.uuid4())
         ts = timestamp or datetime.now(tz=timezone.utc)
-        vector = _vectorize(text, self._dim)
+        vector = _vectorize(safe_text, self._dim)
 
         self._events.append(
             {
                 "id": event_id,
-                "text": text,
+                "text": safe_text,
                 "vector": vector,
                 "metadata": metadata or {},
                 "timestamp": ts.isoformat(),

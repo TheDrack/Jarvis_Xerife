@@ -8,12 +8,17 @@ Supports:
 - Email addresses
 - Brazilian CPF numbers
 - Phone numbers (Brazilian and international)
+
+Implements :class:`app.core.nexuscomponent.NexusComponent` so it can be
+resolved via ``nexus.resolve("pii_redactor")``.
 """
 
 import logging
 import re
 import uuid
 from typing import Any, Dict, List, Optional
+
+from app.core.nexuscomponent import NexusComponent
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +49,11 @@ _REDACTION_MAP = [
 ]
 
 
-class PiiRedactor:
+class PiiRedactor(NexusComponent):
     """Sanitize text by replacing PII with safe placeholders.
+
+    Implements :class:`NexusComponent` so it is resolvable via
+    ``nexus.resolve("pii_redactor")``.
 
     Designed to be used as a pre-processing step before any text is sent
     to an embedding model or stored in the vector index.
@@ -69,6 +77,47 @@ class PiiRedactor:
         self._user_index: Dict[str, List[str]] = {}
         # event_id -> raw event record (text, metadata, …)
         self._events: Dict[str, Dict[str, Any]] = {}
+
+    # ------------------------------------------------------------------
+    # NexusComponent interface
+    # ------------------------------------------------------------------
+
+    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Execute a PII action described by *context*.
+
+        Expected context keys:
+            - ``action`` (str): ``"sanitize"`` (default), ``"purge_by_user"``,
+              or ``"purge_all"``.
+            - ``text`` (str): Input text (required for ``sanitize``).
+            - ``user_id`` (str): User identifier (required for ``purge_by_user``
+              and ``register_event``).
+            - ``metadata`` (dict, optional): Metadata for ``register_event``.
+
+        Returns:
+            Dict with ``success`` and action-specific result keys.
+        """
+        ctx = context or {}
+        action = ctx.get("action", "sanitize")
+
+        if action == "sanitize":
+            text = ctx.get("text", "")
+            if not text:
+                return {"success": False, "error": "Campo 'text' obrigatório para sanitize."}
+            sanitized = self.sanitize(text)
+            return {"success": True, "result": sanitized}
+
+        if action == "purge_by_user":
+            user_id = ctx.get("user_id", "")
+            if not user_id:
+                return {"success": False, "error": "Campo 'user_id' obrigatório para purge_by_user."}
+            count = self.purge_by_user(user_id)
+            return {"success": True, "purged": count}
+
+        if action == "purge_all":
+            count = self.purge_all()
+            return {"success": True, "purged": count}
+
+        return {"success": False, "error": f"Ação desconhecida: '{action}'."}
 
     # ------------------------------------------------------------------
     # Core sanitisation

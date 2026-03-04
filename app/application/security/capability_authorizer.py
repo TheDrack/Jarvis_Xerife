@@ -4,11 +4,16 @@
 No capability may be executed without passing through explicit authorization.
 Implements allowlist checking, remote execution blocking, human confirmation
 requirements for sensitive commands, and payload injection detection.
+
+Implements :class:`app.core.nexuscomponent.NexusComponent` so it can be
+resolved via ``nexus.resolve("capability_authorizer")``.
 """
 
 import logging
 import re
 from typing import Any, Dict, Optional, Set
+
+from app.core.nexuscomponent import NexusComponent
 
 logger = logging.getLogger(__name__)
 
@@ -56,11 +61,17 @@ _DEFAULT_ALLOWLIST: Set[str] = {
     "system_executor",
     "auto_evolution",
     "audit_logger",
+    "capability_authorizer",
+    "pii_redactor",
+    "env_secrets_provider",
 }
 
 
-class CapabilityAuthorizer:
+class CapabilityAuthorizer(NexusComponent):
     """Authorization layer that guards capability execution.
+
+    Implements :class:`NexusComponent` so it is resolvable via
+    ``nexus.resolve("capability_authorizer")``.
 
     Args:
         allowlist: Set of capability names permitted to execute.
@@ -80,6 +91,37 @@ class CapabilityAuthorizer:
             if require_confirmation_for is not None
             else set(_SENSITIVE_CAPABILITIES)
         )
+
+    # ------------------------------------------------------------------
+    # NexusComponent interface
+    # ------------------------------------------------------------------
+
+    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Authorize a capability execution described by *context*.
+
+        Expected context keys:
+            - ``user`` (str): Identifier of the requesting user/session.
+            - ``capability_name`` (str): Name of the capability to authorize.
+            - ``payload`` (dict, optional): Execution parameters to scan.
+
+        Returns:
+            ``{"success": True, "authorized": True}`` when authorized.
+            ``{"success": False, "error": "<reason>"}`` when blocked
+            (no exception propagated through this interface).
+        """
+        ctx = context or {}
+        user = ctx.get("user", "anonymous")
+        capability_name = ctx.get("capability_name", "")
+        payload = ctx.get("payload", {})
+
+        if not capability_name:
+            return {"success": False, "error": "Campo 'capability_name' obrigatório no contexto."}
+
+        try:
+            self.authorize(user, capability_name, payload)
+            return {"success": True, "authorized": True, "capability": capability_name}
+        except (PermissionError, ValueError) as exc:
+            return {"success": False, "authorized": False, "error": str(exc)}
 
     # ------------------------------------------------------------------
     # Public API
