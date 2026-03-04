@@ -28,6 +28,7 @@ class AssistantService(NexusComponent):
         self._memory_manager = None
         self._field_vision = None
         self._vector_memory = None
+        self._decision_engine = None
         self.is_running = True
         self._health_check_task: Optional[asyncio.Task] = None
 
@@ -66,6 +67,12 @@ class AssistantService(NexusComponent):
         if self._vector_memory is None:
             self._vector_memory = nexus.resolve("vector_memory_adapter")
         return self._vector_memory
+
+    def _get_decision_engine(self):
+        """Resolve o DecisionEngine via Nexus sob demanda (lazy loading)."""
+        if self._decision_engine is None:
+            self._decision_engine = nexus.resolve("decision_engine")
+        return self._decision_engine
 
     def start_health_check(self) -> None:
         """Inicia o loop de verificação de saúde em background (non-blocking)."""
@@ -197,6 +204,26 @@ class AssistantService(NexusComponent):
                 logger.error(f"❌ {error_msg}")
                 return Response(success=False, message=error_msg, error="INIT_FAILURE")
 
+            # 1b. Consulta DecisionEngine para seleção de LLM/ferramenta (com fallback gracioso)
+            decision_meta: Dict[str, Any] = {}
+            try:
+                de = self._get_decision_engine()
+                if de is not None and hasattr(de, "decide"):
+                    decision = de.decide({"command": text, "channel": channel})
+                    decision_meta = {
+                        "chosen": decision.chosen,
+                        "score": decision.score,
+                        "jrvs_version": decision.jrvs_version,
+                    }
+                    logger.debug(
+                        "🧠 [DecisionEngine] chosen=%s score=%.3f jrvs_version=%s",
+                        decision.chosen,
+                        decision.score,
+                        decision.jrvs_version,
+                    )
+            except Exception as de_exc:
+                logger.warning("⚠️ [DecisionEngine] Indisponível, usando lógica padrão: %s", de_exc)
+
             # 2a. Recupera contexto da memória VETORIAL (últimos 30 dias)
             vector_context_lines: List[str] = []
             try:
@@ -249,7 +276,8 @@ class AssistantService(NexusComponent):
                 data={
                     "intent": str(intent),
                     "result": result,
-                    "command_type": getattr(intent, 'type', 'unknown') if intent else "unknown"
+                    "command_type": getattr(intent, 'type', 'unknown') if intent else "unknown",
+                    **decision_meta,
                 },
             )
 

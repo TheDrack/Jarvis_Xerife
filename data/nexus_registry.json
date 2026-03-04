@@ -13,5 +13,9 @@
     "vector_memory_adapter": "app.adapters.infrastructure.vector_memory_adapter",
     "vision_adapter": "app.adapters.infrastructure.vision_adapter",
     "document_store": "app.utils.document_store",
-    "jrvs_translator": "app.application.services.jrvs_translator"
+    "jrvs_translator": "app.application.services.jrvs_translator",
+    "policy_store": "app.core.meta.policy_store",
+    "jrvs_compiler": "app.core.meta.jrvs_compiler",
+    "decision_engine": "app.core.meta.decision_engine",
+    "exploration_controller": "app.core.meta.exploration_controller"
 }
