@@ -4,6 +4,7 @@
 import json
 import logging
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -179,6 +180,11 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
 
             approved_dir.mkdir(parents=True, exist_ok=True)
             destination = approved_dir / proposal_id
+            if destination.exists():
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Proposal '{proposal_id}' has already been approved.",
+                )
             shutil.move(str(proposal_file), str(destination))
             logger.info("✅ [PROPOSALS] Proposta '%s' aprovada e movida.", proposal_id)
 
@@ -187,7 +193,10 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
             github_worker = GitHubWorker()
             dispatch_ok = github_worker.trigger_repository_dispatch(
                 event_type="implement_proposal",
-                client_payload={"proposal_id": proposal_id},
+                client_payload={
+                    "proposal_id": proposal_id,
+                    "approved_at": datetime.now(timezone.utc).isoformat(),
+                },
             )
 
             if not dispatch_ok:

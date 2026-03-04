@@ -327,12 +327,14 @@ class DeviceOrchestratorService(SoldierProvider):
             return 0
         loaded = 0
         try:
-            active_statuses = {SoldierStatus.ONLINE.value, SoldierStatus.RECONNECTING.value}
+            active_statuses = [SoldierStatus.ONLINE.value, SoldierStatus.RECONNECTING.value]
             with Session(self._engine) as session:
-                rows = session.exec(select(SoldierDB)).all()
+                # Filter at DB level for efficiency
+                stmt = select(SoldierDB).where(
+                    SoldierDB.status.in_(active_statuses)  # type: ignore[union-attr]
+                )
+                rows = session.exec(stmt).all()
                 for row in rows:
-                    if row.status not in active_statuses:
-                        continue
                     try:
                         status = SoldierStatus(row.status)
                     except ValueError:
