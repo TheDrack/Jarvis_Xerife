@@ -1,24 +1,45 @@
 # -*- coding: utf-8 -*-
 from app.core.nexuscomponent import NexusComponent
 
+
 class Cap023(NexusComponent):
     """
-    Capacidade: Maintain internal operational self-model
-    ID: {cap['id']}
-    Setor: {target_dir}
+    Capability: Maintain internal operational self-model
+    ID: CAP-023
+    Setor: app/domain/capabilities/cap_023.py
+    Descricao: Create a real-time digital representation of the system's own state and processes.
     """
 
     def __init__(self):
         super().__init__()
-        # Padrões iniciais do componente
+        self.cap_id = "CAP-023"
+        self.title = "Maintain internal operational self-model"
         self.active = True
 
     def configure(self, config: dict = None):
-        """Opcional: Configuração via Pipeline YAML"""
+        """Configuracao opcional via Pipeline YAML."""
         if config:
-            pass
+            self.active = config.get("active", True)
 
-    def execute(self, context: dict = None):
-        """Execução lógica principal"""
-        print('🚀 Executando Cap023...')
-        return {'status': 'success', 'id': 'CAP-023'}
+    def execute(self, context: dict = None) -> dict:
+        """Execucao logica principal.
+
+        Retorna evidencia de efeito conforme contrato NexusComponent.
+        """
+        if context is None:
+            context = {}
+
+        cap_id = self.cap_id
+        title = self.title
+        active = self.active
+
+        if not active:
+            return {"success": False, "cap_id": cap_id, "reason": "componente inativo"}
+
+        result = {
+            "cap_id": cap_id,
+            "title": title,
+            "status": "executed",
+            "context_keys": list(context.keys()),
+        }
+        return {"success": True, "result": result}

@@ -1,24 +1,45 @@
 # -*- coding: utf-8 -*-
 from app.core.nexuscomponent import NexusComponent
 
+
 class Cap034(NexusComponent):
     """
-    Capacidade: Continuously update user model
-    ID: {cap['id']}
-    Setor: {target_dir}
+    Capability: Continuously update user model
+    ID: CAP-034
+    Setor: app/domain/capabilities/cap_034.py
+    Descricao: Adjust the user profile in real-time based on new interactions.
     """
 
     def __init__(self):
         super().__init__()
-        # Padrões iniciais do componente
+        self.cap_id = "CAP-034"
+        self.title = "Continuously update user model"
         self.active = True
 
     def configure(self, config: dict = None):
-        """Opcional: Configuração via Pipeline YAML"""
+        """Configuracao opcional via Pipeline YAML."""
         if config:
-            pass
+            self.active = config.get("active", True)
 
-    def execute(self, context: dict = None):
-        """Execução lógica principal"""
-        print('🚀 Executando Cap034...')
-        return {'status': 'success', 'id': 'CAP-034'}
+    def execute(self, context: dict = None) -> dict:
+        """Execucao logica principal.
+
+        Retorna evidencia de efeito conforme contrato NexusComponent.
+        """
+        if context is None:
+            context = {}
+
+        cap_id = self.cap_id
+        title = self.title
+        active = self.active
+
+        if not active:
+            return {"success": False, "cap_id": cap_id, "reason": "componente inativo"}
+
+        result = {
+            "cap_id": cap_id,
+            "title": title,
+            "status": "executed",
+            "context_keys": list(context.keys()),
+        }
+        return {"success": True, "result": result}

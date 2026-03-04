@@ -20,6 +20,9 @@
     "decision_engine": "app.core.meta.decision_engine.DecisionEngine",
     "exploration_controller": "app.core.meta.exploration_controller.ExplorationController",
     "notification_service": "app.application.services.notification_service.NotificationService",
-    "overwatch_daemon": "app.adapters.infrastructure.overwatch_adapter.OverwatchDaemon"
+    "overwatch_daemon": "app.adapters.infrastructure.overwatch_adapter.OverwatchDaemon",
+    "auto_evolution_service": "app.application.services.auto_evolutionV2.AutoEvolutionServiceV2",
+    "metabolism_core": "app.application.services.metabolism_core.MetabolismCore",
+    "evolution_loop": "app.application.services.evolution_loop.EvolutionLoopService"
   }
 }
