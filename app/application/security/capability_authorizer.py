@@ -37,6 +37,7 @@ _SENSITIVE_CAPABILITIES: Set[str] = {
     "gist_uploader",
     "delete_file",
     "format_disk",
+    "osint_search",
 }
 
 # Default allowlist of approved capabilities
@@ -64,6 +65,8 @@ _DEFAULT_ALLOWLIST: Set[str] = {
     "capability_authorizer",
     "pii_redactor",
     "env_secrets_provider",
+    "osint_search",
+    "eagle_osint_adapter",
 }
 
 
