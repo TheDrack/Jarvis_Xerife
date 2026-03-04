@@ -23,7 +23,7 @@ Contexto esperado pelo execute()::
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from app.core.nexuscomponent import NexusComponent
 from app.utils.document_store import DocumentStore
@@ -64,8 +64,8 @@ class JrvsTranslator(NexusComponent):
         specific_path = ctx.get("path")
         data_dir = Path(ctx.get("data_dir", str(self._data_dir)))
 
-        translated: list[str] = []
-        errors: list[str] = []
+        translated: List[str] = []
+        errors: List[str] = []
 
         if specific_path:
             src = Path(specific_path)
@@ -94,10 +94,10 @@ class JrvsTranslator(NexusComponent):
 
     def _scan_and_translate(
         self, data_dir: Path, action: str
-    ) -> tuple[list[str], list[str]]:
+    ) -> Tuple[List[str], List[str]]:
         """Varre *data_dir* e traduz todos os arquivos aplicáveis."""
-        translated: list[str] = []
-        errors: list[str] = []
+        translated: List[str] = []
+        errors: List[str] = []
 
         if not data_dir.exists():
             logger.warning(f"⚠️ [JrvsTranslator] Diretório não encontrado: {data_dir}")
@@ -118,7 +118,7 @@ class JrvsTranslator(NexusComponent):
 
     def _translate_file(
         self, src: Path, action: str
-    ) -> tuple[list[str], list[str]]:
+    ) -> Tuple[List[str], List[str]]:
         """Traduz um único arquivo de acordo com *action*.
 
         Args:
@@ -128,8 +128,8 @@ class JrvsTranslator(NexusComponent):
         Returns:
             Tupla (lista_traduzidos, lista_erros).
         """
-        translated: list[str] = []
-        errors: list[str] = []
+        translated: List[str] = []
+        errors: List[str] = []
 
         if action in ("to_jrvs", "sync_all"):
             if src.suffix.lower() in _TRANSLATABLE_SUFFIXES:
@@ -147,7 +147,7 @@ class JrvsTranslator(NexusComponent):
     # Conversores
     # ------------------------------------------------------------------
 
-    def _to_jrvs(self, src: Path) -> tuple[bool, str]:
+    def _to_jrvs(self, src: Path) -> Tuple[bool, str]:
         """Converte arquivo legível → .jrvs.
 
         Args:
@@ -167,7 +167,7 @@ class JrvsTranslator(NexusComponent):
             logger.warning(f"⚠️ [to_jrvs] {msg}")
             return False, msg
 
-    def _from_jrvs(self, src: Path) -> tuple[bool, str]:
+    def _from_jrvs(self, src: Path) -> Tuple[bool, str]:
         """Converte .jrvs → arquivo legível (JSON por padrão).
 
         O arquivo de destino terá a mesma base do .jrvs com extensão .json.

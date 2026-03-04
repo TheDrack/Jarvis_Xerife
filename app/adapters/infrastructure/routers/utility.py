@@ -4,7 +4,7 @@
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -216,7 +216,7 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
 
     @router.post("/v1/translate/jrvs")
     async def trigger_jrvs_translation(
-        payload: Dict[str, Any] = {},
+        payload: Optional[Dict[str, Any]] = None,
         current_user: User = Depends(get_current_user),
     ) -> Dict[str, Any]:
         """
@@ -233,14 +233,15 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
         """
         from app.application.services.jrvs_translator import JrvsTranslator
 
+        body = payload or {}
         translator = JrvsTranslator()
-        context = {
-            "action": payload.get("action", "sync_all"),
+        context: Dict[str, Any] = {
+            "action": body.get("action", "sync_all"),
         }
-        if "path" in payload:
-            context["path"] = payload["path"]
-        if "data_dir" in payload:
-            context["data_dir"] = payload["data_dir"]
+        if "path" in body:
+            context["path"] = body["path"]
+        if "data_dir" in body:
+            context["data_dir"] = body["data_dir"]
 
         result = translator.execute(context)
         if not result["success"]:

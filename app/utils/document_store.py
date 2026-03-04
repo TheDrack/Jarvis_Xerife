@@ -129,7 +129,7 @@ class DocumentStore:
     def _read_yaml(path: Path) -> Any:
         if not _YAML_AVAILABLE:
             raise ValueError(
-                "PyYAML não instalado. Execute: pip install pyyaml"
+                "PyYAML not installed / PyYAML não instalado. Run: pip install pyyaml"
             )
         with open(path, "r", encoding="utf-8") as fh:
             return yaml.safe_load(fh)
@@ -138,7 +138,7 @@ class DocumentStore:
     def _write_yaml(path: Path, data: Any, **_: Any) -> None:
         if not _YAML_AVAILABLE:
             raise ValueError(
-                "PyYAML não instalado. Execute: pip install pyyaml"
+                "PyYAML not installed / PyYAML não instalado. Run: pip install pyyaml"
             )
         with open(path, "w", encoding="utf-8") as fh:
             yaml.safe_dump(data, fh, allow_unicode=True, default_flow_style=False)

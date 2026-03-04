@@ -66,13 +66,17 @@ class TestJrvsTranslatorExecute:
 
     def test_execute_sync_all(self, translator, tmp_path):
         # Prepara um JSON no diretório temporário
+        data = {"ok": True}
         (tmp_path / "config.json").write_text('{"ok": true}', encoding="utf-8")
 
         result = translator.execute({"action": "sync_all", "data_dir": str(tmp_path)})
 
         assert result["success"] is True
         assert len(result["translated"]) >= 1
-        assert (tmp_path / "config.jrvs").exists()
+        jrvs_path = tmp_path / "config.jrvs"
+        assert jrvs_path.exists()
+        # Verifica que o conteúdo do .jrvs corresponde ao JSON original
+        assert jrvs_read(jrvs_path) == data
 
     def test_execute_to_jrvs(self, translator, tmp_path):
         (tmp_path / "file.json").write_text('{"a": 1}', encoding="utf-8")
@@ -107,4 +111,6 @@ class TestJrvsTranslatorExecute:
 
     def test_execute_nonexistent_dir_returns_success(self, translator):
         result = translator.execute({"action": "to_jrvs", "data_dir": "/tmp/dir_inexistente_xyz"})
-        assert "success" in result
+        assert result["success"] is True
+        assert result["translated"] == []
+        assert result["errors"] == []
