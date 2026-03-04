@@ -4,22 +4,27 @@ fix_cap_stubs.py — Corrige arquivos cap_NNN.py gerados com templates não expa
 
 Detecta arquivos que contêm os marcadores literais `{cap['id']}` ou `{target_dir}`
 (bug do gerador original), substitui pelos valores reais derivados do nome do arquivo
-e de data/capabilities.json, e atualiza o docstring com o título e descrição reais.
+e de data/capabilities.jrvs, e atualiza o docstring com o título e descrição reais.
 
 Arquivos com mais de 20 linhas e sem os marcadores de stub são preservados intactos.
 """
-import json
 import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional
+
+# Adiciona o root do projeto ao path para imports locais
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+
+from app.utils.document_store import document_store
 
 # ---------------------------------------------------------------------------
 # Configuração
 # ---------------------------------------------------------------------------
 
 CAPS_DIR = Path("app/domain/capabilities")
-CAPS_JSON = Path("data/capabilities.json")
+CAPS_JSON = Path("data/capabilities.jrvs")
 STUB_MARKERS = ["{cap['id']}", "{target_dir}"]
 
 STUB_TEMPLATE = '''\
@@ -76,12 +81,11 @@ class {class_name}(NexusComponent):
 # ---------------------------------------------------------------------------
 
 def _load_caps_index(caps_json: Path) -> Dict[str, Dict]:
-    """Retorna um dict {cap_id: cap_data} a partir de capabilities.json."""
+    """Retorna um dict {cap_id: cap_data} a partir de capabilities.jrvs."""
     if not caps_json.exists():
         print(f"⚠️  {caps_json} não encontrado — usando metadados mínimos.")
         return {}
-    with open(caps_json, "r", encoding="utf-8") as fh:
-        data = json.load(fh)
+    data = document_store.read(caps_json)
     return {c["id"]: c for c in data.get("capabilities", [])}
 
 

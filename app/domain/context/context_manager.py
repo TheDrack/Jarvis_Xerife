@@ -1,6 +1,6 @@
 from app.core.interfaces import NexusComponent
-import json
 import os
+from app.utils.document_store import document_store
 
 class ContextManager(NexusComponent):
     """
@@ -8,7 +8,7 @@ class ContextManager(NexusComponent):
     Objetivo: Gerenciar o estado mental e variáveis de ambiente do Jarvis.
     """
     def __init__(self):
-        self.state_path = "storage/state.json"
+        self.state_path = "storage/state.jrvs"
         self.current_context = {}
 
     def execute(self, action: str, data: dict = None) -> dict:
@@ -27,14 +27,12 @@ class ContextManager(NexusComponent):
         return {"error": "Ação inválida no ContextManager"}
 
     def _save_state(self, data):
-        with open(self.state_path, 'w') as f:
-            json.dump(data, f)
+        document_store.write(self.state_path, data)
         return {"status": "saved"}
 
     def _load_state(self, _):
         if os.path.exists(self.state_path):
-            with open(self.state_path, 'r') as f:
-                return json.load(f)
+            return document_store.read(self.state_path)
         return {}
 
     def _update_context(self, data):

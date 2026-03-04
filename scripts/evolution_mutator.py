@@ -10,7 +10,6 @@ Pipeline:
 """
 import argparse
 import ast
-import json
 import os
 import re
 import sys
@@ -22,18 +21,18 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from app.core.nexus import nexus
+from app.utils.document_store import document_store
 
 
 # ---------------------------------------------------------------------------
 # Utilitários de dados
 # ---------------------------------------------------------------------------
 
-def _load_capabilities(cap_path: str = "data/capabilities.json") -> List[Dict]:
+def _load_capabilities(cap_path: str = "data/capabilities.jrvs") -> List[Dict]:
     path = Path(cap_path)
     if not path.exists():
         return []
-    with open(path, "r", encoding="utf-8") as fh:
-        return json.load(fh).get("capabilities", [])
+    return document_store.read(path).get("capabilities", [])
 
 
 def _get_cap(cap_id: str, caps: List[Dict]) -> Optional[Dict]:
@@ -74,7 +73,7 @@ def _cap_id_to_file(cap_id: str) -> Path:
 # ---------------------------------------------------------------------------
 
 def update_capability_status(
-    cap_id: str, status: str = "complete", cap_path: str = "data/capabilities.json"
+    cap_id: str, status: str = "complete", cap_path: str = "data/capabilities.jrvs"
 ) -> bool:
     """Sincroniza o status no arquivo base de capacidades."""
     path = Path(cap_path)
@@ -82,8 +81,7 @@ def update_capability_status(
         print(f"⚠️  Alerta: {cap_path} não encontrado para atualização de status.")
         return False
     try:
-        with open(path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
+        data = document_store.read(path)
         updated = False
         for cap in data.get("capabilities", []):
             if cap["id"] == cap_id:
@@ -91,8 +89,7 @@ def update_capability_status(
                 updated = True
                 break
         if updated:
-            with open(path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh, indent=4, ensure_ascii=False)
+            document_store.write(path, data)
             print(f"💾 DNA Sincronizado: {cap_id} → {status}")
         return updated
     except Exception as exc:

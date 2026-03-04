@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Tests for Nexus ↔ Gist ↔ nexus_registry.json sync behavior"""
+"""Tests for Nexus ↔ Gist ↔ nexus_registry.jrvs sync behavior"""
 
-import json
 import os
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -32,7 +31,7 @@ class TestNexusRegistrySync:
         nexus = JarvisNexus.__new__(JarvisNexus)
         nexus.base_dir = "/fake"
 
-        with patch("builtins.open", mock_open(read_data=json.dumps(registry_data))):
+        with patch("app.core.nexus._jrvs_read", return_value=registry_data):
             result = nexus._load_local_registry()
 
         assert result["audit_logger"] == "app.adapters.infrastructure.audit_logger"
@@ -45,7 +44,7 @@ class TestNexusRegistrySync:
         nexus = JarvisNexus.__new__(JarvisNexus)
         nexus.base_dir = "/fake"
 
-        with patch("builtins.open", side_effect=FileNotFoundError("not found")):
+        with patch("app.core.nexus._jrvs_read", side_effect=FileNotFoundError("not found")):
             result = nexus._load_local_registry()
 
         assert result == {}
@@ -62,7 +61,7 @@ class TestNexusRegistrySync:
         mock_gist_response = MagicMock()
         mock_gist_response.status_code = 500
 
-        with patch("builtins.open", mock_open(read_data=json.dumps(registry_data))), \
+        with patch("app.core.nexus._jrvs_read", return_value=registry_data), \
              patch("requests.get", return_value=mock_gist_response):
             nexus = JarvisNexus.__new__(JarvisNexus)
             nexus.gist_id = "test_id"
@@ -92,7 +91,7 @@ class TestNexusRegistrySync:
         mock_gist_response.status_code = 200
         mock_gist_response.json.return_value = gist_data
 
-        with patch("builtins.open", mock_open(read_data=json.dumps(registry_data))), \
+        with patch("app.core.nexus._jrvs_read", return_value=registry_data), \
              patch("requests.get", return_value=mock_gist_response):
             nexus = JarvisNexus.__new__(JarvisNexus)
             nexus.gist_id = "test_id"
@@ -121,7 +120,7 @@ class TestNexusRegistrySync:
         mock_gist_response.status_code = 200
         mock_gist_response.json.return_value = gist_data
 
-        with patch("builtins.open", mock_open(read_data=json.dumps(registry_data))), \
+        with patch("app.core.nexus._jrvs_read", return_value=registry_data), \
              patch("requests.get", return_value=mock_gist_response):
             nexus = JarvisNexus.__new__(JarvisNexus)
             nexus.gist_id = "test_id"
@@ -135,7 +134,7 @@ class TestNexusRegistrySync:
         assert nexus._mutated is False
 
     def test_update_local_registry_writes_full_class_path(self):
-        """_update_local_registry should write module.ClassName format."""
+        """_update_local_registry should write module.ClassName format in JRVS."""
         from app.core.nexus import JarvisNexus
 
         nexus = JarvisNexus.__new__(JarvisNexus)
@@ -147,11 +146,10 @@ class TestNexusRegistrySync:
 
         captured = {}
 
-        def capture_dump(data, f, **kwargs):
+        def capture_write(path, data):
             captured.update(data)
 
-        with patch("json.dump", side_effect=capture_dump), \
-             patch("builtins.open", mock_open()):
+        with patch("app.core.nexus._jrvs_write", side_effect=capture_write):
             nexus._update_local_registry()
 
         assert "components" in captured

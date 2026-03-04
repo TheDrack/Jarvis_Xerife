@@ -25,12 +25,13 @@ Usage – plug in a metrics collector:
 import concurrent.futures
 import importlib
 import inspect
-import json
 import logging
 import os
 import time
 from threading import RLock
 from typing import Any, Dict, List, Optional, Tuple
+
+from app.utils.jrvs_codec import JrvsDecodeError, read_file as _jrvs_read, write_file as _jrvs_write
 
 logger = logging.getLogger(__name__)
 
@@ -466,13 +467,12 @@ class JarvisNexus:
 
     def _load_local_registry(self) -> Dict[str, str]:
         """
-        Read nexus_registry.json from base_dir and strip the trailing
+        Read nexus_registry.jrvs from base_dir and strip the trailing
         ``.ClassName`` suffix from each stored path.
         """
         try:
-            registry_path = os.path.join(self.base_dir, "data", "nexus_registry.json")
-            with open(registry_path) as f:
-                data = json.load(f)
+            registry_path = os.path.join(self.base_dir, "data", "nexus_registry.jrvs")
+            data = _jrvs_read(registry_path)
             result: Dict[str, str] = {}
             for component_id, path in data.get("components", {}).items():
                 parts = path.rsplit(".", 1)
@@ -482,7 +482,7 @@ class JarvisNexus:
                 else:
                     result[component_id] = path
             return result
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
+        except (FileNotFoundError, JrvsDecodeError, OSError):
             return {}
 
     def _load_remote_memory(self) -> Dict[str, str]:
@@ -502,7 +502,7 @@ class JarvisNexus:
 
     def _update_local_registry(self) -> None:
         """
-        Write _cache back to nexus_registry.json, appending the inferred
+        Write _cache back to nexus_registry.jrvs, appending the inferred
         ``.ClassName`` suffix so the file remains human-readable.
         """
         components: Dict[str, str] = {}
@@ -510,9 +510,8 @@ class JarvisNexus:
             last_segment = module_path.rsplit(".", 1)[-1]
             class_name = "".join(part.capitalize() for part in last_segment.split("_"))
             components[component_id] = f"{module_path}.{class_name}"
-        registry_path = os.path.join(self.base_dir, "data", "nexus_registry.json")
-        with open(registry_path, "w") as f:
-            json.dump({"components": components}, f, indent=2)
+        registry_path = os.path.join(self.base_dir, "data", "nexus_registry.jrvs")
+        _jrvs_write(registry_path, {"components": components})
 
     # ------------------------------------------------------------------
     # Gist sync
