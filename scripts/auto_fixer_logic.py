@@ -63,6 +63,12 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Any
 
+# Adiciona o root do projeto ao path para imports locais
+_SCRIPTS_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_SCRIPTS_ROOT))
+
+from app.utils.document_store import document_store
+
 # Import the state machine
 try:
     # Try relative import first (when run as module)
@@ -158,13 +164,12 @@ class AutoFixer:
         Returns:
             True if we can proceed, False if limit exceeded
         """
-        tracking_file = self.repo_path / ".github" / "healing_attempts.json"
+        tracking_file = self.repo_path / ".github" / "healing_attempts.jrvs"
 
         try:
             # Load or create tracking data
             if tracking_file.exists():
-                with open(tracking_file, 'r') as f:
-                    attempts = json.load(f)
+                attempts = document_store.read(tracking_file)
             else:
                 attempts = {}
 
@@ -184,8 +189,7 @@ class AutoFixer:
 
             # Save tracking data
             tracking_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(tracking_file, 'w') as f:
-                json.dump(attempts, f, indent=2)
+            document_store.write(tracking_file, attempts)
 
             logger.info(f"✓ Healing attempt {current_attempts + 1}/{MAX_HEALING_ATTEMPTS} for issue #{issue_id}")
             return True

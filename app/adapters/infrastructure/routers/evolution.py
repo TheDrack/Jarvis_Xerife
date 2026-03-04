@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Evolution router: /v1/status/evolution, /v1/evolution/* endpoints."""
 
-import json
 import logging
 import shutil
 from datetime import datetime, timezone
@@ -11,6 +10,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.adapters.infrastructure import api_models
+from app.utils.document_store import document_store
 
 logger = logging.getLogger(__name__)
 
@@ -147,9 +147,9 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
             if not pending_dir.exists():
                 return []
             proposals: List[Dict[str, Any]] = []
-            for proposal_file in sorted(pending_dir.glob("*.json")):
+            for proposal_file in sorted(pending_dir.glob("*.jrvs")):
                 try:
-                    data: Dict[str, Any] = json.loads(proposal_file.read_text(encoding="utf-8"))
+                    data: Dict[str, Any] = document_store.read(proposal_file)
                     data["filename"] = proposal_file.name
                     proposals.append(data)
                 except Exception as read_err:

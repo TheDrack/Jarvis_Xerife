@@ -1,6 +1,6 @@
 from app.core.nexus import nexus
 from app.core.nexuscomponent import NexusComponent
-import json
+from app.utils.document_store import document_store
 from pathlib import Path
 from typing import List, Dict, Optional
 import logging
@@ -8,11 +8,11 @@ logger = logging.getLogger(__name__)
 
 class AutoEvolutionServiceV2(NexusComponent):
     """
-    Versão Evoluída: Migração de Roadmap Markdown para Inventário de Capacidades JSON.
-    Localização: data/capabilities.json
+    Versão Evoluída: Migração de Roadmap Markdown para Inventário de Capacidades .JRVS.
+    Localização: data/capabilities.jrvs
     """
 
-    def __init__(self, capabilities_path: str = "data/capabilities.json") -> None:
+    def __init__(self, capabilities_path: str = "data/capabilities.jrvs") -> None:
         super().__init__()
         # Define o caminho relativo ao root do projeto
         self.capabilities_path = Path(capabilities_path)
@@ -77,17 +77,13 @@ class AutoEvolutionServiceV2(NexusComponent):
         if not self.capabilities_path.exists():
             return {"capabilities": []}
         try:
-            return json.loads(self.capabilities_path.read_text(encoding='utf-8'))
+            return document_store.read(self.capabilities_path)
         except Exception:
             return {"capabilities": []}
 
     def _save_data(self, data: Dict):
-        """Persiste as atualizações no JSON."""
-        self.capabilities_path.parent.mkdir(parents=True, exist_ok=True)
-        self.capabilities_path.write_text(
-            json.dumps(data, indent=2, ensure_ascii=False), 
-            encoding='utf-8'
-        )
+        """Persiste as atualizações no formato .jrvs."""
+        document_store.write(self.capabilities_path, data)
 
     def get_success_metrics(self) -> Dict:
         """Calcula métricas reais baseadas nos itens de capacidade."""

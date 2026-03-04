@@ -3,7 +3,7 @@
 evolve_all_pending.py — Evolução em lote de capacidades JARVIS pendentes.
 
 Pipeline:
-  1. Carrega capabilities.json e filtra as pendentes.
+  1. Carrega capabilities.jrvs e filtra as pendentes.
   2. Ordena respeitando dependências (topological sort).
   3. Chama evolution_mutator.evolve() para cada cap.
   4. Loga progresso e contagem de sucesso/falha ao final.
@@ -12,7 +12,6 @@ Uso:
   python scripts/evolve_all_pending.py [--dry-run] [--limit N] [--cap-id CAP-042] [--delay 2.0]
 """
 import argparse
-import json
 import sys
 import time
 from pathlib import Path
@@ -22,6 +21,7 @@ from typing import Dict, List, Optional, Set
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
+from app.utils.document_store import document_store
 from scripts.evolution_mutator import evolve as mutator_evolve, update_capability_status
 
 # Default priority assigned to capabilities that don't specify one
@@ -32,13 +32,12 @@ _DEFAULT_PRIORITY = 99
 # Utilidades
 # ---------------------------------------------------------------------------
 
-def _load_capabilities(cap_path: str = "data/capabilities.json") -> List[Dict]:
+def _load_capabilities(cap_path: str = "data/capabilities.jrvs") -> List[Dict]:
     path = Path(cap_path)
     if not path.exists():
         print(f"❌ {cap_path} não encontrado.")
         sys.exit(1)
-    with open(path, "r", encoding="utf-8") as fh:
-        return json.load(fh).get("capabilities", [])
+    return document_store.read(path).get("capabilities", [])
 
 
 def _topological_sort(caps: List[Dict], completed_ids: Set[str]) -> List[Dict]:

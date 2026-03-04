@@ -3,7 +3,7 @@
 PolicyStore — Armazena e serve políticas brutas por módulo.
 
 Responsabilidades:
-  - Persistência atômica de políticas JSON por módulo em `data/jrvs/{module}.policies.json`.
+  - Persistência atômica de políticas em formato .jrvs por módulo em `data/jrvs/{module}.policies.jrvs`.
   - Contador de atualizações por módulo; dispara recompilação ao atingir
     JRVS_RECOMPILE_THRESHOLD (default 20).
   - Expõe `get_policies_by_module(module_name)` para o JRVSCompiler.
@@ -13,12 +13,12 @@ Variáveis de ambiente:
   JRVS_DIR                  str   Diretório base para os arquivos .jrvs (default "data/jrvs").
 """
 
-import json
 import logging
 import os
-import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
+
+from app.utils.jrvs_codec import JrvsDecodeError, read_file as _jrvs_read, write_file as _jrvs_write
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +67,8 @@ class PolicyStore:
         if not path.exists():
             return {}
         try:
-            with open(path, "r", encoding="utf-8") as fh:
-                return json.load(fh)
-        except (json.JSONDecodeError, OSError) as exc:
+            return _jrvs_read(path)
+        except (JrvsDecodeError, OSError) as exc:
             logger.warning(
                 "[PolicyStore] Falha ao ler políticas do módulo '%s': %s", module_name, exc
             )
@@ -79,7 +78,7 @@ class PolicyStore:
         """Retorna lista de nomes de módulos com arquivos de política existentes."""
         return [
             p.stem.replace(".policies", "")
-            for p in self._dir.glob("*.policies.json")
+            for p in self._dir.glob("*.policies.jrvs")
         ]
 
     # ------------------------------------------------------------------
@@ -148,20 +147,9 @@ class PolicyStore:
     # ------------------------------------------------------------------
 
     def _policy_path(self, module_name: str) -> Path:
-        return self._dir / f"{module_name}.policies.json"
+        return self._dir / f"{module_name}.policies.jrvs"
 
     @staticmethod
     def _atomic_write_json(path: Path, data: Dict[str, Any]) -> None:
-        """Escreve *data* em *path* de forma atômica via arquivo temporário."""
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=".tmp_",
-            suffix=".json",
-            delete=False,
-        ) as tmp:
-            json.dump(data, tmp, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-            tmp_path = tmp.name
-        os.replace(tmp_path, path)
+        """Escreve *data* em *path* de forma atômica no formato .jrvs."""
+        _jrvs_write(path, data)

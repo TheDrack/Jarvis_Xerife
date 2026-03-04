@@ -1,9 +1,9 @@
-import json
 import os
 from app.core.nexus import NexusComponent
+from app.utils.document_store import document_store
 
 class ContextMemory(NexusComponent):
-    def configure(self, config={"max_history": 5, "storage_path": "data/context_history.json"}):
+    def configure(self, config={"max_history": 5, "storage_path": "data/context_history.jrvs"}):
         self.max_history = config["max_history"]
         self.storage_path = config["storage_path"]
         os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
@@ -27,10 +27,8 @@ class ContextMemory(NexusComponent):
 
     def _load_history(self):
         if os.path.exists(self.storage_path):
-            with open(self.storage_path, 'r') as f:
-                return json.load(f)
+            return document_store.read(self.storage_path)
         return []
 
     def _save_history(self, history):
-        with open(self.storage_path, 'w') as f:
-            json.dump(history, f, indent=4)
+        document_store.write(self.storage_path, history)

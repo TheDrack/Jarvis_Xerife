@@ -7,7 +7,6 @@ This service enables Jarvis to propose and implement improvements autonomously,
 but under strict cost-benefit and security filters.
 """
 
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +20,7 @@ from app.domain.models.viability import (
     RiskLevel,
     ViabilityMatrix,
 )
+from app.utils.document_store import document_store
 
 logger = logging.getLogger(__name__)
 
@@ -156,12 +156,11 @@ class StrategistService(NexusComponent):
             status = "rejected"
         
         # Create filename
-        filename = f"{matrix.proposal_id}.json"
+        filename = f"{matrix.proposal_id}.jrvs"
         filepath = target_dir / filename
         
-        # Save as JSON
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(matrix.to_dict(), f, indent=2, ensure_ascii=False)
+        # Save as JRVS
+        document_store.write(filepath, matrix.to_dict())
         
         logger.info(f"Proposal archived: {filepath} (status={status})")
         return filepath

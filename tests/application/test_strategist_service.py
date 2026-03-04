@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """Tests for Xerife Strategist Service"""
 
-import json
 from pathlib import Path
 
 import pytest
@@ -18,6 +17,7 @@ from app.domain.models.viability import (
     RiskLevel,
     ViabilityMatrix,
 )
+from app.utils.document_store import document_store
 
 
 @pytest.fixture
@@ -154,8 +154,7 @@ def test_strategist_archive_proposal(strategist):
     assert "approved" in str(filepath)
     
     # Verify content
-    with open(filepath, 'r') as f:
-        data = json.load(f)
+    data = document_store.read(filepath)
     
     assert data['proposal_title'] == "Archive Test"
     assert data['viable'] is True
@@ -183,8 +182,7 @@ def test_strategist_archive_rejected_proposal(strategist):
     assert "rejected" in str(filepath)
     
     # Verify rejection reason
-    with open(filepath, 'r') as f:
-        data = json.load(f)
+    data = document_store.read(filepath)
     
     assert data['viable'] is False
     assert data['rejection_reason'] != ""

@@ -22,7 +22,6 @@ Usage (embedded in main.py):
     daemon.start()  # non-blocking, runs in a daemon thread
 """
 
-import json
 import logging
 import os
 import threading
@@ -32,6 +31,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from app.core.nexus import nexus
 from app.core.nexuscomponent import NexusComponent
+from app.utils.document_store import document_store
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +43,7 @@ _CPU_CHECK_EVERY = 6             # ticks (every ~60 s)
 _CPU_HIGH_THRESHOLD = 85.0       # %
 _RAM_HIGH_THRESHOLD = 85.0       # %
 _INACTIVITY_TIMEOUT_SEC = 1800   # 30 minutes
-_CONTEXT_FILE = Path("data/context.json")
+_CONTEXT_FILE = Path("data/context.jrvs")
 _PERIMETER_CHECK_EVERY = 3       # ticks (every ~30 s)
 _OVERWATCH_COMPILE_INTERVAL_SEC = float(
     os.getenv("OVERWATCH_COMPILE_INTERVAL_SEC", "600")
@@ -174,7 +174,7 @@ class OverwatchDaemon(NexusComponent):
             logger.debug("[PROACTIVE_CORE] Erro ao verificar recursos: %s", exc)
 
     def _check_context_file(self) -> None:
-        """Detect changes in data/context.json and log them."""
+        """Detect changes in data/context.jrvs and log them."""
         try:
             if not _CONTEXT_FILE.exists():
                 return
@@ -184,10 +184,10 @@ class OverwatchDaemon(NexusComponent):
                 return
             if mtime != self._context_mtime:
                 self._context_mtime = mtime
-                logger.info("[PROACTIVE_CORE] data/context.json atualizado. Recarregando contexto.")
+                logger.info("[PROACTIVE_CORE] data/context.jrvs atualizado. Recarregando contexto.")
                 self._on_context_changed()
         except Exception as exc:
-            logger.debug("[PROACTIVE_CORE] Erro ao verificar context.json: %s", exc)
+            logger.debug("[PROACTIVE_CORE] Erro ao verificar context.jrvs: %s", exc)
 
     def _check_jrvs_compile(self) -> None:
         """Periodically run JRVSCompiler.compile_all() based on OVERWATCH_COMPILE_INTERVAL_SEC.
@@ -261,13 +261,12 @@ class OverwatchDaemon(NexusComponent):
     # ------------------------------------------------------------------
 
     def _on_context_changed(self) -> None:
-        """React to a context.json change."""
+        """React to a context.jrvs change."""
         try:
-            with _CONTEXT_FILE.open() as fh:
-                ctx: Dict[str, Any] = json.load(fh)
+            ctx: Dict[str, Any] = document_store.read(_CONTEXT_FILE)
             logger.info("[PROACTIVE_CORE] Novo contexto carregado: %s chave(s).", len(ctx))
         except Exception as exc:
-            logger.warning("[PROACTIVE_CORE] Falha ao ler context.json: %s", exc)
+            logger.warning("[PROACTIVE_CORE] Falha ao ler context.jrvs: %s", exc)
 
     def _suggest_pending_task(self) -> None:
         """Fetch the next pending calendar task and notify the user."""
@@ -285,14 +284,13 @@ class OverwatchDaemon(NexusComponent):
 
     def _get_pending_calendar_tasks(self, limit: int = 5) -> List[str]:
         """
-        Return pending tasks from ``data/context.json`` (``pending_tasks`` key)
+        Return pending tasks from ``data/context.jrvs`` (``pending_tasks`` key)
         or an empty list if unavailable.
         """
         tasks: List[str] = []
         try:
             if _CONTEXT_FILE.exists():
-                with _CONTEXT_FILE.open() as fh:
-                    ctx: Dict[str, Any] = json.load(fh)
+                ctx: Dict[str, Any] = document_store.read(_CONTEXT_FILE)
                 raw = ctx.get("pending_tasks", [])
                 tasks = [str(t) for t in raw[:limit]]
         except Exception:

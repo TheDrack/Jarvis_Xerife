@@ -6,7 +6,7 @@ Responsabilidades:
   - Ao descobrir uma ferramenta, persiste em PolicyStore e aciona compilação do módulo
     ``tools``.
   - Respeita o threshold de promoção: se ``confidence < JRVS_PROMOTE_THRESHOLD``, grava
-    em ``data/jrvs/pending_tools.json`` e promove apenas após X sucessos consecutivos.
+    em ``data/jrvs/pending_tools.jrvs`` e promove apenas após X sucessos consecutivos.
   - Verifica o estado de estabilidade do DecisionEngine antes de promover: em modo
     "critical" (global_success_ema < 0.4) a promoção de novas ferramentas é suspensa.
   - Chama ``nexus.commit_memory()`` para persistência remota do registro de metadados.
@@ -17,23 +17,22 @@ Variáveis de ambiente:
   JRVS_PROMOTE_MIN_SUCCESSES int    Sucessos necessários para promover tool pendente (default 3).
 """
 
-import json
 import logging
 import os
-import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from app.core.meta.jrvs_compiler import JRVSCompiler
 from app.core.meta.policy_store import PolicyStore
 from app.core.nexuscomponent import NexusComponent
+from app.utils.jrvs_codec import JrvsDecodeError, read_file as _jrvs_read, write_file as _jrvs_write
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_PROMOTE_THRESHOLD = 0.8
 _DEFAULT_JRVS_DIR = "data/jrvs"
 _DEFAULT_MIN_SUCCESSES = 3
-_PENDING_FILE = "pending_tools.json"
+_PENDING_FILE = "pending_tools.jrvs"
 
 
 class ExplorationController(NexusComponent):
@@ -242,24 +241,12 @@ class ExplorationController(NexusComponent):
         if not path.exists():
             return {}
         try:
-            with open(path, "r", encoding="utf-8") as fh:
-                return json.load(fh)
-        except (json.JSONDecodeError, OSError):
+            return _jrvs_read(path)
+        except (JrvsDecodeError, OSError):
             return {}
 
     def _save_pending(self, pending: Dict[str, Any]) -> None:
-        path = self._pending_path()
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=".tmp_",
-            suffix=".json",
-            delete=False,
-        ) as tmp:
-            json.dump(pending, tmp, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-            tmp_path = tmp.name
-        os.replace(tmp_path, path)
+        _jrvs_write(self._pending_path(), pending)
 
     def _add_to_pending(self, component_id: str, entry: Dict[str, Any]) -> None:
         pending = self._load_pending()

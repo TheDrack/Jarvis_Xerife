@@ -218,14 +218,13 @@ class TestCloudMockObservability:
 
 
 class TestNexusRegistryPath:
-    """Tests that the Nexus registry is loaded from data/nexus_registry.json."""
+    """Tests that the Nexus registry is loaded from data/nexus_registry.jrvs."""
 
     def test_registry_loaded_from_data_directory(self, tmp_path):
-        """JarvisNexus should load registry from data/nexus_registry.json, not the project root."""
-        import json
-        import os
+        """JarvisNexus should load registry from data/nexus_registry.jrvs, not the project root."""
+        from app.utils.jrvs_codec import write_file as jrvs_write
 
-        # Create a temp project structure with data/nexus_registry.json
+        # Create a temp project structure with data/nexus_registry.jrvs
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         registry = {
@@ -233,7 +232,7 @@ class TestNexusRegistryPath:
                 "test_service": "app.services.test_service.TestService"
             }
         }
-        (data_dir / "nexus_registry.json").write_text(json.dumps(registry))
+        jrvs_write(data_dir / "nexus_registry.jrvs", registry)
 
         nexus = JarvisNexus()
         nexus.base_dir = str(tmp_path)
@@ -244,10 +243,14 @@ class TestNexusRegistryPath:
         assert result["test_service"] == "app.services.test_service"
 
     def test_registry_not_found_at_root_returns_empty(self, tmp_path):
-        """If registry is at root (wrong path), _load_local_registry should return {}."""
+        """If registry is at root (wrong path), _load_local_registry should return {}.
+        
+        The registry must be at data/nexus_registry.jrvs inside base_dir.
+        Files placed directly at root (not in data/) are not found, so {} is returned.
+        """
         import json
 
-        # Put the registry at root level (wrong path)
+        # Put the registry at root level (wrong path) as JSON (wrong format too)
         (tmp_path / "nexus_registry.json").write_text(
             json.dumps({"components": {"some_service": "app.some.SomeService"}})
         )
@@ -261,8 +264,7 @@ class TestNexusRegistryPath:
 
     def test_init_loads_registry_into_cache(self, tmp_path):
         """JarvisNexus.__init__ should pre-populate _cache from the registry."""
-        import json
-        import os
+        from app.utils.jrvs_codec import write_file as jrvs_write
 
         data_dir = tmp_path / "data"
         data_dir.mkdir()
@@ -271,7 +273,7 @@ class TestNexusRegistryPath:
                 "telegram_adapter": "app.adapters.infrastructure.telegram_adapter.TelegramAdapter"
             }
         }
-        (data_dir / "nexus_registry.json").write_text(json.dumps(registry))
+        jrvs_write(data_dir / "nexus_registry.jrvs", registry)
 
         # Patch os.getcwd to point to tmp_path
         with patch("app.core.nexus.os.path.abspath") as mock_abs:

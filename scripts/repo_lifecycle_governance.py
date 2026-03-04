@@ -1,25 +1,33 @@
 # -*- coding: utf-8 -*-
 import os
-import json
 import shutil
 import re
+import sys
 from pathlib import Path
+
+# Adiciona o root do projeto ao path para imports locais
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+
+from app.utils.document_store import document_store
 
 REPO_ROOT = Path(".").resolve()
 FROZEN_ROOT = REPO_ROOT / ".frozen"
-FROZEN_INDEX = FROZEN_ROOT / "frozen_index.json"
+FROZEN_INDEX = FROZEN_ROOT / "frozen_index.jrvs"
 
 IMMUTABLE_PATHS = [
     "app/core", "app/runtime", "app/bootstrap", "tests", 
     "docs", "scripts", "dags", "__init__.py", "setup.py"
 ]
 
+_SCANNABLE_EXTENSIONS = {".yml", ".yaml", ".json", ".jrvs", ".py", ".md"}
+
 def is_immutable(rel_path: str) -> bool:
     return any(rel_path.startswith(p) or rel_path == p for p in IMMUTABLE_PATHS)
 
 def load_index():
     if not FROZEN_INDEX.exists(): return {}
-    try: return json.loads(FROZEN_INDEX.read_text())
+    try: return document_store.read(FROZEN_INDEX)
     except: return {}
 
 def discover_used_modules():
@@ -28,7 +36,7 @@ def discover_used_modules():
     pattern = re.compile(r'[a-zA-Z0-9_\-\.\/]+') 
     for cfg in REPO_ROOT.rglob("*"):
         if ".frozen" in str(cfg) or ".git" in str(cfg) or "__pycache__" in str(cfg): continue
-        if cfg.is_file() and cfg.suffix in [".yml", ".yaml", ".json", ".py", ".md"]:
+        if cfg.is_file() and cfg.suffix in _SCANNABLE_EXTENSIONS:
             try:
                 content = cfg.read_text(encoding="utf-8")
                 used.update(pattern.findall(content))
@@ -99,7 +107,7 @@ def main():
                 if not os.listdir(dir_path):
                     os.rmdir(dir_path)
 
-    FROZEN_INDEX.write_text(json.dumps(index, indent=2))
+    document_store.write(FROZEN_INDEX, index)
     print("="*60 + "\nGOVERNANÇA CONCLUÍDA.\n" + "="*60)
 
 if __name__ == "__main__":
