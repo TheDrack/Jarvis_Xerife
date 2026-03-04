@@ -5,7 +5,7 @@ import logging
 import sys
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
-from app.core.nexus import nexus
+from app.core.nexus import nexus, CloudMock
 
 def run_pipeline(pipeline_name: str, global_strict: bool = False):
     logging.info(f"🚀 INICIANDO RUNNER: {pipeline_name}")
@@ -39,6 +39,18 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False):
             msg = f"❌ Falha crítica: Instância de {t_id} não encontrada."
             if is_strict: raise RuntimeError(msg)
             logging.error(msg)
+            continue
+
+        # Detect Circuit Breaker fallback: do not silently treat a CloudMock as success
+        if getattr(instance, "__is_cloud_mock__", False):
+            msg = (
+                f"⚠️ Componente '{t_id}' indisponível (Circuit Breaker ativo). "
+                "Execução real foi substituída por CloudMock – verifique o componente."
+            )
+            logging.error(msg)
+            if is_strict:
+                raise RuntimeError(f"❌ Falha crítica: '{t_id}' retornou CloudMock em strict mode.")
+            context["result"] = {"error": "component_unavailable", "source": t_id}
             continue
 
         try:
