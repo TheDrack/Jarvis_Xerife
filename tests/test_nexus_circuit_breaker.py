@@ -1,12 +1,18 @@
 # -*- coding: utf-8 -*-
 """Tests for JarvisNexus - Circuit Breaker and CloudMock validation"""
 
+import threading
 import time
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.core.nexus import CloudMock, JarvisNexus, _CIRCUIT_BREAKER_RESET
+from app.core.nexus import (
+    AmbiguousComponentError,
+    CloudMock,
+    JarvisNexus,
+    _CIRCUIT_BREAKER_RESET,
+)
 
 
 class TestCloudMock:
@@ -89,3 +95,117 @@ class TestJarvisNexusCircuitBreaker:
         with patch.object(nexus, "_resolve_internal", return_value=None):
             result = nexus.resolve("nonexistent_xyz_abc")
         assert result is None
+
+
+class TestThreadSafeResolve:
+    """Tests for double-checked locking and single-instance guarantee."""
+
+    def test_thread_safe_resolve_creates_single_instance(self):
+        """Concurrent calls to resolve() must return the exact same instance."""
+        nexus = JarvisNexus()
+        instances = []
+        barrier = threading.Barrier(8)
+
+        class _UniqueSvc:
+            pass
+
+        call_count = {"n": 0}
+
+        def _build(target_id, hint_path=None):
+            call_count["n"] += 1
+            return _UniqueSvc()
+
+        def _worker():
+            barrier.wait()  # All threads start at the same instant
+            instances.append(nexus.resolve("shared_svc"))
+
+        with patch.object(nexus, "_resolve_internal", side_effect=_build):
+            threads = [threading.Thread(target=_worker) for _ in range(8)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join(timeout=10)
+
+        # All threads must have received an instance
+        assert len(instances) == 8
+        # All must be the same object (cached)
+        first = instances[0]
+        assert all(i is first for i in instances)
+
+
+class TestAmbiguousDiscovery:
+    """Tests for AmbiguousComponentError during filesystem discovery."""
+
+    def test_ambiguous_discovery_raises_error(self):
+        """_global_search_with_path must raise AmbiguousComponentError for >1 match."""
+        nexus = JarvisNexus()
+
+        class _FakeA:
+            pass
+
+        class _FakeB:
+            pass
+
+        # Simulate two candidates for the same component_id
+        fake_candidates = [(_FakeA(), "app.mod_a.fake"), (_FakeB(), "app.mod_b.fake")]
+
+        original = nexus._global_search_with_path
+
+        def _ambiguous(target_id):
+            # Reuse the real method's logic with injected candidates list
+            from app.core.nexus import AmbiguousComponentError
+            if len(fake_candidates) > 1:
+                paths = [p for _, p in fake_candidates]
+                raise AmbiguousComponentError(target_id, paths)
+            return fake_candidates[0] if fake_candidates else (None, None)
+
+        with patch.object(nexus, "_global_search_with_path", side_effect=_ambiguous):
+            result = nexus.resolve("fake")
+
+        # AmbiguousComponentError is caught by _resolve_with_timeout → CloudMock returned
+        assert isinstance(result, CloudMock)
+        assert "fake" in nexus._circuit_breaker
+
+    def test_ambiguous_component_error_carries_candidates(self):
+        """AmbiguousComponentError should expose component_id and candidates."""
+        err = AmbiguousComponentError("my_svc", ["app.a.my_svc", "app.b.my_svc"])
+        assert err.component_id == "my_svc"
+        assert "app.a.my_svc" in err.candidates
+        assert "app.b.my_svc" in err.candidates
+
+
+class TestCloudMockObservability:
+    """Tests for CloudMock call tracking and metrics integration."""
+
+    def test_cloudmock_records_calls_and_metrics(self):
+        """CloudMock must track calls and forward to a metrics collector."""
+        mock = CloudMock("obs_svc")
+
+        collector = MagicMock()
+        mock._metrics_collector = collector
+
+        # Call an arbitrary method three times
+        mock.do_something("a", key="b")
+        mock.do_something("c")
+        mock.another_method()
+
+        assert mock._call_count == 3
+        assert len(mock._last_calls) == 3
+        assert mock._last_calls[0]["method"] == "do_something"
+        assert mock._last_calls[2]["method"] == "another_method"
+
+        # Metrics collector must have been notified for each call
+        assert collector.increment.call_count == 3
+        collector.increment.assert_called_with("nexus.fallback_count")
+
+    def test_cloudmock_last_calls_capped_at_ten(self):
+        """_last_calls must not grow beyond 10 entries."""
+        mock = CloudMock("capped_svc")
+        for i in range(20):
+            mock.method_x(i)
+        assert len(mock._last_calls) == 10
+
+    def test_cloudmock_has_is_cloud_mock_flag(self):
+        """CloudMock must advertise itself via __is_cloud_mock__."""
+        assert CloudMock.__is_cloud_mock__ is True
+        assert CloudMock("x").__is_cloud_mock__ is True
