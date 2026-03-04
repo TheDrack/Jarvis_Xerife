@@ -75,6 +75,8 @@ logs/
 data/*.xlsx
 data/*.xls
 data/*.csv
+data/recon/
+data/audit_osint.jrvs
 *.txt
 !requirements.txt
 !requirements/*.txt
