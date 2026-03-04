@@ -1,17 +1,27 @@
 # -*- coding: utf-8 -*-
 import os
 import logging
+from typing import Any, Dict
+
 from app.core.nexus import nexus
+from app.core.nexuscomponent import NexusComponent
 
 logger = logging.getLogger(__name__)
 
-class NotificationService:
+class NotificationService(NexusComponent):
     """
     Serviço inteligente para despacho de mensagens agnóstico à interface.
     """
     def __init__(self):
         # Lista de interfaces prioritárias que o Jarvis deve tentar usar
         self.interface_priority = ["telegram_adapter", "whatsapp_adapter", "discord_adapter"]
+
+    def execute(self, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Implementação do contrato NexusComponent."""
+        ctx = context or {}
+        message = ctx.get("message", "🤖 **JARVIS Online**")
+        sent = self.broadcast_startup(message)
+        return {"success": sent, "sent": sent}
 
     def broadcast_startup(self, message: str = "🤖 **JARVIS Online**"):
         """

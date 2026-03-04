@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from scripts.overwatch_daemon import OverwatchDaemon
+from app.adapters.infrastructure.overwatch_adapter import OverwatchDaemon
 
 
 class TestOverwatchDaemon:
@@ -68,7 +68,7 @@ class TestOverwatchDaemon:
         ctx_file = tmp_path / "context.json"
         ctx_file.write_text('{"pending_tasks": ["task A"]}')
 
-        import scripts.overwatch_daemon as mod
+        import app.adapters.infrastructure.overwatch_adapter as mod
         original = mod._CONTEXT_FILE
         mod._CONTEXT_FILE = ctx_file
 
@@ -92,7 +92,7 @@ class TestOverwatchDaemon:
         ctx_file = tmp_path / "context.json"
         ctx_file.write_text('{"pending_tasks": ["reunião às 15h", "enviar relatório"]}')
 
-        import scripts.overwatch_daemon as mod
+        import app.adapters.infrastructure.overwatch_adapter as mod
         original = mod._CONTEXT_FILE
         mod._CONTEXT_FILE = ctx_file
         try:
@@ -110,7 +110,7 @@ class TestOverwatchDaemon:
         mock_vision = MagicMock()
         mock_vision.capture_and_analyze.return_value = "sim"
 
-        with patch("scripts.overwatch_daemon.nexus") as mock_nexus:
+        with patch("app.adapters.infrastructure.overwatch_adapter.nexus") as mock_nexus:
             mock_nexus.resolve.return_value = mock_vision
             with patch.object(daemon, "_suggest_pending_task") as mock_suggest:
                 daemon._check_inactivity()

@@ -8,7 +8,16 @@ class NexusComponent(ABC):
     Implementa o princípio de Validação Baseada em Evidência.
     """
     def configure(self, config: Dict[str, Any]) -> None:
+        """Configuração opcional antes da execução."""
         pass
+
+    def can_execute(self, context: Dict[str, Any]) -> bool:
+        """
+        Verifica se este componente pode executar dado o contexto.
+        Implementação padrão sempre retorna True.
+        Sobrescreva para adicionar pré-condições.
+        """
+        return True
 
     @abstractmethod
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

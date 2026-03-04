@@ -228,3 +228,79 @@ class TestVectorMemoryPiiIntegration:
                 mock_redactor.sanitize.assert_called_once_with("texto qualquer")
         finally:
             mod._FAISS_AVAILABLE = original
+
+
+# ---------------------------------------------------------------------------
+# 5. can_execute contract compliance
+# ---------------------------------------------------------------------------
+
+class TestCanExecuteContract:
+    """All NexusComponents must implement or inherit can_execute."""
+
+    def test_nexuscomponent_has_can_execute_default(self):
+        """NexusComponent base class must provide a default can_execute that returns True."""
+        from app.core.nexuscomponent import NexusComponent
+
+        class _MinimalComponent(NexusComponent):
+            def execute(self, context=None):
+                return {"success": True}
+
+        component = _MinimalComponent()
+        assert callable(getattr(component, "can_execute", None))
+        assert component.can_execute({}) is True
+        assert component.can_execute(None) is True
+
+    def test_overwatch_daemon_inherits_nexus_component(self):
+        """OverwatchDaemon must inherit NexusComponent after Task 4/8 fix."""
+        from app.adapters.infrastructure.overwatch_adapter import OverwatchDaemon
+        from app.core.nexuscomponent import NexusComponent
+
+        daemon = OverwatchDaemon()
+        assert isinstance(daemon, NexusComponent)
+        assert callable(getattr(daemon, "can_execute", None))
+        assert daemon.can_execute({}) is True
+
+    def test_notification_service_inherits_nexus_component(self):
+        """NotificationService must inherit NexusComponent after Task 6 fix."""
+        from app.application.services.notification_service import NotificationService
+        from app.core.nexuscomponent import NexusComponent
+
+        svc = NotificationService()
+        assert isinstance(svc, NexusComponent)
+        assert callable(getattr(svc, "can_execute", None))
+        assert svc.can_execute({}) is True
+
+    def test_registered_components_have_can_execute(self):
+        """NexusComponent subclasses registered in data/nexus_registry.json must have can_execute."""
+        import json
+        import os
+        import importlib
+
+        registry_path = os.path.join(os.getcwd(), "data", "nexus_registry.json")
+        if not os.path.exists(registry_path):
+            return  # Skip if registry not found
+
+        with open(registry_path) as f:
+            data = json.load(f)
+
+        from app.core.nexuscomponent import NexusComponent
+
+        for component_id, full_path in data.get("components", {}).items():
+            parts = full_path.rsplit(".", 1)
+            if len(parts) != 2 or not parts[1][0].isupper():
+                continue  # Skip non-class entries
+            module_path, class_name = parts
+            try:
+                module = importlib.import_module(module_path)
+                cls = getattr(module, class_name, None)
+                if cls is None or not isinstance(cls, type):
+                    continue
+                # Only check classes that are NexusComponent subclasses
+                if not issubclass(cls, NexusComponent):
+                    continue
+                # NexusComponent subclasses must have can_execute (from base or overridden)
+                assert hasattr(cls, "can_execute"), (
+                    f"NexusComponent '{component_id}' ({full_path}) lacks can_execute"
+                )
+            except (ImportError, ModuleNotFoundError):
+                pass  # Component not available in test environment (e.g., hardware deps)

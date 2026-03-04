@@ -57,6 +57,11 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False):
             if hasattr(instance, "configure"):
                 instance.configure(component_config)
 
+            # Verifica pré-condição antes de executar
+            if hasattr(instance, "can_execute") and not instance.can_execute(context):
+                logging.info("[PIPELINE] Componente '%s' pulado (can_execute=False)", name)
+                continue
+
             logging.info(f"⚙️ Executando: {name}...")
             
             # Execução do componente
