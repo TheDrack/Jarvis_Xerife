@@ -1,3 +1,4 @@
+from app.core.nexus import nexus
 from app.core.nexuscomponent import NexusComponent
 import json
 from pathlib import Path
@@ -10,6 +11,11 @@ class AutoEvolutionServiceV2(NexusComponent):
     Versão Evoluída: Migração de Roadmap Markdown para Inventário de Capacidades JSON.
     Localização: data/capabilities.json
     """
+
+    def __init__(self, capabilities_path: str = "data/capabilities.json") -> None:
+        super().__init__()
+        # Define o caminho relativo ao root do projeto
+        self.capabilities_path = Path(capabilities_path)
 
     def execute(self, context: Optional[Dict] = None) -> Dict:
         """
@@ -52,7 +58,10 @@ class AutoEvolutionServiceV2(NexusComponent):
                     )
                     if success:
                         return {"success": True, "evolved": cap_id}
-                    return {"success": False, "error": f"Evolução de {cap_id} falhou após {max_attempts} tentativas."}
+                    return {
+                        "success": False,
+                        "error": f"Evolução de {cap_id} falhou após {max_attempts} tentativas.",
+                    }
                 except Exception as exc:
                     logger.error("[AutoEvolutionV2] Erro na evolução de %s: %s", cap_id, exc)
                     return {"success": False, "error": str(exc), "cap_id": cap_id}
@@ -62,9 +71,6 @@ class AutoEvolutionServiceV2(NexusComponent):
         except Exception as exc:
             logger.error("[AutoEvolutionV2] execute() falhou: %s", exc)
             return {"success": False, "error": str(exc)}
-    def __init__(self, capabilities_path="data/capabilities.json"):
-        # Define o caminho relativo ao root do projeto
-        self.capabilities_path = Path(capabilities_path)
 
     def _load_data(self) -> Dict:
         """Carrega o inventário de capacidades."""

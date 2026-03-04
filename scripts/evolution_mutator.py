@@ -21,7 +21,7 @@ from typing import Dict, List, Optional
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from app.application.services.metabolism_core import MetabolismCore
+from app.core.nexus import nexus
 
 
 # ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ def _evolve_cap(
 
     examples = _last_completed_examples(caps)
     target_file = _cap_id_to_file(cap_id)
-    core = MetabolismCore()
+    core = nexus.resolve("metabolism_core")
 
     system_prompt, user_prompt = _build_prompts(cap, examples, roadmap_context)
     failure_reason: Optional[str] = None
