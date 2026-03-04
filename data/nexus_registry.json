@@ -11,5 +11,7 @@
     "gist_uploader": "app.adapters.infrastructure.gist_uploader",
     "drive_uploader": "app.adapters.infrastructure.drive_uploader",
     "vector_memory_adapter": "app.adapters.infrastructure.vector_memory_adapter",
-    "vision_adapter": "app.adapters.infrastructure.vision_adapter"
+    "vision_adapter": "app.adapters.infrastructure.vision_adapter",
+    "document_store": "app.utils.document_store",
+    "jrvs_translator": "app.application.services.jrvs_translator"
 }

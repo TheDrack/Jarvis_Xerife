@@ -36,6 +36,9 @@ O JARVIS é uma plataforma de automação e assistência que:
 | **Memória Vetorial (FAISS)** | ✅ **Ativo** |
 | **Visão Computacional (Gemini Flash)** | ✅ **Ativo** |
 | **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** |
+| **DocumentStore (I/O Universal)** | ✅ **Ativo** |
+| **Formato .jrvs (binário interno)** | ✅ **Ativo** |
+| **JrvsTranslator (fluxo tradutivo)** | ✅ **Ativo** |
 | Auto-Evolução | ⏸️ **PAUSADA** |
 
 > Auto-evolução está **pausada** enquanto a estrutura do repositório é reorganizada.
@@ -117,6 +120,59 @@ Componentes não utilizados ficam em `.frozen/` até serem necessários.
 
 ---
 
+## 📦 DocumentStore & Formato .jrvs
+
+O **DocumentStore** é o sistema universal de leitura/escrita de documentos.
+Ele detecta automaticamente o formato pelo sufixo do arquivo:
+
+```python
+from app.utils.document_store import document_store
+
+# Lê qualquer formato (.json, .yml, .txt, .jrvs)
+data = document_store.read("data/nexus_registry.json")
+
+# Grava no formato correto para o sufixo
+document_store.write("data/nexus_registry.jrvs", data)
+```
+
+### Formato `.jrvs`
+
+O `.jrvs` é o formato binário interno do JARVIS — compacto, verificado por CRC32
+e ~5–10× mais rápido para leitura do que JSON para arquivos grandes.
+
+```
+┌──────────────────────────────────────────────────┐
+│  Magic  │ Version │  Flags  │  CRC32  │   Len   │
+│ 4 bytes │ 2 bytes │ 2 bytes │ 4 bytes │ 4 bytes │
+├──────────────────────────────────────────────────┤
+│          Dados (JSON + zlib comprimido)           │
+└──────────────────────────────────────────────────┘
+```
+
+### Fluxo de Atualização Tradutiva
+
+O **JrvsTranslator** sincroniza arquivos `.jrvs` com seus equivalentes legíveis.
+Pode ser ativado manualmente ou via webhook:
+
+```bash
+# Via API (requer autenticação)
+curl -X POST /v1/translate/jrvs \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"action": "sync_all", "data_dir": "data"}'
+```
+
+```python
+from app.application.services.jrvs_translator import JrvsTranslator
+
+translator = JrvsTranslator()
+translator.execute({"action": "to_jrvs", "data_dir": "data"})
+```
+
+> ⚠️ Arquivos `.json`/`.yml` são a **fonte de verdade**. Edite sempre o formato
+> legível e execute a tradução para atualizar o `.jrvs`.
+
+---
+
 ## 🧊 Política Frozen
 
 Arquivos em `.frozen/` são código preservado mas inativo.  
@@ -147,6 +203,7 @@ pytest tests/ -v
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitetura do sistema |
 | [docs/NEXUS.md](docs/NEXUS.md) | Sistema de injeção de dependência |
 | [docs/ARQUIVO_MAP.md](docs/ARQUIVO_MAP.md) | Mapa de todos os arquivos ativos |
+| [data/README.md](data/README.md) | Formatos de dados: JSON, YAML, .jrvs |
 | [padrão_estrutural.md](padrão_estrutural.md) | Padrão de pipelines e arquitetura |
 
 ---
