@@ -6,14 +6,62 @@ import logging
 logger = logging.getLogger(__name__)
 
 class AutoEvolutionServiceV2(NexusComponent):
-    def execute(self, context: dict):
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
-
     """
     Versão Evoluída: Migração de Roadmap Markdown para Inventário de Capacidades JSON.
     Localização: data/capabilities.json
     """
+
+    def execute(self, context: Optional[Dict] = None) -> Dict:
+        """
+        Despacha ações baseadas em context["action"]:
+          "status"      → get_success_metrics()
+          "find_next"   → find_next_mission()
+          "evolve_next" | "evolve_cap" → evolve uma cap pelo evolution_mutator
+        """
+        if not context:
+            context = {}
+
+        action = context.get("action", "status")
+
+        try:
+            if action == "status":
+                metrics = self.get_success_metrics()
+                return {"success": True, "action": action, "metrics": metrics}
+
+            if action == "find_next":
+                mission = self.find_next_mission()
+                return {"success": True, "action": action, "mission": mission}
+
+            if action in ("evolve_next", "evolve_cap"):
+                cap_id = context.get("cap_id")
+                if not cap_id:
+                    mission = self.find_next_mission()
+                    if not mission:
+                        return {"success": False, "error": "Nenhuma cap pendente encontrada."}
+                    cap_id = mission["id"]
+
+                roadmap_context = context.get("roadmap_context", "")
+                max_attempts = context.get("max_attempts", 3)
+
+                try:
+                    from scripts.evolution_mutator import evolve as mutator_evolve
+                    success = mutator_evolve(
+                        cap_id=cap_id,
+                        roadmap_context=roadmap_context,
+                        max_attempts=max_attempts,
+                    )
+                    if success:
+                        return {"success": True, "evolved": cap_id}
+                    return {"success": False, "error": f"Evolução de {cap_id} falhou após {max_attempts} tentativas."}
+                except Exception as exc:
+                    logger.error("[AutoEvolutionV2] Erro na evolução de %s: %s", cap_id, exc)
+                    return {"success": False, "error": str(exc), "cap_id": cap_id}
+
+            return {"success": False, "error": f"Ação desconhecida: {action!r}"}
+
+        except Exception as exc:
+            logger.error("[AutoEvolutionV2] execute() falhou: %s", exc)
+            return {"success": False, "error": str(exc)}
     def __init__(self, capabilities_path="data/capabilities.json"):
         # Define o caminho relativo ao root do projeto
         self.capabilities_path = Path(capabilities_path)

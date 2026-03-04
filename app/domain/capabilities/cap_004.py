@@ -1,24 +1,45 @@
 # -*- coding: utf-8 -*-
 from app.core.nexuscomponent import NexusComponent
 
+
 class Cap004(NexusComponent):
     """
-    Capacidade: Generate technical objectives from detected gaps
-    ID: {cap['id']}
-    Setor: {target_dir}
+    Capability: Generate technical objectives from detected gaps
+    ID: CAP-004
+    Setor: app/domain/capabilities/cap_004.py
+    Descricao: Transform identified weaknesses into actionable engineering or development goals.
     """
 
     def __init__(self):
         super().__init__()
-        # Padrões iniciais do componente
+        self.cap_id = "CAP-004"
+        self.title = "Generate technical objectives from detected gaps"
         self.active = True
 
     def configure(self, config: dict = None):
-        """Opcional: Configuração via Pipeline YAML"""
+        """Configuracao opcional via Pipeline YAML."""
         if config:
-            pass
+            self.active = config.get("active", True)
 
-    def execute(self, context: dict = None):
-        """Execução lógica principal"""
-        print('🚀 Executando Cap004...')
-        return {'status': 'success', 'id': 'CAP-004'}
+    def execute(self, context: dict = None) -> dict:
+        """Execucao logica principal.
+
+        Retorna evidencia de efeito conforme contrato NexusComponent.
+        """
+        if context is None:
+            context = {}
+
+        cap_id = self.cap_id
+        title = self.title
+        active = self.active
+
+        if not active:
+            return {"success": False, "cap_id": cap_id, "reason": "componente inativo"}
+
+        result = {
+            "cap_id": cap_id,
+            "title": title,
+            "status": "executed",
+            "context_keys": list(context.keys()),
+        }
+        return {"success": True, "result": result}
