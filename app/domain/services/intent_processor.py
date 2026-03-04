@@ -13,6 +13,8 @@ class IntentProcessor(NexusComponent):
     """
 
     def execute(self, context: dict) -> Any:
+        if not context:
+            return "Erro: Contexto inválido ou vazio."
         intent_obj = context.get("intent")
         if not intent_obj:
             return "Erro: Objeto de intenção não encontrado no contexto."

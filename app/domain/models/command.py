@@ -1,4 +1,3 @@
-from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Domain models - Core business entities"""
 
@@ -37,7 +36,7 @@ class Intent:
 
 
 @dataclass
-class Command(NexusComponent):
+class Command:
     """Represents a command to be executed"""
 
     intent: Intent

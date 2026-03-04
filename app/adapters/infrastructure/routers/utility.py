@@ -214,4 +214,37 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
                 "error": str(e),
             }
 
+    @router.post("/v1/translate/jrvs")
+    async def trigger_jrvs_translation(
+        payload: Dict[str, Any] = {},
+        current_user: User = Depends(get_current_user),
+    ) -> Dict[str, Any]:
+        """
+        Dispara o fluxo de atualização tradutiva entre arquivos .jrvs e
+        seus equivalentes legíveis por humanos (JSON, YAML, TXT).
+
+        Body (todos opcionais)::
+
+            {
+                "action":   "to_jrvs" | "from_jrvs" | "sync_all",  // padrão: sync_all
+                "path":     "data/nexus_registry.json",             // arquivo específico
+                "data_dir": "data"                                  // diretório a varrer
+            }
+        """
+        from app.application.services.jrvs_translator import JrvsTranslator
+
+        translator = JrvsTranslator()
+        context = {
+            "action": payload.get("action", "sync_all"),
+        }
+        if "path" in payload:
+            context["path"] = payload["path"]
+        if "data_dir" in payload:
+            context["data_dir"] = payload["data_dir"]
+
+        result = translator.execute(context)
+        if not result["success"]:
+            logger.warning(f"[JrvsTranslator] Erros na tradução: {result['errors']}")
+        return result
+
     return router

@@ -1,4 +1,3 @@
-from app.core.nexuscomponent import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for Domain models"""
 
@@ -7,11 +6,7 @@ import pytest
 from app.domain.models import Command, CommandType, Intent, Response
 
 
-class TestIntent(NexusComponent):
-
-    def execute(self, context: dict):
-        """Execução automática JARVIS."""
-        pass
+class TestIntent:
     """Test cases for Intent model"""
 
     def test_create_intent(self):
@@ -45,11 +40,7 @@ class TestIntent(NexusComponent):
             Intent(command_type=CommandType.TYPE_TEXT, confidence=-0.1)
 
 
-class TestCommand(NexusComponent):
-
-    def execute(self, context: dict):
-        """Execução automática JARVIS."""
-        pass
+class TestCommand:
     """Test cases for Command model"""
 
     def test_create_command(self):
@@ -74,11 +65,7 @@ class TestCommand(NexusComponent):
         assert command.context == {}
 
 
-class TestResponse(NexusComponent):
-
-    def execute(self, context: dict):
-        """Execução automática JARVIS."""
-        pass
+class TestResponse:
     """Test cases for Response model"""
 
     def test_create_success_response(self):
@@ -121,11 +108,7 @@ class TestResponse(NexusComponent):
         assert response.data["count"] == 5
 
 
-class TestCommandType(NexusComponent):
-
-    def execute(self, context: dict):
-        """Execução automática JARVIS."""
-        pass
+class TestCommandType:
     """Test cases for CommandType enum"""
 
     def test_command_types(self):
@@ -136,3 +119,4 @@ class TestCommandType(NexusComponent):
         assert CommandType.OPEN_URL.value == "open_url"
         assert CommandType.SEARCH_ON_PAGE.value == "search_on_page"
         assert CommandType.UNKNOWN.value == "unknown"
+

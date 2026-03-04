@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """Gerenciador de Memória Semântica de Longo Prazo do JARVIS."""
 
-import json
 import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.nexuscomponent import NexusComponent
+from app.utils.document_store import document_store
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,8 @@ class MemoryManager(NexusComponent):
 
     Persiste interações passadas em disco e recupera contexto relevante
     para novas consultas usando correspondência de palavras-chave.
+    Suporta armazenamento em qualquer formato suportado pelo DocumentStore
+    (.json, .jrvs, .yml, .txt).
     """
 
     def __init__(
@@ -41,7 +43,7 @@ class MemoryManager(NexusComponent):
         return {"success": True, "relevant_context": relevant}
 
     def store_interaction(self, user_input: str, response: str) -> None:
-        """Persiste uma nova interação no arquivo de memória JSON."""
+        """Persiste uma nova interação no arquivo de memória."""
         interactions = self._load_interactions()
         interactions.append(
             {
@@ -92,19 +94,18 @@ class MemoryManager(NexusComponent):
         return [item for _, item in scored[:max_results]]
 
     def _load_interactions(self) -> List[Dict[str, Any]]:
-        """Carrega as interações persistidas do arquivo JSON."""
+        """Carrega as interações persistidas via DocumentStore."""
         if os.path.exists(self._storage_path):
             try:
-                with open(self._storage_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, OSError) as e:
+                data = document_store.read(self._storage_path)
+                return data if isinstance(data, list) else []
+            except (OSError, Exception) as e:
                 logger.warning(f"⚠️ [MEMORY] Erro ao carregar memória: {e}")
         return []
 
     def _save_interactions(self, interactions: List[Dict[str, Any]]) -> None:
-        """Persiste as interações no arquivo JSON."""
+        """Persiste as interações via DocumentStore."""
         try:
-            with open(self._storage_path, "w", encoding="utf-8") as f:
-                json.dump(interactions, f, indent=2, ensure_ascii=False)
+            document_store.write(self._storage_path, interactions)
         except OSError as e:
             logger.error(f"❌ [MEMORY] Falha ao persistir memória: {e}")
