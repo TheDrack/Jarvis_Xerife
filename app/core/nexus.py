@@ -81,6 +81,9 @@ class CloudMock:
 
     __is_cloud_mock__ = True
 
+    # Global counter tracking total fallback calls across all CloudMock instances
+    _global_fallback_count: int = 0
+
     def __init__(self, component_id: str = "unknown") -> None:
         self._component_id = component_id
         self._call_count: int = 0
@@ -90,6 +93,8 @@ class CloudMock:
     def __getattr__(self, name: str):
         def _noop(*args, **kwargs):
             self._call_count += 1
+            CloudMock._global_fallback_count += 1
+            count = CloudMock._global_fallback_count
             record = {"method": name, "args": args, "kwargs": kwargs}
             self._last_calls.append(record)
             if len(self._last_calls) > 10:
@@ -99,6 +104,11 @@ class CloudMock:
                 f"(componente real indisponível).",
                 extra={"component_id": self._component_id, "method": name},
             )
+            if count % 10 == 0:
+                logger.critical(
+                    "🚨 [NEXUS] ALERTA DE DEGRADAÇÃO: %d fallbacks ocorridos desde o início.",
+                    count,
+                )
             if self._metrics_collector is not None:
                 try:
                     self._metrics_collector.increment("nexus.fallback_count")
@@ -273,6 +283,9 @@ class JarvisNexus:
             try:
                 return pending_future.result(timeout=_CIRCUIT_BREAKER_TIMEOUT + _WAITER_TIMEOUT_MARGIN)
             except Exception:
+                logger.warning(
+                    "☁️ [NEXUS] Componente '%s' indisponível. Usando Mock.", target_id
+                )
                 return CloudMock(target_id)
 
         # --- Build branch: we own the resolution ---
@@ -283,6 +296,9 @@ class JarvisNexus:
                 if self._instances.get(target_id) is pending_future:
                     del self._instances[target_id]
             pending_future.set_exception(err)
+            logger.warning(
+                "☁️ [NEXUS] Componente '%s' indisponível. Usando Mock.", target_id
+            )
             return CloudMock(target_id)
 
         duration_ms = int((time.time() - start) * 1000)
@@ -290,6 +306,11 @@ class JarvisNexus:
             "cloudmock" if isinstance(instance, CloudMock)
             else ("ok" if instance else "none")
         )
+        if isinstance(instance, CloudMock):
+            logger.warning(
+                "☁️ [NEXUS] Componente '%s' indisponível. Usando Mock.",
+                target_id,
+            )
         logger.info(
             "nexus.resolve",
             extra={

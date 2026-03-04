@@ -11,13 +11,15 @@ Each Soldier carries:
     - ``PublicKey``   – RSA/Ed25519 public key for tunnel authentication
     - ``Status``      – Online / Offline / Reconnecting
 
-The service is intentionally infrastructure-agnostic: it stores state in
-memory and delegates persistence to an optional ``SoldierProvider`` port.
+The service supports hybrid persistence (Memory + SQLite via SQLModel).
+An optional ``db_url`` enables SQLite persistence so the registry survives
+restarts.  When the DB is unavailable the service falls back to memory-only
+mode without interrupting operation.
 """
 
 import logging
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from app.application.ports.soldier_provider import SoldierProvider
 from app.domain.models.soldier import (
@@ -27,6 +29,41 @@ from app.domain.models.soldier import (
     TelemetryPayload,
 )
 
+try:
+    from sqlmodel import Field, Session, SQLModel, create_engine, select
+
+    _SQLMODEL_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _SQLMODEL_AVAILABLE = False
+    Field = Any  # type: ignore[assignment,misc]
+
+
+# ---------------------------------------------------------------------------
+# SQLite persistence model
+# ---------------------------------------------------------------------------
+
+if _SQLMODEL_AVAILABLE:
+
+    class SoldierDB(SQLModel, table=True):  # type: ignore[call-arg]
+        """SQLite row that mirrors a :class:`SoldierRecord`."""
+
+        __tablename__ = "soldiers"
+
+        soldier_id: str = Field(primary_key=True)
+        public_key: str = ""
+        device_type: str = "unknown"
+        alias: Optional[str] = None
+        status: str = SoldierStatus.OFFLINE.value
+        registered_at: Optional[str] = None
+        last_seen: Optional[str] = None
+        lat: Optional[float] = None
+        lon: Optional[float] = None
+        last_ip: Optional[str] = None
+        battery_pct: Optional[float] = None
+        cpu_pct: Optional[float] = None
+        ram_pct: Optional[float] = None
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,12 +72,14 @@ class DeviceOrchestratorService(SoldierProvider):
     Centralised Soldier registry and C2 orchestrator.
 
     Stores all Soldier records in an in-memory dict keyed by ``soldier_id``.
-    An optional external ``SoldierProvider`` can be injected via the
-    constructor to add database persistence without changing this service.
+    Supports optional SQLite persistence via ``db_url`` so the registry
+    survives process restarts.  When the DB is unavailable the service
+    operates in memory-only mode without interrupting normal operation.
 
     Example usage::
 
-        service = DeviceOrchestratorService()
+        service = DeviceOrchestratorService(db_url="sqlite:///soldiers.db")
+        service.bootstrap()  # Load persisted soldiers into memory
         reg = SoldierRegistration(
             soldier_id="pi-zero-01",
             public_key="ssh-ed25519 AAAA...",
@@ -51,15 +90,36 @@ class DeviceOrchestratorService(SoldierProvider):
         print(service.list_active_soldiers())
     """
 
-    def __init__(self, external_provider: Optional[SoldierProvider] = None) -> None:
+    def __init__(
+        self,
+        external_provider: Optional[SoldierProvider] = None,
+        db_url: Optional[str] = None,
+    ) -> None:
         """
         Args:
             external_provider: Optional persistence backend.  When provided,
                 mutations are forwarded to both the in-memory store and the
                 external provider.
+            db_url: SQLAlchemy-compatible DB URL for hybrid persistence
+                (e.g. ``"sqlite:///soldiers.db"``).  When *None* the service
+                operates in memory-only mode.
         """
         self._registry: Dict[str, SoldierRecord] = {}
         self._external = external_provider
+        self._engine: Optional[Any] = None
+
+        if db_url and _SQLMODEL_AVAILABLE:
+            try:
+                self._engine = create_engine(db_url, echo=False)
+                SQLModel.metadata.create_all(self._engine)
+                logger.info("🗄️ [C2] SQLite persistence activada: %s", db_url)
+            except Exception as exc:
+                logger.error(
+                    "❌ [C2] Falha ao inicializar DB ('%s'). Modo memory-only. Erro: %s",
+                    db_url,
+                    exc,
+                )
+                self._engine = None
 
     # ------------------------------------------------------------------
     # NexusComponent interface
@@ -124,6 +184,7 @@ class DeviceOrchestratorService(SoldierProvider):
         if self._external:
             self._external.register_soldier(registration)
 
+        self._save_to_db(record)
         return record
 
     def get_soldier(self, soldier_id: str) -> Optional[SoldierRecord]:
@@ -144,6 +205,7 @@ class DeviceOrchestratorService(SoldierProvider):
         if self._external:
             self._external.update_status(soldier_id, status)
 
+        self._save_to_db(record)
         return True
 
     def list_soldiers(self, status_filter: Optional[SoldierStatus] = None) -> List[SoldierRecord]:
@@ -206,15 +268,103 @@ class DeviceOrchestratorService(SoldierProvider):
             record.lon,
             record.battery_pct,
         )
+        self._save_to_db(record)
         return True
 
     def get_tactical_map(self) -> List[Dict]:
         """Return all Soldiers formatted for display on a Tactical Map."""
         return [self._soldier_to_map_entry(s) for s in self._registry.values()]
 
+    def bootstrap(self) -> None:
+        """Load previously persisted ONLINE/RECONNECTING Soldiers into memory.
+
+        Call this once after construction (e.g. during application startup)
+        so the in-memory registry is pre-populated from the SQLite store.
+        """
+        loaded = self._load_from_db()
+        if loaded:
+            logger.info("🔁 [C2] Bootstrap: %d soldado(s) carregado(s) do DB.", loaded)
+
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _save_to_db(self, record: SoldierRecord) -> None:
+        """Persist *record* to SQLite.  Silently skips when DB is not configured."""
+        if self._engine is None or not _SQLMODEL_AVAILABLE:
+            return
+        try:
+            with Session(self._engine) as session:
+                row = session.get(SoldierDB, record.soldier_id)
+                if row is None:
+                    row = SoldierDB(soldier_id=record.soldier_id)
+                    session.add(row)
+                row.public_key = record.public_key
+                row.device_type = record.device_type
+                row.alias = record.alias
+                row.status = record.status.value
+                row.registered_at = (
+                    record.registered_at.isoformat() if record.registered_at else None
+                )
+                row.last_seen = record.last_seen.isoformat() if record.last_seen else None
+                row.lat = record.lat
+                row.lon = record.lon
+                row.last_ip = record.last_ip
+                row.battery_pct = record.battery_pct
+                row.cpu_pct = record.cpu_pct
+                row.ram_pct = record.ram_pct
+                session.commit()
+        except Exception as exc:
+            logger.error("❌ [C2] _save_to_db falhou para '%s': %s", record.soldier_id, exc)
+
+    def _load_from_db(self) -> int:
+        """Load ONLINE/RECONNECTING Soldiers from SQLite into the in-memory registry.
+
+        Returns:
+            Number of soldiers loaded.
+        """
+        if self._engine is None or not _SQLMODEL_AVAILABLE:
+            return 0
+        loaded = 0
+        try:
+            active_statuses = [SoldierStatus.ONLINE.value, SoldierStatus.RECONNECTING.value]
+            with Session(self._engine) as session:
+                # Filter at DB level for efficiency
+                stmt = select(SoldierDB).where(
+                    SoldierDB.status.in_(active_statuses)  # type: ignore[union-attr]
+                )
+                rows = session.exec(stmt).all()
+                for row in rows:
+                    try:
+                        status = SoldierStatus(row.status)
+                    except ValueError:
+                        status = SoldierStatus.OFFLINE
+                    record = SoldierRecord(
+                        soldier_id=row.soldier_id,
+                        public_key=row.public_key,
+                        device_type=row.device_type,
+                        alias=row.alias,
+                        status=status,
+                        registered_at=(
+                            datetime.fromisoformat(row.registered_at)
+                            if row.registered_at
+                            else datetime.now(timezone.utc)
+                        ),
+                        last_seen=(
+                            datetime.fromisoformat(row.last_seen) if row.last_seen else None
+                        ),
+                        lat=row.lat,
+                        lon=row.lon,
+                        last_ip=row.last_ip,
+                        battery_pct=row.battery_pct,
+                        cpu_pct=row.cpu_pct,
+                        ram_pct=row.ram_pct,
+                    )
+                    self._registry[record.soldier_id] = record
+                    loaded += 1
+        except Exception as exc:
+            logger.error("❌ [C2] _load_from_db falhou: %s", exc)
+        return loaded
 
     @staticmethod
     def _soldier_to_map_entry(soldier: SoldierRecord) -> Dict:
