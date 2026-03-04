@@ -54,6 +54,9 @@ _RAM_HIGH_THRESHOLD = 85.0       # %
 _INACTIVITY_TIMEOUT_SEC = 1800   # 30 minutes
 _CONTEXT_FILE = Path("data/context.json")
 _PERIMETER_CHECK_EVERY = 3       # ticks (every ~30 s)
+_OVERWATCH_COMPILE_INTERVAL_SEC = float(
+    os.getenv("OVERWATCH_COMPILE_INTERVAL_SEC", "600")
+)  # 10 minutes
 
 
 class OverwatchDaemon:
@@ -86,6 +89,7 @@ class OverwatchDaemon:
         self._last_activity_ts: float = time.monotonic()
         self._context_mtime: Optional[float] = None
         self._tick_count: int = 0
+        self._last_compile_ts: float = 0.0  # timestamp of last compile_all run
 
         # Tactical Perimeter state
         self._authorized_macs: Set[str] = {m.upper() for m in (authorized_macs or set())}
@@ -128,6 +132,7 @@ class OverwatchDaemon:
                 self._check_context_file()
                 self._check_inactivity()
                 self._check_tactical_perimeter()
+                self._check_jrvs_compile()
             except Exception as exc:
                 logger.error("[PROACTIVE_CORE] Erro no loop principal: %s", exc)
             time.sleep(self._poll_interval)
@@ -177,6 +182,35 @@ class OverwatchDaemon:
                 self._on_context_changed()
         except Exception as exc:
             logger.debug("[PROACTIVE_CORE] Erro ao verificar context.json: %s", exc)
+
+    def _check_jrvs_compile(self) -> None:
+        """Periodically run JRVSCompiler.compile_all() based on OVERWATCH_COMPILE_INTERVAL_SEC."""
+        now = time.monotonic()
+        if now - self._last_compile_ts < _OVERWATCH_COMPILE_INTERVAL_SEC:
+            return
+        self._last_compile_ts = now
+        lock_path = Path("data/jrvs/.compile.lock")
+        try:
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            if lock_path.exists():
+                logger.debug("[PROACTIVE_CORE] Compilação JRVS bloqueada por lock file.")
+                return
+            lock_path.touch()
+            try:
+                from app.core.meta.jrvs_compiler import JRVSCompiler  # noqa: PLC0415
+
+                compiler = JRVSCompiler()
+                compiler.compile_all()
+                logger.info("[PROACTIVE_CORE] JRVS compile_all concluído.")
+            finally:
+                try:
+                    lock_path.unlink(missing_ok=True)
+                except Exception as unlink_exc:  # pragma: no cover
+                    logger.debug(
+                        "[PROACTIVE_CORE] Falha ao remover lock file JRVS: %s", unlink_exc
+                    )
+        except Exception as exc:
+            logger.error("[PROACTIVE_CORE] Falha ao executar JRVS compile_all: %s", exc)
 
     def _check_inactivity(self) -> None:
         """After 30 min of inactivity, check if the user is present and suggest a task."""
