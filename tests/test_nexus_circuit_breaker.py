@@ -215,3 +215,68 @@ class TestCloudMockObservability:
         """CloudMock must advertise itself via __is_cloud_mock__."""
         assert CloudMock.__is_cloud_mock__ is True
         assert CloudMock("x").__is_cloud_mock__ is True
+
+
+class TestNexusRegistryPath:
+    """Tests that the Nexus registry is loaded from data/nexus_registry.json."""
+
+    def test_registry_loaded_from_data_directory(self, tmp_path):
+        """JarvisNexus should load registry from data/nexus_registry.json, not the project root."""
+        import json
+        import os
+
+        # Create a temp project structure with data/nexus_registry.json
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        registry = {
+            "components": {
+                "test_service": "app.services.test_service.TestService"
+            }
+        }
+        (data_dir / "nexus_registry.json").write_text(json.dumps(registry))
+
+        nexus = JarvisNexus()
+        nexus.base_dir = str(tmp_path)
+
+        result = nexus._load_local_registry()
+
+        assert "test_service" in result
+        assert result["test_service"] == "app.services.test_service"
+
+    def test_registry_not_found_at_root_returns_empty(self, tmp_path):
+        """If registry is at root (wrong path), _load_local_registry should return {}."""
+        import json
+
+        # Put the registry at root level (wrong path)
+        (tmp_path / "nexus_registry.json").write_text(
+            json.dumps({"components": {"some_service": "app.some.SomeService"}})
+        )
+
+        nexus = JarvisNexus()
+        nexus.base_dir = str(tmp_path)
+
+        result = nexus._load_local_registry()
+        # Should return empty because it looks in data/ not root
+        assert result == {}
+
+    def test_init_loads_registry_into_cache(self, tmp_path):
+        """JarvisNexus.__init__ should pre-populate _cache from the registry."""
+        import json
+        import os
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        registry = {
+            "components": {
+                "telegram_adapter": "app.adapters.infrastructure.telegram_adapter.TelegramAdapter"
+            }
+        }
+        (data_dir / "nexus_registry.json").write_text(json.dumps(registry))
+
+        # Patch os.getcwd to point to tmp_path
+        with patch("app.core.nexus.os.path.abspath") as mock_abs:
+            mock_abs.return_value = str(tmp_path)
+            nexus = JarvisNexus()
+
+        assert "telegram_adapter" in nexus._cache
+        assert nexus._cache["telegram_adapter"] == "app.adapters.infrastructure.telegram_adapter"

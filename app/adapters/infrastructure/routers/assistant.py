@@ -2,7 +2,7 @@
 """Assistant router: /v1/execute, /v1/message, /v1/task, /v1/status, /v1/history"""
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 
 from app.adapters.infrastructure.api_models import (
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
-def create_assistant_router(assistant_service, db_adapter, get_current_user) -> APIRouter:
+def create_assistant_router(assistant_service, db_adapter, get_current_user, limiter=None) -> APIRouter:
     """
     Create the assistant router with all command/message endpoints.
 
@@ -31,6 +31,7 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user) -> 
         assistant_service: Injected AssistantService instance
         db_adapter: SQLiteHistoryAdapter for task persistence
         get_current_user: Dependency callable for authentication
+        limiter: Optional slowapi Limiter instance for rate limiting
 
     Returns:
         Configured APIRouter
@@ -38,6 +39,12 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user) -> 
     from app.adapters.infrastructure.api_models import RequestSource
 
     router = APIRouter()
+
+    def _noop_decorator(f):
+        """No-op decorator used when rate limiting is disabled."""
+        return f
+
+    _rate_limit = limiter.limit("30/minute") if limiter is not None else _noop_decorator
 
     def _should_bypass_identifier(request_source: str = None) -> bool:
         """Return True if request should skip Jarvis intent identification."""
@@ -49,8 +56,10 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user) -> 
         }
 
     @router.post("/v1/execute", response_model=ExecuteResponse)
+    @_rate_limit
     async def execute_command(
-        request: ExecuteRequest,
+        request: Request,
+        body: ExecuteRequest,
         current_user: User = Depends(get_current_user),
     ) -> ExecuteResponse:
         """
@@ -62,12 +71,12 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user) -> 
         """
         try:
             request_source = None
-            if request.metadata and request.metadata.request_source:
-                request_source = request.metadata.request_source.value
+            if body.metadata and body.metadata.request_source:
+                request_source = body.metadata.request_source.value
 
             source_info = f" (source: {request_source})" if request_source else ""
             logger.info(
-                f"User '{current_user.username}' executing command via API{source_info}: {request.command}"
+                f"User '{current_user.username}' executing command via API{source_info}: {body.command}"
             )
 
             bypass_identifier = _should_bypass_identifier(request_source)
@@ -75,17 +84,17 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user) -> 
                 logger.info("GitHub-sourced request – bypassing Jarvis identifier.")
 
             metadata_dict = None
-            if request.metadata:
+            if body.metadata:
                 metadata_dict = {
-                    "source_device_id": request.metadata.source_device_id,
-                    "network_id": request.metadata.network_id,
-                    "network_type": request.metadata.network_type,
+                    "source_device_id": body.metadata.source_device_id,
+                    "network_id": body.metadata.network_id,
+                    "network_type": body.metadata.network_type,
                     "request_source": request_source,
                     "bypass_identifier": bypass_identifier,
                 }
 
             response = await assistant_service.async_process_command(
-                request.command, channel="api", request_metadata=metadata_dict
+                body.command, channel="api", request_metadata=metadata_dict
             )
             logger.info(
                 f"Response for '{current_user.username}': success={response.success}, "
@@ -102,14 +111,16 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user) -> 
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
     @router.post("/v1/message", response_model=MessageResponse)
+    @_rate_limit
     async def send_message(
-        request: MessageRequest,
+        request: Request,
+        body: MessageRequest,
         current_user: User = Depends(get_current_user),
     ) -> MessageResponse:
         """Send a natural-language message to the assistant (Protected endpoint)."""
         try:
-            logger.info(f"User '{current_user.username}' sending message: {request.text}")
-            response = await assistant_service.async_process_command(request.text, channel="api")
+            logger.info(f"User '{current_user.username}' sending message: {body.text}")
+            response = await assistant_service.async_process_command(body.text, channel="api")
             logger.info(
                 f"Response for '{current_user.username}': success={response.success}, "
                 f"len={len(response.message) if response.message else 0}"

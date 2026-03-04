@@ -4,11 +4,14 @@
 import logging
 from pathlib import Path
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.staticfiles import StaticFiles
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.adapters.infrastructure import api_models
 from app.adapters.infrastructure.api_models import Token, User
@@ -33,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 auth_adapter = AuthAdapter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
@@ -89,6 +93,10 @@ def create_api_server(
         redoc_url=None,
     )
 
+    # -- Rate limiting ---------------------------------------------------------
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
     # -- Shared infrastructure --------------------------------------------------
     db_adapter = SQLiteHistoryAdapter(database_url=settings.database_url)
     device_service = DeviceService(engine=db_adapter.engine)
@@ -100,7 +108,8 @@ def create_api_server(
 
     # -- Core endpoints (no auth required) --------------------------------------
     @app.post("/v1/telegram/webhook")
-    async def telegram_webhook(data: dict, background_tasks: BackgroundTasks):
+    @limiter.limit("30/minute")
+    async def telegram_webhook(request: Request, data: dict, background_tasks: BackgroundTasks):
         """Receive Telegram updates and dispatch via telegram_adapter."""
         telegram = nexus.resolve("telegram_adapter")
         assistant = nexus.resolve("assistant_service")
@@ -188,7 +197,7 @@ def create_api_server(
         return HTMLResponse(content=html_content)
 
     # -- Register domain routers ------------------------------------------------
-    app.include_router(create_assistant_router(assistant_service, db_adapter, get_current_user))
+    app.include_router(create_assistant_router(assistant_service, db_adapter, get_current_user, limiter))
     app.include_router(create_health_router(db_adapter))
     app.include_router(create_extensions_router(extension_manager, get_current_user))
     app.include_router(create_devices_router(device_service, db_adapter, get_current_user))

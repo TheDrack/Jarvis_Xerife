@@ -21,7 +21,7 @@ from app.core.nexus import nexus
 
 # Proactive core (Overwatch Daemon)
 try:
-    from scripts.overwatch_daemon import OverwatchDaemon
+    from app.adapters.infrastructure.overwatch_adapter import OverwatchDaemon
     _OVERWATCH_AVAILABLE = True
 except ImportError:
     _OVERWATCH_AVAILABLE = False
@@ -78,44 +78,39 @@ def bootstrap_background_services():
     if os.getenv("RENDER") == "true":
         time.sleep(5)
 
+    # PASSO 1: Inicia o Núcleo Proativo PRIMEIRO (não depende do Telegram)
+    _daemon_instance = None
+    if _OVERWATCH_AVAILABLE:
+        try:
+            _daemon_instance = OverwatchDaemon()
+            _daemon_instance.start()
+            logger.info("[PROACTIVE_CORE] OverwatchDaemon ativo em background.")
+        except Exception as e:
+            logger.warning(f"[PROACTIVE_CORE] Falha ao iniciar OverwatchDaemon: {e}")
+
+    # PASSO 2: Resolve componentes de interface e inicia polling (bloqueante — deve ser último)
     try:
-        # 1. Resolução Dinâmica (Usa o os.walk blindado do Nexus)
         assistant = nexus.resolve("assistant_service")
         telegram = nexus.resolve("telegram_adapter")
 
         if assistant and telegram:
-            # 2. Notificação Inteligente de Startup
+            # Notificação Inteligente de Startup
             send_dynamic_startup_notification()
 
             logger.info("✅ [NEXUS] Ecossistema localizado. Ativando Polling...")
 
-            # 3. Início do Loop de Interface
+            # Início do Loop de Interface
             def telegram_callback(text, chat_id):
-                if _OVERWATCH_AVAILABLE:
-                    # Notify Overwatch that the user is active
-                    try:
-                        overwatch = nexus.resolve("overwatch_daemon")
-                        if overwatch is not None:
-                            overwatch.notify_activity()
-                    except Exception:
-                        pass
+                if _daemon_instance is not None:
+                    _daemon_instance.notify_activity()
                 return assistant.process_command(text, channel="telegram")
 
-            telegram.start_polling(callback=telegram_callback)
+            telegram.start_polling(callback=telegram_callback)  # bloqueante — deve ser o último call
         else:
             logger.error("⚠️ [NEXUS] Falha crítica: Componentes vitais não localizados.")
 
     except Exception as e:
         logger.error(f"❌ [BOOTSTRAP] Erro fatal na thread de serviços: {e}")
-
-    # 4. Inicia o Núcleo Proativo (Overwatch Daemon) — independente do Telegram
-    if _OVERWATCH_AVAILABLE:
-        try:
-            daemon = OverwatchDaemon()
-            daemon.start()
-            logger.info("[PROACTIVE_CORE] OverwatchDaemon ativo em background.")
-        except Exception as e:
-            logger.warning(f"[PROACTIVE_CORE] Falha ao iniciar OverwatchDaemon: {e}")
 
 def start_cloud_service():
     print("=" * 60)

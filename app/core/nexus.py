@@ -171,6 +171,8 @@ class JarvisNexus:
         self._metrics_collector: Optional[Any] = None
         self.gist_id: str = os.getenv("NEXUS_GIST_ID", "")
         self.base_dir: str = os.path.abspath(os.getcwd())
+        # Carrega o registry local no boot para evitar discovery desnecessário
+        self._cache.update(self._load_local_registry())
 
     # ------------------------------------------------------------------
     # Executor (lazy, persistent – avoids blocking shutdown on timeout)
@@ -319,7 +321,10 @@ class JarvisNexus:
                 target_id,
             )
         logger.info(
-            "nexus.resolve",
+            "⚡ [NEXUS] resolve('%s') → %s em %dms",
+            target_id,
+            result_label,
+            duration_ms,
             extra={
                 "component_id": target_id,
                 "duration_ms": duration_ms,
@@ -465,7 +470,7 @@ class JarvisNexus:
         ``.ClassName`` suffix from each stored path.
         """
         try:
-            registry_path = os.path.join(self.base_dir, "nexus_registry.json")
+            registry_path = os.path.join(self.base_dir, "data", "nexus_registry.json")
             with open(registry_path) as f:
                 data = json.load(f)
             result: Dict[str, str] = {}
@@ -505,7 +510,7 @@ class JarvisNexus:
             last_segment = module_path.rsplit(".", 1)[-1]
             class_name = "".join(part.capitalize() for part in last_segment.split("_"))
             components[component_id] = f"{module_path}.{class_name}"
-        registry_path = os.path.join(self.base_dir, "nexus_registry.json")
+        registry_path = os.path.join(self.base_dir, "data", "nexus_registry.json")
         with open(registry_path, "w") as f:
             json.dump({"components": components}, f, indent=2)
 

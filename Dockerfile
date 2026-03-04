@@ -1,6 +1,6 @@
 # Multi-stage build for Jarvis Voice Assistant
 # Stage 1: Builder for dependencies
-FROM python:3.11-slim as builder
+FROM python:3.12-slim as builder
 
 # Set working directory
 WORKDIR /app
@@ -17,7 +17,7 @@ COPY requirements/edge.txt requirements/core.txt requirements/
 RUN pip install --no-cache-dir --user -r requirements/edge.txt
 
 # Stage 2: Edge Runtime (with hardware support)
-FROM python:3.11-slim as edge
+FROM python:3.12-slim as edge
 
 # Install runtime dependencies for audio, GUI and GitHub CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -43,7 +43,7 @@ RUN mkdir -p data logs
 CMD ["python", "main.py"]
 
 # Stage 3: Cloud Runtime (headless, no hardware dependencies)
-FROM python:3.11-slim as cloud
+FROM python:3.12-slim as cloud
 
 WORKDIR /app
 
