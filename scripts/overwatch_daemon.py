@@ -184,31 +184,40 @@ class OverwatchDaemon:
             logger.debug("[PROACTIVE_CORE] Erro ao verificar context.json: %s", exc)
 
     def _check_jrvs_compile(self) -> None:
-        """Periodically run JRVSCompiler.compile_all() based on OVERWATCH_COMPILE_INTERVAL_SEC."""
+        """Periodically run JRVSCompiler.compile_all() based on OVERWATCH_COMPILE_INTERVAL_SEC.
+
+        Uses the unified compile lock (data/jrvs/.compile.lock) to prevent concurrent runs
+        with PolicyStore threshold-triggered compilations.
+        """
         now = time.monotonic()
         if now - self._last_compile_ts < _OVERWATCH_COMPILE_INTERVAL_SEC:
             return
         self._last_compile_ts = now
-        lock_path = Path("data/jrvs/.compile.lock")
         try:
-            lock_path.parent.mkdir(parents=True, exist_ok=True)
-            if lock_path.exists():
-                logger.debug("[PROACTIVE_CORE] Compilação JRVS bloqueada por lock file.")
-                return
-            lock_path.touch()
-            try:
-                from app.core.meta.jrvs_compiler import JRVSCompiler  # noqa: PLC0415
+            from app.core.meta.compile_lock import (  # noqa: PLC0415
+                acquire_compile_lock,
+                release_compile_lock,
+            )
+            from app.core.meta.jrvs_compiler import JRVSCompiler  # noqa: PLC0415
 
+            jrvs_dir = os.getenv("JRVS_DIR", "data/jrvs")
+            if not acquire_compile_lock(jrvs_dir):
+                logger.debug("[PROACTIVE_CORE] JRVS compile_all bloqueado pelo lock unificado.")
+                return
+            try:
                 compiler = JRVSCompiler()
-                compiler.compile_all()
+                # Compile each module directly (lock already held by this method)
+                modules = set(("llm", "tools", "meta")) | set(compiler._store.list_modules())
+                for module_name in sorted(modules):
+                    try:
+                        compiler._compile_module_locked(module_name)
+                    except Exception as exc:  # pragma: no cover
+                        logger.error(
+                            "[PROACTIVE_CORE] Falha ao compilar '%s': %s", module_name, exc
+                        )
                 logger.info("[PROACTIVE_CORE] JRVS compile_all concluído.")
             finally:
-                try:
-                    lock_path.unlink(missing_ok=True)
-                except Exception as unlink_exc:  # pragma: no cover
-                    logger.debug(
-                        "[PROACTIVE_CORE] Falha ao remover lock file JRVS: %s", unlink_exc
-                    )
+                release_compile_lock(jrvs_dir)
         except Exception as exc:
             logger.error("[PROACTIVE_CORE] Falha ao executar JRVS compile_all: %s", exc)
 

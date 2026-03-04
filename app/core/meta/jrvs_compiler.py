@@ -11,11 +11,13 @@ Responsabilidades:
   - Escreve também um `.json` legível por humanos para inspeção/CI.
   - Valida integridade via CRC32 do header e SHA-256 do payload.
   - Escritas são atômicas (tempfile + os.replace).
+  - Usa lock unificado (data/jrvs/.compile.lock) para evitar compilações concorrentes.
 
 Variáveis de ambiente:
   JRVS_DIR                 str   Diretório base (default "data/jrvs").
   JRVS_COMPILER_VERSION    str   Versão bumável do compilador (default "1.0.0").
   JRVS_RECOMPILE_THRESHOLD int   Threshold de atualizações para recompilação (default 20).
+  JRVS_COMPILE_LOCK_TIMEOUT float Segundos até um lock ser considerado stale (default 120).
 """
 
 import hashlib
@@ -28,6 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from app.core.meta.compile_lock import acquire_compile_lock, release_compile_lock
 from app.core.meta.policy_store import PolicyStore
 from app.utils import jrvs_codec
 
@@ -36,9 +39,15 @@ logger = logging.getLogger(__name__)
 _DEFAULT_JRVS_DIR = "data/jrvs"
 _DEFAULT_COMPILER_VERSION = "1.0.0"
 _DEFAULT_THRESHOLD = 20
+_SCHEMA_VERSION = "1.1"
+_DECISION_MODEL_VERSION = "1.1"
 
 # Módulos canônicos suportados inicialmente
 _KNOWN_MODULES = ("llm", "tools", "meta")
+
+
+class SchemaVersionError(ValueError):
+    """Raised when a .jrvs file has an incompatible schema_version."""
 
 
 class JRVSCompiler:
@@ -72,13 +81,15 @@ class JRVSCompiler:
         """Compila o módulo *module_name* para um arquivo .jrvs.
 
         Fluxo:
-          1. Lê políticas do PolicyStore.
-          2. Normaliza o schema adicionando campos ``meta.*``.
-          3. Calcula SHA-256 do payload JSON canônico.
-          4. Embute assinatura no campo ``meta.sha256``.
-          5. Serializa com jrvs_codec (zlib + header CRC32).
-          6. Escreve atomicamente ``{jrvs_dir}/{module_name}.jrvs``.
-          7. Escreve ``{jrvs_dir}/{module_name}.json`` legível.
+          1. Adquire o lock de compilação unificado.
+          2. Lê políticas do PolicyStore.
+          3. Normaliza o schema adicionando campos ``meta.*``.
+          4. Calcula SHA-256 do payload JSON canônico.
+          5. Embute assinatura no campo ``meta.sha256``.
+          6. Serializa com jrvs_codec (zlib + header CRC32).
+          7. Escreve atomicamente ``{jrvs_dir}/{module_name}.jrvs``.
+          8. Escreve ``{jrvs_dir}/{module_name}.json`` legível.
+          9. Libera o lock.
 
         Args:
             module_name: Nome do módulo (ex: ``"llm"``).
@@ -86,6 +97,20 @@ class JRVSCompiler:
         Returns:
             Path do arquivo .jrvs gerado.
         """
+        jrvs_dir_str = str(self._dir)
+        if not acquire_compile_lock(jrvs_dir_str):
+            logger.warning(
+                "[JRVSCompiler] Compilação de '%s' bloqueada pelo lock ativo.", module_name
+            )
+            return self._jrvs_path(module_name)
+
+        try:
+            return self._compile_module_locked(module_name)
+        finally:
+            release_compile_lock(jrvs_dir_str)
+
+    def _compile_module_locked(self, module_name: str) -> Path:
+        """Executa a compilação com o lock já adquirido."""
         t0 = time.monotonic()
         policies = self._store.get_policies_by_module(module_name)
         items_count = len(policies)
@@ -95,10 +120,11 @@ class JRVSCompiler:
             "module": module_name,
             "policies": policies,
             "meta": {
-                "version": 1,
+                "schema_version": _SCHEMA_VERSION,
+                "decision_model_version": _DECISION_MODEL_VERSION,
                 "compiler_version": self._compiler_version,
                 "compiled_at": compiled_at,
-                "module": module_name,
+                "module_name": module_name,
             },
         }
 
@@ -118,9 +144,10 @@ class JRVSCompiler:
 
         duration_ms = (time.monotonic() - t0) * 1000
         logger.info(
-            "[JRVSCompiler] Módulo '%s' compilado: items=%d, sha256=%s…, "
+            "[JRVSCompiler] Módulo '%s' compilado: schema=%s, items=%d, sha256=%s…, "
             "duração=%.1f ms, saída=%s",
             module_name,
+            _SCHEMA_VERSION,
             items_count,
             sha256[:12],
             duration_ms,
@@ -131,13 +158,20 @@ class JRVSCompiler:
     def compile_all(self) -> None:
         """Compila todos os módulos detectados no PolicyStore + módulos canônicos."""
         modules = set(_KNOWN_MODULES) | set(self._store.list_modules())
-        for module_name in sorted(modules):
-            try:
-                self.compile_module(module_name)
-            except Exception as exc:  # pragma: no cover
-                logger.error(
-                    "[JRVSCompiler] Falha ao compilar módulo '%s': %s", module_name, exc
-                )
+        jrvs_dir_str = str(self._dir)
+        if not acquire_compile_lock(jrvs_dir_str):
+            logger.warning("[JRVSCompiler] compile_all bloqueado pelo lock ativo.")
+            return
+        try:
+            for module_name in sorted(modules):
+                try:
+                    self._compile_module_locked(module_name)
+                except Exception as exc:  # pragma: no cover
+                    logger.error(
+                        "[JRVSCompiler] Falha ao compilar módulo '%s': %s", module_name, exc
+                    )
+        finally:
+            release_compile_lock(jrvs_dir_str)
 
     # ------------------------------------------------------------------
     # Validate
@@ -199,13 +233,27 @@ class JRVSCompiler:
 
         Raises:
             FileNotFoundError: Se o arquivo .jrvs não existir.
+            SchemaVersionError: Se o schema_version for incompatível.
         """
         path = self._jrvs_path(module_name)
         if not path.exists():
             raise FileNotFoundError(
                 f"[JRVSCompiler] Módulo '{module_name}' não encontrado: {path}"
             )
-        return self._codec.read_file(path)
+        data = self._codec.read_file(path)
+        schema = data.get("meta", {}).get("schema_version", "")
+        if schema != _SCHEMA_VERSION:
+            logger.warning(
+                "[JRVSCompiler] Schema mismatch em '%s': obtido='%s', esperado='%s'. "
+                "Usando fallback ao PolicyStore.",
+                module_name,
+                schema,
+                _SCHEMA_VERSION,
+            )
+            raise SchemaVersionError(
+                f"Schema mismatch for '{module_name}': got '{schema}', expected '{_SCHEMA_VERSION}'"
+            )
+        return data
 
     # ------------------------------------------------------------------
     # Recompile heuristic
@@ -263,3 +311,4 @@ class JRVSCompiler:
             tmp.write(JRVSCompiler._canonical_json(data))
             tmp_path = tmp.name
         os.replace(tmp_path, path)
+

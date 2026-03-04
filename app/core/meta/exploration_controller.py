@@ -7,12 +7,14 @@ Responsabilidades:
     ``tools``.
   - Respeita o threshold de promoção: se ``confidence < JRVS_PROMOTE_THRESHOLD``, grava
     em ``data/jrvs/pending_tools.json`` e promove apenas após X sucessos consecutivos.
+  - Verifica o estado de estabilidade do DecisionEngine antes de promover: em modo
+    "critical" (global_success_ema < 0.4) a promoção de novas ferramentas é suspensa.
   - Chama ``nexus.commit_memory()`` para persistência remota do registro de metadados.
 
 Variáveis de ambiente:
-  JRVS_PROMOTE_THRESHOLD  float  Confiança mínima para promoção imediata (default 0.8).
-  JRVS_DIR                str    Diretório base dos arquivos .jrvs (default "data/jrvs").
-  JRVS_PROMOTE_MIN_SUCCESSES int Sucessos necessários para promover tool pendente (default 3).
+  JRVS_PROMOTE_THRESHOLD     float  Confiança mínima para promoção imediata (default 0.8).
+  JRVS_DIR                   str    Diretório base dos arquivos .jrvs (default "data/jrvs").
+  JRVS_PROMOTE_MIN_SUCCESSES int    Sucessos necessários para promover tool pendente (default 3).
 """
 
 import json
@@ -109,6 +111,9 @@ class ExplorationController(NexusComponent):
     ) -> bool:
         """Processa a descoberta de uma nova ferramenta.
 
+        Respeita o estado de estabilidade: em modo "critical" a promoção é suspensa
+        e a ferramenta vai diretamente para a fila pendente.
+
         Args:
             component_id: Identificador único da ferramenta.
             discovery_path: Caminho de importação Python (ex: ``"app.plugins.my_tool"``).
@@ -127,6 +132,16 @@ class ExplorationController(NexusComponent):
             "last_used": None,
             **(extra or {}),
         }
+
+        # Check stability before promoting
+        if self._is_stability_critical():
+            self._add_to_pending(component_id, tool_entry)
+            logger.warning(
+                "[ExplorationController] Promoção de '%s' suspensa: sistema em modo de "
+                "estabilidade crítica.",
+                component_id,
+            )
+            return False
 
         if confidence >= self._promote_threshold:
             self._promote_to_policy_store(component_id, tool_entry)
@@ -191,6 +206,19 @@ class ExplorationController(NexusComponent):
             "[ExplorationController] Ferramenta '%s' promovida ao PolicyStore (tools).",
             component_id,
         )
+
+    def _is_stability_critical(self) -> bool:
+        """Retorna True se o sistema está em modo de estabilidade crítica."""
+        try:
+            from app.core.meta.decision_engine import (  # noqa: PLC0415
+                _STABILITY_THRESHOLD,
+                _DEFAULT_GLOBAL_SUCCESS_EMA,
+            )
+            meta_policies = self._policy_store.get_policies_by_module("meta")
+            gse = float(meta_policies.get("global_success_ema", _DEFAULT_GLOBAL_SUCCESS_EMA))
+            return gse < _STABILITY_THRESHOLD
+        except Exception:
+            return False
 
     def _trigger_compile_and_sync(self) -> None:
         try:
