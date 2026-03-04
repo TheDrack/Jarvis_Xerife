@@ -40,6 +40,12 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
 
     router = APIRouter()
 
+    def _noop_decorator(f):
+        """No-op decorator used when rate limiting is disabled."""
+        return f
+
+    _rate_limit = limiter.limit("30/minute") if limiter is not None else _noop_decorator
+
     def _should_bypass_identifier(request_source: str = None) -> bool:
         """Return True if request should skip Jarvis intent identification."""
         if not request_source:
@@ -50,7 +56,7 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
         }
 
     @router.post("/v1/execute", response_model=ExecuteResponse)
-    @(limiter.limit("30/minute") if limiter else lambda f: f)
+    @_rate_limit
     async def execute_command(
         request: Request,
         body: ExecuteRequest,
@@ -105,7 +111,7 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
     @router.post("/v1/message", response_model=MessageResponse)
-    @(limiter.limit("30/minute") if limiter else lambda f: f)
+    @_rate_limit
     async def send_message(
         request: Request,
         body: MessageRequest,
