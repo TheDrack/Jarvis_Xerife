@@ -18,10 +18,19 @@ from app.core.nexus import (
 class TestCloudMock:
     """Tests for the CloudMock fallback component."""
 
-    def test_execute_returns_failure_dict(self):
+    def test_execute_preserves_context(self):
+        mock = CloudMock("test_component")
+        ctx = {"artifacts": {"prev": "data"}, "metadata": {"pipeline": "test"}, "result": {}}
+        result = mock.execute(ctx)
+        # The original context must be returned intact (with fallback info merged into result)
+        assert result is ctx
+        assert result["artifacts"]["prev"] == "data"
+        assert result["result"]["fallback"] is True
+        assert result["result"]["component"] == "test_component"
+
+    def test_execute_without_context_returns_fallback_dict(self):
         mock = CloudMock("test_component")
         result = mock.execute()
-        assert result["success"] is False
         assert result["fallback"] is True
         assert result["component"] == "test_component"
 

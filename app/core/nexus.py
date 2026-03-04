@@ -122,7 +122,14 @@ class CloudMock:
         logger.warning(
             f"☁️ [CloudMock] execute() chamado para '{self._component_id}' (componente indisponível)."
         )
-        return {"success": False, "fallback": True, "component": self._component_id}
+        # Return the original context unchanged so downstream pipeline steps keep their
+        # state intact.  A plain dict with fallback metadata is merged into context so
+        # callers can still detect that a mock was used.
+        if isinstance(context, dict):
+            context.setdefault("result", {})
+            context["result"] = {"fallback": True, "component": self._component_id}
+            return context
+        return {"fallback": True, "component": self._component_id}
 
 
 # ---------------------------------------------------------------------------

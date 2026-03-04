@@ -6,7 +6,7 @@ components:
 
   drive_uploader:
     id: "drive_uploader"
-    hint_path: app/adapters/infrastructure"
+    hint_path: "app/adapters/infrastructure/drive_uploader.py"
     singleton: true
     # Se o Google Drive falhar (cota), o pipeline CONTINUA para o Telegram/Gist
     config:

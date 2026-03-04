@@ -2,9 +2,6 @@
 import os
 import logging
 from typing import Any, Optional
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
-from google.oauth2 import service_account
 from app.core.nexuscomponent import NexusComponent
 
 logger = logging.getLogger(__name__)
@@ -28,13 +25,18 @@ class DriveUploader(NexusComponent):
     def _get_service(self):
         if self.service:
             return self.service
-        
+
         if not self.service_account_info:
             logger.error("❌ [DRIVE] G_JSON (Service Account) não configurado.")
             return None
 
         try:
             import json
+            # Lazy imports: these are heavy and slow to load; deferring them avoids
+            # triggering the Nexus circuit-breaker during module import.
+            from google.oauth2 import service_account  # noqa: E402
+            from googleapiclient.discovery import build  # noqa: E402
+
             info = json.loads(self.service_account_info)
             creds = service_account.Credentials.from_service_account_info(info, scopes=self.scopes)
             self.service = build('drive', 'v3', credentials=creds, cache_discovery=False)
@@ -78,9 +80,9 @@ class DriveUploader(NexusComponent):
                 'parents': [self.folder_id] if self.folder_id else []
             }
 
-            media = MediaFileUpload(file_path, mimetype='text/plain', resumable=True)
+            from googleapiclient.http import MediaFileUpload  # noqa: E402
 
-            # 3. Execução do Upload (Suporta Shared Drives via supportsAllDrives)
+            media = MediaFileUpload(file_path, mimetype='text/plain', resumable=True)
             request = service.files().create(
                 body=file_metadata,
                 media_body=media,
