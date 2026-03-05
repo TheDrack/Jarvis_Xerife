@@ -1,11 +1,9 @@
-```python
 # -*- coding: utf-8 -*-
 import os
 import logging
 import re
 from datetime import datetime
 from app.core.nexuscomponent import NexusComponent
-import pytest
 
 # Configuração de logging integrada ao Nexus
 logger = logging.getLogger(__name__)
@@ -146,10 +144,3 @@ class Consolidator(NexusComponent):
         except Exception as e:
             print(f" [CONSOLIDATOR] Falha na Homeostase do arquivo: {e}")
             raise e
-
-@pytest.mark.asyncio
-async def test_consolidator():
-    consolidator = Consolidator()
-    context = {}
-    await consolidator.execute(context)
-```
