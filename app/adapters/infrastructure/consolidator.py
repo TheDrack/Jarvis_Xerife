@@ -1,9 +1,11 @@
+```python
 # -*- coding: utf-8 -*-
 import os
 import logging
 import re
 from datetime import datetime
 from app.core.nexuscomponent import NexusComponent
+import pytest
 
 # Configuração de logging integrada ao Nexus
 logger = logging.getLogger(__name__)
@@ -65,7 +67,7 @@ class Consolidator(NexusComponent):
             out.write("\n")
 
     def execute(self, context: dict) -> dict:
-        print(f"🧬 [NEXUS] Iniciando Consolidação Simbiótica: {datetime.now()}")
+        print(f" [NEXUS] Iniciando Consolidação Simbiótica: {datetime.now()}")
 
         ignored_dirs = {'.git', '__pycache__', '.venv', 'dist', 'build', 'node_modules', '.github'}
         relevant_extensions = (".py", ".yml", ".yaml", ".json", ".sql", ".dockerfile", "Dockerfile")
@@ -105,7 +107,7 @@ class Consolidator(NexusComponent):
                             all_files.append(full_path)
                             # Adiciona árvore textual simplificada
                             level = root.replace('.', '').count(os.sep)
-                            out.write(f"{' ' * 4 * level}📄 {full_path}\n")
+                            out.write(f"{' ' * 4 * level} {full_path}\n")
 
                 # 4. CONTEÚDO ANALÍTICO
                 out.write("\n" + "=" * 100 + "\n")
@@ -133,7 +135,7 @@ class Consolidator(NexusComponent):
                     except Exception as e:
                         out.write(f"\n[ERRO CRÍTICO NO ARQUIVO {path}: {e}]\n")
 
-            print(f"✅ [NEXUS] Consolidação técnica finalizada: {file_path}")
+            print(f" [NEXUS] Consolidação técnica finalizada: {file_path}")
             
             res_payload = {"status": "success", "file_path": file_path, "timestamp": datetime.now().isoformat()}
             context["result"] = res_payload
@@ -142,5 +144,12 @@ class Consolidator(NexusComponent):
             return context
 
         except Exception as e:
-            print(f"💥 [CONSOLIDATOR] Falha na Homeostase do arquivo: {e}")
+            print(f" [CONSOLIDATOR] Falha na Homeostase do arquivo: {e}")
             raise e
+
+@pytest.mark.asyncio
+async def test_consolidator():
+    consolidator = Consolidator()
+    context = {}
+    await consolidator.execute(context)
+```
