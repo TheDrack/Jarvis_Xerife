@@ -42,8 +42,17 @@ jobs:
 
       - name: 🔍 Verificação de Gatilho
         id: gatekeeper
+        env:
+          # Must match the git user.name set in "Configurar Identidade JARVIS" step
+          HEALER_GIT_NAME: "JARVIS"
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]] || \
+          LAST_COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+          
+          # Prevent self-loop: if the last commit was made by JARVIS itself
+          # (e.g. a previous healing run), skip this run unconditionally.
+          if [[ "$LAST_COMMIT_AUTHOR" == "$HEALER_GIT_NAME" ]]; then
+            echo "authorized=false" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "pull_request" ]] || \
              ([[ "${{ github.event_name }}" == "workflow_run" ]] && [[ "${{ github.event.workflow_run.conclusion }}" == "failure" ]]) || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "authorized=true" >> $GITHUB_OUTPUT
