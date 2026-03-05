@@ -4,7 +4,7 @@
 import logging
 import os
 import textwrap
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -26,6 +26,18 @@ def _make_pipeline_config(strict_mode: bool = False) -> str:
     )
 
 
+def _make_hint_path_config(hint_path: str) -> str:
+    """Return a pipeline YAML string with a hint_path on the component."""
+    return textwrap.dedent(
+        f"""\
+        components:
+          my_step:
+            id: "my_component"
+            hint_path: "{hint_path}"
+        """
+    )
+
+
 @pytest.fixture
 def pipeline_dir(tmp_path):
     """Write pipeline YAML files into a tmp_path-based config tree."""
@@ -33,6 +45,9 @@ def pipeline_dir(tmp_path):
     cfg_dir.mkdir(parents=True)
     (cfg_dir / "test_pipeline.yml").write_text(_make_pipeline_config())
     (cfg_dir / "test_strict.yml").write_text(_make_pipeline_config(strict_mode=True))
+    (cfg_dir / "test_hint_path.yml").write_text(
+        _make_hint_path_config("app/adapters/infrastructure/my_component.py")
+    )
     return tmp_path
 
 
@@ -99,3 +114,59 @@ class TestCloudMockDetection:
                 os.chdir(orig_dir)
 
         real_component.execute.assert_called_once()
+
+
+class TestHintPathForwarding:
+    """pipeline_runner must forward hint_path from the YAML config to nexus.resolve()."""
+
+    def test_hint_path_is_forwarded_to_resolve(self, pipeline_dir):
+        """When a component YAML entry has hint_path, it must be passed to nexus.resolve()."""
+        real_component = MagicMock()
+        real_component.__is_cloud_mock__ = False
+        real_component.execute.return_value = {
+            "artifacts": {},
+            "metadata": {"pipeline": "test_hint_path"},
+            "env": {},
+            "result": {},
+        }
+
+        with patch("app.runtime.pipeline_runner.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = real_component
+
+            orig_dir = os.getcwd()
+            try:
+                os.chdir(pipeline_dir)
+                run_pipeline("test_hint_path")
+            finally:
+                os.chdir(orig_dir)
+
+        mock_nexus.resolve.assert_called_once_with(
+            target_id="my_component",
+            hint_path="app/adapters/infrastructure/my_component.py",
+        )
+
+    def test_none_hint_path_forwarded_when_absent(self, pipeline_dir):
+        """When hint_path is absent from YAML, nexus.resolve() is called with hint_path=None."""
+        real_component = MagicMock()
+        real_component.__is_cloud_mock__ = False
+        real_component.execute.return_value = {
+            "artifacts": {},
+            "metadata": {"pipeline": "test_pipeline"},
+            "env": {},
+            "result": {},
+        }
+
+        with patch("app.runtime.pipeline_runner.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = real_component
+
+            orig_dir = os.getcwd()
+            try:
+                os.chdir(pipeline_dir)
+                run_pipeline("test_pipeline")
+            finally:
+                os.chdir(orig_dir)
+
+        mock_nexus.resolve.assert_called_once_with(
+            target_id="my_component",
+            hint_path=None,
+        )
