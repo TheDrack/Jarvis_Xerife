@@ -60,7 +60,6 @@ jobs:
       - name: 🔧 Instalação do DNA
         if: steps.gatekeeper.outputs.authorized == 'true'
         run: |
-          # O comando --clear força a recriação do venv mesmo que o setup-uv já tenha criado um
           uv venv --clear --python 3.11
           uv pip install -r requirements/core.txt pytest pytest-json-report pytest-cov anyio autopep8 requests
 
@@ -83,46 +82,53 @@ jobs:
         run: |
           PYTEST_IGNORES="--ignore=tests/test_engine.py --ignore=tests/test_system_commands.py"
           
-          # Usamos 'uv run' para garantir que o venv correto seja utilizado
+          # 1. Teste inicial para gerar relatório de erros
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           
+          # 2. Execução do Healer (IA)
           PRODUCTION_LOG_ARG=""
           if [[ -n "${{ github.event.inputs.error_log }}" ]]; then
             echo "${{ github.event.inputs.error_log }}" > production_error.log
             PRODUCTION_LOG_ARG="--production-log production_error.log"
           fi
-          
           uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt $PRODUCTION_LOG_ARG
+          
+          # 3. Validação pós-cura
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
+          # 4. Decisão de Status (Não mata o processo aqui para permitir o commit)
           if ! grep -qE "ERRORS?|errors?|failed|IndentationError" final_log.txt; then
              echo "status=success" >> $GITHUB_OUTPUT
+             echo "DNA Estável."
           else
-             echo "status=failure" >> $GITHUB_OUTPUT
-             exit 1
+             echo "status=partial_fix" >> $GITHUB_OUTPUT
+             echo "⚠️ DNA ainda instável após tentativa de cura."
+             cat final_log.txt # Exibe o erro no log do GitHub para você ver
           fi
 
-      - name: 🛠️ Aplicar Correções (PR ou Recovery)
-        if: steps.gatekeeper.outputs.authorized == 'true' && steps.healing_process.outputs.status == 'success'
+      - name: 🛠️ Aplicar Correções (Mesmo se Parcial)
+        if: steps.gatekeeper.outputs.authorized == 'true' && (steps.healing_process.outputs.status == 'success' || steps.healing_process.outputs.status == 'partial_fix')
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
           git add .
           if ! git diff --staged --quiet; then
-            git commit -m "fix(jarvis): auto-cura de integridade aplicada"
+            git commit -m "fix(jarvis): tentativa de auto-cura [${{ steps.healing_process.outputs.status }}]"
             
             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
               git push origin HEAD:${{ github.head_ref }}
-              gh pr merge ${{ github.event.pull_request.number }} --auto --merge || true
+              # Só tenta merge automático se o status for success
+              if [[ "${{ steps.healing_process.outputs.status }}" == "success" ]]; then
+                gh pr merge ${{ github.event.pull_request.number }} --auto --merge || true
+              fi
             else
               git push origin HEAD:${{ steps.recover_logic.outputs.target_branch }}
-              PR_URL=$(gh pr create --title "🛡️ JARVIS: Recuperação de Sistema" \
-                --body "Correção automática aplicada após falha no workflow." \
+              PR_URL=$(gh pr create --title "🛡️ JARVIS: Recuperação (${{ steps.healing_process.outputs.status }})" \
+                --body "O JARVIS aplicou correções. Status: ${{ steps.healing_process.outputs.status }}" \
                 --head ${{ steps.recover_logic.outputs.target_branch }} --base main)
-              gh pr merge $PR_URL --auto --merge || true
             fi
           fi
 
       - name: 💤 Standby
         if: steps.gatekeeper.outputs.authorized == 'false'
-        run: echo "Sistemas estáveis. Badge mantido como Success."
+        run: echo "Sistemas estáveis."
