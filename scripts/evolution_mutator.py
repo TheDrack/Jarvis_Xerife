@@ -234,7 +234,7 @@ def _evolve_cap(
     """
     cap = _get_cap(cap_id, caps)
     if not cap:
-        print(f"❌ {cap_id} não encontrado em capabilities.json")
+        print(f"❌ {cap_id} não encontrado em capabilities.jrvs")
         return False
 
     examples = _last_completed_examples(caps)

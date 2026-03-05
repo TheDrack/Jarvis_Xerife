@@ -98,7 +98,7 @@ def main() -> None:
         # Modo de cap específica
         target = next((c for c in all_caps if c["id"] == args.cap_id), None)
         if not target:
-            print(f"❌ {args.cap_id} não encontrado em capabilities.json")
+            print(f"❌ {args.cap_id} não encontrado em capabilities.jrvs")
             sys.exit(1)
         pending_ordered = [target]
     else:
