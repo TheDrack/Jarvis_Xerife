@@ -36,7 +36,6 @@ logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 auth_adapter = AuthAdapter()
-limiter = Limiter(key_func=get_remote_address)
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
@@ -94,6 +93,7 @@ def create_api_server(
     )
 
     # -- Rate limiting ---------------------------------------------------------
+    limiter = Limiter(key_func=get_remote_address)
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

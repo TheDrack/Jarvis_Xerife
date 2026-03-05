@@ -54,6 +54,10 @@ class Capability(NexusComponent, SQLModel, table=True):
     Each device can have multiple capabilities like camera access, bluetooth scanning, etc.
     """
 
+    def execute(self, context: dict):
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
+
     __tablename__ = "capabilities"
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -69,6 +73,10 @@ class CommandResult(NexusComponent, SQLModel, table=True):
     SQLModel table for storing command execution results from devices.
     This enables the feedback loop for distributed command execution.
     """
+
+    def execute(self, context: dict):
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     __tablename__ = "command_results"
 

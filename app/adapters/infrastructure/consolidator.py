@@ -81,13 +81,19 @@ class Consolidator(NexusComponent):
                 out.write(f"TIMESTAMP: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
                 out.write("PADRÃO: Arquitetura Hexagonal + Nexus DI\n")
                 out.write("=" * 100 + "\n\n")
+                out.write("COMO LER ESTE DOCUMENTO\n")
+                out.write("-" * 40 + "\n")
+                out.write("Este documento está organizado em 3 seções:\n")
+                out.write("SEÇÃO 1: Documentação (README, arquitetura, etc.)\n")
+                out.write("SEÇÃO 2: Estrutura de diretórios (tree)\n")
+                out.write("SEÇÃO 3: Conteúdo dos arquivos do projeto\n\n")
 
                 # 2. DOCUMENTAÇÃO
                 self._write_doc_section(out, base_dir)
 
                 # 3. ESTRUTURA E MAPA DE COMPONENTES
                 out.write("\n" + "=" * 100 + "\n")
-                out.write("SEÇÃO 2 — ESTRUTURA E MAPA DE COMPONENTES\n")
+                out.write("SEÇÃO 2 — ESTRUTURA DO PROJETO (TREE)\n")
                 out.write("=" * 100 + "\n")
                 
                 all_files = []
@@ -103,7 +109,7 @@ class Consolidator(NexusComponent):
 
                 # 4. CONTEÚDO ANALÍTICO
                 out.write("\n" + "=" * 100 + "\n")
-                out.write("SEÇÃO 3 — CÓDIGO FONTE COM ANÁLISE DE DEPENDÊNCIAS\n")
+                out.write("SEÇÃO 3 — CONTEÚDO DOS ARQUIVOS CONSOLIDADOS\n")
                 out.write("=" * 100 + "\n")
 
                 for path in all_files:
