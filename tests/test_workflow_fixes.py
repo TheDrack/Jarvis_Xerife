@@ -157,34 +157,26 @@ def test_services_package_importable_without_sqlmodel():
 
     This is critical for the self-healing workflow where only a minimal set of
     packages is installed.  The package __init__.py must guard its optional imports.
+
+    We test this by launching a subprocess with sqlmodel *blocked* from importation,
+    confirming that both the services package and MetabolismCore are still importable.
     """
-    import importlib  # noqa: PLC0415
-
-    # Modules that depend on sqlmodel and must be temporarily evicted
-    _SQLMODEL_DEPENDENTS = (
-        'app.application.services.assistant_service',
-        'app.application.services.device_service',
-        'app.domain.models',
-        'app.domain.models.device',
-        'app.domain.models.__init__',
+    code = (
+        "import sys, types\n"
+        # Block sqlmodel at the importer level
+        "sys.modules['sqlmodel'] = None\n"
+        "import app.application.services\n"
+        "from app.application.services.metabolism_core import MetabolismCore\n"
+        "assert MetabolismCore is not None, 'MetabolismCore must be importable'\n"
     )
-
-    # Simulate missing sqlmodel by temporarily hiding it from sys.modules
-    sqlmodel_mod = sys.modules.pop('sqlmodel', None)
-    removed = {k: sys.modules.pop(k) for k in _SQLMODEL_DEPENDENTS if k in sys.modules}
-
-    try:
-        # Flush the services package so its __init__.py runs again
-        sys.modules.pop('app.application.services', None)
-        importlib.import_module('app.application.services')
-
-        # MetabolismCore (which doesn't need sqlmodel) must still resolve correctly
-        sys.modules.pop('app.application.services.metabolism_core', None)
-        mc = importlib.import_module('app.application.services.metabolism_core')
-        assert hasattr(mc, 'MetabolismCore'), "MetabolismCore must remain importable"
-    finally:
-        # Restore any modules we temporarily removed
-        if sqlmodel_mod is not None:
-            sys.modules['sqlmodel'] = sqlmodel_mod
-        sys.modules.update(removed)
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        cwd=str(PROJECT_ROOT),
+    )
+    assert result.returncode == 0, (
+        "app.application.services must be importable without sqlmodel.\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
 
