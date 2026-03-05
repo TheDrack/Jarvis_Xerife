@@ -82,7 +82,9 @@ class Consolidator(NexusComponent):
             abs_path = os.path.join(base_dir, rel_path)
             if not os.path.isfile(abs_path):
                 continue
-            out.write(f"\n{'─' * 80}\nDOC: {rel_path.replace('\\', '/')}\n{'─' * 80}\n")
+            sep = '─' * 80
+            rel = rel_path.replace('\\', '/')
+            out.write(f"\n{sep}\nDOC: {rel}\n{sep}\n")
             try:
                 with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
                     out.write(f.read() or "[DOCUMENTO VAZIO]")
