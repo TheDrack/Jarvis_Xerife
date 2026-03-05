@@ -15,10 +15,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Configurable timeouts (shared with nexus.py via env vars)
 # ---------------------------------------------------------------------------
-CIRCUIT_BREAKER_TIMEOUT = float(os.getenv("NEXUS_TIMEOUT", "2.0"))
+CIRCUIT_BREAKER_TIMEOUT = float(os.getenv("NEXUS_TIMEOUT", "30.0"))
 CIRCUIT_BREAKER_RESET = float(os.getenv("NEXUS_CIRCUIT_RESET", "60.0"))
-NEXUS_IMPORT_TIMEOUT = float(os.getenv("NEXUS_IMPORT_TIMEOUT", "1.0"))
-NEXUS_INSTANTIATE_TIMEOUT = float(os.getenv("NEXUS_INSTANTIATE_TIMEOUT", "1.0"))
+NEXUS_IMPORT_TIMEOUT = float(os.getenv("NEXUS_IMPORT_TIMEOUT", "10.0"))
+NEXUS_INSTANTIATE_TIMEOUT = float(os.getenv("NEXUS_INSTANTIATE_TIMEOUT", "5.0"))
 NEXUS_STRICT_MODE = os.getenv("NEXUS_STRICT_MODE", "false").lower() == "true"
 # Extra margin added to CIRCUIT_BREAKER_TIMEOUT when a waiter thread blocks
 WAITER_TIMEOUT_MARGIN = 1.0
