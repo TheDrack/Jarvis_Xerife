@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: 🛰️ Checkout
-        uses: actions/checkout@@v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
@@ -109,7 +109,6 @@ jobs:
         if: steps.gatekeeper.outputs.authorized == 'true'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
-          # Fallback para branch atual se as variáveis do GH falharem
         run: |
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           git add .
