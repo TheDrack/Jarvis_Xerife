@@ -20,6 +20,21 @@ _TAIL_LINES = 50
 _MAX_ERROR_LOG_INPUT = 2000  # Limite seguro para inputs do GitHub Actions workflow_dispatch
 
 
+def _classify_error_type(error_line: str) -> str:
+    """Classifica o tipo de erro a partir de uma linha de log."""
+    for t in (
+        "ModuleNotFoundError",
+        "ImportError",
+        "SyntaxError",
+        "NameError",
+        "AttributeError",
+        "TypeError",
+    ):
+        if t in error_line:
+            return t
+    return "UnknownError"
+
+
 class FieldVision(NexusComponent):
     """
     👁️ Monitor proativo de integridade do sistema (Field Vision).
@@ -89,6 +104,23 @@ class FieldVision(NexusComponent):
                 "action": "memory_resolved",
                 "known_solutions": len(known_solution),
             }
+
+        # 🔧 Tenta reparo local antes de disparar CI (~90s de latência)
+        try:
+            local_agent = nexus.resolve("local_repair_agent")
+            if local_agent:
+                repair_ctx = {
+                    "error_type": _classify_error_type(errors[0]),
+                    "error_message": errors[0],
+                    "traceback": "\n".join(errors),
+                    "file_path": None,
+                }
+                repair_result = local_agent.execute(repair_ctx)
+                if repair_result.get("fixed"):
+                    logger.info("Self-Healing local: %s", repair_result.get("details"))
+                    return {"success": True, "healed": True, "method": "local"}
+        except Exception as exc:
+            logger.warning("LocalRepairAgent inesperado: %s — escalando para CI", exc)
 
         # 🧬 Erro persiste – dispara o workflow de auto-cura
         logger.warning("🧬 [FieldVision] Nenhuma solução prévia. Acionando Self-Healing V3…")

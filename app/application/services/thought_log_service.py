@@ -1,4 +1,4 @@
-from app.core.nexus import NexusComponent
+from app.core.nexus import NexusComponent, nexus
 # -*- coding: utf-8 -*-
 """ThoughtLogService - Manages internal reasoning logs and self-healing cycles"""
 
@@ -101,7 +101,24 @@ class ThoughtLogService(NexusComponent):
                 session.add(thought_log)
                 session.commit()
                 session.refresh(thought_log)
-                
+
+                # Indexa thought na memória vetorial (não-bloqueante)
+                try:
+                    vector_memory = nexus.resolve("vector_memory_adapter")
+                    if vector_memory:
+                        vector_memory.execute({
+                            "action": "store",
+                            "text": f"[{status}] {thought_process}",
+                            "metadata": {
+                                "mission_id": mission_id,
+                                "thought_type": status.value
+                                if isinstance(status, InteractionStatus)
+                                else status,
+                            },
+                        })
+                except Exception as exc:
+                    logger.debug("Falha ao indexar thought na memória vetorial: %s", exc)
+
                 logger.info(f"Created thought log for mission {mission_id}, retry {retry_count}")
                 return thought_log
                 
@@ -322,4 +339,29 @@ class ThoughtLogService(NexusComponent):
                 
         except Exception as e:
             logger.error(f"Error getting recent thoughts: {e}")
+            return []
+
+    def find_similar_repairs(self, error_description: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """
+        Busca reparos similares na memória vetorial.
+
+        Args:
+            error_description: Descrição do erro para busca semântica.
+            top_k: Número máximo de resultados a retornar.
+
+        Returns:
+            Lista de resultados similares ou lista vazia se memória indisponível.
+        """
+        try:
+            vm = nexus.resolve("vector_memory_adapter")
+            if not vm:
+                return []
+            result = vm.execute({
+                "action": "query",
+                "text": error_description,
+                "top_k": top_k,
+                "days_back": 30,
+            })
+            return result.get("results", [])
+        except Exception:
             return []
