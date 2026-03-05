@@ -4,7 +4,15 @@ on:
   pull_request:
     branches: [main, master, develop]
   workflow_run:
-    workflows: ["CI", "Test Suite", "Production Deploy"]
+    # Nomes extraídos da sua lista de Workflows
+    workflows: 
+      - "Copilot coding agent"
+      - "Copilot code review"
+      - "Repo Lifecycle Governance"
+      - "☁️ Sync JARVIS to Google Drive"
+      - "💎 JARVIS: Crystallizer"
+      - "🖥️ Build and Release Jarvis Installer"
+      - "🚀 JARVIS Integrated Evolution"
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -17,6 +25,7 @@ jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
     runs-on: ubuntu-latest
+    # Impede colisões de push se múltiplos workflows falharem ao mesmo tempo
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -33,9 +42,10 @@ jobs:
           token: ${{ secrets.GIT_PAT }}
           ref: ${{ github.head_ref || github.ref }}
 
-      - name: 🔍 Verificação de Gatilho
+      - name: 🔍 Verificação de Gatilho (Filtro de Falha)
         id: gatekeeper
         run: |
+          # Regra: PR, Dispatch ou Workflow alvo com conclusão == 'failure'
           if [[ "${{ github.event_name }}" == "pull_request" ]] || \
              ([[ "${{ github.event_name }}" == "workflow_run" ]] && [[ "${{ github.event.workflow_run.conclusion }}" == "failure" ]]) || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -82,10 +92,10 @@ jobs:
         run: |
           PYTEST_IGNORES="--ignore=tests/test_engine.py --ignore=tests/test_system_commands.py"
           
-          # 1. Teste inicial para gerar relatório de erros
+          # Coleta falhas iniciais
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           
-          # 2. Execução do Healer (IA)
+          # Executa o Healer
           PRODUCTION_LOG_ARG=""
           if [[ -n "${{ github.event.inputs.error_log }}" ]]; then
             echo "${{ github.event.inputs.error_log }}" > production_error.log
@@ -93,42 +103,41 @@ jobs:
           fi
           uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt $PRODUCTION_LOG_ARG
           
-          # 3. Validação pós-cura
+          # Validação final (não usamos exit 1 para o workflow não ficar vermelho e permitir o commit)
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
-          # 4. Decisão de Status (Não mata o processo aqui para permitir o commit)
           if ! grep -qE "ERRORS?|errors?|failed|IndentationError" final_log.txt; then
              echo "status=success" >> $GITHUB_OUTPUT
-             echo "DNA Estável."
           else
-             echo "status=partial_fix" >> $GITHUB_OUTPUT
-             echo "⚠️ DNA ainda instável após tentativa de cura."
-             cat final_log.txt # Exibe o erro no log do GitHub para você ver
+             echo "status=partial" >> $GITHUB_OUTPUT
           fi
 
-      - name: 🛠️ Aplicar Correções (Mesmo se Parcial)
-        if: steps.gatekeeper.outputs.authorized == 'true' && (steps.healing_process.outputs.status == 'success' || steps.healing_process.outputs.status == 'partial_fix')
+      - name: 🛠️ Commit & Push (Sincronização de Correção)
+        if: steps.gatekeeper.outputs.authorized == 'true'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
           git add .
           if ! git diff --staged --quiet; then
-            git commit -m "fix(jarvis): tentativa de auto-cura [${{ steps.healing_process.outputs.status }}]"
+            git commit -m "fix(jarvis): auto-cura aplicada via ${{ github.event_name }} [${{ steps.healing_process.outputs.status }}]"
             
             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
               git push origin HEAD:${{ github.head_ref }}
-              # Só tenta merge automático se o status for success
               if [[ "${{ steps.healing_process.outputs.status }}" == "success" ]]; then
                 gh pr merge ${{ github.event.pull_request.number }} --auto --merge || true
               fi
             else
-              git push origin HEAD:${{ steps.recover_logic.outputs.target_branch }}
-              PR_URL=$(gh pr create --title "🛡️ JARVIS: Recuperação (${{ steps.healing_process.outputs.status }})" \
-                --body "O JARVIS aplicou correções. Status: ${{ steps.healing_process.outputs.status }}" \
-                --head ${{ steps.recover_logic.outputs.target_branch }} --base main)
+              # Recovery para Workflow_Run
+              TARGET_BRANCH="${{ steps.recover_logic.outputs.target_branch }}"
+              git push origin HEAD:$TARGET_BRANCH
+              gh pr create --title "🛡️ JARVIS: Reparo Automático ($TARGET_BRANCH)" \
+                --body "Correção aplicada após falha no workflow: ${{ github.event.workflow_run.name }}" \
+                --head $TARGET_BRANCH --base main || true
             fi
+          else
+            echo "Nenhuma alteração necessária no DNA."
           fi
 
       - name: 💤 Standby
         if: steps.gatekeeper.outputs.authorized == 'false'
-        run: echo "Sistemas estáveis."
+        run: echo "Sistemas estáveis ou workflow de sucesso ignorado. JARVIS em repouso."
