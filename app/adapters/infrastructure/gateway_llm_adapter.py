@@ -54,7 +54,7 @@ class GatewayLLMCommandAdapter(NexusComponent):
     
     # Default model for auto-fix recommendations
     # Update this when new models are released
-    RECOMMENDED_GEMINI_MODEL = "gemini-2.0-flash-exp"
+    RECOMMENDED_GEMINI_MODEL = "gemini-2.0-flash"
     
     def __init__(
         self,

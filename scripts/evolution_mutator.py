@@ -103,7 +103,7 @@ def update_capability_status(
 
 _ARCHITECTURE_CONTRACT = """\
 CONTRATO DE ARQUITETURA JARVIS:
-- Toda capability herda de NexusComponent (de app.core.nexuscomponent).
+- Toda capability herda de NexusComponent (de app.core.nexus).
 - O arquivo deve ficar em app/domain/capabilities/.
 - O método execute(self, context=None) NUNCA lança exceção — use try/except interno.
 - execute() SEMPRE retorna um dict com ao menos {"success": bool}.
