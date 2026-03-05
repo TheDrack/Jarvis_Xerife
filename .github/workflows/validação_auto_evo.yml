@@ -1,4 +1,4 @@
-```yaml
+
 name: 🧬 Validação — Auto-Evolução e Multi-LLM
 
 on:
@@ -351,4 +351,3 @@ jobs:
           print(f"  Caps pendentes no JSON   : {total - complete}")
           print("=" * 55)
           EOF
-```
