@@ -3,7 +3,6 @@ from app.core.nexus import NexusComponent
 import os
 import json
 import requests
-import re
 import logging
 import time
 from typing import Any, Dict, List, Optional
@@ -235,39 +234,39 @@ class MetabolismCore(NexusComponent):
             return self._safe_json_decode(content)
         return content
 
-    def _safe_json_decode(self, content: str) -> Any:
-        """Extrai e limpa o JSON de strings sujas ou blocos markdown."""
-        # Conteúdo vazio ou só espaços — falha rápida
-        if not content or not content.strip():
+    def _safe_json_decode(self, text: str) -> Any:
+        """Extrai e limpa o JSON de strings sujas ou blocos markdown (3 estágios)."""
+        if not text or not text.strip():
             raise Exception("DNA corrompido para decodificação: conteúdo vazio recebido do LLM")
 
-        # Tenta diretamente
+        # Estágio 1: parse direto
         try:
-            return json.loads(content)
+            return json.loads(text)
         except json.JSONDecodeError:
             pass
 
-        # Remove blocos de markdown ```json ... ```
-        clean = re.sub(r"```(?:json)?\s*", "", content).replace("```", "").strip()
-        try:
-            return json.loads(clean)
-        except json.JSONDecodeError:
-            pass
-
-        # Tenta extrair o primeiro {...} (suporta JSON truncado com greedy match)
-        match = re.search(r"(\{.*\})", clean, re.DOTALL)
-        if match:
+        # Estágio 2: strip de markdown
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            lines = cleaned.split("\n")
+            inner = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
             try:
-                return json.loads(match.group(1))
-            except Exception:
-                pass
+                return json.loads(inner)
+            except json.JSONDecodeError:
+                cleaned = inner
 
-        # Limpeza agressiva de quebras de linha
-        sanitized = content.replace("\n", "\\n").replace("\r", "\\r")
+        # Estágio 3: json-repair
         try:
-            return json.loads(sanitized)
-        except Exception as exc:
-            raise Exception(f"DNA corrompido para decodificação: {exc}") from exc
+            from json_repair import repair_json
+            repaired = repair_json(cleaned, return_objects=True)
+            if isinstance(repaired, dict) and repaired:
+                return repaired
+        except Exception:
+            pass
+
+        raise Exception(
+            f"DNA corrompido para decodificação: JSON irrecuperável após 3 estágios: {text[:300]}"
+        )
 
 
 class RateLimitError(Exception):
