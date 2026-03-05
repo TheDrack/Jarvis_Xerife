@@ -11,7 +11,7 @@ class HttpClient:
         self.session = requests.Session()
 
     def request(self, method: str, endpoint: str, **kwargs):
-        url = f"{self.base_dir}{endpoint}" if endpoint.startswith('/') else f"{self.base_url}/{endpoint}"
+        url = f"{self.base_url}{endpoint}" if endpoint.startswith('/') else f"{self.base_url}/{endpoint}"
         
         try:
             response = self.session.request(method, url, **kwargs)
