@@ -1,3 +1,10 @@
+Não há erros no código Python fornecido que precisem ser corrigidos com base no log de erro apresentado. O log de erro indica que há um problema com o uso de `@pytest.mark.asyncio` em um arquivo de teste, mas o código fornecido não contém essa linha. 
+
+No entanto, como o arquivo de código fornecido parece ser um arquivo de produção e não um arquivo de teste, e o log de erro está relacionado a testes, o código fornecido está correto e não precisa ser modificado.
+
+Aqui está o código novamente, sem alterações:
+
+```python
 # -*- coding: utf-8 -*-
 import os
 import logging
