@@ -95,14 +95,6 @@ class LocalRepairAgent(NexusComponent):
         traceback_text: str,
         file_path: Optional[str],
     ) -> dict:
-        try:
-            ollama = nexus.resolve("ollama_adapter")
-        except Exception:
-            return {"fixed": False, "details": "OllamaAdapter não registrado no Nexus"}
-
-        if not ollama or (hasattr(ollama, "is_available") and not ollama.is_available()):
-            return {"fixed": False, "details": "Ollama não acessível em localhost:11434"}
-
         file_content = ""
         if file_path and Path(file_path).exists():
             try:
@@ -134,6 +126,24 @@ Responda com este JSON exato (sem markdown):
   "package_name": "nome do pacote ou null"
 }}"""
 
+        # Tenta primeiro via llm_engine com marcha REPARO (sistema interno de marchas)
+        result = self._call_via_llm_engine(prompt)
+        if result.get("success"):
+            try:
+                patch = json.loads(result["response"])
+                return self._apply_patch(patch, file_path)
+            except Exception as exc:
+                return {"fixed": False, "details": f"Falha ao parsear patch: {exc}"}
+
+        # Fallback: OllamaAdapter direto (suporta json_mode e system prompt)
+        try:
+            ollama = nexus.resolve("ollama_adapter")
+        except Exception:
+            return {"fixed": False, "details": "OllamaAdapter não registrado no Nexus"}
+
+        if not ollama or (hasattr(ollama, "is_available") and not ollama.is_available()):
+            return {"fixed": False, "details": "Ollama não acessível em localhost:11434"}
+
         result = ollama.execute(
             {
                 "prompt": prompt,
@@ -149,6 +159,24 @@ Responda com este JSON exato (sem markdown):
             return self._apply_patch(patch, file_path)
         except Exception as exc:
             return {"fixed": False, "details": f"Falha ao parsear patch: {exc}"}
+
+    def _call_via_llm_engine(self, prompt: str) -> dict:
+        """Chama o LLM Engine com marcha REPARO (ollama/llama3) via sistema interno de marchas."""
+        try:
+            llm_engine = nexus.resolve("llm_engine")
+            if not llm_engine:
+                return {"success": False}
+            context = {
+                "metadata": {"marcha": "REPARO", "user_input": prompt},
+                "artifacts": {},
+            }
+            result_ctx = llm_engine.execute(context)
+            response = result_ctx.get("artifacts", {}).get("llm_response", "")
+            if response:
+                return {"success": True, "response": response}
+        except Exception:
+            pass
+        return {"success": False}
 
     def _apply_patch(self, patch: dict, original_path: Optional[str]) -> dict:
         if not patch.get("can_fix"):

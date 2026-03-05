@@ -63,11 +63,22 @@ class TestExecuteOllamaUnavailable:
             "traceback": "NameError: name 'foo' is not defined",
         }
 
+        # llm_engine returns no response (REPARO marcha not available), ollama also unavailable
+        mock_llm_engine = MagicMock()
+        mock_llm_engine.execute.return_value = {"metadata": {}, "artifacts": {}}
+
         mock_ollama = MagicMock()
         mock_ollama.is_available.return_value = False
 
+        def side_effect(name):
+            if name == "llm_engine":
+                return mock_llm_engine
+            if name == "ollama_adapter":
+                return mock_ollama
+            return None
+
         with patch("app.application.services.local_repair_agent.nexus") as mock_nexus:
-            mock_nexus.resolve.return_value = mock_ollama
+            mock_nexus.resolve.side_effect = side_effect
             result = agent.execute(context)
 
         assert result["fixed"] is False

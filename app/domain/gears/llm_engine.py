@@ -7,7 +7,8 @@ class LlmEngine(NexusComponent):
         self.fleet = {
             "CONVERSA": ["openai/gpt-4o-mini"],
             "CODIGO": ["anthropic/claude-3-5-sonnet-20240620"],
-            "INTERNET": ["perplexity/pplx-70b-online"]
+            "INTERNET": ["perplexity/pplx-70b-online"],
+            "REPARO": ["ollama/llama3"],
         }
 
     def configure(self, config: dict = None):
