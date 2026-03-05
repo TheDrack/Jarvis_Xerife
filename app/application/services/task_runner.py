@@ -3,6 +3,7 @@
 
 import logging
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -28,7 +29,7 @@ class TaskRunner(NexusComponent):
         budget_cap_usd: Optional[float] = None,
     ):
         super().__init__()
-        self.cache_dir: Path = Path(cache_dir) if cache_dir else Path("/tmp/task_runner_cache")
+        self.cache_dir: Path = Path(cache_dir) if cache_dir else Path(tempfile.gettempdir()) / "task_runner_cache"
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.use_venv = use_venv
         self.sandbox_mode = sandbox_mode

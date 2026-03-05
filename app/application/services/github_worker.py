@@ -22,8 +22,8 @@ class GitHubWorker(NexusComponent):
     def __init__(self, repo_path: Optional[str] = None):
         super().__init__()
         self.repo_path: Path = Path(repo_path) if repo_path else Path.cwd()
-        # Legacy REST API fields
-        self.token = os.getenv("GITHUB_TOKEN")
+        # Legacy REST API fields – prefer GITHUB_PAT, fall back to GITHUB_TOKEN
+        self.token = os.getenv("GITHUB_PAT") or os.getenv("GITHUB_TOKEN")
         self.repo = os.getenv("GITHUB_REPO")
 
     # ------------------------------------------------------------------
