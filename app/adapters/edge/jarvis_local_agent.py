@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """

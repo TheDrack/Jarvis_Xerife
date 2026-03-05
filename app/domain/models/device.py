@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 import logging
 logger = logging.getLogger(__name__)
 # -*- coding: utf-8 -*-

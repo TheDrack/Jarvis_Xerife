@@ -18,7 +18,7 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 

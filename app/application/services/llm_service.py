@@ -4,7 +4,7 @@ import os
 from typing import Any, Optional
 import httpx
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 import logging
 from abc import ABC, abstractmethod
 from typing import List, Any, Dict

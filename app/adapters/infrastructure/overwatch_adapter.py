@@ -29,8 +29,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from app.core.nexus import nexus
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import nexus, NexusComponent
 from app.utils.document_store import document_store
 
 logger = logging.getLogger(__name__)

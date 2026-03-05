@@ -13,7 +13,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 

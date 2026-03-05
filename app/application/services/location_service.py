@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.domain.models.device import Device
 import logging
 logger = logging.getLogger(__name__)

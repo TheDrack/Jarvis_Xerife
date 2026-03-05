@@ -33,7 +33,7 @@ class ProjectCrystallizer:
             "nexuscomponent.py", "crystallizer_engine.py"
         }
 
-        self.nexus_import = "from app.core.nexuscomponent import NexusComponent"
+        from app.core.nexus import NexusComponent
         self.target_parent = "NexusComponent"
 
     def _create_checkpoint(self):

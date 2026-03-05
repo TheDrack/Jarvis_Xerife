@@ -8,8 +8,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from app.core.nexus import nexus
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import nexus, NexusComponent
 from app.domain.models.mission import Mission, MissionResult
 
 logger = logging.getLogger(__name__)

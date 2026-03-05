@@ -5,7 +5,7 @@ from abc import abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 
 class MemoryProvider(NexusComponent):

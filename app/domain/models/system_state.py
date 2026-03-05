@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 # --- CÓDIGO COMPLETO REESTRUTURADO ---
 from pydantic import BaseModel, Field
 from typing import Dict, Any, Optional

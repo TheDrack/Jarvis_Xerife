@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 
 class Cap001(NexusComponent):

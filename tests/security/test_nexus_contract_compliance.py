@@ -19,7 +19,7 @@ from app.application.privacy.pii_redactor import PiiRedactor
 from app.application.security.capability_authorizer import CapabilityAuthorizer
 from app.adapters.infrastructure.secrets.env_secrets_provider import EnvSecretsProvider
 from app.adapters.infrastructure.vector_memory_adapter import VectorMemoryAdapter
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ class TestCanExecuteContract:
 
     def test_nexuscomponent_has_can_execute_default(self):
         """NexusComponent base class must provide a default can_execute that returns True."""
-        from app.core.nexuscomponent import NexusComponent
+        from app.core.nexus import NexusComponent
 
         class _MinimalComponent(NexusComponent):
             def execute(self, context=None):
@@ -253,7 +253,7 @@ class TestCanExecuteContract:
     def test_overwatch_daemon_inherits_nexus_component(self):
         """OverwatchDaemon must inherit NexusComponent after Task 4/8 fix."""
         from app.adapters.infrastructure.overwatch_adapter import OverwatchDaemon
-        from app.core.nexuscomponent import NexusComponent
+        from app.core.nexus import NexusComponent
 
         daemon = OverwatchDaemon()
         assert isinstance(daemon, NexusComponent)
@@ -263,7 +263,7 @@ class TestCanExecuteContract:
     def test_notification_service_inherits_nexus_component(self):
         """NotificationService must inherit NexusComponent after Task 6 fix."""
         from app.application.services.notification_service import NotificationService
-        from app.core.nexuscomponent import NexusComponent
+        from app.core.nexus import NexusComponent
 
         svc = NotificationService()
         assert isinstance(svc, NexusComponent)
@@ -283,7 +283,7 @@ class TestCanExecuteContract:
         with open(registry_path) as f:
             data = json.load(f)
 
-        from app.core.nexuscomponent import NexusComponent
+        from app.core.nexus import NexusComponent
 
         for component_id, full_path in data.get("components", {}).items():
             parts = full_path.rsplit(".", 1)

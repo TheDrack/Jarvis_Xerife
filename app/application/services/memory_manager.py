@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.utils.document_store import document_store
 
 logger = logging.getLogger(__name__)

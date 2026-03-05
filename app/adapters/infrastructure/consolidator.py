@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 from typing import List
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 

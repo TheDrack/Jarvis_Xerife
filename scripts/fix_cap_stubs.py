@@ -29,7 +29,7 @@ STUB_MARKERS = ["{cap['id']}", "{target_dir}"]
 
 STUB_TEMPLATE = '''\
 # -*- coding: utf-8 -*-
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 
 class {class_name}(NexusComponent):
