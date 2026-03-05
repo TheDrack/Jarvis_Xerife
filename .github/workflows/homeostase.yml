@@ -4,7 +4,6 @@ on:
   pull_request:
     branches: [main, master, develop]
   workflow_run:
-    # Nomes extraídos da sua lista de Workflows
     workflows: 
       - "Copilot coding agent"
       - "Copilot code review"
@@ -25,7 +24,6 @@ jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
     runs-on: ubuntu-latest
-    # Impede colisões de push se múltiplos workflows falharem ao mesmo tempo
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
@@ -36,16 +34,15 @@ jobs:
 
     steps:
       - name: 🛰️ Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
-          ref: ${{ github.head_ref || github.ref }}
+          ref: ${{ github.head_ref || github.ref_name || 'main' }}
 
-      - name: 🔍 Verificação de Gatilho (Filtro de Falha)
+      - name: 🔍 Verificação de Gatilho
         id: gatekeeper
         run: |
-          # Regra: PR, Dispatch ou Workflow alvo com conclusão == 'failure'
           if [[ "${{ github.event_name }}" == "pull_request" ]] || \
              ([[ "${{ github.event_name }}" == "workflow_run" ]] && [[ "${{ github.event.workflow_run.conclusion }}" == "failure" ]]) || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
@@ -91,19 +88,15 @@ jobs:
           PYTHONPATH: "."
         run: |
           PYTEST_IGNORES="--ignore=tests/test_engine.py --ignore=tests/test_system_commands.py"
-          
-          # Coleta falhas iniciais
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           
-          # Executa o Healer
           PRODUCTION_LOG_ARG=""
           if [[ -n "${{ github.event.inputs.error_log }}" ]]; then
             echo "${{ github.event.inputs.error_log }}" > production_error.log
             PRODUCTION_LOG_ARG="--production-log production_error.log"
           fi
-          uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt $PRODUCTION_LOG_ARG
           
-          # Validação final (não usamos exit 1 para o workflow não ficar vermelho e permitir o commit)
+          uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt $PRODUCTION_LOG_ARG
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
           if ! grep -qE "ERRORS?|errors?|failed|IndentationError" final_log.txt; then
@@ -116,23 +109,29 @@ jobs:
         if: steps.gatekeeper.outputs.authorized == 'true'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
+          # Fallback para branch atual se as variáveis do GH falharem
         run: |
+          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           git add .
+          
           if ! git diff --staged --quiet; then
             git commit -m "fix(jarvis): auto-cura aplicada via ${{ github.event_name }} [${{ steps.healing_process.outputs.status }}]"
             
             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              git push origin HEAD:${{ github.head_ref }}
+              PUSH_TARGET=${{ github.head_ref }}
+              git push origin HEAD:$PUSH_TARGET
               if [[ "${{ steps.healing_process.outputs.status }}" == "success" ]]; then
                 gh pr merge ${{ github.event.pull_request.number }} --auto --merge || true
               fi
-            else
-              # Recovery para Workflow_Run
+            elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
               TARGET_BRANCH="${{ steps.recover_logic.outputs.target_branch }}"
               git push origin HEAD:$TARGET_BRANCH
               gh pr create --title "🛡️ JARVIS: Reparo Automático ($TARGET_BRANCH)" \
                 --body "Correção aplicada após falha no workflow: ${{ github.event.workflow_run.name }}" \
                 --head $TARGET_BRANCH --base main || true
+            else
+              # Modo Dispatch: Push na branch onde foi disparado
+              git push origin HEAD:$CURRENT_BRANCH
             fi
           else
             echo "Nenhuma alteração necessária no DNA."
@@ -140,4 +139,4 @@ jobs:
 
       - name: 💤 Standby
         if: steps.gatekeeper.outputs.authorized == 'false'
-        run: echo "Sistemas estáveis ou workflow de sucesso ignorado. JARVIS em repouso."
+        run: echo "Sistemas estáveis."
