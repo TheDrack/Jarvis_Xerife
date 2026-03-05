@@ -31,6 +31,7 @@ import time
 from threading import RLock
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.core.nexuscomponent import _nexus_context
 from app.utils.jrvs_codec import JrvsDecodeError, read_file as _jrvs_read, write_file as _jrvs_write
 
 logger = logging.getLogger(__name__)
@@ -145,6 +146,25 @@ class _CircuitBreakerEntry:
     def __init__(self) -> None:
         self.open_at: float = 0.0
         self.last_failure: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Nexus-guarded instantiation helper
+# ---------------------------------------------------------------------------
+
+def _nexus_guarded_instantiate(cls: type) -> Any:
+    """Instantiate *cls* with the Nexus context flag set.
+
+    This function is submitted to the thread-pool executor so that
+    ``_nexus_context.resolving`` is set in the same thread that calls
+    ``cls()``.  NexusComponent subclasses read this flag in their guarded
+    ``__init__`` to suppress the direct-instantiation warning.
+    """
+    _nexus_context.resolving = True
+    try:
+        return cls()
+    finally:
+        _nexus_context.resolving = False
 
 
 # ---------------------------------------------------------------------------
@@ -412,8 +432,10 @@ class JarvisNexus:
             for name, obj in inspect.getmembers(module, inspect.isclass):
                 norm_class = name.replace("_", "").lower()
                 if norm_class == norm_target or name.lower() == target_id.lower():
-                    # Fine-grained instantiation timeout
-                    inst_future = executor.submit(obj)
+                    # Fine-grained instantiation timeout – use the guarded
+                    # helper so NexusComponent subclasses don't emit the
+                    # direct-instantiation warning when Nexus owns the build.
+                    inst_future = executor.submit(_nexus_guarded_instantiate, obj)
                     try:
                         return inst_future.result(timeout=_NEXUS_INSTANTIATE_TIMEOUT)
                     except concurrent.futures.TimeoutError:
@@ -423,6 +445,78 @@ class JarvisNexus:
             raise  # Propagate so _resolve_with_timeout can open the circuit
         except Exception:
             return None
+
+    def _find_class_from_path(self, module_path: str, target_id: str) -> Optional[type]:
+        """Import *module_path* and return the class that matches *target_id*.
+
+        Unlike ``_instantiate_from_path``, this method does **not** instantiate
+        the class.  It is used by :meth:`resolve_class` to return the raw type
+        so callers can construct multiple instances or subclass it themselves.
+        """
+        try:
+            clean_path = module_path.replace("/", ".").replace("\\", ".").replace(".py", "")
+            if clean_path.startswith("."):
+                clean_path = clean_path[1:]
+
+            module = importlib.import_module(clean_path)
+            norm_target = target_id.replace("_", "").lower()
+            for name, obj in inspect.getmembers(module, inspect.isclass):
+                norm_class = name.replace("_", "").lower()
+                if norm_class == norm_target or name.lower() == target_id.lower():
+                    return obj  # type: ignore[return-value]
+        except Exception:
+            pass
+        return None
+
+    def resolve_class(self, target_id: str, hint_path: Optional[str] = None) -> Optional[type]:
+        """Return the *class* for a component without instantiating it.
+
+        This is the companion to :meth:`resolve`.  Use ``resolve_class`` when
+        you need the type itself – e.g. to create multiple instances, to
+        subclass it, or to pass it as a factory::
+
+            MyComp = nexus.resolve_class("my_component")
+            if MyComp:
+                instance = MyComp()
+
+        The search order mirrors :meth:`_resolve_internal`:
+        1. Explicit ``hint_path`` (if provided).
+        2. Registered path in the local cache / DNA path map.
+        3. Filesystem discovery (skipped in strict mode).
+
+        Returns ``None`` when the component cannot be located.
+        """
+        # 1. Explicit hint
+        if hint_path:
+            cls = self._find_class_from_path(hint_path, target_id)
+            if cls is not None:
+                return cls
+
+        # 2. Registered / cached path
+        stored_path = self._cache.get(target_id) or self._path_map.get(target_id)
+        if stored_path:
+            cls = self._find_class_from_path(stored_path, target_id)
+            if cls is not None:
+                return cls
+
+        # 3. Filesystem discovery (skipped in strict mode)
+        if _NEXUS_STRICT_MODE:
+            logger.error(
+                f"❌ [NEXUS] Strict mode: '{target_id}' não encontrado no registro (resolve_class)."
+            )
+            return None
+
+        logger.info(f"🔍 [NEXUS] resolve_class: varredura em disco para '{target_id}'...")
+        try:
+            _, real_path = self._global_search_with_path(target_id)
+        except Exception as err:
+            logger.error(f"❌ [NEXUS] resolve_class: erro ao buscar '{target_id}': {err}")
+            return None
+
+        if real_path:
+            return self._find_class_from_path(real_path, target_id)
+
+        logger.error(f"❌ [NEXUS] resolve_class: '{target_id}' não localizado no projeto.")
         return None
 
     def _global_search_with_path(self, target_id: str) -> Tuple[Optional[Any], Optional[str]]:
