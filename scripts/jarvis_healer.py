@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import argparse
+import json
 import os
 import subprocess
 import re
@@ -8,6 +9,22 @@ from pathlib import Path
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+def _has_failures(report_path: str) -> bool:
+    """
+    Read the pytest-json-report file and return True only when there are
+    actual test failures or collection errors that require healing.
+    Returns True (conservative/safe) when the file is absent or unparseable.
+    """
+    if not report_path or not os.path.exists(report_path):
+        return True  # No report → assume failures to be safe
+    try:
+        data = json.loads(Path(report_path).read_text(encoding="utf-8"))
+        summary = data.get("summary", {})
+        return bool(summary.get("failed", 0) or summary.get("error", 0))
+    except Exception:
+        return True  # Can't parse → assume failures to be safe
+
 
 def _strip_markdown_fences(text: str) -> str:
     """Remove markdown code fences that LLMs sometimes add despite instructions."""
@@ -120,6 +137,12 @@ def heal():
     parser.add_argument('--production-log', required=False,
                         help='Log de erro de produção enviado pelo Field Vision via workflow_dispatch')
     args = parser.parse_args()
+
+    # Exit immediately when there are no failures — avoids unnecessary file
+    # changes from mass_reindent that would trigger another workflow run.
+    if not _has_failures(args.report):
+        print("✅ [Healer] Sem falhas detectadas no relatório. Nenhuma cura necessária.")
+        return
 
     error_context = ""
     target_files = set()
