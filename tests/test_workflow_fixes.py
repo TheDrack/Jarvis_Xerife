@@ -1,39 +1,35 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Test script to validate the workflow fixes for metabolism and auto-evolution.
+Tests to validate the workflow fixes for metabolism and auto-evolution.
 
-This script tests:
-1. metabolism_analyzer.py outputs are correct
-2. metabolism_mutator.py handles errors gracefully
-3. auto_evolution service works properly
+Validates:
+1. metabolism_analyzer.py produces all required GITHUB_OUTPUT fields
+2. evolution_mutator.py handles missing cap_id gracefully
+3. AutoEvolutionServiceV2 integration basics
+4. services package importable without optional dependencies (sqlmodel, etc.)
 """
 
 import os
-import sys
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
-# Add project root to path
+import pytest
+
 PROJECT_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
 
-def test_metabolism_analyzer():
-    """Test that metabolism_analyzer.py produces correct outputs"""
-    print("=" * 60)
-    print("TEST 1: Metabolism Analyzer")
-    print("=" * 60)
-    
-    # Use context manager for automatic cleanup
+def test_metabolism_analyzer_required_outputs():
+    """metabolism_analyzer.py must write all required fields to GITHUB_OUTPUT."""
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         output_file = f.name
-    
+
     try:
         env = os.environ.copy()
         env['GITHUB_OUTPUT'] = output_file
-        
+
         result = subprocess.run(
             [
                 sys.executable,
@@ -41,186 +37,150 @@ def test_metabolism_analyzer():
                 '--intent', 'test',
                 '--instruction', 'Test the analyzer',
                 '--context', 'Test context with sufficient length to pass validation',
-                '--event-type', 'test'
+                '--event-type', 'test',
             ],
             capture_output=True,
             text=True,
             env=env,
-            cwd=PROJECT_ROOT
+            cwd=str(PROJECT_ROOT),
         )
-        
-        # Check outputs were written
+
         with open(output_file, 'r') as f:
             outputs = f.read()
-        
-        print(f"Exit code: {result.returncode}")
-        print(f"Outputs written:\n{outputs}")
-        
-        # Validate outputs
-        assert 'requires_human=' in outputs, "Missing requires_human output"
-        assert 'intent_type=' in outputs, "Missing intent_type output"
-        assert 'impact_type=' in outputs, "Missing impact_type output"
-        assert 'mutation_strategy=' in outputs, "Missing mutation_strategy output"
-        
-        # Check that mutation_strategy is not "None"
-        for line in outputs.split('\n'):
+
+        assert result.returncode == 0, (
+            f"metabolism_analyzer.py exited with code {result.returncode}.\n"
+            f"stderr: {result.stderr}\nstdout: {result.stdout}"
+        )
+        assert 'requires_human=' in outputs, "Missing required output: requires_human"
+        assert 'intent_type=' in outputs, "Missing required output: intent_type"
+        assert 'impact_type=' in outputs, "Missing required output: impact_type"
+        assert 'mutation_strategy=' in outputs, "Missing required output: mutation_strategy"
+
+        for line in outputs.splitlines():
             if line.startswith('mutation_strategy='):
                 value = line.split('=', 1)[1]
-                assert value != 'None', "mutation_strategy should not be 'None'"
-        
-        print("✅ TEST 1 PASSED: Analyzer produces correct outputs")
-        return True
-        
-    except Exception as e:
-        print(f"❌ TEST 1 FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+                assert value != 'None', "mutation_strategy must not be the string 'None'"
+
     finally:
-        # Always cleanup the temporary file
-        try:
-            if os.path.exists(output_file):
-                os.unlink(output_file)
-        except Exception:
-            pass  # Best effort cleanup
+        if os.path.exists(output_file):
+            os.unlink(output_file)
 
 
-def test_metabolism_mutator():
-    """Test that metabolism_mutator.py handles operations correctly"""
-    print("\n" + "=" * 60)
-    print("TEST 2: Metabolism Mutator")
-    print("=" * 60)
-    
-    # Use context manager for automatic cleanup
+def test_metabolism_analyzer_escalates_on_short_context():
+    """When context is too short the analyzer should escalate (requires_human=true)."""
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
         output_file = f.name
-    
+
     try:
         env = os.environ.copy()
         env['GITHUB_OUTPUT'] = output_file
-        
+
         result = subprocess.run(
             [
                 sys.executable,
-                str(PROJECT_ROOT / 'scripts' / 'metabolism_mutator.py'),
-                '--strategy', 'minimal_change',
-                '--intent', 'test',
-                '--impact', 'test'
+                str(PROJECT_ROOT / 'scripts' / 'metabolism_analyzer.py'),
+                '--intent', 'x',
+                '--instruction', 'y',
+                '--context', '',
             ],
             capture_output=True,
             text=True,
             env=env,
-            cwd=PROJECT_ROOT
+            cwd=str(PROJECT_ROOT),
         )
-        
-        print(f"Exit code: {result.returncode}")
-        print(f"Output: {result.stdout[-500:]}")  # Last 500 chars
-        
-        # Should succeed with exit code 0
-        assert result.returncode == 0, f"Expected exit code 0, got {result.returncode}"
-        
-        # Check for success message
-        assert '"success": true' in result.stdout, "Expected success=true in output"
-        
-        print("✅ TEST 2 PASSED: Mutator executes successfully")
-        return True
-        
-    except Exception as e:
-        print(f"❌ TEST 2 FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+
+        with open(output_file, 'r') as f:
+            outputs = f.read()
+
+        assert result.returncode == 0, (
+            f"metabolism_analyzer.py exited with code {result.returncode}.\n"
+            f"stderr: {result.stderr}"
+        )
+        assert 'requires_human=true' in outputs, (
+            "Short context should force escalation (requires_human=true)"
+        )
+
     finally:
-        # Always cleanup the temporary file
-        try:
-            if os.path.exists(output_file):
-                os.unlink(output_file)
-        except Exception:
-            pass  # Best effort cleanup
+        if os.path.exists(output_file):
+            os.unlink(output_file)
+
+
+def test_evolution_mutator_missing_cap_id():
+    """evolution_mutator.py must exit non-zero when no cap_id can be determined."""
+    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
+        output_file = f.name
+
+    try:
+        env = os.environ.copy()
+        env['GITHUB_OUTPUT'] = output_file
+        env.pop('ISSUE_BODY', None)  # Ensure no cap-id can be inferred
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(PROJECT_ROOT / 'scripts' / 'evolution_mutator.py'),
+                '--strategy', 'minimal_change',
+                '--intent', 'test',
+                '--impact', 'test',
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd=str(PROJECT_ROOT),
+        )
+
+        assert result.returncode != 0, (
+            "evolution_mutator.py should exit non-zero when no cap_id is provided"
+        )
+
+    finally:
+        if os.path.exists(output_file):
+            os.unlink(output_file)
 
 
 def test_auto_evolution_service():
-    """Test that auto_evolution service can find missions"""
-    print("\n" + "=" * 60)
-    print("TEST 3: Auto Evolution Service")
-    print("=" * 60)
-    
+    """AutoEvolutionServiceV2 must be importable and respond to basic queries."""
+    from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2  # noqa: PLC0415
+
+    service = AutoEvolutionServiceV2()
+
+    is_auto = service.is_auto_evolution_pr("[Auto-Evolution] Test PR")
+    assert is_auto is True, "is_auto_evolution_pr() should detect auto-evolution PRs"
+
+    is_not_auto = service.is_auto_evolution_pr("Fix: regular bug fix")
+    assert is_not_auto is False, "is_auto_evolution_pr() should not match regular PRs"
+
+
+def test_services_package_importable_without_sqlmodel():
+    """app.application.services package must be importable even when sqlmodel is absent.
+
+    This is critical for the self-healing workflow where only a minimal set of
+    packages is installed.  The package __init__.py must guard its optional imports.
+    """
+    import importlib  # noqa: PLC0415
+
+    # Simulate missing sqlmodel by temporarily hiding it from sys.modules
+    sqlmodel_mod = sys.modules.pop('sqlmodel', None)
+    to_remove = [
+        k for k in list(sys.modules.keys())
+        if any(x in k for x in ('assistant_service', 'device_service',
+                                 'domain.models', 'domain.models.device'))
+    ]
+    removed = {k: sys.modules.pop(k) for k in to_remove}
+
     try:
-        from app.application.services.auto_evolution import AutoEvolutionService
-        
-        service = AutoEvolutionService()
-        
-        # Test parse_roadmap
-        roadmap = service.parse_roadmap()
-        print(f"Parsed roadmap with {roadmap.get('total_sections', 0)} sections")
-        
-        assert 'sections' in roadmap, "Roadmap should have sections"
-        
-        # Test find_next_mission
-        mission = service.find_next_mission()
-        if mission:
-            print(f"Found mission: {mission['mission']['description'][:50]}...")
-            print(f"Section: {mission['section']}, Priority: {mission['priority']}")
-        else:
-            print("No mission found (all complete)")
-        
-        # Test is_auto_evolution_pr
-        is_auto = service.is_auto_evolution_pr(
-            pr_title="[Auto-Evolution] Test PR",
-            pr_body="Auto evolution test"
-        )
-        assert is_auto == True, "Should detect auto-evolution PR"
-        
-        is_not_auto = service.is_auto_evolution_pr(
-            pr_title="Fix: regular bug fix",
-            pr_body="Regular fix"
-        )
-        assert is_not_auto == False, "Should not detect regular PR as auto-evolution"
-        
-        print("✅ TEST 3 PASSED: Auto evolution service works correctly")
-        return True
-        
-    except Exception as e:
-        print(f"❌ TEST 3 FAILED: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
+        # Flush the services package so its __init__.py runs again
+        sys.modules.pop('app.application.services', None)
+        importlib.import_module('app.application.services')
 
+        # MetabolismCore (which doesn't need sqlmodel) must still resolve correctly
+        sys.modules.pop('app.application.services.metabolism_core', None)
+        mc = importlib.import_module('app.application.services.metabolism_core')
+        assert hasattr(mc, 'MetabolismCore'), "MetabolismCore must remain importable"
+    finally:
+        # Restore any modules we temporarily removed
+        if sqlmodel_mod is not None:
+            sys.modules['sqlmodel'] = sqlmodel_mod
+        sys.modules.update(removed)
 
-def main():
-    """Run all tests"""
-    print("\n" + "=" * 60)
-    print("WORKFLOW FIXES VALIDATION TEST SUITE")
-    print("=" * 60 + "\n")
-    
-    results = []
-    
-    # Run tests
-    results.append(("Metabolism Analyzer", test_metabolism_analyzer()))
-    results.append(("Metabolism Mutator", test_metabolism_mutator()))
-    results.append(("Auto Evolution Service", test_auto_evolution_service()))
-    
-    # Summary
-    print("\n" + "=" * 60)
-    print("TEST SUMMARY")
-    print("=" * 60)
-    
-    passed = sum(1 for _, result in results if result)
-    total = len(results)
-    
-    for name, result in results:
-        status = "✅ PASSED" if result else "❌ FAILED"
-        print(f"{status}: {name}")
-    
-    print(f"\nTotal: {passed}/{total} tests passed")
-    
-    if passed == total:
-        print("\n🎉 All tests passed! Workflows should work correctly.")
-        return 0
-    else:
-        print(f"\n⚠️  {total - passed} test(s) failed. Review errors above.")
-        return 1
-
-
-if __name__ == '__main__':
-    sys.exit(main())

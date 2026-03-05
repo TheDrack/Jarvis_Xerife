@@ -93,7 +93,7 @@ jobs:
           
           uv run pytest --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
-          if ! grep -qE "ERRORS|failed|IndentationError" final_log.txt; then
+          if ! grep -qE "ERRORS?|errors?|failed|IndentationError" final_log.txt; then
              echo "✅ Integridade validada."
              echo "status=success" >> $GITHUB_OUTPUT
           else
