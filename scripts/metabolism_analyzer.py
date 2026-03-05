@@ -32,7 +32,7 @@ class MetabolismAnalyzer:
         if any(kw in full_context.lower() for kw in ['database', 'schema', 'auth', 'delete']):
             return self._escalate(EscalationReason.ARCHITECTURAL_JUDGMENT)
 
-        system_p = "Você é o Mecânico do JARVIS. Analise se a mudança é segura. Responda APENAS JSON: {'requires_human': bool, 'reason': str, 'risk_level': int}"
+        system_p = "Você é o Mecânico do JARVIS. Analise se a mudança é segura. Responda APENAS JSON: {'requires_human': bool, 'reason': str, 'risk_level': int, 'intent_type': str, 'impact_type': str, 'mutation_strategy': str}"
         user_p = f"INTENÇÃO: {intent}\nPROPOSTA: {full_context}\nEVOLUÇÃO: {is_evolution}"
 
         try:
@@ -43,7 +43,14 @@ class MetabolismAnalyzer:
             return self._escalate(EscalationReason.CRITICAL_RISK)
 
     def _escalate(self, reason: EscalationReason) -> Dict[str, Any]:
-        res = {"requires_human": True, "reason": reason.value, "risk_level": 10}
+        res = {
+            "requires_human": True,
+            "reason": reason.value,
+            "risk_level": 10,
+            "intent_type": "escalation",
+            "impact_type": "blocked",
+            "mutation_strategy": "none",
+        }
         self._export_to_gh(res)
         return res
 
@@ -53,11 +60,15 @@ class MetabolismAnalyzer:
             with open(gh_output, 'a') as f:
                 f.write(f"requires_human={str(result['requires_human']).lower()}\n")
                 f.write(f"escalation_reason={result.get('reason', '')}\n")
+                f.write(f"intent_type={result.get('intent_type', 'unknown')}\n")
+                f.write(f"impact_type={result.get('impact_type', 'unknown')}\n")
+                f.write(f"mutation_strategy={result.get('mutation_strategy', 'none')}\n")
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument('--intent', required=True)
     p.add_argument('--instruction', required=True)
     p.add_argument('--context', default='')
+    p.add_argument('--event-type', default='', dest='event_type')
     args = p.parse_args()
     print(json.dumps(MetabolismAnalyzer().analyze_event(args.intent, args.instruction, args.context)))

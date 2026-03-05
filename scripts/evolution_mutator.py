@@ -240,6 +240,12 @@ def _evolve_cap(
     examples = _last_completed_examples(caps)
     target_file = _cap_id_to_file(cap_id)
     core = nexus.resolve("metabolism_core")
+    if core is None:
+        print(
+            f"❌ [{cap_id}] Nexus não conseguiu resolver 'metabolism_core'. "
+            "Verifique as dependências e o ambiente."
+        )
+        return False
 
     system_prompt, user_prompt = _build_prompts(cap, examples, roadmap_context)
     failure_reason: Optional[str] = None

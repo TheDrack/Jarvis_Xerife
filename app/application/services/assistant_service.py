@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import logging
+from datetime import datetime as _dt
 from typing import Any, Dict, List, Optional
 
+from app.application.services.dependency_manager import DependencyManager
+from app.core.config import settings
 from app.core.nexus import nexus
 from app.core.nexuscomponent import NexusComponent
 from app.domain.models import Response
@@ -18,18 +21,38 @@ class AssistantService(NexusComponent):
     utilizando instâncias resolvidas pelo Nexus.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        voice_provider=None,
+        action_provider=None,
+        web_provider=None,
+        command_interpreter=None,
+        intent_processor=None,
+        wake_word=None,
+        dependency_manager=None,
+    ):
         super().__init__()
-        # Inicialização protegida: tenta resolver, mas não trava se retornar None no boot
-        self._interpreter = nexus.resolve("command_interpreter")
-        self._intent_processor = nexus.resolve("intent_processor")
-        self._voice = None
+        # Use injected providers if supplied, otherwise resolve via Nexus
+        if command_interpreter is not None:
+            self._interpreter = command_interpreter
+        else:
+            self._interpreter = nexus.resolve("command_interpreter")
+        if intent_processor is not None:
+            self._intent_processor = intent_processor
+        else:
+            self._intent_processor = nexus.resolve("intent_processor")
+        self._voice = voice_provider
+        self._action = action_provider
+        self._web = web_provider
         self._history_adapter = None
         self._memory_manager = None
         self._field_vision = None
         self._vector_memory = None
         self._decision_engine = None
-        self.is_running = True
+        self.is_running = False
+        self.wake_word = wake_word or getattr(settings, "wake_word", "xerife")
+        self._command_history: List[Dict[str, Any]] = []
+        self.dependency_manager = dependency_manager if dependency_manager is not None else DependencyManager()
         self._health_check_task: Optional[asyncio.Task] = None
 
     def _get_interpreter(self):
@@ -193,6 +216,25 @@ class AssistantService(NexusComponent):
         Blindado contra erros de NoneType através de resolução dinâmica.
         """
         try:
+            # Direct providers path (for test/injection use)
+            if self._action is not None or self._web is not None or self._voice is not None:
+                interpreter = self._get_interpreter()
+                if not interpreter:
+                    return Response(success=False, message="Interpreter unavailable", error="INIT_FAILURE")
+                if hasattr(interpreter, "interpret"):
+                    intent = interpreter.interpret(text)
+                else:
+                    intent = interpreter.execute({"text": text})
+                response = self._dispatch_with_providers(intent)
+                self._command_history.insert(0, {
+                    "command": text,
+                    "success": response.success,
+                    "timestamp": _dt.now().isoformat(),
+                    "message": response.message or "",
+                })
+                self._save_to_hive(text, response, channel=channel)
+                return response
+
             logger.info(f"🎙️ [{channel.upper()}] Processando: {text}")
 
             # 1. Resolve componentes (Lazy Loading de segurança)
@@ -305,12 +347,24 @@ class AssistantService(NexusComponent):
 
             # 7. Persiste na memória compartilhada
             self._save_to_hive(text, response, channel=channel)
+            self._command_history.insert(0, {
+                "command": text,
+                "success": response.success,
+                "timestamp": _dt.now().isoformat(),
+                "message": response.message or "",
+            })
             return response
 
         except Exception as e:
             logger.error(f"💥 Erro ao processar comando: {e}")
             response = Response(success=False, message=f"Erro interno: {str(e)}", error=str(e))
             self._save_to_hive(text, response, channel=channel)
+            self._command_history.insert(0, {
+                "command": text,
+                "success": False,
+                "timestamp": _dt.now().isoformat(),
+                "message": response.message or "",
+            })
             return response
 
     async def async_process_command(
@@ -328,3 +382,55 @@ class AssistantService(NexusComponent):
         """Reage a eventos globais disparados pelo Nexus."""
         if event_type == "wake_word_detected":
             logger.info("👂 Assistente em prontidão para ouvir...")
+
+    def stop(self) -> None:
+        """Stop the assistant service."""
+        self.is_running = False
+
+    def get_command_history(self, limit: int = 5) -> List[Dict[str, Any]]:
+        """Return the most recent command history entries."""
+        return self._command_history[:limit]
+
+    def _dispatch_with_providers(self, intent) -> Response:
+        """Direct dispatch to injected providers based on intent command type."""
+        from app.domain.models import CommandType
+        cmd_type = intent.command_type
+        params = intent.parameters
+        try:
+            if cmd_type == CommandType.TYPE_TEXT:
+                text_val = params.get("text", "")
+                if self._action:
+                    self._action.type_text(text_val)
+                return Response(success=True, message=f"Typed: {text_val}", data={"command_type": "type_text"})
+            elif cmd_type == CommandType.PRESS_KEY:
+                key = params.get("key", "")
+                if self._action:
+                    self._action.press_key(key)
+                return Response(success=True, message=f"Pressed: {key}", data={"command_type": "press_key"})
+            elif cmd_type == CommandType.OPEN_BROWSER:
+                if self._action:
+                    self._action.hotkey("ctrl", "shift", "c")
+                return Response(success=True, message="Opened browser", data={"command_type": "open_browser"})
+            elif cmd_type == CommandType.OPEN_URL:
+                url = params.get("url", "")
+                if self._web:
+                    self._web.open_url(url)
+                return Response(success=True, message=f"Opened: {url}", data={"command_type": "open_url"})
+            elif cmd_type == CommandType.SEARCH_ON_PAGE:
+                query = params.get("search_text", params.get("query", ""))
+                if self._web:
+                    self._web.search_on_page(query)
+                return Response(success=True, message=f"Searched: {query}", data={"command_type": "search_on_page"})
+            elif cmd_type == CommandType.UNKNOWN:
+                interpreter = self._interpreter
+                if hasattr(interpreter, "generate_conversational_response"):
+                    try:
+                        response_text = interpreter.generate_conversational_response(intent.raw_input)
+                        return Response(success=True, message=response_text, data={"command_type": "chat"})
+                    except Exception:
+                        pass
+                return Response(success=False, message="Unknown command", error="UNKNOWN_COMMAND")
+            else:
+                return Response(success=False, message="Unhandled command type", error="UNKNOWN_COMMAND")
+        except Exception as e:
+            return Response(success=False, message=str(e), error="EXECUTION_ERROR")
