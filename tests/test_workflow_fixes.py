@@ -160,14 +160,18 @@ def test_services_package_importable_without_sqlmodel():
     """
     import importlib  # noqa: PLC0415
 
+    # Modules that depend on sqlmodel and must be temporarily evicted
+    _SQLMODEL_DEPENDENTS = (
+        'app.application.services.assistant_service',
+        'app.application.services.device_service',
+        'app.domain.models',
+        'app.domain.models.device',
+        'app.domain.models.__init__',
+    )
+
     # Simulate missing sqlmodel by temporarily hiding it from sys.modules
     sqlmodel_mod = sys.modules.pop('sqlmodel', None)
-    to_remove = [
-        k for k in list(sys.modules.keys())
-        if any(x in k for x in ('assistant_service', 'device_service',
-                                 'domain.models', 'domain.models.device'))
-    ]
-    removed = {k: sys.modules.pop(k) for k in to_remove}
+    removed = {k: sys.modules.pop(k) for k in _SQLMODEL_DEPENDENTS if k in sys.modules}
 
     try:
         # Flush the services package so its __init__.py runs again
