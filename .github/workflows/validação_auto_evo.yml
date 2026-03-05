@@ -45,7 +45,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar requests
+      - name: Instalar dependências
         run: pip install -q requests
 
       - name: 🔍 Checar LLMs e testar MetabolismCore
@@ -85,13 +85,14 @@ jobs:
               sys.exit(1)
 
           try:
-              from app.application.services.metabolism_core import MetabolismCore
-              result = MetabolismCore().ask_jarvis(
+              from app.core.nexus import nexus
+              core = nexus.resolve("metabolism_core")
+              result = core.ask_jarvis(
                   'Responda apenas JSON sem markdown.',
                   'Responda: {"status": "ok"}',
                   require_json=True,
               )
-              print(f"✅ MetabolismCore OK → {result}")
+              print(f"✅ MetabolismCore (via Nexus) OK → {result}")
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
                   f.write("llms_ok=true\n")
           except Exception as e:
@@ -262,7 +263,7 @@ jobs:
 
       - name: Instalar dependências de dev
         run: |
-          pip install -q pytest pytest-asyncio
+          pip install -q pytest pytest-asyncio pytest-cov
           pip install -q -r requirements/core.txt || pip install -q requests pydantic
 
       - name: 🧪 Testes de domínio
@@ -294,11 +295,21 @@ jobs:
           python-version: "3.12"
 
       - name: 📊 Resumo final
+        env:
+          DIAGNOSTICO_LLM: ${{ needs.diagnostico-llm.result }}
+          VALIDAR_STUBS: ${{ needs.validar-stubs.result }}
+          TESTES: ${{ needs.testes.result }}
         run: |
           python - <<'PYEOF'
-          import json
+          import json, os, time
           from pathlib import Path
-          caps  = json.loads(Path("data/capabilities.json").read_text(encoding="utf-8")).get("capabilities", [])
+
+          sys_path_add = "."
+          import sys; sys.path.insert(0, sys_path_add)
+
+          # --- Dados de capabilities ---
+          caps_path = Path("data/capabilities.json")
+          caps = json.loads(caps_path.read_text(encoding="utf-8")).get("capabilities", []) if caps_path.exists() else []
           total    = len(caps)
           complete = sum(1 for c in caps if c.get("status") == "complete")
           stub_markers = ["return {'status': 'success', 'id': 'CAP-"]
@@ -307,12 +318,50 @@ jobs:
               code = f.read_text(encoding="utf-8")
               if any(m in code for m in stub_markers): stubs += 1
               elif "def execute" in code and len(code.splitlines()) > 20: impl += 1
+
+          # --- Resultados dos jobs ---
+          job_results = {
+              "diagnostico-llm": os.getenv("DIAGNOSTICO_LLM", "unknown"),
+              "validar-stubs":   os.getenv("VALIDAR_STUBS", "unknown"),
+              "testes":          os.getenv("TESTES", "unknown"),
+          }
+
+          # --- Print no log ---
           print("=" * 50)
           print("📊 RELATÓRIO FINAL")
           print("=" * 50)
-          print(f"  JSON: {complete}/{total} caps completas ({complete/total*100:.1f}%)")
+          print(f"  JSON: {complete}/{total} caps completas ({complete/total*100:.1f}%)" if total else "  Sem capabilities carregadas.")
           print(f"  Arquivos com lógica real : {impl}")
           print(f"  Arquivos ainda stub      : {stubs}")
           print(f"  Caps pendentes           : {total - complete}")
+          print()
+          print("  Resultados por job:")
+          for job, res in job_results.items():
+              icon = "✅" if res == "success" else ("⏭️" if res == "skipped" else "❌")
+              print(f"    {icon}  {job}: {res}")
           print("=" * 50)
+
+          # --- Salva report_final.json ---
+          report = {
+              "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+              "capabilities": {
+                  "total": total,
+                  "completas": complete,
+                  "percentual": round(complete / total * 100, 1) if total else 0,
+                  "arquivos_com_logica": impl,
+                  "arquivos_stub": stubs,
+                  "pendentes": total - complete,
+              },
+              "job_results": job_results,
+          }
+          Path("report_final.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
+          print("💾 report_final.json salvo.")
           PYEOF
+
+      - name: 💾 Commit do relatório
+        run: |
+          git config user.name  "JARVIS Evolution Bot"
+          git config user.email "jarvis-bot@noreply.github.com"
+          git add report_final.json
+          git diff --cached --quiet || git commit -m "📊 relatório: $(date +'%Y-%m-%d %H:%M')"
+          git push || true
