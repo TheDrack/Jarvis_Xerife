@@ -4,12 +4,12 @@ on:
   pull_request:
     branches: [main, master, develop]
   workflow_run:
-    workflows: ["*"]
+    workflows: ["CI", "Test Suite", "Production Deploy"]
     types: [completed]
   workflow_dispatch:
     inputs:
       error_log:
-        description: 'Log de erro da produção (enviado pelo Field Vision)'
+        description: 'Log de erro da produção'
         required: false
         default: ''
 
@@ -17,8 +17,11 @@ jobs:
   homeostasis:
     name: "🧪 Vistoria e Auto-Cura"
     runs-on: ubuntu-latest
-    # O IF foi removido daqui para garantir que o Job sempre execute e o Badge fique verde ✅
-    
+    # Impede que execuções simultâneas quebrem o Git
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+
     permissions:
       contents: write
       pull-requests: write
@@ -29,20 +32,25 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GIT_PAT }}
+          # Importante: Mantém a referência da branch para permitir o push
+          ref: ${{ github.head_ref || github.ref }}
 
       - name: 🔍 Verificação de Gatilho
         id: gatekeeper
         run: |
-          # Define se deve ou não agir
           if [[ "${{ github.event_name }}" == "pull_request" ]] || \
-             ([[ "${{ github.event_name }}" == "workflow_run" ]] && \
-              [[ "${{ github.event.workflow_run.conclusion }}" == "failure" ]] && \
-              [[ "${{ github.event.workflow_run.name }}" != "🧬 JARVIS Self Healing V3" ]]) || \
+             ([[ "${{ github.event_name }}" == "workflow_run" ]] && [[ "${{ github.event.workflow_run.conclusion }}" == "failure" ]]) || \
              [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "authorized=true" >> $GITHUB_OUTPUT
           else
             echo "authorized=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: ⚙️ Configurar Identidade JARVIS
+        if: steps.gatekeeper.outputs.authorized == 'true'
+        run: |
+          git config --global user.name "JARVIS"
+          git config --global user.email "jarvis@simbiose.ai"
 
       - name: 📦 Setup UV
         if: steps.gatekeeper.outputs.authorized == 'true'
@@ -54,9 +62,7 @@ jobs:
       - name: 🔧 Instalação do DNA
         if: steps.gatekeeper.outputs.authorized == 'true'
         run: |
-          uv venv --clear --python 3.11
-          # Instala as dependências cloud completas (sqlmodel, slowapi, etc.) para que o pytest
-          # consiga importar todos os módulos do projeto sem erros de coleção.
+          uv venv --python 3.11
           uv pip install -r requirements/core.txt pytest pytest-json-report pytest-cov anyio autopep8 requests
 
       - name: 🔍 Modo de Recuperação (Workflow Failure)
@@ -65,16 +71,9 @@ jobs:
         run: |
           FAILED_SHA=${{ github.event.workflow_run.head_sha }}
           STABLE_SHA=$(git rev-parse $FAILED_SHA^)
-          BACKUP_BRANCH="jarvis/broken-state-${{ github.run_id }}"
           RECOVERY_BRANCH="jarvis/recovery-${{ github.run_id }}"
-
-          git branch $BACKUP_BRANCH $FAILED_SHA
-          git push origin refs/heads/$BACKUP_BRANCH
-
           git checkout -b $RECOVERY_BRANCH $STABLE_SHA
-          
           echo "target_branch=$RECOVERY_BRANCH" >> $GITHUB_OUTPUT
-          echo "backup_branch=$BACKUP_BRANCH" >> $GITHUB_OUTPUT
 
       - name: 🔄 Ciclo de Auto-Cura e Testes
         if: steps.gatekeeper.outputs.authorized == 'true'
@@ -83,8 +82,6 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PYTHONPATH: "."
         run: |
-          # tests/test_engine.py e test_system_commands.py referenciam módulos não-existentes
-          # (app.core.engine, app.actions) e não podem ser curados automaticamente.
           PYTEST_IGNORES="--ignore=tests/test_engine.py --ignore=tests/test_system_commands.py"
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           
@@ -95,58 +92,38 @@ jobs:
           fi
           
           uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt $PRODUCTION_LOG_ARG
-          
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
           if ! grep -qE "ERRORS?|errors?|failed|IndentationError" final_log.txt; then
-             echo "✅ Integridade validada."
              echo "status=success" >> $GITHUB_OUTPUT
           else
-             echo "❌ DNA instável."
              echo "status=failure" >> $GITHUB_OUTPUT
              exit 1
           fi
 
-      - name: 🛠️ Commit & Merge (PR Mode)
-        if: steps.gatekeeper.outputs.authorized == 'true' && github.event_name == 'pull_request' && steps.healing_process.outputs.status == 'success'
+      - name: 🛠️ Aplicar Correções (PR ou Recovery)
+        if: steps.gatekeeper.outputs.authorized == 'true' && steps.healing_process.outputs.status == 'success'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
-          git config user.name "JARVIS"
-          git config user.email "jarvis@simbiose.ai"
           git add .
-          
           if ! git diff --staged --quiet; then
-            git commit -m "chore: auto-cura integridade"
-            git push origin HEAD:refs/heads/${{ github.head_ref }}
+            git commit -m "fix(jarvis): auto-cura de integridade aplicada"
             
-            gh pr merge ${{ github.event.pull_request.number }} --auto --merge || \
-            gh pr merge ${{ github.event.pull_request.number }} --merge --admin
-          else
-            echo "Nenhuma alteração pendente."
-          fi
-
-      - name: 🚀 Abrir PR de Reparo (Recovery Mode)
-        if: steps.gatekeeper.outputs.authorized == 'true' && github.event_name == 'workflow_run' && steps.healing_process.outputs.status == 'success'
-        env:
-          GH_TOKEN: ${{ secrets.GIT_PAT }}
-        run: |
-          git config user.name "JARVIS"
-          git config user.email "jarvis@simbiose.ai"
-          git add .
-          
-          if ! git diff --staged --quiet; then
-            git commit -m "fix: restauração estável e correção automática"
-            git push origin HEAD:refs/heads/${{ steps.recover_logic.outputs.target_branch }}
-            
-            PR_URL=$(gh pr create --title "JARVIS Recuperação: ${{ github.event.workflow_run.name }}" \
-              --body "### 🛡️ Sistema de Auto-Cura Ativado" \
-              --head ${{ steps.recover_logic.outputs.target_branch }} \
-              --base main)
-              
-            gh pr merge $PR_URL --auto --merge || gh pr merge $PR_URL --admin --merge
+            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              # Push direto na branch do PR
+              git push origin HEAD:${{ github.head_ref }}
+              gh pr merge ${{ github.event.pull_request.number }} --auto --merge || true
+            else
+              # Modo Recovery para falhas de Workflow
+              git push origin HEAD:${{ steps.recover_logic.outputs.target_branch }}
+              PR_URL=$(gh pr create --title "🛡️ JARVIS: Recuperação de Sistema" \
+                --body "Correção automática aplicada após falha no workflow." \
+                --head ${{ steps.recover_logic.outputs.target_branch }} --base main)
+              gh pr merge $PR_URL --auto --merge || true
+            fi
           fi
 
       - name: 💤 Standby
         if: steps.gatekeeper.outputs.authorized == 'false'
-        run: echo "Sistemas estáveis. JARVIS em modo de espera."
+        run: echo "Sistemas estáveis. Badge mantido como Success."
