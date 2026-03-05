@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import logging
+from datetime import datetime as _dt
 from typing import Any, Dict, List, Optional
 
 from app.application.services.dependency_manager import DependencyManager
@@ -217,7 +218,6 @@ class AssistantService(NexusComponent):
         try:
             # Direct providers path (for test/injection use)
             if self._action is not None or self._web is not None or self._voice is not None:
-                from datetime import datetime as _dt
                 interpreter = self._get_interpreter()
                 if not interpreter:
                     return Response(success=False, message="Interpreter unavailable", error="INIT_FAILURE")
@@ -347,7 +347,6 @@ class AssistantService(NexusComponent):
 
             # 7. Persiste na memória compartilhada
             self._save_to_hive(text, response, channel=channel)
-            from datetime import datetime as _dt
             self._command_history.insert(0, {
                 "command": text,
                 "success": response.success,
@@ -360,7 +359,6 @@ class AssistantService(NexusComponent):
             logger.error(f"💥 Erro ao processar comando: {e}")
             response = Response(success=False, message=f"Erro interno: {str(e)}", error=str(e))
             self._save_to_hive(text, response, channel=channel)
-            from datetime import datetime as _dt
             self._command_history.insert(0, {
                 "command": text,
                 "success": False,
