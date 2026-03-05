@@ -12,6 +12,7 @@ on:
       - "💎 JARVIS: Crystallizer"
       - "🖥️ Build and Release Jarvis Installer"
       - "🚀 JARVIS Integrated Evolution"
+      - "🧬 Validação — Auto-Evolução e Multi-LLM"
     types: [completed]
   workflow_dispatch:
     inputs:
