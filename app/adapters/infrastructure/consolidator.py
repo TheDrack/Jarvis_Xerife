@@ -21,7 +21,6 @@ DOCS_ORDER = [
 _IGNORED_DIRS = {".git", "__pycache__", ".venv", "dist", "build", "node_modules", ".github"}
 _RELEVANT_EXT = (".py", ".yml", ".yaml", ".json", ".sql", ".dockerfile", "Dockerfile")
 
-
 class Consolidator(NexusComponent):
     def __init__(self):
         super().__init__()
