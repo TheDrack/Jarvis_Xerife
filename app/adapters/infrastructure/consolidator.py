@@ -147,6 +147,7 @@ class Consolidator(NexusComponent):
             print(f" [CONSOLIDATOR] Falha na Homeostase do arquivo: {e}")
             raise e
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize("test_input, expected", [
     ("test_consolidator", None),
 ])
