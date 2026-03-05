@@ -1,6 +1,7 @@
 """OllamaAdapter — LLMs locais via Ollama. API compatível com OpenAI."""
 import json
 import logging
+import urllib.request
 from typing import Any
 
 from app.core.nexus import NexusComponent
@@ -32,8 +33,6 @@ class OllamaAdapter(NexusComponent):
         if self._available is not None:
             return self._available
         try:
-            import urllib.request
-
             req = urllib.request.urlopen(f"{self.base_url}/api/tags", timeout=2)
             self._available = req.status == 200
         except Exception:
@@ -47,8 +46,6 @@ class OllamaAdapter(NexusComponent):
         json_mode: bool = True,
         system: str | None = None,
     ) -> str:
-        import urllib.request
-
         messages = []
         if system:
             messages.append({"role": "system", "content": system})
@@ -69,8 +66,6 @@ class OllamaAdapter(NexusComponent):
 
     def list_local_models(self) -> list[str]:
         try:
-            import urllib.request
-
             with urllib.request.urlopen(f"{self.base_url}/api/tags", timeout=5) as resp:
                 return [m["name"] for m in json.loads(resp.read())["models"]]
         except Exception:

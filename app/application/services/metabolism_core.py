@@ -5,6 +5,11 @@ import json
 import requests
 import logging
 import time
+
+try:
+    from json_repair import repair_json as _repair_json
+except ImportError:  # pragma: no cover
+    _repair_json = None  # type: ignore[assignment]
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -257,10 +262,10 @@ class MetabolismCore(NexusComponent):
 
         # Estágio 3: json-repair
         try:
-            from json_repair import repair_json
-            repaired = repair_json(cleaned, return_objects=True)
-            if isinstance(repaired, dict) and repaired:
-                return repaired
+            if _repair_json is not None:
+                repaired = _repair_json(cleaned, return_objects=True)
+                if isinstance(repaired, dict) and repaired:
+                    return repaired
         except Exception:
             pass
 

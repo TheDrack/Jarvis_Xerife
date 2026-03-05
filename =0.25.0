@@ -1,7 +1,0 @@
-Defaulting to user installation because normal site-packages is not writeable
-Collecting json-repair
-  Downloading json_repair-0.58.4-py3-none-any.whl.metadata (16 kB)
-Downloading json_repair-0.58.4-py3-none-any.whl (41 kB)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 41.6/41.6 kB 12.9 MB/s eta 0:00:00
-Installing collected packages: json-repair
-Successfully installed json-repair-0.58.4
