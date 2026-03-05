@@ -5,11 +5,11 @@ on:
   workflow_dispatch:
     inputs:
       cap_id:
-        description: "CAP a evoluir (ex: CAP-001). Deixe vazio para testar apenas diagnóstico."
+        description: "CAP a evoluir (ex: CAP-001). Deixe vazio para pular evolução."
         required: false
         default: ""
       run_batch:
-        description: "Executar evolução em lote das pendentes?"
+        description: "Executar evolução em lote?"
         required: false
         default: "false"
         type: choice
@@ -17,11 +17,11 @@ on:
           - "false"
           - "true"
       batch_limit:
-        description: "Limite de caps no lote (0 = sem limite)"
+        description: "Limite de caps no lote"
         required: false
         default: "5"
       run_tests:
-        description: "Executar suite de testes pytest?"
+        description: "Executar pytest?"
         required: false
         default: "true"
         type: choice
@@ -29,164 +29,143 @@ on:
           - "true"
           - "false"
 
+permissions:
+  contents: write
+
 jobs:
   diagnostico-llm:
     name: 🔍 Diagnóstico de LLMs
     runs-on: ubuntu-latest
+    outputs:
+      llms_ok: ${{ steps.check.outputs.llms_ok }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
-      - name: Instalar dependências
-        run: |
-          pip install -q requests
-          pip install -q -r requirements/core.txt || pip install -q requests pydantic
+      - name: Instalar requests
+        run: pip install -q requests
 
-      - name: 🔍 Verificar quais LLMs estão configurados
+      - name: 🔍 Checar LLMs e testar MetabolismCore
+        id: check
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
         run: |
-          python - <<'EOF'
-          import os
+          python - <<'PYEOF'
+          import os, sys
+          sys.path.insert(0, ".")
+
           provedores = {
-              "Groq (llama-3.3-70b)":         "GROQ_API_KEY",
-              "Google Gemini (2.0-flash-exp)": "GEMINI_API_KEY",
-              "OpenRouter (deepseek-r1:free)": "OPENROUTER_API_KEY",
-              "Mistral (mistral-small)":       "MISTRAL_API_KEY",
+              "Groq":        "GROQ_API_KEY",
+              "Gemini":      "GEMINI_API_KEY",
+              "OpenRouter":  "OPENROUTER_API_KEY",
+              "Mistral":     "MISTRAL_API_KEY",
           }
-          print("=" * 50)
-          print("DIAGNÓSTICO DE LLMs CONFIGURADOS")
-          print("=" * 50)
+          print("=" * 45)
           disponiveis = 0
           for nome, env in provedores.items():
               key = os.getenv(env, "")
               ok = bool(key and len(key) > 10)
-              print(f"{'✅ CONFIGURADO' if ok else '❌ ausente'}  {nome} ({env})")
+              print(f"{'✅' if ok else '❌'}  {nome} ({env})")
               if ok:
                   disponiveis += 1
-          print(f"\nTotal disponíveis: {disponiveis}/{len(provedores)}")
-          if disponiveis == 0:
-              print("\n⛔ NENHUM LLM configurado nos secrets.")
-              raise SystemExit(1)
-          EOF
+          print(f"\nDisponíveis: {disponiveis}/{len(provedores)}")
+          print("=" * 45)
 
-      - name: 🧪 Testar MetabolismCore
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-        run: |
-          python - <<'EOF'
-          import sys
-          sys.path.insert(0, ".")
-          from app.application.services.metabolism_core import MetabolismCore
-          core = MetabolismCore()
+          if disponiveis == 0:
+              print("⛔ Nenhum secret de LLM configurado.")
+              print("   Vá em Settings > Secrets > Actions e adicione ao menos GROQ_API_KEY.")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("llms_ok=false\n")
+              sys.exit(1)
+
           try:
-              result = core.ask_jarvis(
-                  system_prompt='Responda apenas com JSON válido, sem markdown.',
-                  user_prompt='Responda: {"status": "ok", "provider": "seu nome aqui"}',
+              from app.application.services.metabolism_core import MetabolismCore
+              result = MetabolismCore().ask_jarvis(
+                  'Responda apenas JSON sem markdown.',
+                  'Responda: {"status": "ok"}',
                   require_json=True,
               )
-              print(f"✅ MetabolismCore funcionando! Resposta: {result}")
-          except RuntimeError as e:
-              print(f"❌ Todos os LLMs falharam: {e}")
-              raise SystemExit(1)
-          EOF
+              print(f"✅ MetabolismCore OK → {result}")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("llms_ok=true\n")
+          except Exception as e:
+              print(f"❌ MetabolismCore falhou: {e}")
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("llms_ok=false\n")
+              sys.exit(1)
+          PYEOF
 
   validar-stubs:
-    name: 🔧 Validar e corrigir stubs
+    name: 🔧 Corrigir stubs + relatório
     runs-on: ubuntu-latest
     needs: diagnostico-llm
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
-      - name: Instalar dependências
-        run: pip install -q requests
-
-      - name: 🔧 Executar fix_cap_stubs.py
-        run: |
-          python scripts/fix_cap_stubs.py
-          echo "✅ Stubs corrigidos."
+      - name: 🔧 fix_cap_stubs.py
+        run: python scripts/fix_cap_stubs.py
 
       - name: 🔍 Verificar templates não expandidos
         run: |
-          python - <<'EOF'
+          python - <<'PYEOF'
           from pathlib import Path
           import sys
-          caps_dir = Path("app/domain/capabilities")
-          problemas = []
-          for f in sorted(caps_dir.glob("cap_*.py")):
-              conteudo = f.read_text(encoding="utf-8")
-              if "{cap['id']}" in conteudo or "{target_dir}" in conteudo:
-                  problemas.append(f.name)
+          problemas = [
+              f.name for f in sorted(Path("app/domain/capabilities").glob("cap_*.py"))
+              if "{cap['id']}" in f.read_text(encoding="utf-8")
+              or "{target_dir}" in f.read_text(encoding="utf-8")
+          ]
           if problemas:
-              print(f"❌ {len(problemas)} arquivo(s) ainda com template literal:")
-              for p in problemas:
-                  print(f"   - {p}")
+              print(f"❌ {len(problemas)} arquivo(s) com template literal:")
+              print("\n".join(f"  - {p}" for p in problemas))
               sys.exit(1)
-          else:
-              total = len(list(caps_dir.glob("cap_*.py")))
-              print(f"✅ Todos os {total} arquivos cap_NNN.py estão corretos.")
-          EOF
+          total = len(list(Path("app/domain/capabilities").glob("cap_*.py")))
+          print(f"✅ Todos os {total} arquivos estão corretos.")
+          PYEOF
 
-      - name: 📊 Relatório de progresso das capabilities
+      - name: 📊 Progresso do roadmap
         run: |
-          python - <<'EOF'
+          python - <<'PYEOF'
           import json
           from pathlib import Path
-          data = json.loads(Path("data/capabilities.json").read_text(encoding="utf-8"))
-          caps = data.get("capabilities", [])
+          caps = json.loads(Path("data/capabilities.json").read_text(encoding="utf-8")).get("capabilities", [])
           total    = len(caps)
           complete = sum(1 for c in caps if c.get("status") == "complete")
-          pending  = total - complete
-          print("=" * 50)
-          print(f"ROADMAP: {complete}/{total} caps completas ({complete/total*100:.1f}%)")
-          print(f"Pendentes: {pending}")
-          print("=" * 50)
+          print(f"ROADMAP: {complete}/{total} ({complete/total*100:.1f}%) completas")
           proximas = sorted([c for c in caps if c.get("status") != "complete"], key=lambda x: x.get("priority", 99))
-          print("\nPróximas 10 na fila:")
+          print("\nPróximas 10:")
           for c in proximas[:10]:
               print(f"  [{c.get('priority','?')}] {c['id']} — {c['title'][:55]}")
-          EOF
+          PYEOF
 
   evoluir-cap:
-    name: 🧬 Evoluir cap específica
+    name: 🧬 Evoluir ${{ github.event.inputs.cap_id }}
     runs-on: ubuntu-latest
     needs: validar-stubs
-    if: ${{ github.event.inputs.cap_id != '' && github.event.inputs.run_batch == 'false' }}
+    if: ${{ github.event.inputs.cap_id != '' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
       - name: Instalar dependências
         run: |
           pip install -q requests
           pip install -q -r requirements/core.txt || pip install -q requests pydantic
 
-      - name: 🧬 Executar evolution_mutator.py
+      - name: 🧬 Evoluir cap
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -195,43 +174,41 @@ jobs:
         run: |
           python scripts/evolution_mutator.py \
             --cap-id "${{ github.event.inputs.cap_id }}" \
-            --roadmap-context "Gerado via GitHub Actions — validação da auto-evolução" \
+            --roadmap-context "Gerado via GitHub Actions" \
             --max-attempts 3
 
       - name: 🔍 Validar código gerado
         run: |
-          python - <<'EOF'
+          python - <<'PYEOF'
           import ast, sys
           from pathlib import Path
-          num = "${{ github.event.inputs.cap_id }}".replace("CAP-", "").zfill(3)
+          num     = "${{ github.event.inputs.cap_id }}".replace("CAP-", "").zfill(3)
           arquivo = Path(f"app/domain/capabilities/cap_{num}.py")
           if not arquivo.exists():
-              print(f"❌ Arquivo {arquivo} não foi criado.")
-              sys.exit(1)
+              print(f"❌ {arquivo} não foi criado."); sys.exit(1)
           code = arquivo.read_text(encoding="utf-8")
-          print(f"📄 {arquivo} ({len(code.splitlines())} linhas)")
+          print(f"📄 {arquivo} — {len(code.splitlines())} linhas")
           try:
               tree = ast.parse(code)
           except SyntaxError as e:
-              print(f"❌ Erro de sintaxe: {e}"); sys.exit(1)
+              print(f"❌ Sintaxe inválida: {e}"); sys.exit(1)
           has_class   = any(isinstance(n, ast.ClassDef) for n in ast.walk(tree))
           has_execute = any(isinstance(n, ast.FunctionDef) and n.name == "execute" for n in ast.walk(tree))
-          is_stub     = any(p in code for p in ["print('🚀 Executando Cap", "return {'status': 'success', 'id': 'CAP-"])
-          if not has_class:   print("❌ Nenhuma classe encontrada.");          sys.exit(1)
-          if not has_execute: print("❌ Método execute() não encontrado.");    sys.exit(1)
-          if is_stub:         print("❌ Ainda é um stub (retorno trivial)."); sys.exit(1)
-          print("✅ Código válido — classe e execute() com lógica real.")
-          print("\n--- Primeiras 30 linhas ---")
-          for i, linha in enumerate(code.splitlines()[:30], 1):
-              print(f"{i:3}: {linha}")
-          EOF
+          is_stub     = "return {'status': 'success', 'id': 'CAP-" in code
+          if not has_class:   print("❌ Sem classe.");        sys.exit(1)
+          if not has_execute: print("❌ Sem execute().");     sys.exit(1)
+          if is_stub:         print("❌ Ainda é um stub.");   sys.exit(1)
+          print("✅ Código válido com lógica real.")
+          for i, l in enumerate(code.splitlines()[:25], 1):
+              print(f"{i:3}: {l}")
+          PYEOF
 
-      - name: 💾 Commit do arquivo evoluído
+      - name: 💾 Commit
         run: |
           git config user.name  "JARVIS Evolution Bot"
           git config user.email "jarvis-bot@noreply.github.com"
           git add app/domain/capabilities/ data/capabilities.json
-          git diff --cached --quiet || git commit -m "🧬 auto-evolução: ${{ github.event.inputs.cap_id }} implementada"
+          git diff --cached --quiet || git commit -m "🧬 evolução: ${{ github.event.inputs.cap_id }}"
           git push
 
   evoluir-lote:
@@ -240,21 +217,18 @@ jobs:
     needs: validar-stubs
     if: ${{ github.event.inputs.run_batch == 'true' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
       - name: Instalar dependências
         run: |
           pip install -q requests
           pip install -q -r requirements/core.txt || pip install -q requests pydantic
 
-      - name: 🚀 Executar evolução em lote
+      - name: 🚀 Lote
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -266,12 +240,12 @@ jobs:
             --delay 3 \
             --max-attempts 2
 
-      - name: 💾 Commit do lote evoluído
+      - name: 💾 Commit do lote
         run: |
           git config user.name  "JARVIS Evolution Bot"
           git config user.email "jarvis-bot@noreply.github.com"
           git add app/domain/capabilities/ data/capabilities.json
-          git diff --cached --quiet || git commit -m "🧬 auto-evolução em lote: $(date +'%Y-%m-%d %H:%M') — limite ${{ github.event.inputs.batch_limit }}"
+          git diff --cached --quiet || git commit -m "🧬 lote: $(date +'%Y-%m-%d %H:%M') — limite ${{ github.event.inputs.batch_limit }}"
           git push
 
   testes:
@@ -280,14 +254,11 @@ jobs:
     needs: validar-stubs
     if: ${{ github.event.inputs.run_tests == 'true' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
 
       - name: Instalar dependências de dev
         run: |
@@ -305,7 +276,7 @@ jobs:
       - name: 🧪 Testes de segurança
         run: pytest tests/security/ -v --tb=short -q || true
 
-      - name: 🧪 Testes de AssistantService e Overwatch
+      - name: 🧪 AssistantService + Overwatch
         run: |
           pytest tests/application/test_assistant_service.py -v --tb=short -q || true
           pytest tests/test_overwatch_daemon.py              -v --tb=short -q || true
@@ -316,38 +287,32 @@ jobs:
     needs: [diagnostico-llm, validar-stubs, testes]
     if: always()
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: 📊 Resumo pós-execução
+      - name: 📊 Resumo final
         run: |
-          python - <<'EOF'
+          python - <<'PYEOF'
           import json
           from pathlib import Path
-          data = json.loads(Path("data/capabilities.json").read_text(encoding="utf-8"))
-          caps  = data.get("capabilities", [])
+          caps  = json.loads(Path("data/capabilities.json").read_text(encoding="utf-8")).get("capabilities", [])
           total    = len(caps)
           complete = sum(1 for c in caps if c.get("status") == "complete")
-          caps_dir = Path("app/domain/capabilities")
-          stub_markers = ["print('🚀 Executando Cap", "return {'status': 'success', 'id': 'CAP-"]
-          implementados = stubs = 0
-          for f in caps_dir.glob("cap_*.py"):
+          stub_markers = ["return {'status': 'success', 'id': 'CAP-"]
+          impl = stubs = 0
+          for f in Path("app/domain/capabilities").glob("cap_*.py"):
               code = f.read_text(encoding="utf-8")
-              if any(m in code for m in stub_markers):
-                  stubs += 1
-              elif "def execute" in code and len(code.splitlines()) > 20:
-                  implementados += 1
-          print("=" * 55)
-          print("📊 RELATÓRIO FINAL — JARVIS AUTO-EVOLUÇÃO")
-          print("=" * 55)
-          print(f"  capabilities.json : {complete}/{total} completas ({complete/total*100:.1f}%)")
-          print(f"  Arquivos com lógica real : {implementados}")
-          print(f"  Arquivos ainda como stub : {stubs}")
-          print(f"  Caps pendentes no JSON   : {total - complete}")
-          print("=" * 55)
-          EOF
+              if any(m in code for m in stub_markers): stubs += 1
+              elif "def execute" in code and len(code.splitlines()) > 20: impl += 1
+          print("=" * 50)
+          print("📊 RELATÓRIO FINAL")
+          print("=" * 50)
+          print(f"  JSON: {complete}/{total} caps completas ({complete/total*100:.1f}%)")
+          print(f"  Arquivos com lógica real : {impl}")
+          print(f"  Arquivos ainda stub      : {stubs}")
+          print(f"  Caps pendentes           : {total - complete}")
+          print("=" * 50)
+          PYEOF
