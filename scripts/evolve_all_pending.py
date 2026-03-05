@@ -33,11 +33,23 @@ _DEFAULT_PRIORITY = 99
 # ---------------------------------------------------------------------------
 
 def _load_capabilities(cap_path: str = "data/capabilities.jrvs") -> List[Dict]:
+    """Carrega capabilities de *cap_path* com fallback automático para .json."""
     path = Path(cap_path)
-    if not path.exists():
-        print(f"❌ {cap_path} não encontrado.")
-        sys.exit(1)
-    return document_store.read(path).get("capabilities", [])
+    if path.exists():
+        try:
+            return document_store.read(path).get("capabilities", [])
+        except Exception as exc:
+            print(f"⚠️  Falha ao ler {path}: {exc}")
+    # Fallback: tenta o equivalente .json
+    json_path = path.with_suffix(".json")
+    if json_path.exists():
+        print(f"⚠️  Usando fallback: {json_path}")
+        try:
+            return document_store.read(json_path).get("capabilities", [])
+        except Exception as exc:
+            print(f"❌ Fallback também falhou: {exc}")
+    print(f"❌ Nenhum arquivo de capabilities encontrado ({cap_path} / {json_path}).")
+    sys.exit(1)
 
 
 def _topological_sort(caps: List[Dict], completed_ids: Set[str]) -> List[Dict]:

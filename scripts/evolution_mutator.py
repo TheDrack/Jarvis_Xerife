@@ -28,16 +28,43 @@ from app.utils.document_store import document_store
 # Utilitários de dados
 # ---------------------------------------------------------------------------
 
+def _normalize_cap_id(cap_id: str) -> str:
+    """Normaliza o cap_id para o formato canônico 'CAP-NNN'.
+
+    Aceita entradas como '1', '001', '42', 'CAP-1', 'CAP-001', 'cap-042'.
+    """
+    import re as _re
+    s = cap_id.strip()
+    # Tenta extrair o número de padrões como "CAP-042", "CAP_042", "042" ou "42"
+    m = _re.fullmatch(r"(?:CAP[-_])?(\d+)", s, _re.IGNORECASE)
+    if m:
+        return f"CAP-{int(m.group(1)):03d}"
+    return s.upper()  # devolve como veio (em maiúsculas) se não reconhecer o padrão
+
+
 def _load_capabilities(cap_path: str = "data/capabilities.jrvs") -> List[Dict]:
+    """Carrega capabilities de *cap_path* com fallback automático para .json."""
     path = Path(cap_path)
-    if not path.exists():
-        return []
-    return document_store.read(path).get("capabilities", [])
+    if path.exists():
+        try:
+            return document_store.read(path).get("capabilities", [])
+        except Exception as exc:
+            print(f"⚠️  Falha ao ler {path}: {exc}")
+    # Fallback: tenta o equivalente .json
+    json_path = path.with_suffix(".json")
+    if json_path.exists():
+        print(f"⚠️  Usando fallback: {json_path}")
+        try:
+            return document_store.read(json_path).get("capabilities", [])
+        except Exception as exc:
+            print(f"❌ Fallback também falhou: {exc}")
+    return []
 
 
 def _get_cap(cap_id: str, caps: List[Dict]) -> Optional[Dict]:
+    normalized = _normalize_cap_id(cap_id)
     for c in caps:
-        if c["id"] == cap_id:
+        if c["id"] == normalized:
             return c
     return None
 
@@ -75,26 +102,34 @@ def _cap_id_to_file(cap_id: str) -> Path:
 def update_capability_status(
     cap_id: str, status: str = "complete", cap_path: str = "data/capabilities.jrvs"
 ) -> bool:
-    """Sincroniza o status no arquivo base de capacidades."""
+    """Sincroniza o status em *cap_path* (.jrvs) e no equivalente .json."""
+    normalized = _normalize_cap_id(cap_id)
     path = Path(cap_path)
-    if not path.exists():
-        print(f"⚠️  Alerta: {cap_path} não encontrado para atualização de status.")
+    json_path = path.with_suffix(".json")
+    updated = False
+
+    def _update_file(file_path: Path) -> bool:
+        if not file_path.exists():
+            return False
+        try:
+            data = document_store.read(file_path)
+            for cap in data.get("capabilities", []):
+                if cap["id"] == normalized:
+                    cap["status"] = status
+                    document_store.write(file_path, data)
+                    print(f"💾 Sincronizado ({file_path.suffix}): {normalized} → {status}")
+                    return True
+        except Exception as exc:
+            print(f"⚠️  Erro ao atualizar {file_path}: {exc}")
         return False
-    try:
-        data = document_store.read(path)
-        updated = False
-        for cap in data.get("capabilities", []):
-            if cap["id"] == cap_id:
-                cap["status"] = status
-                updated = True
-                break
-        if updated:
-            document_store.write(path, data)
-            print(f"💾 DNA Sincronizado: {cap_id} → {status}")
-        return updated
-    except Exception as exc:
-        print(f"❌ Erro ao atualizar status: {exc}")
-        return False
+
+    updated_jrvs = _update_file(path)
+    updated_json = _update_file(json_path)
+    updated = updated_jrvs or updated_json
+
+    if not updated:
+        print(f"⚠️  Alerta: {normalized} não encontrado para atualização de status.")
+    return updated
 
 
 # ---------------------------------------------------------------------------
@@ -232,9 +267,10 @@ def _evolve_cap(
     Executa o pipeline completo para uma cap.
     Retorna True em sucesso, False em falha definitiva.
     """
+    cap_id = _normalize_cap_id(cap_id)
     cap = _get_cap(cap_id, caps)
     if not cap:
-        print(f"❌ {cap_id} não encontrado em capabilities.jrvs")
+        print(f"❌ {cap_id} não encontrado em capabilities.jrvs / capabilities.json")
         return False
 
     examples = _last_completed_examples(caps)
@@ -299,6 +335,15 @@ def _evolve_cap(
     return False
 
 
+def _next_pending_cap(caps: List[Dict]) -> Optional[str]:
+    """Retorna o ID da próxima cap pendente com maior prioridade."""
+    pending = sorted(
+        [c for c in caps if c.get("status") != "complete"],
+        key=lambda x: x.get("priority", 99),
+    )
+    return pending[0]["id"] if pending else None
+
+
 # ---------------------------------------------------------------------------
 # Função pública chamável por outros scripts
 # ---------------------------------------------------------------------------
@@ -320,8 +365,14 @@ def evolve(
         if m:
             cap_id = m.group(1)
     if not cap_id:
-        print("❌ cap_id não informado.")
+        # Auto-seleciona a próxima cap pendente
+        cap_id = _next_pending_cap(caps)
+        if cap_id:
+            print(f"🎯 Auto-selecionado: {cap_id}")
+    if not cap_id:
+        print("❌ cap_id não informado e não há caps pendentes.")
         return False
+    cap_id = _normalize_cap_id(cap_id)
     return _evolve_cap(cap_id, roadmap_context, max_attempts, caps)
 
 
@@ -331,7 +382,7 @@ def evolve(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Motor de mutação de capacidades JARVIS")
-    parser.add_argument("--cap-id", help="Ex: CAP-042")
+    parser.add_argument("--cap-id", help="Ex: CAP-042 (ou apenas 42)")
     parser.add_argument("--roadmap-context", default="", help="Contexto livre do roadmap")
     parser.add_argument("--max-attempts", type=int, default=3)
     # Compatibilidade com Actions legado
@@ -351,9 +402,7 @@ def main() -> None:
         m = re.search(r"(CAP-\d+)", args.roadmap_context)
         if m:
             cap_id = m.group(1)
-    if not cap_id:
-        print("❌ Erro: CAP-ID não encontrado. Use --cap-id ou defina ISSUE_BODY.")
-        sys.exit(1)
+    # cap_id pode continuar None/vazio — evolve() fará auto-seleção
 
     success = evolve(cap_id=cap_id, roadmap_context=args.roadmap_context, max_attempts=args.max_attempts)
     sys.exit(0 if success else 1)

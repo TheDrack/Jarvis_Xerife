@@ -150,10 +150,10 @@ jobs:
           PYEOF
 
   evoluir-cap:
-    name: 🧬 Evoluir ${{ github.event.inputs.cap_id }}
+    name: 🧬 Evoluir cap
     runs-on: ubuntu-latest
-    needs: validar-stubs
-    if: ${{ github.event.inputs.cap_id != '' }}
+    needs: [validar-stubs, diagnostico-llm]
+    if: ${{ github.event.inputs.run_batch != 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -166,7 +166,33 @@ jobs:
           pip install -q requests
           pip install -q -r requirements/core.txt || pip install -q requests pydantic
 
+      - name: 🎯 Selecionar CAP
+        id: select_cap
+        run: |
+          CAP_ID="${{ github.event.inputs.cap_id }}"
+          if [ -z "$CAP_ID" ]; then
+            CAP_ID=$(python - <<'PYEOF'
+import json, sys
+from pathlib import Path
+path = Path("data/capabilities.json")
+if not path.exists():
+    sys.exit(0)
+caps = json.loads(path.read_text(encoding="utf-8")).get("capabilities", [])
+pending = sorted([c for c in caps if c.get("status") not in ("complete",)], key=lambda x: x.get("priority", 99))
+print(pending[0]["id"] if pending else "", end="")
+PYEOF
+            )
+            if [ -z "$CAP_ID" ]; then
+              echo "✅ Sem caps pendentes para evoluir."
+              echo "cap_id=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "🎯 Auto-selecionado: $CAP_ID"
+          fi
+          echo "cap_id=$CAP_ID" >> "$GITHUB_OUTPUT"
+
       - name: 🧬 Evoluir cap
+        if: steps.select_cap.outputs.cap_id != ''
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -174,16 +200,18 @@ jobs:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
         run: |
           python scripts/evolution_mutator.py \
-            --cap-id "${{ github.event.inputs.cap_id }}" \
+            --cap-id "${{ steps.select_cap.outputs.cap_id }}" \
             --roadmap-context "Gerado via GitHub Actions" \
             --max-attempts 3
 
       - name: 🔍 Validar código gerado
+        if: steps.select_cap.outputs.cap_id != ''
         run: |
           python - <<'PYEOF'
           import ast, sys
           from pathlib import Path
-          num     = "${{ github.event.inputs.cap_id }}".replace("CAP-", "").zfill(3)
+          cap_id  = "${{ steps.select_cap.outputs.cap_id }}"
+          num     = cap_id.replace("CAP-", "").zfill(3)
           arquivo = Path(f"app/domain/capabilities/cap_{num}.py")
           if not arquivo.exists():
               print(f"❌ {arquivo} não foi criado."); sys.exit(1)
@@ -205,17 +233,18 @@ jobs:
           PYEOF
 
       - name: 💾 Commit
+        if: steps.select_cap.outputs.cap_id != ''
         run: |
           git config user.name  "JARVIS Evolution Bot"
           git config user.email "jarvis-bot@noreply.github.com"
-          git add app/domain/capabilities/ data/capabilities.json
-          git diff --cached --quiet || git commit -m "🧬 evolução: ${{ github.event.inputs.cap_id }}"
+          git add app/domain/capabilities/ data/capabilities.json data/capabilities.jrvs
+          git diff --cached --quiet || git commit -m "🧬 evolução: ${{ steps.select_cap.outputs.cap_id }}"
           git push
 
   evoluir-lote:
     name: 🚀 Lote (limite ${{ github.event.inputs.batch_limit }})
     runs-on: ubuntu-latest
-    needs: validar-stubs
+    needs: [validar-stubs, diagnostico-llm]
     if: ${{ github.event.inputs.run_batch == 'true' }}
     steps:
       - uses: actions/checkout@v4
@@ -245,7 +274,7 @@ jobs:
         run: |
           git config user.name  "JARVIS Evolution Bot"
           git config user.email "jarvis-bot@noreply.github.com"
-          git add app/domain/capabilities/ data/capabilities.json
+          git add app/domain/capabilities/ data/capabilities.json data/capabilities.jrvs
           git diff --cached --quiet || git commit -m "🧬 lote: $(date +'%Y-%m-%d %H:%M') — limite ${{ github.event.inputs.batch_limit }}"
           git push
 

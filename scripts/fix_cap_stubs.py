@@ -81,12 +81,26 @@ class {class_name}(NexusComponent):
 # ---------------------------------------------------------------------------
 
 def _load_caps_index(caps_json: Path) -> Dict[str, Dict]:
-    """Retorna um dict {cap_id: cap_data} a partir de capabilities.jrvs."""
-    if not caps_json.exists():
-        print(f"⚠️  {caps_json} não encontrado — usando metadados mínimos.")
-        return {}
-    data = document_store.read(caps_json)
-    return {c["id"]: c for c in data.get("capabilities", [])}
+    """Retorna um dict {cap_id: cap_data} com fallback automático para .json."""
+    path = caps_json
+    # Try the specified path (.jrvs)
+    if path.exists():
+        try:
+            data = document_store.read(path)
+            return {c["id"]: c for c in data.get("capabilities", [])}
+        except Exception as exc:
+            print(f"⚠️  {path} falhou ao ler: {exc}")
+    # Fallback: tenta o equivalente .json
+    json_path = path.with_suffix(".json")
+    if json_path.exists():
+        print(f"⚠️  Usando fallback: {json_path}")
+        try:
+            data = document_store.read(json_path)
+            return {c["id"]: c for c in data.get("capabilities", [])}
+        except Exception as exc:
+            print(f"⚠️  Fallback {json_path} falhou: {exc}")
+    print(f"⚠️  Nenhum índice de capabilities encontrado — usando metadados mínimos.")
+    return {}
 
 
 def _file_to_cap_id(file_path: Path) -> str:
