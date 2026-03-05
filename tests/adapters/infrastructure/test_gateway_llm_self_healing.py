@@ -160,7 +160,7 @@ class TestGatewayLLMAdapterSelfHealing(NexusComponent):
             plan = gateway_adapter._parse_fix_plan_from_response(response, error)
             
             assert plan is not None
-            assert "gemini-2.0-flash-exp" in plan["fix_code"]
+            assert "gemini-2.0-flash" in plan["fix_code"]
 
     @pytest.mark.anyio
     async def test_parse_fix_plan_unsupported_error(self, gateway_adapter):

@@ -5,9 +5,14 @@ import json
 import requests
 import re
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# Cooldown em segundos para provedores que retornaram HTTP 429
+_RATE_LIMIT_COOLDOWN: Dict[str, float] = {}
+_RATE_LIMIT_SECONDS = 30
 
 
 class MetabolismCore(NexusComponent):
@@ -24,13 +29,13 @@ class MetabolismCore(NexusComponent):
             "json_mode": True,
         },
         {
-            "name": "google/gemini-2.0-flash-exp",
+            "name": "google/gemini-2.0-flash",
             "env": "GEMINI_API_KEY",
             "url": (
                 "https://generativelanguage.googleapis.com/v1beta/models/"
-                "gemini-2.0-flash-exp:generateContent"
+                "gemini-2.0-flash:generateContent"
             ),
-            "model": "gemini-2.0-flash-exp",
+            "model": "gemini-2.0-flash",
             "type": "gemini",
             "json_mode": False,
         },
@@ -99,6 +104,15 @@ class MetabolismCore(NexusComponent):
                 logger.debug("[MetabolismCore] Provedor %s sem key, pulando.", provider["name"])
                 continue
 
+            # Pula provedores em cooldown por rate-limit
+            cooldown_until = _RATE_LIMIT_COOLDOWN.get(provider["name"], 0.0)
+            if time.time() < cooldown_until:
+                logger.debug(
+                    "[MetabolismCore] Provedor %s em cooldown por rate-limit, pulando.",
+                    provider["name"],
+                )
+                continue
+
             try:
                 result = self._call_provider(
                     provider=provider,
@@ -111,6 +125,7 @@ class MetabolismCore(NexusComponent):
                 return result
             except RateLimitError as exc:
                 logger.warning("[MetabolismCore] Rate-limit em %s: %s", provider["name"], exc)
+                _RATE_LIMIT_COOLDOWN[provider["name"]] = time.time() + _RATE_LIMIT_SECONDS
                 last_error = exc
                 continue
             except Exception as exc:
@@ -222,6 +237,10 @@ class MetabolismCore(NexusComponent):
 
     def _safe_json_decode(self, content: str) -> Any:
         """Extrai e limpa o JSON de strings sujas ou blocos markdown."""
+        # Conteúdo vazio ou só espaços — falha rápida
+        if not content or not content.strip():
+            raise Exception("DNA corrompido para decodificação: conteúdo vazio recebido do LLM")
+
         # Tenta diretamente
         try:
             return json.loads(content)
@@ -235,8 +254,8 @@ class MetabolismCore(NexusComponent):
         except json.JSONDecodeError:
             pass
 
-        # Tenta extrair o primeiro {...}
-        match = re.search(r"(\{.*\})", content, re.DOTALL)
+        # Tenta extrair o primeiro {...} (suporta JSON truncado com greedy match)
+        match = re.search(r"(\{.*\})", clean, re.DOTALL)
         if match:
             try:
                 return json.loads(match.group(1))
