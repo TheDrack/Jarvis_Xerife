@@ -20,7 +20,7 @@ from typing import Dict, List, Optional
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from app.core.nexus import nexus
+from app.core.nexus import nexus, CloudMock
 from app.utils.document_store import document_store
 
 
@@ -276,9 +276,9 @@ def _evolve_cap(
     examples = _last_completed_examples(caps)
     target_file = _cap_id_to_file(cap_id)
     core = nexus.resolve("metabolism_core")
-    if core is None:
+    if core is None or isinstance(core, CloudMock):
         print(
-            f"❌ [{cap_id}] Nexus não conseguiu resolver 'metabolism_core'. "
+            f"❌ [{cap_id}] metabolism_core indisponível (CloudMock injetado ou None). "
             "Verifique as dependências e o ambiente."
         )
         return False

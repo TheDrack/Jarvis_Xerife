@@ -50,10 +50,12 @@ class TestJarvisNexusCircuitBreaker:
         nexus = JarvisNexus()
 
         def _slow_resolve(target_id, hint_path=None):
-            time.sleep(10)  # much longer than 2 s timeout
+            time.sleep(5)  # longer than the patched 1s timeout
             return None
 
-        with patch.object(nexus, "_resolve_internal", side_effect=_slow_resolve):
+        # Patch the circuit-breaker timeout to 1 s so the test stays fast
+        with patch("app.core.nexus.CIRCUIT_BREAKER_TIMEOUT", 1.0), \
+             patch.object(nexus, "_resolve_internal", side_effect=_slow_resolve):
             result = nexus.resolve("slow_component")
 
         assert isinstance(result, CloudMock)

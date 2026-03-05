@@ -237,7 +237,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Instalar dependências de dev
-        run: pip install -q pytest pytest-asyncio
+        run: pip install -q pytest pytest-asyncio pytest-cov
       - name: 🧪 Rodar Testes
         run: pytest tests/domain/ -v --tb=short
 
