@@ -1,6 +1,7 @@
-from app.core.nexus import NexusComponent, nexus
 # -*- coding: utf-8 -*-
 """ThoughtLogService - Manages internal reasoning logs and self-healing cycles"""
+
+from app.core.nexus import NexusComponent, nexus
 
 import json
 import logging
@@ -363,5 +364,6 @@ class ThoughtLogService(NexusComponent):
                 "days_back": 30,
             })
             return result.get("results", [])
-        except Exception:
+        except Exception as exc:
+            logger.debug("Falha ao buscar reparos similares na memória vetorial: %s", exc)
             return []

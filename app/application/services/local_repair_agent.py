@@ -18,6 +18,8 @@ from app.core.nexus import NexusComponent, nexus
 logger = logging.getLogger(__name__)
 
 SAFE_AUTO_INSTALL = {"instructor", "json_repair", "json-repair", "httpx", "pydantic", "faiss"}
+_MAX_FILE_CONTENT_LENGTH = 4000
+_MAX_TRACEBACK_LENGTH = 1200
 
 
 class LocalRepairAgent(NexusComponent):
@@ -105,7 +107,9 @@ class LocalRepairAgent(NexusComponent):
         if file_path and Path(file_path).exists():
             try:
                 text = Path(file_path).read_text(encoding="utf-8")
-                file_content = text[:4000] + ("\n...[truncado]" if len(text) > 4000 else "")
+                file_content = text[:_MAX_FILE_CONTENT_LENGTH] + (
+                    "\n...[truncado]" if len(text) > _MAX_FILE_CONTENT_LENGTH else ""
+                )
             except Exception:
                 pass
 
@@ -113,7 +117,7 @@ class LocalRepairAgent(NexusComponent):
 
 ERRO: {error_type}: {error_message}
 TRACEBACK:
-{traceback_text[:1200]}
+{traceback_text[:_MAX_TRACEBACK_LENGTH]}
 ARQUIVO: {file_path or 'desconhecido'}
 CONTEÚDO:
 {file_content}
