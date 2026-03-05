@@ -1,5 +1,4 @@
-from app.core.nexus import nexus
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import nexus, NexusComponent
 from app.utils.document_store import document_store
 from pathlib import Path
 from typing import List, Dict, Optional

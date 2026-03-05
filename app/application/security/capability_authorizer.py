@@ -13,7 +13,7 @@ import logging
 import re
 from typing import Any, Dict, Optional, Set
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 

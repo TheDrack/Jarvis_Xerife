@@ -2,7 +2,7 @@
 import os
 import logging
 from typing import Any, Optional
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 

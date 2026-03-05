@@ -13,7 +13,7 @@ import logging
 import os
 from typing import Any, Dict, Optional
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.ports.secrets_provider import SecretsProvider
 
 logger = logging.getLogger(__name__)

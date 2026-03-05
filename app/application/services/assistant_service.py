@@ -6,8 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from app.application.services.dependency_manager import DependencyManager
 from app.core.config import settings
-from app.core.nexus import nexus
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import nexus, NexusComponent
 from app.domain.models import Response
 
 logger = logging.getLogger(__name__)

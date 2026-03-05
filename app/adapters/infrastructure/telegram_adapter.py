@@ -10,7 +10,7 @@ import urllib.request
 from typing import Any, Callable, Dict, Optional
 
 from app.adapters.infrastructure.http_client import HttpClient
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 

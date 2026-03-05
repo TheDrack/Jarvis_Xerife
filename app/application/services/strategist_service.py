@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 # -*- coding: utf-8 -*-
 """
 Xerife Strategist Service - Autonomous improvement proposal system with ROI analysis

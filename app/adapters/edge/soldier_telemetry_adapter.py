@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from app.application.ports.memory_provider import MemoryProvider
 from app.application.services.device_orchestrator_service import DeviceOrchestratorService
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.domain.models.soldier import (
     LocationPayload,
     NearbyDevice,

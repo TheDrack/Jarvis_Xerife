@@ -27,7 +27,7 @@ import httpx
 from app.application.ports.osint_provider import OsintProvider
 from app.application.privacy.pii_redactor import PiiRedactor
 from app.application.security.capability_authorizer import CapabilityAuthorizer
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.ports.secrets_provider import SecretsProvider
 from app.utils import jrvs_codec
 

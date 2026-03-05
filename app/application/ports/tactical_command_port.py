@@ -4,7 +4,7 @@
 from abc import abstractmethod
 from typing import Any, Dict, Optional
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 
 class TacticalCommandPort(NexusComponent):

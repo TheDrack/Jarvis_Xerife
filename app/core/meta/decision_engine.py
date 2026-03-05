@@ -28,7 +28,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from app.core.meta.jrvs_compiler import JRVSCompiler, SchemaVersionError
 from app.core.meta.policy_store import PolicyStore
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 

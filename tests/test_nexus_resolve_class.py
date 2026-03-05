@@ -6,9 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from app.core.nexus import JarvisNexus
+from app.core.nexus import JarvisNexus, NexusComponent
 from app.core.nexuscomponent import (
-    NexusComponent,
     _class_to_component_id,
     _nexus_context,
 )

@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from typing import Optional, Dict, Any
-from app.core.nexus import nexus
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import nexus, NexusComponent
 
 logger = logging.getLogger(__name__)
 

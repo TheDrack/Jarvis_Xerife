@@ -4,7 +4,7 @@ Command Interpreter - Pure business logic for interpreting user commands.
 Integrado ao ecossistema Nexus para resolução dinâmica.
 """
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.domain.models import CommandType, Intent
 from app.core.config import settings
 import logging

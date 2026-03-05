@@ -2,13 +2,11 @@
 import functools
 import logging
 import re
-import threading
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
-# Thread-local context shared with JarvisNexus so subclasses can detect
-# whether they are being instantiated via nexus.resolve or directly.
-_nexus_context = threading.local()
+# Shared thread-local so NexusComponent and JarvisNexus observe the same flag.
+from app.core.nexus_exceptions import nexus_context as _nexus_context  # noqa: F401
 
 _nexus_component_logger = logging.getLogger(__name__)
 

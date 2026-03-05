@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
 from typing import Any
-from app.core.nexus import nexus, CloudMock
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import CloudMock, nexus, NexusComponent
 from app.domain.models import CommandType
 
 logger = logging.getLogger(__name__)

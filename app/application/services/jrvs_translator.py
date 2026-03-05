@@ -25,7 +25,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.utils.document_store import DocumentStore
 
 logger = logging.getLogger(__name__)

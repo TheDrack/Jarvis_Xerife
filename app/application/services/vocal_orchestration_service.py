@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.application.containers.hub import hub
 import torchaudio
 import logging

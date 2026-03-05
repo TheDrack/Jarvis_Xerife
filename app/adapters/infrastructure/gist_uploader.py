@@ -3,7 +3,7 @@ import requests
 import os
 import json
 import logging
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 

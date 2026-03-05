@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 # -*- coding: utf-8 -*-
 """Additional tests for the RLS security health check endpoint"""
 

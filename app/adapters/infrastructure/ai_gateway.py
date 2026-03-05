@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 # -*- coding: utf-8 -*-
 """AI Gateway - Intelligent routing between multiple LLM providers
 

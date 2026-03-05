@@ -24,7 +24,7 @@ from typing import Any, Dict, Optional
 
 from app.core.meta.jrvs_compiler import JRVSCompiler
 from app.core.meta.policy_store import PolicyStore
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.utils.jrvs_codec import JrvsDecodeError, read_file as _jrvs_read, write_file as _jrvs_write
 
 logger = logging.getLogger(__name__)
