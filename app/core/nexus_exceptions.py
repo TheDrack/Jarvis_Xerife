@@ -24,6 +24,10 @@ NEXUS_STRICT_MODE = os.getenv("NEXUS_STRICT_MODE", "false").lower() == "true"
 WAITER_TIMEOUT_MARGIN = 1.0
 
 # Thread-local re-exported so nexus.py and nexuscomponent.py share the same object
+# Thread-local context shared between JarvisNexus (discovery/instantiation) and
+# NexusComponent (guarded __init__).  JarvisNexus sets ``nexus_context.resolving = True``
+# before calling ``cls()`` so that NexusComponent.__init_subclass__ can detect the
+# difference between a Nexus-managed instantiation and a direct ``MyComp()`` call.
 nexus_context = _thread_local()
 
 

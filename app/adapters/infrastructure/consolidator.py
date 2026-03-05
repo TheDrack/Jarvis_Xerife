@@ -58,17 +58,13 @@ class Consolidator(NexusComponent):
         """Extract test names from *content* and return a compact summary string."""
         try:
             tree = ast.parse(content)
-            funcs = [
-                n.name
-                for n in ast.walk(tree)
-                if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-                and n.name.startswith("test_")
-            ]
-            classes = [
-                n.name
-                for n in ast.walk(tree)
-                if isinstance(n, ast.ClassDef) and n.name.startswith("Test")
-            ]
+            funcs = []
+            classes = []
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
+                    funcs.append(node.name)
+                elif isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+                    classes.append(node.name)
         except SyntaxError:
             funcs = re.findall(r"def (test_\w+)", content)
             classes = re.findall(r"class (Test\w+)", content)
@@ -87,7 +83,7 @@ class Consolidator(NexusComponent):
             abs_path = os.path.join(base_dir, rel_path)
             if not os.path.isfile(abs_path):
                 continue
-            out.write(f"\n{'─' * 80}\nDOC: {rel_path.replace(chr(92), '/')}\n{'─' * 80}\n")
+            out.write(f"\n{'─' * 80}\nDOC: {rel_path.replace('\\', '/')}\n{'─' * 80}\n")
             try:
                 with open(abs_path, "r", encoding="utf-8", errors="ignore") as f:
                     out.write(f.read() or "[DOCUMENTO VAZIO]")
