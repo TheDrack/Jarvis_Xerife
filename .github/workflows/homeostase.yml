@@ -57,7 +57,7 @@ jobs:
           uv venv --clear --python 3.11
           # Instala as dependências cloud completas (sqlmodel, slowapi, etc.) para que o pytest
           # consiga importar todos os módulos do projeto sem erros de coleção.
-          uv pip install -r requirements/core.txt pytest pytest-json-report pytest-cov anyio autopep8
+          uv pip install -r requirements/core.txt pytest pytest-json-report pytest-cov anyio autopep8 requests
 
       - name: 🔍 Modo de Recuperação (Workflow Failure)
         if: steps.gatekeeper.outputs.authorized == 'true' && github.event_name == 'workflow_run'
