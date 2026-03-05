@@ -60,7 +60,7 @@ jobs:
       - name: 🔧 Instalação do DNA
         if: steps.gatekeeper.outputs.authorized == 'true'
         run: |
-          # Adicionado --clear para evitar erro de ambiente existente
+          # O comando --clear força a recriação do venv mesmo que o setup-uv já tenha criado um
           uv venv --clear --python 3.11
           uv pip install -r requirements/core.txt pytest pytest-json-report pytest-cov anyio autopep8 requests
 
@@ -82,9 +82,9 @@ jobs:
           PYTHONPATH: "."
         run: |
           PYTEST_IGNORES="--ignore=tests/test_engine.py --ignore=tests/test_system_commands.py"
-          # Ativa o venv e roda os testes
-          source .venv/bin/activate
-          pytest $PYTEST_IGNORES --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
+          
+          # Usamos 'uv run' para garantir que o venv correto seja utilizado
+          uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report.json > pytest_log.txt 2>&1 || true
           
           PRODUCTION_LOG_ARG=""
           if [[ -n "${{ github.event.inputs.error_log }}" ]]; then
@@ -92,8 +92,8 @@ jobs:
             PRODUCTION_LOG_ARG="--production-log production_error.log"
           fi
           
-          python scripts/jarvis_healer.py --report report.json --log pytest_log.txt $PRODUCTION_LOG_ARG
-          pytest $PYTEST_IGNORES --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
+          uv run python scripts/jarvis_healer.py --report report.json --log pytest_log.txt $PRODUCTION_LOG_ARG
+          uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report_final.json > final_log.txt 2>&1 || true
           
           if ! grep -qE "ERRORS?|errors?|failed|IndentationError" final_log.txt; then
              echo "status=success" >> $GITHUB_OUTPUT
