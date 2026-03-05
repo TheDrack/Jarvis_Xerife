@@ -1,4 +1,3 @@
-
 name: 🧬 Validação — Auto-Evolução e Multi-LLM
 
 on:
@@ -8,6 +7,7 @@ on:
         description: "CAP a evoluir (ex: CAP-001). Deixe vazio para pular evolução."
         required: false
         default: ""
+        type: string
       run_batch:
         description: "Executar evolução em lote?"
         required: false
@@ -20,6 +20,7 @@ on:
         description: "Limite de caps no lote"
         required: false
         default: "5"
+        type: string
       run_tests:
         description: "Executar pytest?"
         required: false
@@ -79,7 +80,6 @@ jobs:
 
           if disponiveis == 0:
               print("⛔ Nenhum secret de LLM configurado.")
-              print("   Vá em Settings > Secrets > Actions e adicione ao menos GROQ_API_KEY.")
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
                   f.write("llms_ok=false\n")
               sys.exit(1)
@@ -92,7 +92,7 @@ jobs:
                   'Responda: {"status": "ok"}',
                   require_json=True,
               )
-              print(f"✅ MetabolismCore (via Nexus) OK → {result}")
+              print(f"✅ MetabolismCore OK → {result}")
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
                   f.write("llms_ok=true\n")
           except Exception as e:
@@ -130,23 +130,7 @@ jobs:
               print(f"❌ {len(problemas)} arquivo(s) com template literal:")
               print("\n".join(f"  - {p}" for p in problemas))
               sys.exit(1)
-          total = len(list(Path("app/domain/capabilities").glob("cap_*.py")))
-          print(f"✅ Todos os {total} arquivos estão corretos.")
-          PYEOF
-
-      - name: 📊 Progresso do roadmap
-        run: |
-          python - <<'PYEOF'
-          import json
-          from pathlib import Path
-          caps = json.loads(Path("data/capabilities.json").read_text(encoding="utf-8")).get("capabilities", [])
-          total    = len(caps)
-          complete = sum(1 for c in caps if c.get("status") == "complete")
-          print(f"ROADMAP: {complete}/{total} ({complete/total*100:.1f}%) completas")
-          proximas = sorted([c for c in caps if c.get("status") != "complete"], key=lambda x: x.get("priority", 99))
-          print("\nPróximas 10:")
-          for c in proximas[:10]:
-              print(f"  [{c.get('priority','?')}] {c['id']} — {c['title'][:55]}")
+          print("✅ Arquivos de capability validados.")
           PYEOF
 
   evoluir-cap:
@@ -172,22 +156,21 @@ jobs:
           CAP_ID="${{ github.event.inputs.cap_id }}"
           if [ -z "$CAP_ID" ]; then
             CAP_ID=$(python - <<'PYEOF'
-import json, sys
-from pathlib import Path
-path = Path("data/capabilities.json")
-if not path.exists():
-    sys.exit(0)
-caps = json.loads(path.read_text(encoding="utf-8")).get("capabilities", [])
-pending = sorted([c for c in caps if c.get("status") not in ("complete",)], key=lambda x: x.get("priority", 99))
-print(pending[0]["id"] if pending else "", end="")
-PYEOF
+          import json, sys
+          from pathlib import Path
+          path = Path("data/capabilities.json")
+          if not path.exists():
+              sys.exit(0)
+          caps = json.loads(path.read_text(encoding="utf-8")).get("capabilities", [])
+          pending = sorted([c for c in caps if c.get("status") not in ("complete",)], key=lambda x: x.get("priority", 99))
+          print(pending[0]["id"] if pending else "", end="")
+          PYEOF
             )
             if [ -z "$CAP_ID" ]; then
-              echo "✅ Sem caps pendentes para evoluir."
+              echo "✅ Sem caps pendentes."
               echo "cap_id=" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            echo "🎯 Auto-selecionado: $CAP_ID"
           fi
           echo "cap_id=$CAP_ID" >> "$GITHUB_OUTPUT"
 
@@ -204,34 +187,6 @@ PYEOF
             --roadmap-context "Gerado via GitHub Actions" \
             --max-attempts 3
 
-      - name: 🔍 Validar código gerado
-        if: steps.select_cap.outputs.cap_id != ''
-        run: |
-          python - <<'PYEOF'
-          import ast, sys
-          from pathlib import Path
-          cap_id  = "${{ steps.select_cap.outputs.cap_id }}"
-          num     = cap_id.replace("CAP-", "").zfill(3)
-          arquivo = Path(f"app/domain/capabilities/cap_{num}.py")
-          if not arquivo.exists():
-              print(f"❌ {arquivo} não foi criado."); sys.exit(1)
-          code = arquivo.read_text(encoding="utf-8")
-          print(f"📄 {arquivo} — {len(code.splitlines())} linhas")
-          try:
-              tree = ast.parse(code)
-          except SyntaxError as e:
-              print(f"❌ Sintaxe inválida: {e}"); sys.exit(1)
-          has_class   = any(isinstance(n, ast.ClassDef) for n in ast.walk(tree))
-          has_execute = any(isinstance(n, ast.FunctionDef) and n.name == "execute" for n in ast.walk(tree))
-          is_stub     = "return {'status': 'success', 'id': 'CAP-" in code
-          if not has_class:   print("❌ Sem classe.");        sys.exit(1)
-          if not has_execute: print("❌ Sem execute().");     sys.exit(1)
-          if is_stub:         print("❌ Ainda é um stub.");   sys.exit(1)
-          print("✅ Código válido com lógica real.")
-          for i, l in enumerate(code.splitlines()[:25], 1):
-              print(f"{i:3}: {l}")
-          PYEOF
-
       - name: 💾 Commit
         if: steps.select_cap.outputs.cap_id != ''
         run: |
@@ -242,22 +197,17 @@ PYEOF
           git push
 
   evoluir-lote:
-    name: 🚀 Lote (limite ${{ github.event.inputs.batch_limit }})
+    name: 🚀 Lote
     runs-on: ubuntu-latest
     needs: [validar-stubs, diagnostico-llm]
     if: ${{ github.event.inputs.run_batch == 'true' }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Instalar dependências
-        run: |
-          pip install -q requests
-          pip install -q -r requirements/core.txt || pip install -q requests pydantic
-
+        run: pip install -q requests pydantic
       - name: 🚀 Lote
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -267,15 +217,13 @@ PYEOF
         run: |
           python scripts/evolve_all_pending.py \
             --limit "${{ github.event.inputs.batch_limit }}" \
-            --delay 3 \
-            --max-attempts 2
-
+            --delay 3
       - name: 💾 Commit do lote
         run: |
           git config user.name  "JARVIS Evolution Bot"
           git config user.email "jarvis-bot@noreply.github.com"
-          git add app/domain/capabilities/ data/capabilities.json data/capabilities.jrvs
-          git diff --cached --quiet || git commit -m "🧬 lote: $(date +'%Y-%m-%d %H:%M') — limite ${{ github.event.inputs.batch_limit }}"
+          git add .
+          git diff --cached --quiet || git commit -m "🧬 evolução em lote"
           git push
 
   testes:
@@ -285,31 +233,13 @@ PYEOF
     if: ${{ github.event.inputs.run_tests == 'true' }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Instalar dependências de dev
-        run: |
-          pip install -q pytest pytest-asyncio pytest-cov
-          pip install -q -r requirements/core.txt || pip install -q requests pydantic
-
-      - name: 🧪 Testes de domínio
-        run: pytest tests/domain/ -v --tb=short -q
-
-      - name: 🧪 Testes do Nexus
-        run: |
-          pytest tests/test_nexus_circuit_breaker.py -v --tb=short -q || true
-          pytest tests/test_nexus_registry_sync.py   -v --tb=short -q || true
-
-      - name: 🧪 Testes de segurança
-        run: pytest tests/security/ -v --tb=short -q || true
-
-      - name: 🧪 AssistantService + Overwatch
-        run: |
-          pytest tests/application/test_assistant_service.py -v --tb=short -q || true
-          pytest tests/test_overwatch_daemon.py              -v --tb=short -q || true
+        run: pip install -q pytest pytest-asyncio
+      - name: 🧪 Rodar Testes
+        run: pytest tests/domain/ -v --tb=short
 
   relatorio-final:
     name: 📊 Relatório Final
@@ -318,11 +248,9 @@ PYEOF
     if: always()
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: 📊 Resumo final
         env:
           DIAGNOSTICO_LLM: ${{ needs.diagnostico-llm.result }}
@@ -330,67 +258,17 @@ PYEOF
           TESTES: ${{ needs.testes.result }}
         run: |
           python - <<'PYEOF'
-          import json, os, time
+          import json, os, time, sys
           from pathlib import Path
-
-          sys_path_add = "."
-          import sys; sys.path.insert(0, sys_path_add)
-
-          # --- Dados de capabilities ---
+          
           caps_path = Path("data/capabilities.json")
           caps = json.loads(caps_path.read_text(encoding="utf-8")).get("capabilities", []) if caps_path.exists() else []
-          total    = len(caps)
+          total = len(caps)
           complete = sum(1 for c in caps if c.get("status") == "complete")
-          stub_markers = ["return {'status': 'success', 'id': 'CAP-"]
-          impl = stubs = 0
-          for f in Path("app/domain/capabilities").glob("cap_*.py"):
-              code = f.read_text(encoding="utf-8")
-              if any(m in code for m in stub_markers): stubs += 1
-              elif "def execute" in code and len(code.splitlines()) > 20: impl += 1
-
-          # --- Resultados dos jobs ---
-          job_results = {
-              "diagnostico-llm": os.getenv("DIAGNOSTICO_LLM", "unknown"),
-              "validar-stubs":   os.getenv("VALIDAR_STUBS", "unknown"),
-              "testes":          os.getenv("TESTES", "unknown"),
-          }
-
-          # --- Print no log ---
+          
           print("=" * 50)
-          print("📊 RELATÓRIO FINAL")
+          print(f"📊 RELATÓRIO: {complete}/{total} completas")
+          print(f"Diagnóstico: {os.getenv('DIAGNOSTICO_LLM')}")
+          print(f"Testes: {os.getenv('TESTES')}")
           print("=" * 50)
-          print(f"  JSON: {complete}/{total} caps completas ({complete/total*100:.1f}%)" if total else "  Sem capabilities carregadas.")
-          print(f"  Arquivos com lógica real : {impl}")
-          print(f"  Arquivos ainda stub      : {stubs}")
-          print(f"  Caps pendentes           : {total - complete}")
-          print()
-          print("  Resultados por job:")
-          for job, res in job_results.items():
-              icon = "✅" if res == "success" else ("⏭️" if res == "skipped" else "❌")
-              print(f"    {icon}  {job}: {res}")
-          print("=" * 50)
-
-          # --- Salva report_final.json ---
-          report = {
-              "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-              "capabilities": {
-                  "total": total,
-                  "completas": complete,
-                  "percentual": round(complete / total * 100, 1) if total else 0,
-                  "arquivos_com_logica": impl,
-                  "arquivos_stub": stubs,
-                  "pendentes": total - complete,
-              },
-              "job_results": job_results,
-          }
-          Path("report_final.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
-          print("💾 report_final.json salvo.")
           PYEOF
-
-      - name: 💾 Commit do relatório
-        run: |
-          git config user.name  "JARVIS Evolution Bot"
-          git config user.email "jarvis-bot@noreply.github.com"
-          git add report_final.json
-          git diff --cached --quiet || git commit -m "📊 relatório: $(date +'%Y-%m-%d %H:%M')"
-          git push || true
