@@ -25,7 +25,11 @@ CREATE INDEX IF NOT EXISTS idx_voice_profiles_user_id ON voice_profiles(user_id)
 -- Index on last_updated for staleness checks
 CREATE INDEX IF NOT EXISTS idx_voice_profiles_updated ON voice_profiles(last_updated DESC);
 
--- Add FK from users to voice_profiles (backfill after both tables exist)
+-- Add FK from users to voice_profiles (backfill after both tables exist).
+-- Dependency note: this closes the circular reference between users and voice_profiles.
+--   users.voice_profile_id → voice_profiles.id   (added below)
+--   voice_profiles.user_id → users.id             (added in the CREATE TABLE above)
+-- Run migration 003 (users table) first, then this migration 004.
 ALTER TABLE users
     ADD CONSTRAINT IF NOT EXISTS fk_users_voice_profile
     FOREIGN KEY (voice_profile_id) REFERENCES voice_profiles(id) ON DELETE SET NULL;

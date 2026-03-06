@@ -2,7 +2,7 @@
 """FastAPI Server for Headless Control Interface"""
 
 import logging
-import datetime as _dt
+from datetime import datetime as _datetime, timezone as _timezone
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
@@ -238,7 +238,7 @@ def create_api_server(
                 # Echo back a simple ack for keep-alive pings
                 await ws_manager.broadcast_to_user(
                     user_id,
-                    {"type": "ack", "echo": data, "timestamp": _dt.datetime.now(_dt.timezone.utc).isoformat()},
+                    {"type": "ack", "echo": data, "timestamp": _datetime.now(_timezone.utc).isoformat()},
                 )
         except WebSocketDisconnect:
             ws_manager.disconnect(user_id, websocket)
