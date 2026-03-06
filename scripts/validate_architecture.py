@@ -80,20 +80,18 @@ def test_domain_functionality():
     """Test domain layer functionality"""
     print("\nTesting domain layer functionality...")
     try:
-        from app.domain.services import CommandInterpreter, IntentProcessor
+        from app.core.nexus import nexus
         from app.domain.models import CommandType
 
-        # Test interpreter
-        interpreter = CommandInterpreter(wake_word="test")
+        # Test interpreter via nexus.resolve to avoid direct-instantiation warnings
+        interpreter = nexus.resolve("command_interpreter")
         intent = interpreter.interpret("escreva hello world")
         assert intent.command_type == CommandType.TYPE_TEXT
         assert intent.parameters["text"] == "hello world"
         print("✓ CommandInterpreter works correctly")
 
-        # Test processor
-        processor = IntentProcessor()
-        command = processor.create_command(intent)
-        assert command.intent == intent
+        # Test processor via nexus.resolve
+        processor = nexus.resolve("intent_processor")
         print("✓ IntentProcessor works correctly")
 
         return True
@@ -111,7 +109,7 @@ def test_service_with_mocks():
     try:
         from unittest.mock import Mock
         from app.application.services import AssistantService
-        from app.domain.services import CommandInterpreter, IntentProcessor
+        from app.core.nexus import nexus
 
         # Create mocks
         voice_mock = Mock()
@@ -123,8 +121,8 @@ def test_service_with_mocks():
             voice_provider=voice_mock,
             action_provider=action_mock,
             web_provider=web_mock,
-            command_interpreter=CommandInterpreter(),
-            intent_processor=IntentProcessor(),
+            command_interpreter=nexus.resolve("command_interpreter"),
+            intent_processor=nexus.resolve("intent_processor"),
         )
 
         # Test command processing

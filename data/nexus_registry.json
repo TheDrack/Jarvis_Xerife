@@ -37,6 +37,13 @@
     "jarvis_dev_agent": "app.application.services.jarvis_dev_agent.JarvisDevAgent",
     "evolution_sandbox": "app.application.services.evolution_sandbox.EvolutionSandbox",
     "finetune_dataset_collector": "app.application.services.finetune_dataset_collector.FineTuneDatasetCollector",
-    "finetune_trigger_service": "app.application.services.finetune_trigger_service.FineTuneTriggerService"
+    "finetune_trigger_service": "app.application.services.finetune_trigger_service.FineTuneTriggerService",
+    "system_state_tracker": "app.domain.services.system_state_tracker.SystemStateTracker",
+    "reward_signal_provider": "app.domain.services.reward_signal_provider.RewardSignalProvider",
+    "model_orchestrator": "app.application.services.model_orchestrator.ModelOrchestrator",
+    "safety_guardian": "app.domain.services.safety_guardian.SafetyGuardian",
+    "command_interpreter": "app.domain.services.command_interpreter.CommandInterpreter",
+    "intent_processor": "app.domain.services.intent_processor.IntentProcessor",
+    "extension_manager": "app.adapters.infrastructure.extension_manager.ExtensionManager"
   }
 }
