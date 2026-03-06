@@ -58,7 +58,7 @@
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `context_manager.py` | Gerencia contexto de conversa – mantém histórico para conversações contínuas. |
+| `context_manager.py` | **[MELHORIA 5]** Gerencia `data/context.json` com validação via `SystemContext` (Pydantic). Expõe `read_context()`, `write_context()`, `update_context_field()`. Escritas inválidas são rejeitadas com warning. |
 
 ### `ai/`
 
@@ -136,6 +136,8 @@
 | `technical_analysis_service.py` | Análise técnica de código e arquitetura. |
 | `thought_log_service.py` | Serviço de log de pensamentos (armazena decisões do assistente). |
 | `vocal_orchestration_service.py` | Orquestração completa do fluxo vocal (end-to-end). |
+| `evolution_orchestrator.py` | **[MELHORIA 1]** Orquestrador do loop agêntico de auto-evolução. Chama crystallizer → context → memória procedural → LLM → valida sintaxe → cria PR. Registrado no Nexus como `evolution_orchestrator`. |
+| `capability_index_service.py` | **[MELHORIA 4]** Índice vetorial de capabilities (FAISS + fallback). Busca semântica top-k para seleção sem LLM quando similaridade ≥ 0.85. Atualiza `reliability_score` via EMA. Registrado como `capability_index_service`. |
 
 ### `crystallization/`
 
@@ -178,13 +180,14 @@
 | Arquivo | Responsabilidade |
 |---|---|
 | `action_provider.py` | Implementação de `ActionProvider` via pyautogui. Registrada no Nexus. |
-| `ai_gateway.py` | Gateway de IA – roteamento entre múltiplos LLMs (Groq/Gemini). |
+| `ai_gateway.py` | Gateway de IA – roteamento entre múltiplos LLMs (Groq/Gemini). **[MELHORIA 2]** Adicionado roteamento por `task_type`: `code_generation`/`self_repair` → OllamaAdapter; `reasoning`/`vision` → Gemini. |
 | `api_models.py` | Modelos Pydantic para a API REST. |
 | `api_server.py` | Servidor FastAPI – define rotas e autenticação OAuth2. |
 | `audit_logger.py` | Logger de auditoria – persiste logs de execução em JSON. Registrado no Nexus. |
 | `auth_adapter.py` | Autenticação e autorização (JWT, OAuth2). |
 | `consolidator.py` | Consolida o codebase em um arquivo único para contexto de LLMs. |
 | `copilot_context_provider.py` | Fornece contexto do repositório para o GitHub Copilot. |
+| `cost_tracker_adapter.py` | **[MELHORIA 7]** Auditoria de custos de chamadas LLM. Persiste em `llm_cost_log` SQLite. Expõe `log()` e `get_cost_summary()`. Registrado como `cost_tracker_adapter`. |
 | `dummy_voice_provider.py` | Provedor de voz fictício para testes headless. |
 | `extension_manager.py` | Gerenciador de extensões de infraestrutura. |
 | `gateway_llm_adapter.py` | Adaptador principal do gateway LLM (auto-repair, self-healing). |
@@ -192,9 +195,12 @@
 | `gist_uploader.py` | Uploader de arquivos para GitHub Gist (persistência de DNA). |
 | `github_adapter.py` | Adaptador GitHub – cria issues, PRs, comenta, lê repositório. |
 | `http_client.py` | Cliente HTTP genérico baseado em `requests`. NexusComponent. |
+| `ollama_adapter.py` | **[MELHORIA 2]** Adaptador para LLMs locais via Ollama. Suporta `OLLAMA_BASE_URL`, `temperature`, `max_tokens`, `/api/generate`. `is_available()` verifica se o modelo configurado está instalado. Registrado como `ollama_adapter`. |
+| `overwatch_adapter.py` | **[MELHORIA 6]** Daemon de monitoramento proativo. **Novo:** janela deslizante de 10 leituras CPU/RAM, tendência linear, alertas preditivos `[PROACTIVE_CORE][PREDICTIVE]`, campo `trend` em `data/context.json`. |
 | `playwright_worker.py` | Worker Playwright para automação de browser (cloud). |
+| `procedural_memory_adapter.py` | **[MELHORIA 3]** Índice vetorial de soluções bem-sucedidas do ThoughtLog. Busca por similaridade com limiar configurável (padrão 0.80). Registrado como `procedural_memory_adapter`. |
 | `pyinstaller_builder.py` | Gera instalador Windows com PyInstaller. Worker do pipeline. |
-| `reward_adapter.py` | Adaptador de recompensas – persiste e lê rewards do banco. |
+| `reward_adapter.py` | **[MELHORIA 4]** Adaptador de recompensas. **Novo:** `update_capability_reliability()` atualiza `reliability_score` via EMA em `data/capabilities.json`. |
 | `reward_logger.py` | Logger de rewards do RL (arquivo de log). |
 | `setup_wizard.py` | Wizard de configuração inicial do sistema. |
 | `socket_client.py` | Cliente de sockets para comunicação com agentes locais. NexusComponent. |
@@ -241,14 +247,16 @@ Inicializa o modo edge (dispositivo local) – carrega adaptadores de voz, tecla
 
 | Arquivo | Responsabilidade |
 |---|---|
-| `config/llm_fleet.json` | Configuração da frota de LLMs (modelos, endpoints, chaves). |
+| `config/llm_fleet.json` | Configuração da frota de LLMs (modelos, endpoints, chaves, preços por 1k tokens). |
 | `config/pipelines/*.yml` | Definições de pipelines declarativos (build, sync, chat). |
-| `data/nexus_registry.json` | Registry local do Nexus com mapeamento ID → módulo. |
-| `data/capabilities.json` | Capabilities disponíveis com metadados. |
+| `data/nexus_registry.json` | Registry local do Nexus com mapeamento ID → módulo. Inclui: `evolution_orchestrator`, `procedural_memory_adapter`, `capability_index_service`, `cost_tracker_adapter`. |
+| `data/capabilities.json` | Capabilities disponíveis com metadados. **[MELHORIA 4]** Cada capability tem campo `reliability_score` (float 0–1, EMA). |
+| `data/context.json` | **[MELHORIA 5]** Estado do sistema validado pelo `SystemContext` Pydantic. Campos: `current_goal`, `active_capabilities`, `recent_errors`, `user_last_interaction`, `system_health`, `evolution_state`, `trend`. |
 | `data/architecture_rules.yml` | Regras de arquitetura validadas automaticamente. |
+| `data/evolution_proposals/` | Patches Python gerados pelo `EvolutionOrchestrator` (um arquivo `<timestamp>.py` por ciclo). |
 | `migrations/*.sql` | Migrations do banco de dados. |
 | `scripts/` | Scripts utilitários (análise, estado, cristalização, auto-cura, daemon proativo). |
-| `scripts/overwatch_daemon.py` | Daemon proativo (background): monitora CPU/RAM, `data/context.json` e inatividade do usuário. Todas as ações prefixadas `[PROACTIVE_CORE]`. |
+| `scripts/overwatch_daemon.py` | Daemon proativo (background): monitora CPU/RAM, `data/context.json` e inatividade do usuário. **[MELHORIA 6]** Alertas preditivos com janela deslizante de 10 leituras. |
 | `Makefile` | Comandos utilitários (`make test`, `make lint`, etc.). |
 | `Dockerfile` / `docker-compose.yml` | Containerização para deploy em cloud. |
 | `render.yaml` | Configuração de deploy no Render. |

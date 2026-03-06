@@ -116,3 +116,77 @@ class TestOverwatchDaemon:
                 daemon._check_inactivity()
 
         mock_suggest.assert_called_once()
+
+
+class TestOverwatchDaemonPredictive:
+    """Tests for MELHORIA 6 — Overwatch Preditivo."""
+
+    @pytest.fixture
+    def daemon(self):
+        d = OverwatchDaemon(
+            poll_interval=0.01,
+            cpu_threshold=85.0,
+            ram_threshold=85.0,
+            inactivity_timeout=9999,
+        )
+        yield d
+        d.stop()
+
+    def test_compute_trend_stable(self, daemon):
+        """Valores estáveis devem retornar 'stable'."""
+        from collections import deque
+        cpu_hist = deque([50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0, 50.0], maxlen=10)
+        ram_hist = deque([40.0] * 10, maxlen=10)
+        trend = daemon._compute_trend(cpu_hist, ram_hist)
+        assert trend == "stable"
+
+    def test_compute_trend_rising(self, daemon):
+        """Valores crescentes devem retornar 'rising'."""
+        from collections import deque
+        cpu_hist = deque([10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 85.0, 90.0], maxlen=10)
+        ram_hist = deque([40.0] * 10, maxlen=10)
+        trend = daemon._compute_trend(cpu_hist, ram_hist)
+        assert trend == "rising"
+
+    def test_compute_trend_falling(self, daemon):
+        """Valores decrescentes devem retornar 'falling'."""
+        from collections import deque
+        cpu_hist = deque([90.0, 80.0, 70.0, 60.0, 50.0, 40.0, 30.0, 20.0, 10.0, 5.0], maxlen=10)
+        ram_hist = deque([40.0] * 10, maxlen=10)
+        trend = daemon._compute_trend(cpu_hist, ram_hist)
+        assert trend == "falling"
+
+    def test_compute_trend_insufficient_data_is_stable(self, daemon):
+        """Com menos de 10 leituras, deve retornar 'stable'."""
+        from collections import deque
+        cpu_hist = deque([50.0, 60.0, 70.0], maxlen=10)
+        ram_hist = deque([40.0] * 3, maxlen=10)
+        trend = daemon._compute_trend(cpu_hist, ram_hist)
+        assert trend == "stable"
+
+    def test_rising_trend_triggers_predictive_alert(self, daemon):
+        """Tendência de alta com projeção acima do limiar deve disparar notificação [PREDICTIVE]."""
+        import collections
+        # 10 readings escalando de 10 → 85 para projeção > 80
+        readings = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 78.0, 82.0, 85.0]
+        daemon._cpu_history = collections.deque(readings, maxlen=10)
+        daemon._ram_history = collections.deque([30.0] * 10, maxlen=10)
+
+        with patch.object(daemon, "_notify") as mock_notify:
+            daemon._check_predictive_alerts(85.0, 30.0, "rising")
+
+        assert mock_notify.called
+        call_msg = mock_notify.call_args[0][0]
+        assert "[PREDICTIVE]" in call_msg
+
+    def test_stable_trend_no_alert(self, daemon):
+        """Tendência estável não deve disparar notificação preditiva."""
+        import collections
+        readings = [50.0] * 10
+        daemon._cpu_history = collections.deque(readings, maxlen=10)
+        daemon._ram_history = collections.deque([40.0] * 10, maxlen=10)
+
+        with patch.object(daemon, "_notify") as mock_notify:
+            daemon._check_predictive_alerts(50.0, 40.0, "stable")
+
+        mock_notify.assert_not_called()

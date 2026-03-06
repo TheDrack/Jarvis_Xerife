@@ -25,6 +25,10 @@
     "local_repair_agent": "app.application.services.local_repair_agent.LocalRepairAgent",
     "metabolism_core": "app.application.services.metabolism_core.MetabolismCore",
     "evolution_loop": "app.application.services.evolution_loop.EvolutionLoopService",
-    "ollama_adapter": "app.adapters.infrastructure.ollama_adapter.OllamaAdapter"
+    "ollama_adapter": "app.adapters.infrastructure.ollama_adapter.OllamaAdapter",
+    "evolution_orchestrator": "app.application.services.evolution_orchestrator.EvolutionOrchestrator",
+    "procedural_memory_adapter": "app.adapters.infrastructure.procedural_memory_adapter.ProceduralMemoryAdapter",
+    "capability_index_service": "app.application.services.capability_index_service.CapabilityIndexService",
+    "cost_tracker_adapter": "app.adapters.infrastructure.cost_tracker_adapter.CostTrackerAdapter"
   }
 }
