@@ -123,9 +123,10 @@ class TestUserAuthentication(NexusComponent):
         pass
     """Tests for user authentication"""
 
-    def test_authenticate_valid_user(self, auth_adapter):
-        """Test authenticating with valid credentials"""
-        # Using the pre-configured admin user with password "admin123"
+    def test_authenticate_valid_user(self, auth_adapter, monkeypatch):
+        """Test authenticating with valid credentials via env-var fallback."""
+        monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
+        monkeypatch.setenv("JARVIS_ADMIN_EMAIL", "admin@jarvis.local")
         user = auth_adapter.authenticate_user("admin", "admin123")
         
         assert user is not None
@@ -133,8 +134,9 @@ class TestUserAuthentication(NexusComponent):
         assert user["email"] == "admin@jarvis.local"
         assert user["full_name"] == "Administrator"
 
-    def test_authenticate_invalid_password(self, auth_adapter):
+    def test_authenticate_invalid_password(self, auth_adapter, monkeypatch):
         """Test authenticating with invalid password"""
+        monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
         user = auth_adapter.authenticate_user("admin", "wrong_password")
         
         assert user is None
@@ -145,8 +147,10 @@ class TestUserAuthentication(NexusComponent):
         
         assert user is None
 
-    def test_authenticate_returns_no_password(self, auth_adapter):
+    def test_authenticate_returns_no_password(self, auth_adapter, monkeypatch):
         """Test that authenticate doesn't return password hash"""
+        monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
+        monkeypatch.setenv("JARVIS_ADMIN_EMAIL", "admin@jarvis.local")
         user = auth_adapter.authenticate_user("admin", "admin123")
         
         assert user is not None

@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-"""Bridge router: /v1/local-bridge/* WebSocket and REST endpoints."""
+"""Bridge router: /v1/local-bridge/* WebSocket and REST endpoints.
+
+Uses :class:`~app.adapters.infrastructure.soldier_bridge.SoldierBridgeManager`
+which supports multiple simultaneous connections and capability registration.
+"""
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
@@ -11,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 def create_bridge_router() -> APIRouter:
     """
-    Create the local-bridge router for GUI delegation to connected devices.
+    Create the soldier-bridge router for GUI/edge delegation to connected devices.
 
     Returns:
         Configured APIRouter
@@ -23,26 +27,30 @@ def create_bridge_router() -> APIRouter:
         websocket: WebSocket,
         device_id: str = "default",
         device_type: str = "desktop",
+        capabilities: Optional[str] = None,
     ):
         """
-        WebSocket endpoint for connecting a local PC or mobile device to JARVIS.
+        WebSocket endpoint for connecting a soldier device to JARVIS.
 
         Enables JARVIS (in the cloud) to delegate GUI tasks (PyAutoGUI) or
         mobile-specific tasks (camera, sensors, vibration) to connected devices.
+        Supports 3+ simultaneous connections.
 
         Query Parameters:
-            device_id:   Unique identifier for the device (default: "default")
-            device_type: Type of device – desktop, mobile, tablet (default: "desktop")
+            device_id:    Unique identifier for the device (default: "default")
+            device_type:  Type of device – desktop, mobile, tablet, rpi, iot, …
+            capabilities: Comma-separated capability tags, e.g. "pyautogui,camera"
 
         Usage:
             Desktop: ws://jarvis-host/v1/local-bridge?device_id=my_pc&device_type=desktop
-            Mobile:  ws://jarvis-host/v1/local-bridge?device_id=my_phone&device_type=mobile
+            Mobile:  ws://jarvis-host/v1/local-bridge?device_id=my_phone&device_type=mobile&capabilities=camera
         """
-        from app.application.services.local_bridge import get_bridge_manager
+        from app.adapters.infrastructure.soldier_bridge import get_bridge_manager
 
+        caps: List[str] = [c.strip() for c in capabilities.split(",")] if capabilities else []
         bridge_manager = get_bridge_manager()
         try:
-            await bridge_manager.connect(websocket, device_id, device_type)
+            await bridge_manager.connect(websocket, device_id, device_type, caps)
             while True:
                 try:
                     data = await websocket.receive_json()
@@ -58,26 +66,26 @@ def create_bridge_router() -> APIRouter:
 
     @router.get("/v1/local-bridge/devices")
     async def list_connected_devices() -> Dict[str, Any]:
-        """List all currently connected local devices."""
-        from app.application.services.local_bridge import get_bridge_manager
+        """List all currently connected soldier devices and their capabilities."""
+        from app.adapters.infrastructure.soldier_bridge import get_bridge_manager
 
         bridge_manager = get_bridge_manager()
-        devices = bridge_manager.get_connected_devices()
-        return {"connected_devices": devices, "count": len(devices)}
+        soldiers = bridge_manager.get_connected_soldiers()
+        return {"connected_devices": soldiers, "count": len(soldiers)}
 
     @router.post("/v1/local-bridge/send-task")
     async def send_task_to_local_device(device_id: str, task: Dict[str, Any]) -> Any:
         """
-        Send a task to a connected local device.
+        Send a task to a connected soldier device.
 
         Args:
             device_id: Target device ID
             task:      Task definition with 'action' and 'parameters'
 
         Returns:
-            Task result from the local device
+            Task result from the device
         """
-        from app.application.services.local_bridge import get_bridge_manager
+        from app.adapters.infrastructure.soldier_bridge import get_bridge_manager
 
         bridge_manager = get_bridge_manager()
         if not bridge_manager.is_device_connected(device_id):

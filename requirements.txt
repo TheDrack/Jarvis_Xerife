@@ -52,3 +52,6 @@ faiss-cpu>=1.7.4
 
 # Knowledge graph for SemanticMemory (optional - falls back to pure-Python dict)
 networkx>=3.0
+
+# Supabase – cloud database, auth and storage (optional; code falls back gracefully)
+supabase>=2.0.0

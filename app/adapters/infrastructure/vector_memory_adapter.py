@@ -123,8 +123,17 @@ class VectorMemoryAdapter(MemoryProvider):
         text: str,
         metadata: Optional[Dict[str, Any]] = None,
         timestamp: Optional[datetime] = None,
+        user_id: Optional[str] = None,
     ) -> str:
-        """Sanitize *text* for PII then encode and persist it."""
+        """Sanitize *text* for PII then encode and persist it.
+
+        Args:
+            text:      Raw text to store.
+            metadata:  Optional extra metadata dict.
+            timestamp: Optional explicit event timestamp (defaults to now).
+            user_id:   Optional user identifier — stored in metadata so that
+                       queries can be filtered per-user.
+        """
         # Sanitize PII before indexing (mandatory: no raw PII in the vector index)
         pii_redactor = self._get_pii_redactor()
         if pii_redactor is not None and hasattr(pii_redactor, "sanitize"):
@@ -138,12 +147,16 @@ class VectorMemoryAdapter(MemoryProvider):
         ts = timestamp or datetime.now(tz=timezone.utc)
         vector = _vectorize(safe_text, self._dim)
 
+        combined_metadata = metadata or {}
+        if user_id:
+            combined_metadata = {**combined_metadata, "user_id": user_id}
+
         self._events.append(
             {
                 "id": event_id,
                 "text": safe_text,
                 "vector": vector,
-                "metadata": metadata or {},
+                "metadata": combined_metadata,
                 "timestamp": ts.isoformat(),
             }
         )
@@ -160,8 +173,18 @@ class VectorMemoryAdapter(MemoryProvider):
         query_text: str,
         top_k: int = 5,
         days_back: Optional[int] = 30,
+        user_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Return the *top_k* most similar stored events."""
+        """Return the *top_k* most similar stored events.
+
+        Args:
+            query_text: The text to find similar events for.
+            top_k:      Maximum number of results to return.
+            days_back:  Restrict results to the last N days.  ``None`` means
+                        no time filter.
+            user_id:    When provided, only return events that belong to this
+                        user (biographical memory is per-user).
+        """
         if not self._events:
             return []
 
@@ -179,11 +202,18 @@ class VectorMemoryAdapter(MemoryProvider):
         if cutoff_ts:
             candidates = [e for e in self._events if e["timestamp"] >= cutoff_ts]
 
+        # Filter by user_id when provided (biographical memory is per-user)
+        if user_id:
+            candidates = [
+                e for e in candidates
+                if e.get("metadata", {}).get("user_id") == user_id
+            ]
+
         if not candidates:
             return []
 
-        if _FAISS_AVAILABLE and self._index is not None and days_back is None:
-            # Fast path: use FAISS index (no date filter, searches the full index)
+        if _FAISS_AVAILABLE and self._index is not None and days_back is None and not user_id:
+            # Fast path: use FAISS index (no date/user filter, searches the full index)
             q_np = np.array([query_vector], dtype=np.float32)
             k = min(top_k, len(self._events))
             distances, indices = self._index.search(q_np, k)
@@ -197,7 +227,7 @@ class VectorMemoryAdapter(MemoryProvider):
                 results.append(event)
             return results
 
-        # Brute-force cosine similarity (always used when date filter is active)
+        # Brute-force cosine similarity (used when date/user filter is active)
         def _cosine(a: List[float], b: List[float]) -> float:
             dot = sum(x * y for x, y in zip(a, b))
             return dot  # vectors are already L2-normalised → dot == cosine

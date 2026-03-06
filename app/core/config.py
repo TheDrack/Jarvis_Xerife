@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     # Database Settings
     database_url: str = "sqlite:///jarvis.db"
 
+    # Supabase Settings (optional – enables cloud auth, storage and vector queries)
+    supabase_url: Optional[str] = None
+    supabase_key: Optional[str] = None  # anon/service_role key
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

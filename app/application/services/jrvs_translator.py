@@ -55,6 +55,8 @@ class JrvsTranslator(NexusComponent):
                 - ``action``: ``"to_jrvs"`` | ``"from_jrvs"`` | ``"sync_all"``
                 - ``path``: caminho de um arquivo específico (opcional)
                 - ``data_dir``: diretório a varrer (opcional, sobrepõe o padrão)
+                - ``sync_to_cloud``: bool — sincronizar arquivos .jrvs com o
+                  Supabase Storage após a tradução local (padrão: ``False``)
 
         Returns:
             Evidência de efeito com campos ``success``, ``translated``, ``errors``.
@@ -63,6 +65,7 @@ class JrvsTranslator(NexusComponent):
         action = ctx.get("action", "sync_all")
         specific_path = ctx.get("path")
         data_dir = Path(ctx.get("data_dir", str(self._data_dir)))
+        sync_to_cloud: bool = bool(ctx.get("sync_to_cloud", False))
 
         translated: List[str] = []
         errors: List[str] = []
@@ -77,6 +80,11 @@ class JrvsTranslator(NexusComponent):
             translated.extend(t)
             errors.extend(e)
 
+        if sync_to_cloud:
+            cloud_synced, cloud_errors = self.sync_all(data_dir)
+            translated.extend(cloud_synced)
+            errors.extend(cloud_errors)
+
         success = len(errors) == 0
         logger.info(
             f"🔄 [JrvsTranslator] {action}: {len(translated)} traduzidos, {len(errors)} erros."
@@ -87,6 +95,68 @@ class JrvsTranslator(NexusComponent):
             "translated": translated,
             "errors": errors,
         }
+
+    # ------------------------------------------------------------------
+    # Cloud sync
+    # ------------------------------------------------------------------
+
+    def sync_all(
+        self, data_dir: Optional[Path] = None, bucket: str = "jrvs-snapshots"
+    ) -> Tuple[List[str], List[str]]:
+        """Synchronize all .jrvs files under *data_dir* with Supabase Storage.
+
+        For each ``.jrvs`` file found locally:
+        - Uploads the local file to the cloud (overwriting if it already exists).
+
+        For each ``.jrvs`` file present in the cloud but missing locally:
+        - Downloads and saves it locally (restoring from backup).
+
+        Args:
+            data_dir: Local directory to scan.  Defaults to ``self._data_dir``.
+            bucket:   Supabase Storage bucket name (default: ``"jrvs-snapshots"``).
+
+        Returns:
+            Tuple (synced_paths, error_paths).
+        """
+        from app.adapters.infrastructure.jrvs_cloud_storage import JrvsCloudStorage
+
+        cloud = JrvsCloudStorage(bucket=bucket)
+        scan_dir = data_dir or self._data_dir
+
+        synced: List[str] = []
+        errors: List[str] = []
+
+        # --- Upload local → cloud ---
+        if scan_dir.exists():
+            for jrvs_file in scan_dir.rglob("*.jrvs"):
+                try:
+                    raw = jrvs_file.read_bytes()
+                    remote_path = str(jrvs_file.relative_to(scan_dir.parent))
+                    result = cloud.upload(bucket, remote_path, raw)
+                    if result:
+                        synced.append(f"↑ {remote_path}")
+                        logger.debug("☁️  [JrvsTranslator] Uploaded %s", remote_path)
+                    else:
+                        errors.append(f"↑ {jrvs_file} (upload falhou)")
+                except Exception as exc:
+                    errors.append(f"↑ {jrvs_file}: {exc}")
+
+        # --- Download cloud → local (restore missing files) ---
+        try:
+            remote_files = cloud.list(bucket, str(scan_dir.name))
+            for remote_name in remote_files:
+                local_path = scan_dir.parent / remote_name
+                if not local_path.exists():
+                    raw = cloud.download(bucket, remote_name)
+                    if raw:
+                        local_path.parent.mkdir(parents=True, exist_ok=True)
+                        local_path.write_bytes(raw)
+                        synced.append(f"↓ {remote_name}")
+                        logger.info("☁️  [JrvsTranslator] Restored %s from cloud", remote_name)
+        except Exception as exc:
+            logger.debug("[JrvsTranslator] sync_all download phase: %s", exc)
+
+        return synced, errors
 
     # ------------------------------------------------------------------
     # Varredura de diretório

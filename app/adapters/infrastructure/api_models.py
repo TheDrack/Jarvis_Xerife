@@ -158,6 +158,7 @@ class User(BaseModel):
     email: Optional[str] = Field(None, description="User email")
     full_name: Optional[str] = Field(None, description="User full name")
     disabled: Optional[bool] = Field(None, description="Whether user is disabled")
+    user_id: Optional[str] = Field(None, description="Unique user UUID (references users table)")
 
 
 # Extension Manager Models

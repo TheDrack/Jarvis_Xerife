@@ -2,9 +2,10 @@
 """FastAPI Server for Headless Control Interface"""
 
 import logging
+import datetime as _dt
 from pathlib import Path
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -28,6 +29,7 @@ from app.adapters.infrastructure.routers.missions import create_missions_router
 from app.adapters.infrastructure.routers.thoughts import create_thoughts_router
 from app.adapters.infrastructure.routers.utility import create_utility_router
 from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
+from app.adapters.infrastructure.websocket_manager import get_websocket_manager
 from app.application.services import AssistantService, ExtensionManager
 from app.application.services.device_service import DeviceService
 from app.core.config import settings
@@ -56,6 +58,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         username=username,
         email=payload.get("email"),
         full_name=payload.get("full_name"),
+        user_id=payload.get("user_id"),
     )
 
 
@@ -154,6 +157,7 @@ def create_api_server(
                 "sub": user["username"],
                 "email": user["email"],
                 "full_name": user["full_name"],
+                "user_id": user.get("user_id", ""),
             }
         )
         return Token(access_token=access_token, token_type="bearer")
@@ -209,6 +213,36 @@ def create_api_server(
     app.include_router(create_bridge_router())
     app.include_router(create_utility_router(db_adapter, get_current_user))
     app.include_router(create_dev_agent_router())
+
+    # -- WebSocket endpoint for real-time HUD / notifications -------------------
+    ws_manager = get_websocket_manager()
+
+    @app.websocket("/ws/{user_id}")
+    async def websocket_endpoint(websocket: WebSocket, user_id: str):
+        """Real-time WebSocket channel for a specific user.
+
+        The HUD frontend connects here on mount and receives push notifications
+        for: ``evolution_complete``, ``error_alert``, ``mission_update``, and
+        any other events broadcast via :class:`WebSocketManager`.
+
+        Query Parameters:
+            user_id: Unique user identifier (UUID or username).
+
+        Messages sent by the server are JSON objects with at least a ``type``
+        field, e.g. ``{"type": "mission_update", "data": {...}}``.
+        """
+        await ws_manager.connect(user_id, websocket)
+        try:
+            while True:
+                data = await websocket.receive_text()
+                # Echo back a simple ack for keep-alive pings
+                await ws_manager.broadcast_to_user(
+                    user_id,
+                    {"type": "ack", "echo": data, "timestamp": _dt.datetime.now(_dt.timezone.utc).isoformat()},
+                )
+        except WebSocketDisconnect:
+            ws_manager.disconnect(user_id, websocket)
+            logger.info("WS disconnected: user=%s", user_id)
 
     return app
 

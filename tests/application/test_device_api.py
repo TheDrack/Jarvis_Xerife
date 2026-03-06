@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Tests for device management API endpoints"""
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, MagicMock
@@ -9,6 +11,13 @@ from sqlmodel import create_engine, SQLModel
 from app.adapters.infrastructure.api_server import create_api_server
 from app.application.services import AssistantService
 from app.application.services.device_service import DeviceService
+
+
+@pytest.fixture(autouse=True)
+def set_admin_credentials(monkeypatch):
+    """Set env-var admin credentials so authentication works without Supabase."""
+    monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
+    monkeypatch.setenv("JARVIS_ADMIN_EMAIL", "admin@jarvis.local")
 
 
 @pytest.fixture
