@@ -34,7 +34,7 @@ from typing import Any, Deque, Dict, List, Optional, Set
 
 from app.core.nexus import nexus, NexusComponent
 from app.utils.document_store import document_store
-from app.adapters.infrastructure.overwatch_resource_monitor import ResourceMonitor
+from app.adapters.infrastructure.overwatch_resource_monitor import ResourceMonitor, ResourceReading
 from app.adapters.infrastructure.overwatch_perimeter import PerimeterMonitor
 
 logger = logging.getLogger(__name__)
@@ -101,6 +101,7 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor):
         # Predictive monitoring — sliding windows (MELHORIA 6)
         self._cpu_history: Deque[float] = collections.deque(maxlen=_SLIDING_WINDOW_SIZE)
         self._ram_history: Deque[float] = collections.deque(maxlen=_SLIDING_WINDOW_SIZE)
+        self._resource_history: Deque[ResourceReading] = collections.deque(maxlen=_SLIDING_WINDOW_SIZE)
 
         # Consolidação da memória semântica e MetaReflection
         self._consolidation_interval_min: float = float(

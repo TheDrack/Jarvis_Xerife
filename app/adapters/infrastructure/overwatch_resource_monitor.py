@@ -7,6 +7,8 @@ used by OverwatchDaemon via multiple inheritance.
 """
 
 import logging
+import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Deque
 
 if TYPE_CHECKING:
@@ -20,6 +22,15 @@ logger = logging.getLogger(__name__)
 _CPU_CHECK_EVERY = 6              # ticks (every ~60 s)
 _PREDICTIVE_CPU_THRESHOLD = 80.0  # %
 _PREDICTIVE_RAM_THRESHOLD = 85.0  # %
+
+
+@dataclass(slots=True)
+class ResourceReading:
+    """Snapshot de uso de recursos em um instante."""
+
+    cpu: float
+    ram: float
+    timestamp: float
 
 
 class ResourceMonitor(NexusComponent):
@@ -63,6 +74,8 @@ class ResourceMonitor(NexusComponent):
                 self._notify(msg)
 
             # Update sliding windows
+            reading = ResourceReading(cpu=cpu, ram=ram, timestamp=time.time())
+            self._resource_history.append(reading)
             self._cpu_history.append(cpu)
             self._ram_history.append(ram)
 

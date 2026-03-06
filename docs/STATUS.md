@@ -213,3 +213,33 @@ Infraestrutura para fine-tuning LoRA do modelo local:
 - Registrados no Nexus como `finetune_dataset_collector` e `finetune_trigger_service`
 
 ---
+
+## 🔧 Otimizações Fase 3
+
+Aplicadas em 2026-03-06 (Blocos A, B e C):
+
+### Bloco A — `__slots__` e Value Objects
+
+- **A.1** `Intent`, `Command`, `Response` convertidos para `@dataclass(slots=True)` — redução de memória em criações de alta frequência.
+- **A.2** `EvolutionReward` (SQLModel/Pydantic) — sem modificação (Pydantic gerencia slots internamente).
+- **A.3** `ResourceReading @dataclass(slots=True)` adicionado ao `overwatch_resource_monitor.py`. `_cpu_history` / `_ram_history` mantidos para compatibilidade; novo `_resource_history: Deque[ResourceReading]` unifica cpu+ram+timestamp.
+- **A.4** `WorkingMemoryEntry @dataclass(slots=True)` adicionado a `working_memory.py`. `push()` aceita tanto `dict` quanto `WorkingMemoryEntry`.
+
+### Bloco B — Correções de Bugs
+
+- **B.1** `execute()` movido para após `__init__` em `DependencyManager` e `GitHubCorrectionAdapter`.
+- **B.2** `def execute(context=None):` → `def execute(self, context=None):` em 13 arquivos de `.frozen/domain_adapters/`.
+- **B.3** `from app.core.nexuscomponent import NexusComponent` → `from app.core.nexus import NexusComponent` em 130 arquivos `.frozen/`.
+- **B.4** Cache TTL de 30 s adicionado a `_load_capabilities_json()` no `CapabilityManager`.
+- **B.5** `LLMConfig` convertido para classmethods dinâmicos (`use_llm_command_interpretation()`, etc.). Aliases de classe mantidos para retrocompatibilidade.
+- **B.6** `EvolutionSandbox`: timestamp do diretório sandbox ganhou sufixo `uuid4().hex[:8]` para unicidade absoluta.
+- **B.7** `POST /v1/dev-agent/run`: retorna HTTP 429 se `JarvisDevAgent` já estiver em execução (`_agent_running` flag em módulo).
+
+### Bloco C — Melhorias de Qualidade
+
+- **C.1** `WorkingMemory`: adicionados `__iter__`, `__bool__` e `to_list()`. Testes cobrindo os novos métodos em `tests/test_memory_modules.py`.
+- **C.2** `SemanticMemory.query_facts()`: parâmetro opcional `keyword: str` para busca por substring (case-insensitive). Testes adicionados.
+- **C.3** `CapabilityManager.get_evolution_progress()`: campo `critical_path_length` adicionado ao retorno.
+- **C.4** `EvolutionGatekeeper`: rejeições persistidas em `data/gatekeeper_rejections.jsonl` com campos `timestamp`, `reason`, `check_failed`, `files_modified`.
+
+---

@@ -12,10 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class DependencyManager(NexusComponent):
-    def execute(self, context: dict):
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
-
     """
     Service for managing and installing dependencies on-demand.
     Checks if required libraries are available and installs them if needed.
@@ -160,3 +156,6 @@ class DependencyManager(NexusComponent):
             Set of capability names
         """
         return self._installed_capabilities.copy()
+    def execute(self, context: dict):
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}

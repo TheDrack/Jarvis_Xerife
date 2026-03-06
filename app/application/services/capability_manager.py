@@ -19,6 +19,7 @@ what it cannot do, and what it needs to evolve.
 import json
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Set
 
@@ -57,6 +58,8 @@ class CapabilityManager(NexusComponent):
         """
         self.engine = engine
         self._capability_detectors = self._initialize_detectors()
+        self._caps_cache: List[Dict[str, Any]] = []
+        self._caps_cache_ts: float = 0.0
     
     def _initialize_detectors(self) -> Dict[int, callable]:
         """
@@ -421,7 +424,8 @@ class CapabilityManager(NexusComponent):
                 "complete_capabilities": complete,
                 "partial_capabilities": partial,
                 "nonexistent_capabilities": nonexistent,
-                "chapters": chapter_list
+                "chapters": chapter_list,
+                "critical_path_length": len(self.get_critical_path()),
             }
     
     # Detector methods for specific capabilities
@@ -562,15 +566,19 @@ class CapabilityManager(NexusComponent):
         return path
 
     def _load_capabilities_json(self) -> List[Dict[str, Any]]:
-        """Lê data/capabilities.json e retorna a lista de capabilities."""
+        """Lê data/capabilities.json e retorna a lista de capabilities com cache TTL de 30 s."""
+        now = time.time()
+        if self._caps_cache and (now - self._caps_cache_ts) < 30.0:
+            return self._caps_cache
         _file = Path("data/capabilities.json")
         if not _file.exists():
             return []
         try:
             data = json.loads(_file.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                return data
-            return data.get("capabilities", [])
+            result: List[Dict[str, Any]] = data if isinstance(data, list) else data.get("capabilities", [])
+            self._caps_cache = result
+            self._caps_cache_ts = now
+            return result
         except Exception as exc:
             logger.warning("[CapabilityManager] Falha ao ler capabilities.json: %s", exc)
             return []

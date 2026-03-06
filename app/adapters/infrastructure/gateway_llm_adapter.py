@@ -100,7 +100,7 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         self.llm_interpreter = None
         try:
             from app.core.llm_config import LLMConfig
-            if LLMConfig.USE_LLM_COMMAND_INTERPRETATION:
+            if LLMConfig.use_llm_command_interpretation():
                 self.llm_interpreter = LLMCommandInterpreter(
                     wake_word=wake_word,
                     ai_gateway=self.gateway,

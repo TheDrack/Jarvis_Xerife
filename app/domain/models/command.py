@@ -20,7 +20,7 @@ class CommandType(Enum):
     UNKNOWN = "unknown"
 
 
-@dataclass
+@dataclass(slots=True)
 class Intent:
     """Represents the interpreted intent from user input"""
 
@@ -35,7 +35,7 @@ class Intent:
             raise ValueError("Confidence must be between 0 and 1")
 
 
-@dataclass
+@dataclass(slots=True)
 class Command:
     """Represents a command to be executed"""
 
@@ -44,7 +44,7 @@ class Command:
     context: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
+@dataclass(slots=True)
 class Response:
     """Represents a response from command execution"""
 

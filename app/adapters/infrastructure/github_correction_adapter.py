@@ -21,10 +21,6 @@ logger = logging.getLogger(__name__)
 class GitHubCorrectionAdapter(NexusComponent):
     """Handles auto-correction PRs and file content operations via GitHub API."""
 
-    def execute(self, context: dict) -> dict:
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
-
     def __init__(
         self,
         token: Optional[str] = None,
@@ -299,3 +295,7 @@ Este link abre o ambiente de edição do GitHub Copilot Agent diretamente, com o
             return {"success": False, "error": error_msg}
         finally:
             await self.close()
+
+    def execute(self, context: dict) -> dict:
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
