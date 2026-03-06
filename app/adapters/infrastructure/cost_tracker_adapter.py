@@ -99,12 +99,19 @@ class CostTrackerAdapter(NexusComponent):
         """Registra uma chamada LLM na tabela llm_cost_log."""
         cost = self._estimate_cost(model, prompt_tokens, completion_tokens)
         try:
+            from sqlalchemy import text as sa_text  # lazy import
             engine = self._get_engine()
             if engine is None:
                 return
+            insert_sql = sa_text(
+                "INSERT INTO llm_cost_log "
+                "(model, task_type, prompt_tokens, completion_tokens, estimated_cost_usd, success, timestamp) "
+                "VALUES (:model, :task_type, :prompt_tokens, :completion_tokens, "
+                ":estimated_cost_usd, :success, :timestamp)"
+            )
             with engine.connect() as conn:
                 conn.execute(
-                    _INSERT_SQL,
+                    insert_sql,
                     {
                         "model": model,
                         "task_type": task_type,
@@ -122,12 +129,17 @@ class CostTrackerAdapter(NexusComponent):
     def get_cost_summary(self, period_days: int = 7) -> Dict[str, Any]:
         """Retorna custo total, por modelo e por task_type no período."""
         try:
+            from sqlalchemy import text as sa_text  # lazy import
             engine = self._get_engine()
             if engine is None:
                 return {"total": 0.0, "by_model": {}, "by_task_type": {}}
             since = (datetime.now(timezone.utc) - timedelta(days=period_days)).isoformat()
+            select_sql = sa_text(
+                "SELECT model, task_type, prompt_tokens, completion_tokens, estimated_cost_usd "
+                "FROM llm_cost_log WHERE timestamp >= :since"
+            )
             with engine.connect() as conn:
-                rows = list(conn.execute(_SELECT_PERIOD_SQL, {"since": since}))
+                rows = list(conn.execute(select_sql, {"since": since}))
         except Exception as exc:
             logger.debug("[CostTracker] Falha ao consultar resumo: %s", exc)
             return {"total": 0.0, "by_model": {}, "by_task_type": {}}
@@ -153,11 +165,15 @@ class CostTrackerAdapter(NexusComponent):
     def get_median_cost(self, task_type: str) -> float:
         """Retorna o custo mediano para o task_type no histórico completo."""
         try:
+            from sqlalchemy import text as sa_text  # lazy import
             engine = self._get_engine()
             if engine is None:
                 return 0.0
+            select_sql = sa_text(
+                "SELECT estimated_cost_usd FROM llm_cost_log WHERE task_type = :task_type"
+            )
             with engine.connect() as conn:
-                rows = list(conn.execute(_SELECT_BY_TASK_SQL, {"task_type": task_type}))
+                rows = list(conn.execute(select_sql, {"task_type": task_type}))
             costs = sorted(float(r[0]) for r in rows if r[0] is not None)
             if not costs:
                 return 0.0
@@ -200,7 +216,7 @@ class CostTrackerAdapter(NexusComponent):
 
 
 # ---------------------------------------------------------------------------
-# SQL
+# SQL DDL
 # ---------------------------------------------------------------------------
 
 _CREATE_TABLE_SQL = """
@@ -215,23 +231,3 @@ CREATE TABLE IF NOT EXISTS llm_cost_log (
     timestamp TEXT NOT NULL
 )
 """
-
-try:
-    from sqlalchemy import text as _sa_text
-    _INSERT_SQL = _sa_text(
-        "INSERT INTO llm_cost_log "
-        "(model, task_type, prompt_tokens, completion_tokens, estimated_cost_usd, success, timestamp) "
-        "VALUES (:model, :task_type, :prompt_tokens, :completion_tokens, "
-        ":estimated_cost_usd, :success, :timestamp)"
-    )
-    _SELECT_PERIOD_SQL = _sa_text(
-        "SELECT model, task_type, prompt_tokens, completion_tokens, estimated_cost_usd "
-        "FROM llm_cost_log WHERE timestamp >= :since"
-    )
-    _SELECT_BY_TASK_SQL = _sa_text(
-        "SELECT estimated_cost_usd FROM llm_cost_log WHERE task_type = :task_type"
-    )
-except Exception:  # pragma: no cover — sqlalchemy not available at import time
-    _INSERT_SQL = None  # type: ignore[assignment]
-    _SELECT_PERIOD_SQL = None  # type: ignore[assignment]
-    _SELECT_BY_TASK_SQL = None  # type: ignore[assignment]

@@ -28,7 +28,7 @@ try:
         system_health: Dict[str, Any] = {"cpu_percent": 0.0, "ram_percent": 0.0, "status": "healthy"}
         evolution_state: str = "idle"
 
-        model_config = {"extra": "allow"}  # tolera campos desconhecidos
+        model_config = {"extra": "allow"}  # tolerância retroativa: aceita campos legados (strict=False)
 
     _PYDANTIC_AVAILABLE = True
 except ImportError:  # pragma: no cover
@@ -59,11 +59,16 @@ class ContextManager(NexusComponent):
     # ------------------------------------------------------------------
 
     def execute(self, context: Any = None, action: str = "status", data: Optional[dict] = None) -> dict:
-        """Ponto de entrada único exigido pelo Nexus."""
-        # Support legacy positional-arg style: execute("save", {...})
+        """Ponto de entrada único exigido pelo Nexus.
+
+        Suporta dois estilos de chamada:
+            1. Nexus padrão: ``execute({"action": "read_context"})``
+            2. Legacy posicional: ``execute("save", data={...})``
+        """
+        # Support legacy positional-arg style: execute("save", data={...})
         if isinstance(context, str):
             action = context
-            data = data  # already set
+            # data already provided via keyword argument
         elif isinstance(context, dict):
             action = context.get("action", "status")
             data = context.get("data")

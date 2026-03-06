@@ -247,7 +247,7 @@ class ProceduralMemoryAdapter(NexusComponent):
             from app.domain.models.thought_log import ThoughtLog
             with Session(engine) as session:
                 rows = session.exec(
-                    select(ThoughtLog).where(ThoughtLog.success == True)  # noqa: E712
+                    select(ThoughtLog).where(ThoughtLog.success.is_(True))  # noqa: E712
                 ).all()
                 return [
                     {

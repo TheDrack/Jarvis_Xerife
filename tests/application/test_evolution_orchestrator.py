@@ -106,10 +106,8 @@ class TestEvolutionOrchestratorFailureFlow:
         assert result["success"] is False
         assert result["reason"] == "invalid_syntax"
         mock_tls.create_thought.assert_called_once()
-        call_kwargs = mock_tls.create_thought.call_args
-        assert call_kwargs.kwargs.get("success") is False or (
-            len(call_kwargs.args) > 0 and call_kwargs.args[-1] is False
-        )
+        call_kwargs = mock_tls.create_thought.call_args.kwargs
+        assert call_kwargs.get("success") is False
 
 
 class TestEvolutionOrchestratorProceduralMemory:

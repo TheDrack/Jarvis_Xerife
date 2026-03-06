@@ -60,9 +60,9 @@ class TestOllamaAdapterExecute:
 
         assert result["model"] == "deepseek-r1:8b"
         mock_gen.assert_called_once()
-        call_kwargs = mock_gen.call_args
-        assert call_kwargs.args[0] == "test"
-        assert call_kwargs.kwargs.get("model") == "deepseek-r1:8b" or call_kwargs.args[1] == "deepseek-r1:8b"
+        # _generate(prompt, model=...) — first positional arg is prompt
+        assert mock_gen.call_args.args[0] == "test"
+        assert mock_gen.call_args.kwargs.get("model") == "deepseek-r1:8b"
 
     def test_execute_retorna_success_false_quando_chat_falha(self):
         adapter = OllamaAdapter()

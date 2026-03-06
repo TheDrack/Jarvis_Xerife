@@ -147,7 +147,12 @@ class OllamaAdapter(NexusComponent):
         json_mode: bool = True,
         system: Optional[str] = None,
     ) -> str:
-        """Legacy alias para _generate (mantido para compatibilidade com testes existentes)."""
+        """Legacy alias para _generate.
+
+        Mantém ``json_mode=True`` como default para compatibilidade com
+        código existente que o usava diretamente (o ``_generate`` usa False
+        como default para o endpoint /api/generate).
+        """
         return self._generate(prompt, model=model, json_mode=json_mode, system=system)
 
     def list_local_models(self) -> list[str]:
