@@ -1,7 +1,7 @@
 # JARVIS – Status Atual do Projeto
 
 > **Data:** 2026-03-06  
-> **Situação geral:** Reorganização estrutural concluída. Refactoring de módulos grandes finalizado. Etapas 1–5 do plano de evolução arquitetural implementadas.
+> **Situação geral:** Reorganização estrutural concluída. Etapas 1–9 do plano de evolução arquitetural implementadas. Auto-evolução reativada com loop completo e Gatekeeper.
 
 ---
 
@@ -18,20 +18,26 @@
 | Domínio (Modelos, Serviços) | ✅ Ativo |
 | **Memória Vetorial (FAISS)** | ✅ **Ativo** (biográfica, 30 dias) |
 | **Visão Computacional (Gemini Flash)** | ✅ **Ativo** (screenshot / webcam) |
-| **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** (CPU/RAM preditivo, perímetro tático, consolidação semântica) |
+| **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** (CPU/RAM preditivo, perímetro tático, consolidação semântica, fine-tuning trigger) |
 | **LocalRepairAgent (Self-Healing Local)** | ✅ **Ativo** (primeiro estágio, < 1 s) |
-| **EvolutionOrchestrator** | ✅ **Ativo** (loop agêntico + Gatekeeper + MetaReflection) |
+| **EvolutionOrchestrator** | ✅ **Ativo** (loop agêntico + Gatekeeper + MetaReflection + CapabilityManager) |
 | **OllamaAdapter (LLM local)** | ✅ **Ativo** (code_generation, self_repair) |
 | **CostTracker (auditoria LLM)** | ✅ **Ativo** (SQLite, EMA por modelo) |
 | **ProceduralMemory** | ✅ **Ativo** (índice vetorial de soluções) |
 | **CapabilityIndexService** | ✅ **Ativo** (busca semântica top-k, EMA reliability) |
-| **LLMRouter (ETAPA 1)** | ✅ **Ativo** (seleção dinâmica por task_type + fallback por confiabilidade) |
+| **LLMRouter (ETAPA 1)** | ✅ **Ativo** (seleção dinâmica por task_type + fallback por confiabilidade + `preferred_provider`) |
 | **WorkingMemory (ETAPA 2)** | ✅ **Ativo** (deque circular em RAM, 50 entradas, volátil) |
 | **SemanticMemory (ETAPA 2)** | ✅ **Ativo** (grafo de conhecimento, NetworkX opcional) |
-| **EvolutionGatekeeper (ETAPA 3)** | ✅ **Ativo** (4 verificações: testes, estabilidade, frozen, núcleo) |
+| **EvolutionGatekeeper (ETAPA 3)** | ✅ **Ativo** (5 verificações: testes, estabilidade, frozen, núcleo, **sandbox**) |
 | **MetaReflection (ETAPA 4)** | ✅ **Ativo** (reflexão periódica, data/meta_reflection_latest.jrvs) |
 | **Grafo de Dependências de Capabilities (ETAPA 5)** | ✅ **Ativo** (DAG, caminho crítico, executable capabilities) |
-| Auto-Evolução (loop completo) | ⏸️ **PAUSADA** (reorganização em curso) |
+| **Auto-Evolução (loop completo com Gatekeeper) (ETAPA 6)** | ✅ **Ativo (loop completo com Gatekeeper)** |
+| **JarvisDevAgent (ETAPA 7)** | ✅ **Ativo** (agente autônomo de desenvolvimento, `POST /v1/dev-agent/run`) |
+| **EvolutionSandbox (ETAPA 8)** | ✅ **Ativo** (testes isolados antes de aplicar propostas) |
+| **FineTuneDatasetCollector (ETAPA 9)** | ✅ **Ativo** (coleta pares JSONL para fine-tuning LoRA) |
+| **FineTuneTriggerService (ETAPA 9)** | ✅ **Ativo** (disparo automático via OverwatchDaemon a cada 100 ticks/semana) |
+| **Capabilities (cap_*.py) — Correção Crítica A** | ✅ **Corrigido** (78 arquivos: nomes de classe, imports e aliases inválidos) |
+| **LLMRouter/AIGateway — Correção Crítica B** | ✅ **Unificado** (LLMRouter é a política; AIGateway é o executor) |
 | Playwright Worker | 🔧 Em revisão |
 | Instalador PyInstaller | 🔧 Em revisão |
 
@@ -158,30 +164,52 @@ O `FieldVision` complementa o self-healing monitorando logs do sistema:
 
 ---
 
+## ✅ Auto-Evolução — Loop Completo com Gatekeeper (ETAPA 6)
 
+O sistema de auto-evolução está **ativo** com loop completo:
 
-Arquivos em `.frozen/` são código não utilizado atualmente.  
-Eles ficam preservados até que sejam necessários.  
-Para reativar um arquivo frozen:
-1. Mova-o para o local correto em `app/`
-2. Registre-o no Nexus via `data/nexus_registry.json`
-3. Atualize esta documentação
-
----
-
-## ⏸️ Auto-Evolução (PAUSADA)
-
-O sistema de auto-evolução está **pausado** enquanto a reorganização estrutural é concluída.
-
-- Workflow: `.github/workflows/auto_evolution_triggerV2.yml`
-- Status: `workflow_dispatch` apenas (requer acionamento manual)
-- Para reativar: revisar estrutura → estabilizar → remover pausa
+- **Workflow:** `.github/workflows/auto_evolution_triggerV2.yml`
+- **Schedule:** `0 2 * * *` (diário às 02:00 UTC) + `workflow_dispatch` manual
+- **Pipeline:** MetaReflection → CapabilityManager → Gatekeeper (5 checks) → Proposta → PR
+- **Gatekeeper:** 5 verificações: testes, estabilidade, frozen, núcleo, **sandbox**
 
 ---
 
-## 🚧 Pendências
+## 🤖 JarvisDevAgent (ETAPA 7)
 
-- [ ] Revisar `app/domain/gears/` – alguns `cap_*_core.py` pendentes de revisão
-- [ ] Revisar `app/domain/capabilities/` – necessita limpeza
-- [ ] Playwright Worker necessita revisão de integração
-- [ ] Reativar auto-evolução completa após estabilização
+Agente autônomo de desenvolvimento do próprio JARVIS:
+
+- Seleciona capability via `CapabilityManager.get_executable_capabilities()`
+- Consulta `SemanticMemory` por soluções similares (few-shot)
+- Gera código via `LLMRouter` com `task_type=code_generation`
+- Submete ao `EvolutionGatekeeper` antes de criar PR
+- Registra cada ciclo na `SemanticMemory` como `dev_cycle`
+- **API:** `POST /v1/dev-agent/run` (assíncrono, retorna `job_id`)
+- Registrado no Nexus como `jarvis_dev_agent`
+
+---
+
+## 🏖️ EvolutionSandbox (ETAPA 8)
+
+Sandbox de execução isolada para propostas de código:
+
+- Cria diretório temporário em `data/sandbox/<timestamp>/`
+- Copia arquivo-alvo, aplica proposta e executa `pytest tests/ -x`
+- Integrado ao `EvolutionGatekeeper` como 5ª verificação
+- Configurável via `SANDBOX_ENABLED` no `.env` (padrão `true`)
+- Registrado no Nexus como `evolution_sandbox`
+
+---
+
+## 🎓 Fine-Tuning Pipeline (ETAPA 9)
+
+Infraestrutura para fine-tuning LoRA do modelo local:
+
+- **`FineTuneDatasetCollector`:** coleta pares `(prompt, código)` com reward ≥ threshold
+- **`FineTuneTriggerService`:** dispara quando há ≥ 50 novos pares
+- **`OverwatchDaemon`:** executa o trigger a cada 100 ticks ou 1x/semana
+- Dataset exportado em `data/finetune/dataset_<timestamp>.jsonl`
+- Metadados em `data/finetune/trigger_latest.json`
+- Registrados no Nexus como `finetune_dataset_collector` e `finetune_trigger_service`
+
+---

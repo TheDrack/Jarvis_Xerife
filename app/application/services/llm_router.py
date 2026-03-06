@@ -81,7 +81,10 @@ class LLMRouter(NexusComponent):
         adapter_name = getattr(adapter, "__class__", type(adapter)).__name__
         logger.info("[LLMRouter] task_type='%s' → %s", task_type, adapter_name)
         try:
-            result = adapter.execute(ctx)
+            # Enrich context with preferred_provider for AIGateway-based adapters so that
+            # the selection policy lives solely in LLMRouter (not duplicated in AIGateway).
+            enriched_ctx = self._enrich_context_for_gateway(ctx, task_type)
+            result = adapter.execute(enriched_ctx)
             return {**result, "routed_to": adapter_name, "task_type": task_type}
         except Exception as exc:
             logger.error("[LLMRouter] Falha no adaptador %s: %s", adapter_name, exc)
@@ -182,6 +185,25 @@ class LLMRouter(NexusComponent):
         if self._cost_tracker is None:
             self._cost_tracker = self._resolve_adapter("cost_tracker_adapter")
         return self._cost_tracker
+
+    def _enrich_context_for_gateway(self, ctx: Dict[str, Any], task_type: str) -> Dict[str, Any]:
+        """Injeta ``preferred_provider`` no contexto para adaptadores baseados em AIGateway.
+
+        Isso garante que a política de seleção resida exclusivamente no LLMRouter
+        e não seja duplicada dentro do AIGateway.
+
+        - ``vision`` → ``gemini``
+        - outros → não altera (AIGateway usa seu provider padrão)
+        """
+        if ctx.get("preferred_provider"):
+            # Já definido pelo chamador — não sobrescrever.
+            return ctx
+
+        _VISION_TASKS = {"vision", "reasoning"}
+        if task_type in _VISION_TASKS:
+            return {**ctx, "preferred_provider": "gemini"}
+
+        return ctx
 
 
 def _adapter_name_to_model(adapter_name: str) -> str:

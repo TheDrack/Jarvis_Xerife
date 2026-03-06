@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-031(NexusComponent):
+class Cap031(NexusComponent):
     """
     Capacidade: Infer intention from behavior
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-031(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-031'}
 
-# Nexus Compatibility
-Cap031 = Cap

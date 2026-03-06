@@ -135,3 +135,120 @@ class TestEvolutionOrchestratorProceduralMemory:
         assert result["success"] is True
         assert result["source"] == "procedural_memory"
         mock_mem.search_solution.assert_called_once_with("NullPointerError")
+
+
+class TestEvolutionOrchestratorFullCycle:
+    """Etapa 6.6 — Teste de integração: ciclo completo com MetaReflection + Gatekeeper."""
+
+    def test_full_cycle_meta_reflection_injected_gatekeeper_approves(self, orchestrator, tmp_path):
+        """Ciclo completo: MetaReflection injetada → Gatekeeper aprovando → proposta gerada."""
+        valid_code = '"""Ciclo completo."""\n\ndef evolve():\n    return True\n'
+        meta_ctx = {"insights": ["JARVIS está estável", "Focar em capabilities de rede"]}
+
+        mock_gatekeeper = MagicMock()
+        mock_gatekeeper.approve_evolution.return_value = (True, "approved")
+
+        mock_metabolism = MagicMock()
+        mock_metabolism.execute.return_value = {"success": True, "result": f"```python\n{valid_code}```"}
+
+        mock_worker = MagicMock()
+        mock_worker.submit_pull_request.return_value = {"success": True, "pr_url": "http://pr"}
+
+        import app.application.services.evolution_orchestrator as evo_mod
+
+        original_proposals = evo_mod._PROPOSALS_DIR
+        evo_mod._PROPOSALS_DIR = tmp_path / "proposals"
+
+        try:
+            with patch.object(orchestrator, "_load_meta_reflection", return_value=meta_ctx):
+                with patch("app.application.services.evolution_orchestrator.nexus") as mock_nexus:
+                    def resolve(name):
+                        if name == "evolution_gatekeeper":
+                            return mock_gatekeeper
+                        if name == "metabolism_core":
+                            return mock_metabolism
+                        if name == "github_worker":
+                            return mock_worker
+                        return None
+
+                    mock_nexus.resolve.side_effect = resolve
+
+                    result = orchestrator.execute({"error_snippet": "gap a implementar"})
+        finally:
+            evo_mod._PROPOSALS_DIR = original_proposals
+
+        # Verifica que o ciclo foi bem-sucedido
+        assert result["success"] is True
+        assert result["source"] == "llm"
+
+        # Verifica que o Gatekeeper foi consultado
+        mock_gatekeeper.approve_evolution.assert_called_once()
+
+        # Verifica que a proposta foi salva em data/evolution_proposals/
+        proposals_dir = tmp_path / "proposals"
+        proposal_files = list(proposals_dir.glob("*.py"))
+        assert len(proposal_files) == 1
+        content = proposal_files[0].read_text(encoding="utf-8")
+        assert "evolve" in content
+
+    def test_gatekeeper_rejection_escalates_to_commander(self, orchestrator):
+        """Quando o Gatekeeper rejeita, deve escalar para COMMANDER_NEEDED."""
+        mock_gatekeeper = MagicMock()
+        mock_gatekeeper.approve_evolution.return_value = (False, "tests_regressed")
+
+        mock_metabolism = MagicMock()
+
+        with patch("app.application.services.evolution_orchestrator.nexus") as mock_nexus:
+            def resolve(name):
+                if name == "evolution_gatekeeper":
+                    return mock_gatekeeper
+                if name == "metabolism_core":
+                    return mock_metabolism
+                return None
+
+            mock_nexus.resolve.side_effect = resolve
+
+            result = orchestrator.execute({})
+
+        assert result["success"] is False
+        assert "gatekeeper_blocked" in result["reason"]
+
+    def test_capability_selected_via_capability_manager(self, orchestrator, tmp_path):
+        """Verifica que a capability-alvo é selecionada via CapabilityManager."""
+        valid_code = '"""Cap via CapabilityManager."""\ndef run(): pass\n'
+
+        mock_cap_manager = MagicMock()
+        mock_cap_manager.get_executable_capabilities.return_value = [
+            {"id": "CAP-042", "title": "Autonomous test capability"}
+        ]
+
+        mock_metabolism = MagicMock()
+        mock_metabolism.execute.return_value = {"success": True, "result": f"```python\n{valid_code}```"}
+
+        mock_worker = MagicMock()
+        mock_worker.submit_pull_request.return_value = {"success": True}
+
+        import app.application.services.evolution_orchestrator as evo_mod
+
+        original_proposals = evo_mod._PROPOSALS_DIR
+        evo_mod._PROPOSALS_DIR = tmp_path / "proposals"
+
+        try:
+            with patch("app.application.services.evolution_orchestrator.nexus") as mock_nexus:
+                def resolve(name):
+                    if name == "capability_manager":
+                        return mock_cap_manager
+                    if name == "metabolism_core":
+                        return mock_metabolism
+                    if name == "github_worker":
+                        return mock_worker
+                    return None
+
+                mock_nexus.resolve.side_effect = resolve
+
+                result = orchestrator.execute({})
+        finally:
+            evo_mod._PROPOSALS_DIR = original_proposals
+
+        assert result["success"] is True
+        mock_cap_manager.get_executable_capabilities.assert_called_once()

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-070(NexusComponent):
+class Cap070(NexusComponent):
     """
     Capacidade: Optimize stability
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-070(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-070'}
 
-# Nexus Compatibility
-Cap070 = Cap

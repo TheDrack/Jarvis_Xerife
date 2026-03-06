@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-041(NexusComponent):
+class Cap041(NexusComponent):
     """
     Capacidade: Simulate technical consequences before action
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-041(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-041'}
 
-# Nexus Compatibility
-Cap041 = Cap

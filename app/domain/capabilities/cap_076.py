@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-076(NexusComponent):
+class Cap076(NexusComponent):
     """
     Capacidade: Measure real economic return
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-076(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-076'}
 
-# Nexus Compatibility
-Cap076 = Cap

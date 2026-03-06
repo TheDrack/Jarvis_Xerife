@@ -18,6 +18,7 @@ from app.adapters.infrastructure.api_models import Token, User
 from app.adapters.infrastructure.auth_adapter import AuthAdapter
 from app.adapters.infrastructure.routers.assistant import create_assistant_router
 from app.adapters.infrastructure.routers.bridge import create_bridge_router
+from app.adapters.infrastructure.routers.dev_agent import create_dev_agent_router
 from app.adapters.infrastructure.routers.devices import create_devices_router
 from app.adapters.infrastructure.routers.evolution import create_evolution_router
 from app.adapters.infrastructure.routers.extensions import create_extensions_router
@@ -207,6 +208,7 @@ def create_api_server(
     app.include_router(create_evolution_router(db_adapter, get_current_user))
     app.include_router(create_bridge_router())
     app.include_router(create_utility_router(db_adapter, get_current_user))
+    app.include_router(create_dev_agent_router())
 
     return app
 

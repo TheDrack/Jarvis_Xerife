@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-020(NexusComponent):
+class Cap020(NexusComponent):
     """
     Capacidade: Identify redundant capabilities
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-020(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-020'}
 
-# Nexus Compatibility
-Cap020 = Cap

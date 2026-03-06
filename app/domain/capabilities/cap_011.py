@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-011(NexusComponent):
+class Cap011(NexusComponent):
     """
     Capacidade: Request human intervention only when required
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-011(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-011'}
 
-# Nexus Compatibility
-Cap011 = Cap

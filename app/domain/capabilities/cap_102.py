@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-102(NexusComponent):
+class Cap102(NexusComponent):
     """
     Capacidade: Operate as personal cognitive infrastructure
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-102(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-102'}
 
-# Nexus Compatibility
-Cap102 = Cap

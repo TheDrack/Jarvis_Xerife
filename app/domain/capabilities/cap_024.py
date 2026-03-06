@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-024(NexusComponent):
+class Cap024(NexusComponent):
     """
     Capacidade: Monitor performance degradation over time
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-024(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-024'}
 
-# Nexus Compatibility
-Cap024 = Cap

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-056(NexusComponent):
+class Cap056(NexusComponent):
     """
     Capacidade: Interrupt problematic executions
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-056(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-056'}
 
-# Nexus Compatibility
-Cap056 = Cap

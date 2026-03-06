@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-058(NexusComponent):
+class Cap058(NexusComponent):
     """
     Capacidade: Adapt plans during execution
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-058(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-058'}
 
-# Nexus Compatibility
-Cap058 = Cap

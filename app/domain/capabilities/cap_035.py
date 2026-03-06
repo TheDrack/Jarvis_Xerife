@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-035(NexusComponent):
+class Cap035(NexusComponent):
     """
     Capacidade: Detect changes in user patterns
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-035(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-035'}
 
-# Nexus Compatibility
-Cap035 = Cap

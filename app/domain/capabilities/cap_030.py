@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-030(NexusComponent):
+class Cap030(NexusComponent):
     """
     Capacidade: Correlate temporally distant events
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-030(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-030'}
 
-# Nexus Compatibility
-Cap030 = Cap

@@ -9,6 +9,7 @@ Verificações executadas em sequência:
     (b) Estabilidade recente — sem rollback nos últimos 3 ciclos.
     (c) Proteção de arquivos frozen — nenhum arquivo modificado em .frozen/.
     (d) Proteção do núcleo — bloqueia mudanças em app/core/ salvo override.
+    (e) Sandbox de execução — proposta é testada em ambiente isolado (EvolutionSandbox).
 
 Método principal::
 
@@ -125,6 +126,12 @@ class EvolutionGatekeeper(NexusComponent):
             self._log_decision(proposed_change, approved=False, reason=reason)
             return False, reason
 
+        # (e) Sandbox de execução (EvolutionSandbox)
+        ok, reason = self._check_sandbox(proposed_change)
+        if not ok:
+            self._log_decision(proposed_change, approved=False, reason=reason)
+            return False, reason
+
         self._log_decision(proposed_change, approved=True, reason="approved")
         return True, "approved"
 
@@ -216,6 +223,33 @@ class EvolutionGatekeeper(NexusComponent):
             if normalized in _PROTECTED_CORE_FILES:
                 return False, f"core_file_protected: {f}"
         return True, "ok"
+
+    def _check_sandbox(self, proposed_change: Dict[str, Any]) -> Tuple[bool, str]:
+        """(e) Testa o código proposto em sandbox isolado via EvolutionSandbox.
+
+        Se o EvolutionSandbox não estiver disponível ou estiver desabilitado,
+        a verificação passa por padrão (fail-open para desenvolvimento local).
+        """
+        proposed_code: str = proposed_change.get("proposed_code", "")
+        target_file: str = proposed_change.get("target_file", "")
+
+        if not proposed_code:
+            # Sem código para testar — verificação passa
+            return True, "ok"
+
+        try:
+            sandbox = nexus.resolve("evolution_sandbox")
+            if sandbox is None:
+                logger.debug("[EvolutionGatekeeper] EvolutionSandbox indisponível — verificação pulada.")
+                return True, "ok"
+            result = sandbox.test_proposal(proposed_code, target_file)
+            if result.get("passed", False):
+                return True, "ok"
+            errors = "; ".join(result.get("errors", []))
+            return False, f"sandbox_failed: {errors or 'tests_failed'}"
+        except Exception as exc:
+            logger.warning("[EvolutionGatekeeper] Erro no EvolutionSandbox: %s — passando.", exc)
+            return True, "ok"
 
     # ------------------------------------------------------------------
     # Audit logging

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-096(NexusComponent):
+class Cap096(NexusComponent):
     """
     Capacidade: Act proactively and safely
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-096(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-096'}
 
-# Nexus Compatibility
-Cap096 = Cap
