@@ -36,15 +36,17 @@ class TestFineTuneDatasetCollectorCollect:
         t.success = success
         t.problem_description = problem
         t.solution_attempt = solution
+        # Define ambos os campos de reward para compatibilidade com _is_successful()
+        t.reward_received = reward
         t.reward_value = reward
         return t
 
     def test_collect_filters_by_success(self, collector):
         """Deve incluir apenas pensamentos bem-sucedidos."""
         thoughts = [
-            self._make_thought("p1", "s1", success=True),
-            self._make_thought("p2", "s2", success=False),
-            self._make_thought("p3", "s3", success=True),
+            self._make_thought("p1", "s1", success=True, reward=1.0),
+            self._make_thought("p2", "s2", success=False, reward=1.0),
+            self._make_thought("p3", "s3", success=True, reward=1.0),
         ]
 
         mock_tls = MagicMock()
@@ -73,7 +75,7 @@ class TestFineTuneDatasetCollectorCollect:
             mock_nexus.resolve.return_value = mock_tls
             pairs = collector.collect(min_reward=0.7)
 
-        # Apenas p1 (0.9) e p3 (0.8) passam
+        # Apenas p1 (0.9) e p3 (0.8) passam (0.5 < 0.6 floor e < 0.7 threshold)
         assert len(pairs) == 2
 
     def test_collect_returns_empty_when_no_tls(self, collector):
@@ -119,6 +121,58 @@ class TestFineTuneDatasetCollectorExport:
         deep_path = str(tmp_path / "a" / "b" / "c" / "dataset.jsonl")
         collector.export_dataset(deep_path, pairs=[])
         assert Path(deep_path).exists()
+
+    def test_collect_includes_reward_field(self, collector):
+        """Pares coletados devem incluir campo 'reward' com valor do ThoughtLog."""
+        t = MagicMock()
+        t.success = True
+        t.problem_description = "my prompt"
+        t.solution_attempt = "def f(): pass"
+        t.reward_received = 0.8
+        t.reward_value = 0.8
+
+        mock_tls = MagicMock()
+        mock_tls.get_recent_thoughts.return_value = [t]
+
+        with patch("app.application.services.finetune_dataset_collector.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = mock_tls
+            pairs = collector.collect(min_reward=0.0)
+
+        assert len(pairs) == 1
+        assert "reward" in pairs[0]
+        assert pairs[0]["reward"] == 0.8
+
+    def test_collect_reward_floor_filters_low_rewards(self, collector):
+        """Pares com reward < 0.6 devem ser filtrados pelo REWARD_FLOOR."""
+        t_low = MagicMock()
+        t_low.success = True
+        t_low.problem_description = "prompt"
+        t_low.solution_attempt = "code"
+        t_low.reward_received = 0.4
+        t_low.reward_value = 0.4
+
+        t_high = MagicMock()
+        t_high.success = True
+        t_high.problem_description = "prompt2"
+        t_high.solution_attempt = "code2"
+        t_high.reward_received = 0.7
+        t_high.reward_value = 0.7
+
+        mock_tls = MagicMock()
+        mock_tls.get_recent_thoughts.return_value = [t_low, t_high]
+
+        with patch("app.application.services.finetune_dataset_collector.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = mock_tls
+            pairs = collector.collect(min_reward=0.0)
+
+        # t_low (0.4) é bloqueado pelo REWARD_FLOOR=0.6
+        assert len(pairs) == 1
+        assert pairs[0]["reward"] == 0.7
+
+    def test_set_last_reward(self, collector):
+        """set_last_reward deve armazenar o reward para uso interno."""
+        collector.set_last_reward(0.85)
+        assert collector._last_reward == 0.85
 
 
 # ---- FineTuneTriggerService --------------------------------------------------

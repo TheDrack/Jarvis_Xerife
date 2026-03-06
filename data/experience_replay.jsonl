@@ -43,3 +43,84 @@
 {"timestamp": "2026-03-06T19:15:35.422251+00:00", "epoch": 1772824535.4222572, "state": {}, "action_type": "a", "reward": 10.0}
 {"timestamp": "2026-03-06T19:15:35.422314+00:00", "epoch": 1772824535.422319, "state": {}, "action_type": "b", "reward": 5.0}
 {"timestamp": "2026-03-06T19:15:35.427803+00:00", "epoch": 1772824535.4278092, "state": {}, "action_type": "deploy_success", "reward": 50.0}
+{"timestamp": "2026-03-06T19:36:53.970214+00:00", "epoch": 1772825813.9702241, "state": {"cpu": 10.0}, "action_type": "pytest_pass", "reward": 10.0}
+{"timestamp": "2026-03-06T19:36:53.972289+00:00", "epoch": 1772825813.9722977, "state": {}, "action_type": "action_0", "reward": 0.0}
+{"timestamp": "2026-03-06T19:36:53.972371+00:00", "epoch": 1772825813.9723759, "state": {}, "action_type": "action_1", "reward": 1.0}
+{"timestamp": "2026-03-06T19:36:53.972422+00:00", "epoch": 1772825813.972426, "state": {}, "action_type": "action_2", "reward": 2.0}
+{"timestamp": "2026-03-06T19:36:53.972467+00:00", "epoch": 1772825813.9724703, "state": {}, "action_type": "action_3", "reward": 3.0}
+{"timestamp": "2026-03-06T19:36:53.972509+00:00", "epoch": 1772825813.9725122, "state": {}, "action_type": "action_4", "reward": 4.0}
+{"timestamp": "2026-03-06T19:36:53.974328+00:00", "epoch": 1772825813.9743345, "state": {}, "action_type": "a", "reward": 10.0}
+{"timestamp": "2026-03-06T19:36:53.974392+00:00", "epoch": 1772825813.9743965, "state": {}, "action_type": "b", "reward": 5.0}
+{"timestamp": "2026-03-06T19:36:53.979734+00:00", "epoch": 1772825813.9797409, "state": {}, "action_type": "deploy_success", "reward": 50.0}
+{"timestamp": "2026-03-06T19:37:06.227393+00:00", "epoch": 1772825826.2274024, "state": {"cpu": 10.0}, "action_type": "pytest_pass", "reward": 10.0}
+{"timestamp": "2026-03-06T19:37:06.229337+00:00", "epoch": 1772825826.2293437, "state": {}, "action_type": "action_0", "reward": 0.0}
+{"timestamp": "2026-03-06T19:37:06.229408+00:00", "epoch": 1772825826.2294123, "state": {}, "action_type": "action_1", "reward": 1.0}
+{"timestamp": "2026-03-06T19:37:06.229458+00:00", "epoch": 1772825826.2294624, "state": {}, "action_type": "action_2", "reward": 2.0}
+{"timestamp": "2026-03-06T19:37:06.229504+00:00", "epoch": 1772825826.229508, "state": {}, "action_type": "action_3", "reward": 3.0}
+{"timestamp": "2026-03-06T19:37:06.229548+00:00", "epoch": 1772825826.229551, "state": {}, "action_type": "action_4", "reward": 4.0}
+{"timestamp": "2026-03-06T19:37:06.231440+00:00", "epoch": 1772825826.2314458, "state": {}, "action_type": "a", "reward": 10.0}
+{"timestamp": "2026-03-06T19:37:06.231513+00:00", "epoch": 1772825826.231518, "state": {}, "action_type": "b", "reward": 5.0}
+{"timestamp": "2026-03-06T19:37:06.237111+00:00", "epoch": 1772825826.2371178, "state": {}, "action_type": "deploy_success", "reward": 50.0}
+{"timestamp": "2026-03-06T19:41:38.854203+00:00", "epoch": 1772826098.85421, "state": {"cpu": 10.0}, "action_type": "pytest_pass", "reward": 10.0}
+{"timestamp": "2026-03-06T19:41:38.856149+00:00", "epoch": 1772826098.8561559, "state": {}, "action_type": "action_0", "reward": 0.0}
+{"timestamp": "2026-03-06T19:41:38.856214+00:00", "epoch": 1772826098.856219, "state": {}, "action_type": "action_1", "reward": 1.0}
+{"timestamp": "2026-03-06T19:41:38.856265+00:00", "epoch": 1772826098.856269, "state": {}, "action_type": "action_2", "reward": 2.0}
+{"timestamp": "2026-03-06T19:41:38.856310+00:00", "epoch": 1772826098.856314, "state": {}, "action_type": "action_3", "reward": 3.0}
+{"timestamp": "2026-03-06T19:41:38.856353+00:00", "epoch": 1772826098.8563564, "state": {}, "action_type": "action_4", "reward": 4.0}
+{"timestamp": "2026-03-06T19:41:38.858259+00:00", "epoch": 1772826098.8582647, "state": {}, "action_type": "a", "reward": 10.0}
+{"timestamp": "2026-03-06T19:41:38.858320+00:00", "epoch": 1772826098.8583243, "state": {}, "action_type": "b", "reward": 5.0}
+{"timestamp": "2026-03-06T19:41:38.866162+00:00", "epoch": 1772826098.8661685, "state": {}, "action_type": "deploy_success", "reward": 50.0}
+{"timestamp": "2026-03-06T19:41:49.375005+00:00", "epoch": 1772826109.375013, "state": {"cpu": 10.0}, "action_type": "pytest_pass", "reward": 10.0}
+{"timestamp": "2026-03-06T19:41:49.377010+00:00", "epoch": 1772826109.3770163, "state": {}, "action_type": "action_0", "reward": 0.0}
+{"timestamp": "2026-03-06T19:41:49.377079+00:00", "epoch": 1772826109.377084, "state": {}, "action_type": "action_1", "reward": 1.0}
+{"timestamp": "2026-03-06T19:41:49.377131+00:00", "epoch": 1772826109.3771343, "state": {}, "action_type": "action_2", "reward": 2.0}
+{"timestamp": "2026-03-06T19:41:49.377176+00:00", "epoch": 1772826109.3771799, "state": {}, "action_type": "action_3", "reward": 3.0}
+{"timestamp": "2026-03-06T19:41:49.377219+00:00", "epoch": 1772826109.377223, "state": {}, "action_type": "action_4", "reward": 4.0}
+{"timestamp": "2026-03-06T19:41:49.379172+00:00", "epoch": 1772826109.3791778, "state": {}, "action_type": "a", "reward": 10.0}
+{"timestamp": "2026-03-06T19:41:49.379235+00:00", "epoch": 1772826109.3792398, "state": {}, "action_type": "b", "reward": 5.0}
+{"timestamp": "2026-03-06T19:41:49.387239+00:00", "epoch": 1772826109.3872454, "state": {}, "action_type": "deploy_success", "reward": 50.0}
+{"timestamp": "2026-03-06T19:42:58.310427+00:00", "epoch": 1772826178.3104339, "state": {"cpu": 10.0}, "action_type": "pytest_pass", "reward": 10.0}
+{"timestamp": "2026-03-06T19:42:58.312412+00:00", "epoch": 1772826178.3124185, "state": {}, "action_type": "action_0", "reward": 0.0}
+{"timestamp": "2026-03-06T19:42:58.312478+00:00", "epoch": 1772826178.3124826, "state": {}, "action_type": "action_1", "reward": 1.0}
+{"timestamp": "2026-03-06T19:42:58.312529+00:00", "epoch": 1772826178.3125327, "state": {}, "action_type": "action_2", "reward": 2.0}
+{"timestamp": "2026-03-06T19:42:58.312573+00:00", "epoch": 1772826178.3125765, "state": {}, "action_type": "action_3", "reward": 3.0}
+{"timestamp": "2026-03-06T19:42:58.312615+00:00", "epoch": 1772826178.3126185, "state": {}, "action_type": "action_4", "reward": 4.0}
+{"timestamp": "2026-03-06T19:42:58.314545+00:00", "epoch": 1772826178.3145514, "state": {}, "action_type": "a", "reward": 10.0}
+{"timestamp": "2026-03-06T19:42:58.314608+00:00", "epoch": 1772826178.3146124, "state": {}, "action_type": "b", "reward": 5.0}
+{"timestamp": "2026-03-06T19:42:58.322571+00:00", "epoch": 1772826178.3225777, "state": {}, "action_type": "deploy_success", "reward": 50.0}
+{"timestamp": "2026-03-06T19:43:42.608962+00:00", "epoch": 1772826222.6089706, "state": {"cpu": 10.0}, "action_type": "pytest_pass", "reward": 10.0}
+{"timestamp": "2026-03-06T19:43:42.610987+00:00", "epoch": 1772826222.610995, "state": {}, "action_type": "action_0", "reward": 0.0}
+{"timestamp": "2026-03-06T19:43:42.611073+00:00", "epoch": 1772826222.6110773, "state": {}, "action_type": "action_1", "reward": 1.0}
+{"timestamp": "2026-03-06T19:43:42.611126+00:00", "epoch": 1772826222.6111298, "state": {}, "action_type": "action_2", "reward": 2.0}
+{"timestamp": "2026-03-06T19:43:42.611170+00:00", "epoch": 1772826222.6111743, "state": {}, "action_type": "action_3", "reward": 3.0}
+{"timestamp": "2026-03-06T19:43:42.611213+00:00", "epoch": 1772826222.611216, "state": {}, "action_type": "action_4", "reward": 4.0}
+{"timestamp": "2026-03-06T19:43:42.613266+00:00", "epoch": 1772826222.613273, "state": {}, "action_type": "a", "reward": 10.0}
+{"timestamp": "2026-03-06T19:43:42.613330+00:00", "epoch": 1772826222.6133354, "state": {}, "action_type": "b", "reward": 5.0}
+{"timestamp": "2026-03-06T19:43:42.621137+00:00", "epoch": 1772826222.6211438, "state": {}, "action_type": "deploy_success", "reward": 50.0}
+{"timestamp": "2026-03-06T19:45:39.677739+00:00", "epoch": 1772826339.677746, "state": {"cpu": 10.0}, "action_type": "pytest_pass", "reward": 10.0}
+{"timestamp": "2026-03-06T19:45:39.679711+00:00", "epoch": 1772826339.6797175, "state": {}, "action_type": "action_0", "reward": 0.0}
+{"timestamp": "2026-03-06T19:45:39.679780+00:00", "epoch": 1772826339.6797843, "state": {}, "action_type": "action_1", "reward": 1.0}
+{"timestamp": "2026-03-06T19:45:39.679831+00:00", "epoch": 1772826339.679835, "state": {}, "action_type": "action_2", "reward": 2.0}
+{"timestamp": "2026-03-06T19:45:39.679876+00:00", "epoch": 1772826339.6798801, "state": {}, "action_type": "action_3", "reward": 3.0}
+{"timestamp": "2026-03-06T19:45:39.679942+00:00", "epoch": 1772826339.679946, "state": {}, "action_type": "action_4", "reward": 4.0}
+{"timestamp": "2026-03-06T19:45:39.681860+00:00", "epoch": 1772826339.681866, "state": {}, "action_type": "a", "reward": 10.0}
+{"timestamp": "2026-03-06T19:45:39.681946+00:00", "epoch": 1772826339.6819513, "state": {}, "action_type": "b", "reward": 5.0}
+{"timestamp": "2026-03-06T19:45:39.689790+00:00", "epoch": 1772826339.6897972, "state": {}, "action_type": "deploy_success", "reward": 50.0}
+{"timestamp": "2026-03-06T20:10:06.711439+00:00", "epoch": 1772827806.711445, "state": {"cpu": 10.0}, "action_type": "pytest_pass", "reward": 10.0}
+{"timestamp": "2026-03-06T20:10:06.713703+00:00", "epoch": 1772827806.7137094, "state": {}, "action_type": "action_0", "reward": 0.0}
+{"timestamp": "2026-03-06T20:10:06.713771+00:00", "epoch": 1772827806.7137754, "state": {}, "action_type": "action_1", "reward": 1.0}
+{"timestamp": "2026-03-06T20:10:06.713817+00:00", "epoch": 1772827806.7138207, "state": {}, "action_type": "action_2", "reward": 2.0}
+{"timestamp": "2026-03-06T20:10:06.713856+00:00", "epoch": 1772827806.7138596, "state": {}, "action_type": "action_3", "reward": 3.0}
+{"timestamp": "2026-03-06T20:10:06.713893+00:00", "epoch": 1772827806.713896, "state": {}, "action_type": "action_4", "reward": 4.0}
+{"timestamp": "2026-03-06T20:10:06.716151+00:00", "epoch": 1772827806.7161577, "state": {}, "action_type": "a", "reward": 10.0}
+{"timestamp": "2026-03-06T20:10:06.716214+00:00", "epoch": 1772827806.7162185, "state": {}, "action_type": "b", "reward": 5.0}
+{"timestamp": "2026-03-06T20:10:06.725207+00:00", "epoch": 1772827806.7252126, "state": {}, "action_type": "deploy_success", "reward": 50.0}
+{"timestamp": "2026-03-06T20:11:13.306622+00:00", "epoch": 1772827873.3066287, "state": {"cpu": 10.0}, "action_type": "pytest_pass", "reward": 10.0}
+{"timestamp": "2026-03-06T20:11:13.308931+00:00", "epoch": 1772827873.3089378, "state": {}, "action_type": "action_0", "reward": 0.0}
+{"timestamp": "2026-03-06T20:11:13.309010+00:00", "epoch": 1772827873.3090143, "state": {}, "action_type": "action_1", "reward": 1.0}
+{"timestamp": "2026-03-06T20:11:13.309055+00:00", "epoch": 1772827873.3090591, "state": {}, "action_type": "action_2", "reward": 2.0}
+{"timestamp": "2026-03-06T20:11:13.309097+00:00", "epoch": 1772827873.3091004, "state": {}, "action_type": "action_3", "reward": 3.0}
+{"timestamp": "2026-03-06T20:11:13.309142+00:00", "epoch": 1772827873.3091455, "state": {}, "action_type": "action_4", "reward": 4.0}
+{"timestamp": "2026-03-06T20:11:13.311490+00:00", "epoch": 1772827873.3114965, "state": {}, "action_type": "a", "reward": 10.0}
+{"timestamp": "2026-03-06T20:11:13.311550+00:00", "epoch": 1772827873.3115547, "state": {}, "action_type": "b", "reward": 5.0}
+{"timestamp": "2026-03-06T20:11:13.320784+00:00", "epoch": 1772827873.3207903, "state": {}, "action_type": "deploy_success", "reward": 50.0}

@@ -158,6 +158,39 @@ class TestEvolutionGatekeeperFullFlow:
         assert approved is True
         assert reason == "approved"
 
+    def test_approve_calls_reward_signal_provider(self):
+        """Ao aprovar, deve chamar calculate_reward no RewardSignalProvider."""
+        gk = EvolutionGatekeeper()
+        proposed = {
+            "files_modified": ["app/application/services/new_feature.py"],
+            "before_state": {"tests_passing_rate": 0.9},
+            "after_state": {"tests_passing_rate": 1.0},
+        }
+
+        mock_result = MagicMock()
+        mock_result.stdout = "400 tests collected\n"
+        mock_result.stderr = ""
+
+        mock_reward_provider = MagicMock()
+        mock_reward_provider.calculate_reward.return_value = 0.9
+
+        def _resolve(name):
+            if name == "reward_signal_provider":
+                return mock_reward_provider
+            return None
+
+        with patch("subprocess.run", return_value=mock_result), \
+             patch("app.application.services.evolution_gatekeeper.nexus") as mock_nexus:
+            mock_nexus.resolve.side_effect = _resolve
+            approved, reason = gk.approve_evolution(proposed)
+
+        assert approved is True
+        mock_reward_provider.calculate_reward.assert_called_once_with(
+            before_state={"tests_passing_rate": 0.9},
+            after_state={"tests_passing_rate": 1.0},
+            human_approval=True,
+        )
+
     def test_blocks_when_frozen_file_in_change(self):
         """Deve bloquear quando há arquivo frozen na mudança proposta."""
         gk = EvolutionGatekeeper()
