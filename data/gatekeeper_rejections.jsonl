@@ -29,3 +29,7 @@
 {"timestamp": 1772826178.3823793, "reason": "frozen_file_protected: .frozen/old_module.py", "check_failed": "frozen_files", "files_modified": [".frozen/old_module.py"]}
 {"timestamp": 1772826222.6853902, "reason": "frozen_file_protected: .frozen/old_module.py", "check_failed": "frozen_files", "files_modified": [".frozen/old_module.py"]}
 {"timestamp": 1772826339.751412, "reason": "frozen_file_protected: .frozen/old_module.py", "check_failed": "frozen_files", "files_modified": [".frozen/old_module.py"]}
+{"timestamp": 1772827823.7856143, "reason": "frozen_file_protected: .frozen/old_module.py", "check_failed": "frozen_files", "files_modified": [".frozen/old_module.py"]}
+{"timestamp": 1772827824.1721616, "reason": "sandbox_failed: pytest retornou código 1", "check_failed": "sandbox", "files_modified": []}
+{"timestamp": 1772827890.2959144, "reason": "frozen_file_protected: .frozen/old_module.py", "check_failed": "frozen_files", "files_modified": [".frozen/old_module.py"]}
+{"timestamp": 1772827890.679792, "reason": "sandbox_failed: pytest retornou código 1", "check_failed": "sandbox", "files_modified": []}
