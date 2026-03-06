@@ -22,9 +22,8 @@
     "notification_service": "app.application.services.notification_service.NotificationService",
     "overwatch_daemon": "app.adapters.infrastructure.overwatch_adapter.OverwatchDaemon",
     "auto_evolution_service": "app.application.services.auto_evolutionV2.AutoEvolutionServiceV2",
+    "local_repair_agent": "app.application.services.local_repair_agent.LocalRepairAgent",
     "metabolism_core": "app.application.services.metabolism_core.MetabolismCore",
-    "evolution_loop": "app.application.services.evolution_loop.EvolutionLoopService",
-    "ollama_adapter": "app.adapters.infrastructure.ollama_adapter.OllamaAdapter",
-    "local_repair_agent": "app.application.services.local_repair_agent.LocalRepairAgent"
+    "evolution_loop": "app.application.services.evolution_loop.EvolutionLoopService"
   }
 }
