@@ -6,7 +6,7 @@ class Cap051Core(NexusComponent):
     # -*- coding: utf-8 -*-
     '''CAPABILITY: Delegate tasks based on specialization'''
 
-    def execute(context=None):
+    def execute(self, context=None):
         # Template gerado pelo Crystallizer
         return {'status': 'active', 'id': 'CAP-051'}
 

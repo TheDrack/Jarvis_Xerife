@@ -4,7 +4,7 @@ class Cap034Core(NexusComponent):
         pass
 
 
-          def execute(context=None):
+          def execute(self, context=None):
              if context is None:
                 context = {}
              user_id = context.get('user_id')

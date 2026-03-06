@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Dev Agent router: POST /v1/dev-agent/run"""
+"""Dev Agent router: POST /v1/dev-agent/run, GET /v1/dev-agent/jobs"""
 
+import json
 import logging
 import uuid
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
@@ -11,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 # Mutex simples de escopo de módulo — evita execuções paralelas do JarvisDevAgent
 _agent_running: bool = False
+
+_JOBS_FILE = Path("data/dev_agent_jobs.jsonl")
 
 
 def create_dev_agent_router() -> APIRouter:
@@ -22,7 +26,7 @@ def create_dev_agent_router() -> APIRouter:
         """Aciona o JarvisDevAgent de forma assíncrona.
 
         Retorna um ``job_id`` que pode ser usado para acompanhar o progresso
-        futuro (quando um endpoint de status for implementado).
+        via GET /v1/dev-agent/jobs.
         Retorna HTTP 429 se um ciclo já estiver em execução.
         """
         global _agent_running
@@ -38,6 +42,42 @@ def create_dev_agent_router() -> APIRouter:
         background_tasks.add_task(_run_dev_agent_job, job_id)
 
         return {"job_id": job_id, "status": "queued", "message": "JarvisDevAgent iniciado em background."}
+
+    @router.get("/v1/dev-agent/jobs")
+    async def list_dev_agent_jobs(limit: int = 10) -> List[Dict[str, Any]]:
+        """Retorna as últimas ``limit`` entradas do log de auditoria de jobs.
+
+        Ordenadas por ``started_at`` descendente.  Não requer autenticação.
+        """
+        if not _JOBS_FILE.exists():
+            return []
+        try:
+            lines = _JOBS_FILE.read_text(encoding="utf-8").splitlines()
+        except Exception as exc:
+            logger.warning("[DevAgentRouter] Falha ao ler jobs file: %s", exc)
+            return []
+
+        entries: List[Dict[str, Any]] = []
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+        # Dedup: prefer the most recent entry for each job_id (update wins over initial)
+        seen: Dict[str, Dict[str, Any]] = {}
+        for entry in entries:
+            jid = entry.get("job_id", "")
+            # Later entries (updates) overwrite earlier (start) for same job_id
+            if jid not in seen or entry.get("finished_at") is not None:
+                seen[jid] = entry
+
+        deduped = list(seen.values())
+        deduped.sort(key=lambda e: e.get("started_at") or "", reverse=True)
+        return deduped[:limit]
 
     return router
 

@@ -146,6 +146,17 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
     # Public API
     # ------------------------------------------------------------------
 
+    def list_loaded_ids(self) -> list:
+        """Return a copy of the IDs of all currently loaded component instances.
+
+        Thread-safe: acquires the internal lock before reading ``_instances``.
+
+        Returns:
+            A new list of component ID strings.
+        """
+        with self._lock:
+            return list(self._instances.keys())
+
     def resolve_class(self, target_id: str, hint_path: Optional[str] = None) -> Optional[type]:
         """Return the *class* for a component without instantiating it.
 

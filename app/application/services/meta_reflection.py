@@ -11,11 +11,14 @@ Campos do resultado de ``reflect()``:
     successful_patterns  — soluções com maior taxa de sucesso
     recurring_error_types — tipos de erro em >20% dos ciclos
     recommended_focus    — próximo foco de evolução baseado nos gaps críticos
+    rejection_patterns   — padrões de rejeição do Gatekeeper (check_failed,
+                           arquivos mais bloqueados, contagem 7 dias)
 """
 
 import json
 import logging
 from collections import Counter
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -24,7 +27,12 @@ from app.core.nexus import NexusComponent
 logger = logging.getLogger(__name__)
 
 _REFLECTION_FILE = Path("data/meta_reflection_latest.jrvs")
+_REJECTIONS_FILE = Path("data/gatekeeper_rejections.jsonl")
 _RECURRING_ERROR_THRESHOLD = 0.20  # 20%
+_REJECTIONS_WINDOW_LINES = 200
+_REJECTIONS_DAYS = 7
+_REJECTIONS_TOP_FILES = 3
+_REJECTIONS_TOP_CHECKS = 3
 
 
 class MetaReflection(NexusComponent):
@@ -90,6 +98,7 @@ class MetaReflection(NexusComponent):
                 successful_patterns  (list)
                 recurring_error_types (list)
                 recommended_focus    (str)
+                rejection_patterns   (dict) — padrões do Gatekeeper
         """
         fragile_modules = self._find_fragile_modules(reward_history, error_log)
         successful_patterns = self._find_successful_patterns(reward_history)
@@ -97,12 +106,14 @@ class MetaReflection(NexusComponent):
         recommended_focus = self._recommend_focus(
             fragile_modules, successful_patterns, recurring_error_types
         )
+        rejections = self._analyze_rejection_patterns(self._load_rejections())
 
         return {
             "fragile_modules": fragile_modules,
             "successful_patterns": successful_patterns,
             "recurring_error_types": recurring_error_types,
             "recommended_focus": recommended_focus,
+            "rejection_patterns": rejections,
         }
 
     # ------------------------------------------------------------------
@@ -247,6 +258,73 @@ class MetaReflection(NexusComponent):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _load_rejections(self) -> List[Dict[str, Any]]:
+        """Lê as últimas _REJECTIONS_WINDOW_LINES linhas do JSONL de rejeições.
+
+        Returns:
+            Lista de entradas de rejeição; lista vazia se o arquivo não existir.
+        """
+        if not _REJECTIONS_FILE.exists():
+            return []
+        try:
+            lines = _REJECTIONS_FILE.read_text(encoding="utf-8").splitlines()
+            recent = lines[-_REJECTIONS_WINDOW_LINES:]
+            result: List[Dict[str, Any]] = []
+            for line in recent:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    result.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+            return result
+        except Exception as exc:
+            logger.warning("[MetaReflection] Falha ao ler rejeições: %s", exc)
+            return []
+
+    def _analyze_rejection_patterns(
+        self, rejections: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Agrega frequências de rejeição por check_failed e arquivos mais bloqueados.
+
+        Args:
+            rejections: Entradas brutas do gatekeeper_rejections.jsonl.
+
+        Returns:
+            Dicionário com:
+                check_failed_counts  (dict)  frequência por tipo de check
+                top_blocked_files    (list)  3 arquivos mais bloqueados
+                rejections_last_7d   (int)   rejeições nos últimos 7 dias
+        """
+        check_counts: Counter = Counter()
+        file_counts: Counter = Counter()
+        cutoff = (datetime.now(tz=timezone.utc) - timedelta(days=_REJECTIONS_DAYS)).timestamp()
+        count_7d = 0
+
+        for entry in rejections:
+            check = entry.get("check_failed") or ""
+            if check:
+                check_counts[check] += 1
+
+            for f in entry.get("files_modified", []) or []:
+                if f:
+                    file_counts[f] += 1
+
+            ts = entry.get("timestamp")
+            if ts is not None:
+                try:
+                    if float(ts) >= cutoff:
+                        count_7d += 1
+                except (TypeError, ValueError):
+                    pass
+
+        return {
+            "check_failed_counts": dict(check_counts.most_common(_REJECTIONS_TOP_CHECKS)),
+            "top_blocked_files": [f for f, _ in file_counts.most_common(_REJECTIONS_TOP_FILES)],
+            "rejections_last_7d": count_7d,
+        }
 
     def _load_reward_history(self) -> List[Dict[str, Any]]:
         """Carrega histórico de recompensas via Nexus."""

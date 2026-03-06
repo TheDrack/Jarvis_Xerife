@@ -7,7 +7,7 @@ class Cap100Core(NexusComponent):
     """CAPABILITY: Evolve continuously without losing identity
     ID: CAP-100"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-100"}
 

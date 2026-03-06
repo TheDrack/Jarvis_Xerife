@@ -174,3 +174,18 @@ class ResourceMonitor(NexusComponent):
             )
         except Exception as exc:
             logger.debug("[PROACTIVE_CORE] Falha ao escrever trend no context.json: %s", exc)
+
+    def get_resource_trends(self) -> dict:
+        """Retorna a tendência atual de CPU e RAM.
+
+        Returns:
+            Dicionário com ``cpu_trend`` e ``ram_trend``, cada um sendo
+            ``"stable"``, ``"rising"`` ou ``"falling"``.
+        """
+        cpu_hist = getattr(self, "_cpu_history", None)
+        ram_hist = getattr(self, "_ram_history", None)
+        if cpu_hist is None or ram_hist is None:
+            return {"cpu_trend": "stable", "ram_trend": "stable"}
+        cpu_trend = self._compute_trend(cpu_hist, cpu_hist)
+        ram_trend = self._compute_trend(ram_hist, ram_hist)
+        return {"cpu_trend": cpu_trend, "ram_trend": ram_trend}

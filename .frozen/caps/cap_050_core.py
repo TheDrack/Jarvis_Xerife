@@ -7,7 +7,7 @@ class Cap050Core(NexusComponent):
     """CAPABILITY: Orchestrate multiple agents simultaneously
     ID: CAP-050"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-050"}
 

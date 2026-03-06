@@ -7,7 +7,7 @@ class Cap093Core(NexusComponent):
     """CAPABILITY: Maintain full traceability
     ID: CAP-093"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-093"}
 

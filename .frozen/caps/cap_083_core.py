@@ -7,7 +7,7 @@ class Cap083Core(NexusComponent):
     """CAPABILITY: Allocate portion of revenue to creator
     ID: CAP-083"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-083"}
 

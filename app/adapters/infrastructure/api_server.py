@@ -199,7 +199,7 @@ def create_api_server(
 
     # -- Register domain routers ------------------------------------------------
     app.include_router(create_assistant_router(assistant_service, db_adapter, get_current_user, limiter))
-    app.include_router(create_health_router(db_adapter))
+    app.include_router(create_health_router(db_adapter, get_current_user))
     app.include_router(create_extensions_router(extension_manager, get_current_user))
     app.include_router(create_devices_router(device_service, db_adapter, get_current_user))
     app.include_router(create_missions_router(get_current_user))

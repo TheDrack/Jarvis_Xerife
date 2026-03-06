@@ -7,7 +7,7 @@ class Cap090Core(NexusComponent):
     """CAPABILITY: Protect sensitive data
     ID: CAP-090"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-090"}
 

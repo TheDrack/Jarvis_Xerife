@@ -4,7 +4,7 @@ class Cap037Core(NexusComponent):
         pass
 
 
-    def execute(context=None):
+    def execute(self, context=None):
         if context is None:
             context = {}
             urgency_level = context.get('urgency_level', 0)

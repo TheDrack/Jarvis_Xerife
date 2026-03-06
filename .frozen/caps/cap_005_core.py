@@ -6,6 +6,6 @@ class Cap005Core(NexusComponent):
     # -*- coding: utf-8 -*-
     '''CAPABILITY: Prioritize objectives by systemic impact
     DEPENDS ON: ['CAP-004']'''
-    def execute(context=None):
+    def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-005'}
 

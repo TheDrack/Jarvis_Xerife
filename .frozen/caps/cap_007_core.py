@@ -6,6 +6,6 @@ class Cap007Core(NexusComponent):
     # -*- coding: utf-8 -*-
     '''CAPABILITY: Prioritize objectives by future reuse potential
     DEPENDS ON: ['CAP-004']'''
-    def execute(context=None):
+    def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-007'}
 

@@ -180,28 +180,22 @@ def create_utility_router(db_adapter, get_current_user) -> APIRouter:
     async def get_roadmap_progress(
         current_user: User = Depends(get_current_user),
     ) -> Dict[str, Any]:
-        """Get roadmap completion percentage based on ROADMAP.md missions (HUD display)."""
+        """Get roadmap completion percentage based on capabilities inventory (HUD display)."""
         try:
-            from app.application.services.auto_evolution import AutoEvolutionService
+            from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
 
-            metrics = AutoEvolutionService().get_success_metrics()
+            metrics = AutoEvolutionServiceV2().get_success_metrics()
 
-            if "error" in metrics:
-                logger.error(f"Error getting roadmap metrics: {metrics['error']}")
-                return {
-                    "completion_percentage": 0.0,
-                    "total_missions": 0,
-                    "completed": 0,
-                    "in_progress": 0,
-                    "planned": 0,
-                    "error": metrics["error"],
-                }
+            evolution_rate = metrics.get("evolution_rate", 0.0)
+            missions_completed = metrics.get("missions_completed", 0)
+            total_missions = metrics.get("total_missions", 0)
+
             return {
-                "completion_percentage": metrics["completion_percentage"],
-                "total_missions": metrics["total_missions"],
-                "completed": metrics["completed"],
-                "in_progress": metrics["in_progress"],
-                "planned": metrics["planned"],
+                "completion_percentage": round(evolution_rate * 100, 2),
+                "total_missions": total_missions,
+                "completed": missions_completed,
+                "in_progress": 0,
+                "planned": max(0, total_missions - missions_completed),
             }
         except Exception as e:
             logger.error(f"Error getting roadmap progress: {e}")

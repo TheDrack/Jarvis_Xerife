@@ -7,7 +7,7 @@ class Cap048Core(NexusComponent):
     """CAPABILITY: Abort actions with excessive risk
     ID: CAP-048"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-048"}
 

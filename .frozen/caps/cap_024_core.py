@@ -4,7 +4,7 @@ class Cap024Core(NexusComponent):
         pass
 
 
-    def execute(context=None):
+    def execute(self, context=None):
         import time
         import logging
         from app.domain.capabilities import metrics

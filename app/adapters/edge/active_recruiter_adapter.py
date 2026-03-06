@@ -6,14 +6,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 class ActiveRecruiterAdapter(NexusComponent):
+    """O braço ofensivo do JARVIS para expansão de rede."""
+
+    def __init__(self, location_service: LocationService):
+        self.location_service = location_service
+
     def execute(self, context: dict):
         logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
         return {"success": False, "not_implemented": True}
-
-    """O braço ofensivo do JARVIS para expansão de rede."""
-    
-    def __init__(self, location_service: LocationService):
-        self.location_service = location_service
 
     async def scan_and_identify(self, network_range="192.168.1.0/24"):
         """Escanear a rede e aplicar a Inteligência de Alvo."""

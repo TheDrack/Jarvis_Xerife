@@ -6,6 +6,6 @@ class Cap072Core(NexusComponent):
     # -*- coding: utf-8 -*-
     '''CAPABILITY: Evaluate cost of each executed action
     DEPENDS ON: []'''
-    def execute(context=None):
+    def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-072'}
 
