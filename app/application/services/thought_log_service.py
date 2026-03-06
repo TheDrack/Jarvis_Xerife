@@ -52,6 +52,11 @@ class ThoughtLogService(NexusComponent):
         success: bool = False,
         error_message: str = "",
         context_data: Optional[Dict[str, Any]] = None,
+        system_state: Optional[Dict[str, Any]] = None,
+        discarded_alternatives: Optional[list] = None,
+        expected_result: str = "",
+        actual_result: str = "",
+        reward_received: float = 0.0,
     ) -> Optional[ThoughtLog]:
         """
         Create a new thought log entry
@@ -66,6 +71,11 @@ class ThoughtLogService(NexusComponent):
             success: Did this attempt succeed
             error_message: Error if failed
             context_data: Additional context (logs, stack traces, etc.)
+            system_state: Snapshot do estado do sistema no momento da decisão
+            discarded_alternatives: Alternativas descartadas antes da ação escolhida
+            expected_result: O que se esperava que acontecesse
+            actual_result: O que realmente aconteceu
+            reward_received: Valor de reward do RewardSignalProvider
             
         Returns:
             Created ThoughtLog or None if failed
@@ -97,6 +107,11 @@ class ThoughtLogService(NexusComponent):
                     context_data=json.dumps(context_data or {}),
                     requires_human=requires_human,
                     escalation_reason=escalation_reason,
+                    system_state=json.dumps(system_state or {}),
+                    discarded_alternatives=json.dumps(discarded_alternatives or []),
+                    expected_result=expected_result,
+                    actual_result=actual_result,
+                    reward_received=reward_received,
                 )
                 
                 session.add(thought_log)
@@ -341,6 +356,55 @@ class ThoughtLogService(NexusComponent):
         except Exception as e:
             logger.error(f"Error getting recent thoughts: {e}")
             return []
+
+    def get_learning_patterns(self, limit: int = 100) -> Dict[str, Any]:
+        """
+        Identifica padrões de sucesso e falha recorrentes nos thought logs.
+
+        Analisa os logs recentes para extrair insights de aprendizado contínuo:
+        - Taxa de sucesso por tipo de status
+        - Missões com maior número de tentativas
+        - Reward médio recebido
+        - Alternativas descartadas mais comuns
+
+        Args:
+            limit: Número de thought logs recentes a analisar.
+
+        Returns:
+            Dicionário com padrões identificados.
+        """
+        thoughts = self.get_recent_thoughts(limit=limit)
+        if not thoughts:
+            return {"total": 0, "success_rate": 0.0, "avg_reward": 0.0, "patterns": []}
+
+        total = len(thoughts)
+        successes = sum(1 for t in thoughts if t.success)
+        success_rate = round(successes / total, 4) if total else 0.0
+
+        rewards = [t.reward_received for t in thoughts]
+        avg_reward = round(sum(rewards) / total, 4)
+
+        # Missões com mais falhas consecutivas (potenciais loops)
+        mission_failures: Dict[str, int] = {}
+        for t in thoughts:
+            if not t.success:
+                mission_failures[t.mission_id] = mission_failures.get(t.mission_id, 0) + 1
+        top_failing = sorted(mission_failures.items(), key=lambda x: x[1], reverse=True)[:5]
+
+        # Patterns: tuplas (mission_id, failure_count) com falhas repetidas
+        patterns = [
+            {"mission_id": m, "failure_count": c, "pattern": "repeated_failure"}
+            for m, c in top_failing
+            if c >= 2
+        ]
+
+        return {
+            "total": total,
+            "success_rate": success_rate,
+            "avg_reward": avg_reward,
+            "top_failing_missions": [{"mission_id": m, "count": c} for m, c in top_failing],
+            "patterns": patterns,
+        }
 
     def find_similar_repairs(self, error_description: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """

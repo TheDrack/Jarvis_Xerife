@@ -53,3 +53,10 @@ class ThoughtLog(NexusComponent, SQLModel, table=True):
     # Auto-healing tracking
     requires_human: bool = Field(default=False, nullable=False)  # Escalated to human after 3 failures
     escalation_reason: str = Field(default="", nullable=False)  # Why escalation was needed
+
+    # RL / learning fields (Etapa 5)
+    system_state: str = Field(default="{}", nullable=False)  # JSON snapshot do estado do sistema pré-decisão
+    discarded_alternatives: str = Field(default="[]", nullable=False)  # JSON lista de alternativas descartadas
+    expected_result: str = Field(default="", nullable=False)  # Resultado esperado antes da ação
+    actual_result: str = Field(default="", nullable=False)  # Resultado real observado pós-ação
+    reward_received: float = Field(default=0.0, nullable=False)  # Reward do RewardSignalProvider

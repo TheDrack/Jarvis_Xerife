@@ -74,7 +74,7 @@ def create_api_server(
         Configured FastAPI application
     """
     if extension_manager is None:
-        extension_manager = ExtensionManager()
+        extension_manager = nexus.resolve("extension_manager")
 
     swagger_ui_parameters = {
         "persistAuthorization": True,
