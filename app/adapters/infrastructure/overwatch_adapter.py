@@ -49,6 +49,7 @@ _RAM_HIGH_THRESHOLD = 85.0       # %
 _INACTIVITY_TIMEOUT_SEC = 1800   # 30 minutes
 _CONTEXT_FILE = Path("data/context.jrvs")
 _PERIMETER_CHECK_EVERY = 3       # ticks (every ~30 s)
+_FINETUNE_WEEKLY_INTERVAL_SEC = 7 * 24 * 3600.0  # one week in seconds
 _OVERWATCH_COMPILE_INTERVAL_SEC = float(
     os.getenv("OVERWATCH_COMPILE_INTERVAL_SEC", "600")
 )  # 10 minutes
@@ -111,7 +112,7 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor):
         # Fine-tuning trigger — executa a cada 100 ticks ou uma vez por semana
         self._finetune_every_n_ticks: int = 100
         self._last_finetune_ts: float = 0.0
-        self._finetune_weekly_interval_sec: float = 7 * 24 * 3600.0
+        self._finetune_weekly_interval_sec: float = _FINETUNE_WEEKLY_INTERVAL_SEC
 
     # ------------------------------------------------------------------
     # NexusComponent contract

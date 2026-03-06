@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 # Threshold mínimo de confiabilidade para usar um adaptador
 _DEFAULT_RELIABILITY_THRESHOLD = 0.6
 
+# Tipos de tarefa que exigem Gemini como provedor preferido no AIGateway
+_VISION_TASK_TYPES: frozenset = frozenset({"vision", "reasoning"})
+
 # Mapeamento de task_type → lista ordenada de adaptadores preferidos
 _TASK_ADAPTER_MAP: Dict[str, list] = {
     "code_repair": ["ollama_adapter"],
@@ -199,8 +202,7 @@ class LLMRouter(NexusComponent):
             # Já definido pelo chamador — não sobrescrever.
             return ctx
 
-        _VISION_TASKS = {"vision", "reasoning"}
-        if task_type in _VISION_TASKS:
+        if task_type in _VISION_TASK_TYPES:
             return {**ctx, "preferred_provider": "gemini"}
 
         return ctx

@@ -203,3 +203,9 @@ class TestExtractCodeBlock:
     def test_returns_raw_when_no_fence(self):
         text = "def raw(): pass"
         assert _extract_code_block(text) == "def raw(): pass"
+
+    def test_opening_fence_without_closing(self):
+        """Quando não há fence de fechamento, retorna o texto após a abertura."""
+        text = "```python\ndef unclosed():\n    pass"
+        result = _extract_code_block(text)
+        assert "def unclosed" in result

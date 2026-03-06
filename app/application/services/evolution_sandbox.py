@@ -135,15 +135,6 @@ class EvolutionSandbox(NexusComponent):
             cmd = [
                 sys.executable, "-m", "pytest",
                 "tests/",
-                "-v", "--tb=short", "-x",
-                "--no-header",
-                "-q",
-                "--co",  # apenas coleta (dry-run) — troca por execução real se necessário
-            ]
-            # Execução real dos testes (não apenas coleta)
-            cmd = [
-                sys.executable, "-m", "pytest",
-                "tests/",
                 "--tb=short", "-x",
                 "--no-header",
                 "-q",

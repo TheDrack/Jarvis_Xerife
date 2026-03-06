@@ -26,14 +26,17 @@ class FineTuneDatasetCollector(NexusComponent):
 
     Configurável via ``configure(config)``:
         min_reward (float, padrão 0.7): threshold mínimo de reward para incluir o ciclo.
+        max_thoughts (int, padrão 500): limite de ThoughtLogs a consultar por coleta.
     """
 
     def __init__(self) -> None:
         self.min_reward: float = 0.7
+        self.max_thoughts: int = 500
 
     def configure(self, config: Dict[str, Any]) -> None:
         """Configura o coletor via dicionário."""
         self.min_reward = float(config.get("min_reward", self.min_reward))
+        self.max_thoughts = int(config.get("max_thoughts", self.max_thoughts))
 
     def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
         """Sempre pronto para executar."""
@@ -128,7 +131,7 @@ class FineTuneDatasetCollector(NexusComponent):
 
             # Obtém todos os pensamentos recentes (sem filtro de status — filtramos abaixo)
             if hasattr(tls, "get_recent_thoughts"):
-                thoughts = tls.get_recent_thoughts(limit=500)
+                thoughts = tls.get_recent_thoughts(limit=self.max_thoughts)
             else:
                 return []
 

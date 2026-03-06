@@ -21,10 +21,12 @@ def collector():
 class TestFineTuneDatasetCollectorDefaults:
     def test_defaults(self, collector):
         assert collector.min_reward == 0.7
+        assert collector.max_thoughts == 500
 
     def test_configure(self, collector):
-        collector.configure({"min_reward": 0.5})
+        collector.configure({"min_reward": 0.5, "max_thoughts": 100})
         assert collector.min_reward == 0.5
+        assert collector.max_thoughts == 100
 
 
 class TestFineTuneDatasetCollectorCollect:
