@@ -85,11 +85,29 @@ class EvolutionOrchestrator(NexusComponent):
     # ------------------------------------------------------------------
 
     def _run_cycle(self, error_snippet: str, mission_id: str) -> Dict[str, Any]:
+        # 0. Carrega MetaReflection como self_knowledge
+        meta_ctx = self._load_meta_reflection()
+
         # 1. Snapshot do codebase (crystallizer)
         snapshot_info = self._get_snapshot()
 
         # 2. Contexto atual
         system_ctx = self._read_context()
+        if meta_ctx:
+            system_ctx["self_knowledge"] = meta_ctx
+
+        # 2a. Verifica EvolutionGatekeeper antes de modificar arquivos
+        proposed = {
+            "files_modified": [],
+            "mission_id": mission_id,
+        }
+        gatekeeper = self._get_gatekeeper()
+        if gatekeeper is not None:
+            approved, reason = gatekeeper.approve_evolution(proposed)
+            if not approved:
+                logger.warning("[EvolutionOrchestrator] Gatekeeper bloqueou ciclo: %s", reason)
+                self._escalate_commander(mission_id, reason)
+                return {"success": False, "reason": f"gatekeeper_blocked: {reason}"}
 
         # 3. Procura por solução na memória procedural
         procedural_result = self._search_procedural_memory(error_snippet)
@@ -309,3 +327,28 @@ class EvolutionOrchestrator(NexusComponent):
                 metabolism.increment_failure_count()
         except Exception:
             pass
+
+    def _get_gatekeeper(self) -> Optional[Any]:
+        """Tenta resolver o EvolutionGatekeeper via Nexus."""
+        try:
+            return nexus.resolve("evolution_gatekeeper")
+        except Exception:
+            return None
+
+    def _escalate_commander(self, mission_id: str, reason: str) -> None:
+        """Escalona para COMMANDER_NEEDED via MetabolismStateMachine."""
+        logger.warning("[EvolutionOrchestrator] Escalando para COMMANDER_NEEDED: %s", reason)
+        try:
+            metabolism = nexus.resolve("metabolism_core")
+            if metabolism and hasattr(metabolism, "request_commander"):
+                metabolism.request_commander(reason=reason)
+        except Exception as exc:
+            logger.debug("[EvolutionOrchestrator] Falha ao escalar para commander: %s", exc)
+
+    def _load_meta_reflection(self) -> Optional[Dict[str, Any]]:
+        """Carrega a última reflexão meta salva."""
+        try:
+            from app.application.services.meta_reflection import MetaReflection
+            return MetaReflection.load_latest()
+        except Exception:
+            return None

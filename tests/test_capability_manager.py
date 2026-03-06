@@ -5,6 +5,7 @@ from app.core.nexus import NexusComponent
 import json
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 from sqlmodel import Session, create_engine, SQLModel, select
 
 from app.application.services.capability_manager import CapabilityManager
@@ -246,3 +247,108 @@ class TestCapabilityManager(NexusComponent):
         assert chapter1["nonexistent"] == 2
         # Progress: (1 * 100 + 1 * 50) / 4 = 37.5%
         assert chapter1["progress_percentage"] == 37.5
+
+
+class TestCapabilityDependencyGraph:
+    """Tests for ETAPA 5 — Dependency Graph methods."""
+
+    # ------------------------------------------------------------------
+    # Sample capabilities.json data
+    # ------------------------------------------------------------------
+
+    _CAPS = [
+        {"id": "CAP-001", "title": "A", "status": "complete", "depends_on": []},
+        {"id": "CAP-002", "title": "B", "status": "complete", "depends_on": ["CAP-001"]},
+        {"id": "CAP-003", "title": "C", "status": "partial", "depends_on": ["CAP-001"]},
+        {"id": "CAP-004", "title": "D", "status": "nonexistent", "depends_on": ["CAP-002", "CAP-003"]},
+        {"id": "CAP-005", "title": "E", "status": "nonexistent", "depends_on": []},
+    ]
+
+    def _make_manager(self, caps):
+        engine = create_engine("sqlite:///:memory:")
+        SQLModel.metadata.create_all(engine)
+        manager = CapabilityManager(engine=engine)
+        manager._load_capabilities_json = lambda: caps
+        return manager
+
+    def test_build_dependency_graph_structure(self):
+        """build_dependency_graph() deve retornar dicionário de adjacência correto."""
+        manager = self._make_manager(self._CAPS)
+        graph = manager.build_dependency_graph()
+
+        # CAP-001 é predecessora de CAP-002 e CAP-003
+        assert "CAP-002" in graph["CAP-001"]
+        assert "CAP-003" in graph["CAP-001"]
+        # CAP-004 depende de CAP-002 e CAP-003
+        assert "CAP-004" in graph["CAP-002"]
+        assert "CAP-004" in graph["CAP-003"]
+        # CAP-005 não tem predecessores nem dependentes
+        assert graph.get("CAP-005", []) == []
+
+    def test_get_executable_capabilities_returns_ready_ones(self):
+        """get_executable_capabilities() deve retornar só as capabilities prontas."""
+        manager = self._make_manager(self._CAPS)
+        executable = manager.get_executable_capabilities()
+        ids = [c["id"] for c in executable]
+
+        # CAP-003 é parcial com dep CAP-001 (complete) → executável
+        # CAP-005 é nonexistent sem deps → executável
+        assert "CAP-003" in ids
+        assert "CAP-005" in ids
+
+        # CAP-004 depende de CAP-003 (não complete) → NÃO executável
+        assert "CAP-004" not in ids
+
+        # CAP-001 e CAP-002 já são complete → não devem aparecer
+        assert "CAP-001" not in ids
+        assert "CAP-002" not in ids
+
+    def test_get_executable_excludes_blocked(self):
+        """Capabilities com dependências incompletas não devem aparecer."""
+        caps = [
+            {"id": "A", "title": "A", "status": "nonexistent", "depends_on": []},
+            {"id": "B", "title": "B", "status": "nonexistent", "depends_on": ["A"]},
+        ]
+        manager = self._make_manager(caps)
+        executable = manager.get_executable_capabilities()
+        ids = [c["id"] for c in executable]
+
+        # A não tem deps → executável
+        assert "A" in ids
+        # B depende de A (não complete) → não executável
+        assert "B" not in ids
+
+    def test_get_critical_path_linear_chain(self):
+        """Para uma cadeia linear A→B→C, o caminho crítico é [A, B, C]."""
+        caps = [
+            {"id": "A", "title": "A", "status": "nonexistent", "depends_on": []},
+            {"id": "B", "title": "B", "status": "nonexistent", "depends_on": ["A"]},
+            {"id": "C", "title": "C", "status": "nonexistent", "depends_on": ["B"]},
+        ]
+        manager = self._make_manager(caps)
+        path = manager.get_critical_path()
+
+        assert path == ["A", "B", "C"]
+
+    def test_get_critical_path_selects_longest(self):
+        """O caminho crítico deve ser o mais longo em um DAG com bifurcação."""
+        caps = [
+            {"id": "A", "title": "A", "status": "complete", "depends_on": []},
+            {"id": "B", "title": "B", "status": "nonexistent", "depends_on": ["A"]},
+            {"id": "C", "title": "C", "status": "nonexistent", "depends_on": ["A"]},
+            {"id": "D", "title": "D", "status": "nonexistent", "depends_on": ["B"]},
+            # Caminho A→B→D tem comprimento 3; A→C tem comprimento 2
+        ]
+        manager = self._make_manager(caps)
+        path = manager.get_critical_path()
+
+        # O caminho mais longo deve incluir A, B, D
+        assert "A" in path
+        assert "B" in path
+        assert "D" in path
+
+    def test_get_critical_path_empty(self):
+        """Com lista vazia, deve retornar lista vazia."""
+        manager = self._make_manager([])
+        path = manager.get_critical_path()
+        assert path == []

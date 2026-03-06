@@ -49,3 +49,6 @@ psycopg2-binary>=2.9.0  # PostgreSQL driver for production deployments
 # cosine-similarity over an in-memory list (slower but fully functional).
 numpy>=1.24.0
 faiss-cpu>=1.7.4
+
+# Knowledge graph for SemanticMemory (optional - falls back to pure-Python dict)
+networkx>=3.0
