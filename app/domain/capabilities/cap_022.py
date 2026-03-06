@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-022(NexusComponent):
+class Cap022(NexusComponent):
     """
     Capacidade: Evaluate risks before modifying critical capabilities
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-022(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-022'}
 
-# Nexus Compatibility
-Cap022 = Cap

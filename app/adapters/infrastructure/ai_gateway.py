@@ -683,38 +683,29 @@ class AIGateway(NexusComponent):
         )
 
     # ------------------------------------------------------------------
-    # Task-type routing (MELHORIA 2)
+    # Task-type routing (DEPRECATED — use LLMRouter for selection policy)
     # ------------------------------------------------------------------
 
     def select_provider_by_task_type(self, task_type: str) -> LLMProvider:
         """Seleciona o provedor com base no tipo de tarefa.
 
-        Regras:
-            - ``code_generation`` / ``self_repair`` → tenta OllamaAdapter primeiro;
-              fallback para Groq/Gemini se Ollama indisponível.
+        .. deprecated::
+            A lógica de seleção por ``task_type`` foi movida para o
+            :class:`~app.application.services.llm_router.LLMRouter`.
+            Use ``LLMRouter.select_adapter(task_type)`` e passe o adaptador
+            resolvido via ``preferred_provider`` no contexto do AIGateway.
+            Este método é mantido apenas para compatibilidade retroativa.
+
+        Regras legadas:
+            - ``code_generation`` / ``self_repair`` → Groq (OllamaAdapter gerido externamente).
             - ``reasoning`` / ``vision`` → Gemini diretamente.
             - Qualquer outro tipo → comportamento padrão (Groq com fallback).
-
-        O OllamaAdapter é resolvido via Nexus para evitar acoplamento direto.
         """
-        _CODE_TASKS = {"code_generation", "self_repair"}
         _VISION_TASKS = {"reasoning", "vision"}
-
-        if task_type in _CODE_TASKS:
-            try:
-                from app.core.nexus import nexus  # lazy import
-                ollama = nexus.resolve("ollama_adapter")
-                if ollama is not None and hasattr(ollama, "is_available") and ollama.is_available():
-                    logger.info("[AIGateway] task_type=%s → OllamaAdapter (local)", task_type)
-                    return LLMProvider.GROQ  # sinaliza uso local — caller verifica ollama flag
-            except Exception as exc:
-                logger.debug("[AIGateway] OllamaAdapter indisponível: %s", exc)
-            logger.info("[AIGateway] task_type=%s → Groq/Gemini (ollama offline)", task_type)
-            return self.default_provider
 
         if task_type in _VISION_TASKS:
             if self.gemini_client:
-                logger.info("[AIGateway] task_type=%s → Gemini", task_type)
+                logger.info("[AIGateway] task_type=%s → Gemini (legado)", task_type)
                 return LLMProvider.GEMINI
             logger.warning("[AIGateway] task_type=%s requer Gemini, mas não configurado", task_type)
 
@@ -732,6 +723,9 @@ class AIGateway(NexusComponent):
                 - ``messages`` (list): messages to send to the LLM
                 - ``multimodal`` (bool): whether the request is multimodal
                 - ``force_provider`` (str): force a specific provider value
+                - ``preferred_provider`` (str): provider hint resolved externally by
+                  :class:`~app.application.services.llm_router.LLMRouter`.
+                  Takes precedence over automatic provider selection.
 
         Returns:
             Evidence dict with ``success`` and provider metadata.
@@ -739,10 +733,15 @@ class AIGateway(NexusComponent):
         ctx = context or {}
         messages: List[Dict[str, str]] = ctx.get("messages", [])
         multimodal: bool = ctx.get("multimodal", False)
-        force_provider_value: Optional[str] = ctx.get("force_provider")
-        force_provider: Optional[LLMProvider] = (
-            LLMProvider(force_provider_value) if force_provider_value else None
-        )
+        # ``preferred_provider`` is set externally by LLMRouter (selection policy);
+        # ``force_provider`` is kept for direct callers / backward compatibility.
+        force_provider_value: Optional[str] = ctx.get("preferred_provider") or ctx.get("force_provider")
+        force_provider: Optional[LLMProvider] = None
+        if force_provider_value:
+            try:
+                force_provider = LLMProvider(force_provider_value)
+            except ValueError:
+                logger.warning("[AIGateway] Valor de provider desconhecido: %s", force_provider_value)
 
         try:
             loop = asyncio.get_event_loop()

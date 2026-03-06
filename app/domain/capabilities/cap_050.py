@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-050(NexusComponent):
+class Cap050(NexusComponent):
     """
     Capacidade: Orchestrate multiple agents simultaneously
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-050(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-050'}
 
-# Nexus Compatibility
-Cap050 = Cap

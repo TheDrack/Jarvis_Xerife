@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-099(NexusComponent):
+class Cap099(NexusComponent):
     """
     Capacidade: Maintain continuous alignment with user
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-099(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-099'}
 
-# Nexus Compatibility
-Cap099 = Cap

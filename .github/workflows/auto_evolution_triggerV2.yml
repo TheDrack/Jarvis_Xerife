@@ -1,11 +1,9 @@
 name: 🚀 JARVIS Integrated Evolution
-# ⚠️ AUTO-EVOLUÇÃO PAUSADA: Repositório em reorganização estrutural.
-# Reativar apenas quando a estrutura estiver estabilizada.
 
 on:
-  workflow_dispatch: # Evolução é um ato de vontade manual - PAUSADO
+  workflow_dispatch:  # Execução manual quando necessário
   schedule:
-    - cron: "0 */6 * * *"  # Executa a cada 6 horas
+    - cron: "0 2 * * *"  # Execução diária às 02:00 UTC (loop completo com Gatekeeper)
 
 permissions:
   contents: write

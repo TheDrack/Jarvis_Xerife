@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-088(NexusComponent):
+class Cap088(NexusComponent):
     """
     Capacidade: Escalate sensitive decisions to human
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-088(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-088'}
 
-# Nexus Compatibility
-Cap088 = Cap

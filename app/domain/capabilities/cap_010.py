@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-010(NexusComponent):
+class Cap010(NexusComponent):
     """
     Capacidade: Distinguish technical error from conceptual limitation
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-010(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-010'}
 
-# Nexus Compatibility
-Cap010 = Cap

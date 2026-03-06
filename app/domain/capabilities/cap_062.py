@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-062(NexusComponent):
+class Cap062(NexusComponent):
     """
     Capacidade: Learn from recurring successes
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-062(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-062'}
 
-# Nexus Compatibility
-Cap062 = Cap

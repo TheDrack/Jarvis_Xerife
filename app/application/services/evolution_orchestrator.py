@@ -96,7 +96,17 @@ class EvolutionOrchestrator(NexusComponent):
         if meta_ctx:
             system_ctx["self_knowledge"] = meta_ctx
 
-        # 2a. Verifica EvolutionGatekeeper antes de modificar arquivos
+        # 2a. Seleciona a capability-alvo via CapabilityManager (Etapa 5)
+        target_cap = self._select_target_capability()
+        if target_cap:
+            cap_id = target_cap.get("id", "")
+            cap_title = target_cap.get("title", "")
+            logger.info("[EvolutionOrchestrator] Capability-alvo selecionada: %s — %s", cap_id, cap_title)
+            if not error_snippet:
+                error_snippet = f"Implementar capability {cap_id}: {cap_title}"
+            system_ctx["target_capability"] = target_cap
+
+        # 2b. Verifica EvolutionGatekeeper antes de modificar arquivos
         proposed = {
             "files_modified": [],
             "mission_id": mission_id,
@@ -334,6 +344,24 @@ class EvolutionOrchestrator(NexusComponent):
             return nexus.resolve("evolution_gatekeeper")
         except Exception:
             return None
+
+    def _select_target_capability(self) -> Optional[Dict[str, Any]]:
+        """Seleciona a próxima capability a evoluir via CapabilityManager.
+
+        Usa ``get_executable_capabilities()`` para obter capabilities cujas
+        dependências já estão completas, retornando a primeira da lista.
+        Retorna ``None`` se o CapabilityManager não estiver disponível.
+        """
+        try:
+            cap_manager = nexus.resolve("capability_manager")
+            if cap_manager is None or not hasattr(cap_manager, "get_executable_capabilities"):
+                return None
+            caps = cap_manager.get_executable_capabilities()
+            if caps:
+                return caps[0]
+        except Exception as exc:
+            logger.debug("[EvolutionOrchestrator] CapabilityManager indisponível: %s", exc)
+        return None
 
     def _escalate_commander(self, mission_id: str, reason: str) -> None:
         """Escalona para COMMANDER_NEEDED via MetabolismStateMachine."""

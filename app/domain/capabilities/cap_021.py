@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-021(NexusComponent):
+class Cap021(NexusComponent):
     """
     Capacidade: Map impact of one capability over others
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-021(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-021'}
 
-# Nexus Compatibility
-Cap021 = Cap

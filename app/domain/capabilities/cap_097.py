@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-097(NexusComponent):
+class Cap097(NexusComponent):
     """
     Capacidade: Coordinate physical and digital systems
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-097(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-097'}
 
-# Nexus Compatibility
-Cap097 = Cap

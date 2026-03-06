@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-036(NexusComponent):
+class Cap036(NexusComponent):
     """
     Capacidade: Distinguish signal from noise
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-036(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-036'}
 
-# Nexus Compatibility
-Cap036 = Cap

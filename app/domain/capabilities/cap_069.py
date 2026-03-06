@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-069(NexusComponent):
+class Cap069(NexusComponent):
     """
     Capacidade: Optimize response time
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-069(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-069'}
 
-# Nexus Compatibility
-Cap069 = Cap

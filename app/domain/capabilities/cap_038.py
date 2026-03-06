@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-038(NexusComponent):
+class Cap038(NexusComponent):
     """
     Capacidade: Recognize human priority context
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-038(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-038'}
 
-# Nexus Compatibility
-Cap038 = Cap

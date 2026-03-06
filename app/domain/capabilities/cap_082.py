@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-082(NexusComponent):
+class Cap082(NexusComponent):
     """
     Capacidade: Generate recurring revenue
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-082(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-082'}
 
-# Nexus Compatibility
-Cap082 = Cap

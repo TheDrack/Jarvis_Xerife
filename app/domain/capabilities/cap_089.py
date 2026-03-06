@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-089(NexusComponent):
+class Cap089(NexusComponent):
     """
     Capacidade: Log critical decisions for audit
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-089(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-089'}
 
-# Nexus Compatibility
-Cap089 = Cap

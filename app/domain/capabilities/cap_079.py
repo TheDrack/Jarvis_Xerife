@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-079(NexusComponent):
+class Cap079(NexusComponent):
     """
     Capacidade: Automatically reinvest resources
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-079(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-079'}
 
-# Nexus Compatibility
-Cap079 = Cap

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-054(NexusComponent):
+class Cap054(NexusComponent):
     """
     Capacidade: Execute long-running actions
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-054(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-054'}
 
-# Nexus Compatibility
-Cap054 = Cap

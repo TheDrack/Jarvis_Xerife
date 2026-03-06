@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-029(NexusComponent):
+class Cap029(NexusComponent):
     """
     Capacidade: Maintain long-term historical memory
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-029(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-029'}
 
-# Nexus Compatibility
-Cap029 = Cap

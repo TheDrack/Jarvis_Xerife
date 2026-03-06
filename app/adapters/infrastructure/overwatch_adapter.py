@@ -49,6 +49,7 @@ _RAM_HIGH_THRESHOLD = 85.0       # %
 _INACTIVITY_TIMEOUT_SEC = 1800   # 30 minutes
 _CONTEXT_FILE = Path("data/context.jrvs")
 _PERIMETER_CHECK_EVERY = 3       # ticks (every ~30 s)
+_FINETUNE_WEEKLY_INTERVAL_SEC = 7 * 24 * 3600.0  # one week in seconds
 _OVERWATCH_COMPILE_INTERVAL_SEC = float(
     os.getenv("OVERWATCH_COMPILE_INTERVAL_SEC", "600")
 )  # 10 minutes
@@ -108,6 +109,11 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor):
         self._last_consolidation_ts: float = 0.0
         self._meta_reflection_every_n_ticks: int = 50
 
+        # Fine-tuning trigger — executa a cada 100 ticks ou uma vez por semana
+        self._finetune_every_n_ticks: int = 100
+        self._last_finetune_ts: float = 0.0
+        self._finetune_weekly_interval_sec: float = _FINETUNE_WEEKLY_INTERVAL_SEC
+
     # ------------------------------------------------------------------
     # NexusComponent contract
     # ------------------------------------------------------------------
@@ -161,6 +167,7 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor):
                 self._check_jrvs_compile()
                 self._maybe_consolidate_semantic_memory()
                 self._maybe_run_meta_reflection()
+                self._maybe_run_finetune_trigger()
             except Exception as exc:
                 logger.error("[PROACTIVE_CORE] Erro no loop principal: %s", exc)
             time.sleep(self._poll_interval)
@@ -358,6 +365,26 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor):
                 logger.info("[PROACTIVE_CORE] MetaReflection executada no tick %d.", self._tick_count)
         except Exception as exc:
             logger.debug("[PROACTIVE_CORE] Falha ao executar MetaReflection: %s", exc)
+
+    def _maybe_run_finetune_trigger(self) -> None:
+        """Dispara FineTuneTriggerService a cada 100 ticks ou uma vez por semana."""
+        tick_trigger = self._tick_count % self._finetune_every_n_ticks == 0
+        time_trigger = (time.monotonic() - self._last_finetune_ts) >= self._finetune_weekly_interval_sec
+        if not (tick_trigger or time_trigger):
+            return
+        self._last_finetune_ts = time.monotonic()
+        try:
+            trigger = nexus.resolve("finetune_trigger_service")
+            if trigger is not None:
+                result = trigger.execute({})
+                if result.get("triggered"):
+                    logger.info(
+                        "[PROACTIVE_CORE] Fine-tuning disparado no tick %d. Pares=%d.",
+                        self._tick_count,
+                        result.get("pair_count", 0),
+                    )
+        except Exception as exc:
+            logger.debug("[PROACTIVE_CORE] Falha ao executar FineTuneTriggerService: %s", exc)
 
     def register_authorized_mac(self, mac: str) -> None:
         """Add *mac* to the set of authorised devices on the perimeter."""

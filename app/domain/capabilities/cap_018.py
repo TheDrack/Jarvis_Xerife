@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-018(NexusComponent):
+class Cap018(NexusComponent):
     """
     Capacidade: Identify internal dependencies between capabilities
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-018(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-018'}
 
-# Nexus Compatibility
-Cap018 = Cap

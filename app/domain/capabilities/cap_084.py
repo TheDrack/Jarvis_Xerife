@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-084(NexusComponent):
+class Cap084(NexusComponent):
     """
     Capacidade: Detect anomalous internal behavior
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-084(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-084'}
 
-# Nexus Compatibility
-Cap084 = Cap

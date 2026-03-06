@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
-class Cap-025(NexusComponent):
+class Cap025(NexusComponent):
     """
     Capacidade: Detect silent regressions
     Gerado automaticamente pelo CrystallizerEngine
@@ -9,5 +9,3 @@ class Cap-025(NexusComponent):
     def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-025'}
 
-# Nexus Compatibility
-Cap025 = Cap

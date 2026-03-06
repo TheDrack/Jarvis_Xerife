@@ -41,9 +41,9 @@ O JARVIS é uma plataforma de automação e assistência que:
 | **DocumentStore (I/O Universal)** | ✅ **Ativo** |
 | **Formato .jrvs (binário interno)** | ✅ **Ativo** |
 | **JrvsTranslator (fluxo tradutivo)** | ✅ **Ativo** |
-| Auto-Evolução | ⏸️ **PAUSADA** |
+| Auto-Evolução | ✅ **Ativo (loop completo com Gatekeeper)** |
 
-> Auto-evolução está **pausada** enquanto a estrutura do repositório é reorganizada.
+> Auto-evolução está **ativa** com loop completo: MetaReflection → CapabilityManager → Gatekeeper (5 verificações) → Proposta → PR. Execução diária às 02:00 UTC.
 
 ---
 
