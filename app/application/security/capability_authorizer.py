@@ -38,6 +38,7 @@ _SENSITIVE_CAPABILITIES: Set[str] = {
     "delete_file",
     "format_disk",
     "osint_search",
+    "evolution_orchestrator",  # pode criar arquivos e abrir PRs
 }
 
 # Default allowlist of approved capabilities
@@ -67,6 +68,16 @@ _DEFAULT_ALLOWLIST: Set[str] = {
     "env_secrets_provider",
     "osint_search",
     "eagle_osint_adapter",
+    # Fase anterior — novos componentes de auto-evolução
+    "evolution_orchestrator",
+    "ollama_adapter",
+    "cost_tracker_adapter",
+    "procedural_memory_adapter",
+    "capability_index_service",
+    "capability_blueprint_service",
+    "capability_gap_reporter",
+    "capability_detectors",
+    "overwatch_daemon",
 }
 
 

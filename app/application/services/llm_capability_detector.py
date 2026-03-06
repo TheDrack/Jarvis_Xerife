@@ -20,9 +20,74 @@ logger = logging.getLogger(__name__)
 
 
 class LLMCapabilityDetector(NexusComponent):
-    def execute(self, context: dict):
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
+    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:  # type: ignore[override]
+        """Ponto de entrada Nexus para detecção de capabilities.
+
+        Extrai ``capability_id``, ``capability_name`` e ``capability_description``
+        do contexto.  Consulta primeiro o CapabilityIndexService (cache vetorial);
+        se o top resultado tiver similarity >= 0.85 retorna direto.  Caso contrário
+        delega para ``detect_capability_async()`` via asyncio.
+        """
+        ctx = context or {}
+        capability_id = ctx.get("capability_id", 0)
+        capability_name = ctx.get("capability_name", "")
+        capability_description = ctx.get("capability_description", capability_name)
+
+        if not capability_name and not capability_description:
+            return {"success": False, "error": "capability_name ou capability_description obrigatório"}
+
+        # 1. Consulta rápida ao CapabilityIndexService
+        index_result = self.find_capability_by_command(capability_description or capability_name)
+        if index_result and index_result.get("direct"):
+            top = index_result["top_capability"]
+            return {
+                "success": True,
+                "source": "index",
+                "status": "detected",
+                "capability": top,
+            }
+
+        # 2. Fallback para detecção via LLM
+        try:
+            import asyncio
+
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop is not None and loop.is_running():
+                # Executa em thread separada com seu próprio event loop para evitar conflito
+                import concurrent.futures
+
+                def _run() -> Dict[str, Any]:
+                    new_loop = asyncio.new_event_loop()
+                    try:
+                        return new_loop.run_until_complete(
+                            self.detect_capability_async(
+                                capability_id=int(capability_id),
+                                capability_name=capability_name,
+                                capability_description=capability_description,
+                            )
+                        )
+                    finally:
+                        new_loop.close()
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    result = pool.submit(_run).result(timeout=30)
+            else:
+                result = asyncio.run(
+                    self.detect_capability_async(
+                        capability_id=int(capability_id),
+                        capability_name=capability_name,
+                        capability_description=capability_description,
+                    )
+                )
+        except Exception as exc:
+            logger.warning("[LLMCapabilityDetector] Falha na detecção assíncrona: %s", exc)
+            result = self._fallback_detection(capability_name)
+
+        return {"success": True, "source": "llm", "result": result}
 
     """
     Detects implemented capabilities using LLM to analyze code semantics.

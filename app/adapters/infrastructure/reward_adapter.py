@@ -65,6 +65,12 @@ class RewardAdapter(RewardProvider):
         Returns:
             ID of the logged reward
         """
+        # Adjust reward based on cost efficiency (INTEGRAÇÃO 2)
+        reward_value, cost_factor = self._apply_cost_factor(reward_value, action_type)
+        if metadata is None:
+            metadata = {}
+        metadata["cost_factor_applied"] = cost_factor
+
         with Session(self.engine) as session:
             reward = EvolutionReward(
                 action_type=action_type,
@@ -79,9 +85,60 @@ class RewardAdapter(RewardProvider):
             
             logger.info(
                 f"Logged reward: {action_type} = {reward_value:+.2f} points "
-                f"(ID: {reward.id})"
+                f"(ID: {reward.id}, cost_factor={cost_factor:.2f})"
             )
             return reward.id
+
+    def _apply_cost_factor(self, reward_value: float, task_type: str) -> tuple:
+        """Adjust reward based on cost efficiency from CostTrackerAdapter.
+
+        Returns (adjusted_reward, factor_applied).
+        """
+        factor = 1.0
+        try:
+            from app.core.nexus import nexus  # lazy import
+            cost_tracker = nexus.resolve("cost_tracker_adapter")
+            if cost_tracker is None or not hasattr(cost_tracker, "get_cost_summary"):
+                return reward_value, factor
+
+            summary = cost_tracker.get_cost_summary(period_days=1)
+            by_task = summary.get("by_task_type", {})
+            if not by_task:
+                return reward_value, factor
+
+            # Use median cost for the same task_type from the last 24h
+            task_costs = by_task.get(task_type, 0.0)
+            # Approximate per-call cost using total cost if we had counts
+            # Fall back to get_median_cost if available
+            if hasattr(cost_tracker, "get_median_cost"):
+                median = cost_tracker.get_median_cost(task_type)
+            else:
+                median = task_costs
+
+            if median <= 0.0:
+                return reward_value, factor
+
+            # Get current call cost from context_data if provided by caller
+            current_cost = float((context_data or {}).get("current_cost_usd", 0.0))
+
+            if current_cost > 0.0:
+                ratio = current_cost / median
+                if ratio > 1.5:
+                    factor = 0.85
+                    logger.info(
+                        "[RewardAdapter] Custo alto (ratio=%.2f), fator de penalização=%.2f", ratio, factor
+                    )
+                elif ratio < 0.7:
+                    factor = 1.10
+                    logger.info(
+                        "[RewardAdapter] Custo eficiente (ratio=%.2f), fator de bônus=%.2f", ratio, factor
+                    )
+
+        except Exception as exc:
+            logger.debug("[RewardAdapter] Falha ao calcular cost_factor: %s", exc)
+
+        adjusted = max(reward_value * factor, 0.01)
+        return adjusted, factor
 
     def get_rewards(
         self,

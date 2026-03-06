@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 _PROPOSALS_DIR = Path("data/evolution_proposals")
 _CONTEXT_FILE = Path("data/context.json")
 _ARCH_RULES_FILE = Path("data/architecture_rules.yml")
+_PROCEDURAL_PATCHES_PATH = "domain/gears/procedural_patches"
 
 
 class EvolutionOrchestrator(NexusComponent):
@@ -95,14 +96,21 @@ class EvolutionOrchestrator(NexusComponent):
         if procedural_result:
             logger.info("[EvolutionOrchestrator] Solução encontrada na memória procedural.")
             patch_code = procedural_result.get("solution_attempt", "")
+            # Tenta aplicar a solução via crystallizer_engine
+            apply_result = self._apply_via_crystallizer(patch_code, mission_id)
             self._log_thought(
                 mission_id,
                 error_snippet,
                 patch_code,
-                success=True,
+                success=apply_result.get("success", bool(patch_code)),
                 notes="source: procedural_memory",
             )
-            return {"success": True, "source": "procedural_memory", "patch": patch_code}
+            return {
+                "success": apply_result.get("success", bool(patch_code)),
+                "source": "procedural_memory",
+                "patch": patch_code,
+                "apply_result": apply_result,
+            }
 
         # 4. Monta prompt e envia ao LLM
         prompt = self._build_prompt(error_snippet, snapshot_info, system_ctx)
@@ -124,7 +132,7 @@ class EvolutionOrchestrator(NexusComponent):
         proposal_path = self._save_proposal(patch_code)
         pr_result = self._create_pr(proposal_path, mission_id)
 
-        self._log_thought(mission_id, error_snippet, patch_code, success=True)
+        self._log_thought(mission_id, error_snippet, patch_code, success=True, notes="source: llm")
         return {
             "success": True,
             "proposal": str(proposal_path),
@@ -135,6 +143,24 @@ class EvolutionOrchestrator(NexusComponent):
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    def _apply_via_crystallizer(self, code: str, mission_id: str) -> Dict[str, Any]:
+        """Tenta aplicar um patch de código via CrystallizerEngine."""
+        if not code:
+            return {"success": False, "reason": "código vazio"}
+        try:
+            crystallizer = nexus.resolve("crystallizer_engine")
+            if crystallizer is None or not hasattr(crystallizer, "crystallize"):
+                return {"success": False, "reason": "crystallizer_engine indisponível"}
+            result = crystallizer.crystallize(
+                name=f"procedural_patch_{mission_id}",
+                code=code,
+                relative_path=_PROCEDURAL_PATCHES_PATH,
+            )
+            return result or {"success": False, "reason": "crystallize retornou None"}
+        except Exception as exc:
+            logger.debug("[EvolutionOrchestrator] Falha ao aplicar via crystallizer: %s", exc)
+            return {"success": False, "reason": str(exc)}
 
     def _get_snapshot(self) -> Dict[str, Any]:
         try:
