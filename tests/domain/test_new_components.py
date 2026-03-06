@@ -138,44 +138,103 @@ class TestRewardSignalProvider:
     """Tests for RewardSignalProvider domain service."""
 
     def _make_provider(self, tmp_path):
-        from app.domain.services.reward_signal_provider import RewardSignalProvider, _REPLAY_BUFFER_FILE
+        from app.domain.services.reward_signal_provider import (
+            RewardSignalProvider,
+            _REPLAY_BUFFER_FILE,
+            _ThoughtLogAudit,
+        )
         with patch("app.domain.services.reward_signal_provider._REPLAY_BUFFER_FILE", tmp_path / "buffer.jsonl"):
             provider = RewardSignalProvider.__new__(RewardSignalProvider)
             from collections import deque
             provider._replay_buffer = deque(maxlen=1000)
+            provider.thought_log = _ThoughtLogAudit(tmp_path / "thought_log.jsonl")
             return provider
 
-    def test_calculate_reward_pytest_pass(self, tmp_path):
-        """pytest_pass deve retornar reward positivo."""
+    # -- Legado (_calculate_legacy_reward) --
+
+    def test_legacy_reward_pytest_pass(self, tmp_path):
+        """_calculate_legacy_reward: pytest_pass deve retornar reward positivo."""
         provider = self._make_provider(tmp_path)
-        reward = provider.calculate_reward("pytest_pass")
+        reward = provider._calculate_legacy_reward("pytest_pass")
         assert reward == 10.0
 
-    def test_calculate_reward_deploy_success(self, tmp_path):
-        """deploy_success deve retornar reward maior."""
+    def test_legacy_reward_deploy_success(self, tmp_path):
+        """_calculate_legacy_reward: deploy_success deve retornar reward maior."""
         provider = self._make_provider(tmp_path)
-        reward = provider.calculate_reward("deploy_success")
+        reward = provider._calculate_legacy_reward("deploy_success")
         assert reward == 50.0
 
-    def test_calculate_reward_unknown_action(self, tmp_path):
-        """Ação desconhecida deve retornar 0.0."""
+    def test_legacy_reward_unknown_action(self, tmp_path):
+        """_calculate_legacy_reward: ação desconhecida deve retornar 0.0."""
         provider = self._make_provider(tmp_path)
-        reward = provider.calculate_reward("unknown_action")
+        reward = provider._calculate_legacy_reward("unknown_action")
         assert reward == 0.0
 
-    def test_calculate_reward_with_test_growth(self, tmp_path):
-        """Crescimento no número de testes deve ampliar reward."""
+    def test_legacy_reward_with_test_growth(self, tmp_path):
+        """_calculate_legacy_reward: crescimento no número de testes deve ampliar reward."""
         provider = self._make_provider(tmp_path)
-        reward_base = provider.calculate_reward("pytest_pass")
-        reward_with_growth = provider.calculate_reward("pytest_pass", tests_before=10, tests_after=15)
+        reward_base = provider._calculate_legacy_reward("pytest_pass")
+        reward_with_growth = provider._calculate_legacy_reward("pytest_pass", tests_before=10, tests_after=15)
         assert reward_with_growth > reward_base
 
-    def test_calculate_reward_with_test_regression(self, tmp_path):
-        """Redução no número de testes deve reduzir reward."""
+    def test_legacy_reward_with_test_regression(self, tmp_path):
+        """_calculate_legacy_reward: redução no número de testes deve reduzir reward."""
         provider = self._make_provider(tmp_path)
-        reward_base = provider.calculate_reward("pytest_pass")
-        reward_regression = provider.calculate_reward("pytest_pass", tests_before=15, tests_after=10)
+        reward_base = provider._calculate_legacy_reward("pytest_pass")
+        reward_regression = provider._calculate_legacy_reward("pytest_pass", tests_before=15, tests_after=10)
         assert reward_regression < reward_base
+
+    # -- Novo calculate_reward (métricas reais) --
+
+    def test_calculate_reward_all_improved(self, tmp_path):
+        """calculate_reward: tudo melhorou → reward máximo (1.0)."""
+        provider = self._make_provider(tmp_path)
+        before = {"tests_passing_rate": 0.8, "avg_latency_ms": 500, "error_rate_24h": 0.05}
+        after = {"tests_passing_rate": 0.9, "avg_latency_ms": 400, "error_rate_24h": 0.02}
+        reward = provider.calculate_reward(before, after, human_approval=True)
+        assert 0.0 <= reward <= 1.0
+        assert reward > 0.9  # todos os componentes no máximo
+
+    def test_calculate_reward_latency_degraded(self, tmp_path):
+        """calculate_reward: latência piorou → penaliza score de latência."""
+        provider = self._make_provider(tmp_path)
+        before = {"tests_passing_rate": 1.0, "avg_latency_ms": 200, "error_rate_24h": 0.0}
+        after = {"tests_passing_rate": 1.0, "avg_latency_ms": 700, "error_rate_24h": 0.0}
+        reward = provider.calculate_reward(before, after, human_approval=True)
+        assert reward < 1.0  # latência degradou
+
+    def test_calculate_reward_no_human_approval(self, tmp_path):
+        """calculate_reward: sem aprovação humana → -0.1 no score."""
+        provider = self._make_provider(tmp_path)
+        before = {"tests_passing_rate": 1.0, "avg_latency_ms": 200, "error_rate_24h": 0.0}
+        after = {"tests_passing_rate": 1.0, "avg_latency_ms": 200, "error_rate_24h": 0.0}
+        reward_approved = provider.calculate_reward(before, after, human_approval=True)
+        reward_rejected = provider.calculate_reward(before, after, human_approval=False)
+        assert reward_approved - reward_rejected == pytest.approx(0.1, abs=1e-6)
+
+    def test_calculate_reward_default_states(self, tmp_path):
+        """calculate_reward: estados vazios → reward padrão (latência igual, tests igual)."""
+        provider = self._make_provider(tmp_path)
+        reward = provider.calculate_reward({}, {}, human_approval=True)
+        # latency_score = 0.3, error_score = 0.2, test_score = 0.4, human_score = 0.1 → 1.0
+        assert reward == pytest.approx(1.0, abs=1e-4)
+
+    def test_calculate_reward_logs_breakdown(self, tmp_path):
+        """calculate_reward: breakdown deve ser registrado no thought_log."""
+        import json
+        provider = self._make_provider(tmp_path)
+        log_path = tmp_path / "thought_log.jsonl"
+        provider.thought_log = __import__(
+            "app.domain.services.reward_signal_provider", fromlist=["_ThoughtLogAudit"]
+        )._ThoughtLogAudit(log_path)
+        provider.calculate_reward({"tests_passing_rate": 1.0}, {"tests_passing_rate": 1.0})
+        assert log_path.exists()
+        entry = json.loads(log_path.read_text(encoding="utf-8").strip())
+        assert entry["event"] == "reward_calculated"
+        assert "breakdown" in entry
+        assert "test_score" in entry["breakdown"]
+
+    # -- calculate_penalty --
 
     def test_calculate_penalty_pytest_fail(self, tmp_path):
         """pytest_fail deve retornar penalidade negativa."""
@@ -189,6 +248,8 @@ class TestRewardSignalProvider:
         penalty_base = provider.calculate_penalty(action_type="pytest_fail")
         penalty_with_errors = provider.calculate_penalty(errors_introduced=2, action_type="pytest_fail")
         assert penalty_with_errors < penalty_base
+
+    # -- record / buffer --
 
     def test_record_experience_stores_entry(self, tmp_path):
         """record_experience deve adicionar ao replay buffer."""
@@ -219,12 +280,26 @@ class TestRewardSignalProvider:
         total = provider.get_cumulative_reward(last_n=2)
         assert total == 15.0
 
-    def test_execute_reward_action(self, tmp_path):
-        """execute() com action='reward' deve retornar reward calculado."""
+    # -- execute() dispatch --
+
+    def test_execute_reward_action_legacy(self, tmp_path):
+        """execute() com action_type → usa cálculo legado."""
         provider = self._make_provider(tmp_path)
         result = provider.execute({"action": "reward", "action_type": "pytest_pass"})
         assert result["success"] is True
         assert result["reward"] == 10.0
+
+    def test_execute_reward_action_metrics(self, tmp_path):
+        """execute() com before_state/after_state → usa métricas reais."""
+        provider = self._make_provider(tmp_path)
+        result = provider.execute({
+            "action": "reward",
+            "before_state": {"tests_passing_rate": 1.0, "avg_latency_ms": 200, "error_rate_24h": 0.0},
+            "after_state": {"tests_passing_rate": 1.0, "avg_latency_ms": 200, "error_rate_24h": 0.0},
+            "human_approval": True,
+        })
+        assert result["success"] is True
+        assert 0.0 <= result["reward"] <= 1.0
 
     def test_execute_penalty_action(self, tmp_path):
         """execute() com action='penalty' deve retornar penalidade."""

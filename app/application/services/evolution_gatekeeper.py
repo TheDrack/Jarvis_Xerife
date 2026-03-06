@@ -140,6 +140,7 @@ class EvolutionGatekeeper(NexusComponent):
             return False, reason
 
         self._log_decision(proposed_change, approved=True, reason="approved")
+        self._notify_reward(proposed_change)
         return True, "approved"
 
     # ------------------------------------------------------------------
@@ -301,6 +302,37 @@ class EvolutionGatekeeper(NexusComponent):
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as exc:
             logger.debug("[EvolutionGatekeeper] Falha ao persistir rejeição: %s", exc)
+
+    def _notify_reward(self, proposed_change: Dict[str, Any]) -> None:
+        """Calcula reward baseado em métricas reais e notifica FineTuneDatasetCollector.
+
+        Extrai before_state/after_state do proposed_change (se disponíveis) e
+        delega para RewardSignalProvider. O reward é passado para o
+        FineTuneDatasetCollector registrar com o par de treinamento atual.
+        """
+        try:
+            reward_provider = nexus.resolve("reward_signal_provider")
+            if reward_provider is None or not hasattr(reward_provider, "calculate_reward"):
+                return
+
+            before_state: Dict[str, Any] = proposed_change.get("before_state", {})
+            after_state: Dict[str, Any] = proposed_change.get("after_state", {})
+            human_approval: bool = bool(proposed_change.get("human_approval", True))
+
+            reward = reward_provider.calculate_reward(
+                before_state=before_state,
+                after_state=after_state,
+                human_approval=human_approval,
+            )
+
+            # Notifica o FineTuneDatasetCollector com o reward calculado
+            collector = nexus.resolve("finetune_dataset_collector")
+            if collector is not None and hasattr(collector, "set_last_reward"):
+                collector.set_last_reward(reward)
+
+            logger.info("[EvolutionGatekeeper] Reward calculado: %.4f", reward)
+        except Exception as exc:
+            logger.debug("[EvolutionGatekeeper] Falha ao calcular reward: %s", exc)
 
 
 # ---------------------------------------------------------------------------

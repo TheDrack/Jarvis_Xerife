@@ -27,16 +27,39 @@ class FineTuneDatasetCollector(NexusComponent):
     Configurável via ``configure(config)``:
         min_reward (float, padrão 0.7): threshold mínimo de reward para incluir o ciclo.
         max_thoughts (int, padrão 500): limite de ThoughtLogs a consultar por coleta.
+
+    Filtragem de reward — dois limiares são aplicados em conjunto:
+        _REWARD_FLOOR (0.6): mínimo absoluto inviolável para o campo ``reward_received``
+            do ThoughtLog (produzido pelo sistema de métricas reais).
+        min_reward (padrão 0.7): threshold configurável; o limiar efetivo é
+            ``max(min_reward, _REWARD_FLOOR)``.
+
+    Cada par JSONL inclui campo "reward" com o valor de ``reward_received`` do ThoughtLog.
     """
+
+    # Limiar absoluto para o campo reward do novo sistema de métricas reais
+    _REWARD_FLOOR: float = 0.6
 
     def __init__(self) -> None:
         self.min_reward: float = 0.7
         self.max_thoughts: int = 500
+        self._last_reward: Optional[float] = None
 
     def configure(self, config: Dict[str, Any]) -> None:
         """Configura o coletor via dicionário."""
         self.min_reward = float(config.get("min_reward", self.min_reward))
         self.max_thoughts = int(config.get("max_thoughts", self.max_thoughts))
+
+    def set_last_reward(self, reward: float) -> None:
+        """Registra o reward calculado pelo RewardSignalProvider para o ciclo atual.
+
+        Chamado pelo EvolutionGatekeeper após aprovar uma evolução.
+
+        Args:
+            reward: Reward normalizado (0.0–1.0) calculado com métricas reais.
+        """
+        self._last_reward = reward
+        logger.debug("[FineTuneDatasetCollector] Last reward registrado: %.4f", reward)
 
     def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
         """Sempre pronto para executar."""
@@ -87,7 +110,12 @@ class FineTuneDatasetCollector(NexusComponent):
             prompt = self._extract_prompt(thought)
             code = self._extract_code(thought)
             if prompt and code:
-                pairs.append({"instruction": prompt, "output": code})
+                reward_value = self._extract_reward(thought)
+                pairs.append({
+                    "instruction": prompt,
+                    "output": code,
+                    "reward": reward_value,
+                })
 
         logger.info("[FineTuneDatasetCollector] Coletados %d pares (threshold=%.2f).", len(pairs), threshold)
         return pairs
@@ -155,16 +183,31 @@ class FineTuneDatasetCollector(NexusComponent):
 
         # Verifica reward se disponível
         reward = None
-        if hasattr(thought, "reward_value"):
+        if hasattr(thought, "reward_received"):
+            reward = thought.reward_received
+        elif hasattr(thought, "reward_value"):
             reward = thought.reward_value
         elif isinstance(thought, dict):
-            reward = thought.get("reward_value")
+            reward = thought.get("reward_received", thought.get("reward_value"))
 
         if reward is not None:
-            return float(reward) >= min_reward
+            # Aplica threshold mínimo configurado E o floor absoluto de 0.6
+            return float(reward) >= max(min_reward, self._REWARD_FLOOR)
 
         # Sem reward registrado = inclui (ciclo bem-sucedido)
         return True
+
+    def _extract_reward(self, thought: Any) -> float:
+        """Extrai o valor de reward do ThoughtLog."""
+        if hasattr(thought, "reward_received"):
+            val = thought.reward_received
+        elif hasattr(thought, "reward_value"):
+            val = thought.reward_value
+        elif isinstance(thought, dict):
+            val = thought.get("reward_received", thought.get("reward_value", 0.0))
+        else:
+            val = 0.0
+        return float(val) if val is not None else 0.0
 
     def _extract_prompt(self, thought: Any) -> str:
         """Extrai o prompt enviado ao LLM do ThoughtLog."""
