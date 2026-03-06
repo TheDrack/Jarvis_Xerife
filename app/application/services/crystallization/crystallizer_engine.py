@@ -46,13 +46,9 @@ class CrystallizerEngine(NexusComponent):
             })
 
             # REGRA DE AUTO-EVOLUÇÃO:
-            # Após criar o ficheiro, limpamos o cache de instâncias para que o 
+            # Após criar o ficheiro, invalidamos o cache do Nexus para que o 
             # nexus.resolve encontre o novo componente no próximo pedido.
-            if name in nexus._cache:
-                del nexus._cache[name]
-            
-            # Força o Nexus a marcar mutação para salvar no Gist
-            nexus._mutated = True
+            nexus.invalidate_component(name)
             nexus.commit_memory()
 
             return {"success": True, "path": file_path}

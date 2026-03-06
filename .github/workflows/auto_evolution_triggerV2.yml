@@ -4,6 +4,8 @@ name: 🚀 JARVIS Integrated Evolution
 
 on:
   workflow_dispatch: # Evolução é um ato de vontade manual - PAUSADO
+  schedule:
+    - cron: "0 */6 * * *"  # Executa a cada 6 horas
 
 permissions:
   contents: write
@@ -11,10 +13,32 @@ permissions:
   issues: write
 
 jobs:
+  gate:
+    name: "🚦 Gate de Evolução"
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Verificar EVOLUTION_ENABLED
+        id: check
+        env:
+          EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
+        run: |
+          if [ "${EVOLUTION_ENABLED}" = "true" ]; then
+            echo "enabled=true" >> $GITHUB_OUTPUT
+            echo "✅ Auto-evolução habilitada."
+          else
+            echo "enabled=false" >> $GITHUB_OUTPUT
+            echo "⏸️  Auto-evolução pausada (EVOLUTION_ENABLED != true)."
+          fi
+
   evolution_cycle:
     name: "🧬 Ciclo de Evolução"
-    # Mantemos a trava de segurança para não re-evoluir sobre um DNA recém-mutado
-    if: github.event_name != 'pull_request' && !contains(github.event.head_commit.message, '[Auto-Evolution] DNA Mutated')
+    needs: gate
+    if: |
+      needs.gate.outputs.enabled == 'true' &&
+      github.event_name != 'pull_request' &&
+      !contains(github.event.head_commit.message, '[Auto-Evolution] DNA Mutated')
     runs-on: ubuntu-latest
     outputs:
       action: ${{ steps.flow.outputs.action }}

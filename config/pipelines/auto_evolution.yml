@@ -1,0 +1,14 @@
+strict: false
+components:
+  snapshot:
+    id: crystallizer_engine
+  error_scanner:
+    id: field_vision
+  memory:
+    id: procedural_memory_adapter
+  orchestrator:
+    id: evolution_orchestrator
+  cost_logger:
+    id: cost_tracker_adapter
+  thought_logger:
+    id: thought_log_service

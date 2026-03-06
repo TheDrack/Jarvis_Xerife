@@ -129,6 +129,19 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
             target_id, reason, CIRCUIT_BREAKER_RESET,
         )
 
+    def invalidate_component(self, component_id: str) -> None:
+        """Remove *component_id* from the path-cache and instance cache.
+
+        Called by components (e.g. CrystallizerEngine) after writing a new
+        file to disk so that the next ``resolve()`` discovers the fresh module.
+        """
+        with self._lock:
+            if component_id in self._cache:
+                del self._cache[component_id]
+            if component_id in self._instances:
+                del self._instances[component_id]
+        self._mutated = True
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------

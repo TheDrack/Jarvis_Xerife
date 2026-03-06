@@ -26,16 +26,36 @@ class LlmService(NexusComponent):
 
     def ask(self, prompt: str, system_instruction: str = "") -> str:
         """Interface principal para chamadas de texto com Fallback Gemini -> Groq."""
-        try:
-            if not self.gemini_key:
-                raise ValueError("Gemini Key ausente")
-            
-            # Nota: Implementação do Gemini deve ser inserida aqui se disponível.
-            # Por enquanto, mantendo o fluxo para o Groq como provedor funcional.
-            return self._call_groq(prompt, system_instruction) 
-        except Exception as e:
-            logger.warning(f"⚠️ Falha no provedor primário, tentando Groq: {e}")
-            return self._call_groq(prompt, system_instruction)
+        if self.gemini_key:
+            try:
+                return self._call_gemini(prompt, system_instruction)
+            except Exception as e:
+                logger.warning(f"⚠️ Falha no Gemini, tentando Groq: {e}")
+        return self._call_groq(prompt, system_instruction)
+
+    def _call_gemini(self, prompt: str, system_instruction: str) -> str:
+        """Chamada resiliente via HTTP para a API do Gemini."""
+        logger.info("🔄 Gerando resposta via Gemini...")
+        combined_prompt = f"{system_instruction}\n\n{prompt}" if system_instruction else prompt
+        with httpx.Client() as client:
+            response = client.post(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+                headers={
+                    "Content-Type": "application/json",
+                    "x-goog-api-key": self.gemini_key,
+                },
+                json={"contents": [{"parts": [{"text": combined_prompt}]}]},
+                timeout=20.0,
+            )
+        if response.status_code == 200:
+            data = response.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    return parts[0].get("text", "")
+            raise ValueError(f"Resposta Gemini sem candidatos: {data}")
+        raise ValueError(f"Erro Gemini API: {response.status_code} - {response.text}")
 
     def _call_groq(self, prompt: str, system_instruction: str) -> str:
         """Chamada resiliente via HTTP para a API do Groq."""

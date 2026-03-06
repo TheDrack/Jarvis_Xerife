@@ -158,3 +158,59 @@ class TestCapabilityAuthorizer:
     def test_is_allowed_returns_false_for_unknown(self, authorizer):
         """is_allowed() returns False for capabilities not in the allowlist."""
         assert authorizer.is_allowed("nonexistent") is False
+
+
+class TestCapabilityAuthorizerDefaultLists:
+    """Tests verifying _DEFAULT_ALLOWLIST and _SENSITIVE_CAPABILITIES contents."""
+
+    @pytest.fixture
+    def default_authorizer(self):
+        """Authorizer using the production default allowlist."""
+        return CapabilityAuthorizer()
+
+    # ------------------------------------------------------------------
+    # New phase-2 auto-evolution components
+    # ------------------------------------------------------------------
+
+    def test_evolution_orchestrator_is_in_allowlist(self, default_authorizer):
+        """evolution_orchestrator must be present in _DEFAULT_ALLOWLIST."""
+        assert default_authorizer.is_allowed("evolution_orchestrator") is True
+
+    def test_evolution_orchestrator_requires_human_confirmation(self, default_authorizer):
+        """evolution_orchestrator is sensitive and must require human_confirmed."""
+        with pytest.raises(PermissionError, match="confirmação humana"):
+            default_authorizer.authorize(
+                user="bot",
+                capability_name="evolution_orchestrator",
+                payload={},
+            )
+
+    def test_evolution_orchestrator_passes_with_confirmation(self, default_authorizer):
+        """evolution_orchestrator with human_confirmed=True should be authorized."""
+        result = default_authorizer.authorize(
+            user="bot",
+            capability_name="evolution_orchestrator",
+            payload={"human_confirmed": True},
+        )
+        assert result is True
+
+    def test_capability_index_service_is_allowed_without_confirmation(self, default_authorizer):
+        """capability_index_service is not sensitive — no human confirmation required."""
+        result = default_authorizer.authorize(
+            user="bot",
+            capability_name="capability_index_service",
+            payload={},
+        )
+        assert result is True
+
+    def test_cost_tracker_adapter_is_allowed(self, default_authorizer):
+        """cost_tracker_adapter must be present in _DEFAULT_ALLOWLIST."""
+        assert default_authorizer.is_allowed("cost_tracker_adapter") is True
+
+    def test_procedural_memory_adapter_is_allowed(self, default_authorizer):
+        """procedural_memory_adapter must be present in _DEFAULT_ALLOWLIST."""
+        assert default_authorizer.is_allowed("procedural_memory_adapter") is True
+
+    def test_overwatch_daemon_is_allowed(self, default_authorizer):
+        """overwatch_daemon must be present in _DEFAULT_ALLOWLIST."""
+        assert default_authorizer.is_allowed("overwatch_daemon") is True

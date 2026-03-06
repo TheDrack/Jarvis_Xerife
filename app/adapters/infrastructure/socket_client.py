@@ -1,5 +1,5 @@
 import socketio
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
 class SocketClient(NexusComponent):
     """
@@ -10,11 +10,16 @@ class SocketClient(NexusComponent):
         self.sio = socketio.Client()
         self.is_connected = False
 
-    def execute(self, action: str, params: dict = None):
+    def execute(self, context: dict) -> dict:
+        action = context.get("action")
+        params = context.get("params", {})
         if action == "connect":
-            return self.connect_to_server(params.get("url"), params.get("key"))
+            success = self.connect_to_server(params.get("url"), params.get("key"))
+            return {"success": success}
         if action == "send":
-            return self.emit_message(params.get("event"), params.get("data"))
+            self.emit_message(params.get("event"), params.get("data"))
+            return {"success": True}
+        return {"success": False, "error": "action inválida — use 'connect' ou 'send'"}
 
     def connect_to_server(self, url: str, key: str):
         try:
