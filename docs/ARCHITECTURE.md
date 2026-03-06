@@ -45,9 +45,14 @@
 
 ### Core (`app/core/`)
 Núcleo do sistema. Sem dependências externas.
-- **Nexus**: Container de DI com discovery automático e sincronização via Gist
-- **NexusComponent**: Interface base para todos os componentes
+- **Nexus** (`nexus.py`): Container de DI com discovery automático e sincronização via Gist
+- **NexusExceptions** (`nexus_exceptions.py`): CloudMock, timeouts, circuit breaker
+- **NexusDiscovery** (`nexus_discovery.py`): Busca em disco e instanciação com timeout
+- **NexusRegistry** (`nexus_registry.py`): I/O do registry local e Gist sync
+- **NexusComponent** (`nexuscomponent.py`): Interface base para todos os componentes
 - **Config/Encryption**: Configuração segura do sistema
+- **meta/**: Camada cognitiva adaptativa
+  - `PolicyStore`, `JrvsCompiler`, `DecisionEngine`, `ExplorationController`
 
 ### Domain (`app/domain/`)
 Lógica de negócio pura. Sem dependências de infraestrutura.
@@ -73,9 +78,16 @@ Implementações concretas das portas.
 nexus.resolve("component_id")
     │
     ├── 1. Cache local (já instanciado antes?) → retorna instância
-    ├── 2. Remoto (Gist) → busca module_path no mapa remoto
-    └── 3. Discovery local → percorre app/ procurando {component_id}.py
+    ├── 2. nexus_registry.jrvs → busca module_path no registry local
+    ├── 3. Remoto (Gist) → busca module_path no mapa remoto
+    └── 4. Discovery local → percorre app/ procurando {component_id}.py
+              └── AmbiguousComponentError se >1 candidato encontrado
 ```
+
+Timeouts (configuráveis via env):
+- Import: `NEXUS_IMPORT_TIMEOUT` (padrão 10 s)
+- Instantiação: `NEXUS_INSTANTIATE_TIMEOUT` (padrão 5 s)
+- Circuit open: `NEXUS_TIMEOUT` (padrão 30 s), reset: `NEXUS_CIRCUIT_RESET` (padrão 60 s)
 
 ---
 
