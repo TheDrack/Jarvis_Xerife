@@ -372,6 +372,38 @@ Be conservative - only mark as "complete" if you see clear, working implementati
             "recommendations": ["Enable AI Gateway for accurate capability detection"]
         }
 
+    def find_capability_by_command(self, command: str) -> Optional[Dict[str, Any]]:
+        """Busca uma capability por similaridade semântica usando CapabilityIndexService.
+
+        Se o top resultado tiver similaridade > direct_threshold (padrão 0.85),
+        retorna diretamente sem chamar o LLM.
+        Caso contrário, retorna os top-3 como contexto para o LLM.
+
+        Args:
+            command: Comando em linguagem natural.
+
+        Returns:
+            Dict com ``direct`` (bool), ``top_capability`` (dict) e ``context_list`` (list).
+        """
+        try:
+            from app.core.nexus import nexus  # lazy import
+            idx = nexus.resolve("capability_index_service")
+            if idx is None or not hasattr(idx, "find_capability"):
+                return None
+            results = idx.find_capability(command)
+            if not results:
+                return None
+            top = results[0]
+            threshold = getattr(idx, "_direct_threshold", 0.85)
+            return {
+                "direct": top["similarity_score"] >= threshold,
+                "top_capability": top,
+                "context_list": results,
+            }
+        except Exception as exc:
+            logger.debug("[LLMCapabilityDetector] CapabilityIndexService indisponível: %s", exc)
+        return None
+
     def _resolve_provider(self, provider_setting: str) -> Optional[LLMProvider]:
         """Resolve provider based on configuration"""
         provider_setting = provider_setting.lower()

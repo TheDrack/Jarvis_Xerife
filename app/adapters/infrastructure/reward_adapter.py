@@ -278,3 +278,17 @@ class RewardAdapter(RewardProvider):
             'current_period': current_stats,
             'previous_period_total': previous_total
         }
+
+    def update_capability_reliability(self, capability_id: str, success: bool) -> bool:
+        """Atualiza o reliability_score de uma capability via CapabilityIndexService (MELHORIA 4).
+
+        Deve ser chamado após cada execução de uma capability.
+        """
+        try:
+            from app.core.nexus import nexus  # lazy import
+            idx = nexus.resolve("capability_index_service")
+            if idx is not None and hasattr(idx, "update_reliability_score"):
+                return idx.update_reliability_score(capability_id, success)
+        except Exception as exc:
+            logger.warning("[RewardAdapter] Falha ao atualizar reliability_score: %s", exc)
+        return False

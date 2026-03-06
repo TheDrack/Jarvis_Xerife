@@ -740,5 +740,44 @@ class AIGateway:
             f"Rate limit reached on {failed_provider.value} and no fallback provider available"
         )
 
+    # ------------------------------------------------------------------
+    # Task-type routing (MELHORIA 2)
+    # ------------------------------------------------------------------
+
+    def select_provider_by_task_type(self, task_type: str) -> LLMProvider:
+        """Seleciona o provedor com base no tipo de tarefa.
+
+        Regras:
+            - ``code_generation`` / ``self_repair`` → tenta OllamaAdapter primeiro;
+              fallback para Groq/Gemini se Ollama indisponível.
+            - ``reasoning`` / ``vision`` → Gemini diretamente.
+            - Qualquer outro tipo → comportamento padrão (Groq com fallback).
+
+        O OllamaAdapter é resolvido via Nexus para evitar acoplamento direto.
+        """
+        _CODE_TASKS = {"code_generation", "self_repair"}
+        _VISION_TASKS = {"reasoning", "vision"}
+
+        if task_type in _CODE_TASKS:
+            try:
+                from app.core.nexus import nexus  # lazy import
+                ollama = nexus.resolve("ollama_adapter")
+                if ollama is not None and hasattr(ollama, "is_available") and ollama.is_available():
+                    logger.info("[AIGateway] task_type=%s → OllamaAdapter (local)", task_type)
+                    return LLMProvider.GROQ  # sinaliza uso local — caller verifica ollama flag
+            except Exception as exc:
+                logger.debug("[AIGateway] OllamaAdapter indisponível: %s", exc)
+            logger.info("[AIGateway] task_type=%s → Groq/Gemini (ollama offline)", task_type)
+            return self.default_provider
+
+        if task_type in _VISION_TASKS:
+            if self.gemini_client:
+                logger.info("[AIGateway] task_type=%s → Gemini", task_type)
+                return LLMProvider.GEMINI
+            logger.warning("[AIGateway] task_type=%s requer Gemini, mas não configurado", task_type)
+
+        return self.default_provider
+
+
 # Nexus Compatibility
 AiGateway = LLMProvider

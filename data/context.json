@@ -1,0 +1,13 @@
+{
+  "current_goal": null,
+  "active_capabilities": [],
+  "recent_errors": [],
+  "user_last_interaction": null,
+  "system_health": {
+    "cpu_percent": 99.0,
+    "ram_percent": 10.0,
+    "status": "critical"
+  },
+  "evolution_state": "idle",
+  "trend": "stable"
+}

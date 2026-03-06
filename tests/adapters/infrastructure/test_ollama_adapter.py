@@ -13,7 +13,7 @@ class TestOllamaAdapterInit:
 
     def test_default_model(self):
         adapter = OllamaAdapter()
-        assert adapter.model == "qwen2.5-coder:7b"
+        assert adapter.model == "qwen2.5-coder:14b"
 
     def test_default_base_url(self):
         adapter = OllamaAdapter()
@@ -45,25 +45,28 @@ class TestOllamaAdapterExecute:
 
     def test_execute_com_prompt_valido_retorna_success_true(self):
         adapter = OllamaAdapter()
-        with patch.object(adapter, "_chat", return_value='{"resposta": "ok"}'):
+        with patch.object(adapter, "_generate", return_value='{"resposta": "ok"}'):
             result = adapter.execute({"prompt": "Olá, Jarvis!"})
 
         assert result["success"] is True
         assert result["response"] == '{"resposta": "ok"}'
         assert result["provider"] == "ollama"
-        assert result["model"] == "qwen2.5-coder:7b"
+        assert result["model"] == "qwen2.5-coder:14b"
 
     def test_execute_usa_model_do_context(self):
         adapter = OllamaAdapter()
-        with patch.object(adapter, "_chat", return_value="{}") as mock_chat:
+        with patch.object(adapter, "_generate", return_value="{}") as mock_gen:
             result = adapter.execute({"prompt": "test", "model": "deepseek-r1:8b"})
 
         assert result["model"] == "deepseek-r1:8b"
-        mock_chat.assert_called_once_with("test", "deepseek-r1:8b", True, None)
+        mock_gen.assert_called_once()
+        call_kwargs = mock_gen.call_args
+        assert call_kwargs.args[0] == "test"
+        assert call_kwargs.kwargs.get("model") == "deepseek-r1:8b" or call_kwargs.args[1] == "deepseek-r1:8b"
 
     def test_execute_retorna_success_false_quando_chat_falha(self):
         adapter = OllamaAdapter()
-        with patch.object(adapter, "_chat", side_effect=Exception("connection refused")):
+        with patch.object(adapter, "_generate", side_effect=Exception("connection refused")):
             result = adapter.execute({"prompt": "test"})
 
         assert result["success"] is False
@@ -76,17 +79,15 @@ class TestOllamaAdapterIsAvailable:
 
     def test_is_available_retorna_false_quando_ollama_inacessivel(self):
         adapter = OllamaAdapter()
-        with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
+        with patch.object(adapter, "list_local_models", return_value=[]):
             result = adapter.is_available()
 
         assert result is False
         assert adapter._available is False
 
     def test_is_available_retorna_true_quando_ollama_acessivel(self):
-        adapter = OllamaAdapter()
-        mock_resp = MagicMock()
-        mock_resp.status = 200
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        adapter = OllamaAdapter(model="qwen2.5-coder:14b")
+        with patch.object(adapter, "list_local_models", return_value=["qwen2.5-coder:14b", "llama3"]):
             result = adapter.is_available()
 
         assert result is True
