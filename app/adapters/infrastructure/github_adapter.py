@@ -14,6 +14,9 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from app.adapters.infrastructure.github_issue_adapter import GitHubIssueAdapter
+from app.adapters.infrastructure.github_workflow_adapter import GitHubWorkflowAdapter
+
 logger = logging.getLogger(__name__)
 
 
@@ -218,38 +221,10 @@ class GitHubAdapter(NexusComponent):
             # Always close client after dispatch to avoid connection issues
             await self.close()
     
-    async def get_workflow_runs(self, workflow_name: str = "jarvis_code_fixer.yml") -> Dict[str, Any]:
-        """
-        Get recent workflow runs for monitoring.
-        
-        Args:
-            workflow_name: Name of the workflow file
-        
-        Returns:
-            Dictionary with workflow run data
-        """
-        if not self.token:
-            return {"success": False, "error": "GITHUB_TOKEN not configured"}
-        
-        try:
-            url = (
-                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
-                f"/actions/workflows/{workflow_name}/runs"
-            )
-            
-            client = await self._ensure_client()
-            response = await client.get(url)
-            
-            if response.status_code == 200:
-                return {"success": True, "data": response.json()}
-            else:
-                return {
-                    "success": False,
-                    "error": f"Status {response.status_code}: {response.text}"
-                }
-        
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+    async def get_workflow_runs(self, workflow_name: str = "jarvis_code_fixer.yml"):
+        """Backward compatible delegator - see GitHubWorkflowAdapter.get_workflow_runs"""
+        adapter = GitHubWorkflowAdapter(self.token, self.repo_owner, self.repo_name)
+        return await adapter.get_workflow_runs(workflow_name)
     
     async def report_for_auto_correction(
         self,
@@ -458,119 +433,10 @@ Este link abre o ambiente de edição do GitHub Copilot Agent diretamente, com o
         finally:
             await self.close()
 
-    async def create_issue(
-        self,
-        title: str,
-        description: str,
-        error_log: Optional[str] = None,
-        system_info: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Create a new GitHub issue.
-        
-        NOTE: For self-correction scenarios, prefer using report_for_auto_correction()
-        which creates a PR and triggers the Jarvis Autonomous State Machine workflow
-        instead of creating an issue.
-        
-        Args:
-            title: Title of the issue
-            description: Description/body of the issue
-            error_log: Optional error log to include
-            system_info: Optional system information to include
-        
-        Returns:
-            Dictionary with 'success' boolean, 'issue_number' if successful, and optional 'error' message
-        
-        Example:
-            >>> adapter = GitHubAdapter()
-            >>> result = await adapter.create_issue(
-            ...     title="CI Failure: Python Tests failed",
-            ...     description="Test suite failed on main branch"
-            ... )
-        """
-        if not self.token:
-            error_msg = "GITHUB_TOKEN not configured. Cannot create issue."
-            logger.error(error_msg)
-            return {"success": False, "error": error_msg}
-        
-        try:
-            # Build issue body with structured format for better auto-fixer interpretation
-            body_parts = []
-            
-            # Add description section
-            body_parts.append("## Descrição")
-            body_parts.append(description)
-            
-            # Add helpful hint for auto-fixer if description doesn't mention specific files
-            # This helps the auto-fixer identify which files to modify
-            # Use regex to detect actual file extensions (e.g., .py, .yml, .md)
-            import re
-            has_file_mention = bool(re.search(r'\.\w{2,4}\b', description))
-            if not has_file_mention:
-                body_parts.append("\n## Arquivos Relacionados")
-                body_parts.append("*Nota: Para que o auto-reparo funcione corretamente, mencione os arquivos específicos que devem ser modificados.*")
-            
-            if error_log:
-                body_parts.append("\n## Erro")
-                body_parts.append(f"```\n{error_log}\n```")
-            
-            if system_info:
-                body_parts.append("\n## Informações do Sistema")
-                for key, value in system_info.items():
-                    body_parts.append(f"- **{key}**: {value}")
-            
-            # Add auto-generated footer
-            body_parts.append("\n---\n*Issue criada automaticamente pelo Jarvis*")
-            
-            body = "\n".join(body_parts)
-            
-            # Prepare payload
-            payload = {
-                "title": title,
-                "body": body,
-                "labels": ["jarvis-auto-report"],
-            }
-            
-            # Create issue URL
-            url = (
-                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
-                f"/issues"
-            )
-            
-            logger.info(
-                f"Creating issue '{title}' in {self.repo_owner}/{self.repo_name}"
-            )
-            
-            # Send request
-            client = await self._ensure_client()
-            response = await client.post(url, json=payload)
-            
-            # Check response
-            if response.status_code == 201:
-                issue_data = response.json()
-                issue_number = issue_data.get("number")
-                logger.info(f"✅ Issue #{issue_number} created successfully")
-                return {
-                    "success": True,
-                    "issue_number": issue_number,
-                    "issue_url": issue_data.get("html_url"),
-                }
-            else:
-                error_msg = (
-                    f"GitHub API returned status {response.status_code}: "
-                    f"{response.text}"
-                )
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-        
-        except Exception as e:
-            error_msg = f"Error creating issue: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            return {"success": False, "error": error_msg}
-        finally:
-            # TODO: Consider reusing client for better performance with connection pooling
-            # Currently closing after each request to avoid connection issues
-            await self.close()
+    async def create_issue(self, title, description, error_log=None, system_info=None):
+        """Backward compatible delegator - see GitHubIssueAdapter.create_issue"""
+        adapter = GitHubIssueAdapter(self.token, self.repo_owner, self.repo_name)
+        return await adapter.create_issue(title, description, error_log, system_info)
 
 # Nexus Compatibility
 GithubAdapter = GitHubAdapter
