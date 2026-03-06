@@ -17,7 +17,9 @@ from app.core.nexus import NexusComponent, nexus
 
 logger = logging.getLogger(__name__)
 
-SAFE_AUTO_INSTALL = {"instructor", "json_repair", "json-repair", "httpx", "pydantic", "faiss"}
+SAFE_AUTO_INSTALL: frozenset = frozenset(
+    {"instructor", "json_repair", "json-repair", "httpx", "pydantic", "faiss", "litellm"}
+)
 _MAX_FILE_CONTENT_LENGTH = 4000
 _MAX_TRACEBACK_LENGTH = 1200
 
