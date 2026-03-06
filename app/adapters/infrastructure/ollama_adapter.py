@@ -1,91 +1,72 @@
-# -*- coding: utf-8 -*-
-"""OllamaAdapter — Adapter para LLM local via Ollama (localhost:11434)."""
-
+"""OllamaAdapter — LLMs locais via Ollama. API compatível com OpenAI."""
 import json
 import logging
-import urllib.error
 import urllib.request
-from typing import Any, Dict, Optional
+from typing import Any
 
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
-_OLLAMA_BASE_URL = "http://localhost:11434"
-_DEFAULT_MODEL = "llama3"
-_DEFAULT_TIMEOUT = 60
-
 
 class OllamaAdapter(NexusComponent):
-    """Adapter para comunicação com Ollama rodando localmente."""
+    def __init__(self, model: str = "qwen2.5-coder:7b", base_url: str = "http://localhost:11434"):
+        self.model = model
+        self.base_url = base_url.rstrip("/")
+        self._available: bool | None = None
 
-    def __init__(
-        self,
-        base_url: str = _OLLAMA_BASE_URL,
-        model: str = _DEFAULT_MODEL,
-        timeout: int = _DEFAULT_TIMEOUT,
-    ) -> None:
-        self._base_url = base_url
-        self._model = model
-        self._timeout = timeout
-
-    def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Envia um prompt ao Ollama e retorna a resposta.
-
-        Context keys:
-            prompt (str): O prompt a ser enviado.
-            system (str, optional): Mensagem de sistema.
-            model (str, optional): Modelo a usar (sobrescreve o padrão).
-            json_mode (bool, optional): Se True, solicita resposta JSON.
-
-        Returns:
-            dict: {"success": bool, "response": str} ou {"success": False, "error": str}
-        """
-        prompt = context.get("prompt", "")
-        system = context.get("system", "")
-        model = context.get("model", self._model)
-        json_mode = context.get("json_mode", False)
-
+    def execute(self, context: dict) -> dict:
+        prompt = context.get("prompt")
         if not prompt:
-            return {"success": False, "error": "prompt ausente no contexto"}
-
-        payload: Dict[str, Any] = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-        }
-        if system:
-            payload["system"] = system
-        if json_mode:
-            payload["format"] = "json"
-
-        url = f"{self._base_url}/api/generate"
-
+            return {"success": False, "error": "Campo 'prompt' ausente"}
+        model = context.get("model", self.model)
         try:
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                url,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
+            response = self._chat(
+                prompt, model, context.get("json_mode", True), context.get("system")
             )
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-                body = resp.read().decode("utf-8")
-                result = json.loads(body)
-                return {"success": True, "response": result.get("response", "")}
-        except urllib.error.URLError as exc:
-            logger.debug("Ollama indisponível em %s: %s", self._base_url, exc)
-            return {"success": False, "error": str(exc)}
+            return {"success": True, "response": response, "provider": "ollama", "model": model}
         except Exception as exc:
-            logger.debug("Erro ao chamar Ollama: %s", exc)
-            return {"success": False, "error": str(exc)}
+            logger.warning("OllamaAdapter falhou: %s", exc)
+            return {"success": False, "error": str(exc), "provider": "ollama"}
 
     def is_available(self) -> bool:
-        """Verifica se o Ollama está acessível em localhost."""
+        if self._available is not None:
+            return self._available
         try:
-            req = urllib.request.Request(f"{self._base_url}/api/tags", method="GET")
-            with urllib.request.urlopen(req, timeout=3) as resp:
-                return resp.status == 200
+            req = urllib.request.urlopen(f"{self.base_url}/api/tags", timeout=2)
+            self._available = req.status == 200
         except Exception:
-            return False
+            self._available = False
+        return self._available
+
+    def _chat(
+        self,
+        prompt: str,
+        model: str,
+        json_mode: bool = True,
+        system: str | None = None,
+    ) -> str:
+        messages = []
+        if system:
+            messages.append({"role": "system", "content": system})
+        messages.append({"role": "user", "content": prompt})
+        payload: dict[str, Any] = {"model": model, "messages": messages, "stream": False}
+        if json_mode:
+            payload["format"] = "json"
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self.base_url}/v1/chat/completions",
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+        return result["choices"][0]["message"]["content"]
+
+    def list_local_models(self) -> list[str]:
+        try:
+            with urllib.request.urlopen(f"{self.base_url}/api/tags", timeout=5) as resp:
+                return [m["name"] for m in json.loads(resp.read())["models"]]
+        except Exception:
+            return []
