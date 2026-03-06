@@ -16,7 +16,6 @@ from slowapi.util import get_remote_address
 
 from app.adapters.infrastructure import api_models
 from app.adapters.infrastructure.api_models import Token, User
-from app.adapters.infrastructure.auth_adapter import AuthAdapter
 from app.adapters.infrastructure.routers.assistant import create_assistant_router
 from app.adapters.infrastructure.routers.bridge import create_bridge_router
 from app.adapters.infrastructure.routers.dev_agent import create_dev_agent_router
@@ -29,7 +28,6 @@ from app.adapters.infrastructure.routers.missions import create_missions_router
 from app.adapters.infrastructure.routers.thoughts import create_thoughts_router
 from app.adapters.infrastructure.routers.utility import create_utility_router
 from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
-from app.adapters.infrastructure.websocket_manager import get_websocket_manager
 from app.application.services import AssistantService, ExtensionManager
 from app.application.services.device_service import DeviceService
 from app.core.config import settings
@@ -38,7 +36,8 @@ from app.core.nexus import nexus
 logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-auth_adapter = AuthAdapter()
+# All component instances are resolved through the Nexus DI container
+auth_adapter = nexus.resolve("auth_adapter")
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
@@ -215,7 +214,7 @@ def create_api_server(
     app.include_router(create_dev_agent_router())
 
     # -- WebSocket endpoint for real-time HUD / notifications -------------------
-    ws_manager = get_websocket_manager()
+    ws_manager = nexus.resolve("websocket_manager")
 
     @app.websocket("/ws/{user_id}")
     async def websocket_endpoint(websocket: WebSocket, user_id: str):

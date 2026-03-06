@@ -19,9 +19,9 @@ import pytest
 from app.adapters.infrastructure.auth_adapter import AuthAdapter
 from app.adapters.infrastructure.jrvs_cloud_storage import JrvsCloudStorage
 from app.adapters.infrastructure.vector_memory_adapter import VectorMemoryAdapter
-from app.adapters.infrastructure.websocket_manager import WebSocketManager, get_websocket_manager
+from app.adapters.infrastructure.websocket_manager import WebSocketManager
 from app.adapters.infrastructure.soldier_bridge import SoldierBridgeManager
-from app.application.services.soldier_registry import SoldierRegistry, get_soldier_registry
+from app.application.services.soldier_registry import SoldierRegistry
 
 
 # ===========================================================================
@@ -218,9 +218,12 @@ class TestWebSocketManager:
         )
         assert total == 2
 
-    def test_singleton(self):
-        m1 = get_websocket_manager()
-        m2 = get_websocket_manager()
+    def test_singleton_via_nexus(self):
+        """nexus.resolve('websocket_manager') returns the same instance every time."""
+        from app.core.nexus import nexus
+
+        m1 = nexus.resolve("websocket_manager")
+        m2 = nexus.resolve("websocket_manager")
         assert m1 is m2
 
 
@@ -324,9 +327,12 @@ class TestSoldierRegistry:
         all_soldiers = registry.list_all()
         assert len(all_soldiers) == 2
 
-    def test_singleton(self):
-        r1 = get_soldier_registry()
-        r2 = get_soldier_registry()
+    def test_singleton_via_nexus(self):
+        """nexus.resolve('soldier_registry') returns the same instance every time."""
+        from app.core.nexus import nexus
+
+        r1 = nexus.resolve("soldier_registry")
+        r2 = nexus.resolve("soldier_registry")
         assert r1 is r2
 
 

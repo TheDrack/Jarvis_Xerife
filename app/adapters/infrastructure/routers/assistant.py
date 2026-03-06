@@ -29,9 +29,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 def _ws_notify(user: User, event_type: str, data: Dict[str, Any]) -> None:
     """Fire-and-forget WebSocket notification to the user's HUD."""
     try:
-        from app.adapters.infrastructure.websocket_manager import get_websocket_manager
+        from app.core.nexus import nexus
 
-        manager = get_websocket_manager()
+        manager = nexus.resolve("websocket_manager")
         user_id = getattr(user, "user_id", None) or getattr(user, "username", "")
         if not user_id or not manager.is_connected(user_id):
             return

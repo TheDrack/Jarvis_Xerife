@@ -118,9 +118,9 @@ class JrvsTranslator(NexusComponent):
         Returns:
             Tuple (synced_paths, error_paths).
         """
-        from app.adapters.infrastructure.jrvs_cloud_storage import JrvsCloudStorage
+        from app.core.nexus import nexus
 
-        cloud = JrvsCloudStorage(bucket=bucket)
+        cloud = nexus.resolve("jrvs_cloud_storage")
         scan_dir = data_dir or self._data_dir
 
         synced: List[str] = []

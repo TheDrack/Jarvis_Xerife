@@ -149,21 +149,21 @@ class SoldierBridgeManager(LocalBridgeManager):
     def _register_with_registry(
         self, device_id: str, device_type: str, capabilities: List[str]
     ) -> None:
-        """Push registration to SoldierRegistry (non-blocking, best-effort)."""
+        """Push registration to SoldierRegistry via Nexus (non-blocking, best-effort)."""
         try:
-            from app.application.services.soldier_registry import get_soldier_registry
+            from app.core.nexus import nexus
 
-            registry = get_soldier_registry()
+            registry = nexus.resolve("soldier_registry")
             registry.register(device_id, capabilities, device_type=device_type)
         except Exception as exc:
             logger.debug("[SoldierBridge] Registry register falhou: %s", exc)
 
     def _unregister_from_registry(self, device_id: str) -> None:
-        """Remove device from SoldierRegistry when disconnected."""
+        """Remove device from SoldierRegistry via Nexus when disconnected."""
         try:
-            from app.application.services.soldier_registry import get_soldier_registry
+            from app.core.nexus import nexus
 
-            registry = get_soldier_registry()
+            registry = nexus.resolve("soldier_registry")
             registry.unregister(device_id)
         except Exception as exc:
             logger.debug("[SoldierBridge] Registry unregister falhou: %s", exc)

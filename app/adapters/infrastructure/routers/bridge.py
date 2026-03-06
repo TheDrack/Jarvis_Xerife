@@ -3,12 +3,15 @@
 
 Uses :class:`~app.adapters.infrastructure.soldier_bridge.SoldierBridgeManager`
 which supports multiple simultaneous connections and capability registration.
+All components are resolved through the Nexus DI container.
 """
 
 import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+
+from app.core.nexus import nexus
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +48,8 @@ def create_bridge_router() -> APIRouter:
             Desktop: ws://jarvis-host/v1/local-bridge?device_id=my_pc&device_type=desktop
             Mobile:  ws://jarvis-host/v1/local-bridge?device_id=my_phone&device_type=mobile&capabilities=camera
         """
-        from app.adapters.infrastructure.soldier_bridge import get_bridge_manager
-
+        bridge_manager = nexus.resolve("soldier_bridge")
         caps: List[str] = [c.strip() for c in capabilities.split(",")] if capabilities else []
-        bridge_manager = get_bridge_manager()
         try:
             await bridge_manager.connect(websocket, device_id, device_type, caps)
             while True:
@@ -67,9 +68,7 @@ def create_bridge_router() -> APIRouter:
     @router.get("/v1/local-bridge/devices")
     async def list_connected_devices() -> Dict[str, Any]:
         """List all currently connected soldier devices and their capabilities."""
-        from app.adapters.infrastructure.soldier_bridge import get_bridge_manager
-
-        bridge_manager = get_bridge_manager()
+        bridge_manager = nexus.resolve("soldier_bridge")
         soldiers = bridge_manager.get_connected_soldiers()
         return {"connected_devices": soldiers, "count": len(soldiers)}
 
@@ -85,9 +84,7 @@ def create_bridge_router() -> APIRouter:
         Returns:
             Task result from the device
         """
-        from app.adapters.infrastructure.soldier_bridge import get_bridge_manager
-
-        bridge_manager = get_bridge_manager()
+        bridge_manager = nexus.resolve("soldier_bridge")
         if not bridge_manager.is_device_connected(device_id):
             raise HTTPException(
                 status_code=404,

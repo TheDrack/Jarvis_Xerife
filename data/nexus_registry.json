@@ -44,6 +44,11 @@
     "safety_guardian": "app.domain.services.safety_guardian.SafetyGuardian",
     "command_interpreter": "app.domain.services.command_interpreter.CommandInterpreter",
     "intent_processor": "app.domain.services.intent_processor.IntentProcessor",
-    "extension_manager": "app.adapters.infrastructure.extension_manager.ExtensionManager"
+    "extension_manager": "app.adapters.infrastructure.extension_manager.ExtensionManager",
+    "auth_adapter": "app.adapters.infrastructure.auth_adapter.AuthAdapter",
+    "jrvs_cloud_storage": "app.adapters.infrastructure.jrvs_cloud_storage.JrvsCloudStorage",
+    "websocket_manager": "app.adapters.infrastructure.websocket_manager.WebSocketManager",
+    "soldier_bridge": "app.adapters.infrastructure.soldier_bridge.SoldierBridgeManager",
+    "soldier_registry": "app.application.services.soldier_registry.SoldierRegistry"
   }
 }

@@ -40,6 +40,9 @@ class _NexusRegistryMixin:
             pass
 
         # --- Supabase fallback: download registry from cloud if local file missing ---
+        # NOTE: Direct instantiation here is intentional — this code runs during Nexus
+        # bootstrap (__init__), before nexus.resolve() is available. Using nexus.resolve()
+        # here would create a circular dependency.
         try:
             from app.adapters.infrastructure.jrvs_cloud_storage import JrvsCloudStorage
 
@@ -78,18 +81,21 @@ class _NexusRegistryMixin:
         registry_path = os.path.join(self.base_dir, "data", "nexus_registry.jrvs")
         _jrvs_write(registry_path, {"components": components})
 
-        # --- Parallel cloud backup (best-effort, never blocks) ---
+        # --- Parallel cloud backup via Nexus-resolved JrvsCloudStorage (best-effort, never blocks) ---
         try:
             import threading
-
-            from app.adapters.infrastructure.jrvs_cloud_storage import JrvsCloudStorage
 
             with open(registry_path, "rb") as fh:
                 raw = fh.read()
 
             def _upload() -> None:
                 try:
-                    JrvsCloudStorage().upload("jrvs-snapshots", "data/nexus_registry.jrvs", raw)
+                    # Resolve via Nexus — safe here because _update_local_registry is
+                    # called AFTER the Nexus has finished bootstrapping.
+                    from app.core.nexus import nexus as _nexus
+
+                    cloud = _nexus.resolve("jrvs_cloud_storage")
+                    cloud.upload("jrvs-snapshots", "data/nexus_registry.jrvs", raw)
                 except Exception as exc:
                     logger.debug("[NEXUS] Supabase backup falhou silenciosamente: %s", exc)
 

@@ -253,11 +253,11 @@ class DeviceOrchestratorService(SoldierProvider):
         Returns:
             Dispatch result dict.
         """
-        # --- 1. Try SoldierRegistry (connected bridge soldiers) ---
+        # --- 1. Try SoldierRegistry via Nexus (connected bridge soldiers) ---
         try:
-            from app.application.services.soldier_registry import get_soldier_registry
+            from app.core.nexus import nexus
 
-            registry = get_soldier_registry()
+            registry = nexus.resolve("soldier_registry")
             candidates = registry.get_available_soldiers(capability)
             if candidates:
                 soldier_id = candidates[0]["soldier_id"]
