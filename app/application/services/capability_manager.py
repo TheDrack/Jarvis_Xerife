@@ -65,13 +65,15 @@ class CapabilityManager(NexusComponent):
         Returns a mapping of capability IDs to detection functions.
         Each function checks if that capability is implemented in the codebase.
         """
-        # For now, we'll define a few example detectors
-        # In a full implementation, each capability would have its own detector
+        from app.application.services.capability_detectors import (
+            detect_capability_inventory,
+            detect_capability_classification,
+            detect_existing_capabilities_recognition,
+        )
         return {
-            # Example detectors that check for existing functionality
-            1: self._detect_capability_inventory,
-            2: self._detect_capability_classification,
-            16: self._detect_existing_capabilities_recognition,
+            1: lambda: detect_capability_inventory(self.engine),
+            2: lambda: detect_capability_classification(self.engine),
+            16: lambda: detect_existing_capabilities_recognition(self._capability_detectors),
         }
     
     def check_requirements(self, capability_id: int) -> Dict[str, Any]:
@@ -425,139 +427,26 @@ class CapabilityManager(NexusComponent):
     # Detector methods for specific capabilities
     
     def _detect_capability_inventory(self) -> str:
-        """Detect if capability #1 (internal inventory) is implemented"""
-        # Check if we have the capabilities.json and database table
-        json_path = Path(__file__).parent.parent.parent.parent / "data" / "capabilities.json"
-        if json_path.exists():
-            with Session(self.engine) as session:
-                count = len(session.exec(select(JarvisCapability)).all())
-                if count >= 102:
-                    return "complete"
-                elif count > 0:
-                    return "partial"
-        return "nonexistent"
+        """Backward compatible delegator - see capability_detectors.detect_capability_inventory"""
+        from app.application.services.capability_detectors import detect_capability_inventory
+        return detect_capability_inventory(self.engine)
     
     def _detect_capability_classification(self) -> str:
-        """Detect if capability #2 (classification by status) is implemented"""
-        # Check if status field is being used
-        with Session(self.engine) as session:
-            capabilities = session.exec(select(JarvisCapability)).all()
-            if len(capabilities) > 0:
-                # Check if any capabilities have non-default status
-                non_default = sum(1 for c in capabilities if c.status != "nonexistent")
-                if non_default > 0:
-                    return "complete"
-                else:
-                    return "partial"
-        return "nonexistent"
+        """Backward compatible delegator - see capability_detectors.detect_capability_classification"""
+        from app.application.services.capability_detectors import detect_capability_classification
+        return detect_capability_classification(self.engine)
     
     def _detect_existing_capabilities_recognition(self) -> str:
-        """Detect if capability #16 (recognize existing capabilities) is implemented"""
-        # Check if the CapabilityManager class exists and has detectors
-        if len(self._capability_detectors) > 0:
-            return "partial"
-        return "nonexistent"
+        """Backward compatible delegator - see capability_detectors.detect_existing_capabilities_recognition"""
+        from app.application.services.capability_detectors import detect_existing_capabilities_recognition
+        return detect_existing_capabilities_recognition(self._capability_detectors)
     
     async def report_capability_gap_via_pr(
         self,
         capability_id: int,
         github_adapter=None
     ) -> Dict[str, Any]:
-        """
-        Report a capability gap by creating a Pull Request instead of an Issue.
-        
-        This is the new protocol - when a test failure or capability gap is detected,
-        we create a PR with autonomous_instruction.json that triggers the Jarvis
-        Autonomous State Machine workflow.
-        
-        Flow:
-        1. Detect Gap -> Generate Blueprint
-        2. Create Branch (auto-fix/capability-{id}-{timestamp})
-        3. Create autonomous_instruction.json with capability details
-        4. Open Pull Request with Copilot Workspace fallback link
-        
-        Args:
-            capability_id: ID of the capability with a gap
-            github_adapter: Optional GitHubAdapter instance.
-                If not provided, will create one.
-        
-        Returns:
-            Dictionary with 'success' boolean and PR details or error message
-        
-        Example:
-            >>> manager = CapabilityManager(engine)
-            >>> result = await manager.report_capability_gap_via_pr(capability_id=42)
-        """
-        # Get capability details
-        with Session(self.engine) as session:
-            capability = session.get(JarvisCapability, capability_id)
-            if not capability:
-                return {
-                    "success": False,
-                    "error": f"Capability {capability_id} not found"
-                }
-
-            # Generate blueprint for the capability
-            blueprint = self._generate_blueprint(capability)
-        
-        # Lazy import to avoid circular dependency
-        if github_adapter is None:
-            from app.adapters.infrastructure.github_adapter import GitHubAdapter
-            github_adapter = GitHubAdapter()
-        
-        # Prepare structured description for autonomous_instruction.json
-        libs = '\n'.join(f"- {lib}" for lib in blueprint.get('libraries', [])) or '- None'
-        apis = '\n'.join(f"- {api}" for api in blueprint.get('apis', [])) or '- None'
-        envs = '\n'.join(f"- {env}" for env in blueprint.get('env_vars', [])) or '- None'
-        perms = '\n'.join(f"- {perm}" for perm in blueprint.get('permissions', [])) or '- None'
-        reqs = '\n'.join(f"- {req}" for req in blueprint.get('requirements', [])) or '- None'
-
-        description = f"""# Capability Gap Detected
-
-**Capability ID**: {capability.id}
-**Capability Name**: {capability.capability_name}
-**Chapter**: {capability.chapter}
-**Current Status**: {capability.status}
-
-## Blueprint for Implementation
-
-{blueprint.get('blueprint', 'No blueprint available')}
-
-## Technical Requirements
-
-### Libraries Needed
-{libs}
-
-### APIs Required
-{apis}
-
-### Environment Variables
-{envs}
-
-### Permissions
-{perms}
-
-## Requirements Summary
-{reqs}
-
----
-**Note**: This is an automated capability gap report.
-The system has detected that this capability is not yet implemented
-and requires attention.
-"""
-        
-        # Use report_for_auto_correction to create the PR
-        title = f"Implement Capability: {capability.capability_name}"
-        
-        logger.info(f"Creating PR for capability gap: {capability.capability_name}")
-        
-        result = await github_adapter.report_for_auto_correction(
-            title=title,
-            description=description,
-            improvement_context=(
-                f"Capability {capability.id} needs implementation "
-                f"to advance JARVIS evolution."
-            )
-        )
-        
-        return result
+        """Backward compatible delegator - see CapabilityGapReporter.report_capability_gap_via_pr"""
+        from app.application.services.capability_gap_reporter import CapabilityGapReporter
+        reporter = CapabilityGapReporter(self.engine)
+        return await reporter.report_capability_gap_via_pr(capability_id, github_adapter)

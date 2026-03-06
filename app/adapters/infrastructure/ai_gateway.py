@@ -10,81 +10,23 @@ This gateway implements a "Gears" (Marchas) system:
 """
 
 import asyncio
+import concurrent.futures
 import logging
 import os
 import traceback
-from enum import Enum
 from typing import Any, Dict, List, Optional
 
-# Try to import tiktoken, but don't fail if it's not available
-try:
-    import tiktoken
-    HAS_TIKTOKEN = True
-except ImportError:
-    tiktoken = None
-    HAS_TIKTOKEN = False
+# Re-exported from sub-modules for backward compatibility
+from app.adapters.infrastructure.ai_gateway_enums import GroqGear, LLMProvider  # noqa: F401
+from app.adapters.infrastructure.ai_gateway_token_utils import (  # noqa: F401
+    _get_tokenizer,
+    count_tokens,
+)
 
 logger = logging.getLogger(__name__)
 
-# Module-level tokenizer cache to avoid repeated initialization
-_TOKENIZER_CACHE = None
 
-
-def _get_tokenizer():
-    """Get or create tokenizer with caching"""
-    global _TOKENIZER_CACHE
-    if not HAS_TIKTOKEN:
-        return None
-    
-    if _TOKENIZER_CACHE is None:
-        try:
-            # Using cl100k_base encoding (GPT-4, GPT-3.5-turbo)
-            # This is a good approximation for most modern LLMs
-            _TOKENIZER_CACHE = tiktoken.get_encoding("cl100k_base")
-        except Exception as e:
-            logger.warning(f"Failed to initialize tokenizer: {e}. Token counting will be approximate.")
-            _TOKENIZER_CACHE = False  # Use False to indicate initialization was attempted but failed
-    return _TOKENIZER_CACHE if _TOKENIZER_CACHE else None
-
-
-def count_tokens(text: str) -> int:
-    """
-    Count tokens in the given text.
-    
-    Uses tiktoken if available, otherwise falls back to character-based approximation
-    using a 1:4 ratio (1 token ≈ 4 characters).
-    
-    Args:
-        text: Text to count tokens for
-        
-    Returns:
-        Approximate token count
-    """
-    if HAS_TIKTOKEN:
-        tokenizer = _get_tokenizer()
-        if tokenizer:
-            try:
-                return len(tokenizer.encode(text))
-            except Exception as e:
-                logger.warning(f"Error counting tokens: {e}. Using character approximation.")
-    
-    # Fallback: rough approximation (1 token ≈ 4 characters)
-    return len(text) // 4
-
-
-class LLMProvider(str, Enum):
-    """Available LLM providers"""
-    GROQ = "groq"
-    GEMINI = "gemini"
-
-
-class GroqGear(str, Enum):
-    """Groq Gears (Marchas) - Different Groq models for different use cases"""
-    HIGH_GEAR = "high"  # Marcha Alta: Llama-4-Scout or Llama-3.3-70b (default)
-    LOW_GEAR = "low"    # Marcha Baixa: Qwen-3-32B or Llama-8B (rate limit fallback)
-
-
-class AIGateway:
+class AIGateway(NexusComponent):
     """
     AI Gateway that intelligently routes requests between multiple LLM providers.
     
@@ -778,6 +720,47 @@ class AIGateway:
 
         return self.default_provider
 
+    # ------------------------------------------------------------------
+    # NexusComponent interface
+    # ------------------------------------------------------------------
+
+    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """NexusComponent evidence method.
+
+        Args:
+            context: Optional dict with keys:
+                - ``messages`` (list): messages to send to the LLM
+                - ``multimodal`` (bool): whether the request is multimodal
+                - ``force_provider`` (str): force a specific provider value
+
+        Returns:
+            Evidence dict with ``success`` and provider metadata.
+        """
+        ctx = context or {}
+        messages: List[Dict[str, str]] = ctx.get("messages", [])
+        multimodal: bool = ctx.get("multimodal", False)
+        force_provider_value: Optional[str] = ctx.get("force_provider")
+        force_provider: Optional[LLMProvider] = (
+            LLMProvider(force_provider_value) if force_provider_value else None
+        )
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(
+                        asyncio.run,
+                        self.generate_completion(messages, multimodal=multimodal, force_provider=force_provider),
+                    )
+                    result = future.result()
+            else:
+                result = loop.run_until_complete(
+                    self.generate_completion(messages, multimodal=multimodal, force_provider=force_provider)
+                )
+            return {"success": True, "provider": result.get("provider"), "model": result.get("model")}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
 
 # Nexus Compatibility
-AiGateway = LLMProvider
+AiGateway = AIGateway

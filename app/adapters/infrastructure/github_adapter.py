@@ -14,6 +14,9 @@ from typing import Any, Dict, Optional
 
 import httpx
 
+from app.adapters.infrastructure.github_issue_adapter import GitHubIssueAdapter
+from app.adapters.infrastructure.github_workflow_adapter import GitHubWorkflowAdapter
+
 logger = logging.getLogger(__name__)
 
 
@@ -218,38 +221,10 @@ class GitHubAdapter(NexusComponent):
             # Always close client after dispatch to avoid connection issues
             await self.close()
     
-    async def get_workflow_runs(self, workflow_name: str = "jarvis_code_fixer.yml") -> Dict[str, Any]:
-        """
-        Get recent workflow runs for monitoring.
-        
-        Args:
-            workflow_name: Name of the workflow file
-        
-        Returns:
-            Dictionary with workflow run data
-        """
-        if not self.token:
-            return {"success": False, "error": "GITHUB_TOKEN not configured"}
-        
-        try:
-            url = (
-                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
-                f"/actions/workflows/{workflow_name}/runs"
-            )
-            
-            client = await self._ensure_client()
-            response = await client.get(url)
-            
-            if response.status_code == 200:
-                return {"success": True, "data": response.json()}
-            else:
-                return {
-                    "success": False,
-                    "error": f"Status {response.status_code}: {response.text}"
-                }
-        
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+    async def get_workflow_runs(self, workflow_name: str = "jarvis_code_fixer.yml"):
+        """Backward compatible delegator - see GitHubWorkflowAdapter.get_workflow_runs"""
+        adapter = GitHubWorkflowAdapter(self.token, self.repo_owner, self.repo_name)
+        return await adapter.get_workflow_runs(workflow_name)
     
     async def report_for_auto_correction(
         self,
@@ -258,319 +233,17 @@ class GitHubAdapter(NexusComponent):
         error_log: Optional[str] = None,
         improvement_context: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Report an error or improvement request for autonomous correction.
-        
-        Instead of creating an issue, this method:
-        1. Creates a new branch with prefix 'auto-fix/'
-        2. Creates autonomous_instruction.json at repo root with the error/improvement description
-        3. Commits and pushes the changes
-        4. Opens a Pull Request to main branch
-        5. The PR triggers the Jarvis Autonomous State Machine workflow
-        
-        Args:
-            title: Title of the correction/improvement request
-            description: Description of the error or improvement needed
-            error_log: Optional error log to include
-            improvement_context: Optional context about the improvement
-        
-        Returns:
-            Dictionary with 'success' boolean, 'pr_number' and 'pr_url' if successful, and optional 'error' message
-        
-        Example:
-            >>> adapter = GitHubAdapter()
-            >>> result = await adapter.report_for_auto_correction(
-            ...     title="Fix HUD text duplication",
-            ...     description="Duplicate text appears in the HUD display",
-            ...     error_log="DuplicateTextError: Text rendered twice"
-            ... )
-        """
-        if not self.token:
-            error_msg = "GITHUB_TOKEN not configured. Cannot create auto-fix PR."
-            logger.error(error_msg)
-            return {"success": False, "error": error_msg}
-        
-        try:
-            import json
-            from datetime import datetime
-            import random
-            import string
-            
-            # Generate unique branch name with timestamp and random suffix
-            # Include microseconds and random suffix to avoid collisions
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-            random_suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=4))
-            branch_name = f"auto-fix/{timestamp}-{random_suffix}"
-            
-            # Prepare autonomous_instruction.json content
-            instruction_data = {
-                "title": title,
-                "description": description,
-                "error_log": error_log,
-                "improvement_context": improvement_context,
-                "created_at": datetime.now().isoformat(),
-                "triggered_by": "jarvis_self_correction",
-            }
-            
-            instruction_content = json.dumps(instruction_data, indent=2, ensure_ascii=False)
-            
-            # Get the default branch SHA to create new branch from
-            default_branch = "main"
-            ref_url = (
-                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
-                f"/git/ref/heads/{default_branch}"
-            )
-            
-            client = await self._ensure_client()
-            ref_response = await client.get(ref_url)
-            
-            if ref_response.status_code != 200:
-                error_msg = f"Failed to get {default_branch} branch reference: {ref_response.text}"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-            
-            base_sha = ref_response.json()["object"]["sha"]
-            
-            # Create new branch
-            create_ref_url = (
-                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
-                f"/git/refs"
-            )
-            
-            create_ref_payload = {
-                "ref": f"refs/heads/{branch_name}",
-                "sha": base_sha,
-            }
-            
-            create_ref_response = await client.post(create_ref_url, json=create_ref_payload)
-            
-            if create_ref_response.status_code != 201:
-                error_msg = f"Failed to create branch: {create_ref_response.text}"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-            
-            logger.info(f"Created branch: {branch_name}")
-            
-            # Create/update autonomous_instruction.json file
-            file_path = "autonomous_instruction.json"
-            file_url = (
-                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
-                f"/contents/{file_path}"
-            )
-            
-            # Encode content as base64
-            encoded_content = base64.b64encode(instruction_content.encode("utf-8")).decode("ascii")
-            
-            file_payload = {
-                "message": f"Add autonomous instruction: {title}",
-                "content": encoded_content,
-                "branch": branch_name,
-            }
-            
-            file_response = await client.put(file_url, json=file_payload)
-            
-            if file_response.status_code not in [201, 200]:
-                error_msg = f"Failed to create file: {file_response.text}"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-            
-            logger.info(f"Created {file_path} in branch {branch_name}")
-            
-            # Create Pull Request with keyword to trigger Jarvis Autonomous State Machine
-            pr_body = f"""## 🤖 Jarvis Autonomous State Machine - Auto-Correction Request
+        """Backward compatible delegator - see GitHubCorrectionAdapter.report_for_auto_correction"""
+        from app.adapters.infrastructure.github_correction_adapter import GitHubCorrectionAdapter
+        adapter = GitHubCorrectionAdapter(self.token, self.repo_owner, self.repo_name)
+        return await adapter.report_for_auto_correction(
+            title, description, error_log, improvement_context
+        )
 
-### Descrição
-{description}
-"""
-            
-            if error_log:
-                # Truncate error log for PR body to prevent secrets exposure and size limits
-                max_log_length = 500
-                truncated_log = error_log[:max_log_length]
-                if len(error_log) > max_log_length:
-                    truncated_log += f"\n... (truncated {len(error_log) - max_log_length} characters)"
-                
-                pr_body += f"""
-### Erro (Preview)
-```
-{truncated_log}
-```
-*Full error log available in `autonomous_instruction.json`*
-"""
-            
-            if improvement_context:
-                pr_body += f"""
-### Contexto da Melhoria
-{improvement_context}
-"""
-            
-            pr_body += f"""
-### Instrução Autônoma
-O arquivo `autonomous_instruction.json` foi criado na raiz do repositório com os detalhes completos da correção/melhoria solicitada.
-
-### 🔧 Copilot Workspace (Fallback Manual)
-Se preferir editar manualmente ou o workflow automático falhar, você pode abrir o Copilot Workspace diretamente:
-
-**[🚀 Abrir no Copilot Workspace](https://github.com/codespaces/copilot-workspace?repo_id={os.getenv('GITHUB_REPOSITORY_ID', self.repo_owner + '/' + self.repo_name)}&branch={branch_name})**
-
-Este link abre o ambiente de edição do GitHub Copilot Agent diretamente, com o plano de correção já traçado.
-
----
-*Pull Request criada automaticamente pelo protocolo de auto-correção do Jarvis*
-*Esta PR dispara o workflow Jarvis Autonomous State Machine para correção autônoma*
-"""
-            
-            pr_url = (
-                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
-                f"/pulls"
-            )
-            
-            pr_payload = {
-                "title": f"🤖 Auto-fix: {title}",
-                "body": pr_body,
-                "head": branch_name,
-                "base": default_branch,
-            }
-            
-            pr_response = await client.post(pr_url, json=pr_payload)
-            
-            if pr_response.status_code == 201:
-                pr_data = pr_response.json()
-                pr_number = pr_data.get("number")
-                pr_html_url = pr_data.get("html_url")
-                logger.info(f"✅ Pull Request #{pr_number} created successfully: {pr_html_url}")
-                return {
-                    "success": True,
-                    "pr_number": pr_number,
-                    "pr_url": pr_html_url,
-                    "branch": branch_name,
-                    "message": "Auto-correction PR created - Jarvis Autonomous State Machine will process it",
-                }
-            else:
-                error_msg = f"Failed to create PR: {pr_response.status_code} - {pr_response.text}"
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-        
-        except Exception as e:
-            error_msg = f"Error in report_for_auto_correction: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            return {"success": False, "error": error_msg}
-        finally:
-            await self.close()
-
-    async def create_issue(
-        self,
-        title: str,
-        description: str,
-        error_log: Optional[str] = None,
-        system_info: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Create a new GitHub issue.
-        
-        NOTE: For self-correction scenarios, prefer using report_for_auto_correction()
-        which creates a PR and triggers the Jarvis Autonomous State Machine workflow
-        instead of creating an issue.
-        
-        Args:
-            title: Title of the issue
-            description: Description/body of the issue
-            error_log: Optional error log to include
-            system_info: Optional system information to include
-        
-        Returns:
-            Dictionary with 'success' boolean, 'issue_number' if successful, and optional 'error' message
-        
-        Example:
-            >>> adapter = GitHubAdapter()
-            >>> result = await adapter.create_issue(
-            ...     title="CI Failure: Python Tests failed",
-            ...     description="Test suite failed on main branch"
-            ... )
-        """
-        if not self.token:
-            error_msg = "GITHUB_TOKEN not configured. Cannot create issue."
-            logger.error(error_msg)
-            return {"success": False, "error": error_msg}
-        
-        try:
-            # Build issue body with structured format for better auto-fixer interpretation
-            body_parts = []
-            
-            # Add description section
-            body_parts.append("## Descrição")
-            body_parts.append(description)
-            
-            # Add helpful hint for auto-fixer if description doesn't mention specific files
-            # This helps the auto-fixer identify which files to modify
-            # Use regex to detect actual file extensions (e.g., .py, .yml, .md)
-            import re
-            has_file_mention = bool(re.search(r'\.\w{2,4}\b', description))
-            if not has_file_mention:
-                body_parts.append("\n## Arquivos Relacionados")
-                body_parts.append("*Nota: Para que o auto-reparo funcione corretamente, mencione os arquivos específicos que devem ser modificados.*")
-            
-            if error_log:
-                body_parts.append("\n## Erro")
-                body_parts.append(f"```\n{error_log}\n```")
-            
-            if system_info:
-                body_parts.append("\n## Informações do Sistema")
-                for key, value in system_info.items():
-                    body_parts.append(f"- **{key}**: {value}")
-            
-            # Add auto-generated footer
-            body_parts.append("\n---\n*Issue criada automaticamente pelo Jarvis*")
-            
-            body = "\n".join(body_parts)
-            
-            # Prepare payload
-            payload = {
-                "title": title,
-                "body": body,
-                "labels": ["jarvis-auto-report"],
-            }
-            
-            # Create issue URL
-            url = (
-                f"{self.base_url}/repos/{self.repo_owner}/{self.repo_name}"
-                f"/issues"
-            )
-            
-            logger.info(
-                f"Creating issue '{title}' in {self.repo_owner}/{self.repo_name}"
-            )
-            
-            # Send request
-            client = await self._ensure_client()
-            response = await client.post(url, json=payload)
-            
-            # Check response
-            if response.status_code == 201:
-                issue_data = response.json()
-                issue_number = issue_data.get("number")
-                logger.info(f"✅ Issue #{issue_number} created successfully")
-                return {
-                    "success": True,
-                    "issue_number": issue_number,
-                    "issue_url": issue_data.get("html_url"),
-                }
-            else:
-                error_msg = (
-                    f"GitHub API returned status {response.status_code}: "
-                    f"{response.text}"
-                )
-                logger.error(error_msg)
-                return {"success": False, "error": error_msg}
-        
-        except Exception as e:
-            error_msg = f"Error creating issue: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            return {"success": False, "error": error_msg}
-        finally:
-            # TODO: Consider reusing client for better performance with connection pooling
-            # Currently closing after each request to avoid connection issues
-            await self.close()
+    async def create_issue(self, title, description, error_log=None, system_info=None):
+        """Backward compatible delegator - see GitHubIssueAdapter.create_issue"""
+        adapter = GitHubIssueAdapter(self.token, self.repo_owner, self.repo_name)
+        return await adapter.create_issue(title, description, error_log, system_info)
 
 # Nexus Compatibility
 GithubAdapter = GitHubAdapter
