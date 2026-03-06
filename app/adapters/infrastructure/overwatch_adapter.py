@@ -101,6 +101,13 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor):
         self._cpu_history: Deque[float] = collections.deque(maxlen=_SLIDING_WINDOW_SIZE)
         self._ram_history: Deque[float] = collections.deque(maxlen=_SLIDING_WINDOW_SIZE)
 
+        # Consolidação da memória semântica e MetaReflection
+        self._consolidation_interval_min: float = float(
+            os.getenv("OVERWATCH_CONSOLIDATION_MIN", "15")
+        )
+        self._last_consolidation_ts: float = 0.0
+        self._meta_reflection_every_n_ticks: int = 50
+
     # ------------------------------------------------------------------
     # NexusComponent contract
     # ------------------------------------------------------------------
@@ -152,6 +159,8 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor):
                 self._check_inactivity()
                 self._check_tactical_perimeter()
                 self._check_jrvs_compile()
+                self._maybe_consolidate_semantic_memory()
+                self._maybe_run_meta_reflection()
             except Exception as exc:
                 logger.error("[PROACTIVE_CORE] Erro no loop principal: %s", exc)
             time.sleep(self._poll_interval)
@@ -309,6 +318,46 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor):
     # ------------------------------------------------------------------
     # Tactical Perimeter (Phase 3 - Soldier Shield & Response)
     # ------------------------------------------------------------------
+
+    def consolidate_semantic_memory(self) -> None:
+        """Transfere aprendizados da memória FAISS para a SemanticMemory.
+
+        Chamado periodicamente pelo loop principal via _maybe_consolidate_semantic_memory.
+        """
+        try:
+            sem_mem = nexus.resolve("semantic_memory")
+            if sem_mem is None:
+                return
+            vector_mem = nexus.resolve("vector_memory_adapter")
+            entries: list = []
+            if vector_mem is not None and hasattr(vector_mem, "get_recent_entries"):
+                entries = vector_mem.get_recent_entries(limit=100) or []
+            if entries and hasattr(sem_mem, "consolidate_from_episodic"):
+                count = sem_mem.consolidate_from_episodic(entries)
+                logger.info("[PROACTIVE_CORE] %d fatos consolidados na SemanticMemory.", count)
+        except Exception as exc:
+            logger.debug("[PROACTIVE_CORE] Falha ao consolidar SemanticMemory: %s", exc)
+
+    def _maybe_consolidate_semantic_memory(self) -> None:
+        """Executa consolidação se o intervalo configurado tiver passado."""
+        now = time.monotonic()
+        interval_sec = self._consolidation_interval_min * 60
+        if now - self._last_consolidation_ts < interval_sec:
+            return
+        self._last_consolidation_ts = now
+        self.consolidate_semantic_memory()
+
+    def _maybe_run_meta_reflection(self) -> None:
+        """Executa MetaReflection a cada N ticks metabólicos configurados."""
+        if self._tick_count % self._meta_reflection_every_n_ticks != 0:
+            return
+        try:
+            meta_ref = nexus.resolve("meta_reflection")
+            if meta_ref is not None:
+                meta_ref.execute({})
+                logger.info("[PROACTIVE_CORE] MetaReflection executada no tick %d.", self._tick_count)
+        except Exception as exc:
+            logger.debug("[PROACTIVE_CORE] Falha ao executar MetaReflection: %s", exc)
 
     def register_authorized_mac(self, mac: str) -> None:
         """Add *mac* to the set of authorised devices on the perimeter."""

@@ -20,7 +20,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Set
 
 from sqlmodel import Session, create_engine, select
 from sqlalchemy.engine import Engine
@@ -450,3 +450,127 @@ class CapabilityManager(NexusComponent):
         from app.application.services.capability_gap_reporter import CapabilityGapReporter
         reporter = CapabilityGapReporter(self.engine)
         return await reporter.report_capability_gap_via_pr(capability_id, github_adapter)
+
+    # ------------------------------------------------------------------
+    # Dependency Graph methods (ETAPA 5)
+    # ------------------------------------------------------------------
+
+    def build_dependency_graph(self) -> Dict[str, List[str]]:
+        """Constrói um grafo de dependências das capabilities como dicionário de adjacência.
+
+        Lê o campo ``depends_on`` de cada capability em data/capabilities.json
+        e retorna um grafo orientado onde cada chave é o ID da capability e o
+        valor é a lista de capability IDs que dependem dela (dependentes).
+
+        Returns:
+            Dicionário de adjacência: {capability_id: [ids_que_dependem_dele]}
+        """
+        caps = self._load_capabilities_json()
+        graph: Dict[str, List[str]] = {cap["id"]: [] for cap in caps}
+        for cap in caps:
+            for dep in cap.get("depends_on", []):
+                if dep in graph:
+                    graph[dep].append(cap["id"])
+                else:
+                    graph[dep] = [cap["id"]]
+        return graph
+
+    def get_executable_capabilities(self) -> List[Dict[str, Any]]:
+        """Retorna capabilities cujas dependências estão com status ``complete``.
+
+        Apenas essas capabilities podem ser trabalhadas no próximo ciclo
+        de evolução.
+
+        Returns:
+            Lista de dicionários de capabilities prontas para execução.
+        """
+        caps = self._load_capabilities_json()
+        caps_by_id: Dict[str, Dict[str, Any]] = {c["id"]: c for c in caps}
+
+        executable = []
+        for cap in caps:
+            if cap.get("status") == "complete":
+                continue  # já concluída
+            deps = cap.get("depends_on", [])
+            if all(caps_by_id.get(dep, {}).get("status") == "complete" for dep in deps):
+                executable.append(cap)
+        return executable
+
+    def get_critical_path(self) -> List[str]:
+        """Retorna o caminho crítico do DAG de capabilities (sequência mais longa).
+
+        O caminho crítico representa o gargalo do plano de evolução.
+        Utiliza ordenação topológica para calcular a distância máxima.
+
+        Returns:
+            Lista de capability IDs no caminho crítico (do início ao fim).
+        """
+        caps = self._load_capabilities_json()
+        caps_by_id: Dict[str, Dict[str, Any]] = {c["id"]: c for c in caps}
+
+        # Constrói grafo de dependências (dep → cap que depende dela)
+        # Para critical path precisamos: predecessors[cap] = depends_on
+        predecessors: Dict[str, List[str]] = {
+            c["id"]: list(c.get("depends_on", [])) for c in caps
+        }
+        all_ids = list(caps_by_id.keys())
+
+        # Ordenação topológica (Kahn's algorithm)
+        in_degree: Dict[str, int] = {cid: len(predecessors.get(cid, [])) for cid in all_ids}
+        queue: List[str] = [cid for cid in all_ids if in_degree[cid] == 0]
+        topo_order: List[str] = []
+
+        # successors: para cada cap, quem vem depois (quem a lista como dependência)
+        successors: Dict[str, List[str]] = {cid: [] for cid in all_ids}
+        for cid in all_ids:
+            for dep in predecessors.get(cid, []):
+                if dep in successors:
+                    successors[dep].append(cid)
+
+        visited: List[str] = []
+        while queue:
+            queue.sort()  # garante ordenação determinística para produzir caminho crítico estável
+            node = queue.pop(0)
+            topo_order.append(node)
+            for succ in successors.get(node, []):
+                in_degree[succ] -= 1
+                if in_degree[succ] == 0:
+                    queue.append(succ)
+
+        # Distância mais longa (longest path)
+        dist: Dict[str, int] = {cid: 0 for cid in all_ids}
+        prev: Dict[str, Optional[str]] = {cid: None for cid in all_ids}
+
+        for node in topo_order:
+            for succ in successors.get(node, []):
+                if dist[node] + 1 > dist[succ]:
+                    dist[succ] = dist[node] + 1
+                    prev[succ] = node
+
+        # Encontra o nó com maior distância
+        if not dist:
+            return []
+        end_node = max(dist, key=lambda cid: dist[cid])
+
+        # Reconstrói o caminho
+        path: List[str] = []
+        current: Optional[str] = end_node
+        while current is not None:
+            path.append(current)
+            current = prev[current]
+        path.reverse()
+        return path
+
+    def _load_capabilities_json(self) -> List[Dict[str, Any]]:
+        """Lê data/capabilities.json e retorna a lista de capabilities."""
+        _file = Path("data/capabilities.json")
+        if not _file.exists():
+            return []
+        try:
+            data = json.loads(_file.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                return data
+            return data.get("capabilities", [])
+        except Exception as exc:
+            logger.warning("[CapabilityManager] Falha ao ler capabilities.json: %s", exc)
+            return []

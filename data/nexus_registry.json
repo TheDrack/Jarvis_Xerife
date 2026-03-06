@@ -29,6 +29,10 @@
     "evolution_orchestrator": "app.application.services.evolution_orchestrator.EvolutionOrchestrator",
     "procedural_memory_adapter": "app.adapters.infrastructure.procedural_memory_adapter.ProceduralMemoryAdapter",
     "capability_index_service": "app.application.services.capability_index_service.CapabilityIndexService",
-    "cost_tracker_adapter": "app.adapters.infrastructure.cost_tracker_adapter.CostTrackerAdapter"
+    "cost_tracker_adapter": "app.adapters.infrastructure.cost_tracker_adapter.CostTrackerAdapter",
+    "llm_router": "app.application.services.llm_router.LLMRouter",
+    "semantic_memory": "app.domain.memory.semantic_memory.SemanticMemory",
+    "evolution_gatekeeper": "app.application.services.evolution_gatekeeper.EvolutionGatekeeper",
+    "meta_reflection": "app.application.services.meta_reflection.MetaReflection"
   }
 }

@@ -1,7 +1,7 @@
 # JARVIS – Status Atual do Projeto
 
 > **Data:** 2026-03-06  
-> **Situação geral:** Reorganização estrutural concluída. Refactoring de módulos grandes finalizado.
+> **Situação geral:** Reorganização estrutural concluída. Refactoring de módulos grandes finalizado. Etapas 1–5 do plano de evolução arquitetural implementadas.
 
 ---
 
@@ -18,13 +18,19 @@
 | Domínio (Modelos, Serviços) | ✅ Ativo |
 | **Memória Vetorial (FAISS)** | ✅ **Ativo** (biográfica, 30 dias) |
 | **Visão Computacional (Gemini Flash)** | ✅ **Ativo** (screenshot / webcam) |
-| **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** (CPU/RAM preditivo, perímetro tático) |
+| **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** (CPU/RAM preditivo, perímetro tático, consolidação semântica) |
 | **LocalRepairAgent (Self-Healing Local)** | ✅ **Ativo** (primeiro estágio, < 1 s) |
-| **EvolutionOrchestrator** | ✅ **Ativo** (loop agêntico registrado no Nexus) |
+| **EvolutionOrchestrator** | ✅ **Ativo** (loop agêntico + Gatekeeper + MetaReflection) |
 | **OllamaAdapter (LLM local)** | ✅ **Ativo** (code_generation, self_repair) |
 | **CostTracker (auditoria LLM)** | ✅ **Ativo** (SQLite, EMA por modelo) |
 | **ProceduralMemory** | ✅ **Ativo** (índice vetorial de soluções) |
 | **CapabilityIndexService** | ✅ **Ativo** (busca semântica top-k, EMA reliability) |
+| **LLMRouter (ETAPA 1)** | ✅ **Ativo** (seleção dinâmica por task_type + fallback por confiabilidade) |
+| **WorkingMemory (ETAPA 2)** | ✅ **Ativo** (deque circular em RAM, 50 entradas, volátil) |
+| **SemanticMemory (ETAPA 2)** | ✅ **Ativo** (grafo de conhecimento, NetworkX opcional) |
+| **EvolutionGatekeeper (ETAPA 3)** | ✅ **Ativo** (4 verificações: testes, estabilidade, frozen, núcleo) |
+| **MetaReflection (ETAPA 4)** | ✅ **Ativo** (reflexão periódica, data/meta_reflection_latest.jrvs) |
+| **Grafo de Dependências de Capabilities (ETAPA 5)** | ✅ **Ativo** (DAG, caminho crítico, executable capabilities) |
 | Auto-Evolução (loop completo) | ⏸️ **PAUSADA** (reorganização em curso) |
 | Playwright Worker | 🔧 Em revisão |
 | Instalador PyInstaller | 🔧 Em revisão |
