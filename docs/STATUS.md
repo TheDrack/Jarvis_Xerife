@@ -1,7 +1,7 @@
 # JARVIS – Status Atual do Projeto
 
-> **Data:** 2026-03-03  
-> **Situação geral:** Reorganização estrutural concluída. Núcleo Proativo ativo.
+> **Data:** 2026-03-06  
+> **Situação geral:** Reorganização estrutural concluída. Refactoring de módulos grandes finalizado.
 
 ---
 
@@ -10,15 +10,22 @@
 | Componente | Status |
 |---|---|
 | Nexus (Injeção de Dependência) | ✅ Ativo |
-| Nexus Circuit Breaker | ✅ Ativo (timeout 2 s, cooldown 60 s) |
+| Nexus Circuit Breaker | ✅ Ativo (import: 10 s, instantiate: 5 s, reset: 60 s) |
+| Nexus Meta Layer (PolicyStore, JrvsCompiler, DecisionEngine) | ✅ Ativo |
 | API REST (FastAPI) | ✅ Ativo |
 | Adaptadores de Borda (Voz, Teclado) | ✅ Ativo |
 | Adaptadores de Infraestrutura (LLM, DB, GitHub) | ✅ Ativo |
 | Domínio (Modelos, Serviços) | ✅ Ativo |
 | **Memória Vetorial (FAISS)** | ✅ **Ativo** (biográfica, 30 dias) |
-| **Visão Computacional (Gemini 1.5 Flash)** | ✅ **Ativo** (screenshot / webcam) |
-| **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** (CPU/RAM, contexto, inatividade) |
-| Auto-Evolução | ⏸️ **PAUSADA** (reorganização) |
+| **Visão Computacional (Gemini Flash)** | ✅ **Ativo** (screenshot / webcam) |
+| **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** (CPU/RAM preditivo, perímetro tático) |
+| **LocalRepairAgent (Self-Healing Local)** | ✅ **Ativo** (primeiro estágio, < 1 s) |
+| **EvolutionOrchestrator** | ✅ **Ativo** (loop agêntico registrado no Nexus) |
+| **OllamaAdapter (LLM local)** | ✅ **Ativo** (code_generation, self_repair) |
+| **CostTracker (auditoria LLM)** | ✅ **Ativo** (SQLite, EMA por modelo) |
+| **ProceduralMemory** | ✅ **Ativo** (índice vetorial de soluções) |
+| **CapabilityIndexService** | ✅ **Ativo** (busca semântica top-k, EMA reliability) |
+| Auto-Evolução (loop completo) | ⏸️ **PAUSADA** (reorganização em curso) |
 | Playwright Worker | 🔧 Em revisão |
 | Instalador PyInstaller | 🔧 Em revisão |
 
@@ -54,10 +61,33 @@ app/
 O **Nexus** (`app/core/nexus.py`) é o sistema central de instanciação.  
 **Todos os componentes ativos devem ser NexusComponent e registrados no Nexus.**
 
+A partir do refactoring estrutural, o Nexus foi dividido em quatro módulos focados:
+
+| Módulo | Responsabilidade |
+|---|---|
+| `nexus.py` | Container principal, API pública |
+| `nexus_exceptions.py` | CloudMock, exceções, timeouts, circuit breaker |
+| `nexus_discovery.py` | Discovery em disco, localização e instanciação |
+| `nexus_registry.py` | I/O do registry local `.jrvs` e sync com Gist |
+
 - Componentes não instanciados pelo Nexus → movidos para `.frozen/`
-- Registry local: `data/nexus_registry.json`
+- Registry local: `data/nexus_registry.json` / `data/nexus_registry.jrvs`
 - Registry remoto: Gist do GitHub (sincronizado automaticamente)
-- **Circuit Breaker:** se a instanciação demorar > 2 s, injeta `CloudMock` por 60 s.
+- **Circuit Breaker:** import timeout 10 s, instantiation timeout 5 s, circuit open 30 s, reset 60 s.
+- **Strict Mode:** `NEXUS_STRICT_MODE=true` desabilita discovery em disco.
+
+---
+
+## 🧠 Meta Layer – Cognição Adaptativa (Ativo)
+
+O diretório `app/core/meta/` fornece a camada cognitiva do Nexus:
+
+| Componente | Responsabilidade |
+|---|---|
+| `PolicyStore` | Persiste políticas por módulo em `.jrvs`; dispara recompilação ao atingir threshold |
+| `JrvsCompiler` | Compila snapshots binários `.jrvs` por módulo com validação SHA-256 |
+| `DecisionEngine` | Scoring multi-objetivo com epsilon-greedy adaptativo e guardrail de estabilidade |
+| `ExplorationController` | Descobre novas ferramentas e gerencia promoção ao registro primário |
 
 ---
 
@@ -84,23 +114,45 @@ O `VisionAdapter` (`app/adapters/infrastructure/vision_adapter.py`) permite que 
 
 ---
 
-## 🔭 Overwatch Daemon – Núcleo Proativo (Ativo desde 2026-03-03)
+## 🔭 Overwatch Daemon – Núcleo Proativo (Ativo)
 
-O `OverwatchDaemon` (`scripts/overwatch_daemon.py`) roda em background, independente do loop de comandos:
+O `OverwatchDaemon` (`app/adapters/infrastructure/overwatch_adapter.py`) roda em background, independente do loop de comandos. Dividido em mixins focados:
+
+| Mixin | Arquivo | Responsabilidade |
+|---|---|---|
+| `OverwatchDaemon` | `overwatch_adapter.py` | Daemon principal, coordena os mixins |
+| `ResourceMonitor` | `overwatch_resource_monitor.py` | CPU/RAM reativo e preditivo (janela de 10 leituras) |
+| `PerimeterMonitor` | `overwatch_perimeter.py` | Monitoramento tático de perímetro (MAC/ARP) |
 
 | Monitoramento | Ação |
 |---|---|
-| CPU > 85% ou RAM > 85% | Notifica via Telegram/voz |
+| CPU > 85% ou tendência ascendente | Alerta reativo e `[PROACTIVE_CORE][PREDICTIVE]` |
+| RAM > 85% ou tendência ascendente | Alerta reativo e preditivo |
 | Mudança em `data/context.json` | Recarrega contexto |
-| Inatividade > 30 min | Usa `VisionAdapter` para verificar presença; se presente, sugere tarefa pendente do calendário |
+| Inatividade > 30 min | Usa `VisionAdapter` para verificar presença; se presente, sugere tarefa pendente |
+| MAC/ARP desconhecido na rede | Alerta de intrusão tática |
 
 Todas as ações são logadas com o prefixo `[PROACTIVE_CORE]`.  
-Iniciado automaticamente em `main.py` via `bootstrap_background_services()`.
-Usa `nexus.resolve()` para acessar `vision_adapter`, `telegram_adapter` e `voice_provider`.
+Registrado no Nexus como `overwatch_daemon`.
+
+## 🛠️ Self-Healing Local (Ativo)
+
+O `LocalRepairAgent` é o primeiro estágio do pipeline de auto-reparo:
+
+- Detecta e corrige erros comuns em < 1 s (sem chamar GitHub Actions).
+- Suporta auto-instalação segura de dependências via `SAFE_AUTO_INSTALL` (frozenset).
+- Integra com `ThoughtLogService` para rastreabilidade.
+- Registrado no Nexus como `local_repair_agent`.
+
+O `FieldVision` complementa o self-healing monitorando logs do sistema:
+
+- Monitora `logs/jarvis.log` em busca de `ERROR`/`CRITICAL`.
+- Classifica tipo de erro e aciona o workflow `homeostase.yml` via API do GitHub.
+- Registrado no Nexus como `field_vision`.
 
 ---
 
-## 🧊 Política Frozen
+
 
 Arquivos em `.frozen/` são código não utilizado atualmente.  
 Eles ficam preservados até que sejam necessários.  
@@ -123,7 +175,7 @@ O sistema de auto-evolução está **pausado** enquanto a reorganização estrut
 
 ## 🚧 Pendências
 
-- [ ] Revisar `app/domain/gears/` – muitos `cap_*_core.py` ainda presentes
+- [ ] Revisar `app/domain/gears/` – alguns `cap_*_core.py` pendentes de revisão
 - [ ] Revisar `app/domain/capabilities/` – necessita limpeza
 - [ ] Playwright Worker necessita revisão de integração
-- [ ] Testes precisam ser atualizados para nova estrutura
+- [ ] Reativar auto-evolução completa após estabilização

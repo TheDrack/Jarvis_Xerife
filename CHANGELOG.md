@@ -9,7 +9,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Núcleo Proativo Multimodal com Memória Permanente (2026-03-03)
+#### Refactoring Estrutural – Split de Módulos Grandes (2026-03-06)
+
+**Objetivo:** Nenhum arquivo de código deve ultrapassar 300 linhas. Cada responsabilidade em seu próprio módulo, respeitando o contrato Nexus.
+
+**`app/core/nexus.py`** – dividido em 4 módulos:
+- `nexus_exceptions.py`: `CloudMock`, `_CircuitBreakerEntry`, exceções customizadas (`ImportTimeoutError`, `InstantiateTimeoutError`, `AmbiguousComponentError`), timeouts configuráveis (`NEXUS_IMPORT_TIMEOUT=10s`, `NEXUS_INSTANTIATE_TIMEOUT=5s`, `CIRCUIT_BREAKER_TIMEOUT=30s`).
+- `nexus_discovery.py`: `_NexusDiscoveryMixin` – busca em disco, localização de classes e instanciação com timeout.
+- `nexus_registry.py`: `_NexusRegistryMixin` – I/O do registry local `.jrvs` e sync com GitHub Gist.
+
+**`app/adapters/infrastructure/ai_gateway.py`** – dividido:
+- `ai_gateway_enums.py`: Enums `LLMProvider` e `GroqGear`.
+- `ai_gateway_token_utils.py`: Utilitários de contagem de tokens (tiktoken + fallback).
+
+**`app/adapters/infrastructure/gateway_llm_adapter.py`** – dividido:
+- `auto_repair_mixin.py`: Lógica de auto-reparo (análise com Gemini, abertura de PRs).
+
+**`app/adapters/infrastructure/gemini_adapter.py`** – dividido:
+- `gemini_response_helpers.py`: Funções utilitárias de resposta e mapeamento para objetos de domínio.
+
+**`app/adapters/infrastructure/github_adapter.py`** – dividido:
+- `github_correction_adapter.py`: Criação de PRs de correção automática.
+- `github_issue_adapter.py`: CRUD de issues.
+- `github_issue_mixin.py`: Mixin para reportar falhas de infraestrutura como issues.
+- `github_workflow_adapter.py`: Monitoramento de workflow runs.
+
+**`app/adapters/infrastructure/overwatch_adapter.py`** – dividido:
+- `overwatch_resource_monitor.py`: `ResourceMonitor` mixin – CPU/RAM reativo e preditivo.
+- `overwatch_perimeter.py`: `PerimeterMonitor` mixin – monitoramento tático MAC/ARP.
+
+**`app/application/services/capability_manager.py`** – dividido:
+- `capability_blueprint_service.py`: Geração de blueprints e validação de recursos.
+- `capability_detectors.py`: Funções standalone de detecção de capabilities.
+- `capability_gap_reporter.py`: Relatório de gaps via PR.
+
+**`app/application/services/device_service.py`** – dividido:
+- `device_capability_service.py`: Roteamento por capacidade.
+- `device_location_service.py`: Cálculo de distância geográfica (Haversine).
+
+**`app/application/services/llm_capability_detector.py`** – dividido:
+- `llm_capability_prompt_builder.py`: Construção de prompts.
+
+**`scripts/auto_fixer_logic.py`** – dividido em módulos focados:
+- `scripts/fix_applier.py`: I/O de arquivos, Copilot CLI, validação pytest.
+- `scripts/issue_parser.py`: Classificação de issue e localização de arquivo.
+- `scripts/pr_manager.py`: Git/GitHub ops (branch, commit, push, PR, issue lifecycle).
+
+#### Self-Healing Pipeline (2026-03-04)
+
+- `app/application/services/local_repair_agent.py`: `LocalRepairAgent` – primeiro estágio do pipeline de auto-reparo local (< 1 s, sem CI). Detecta e corrige erros comuns, auto-instala dependências via `SAFE_AUTO_INSTALL` (frozenset). Registrado no Nexus como `local_repair_agent`.
+- `app/application/services/field_vision.py`: `FieldVision` – monitor de logs com ciclo de homeostase. Aciona `homeostase.yml` ao detectar `ERROR`/`CRITICAL`.
+- `app/adapters/infrastructure/ollama_adapter.py`: Integração com LLMs locais via Ollama para `code_generation`/`self_repair`. Registrado como `ollama_adapter`.
+
+
 
 **Fase 1 – Estabilização de Infraestrutura**
 - `app/core/nexus.py`: Adicionado `CloudMock` – absorvedor transparente injetado automaticamente quando um componente falha. Corrige `ImportError` em `intent_processor.py` (`from app.core.nexus import CloudMock`).

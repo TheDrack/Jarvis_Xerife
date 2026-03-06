@@ -30,12 +30,14 @@ O JARVIS é uma plataforma de automação e assistência que:
 |---|---|
 | API REST (FastAPI) | ✅ Ativo |
 | Nexus (DI + Circuit Breaker) | ✅ Ativo |
-| Adaptadores LLM (Groq, Gemini) | ✅ Ativo |
+| Nexus Meta Layer (PolicyStore, JrvsCompiler, DecisionEngine) | ✅ Ativo |
+| Adaptadores LLM (Groq, Gemini, Ollama) | ✅ Ativo |
 | Reconhecimento de voz | ✅ Ativo |
 | Orquestração de dispositivos | ✅ Ativo |
 | **Memória Vetorial (FAISS)** | ✅ **Ativo** |
 | **Visão Computacional (Gemini Flash)** | ✅ **Ativo** |
 | **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** |
+| **LocalRepairAgent (Self-Healing Local)** | ✅ **Ativo** |
 | **DocumentStore (I/O Universal)** | ✅ **Ativo** |
 | **Formato .jrvs (binário interno)** | ✅ **Ativo** |
 | **JrvsTranslator (fluxo tradutivo)** | ✅ **Ativo** |
@@ -104,7 +106,10 @@ python app/bootstrap_edge.py
 
 ## 🧬 Nexus – Sistema de Instanciação
 
-O **Nexus** é o container de DI do JARVIS. Todo componente ativo deve ser registrado:
+O **Nexus** é o container de DI do JARVIS, dividido em quatro módulos focados:
+`nexus.py`, `nexus_exceptions.py`, `nexus_discovery.py`, `nexus_registry.py`.
+
+Todo componente ativo deve ser registrado:
 
 ```python
 from app.core.nexus import nexus

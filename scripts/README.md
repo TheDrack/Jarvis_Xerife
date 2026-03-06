@@ -135,6 +135,54 @@ python scripts/auto_fixer_logic.py
 10. Create Pull Request
 ```
 
+### fix_applier.py
+
+Módulo de suporte ao self-healing — I/O de arquivos, interação com GitHub Copilot CLI e validação de correções.
+
+**Funções principais:**
+
+| Função | Descrição |
+|---|---|
+| `read_file(path)` | Lê o conteúdo de um arquivo com tratamento de erro |
+| `write_file(path, content)` | Escreve conteúdo em um arquivo de forma atômica |
+| `call_copilot_cli(prompt)` | Chama o GitHub Copilot CLI (`gh copilot suggest`) |
+| `validate_fix_with_pytest(path)` | Executa pytest no arquivo corrigido para validar o fix |
+| `parse_pytest_report(report_path)` | Lê e interpreta relatório JSON do pytest |
+
+---
+
+### issue_parser.py
+
+Módulo de classificação de issues e localização de arquivos afetados.
+
+**Funções principais:**
+
+| Função | Descrição |
+|---|---|
+| `is_documentation_request(issue_body)` | Detecta se o issue é um pedido de documentação |
+| `classify_issue_type(issue_body)` | Classifica em `bug`, `documentation` ou `feature` |
+| `extract_file_path(issue_body)` | Extrai o caminho do arquivo afetado do traceback/issue |
+
+---
+
+### pr_manager.py
+
+Módulo de operações Git e GitHub para o pipeline de self-healing.
+
+**Funções principais:**
+
+| Função | Descrição |
+|---|---|
+| `create_branch(branch_name)` | Cria e faz checkout de um novo branch Git |
+| `commit_and_push(branch, files, message)` | Adiciona, comita e faz push das correções |
+| `open_pull_request(branch, title, body)` | Abre um Pull Request via GitHub CLI |
+| `close_issue(issue_id, comment)` | Fecha o issue com um comentário de resolução |
+| `attempt_repair(issue_id, issue_body)` | Orquestrador end-to-end: parse → fix → validate → PR |
+
+**Dependências:** `fix_applier`, `issue_parser`
+
+---
+
 ### test_auto_fixer.py
 
 Test script for the auto-fixer with a sample error scenario.
