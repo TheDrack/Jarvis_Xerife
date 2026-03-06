@@ -7,7 +7,7 @@ class Cap002Core(NexusComponent):
     """CAPABILITY: Classify capabilities by status: nonexistent, partial, complete
     ID: CAP-002"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-002"}
 

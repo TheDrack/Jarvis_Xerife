@@ -7,7 +7,7 @@ class Cap101Core(NexusComponent):
     """CAPABILITY: Sustain itself economically long-term
     ID: CAP-101"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-101"}
 

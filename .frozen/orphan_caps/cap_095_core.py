@@ -7,7 +7,7 @@ class Cap095Core(NexusComponent):
     """CAPABILITY: Propose solutions before explicit requests
     ID: CAP-095"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-095"}
 

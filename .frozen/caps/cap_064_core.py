@@ -7,7 +7,7 @@ class Cap064Core(NexusComponent):
     """CAPABILITY: Discard ineffective strategies
     ID: CAP-064"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-064"}
 

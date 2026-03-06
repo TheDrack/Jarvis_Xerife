@@ -7,7 +7,7 @@ class Cap057Core(NexusComponent):
     """CAPABILITY: Rollback partially completed executions
     ID: CAP-057"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-057"}
 

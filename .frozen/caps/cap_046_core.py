@@ -4,7 +4,7 @@ class Cap046Core(NexusComponent):
         pass
 
 
-    def execute(context=None):
+    def execute(self, context=None):
         # Inicialização do processo de avaliação de impacto a longo prazo
         if context is None:
             context = {}

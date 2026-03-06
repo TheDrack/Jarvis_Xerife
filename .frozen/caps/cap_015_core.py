@@ -7,7 +7,7 @@ class Cap015Core(NexusComponent):
     """CAPABILITY: Automatically document each evolution
     ID: CAP-015"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-015"}
 

@@ -7,7 +7,7 @@ class Cap055Core(NexusComponent):
     """CAPABILITY: Monitor execution in real time
     ID: CAP-055"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-055"}
 

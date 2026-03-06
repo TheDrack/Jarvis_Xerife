@@ -25,7 +25,7 @@ class StatusService(NexusComponent):
         minutes, seconds = divmod(remainder, 60)
         
         # Identificação de Adaptadores
-        loaded_adapters = list(nexus._instances.keys())
+        loaded_adapters = nexus.list_loaded_ids()
         
         # Status do Banco (Tentativa de ping via Nexus)
         db_status = "🟢 CONECTADO" if "sqlite_history_adapter" in loaded_adapters else "🔴 OFFLINE"

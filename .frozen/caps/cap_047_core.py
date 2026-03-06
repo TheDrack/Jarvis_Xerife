@@ -4,7 +4,7 @@ class Cap047Core(NexusComponent):
         pass
 
 
-    def execute(context=None):
+    def execute(self, context=None):
         # Import necessary dependencies
         from app.domain.capabilities.cap_040 import CAP040
         from app.domain.capabilities.cap_043 import CAP043

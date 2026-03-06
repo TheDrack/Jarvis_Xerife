@@ -7,7 +7,7 @@ class Cap063Core(NexusComponent):
     """CAPABILITY: Reinforce effective strategies
     ID: CAP-063"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-063"}
 

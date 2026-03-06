@@ -22,7 +22,7 @@
 | **LocalRepairAgent (Self-Healing Local)** | ✅ **Ativo** (primeiro estágio, < 1 s) |
 | **EvolutionOrchestrator** | ✅ **Ativo** (loop agêntico + Gatekeeper + MetaReflection + CapabilityManager) |
 | **OllamaAdapter (LLM local)** | ✅ **Ativo** (code_generation, self_repair) |
-| **CostTracker (auditoria LLM)** | ✅ **Ativo** (SQLite, EMA por modelo) |
+| **Health Endpoint Detalhado** | ✅ **Ativo** (`GET /v1/health/detail` — nexus, evolution, meta_reflection, finetune, gatekeeper, resources) |
 | **ProceduralMemory** | ✅ **Ativo** (índice vetorial de soluções) |
 | **CapabilityIndexService** | ✅ **Ativo** (busca semântica top-k, EMA reliability) |
 | **LLMRouter (ETAPA 1)** | ✅ **Ativo** (seleção dinâmica por task_type + fallback por confiabilidade + `preferred_provider`) |
@@ -241,5 +241,39 @@ Aplicadas em 2026-03-06 (Blocos A, B e C):
 - **C.2** `SemanticMemory.query_facts()`: parâmetro opcional `keyword: str` para busca por substring (case-insensitive). Testes adicionados.
 - **C.3** `CapabilityManager.get_evolution_progress()`: campo `critical_path_length` adicionado ao retorno.
 - **C.4** `EvolutionGatekeeper`: rejeições persistidas em `data/gatekeeper_rejections.jsonl` com campos `timestamp`, `reason`, `check_failed`, `files_modified`.
+
+### Bloco D — Correções Residuais Fase 4
+
+- **D.1** `GatewayLLMCommandAdapter._interpret_sync`: reescrito para chamar diretamente `gemini_adapter._interpret_sync` sem delegar a `self.interpret()`, eliminando recursão infinita em loops asyncio ativos.
+- **D.2** `execute()` movido para após `__init__` em `EvolutionLoopService`, `ActiveRecruiterAdapter`, `AutomationAdapter` e `VoiceProvider`. Docstrings de classe reposicionadas imediatamente após `class`.
+- **D.3** `def execute(context=None):` → `def execute(self, context=None):` em 100 arquivos de `.frozen/caps/` e 10 arquivos de `.frozen/orphan_caps/`.
+- **D.4** `EvolutionLoopService`: construtor convertido para zero argumentos (compatível com Nexus). `configure()` injeta `reward_adapter`; `can_execute()` retorna `False` se `reward_provider` for `None`. Compatibilidade retroativa mantida.
+- **D.5** `JarvisNexus.list_loaded_ids()` adicionado (retorna cópia sob lock). `StatusService` atualizado para usar esse método em vez de `nexus._instances`.
+- **D.6** Endpoint `GET /v1/roadmap/progress` migrado de `AutoEvolutionService` (v1, baseada em ROADMAP.md) para `AutoEvolutionServiceV2` (baseada em `capabilities.json`). Campos `evolution_rate`, `missions_completed` e `total_missions` mapeados para o schema existente.
+
+---
+
+## 🔗 Fase 4 — Integração e Observabilidade
+
+### Etapa 10 — MetaReflection + Padrões de Rejeição do Gatekeeper
+
+- `_load_rejections()`: lê até 200 linhas de `data/gatekeeper_rejections.jsonl` (retorna `[]` se ausente).
+- `_analyze_rejection_patterns()`: agrega frequência por `check_failed`, identifica os 3 arquivos mais bloqueados e conta rejeições nos últimos 7 dias.
+- Campo `rejection_patterns` incluído no retorno de `reflect()` e salvo em `data/meta_reflection_latest.jrvs`.
+- `EvolutionOrchestrator` injeta `rejection_patterns` no `self_knowledge` enviado ao LLM.
+
+### Etapa 11 — Endpoint GET /v1/health/detail
+
+- Rota `GET /v1/health/detail` adicionada ao `create_health_router()` (protegida por autenticação).
+- Seções: `nexus` (componentes carregados), `evolution` (progresso), `meta_reflection` (módulos frágeis + padrões de rejeição), `finetune` (último disparo), `gatekeeper` (total e últimos 7 dias), `resources` (tendência CPU/RAM).
+- Fallback gracioso: componente indisponível → `{"available": false}`. Nunca retorna HTTP 500.
+- `ResourceMonitor.get_resource_trends()` adicionado (retorna `cpu_trend` e `ram_trend`).
+
+### Etapa 12 — JarvisDevAgent: Auditoria de Jobs e Timeout
+
+- Log de auditoria em `data/dev_agent_jobs.jsonl` com campos `job_id`, `started_at`, `finished_at`, `status`, `capability_id`, `gatekeeper_result`, `pr_created`, `error`, `duration_seconds`.
+- Timeout configurável via `DEV_AGENT_TIMEOUT_SECONDS` (padrão: 300 s). Status `timeout` registrado no JSONL.
+- Endpoint `GET /v1/dev-agent/jobs?limit=10`: lê as últimas entradas ordenadas por `started_at` descendente. Sem autenticação.
+- HTTP 429 retornado quando job já está em progresso.
 
 ---

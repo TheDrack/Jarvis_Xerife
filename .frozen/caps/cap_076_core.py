@@ -7,7 +7,7 @@ class Cap076Core(NexusComponent):
     """CAPABILITY: Measure real economic return
     ID: CAP-076"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-076"}
 

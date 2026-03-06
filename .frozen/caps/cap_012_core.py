@@ -7,7 +7,7 @@ class Cap012Core(NexusComponent):
     """CAPABILITY: Validate improvements using automated tests
     ID: CAP-012"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-012"}
 

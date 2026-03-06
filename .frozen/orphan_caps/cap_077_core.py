@@ -7,7 +7,7 @@ class Cap077Core(NexusComponent):
     """CAPABILITY: Eliminate economically unviable actions
     ID: CAP-077"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-077"}
 

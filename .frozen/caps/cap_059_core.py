@@ -6,6 +6,6 @@ class Cap059Core(NexusComponent):
     # -*- coding: utf-8 -*-
     '''CAPABILITY: Distribute execution across devices
     DEPENDS ON: []'''
-    def execute(context=None):
+    def execute(self, context=None):
         return {'status': 'active', 'id': 'CAP-059'}
 

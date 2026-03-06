@@ -7,7 +7,7 @@ class Cap036Core(NexusComponent):
     """CAPABILITY: Distinguish signal from noise
     ID: CAP-036"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-036"}
 

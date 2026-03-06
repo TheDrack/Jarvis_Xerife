@@ -14,6 +14,7 @@ Encapsula o fluxo completo de desenvolvimento autônomo:
 
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -23,6 +24,8 @@ from app.core.nexus import NexusComponent, nexus
 logger = logging.getLogger(__name__)
 
 _PROPOSALS_DIR = Path("data/evolution_proposals")
+_JOBS_FILE = Path("data/dev_agent_jobs.jsonl")
+_DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes
 
 
 class JarvisDevAgent(NexusComponent):
@@ -54,8 +57,81 @@ class JarvisDevAgent(NexusComponent):
             Dicionário com ``success``, ``capability_id``, ``gatekeeper_result``,
             ``pr_created`` e demais metadados do ciclo.
         """
-        ctx = context or {}
+        import time as _time
 
+        ctx = context or {}
+        job_id = ctx.get("job_id", "")
+
+        timeout_secs = int(os.environ.get("DEV_AGENT_TIMEOUT_SECONDS", _DEFAULT_TIMEOUT_SECONDS))
+        started_at = datetime.now(tz=timezone.utc).isoformat()
+        _start_mono = _time.monotonic()
+
+        self._write_job_entry(
+            job_id=job_id,
+            started_at=started_at,
+            status="running",
+            capability_id=None,
+        )
+
+        try:
+            result = self._run_with_timeout(ctx, timeout_secs)
+        except TimeoutError:
+            finished_at = datetime.now(tz=timezone.utc).isoformat()
+            duration = _time.monotonic() - _start_mono
+            self._update_job_entry(
+                job_id=job_id,
+                finished_at=finished_at,
+                status="timeout",
+                capability_id=None,
+                gatekeeper_result=None,
+                pr_created=False,
+                error="execution_timeout",
+                duration_seconds=duration,
+            )
+            return {"success": False, "reason": "timeout", "job_id": job_id}
+        except Exception as exc:
+            finished_at = datetime.now(tz=timezone.utc).isoformat()
+            duration = _time.monotonic() - _start_mono
+            self._update_job_entry(
+                job_id=job_id,
+                finished_at=finished_at,
+                status="failed",
+                capability_id=None,
+                gatekeeper_result=None,
+                pr_created=False,
+                error=str(exc),
+                duration_seconds=duration,
+            )
+            raise
+
+        finished_at = datetime.now(tz=timezone.utc).isoformat()
+        duration = _time.monotonic() - _start_mono
+        status = "success" if result.get("success") else "failed"
+        self._update_job_entry(
+            job_id=job_id,
+            finished_at=finished_at,
+            status=status,
+            capability_id=result.get("capability_id"),
+            gatekeeper_result=result.get("gatekeeper_result"),
+            pr_created=bool(result.get("pr_created")),
+            error=result.get("reason") if not result.get("success") else None,
+            duration_seconds=duration,
+        )
+        return result
+
+    def _run_with_timeout(self, ctx: Dict[str, Any], timeout_secs: int) -> Dict[str, Any]:
+        """Executa o ciclo com timeout via concurrent.futures."""
+        import concurrent.futures
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(self._execute_cycle, ctx)
+            try:
+                return future.result(timeout=timeout_secs)
+            except concurrent.futures.TimeoutError:
+                raise TimeoutError(f"JarvisDevAgent exceeded {timeout_secs}s timeout")
+
+    def _execute_cycle(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
+        """Lógica central do ciclo de desenvolvimento (sem timeout/audit)."""
         # (a) Seleciona capability-alvo
         cap = self._select_capability()
         if cap is None:
@@ -116,6 +192,65 @@ class JarvisDevAgent(NexusComponent):
             "pr": pr_result,
             "proposal": str(proposal_path) if proposal_path else None,
         }
+
+    # ------------------------------------------------------------------
+    # Audit log helpers
+    # ------------------------------------------------------------------
+
+    def _write_job_entry(
+        self,
+        job_id: str,
+        started_at: str,
+        status: str,
+        capability_id: Optional[str],
+    ) -> None:
+        """Grava entrada inicial no log de auditoria."""
+        entry = {
+            "job_id": job_id,
+            "started_at": started_at,
+            "finished_at": None,
+            "status": status,
+            "capability_id": capability_id,
+            "gatekeeper_result": None,
+            "pr_created": False,
+            "error": None,
+            "duration_seconds": None,
+        }
+        self._append_job_log(entry)
+
+    def _update_job_entry(
+        self,
+        job_id: str,
+        finished_at: str,
+        status: str,
+        capability_id: Optional[str],
+        gatekeeper_result: Optional[Dict[str, Any]],
+        pr_created: bool,
+        error: Optional[str],
+        duration_seconds: float,
+    ) -> None:
+        """Atualiza a entrada do job no JSONL (reescreve a última com mesmo job_id)."""
+        update = {
+            "job_id": job_id,
+            "finished_at": finished_at,
+            "status": status,
+            "capability_id": capability_id,
+            "gatekeeper_result": gatekeeper_result,
+            "pr_created": pr_created,
+            "error": error,
+            "duration_seconds": round(duration_seconds, 2),
+        }
+        self._append_job_log(update)
+
+    @staticmethod
+    def _append_job_log(entry: Dict[str, Any]) -> None:
+        """Acrescenta uma linha ao arquivo JSONL de jobs."""
+        try:
+            _JOBS_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with _JOBS_FILE.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception as exc:
+            logger.warning("[JarvisDevAgent] Falha ao gravar job log: %s", exc)
 
     # ------------------------------------------------------------------
     # Internal helpers

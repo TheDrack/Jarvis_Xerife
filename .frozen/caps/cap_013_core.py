@@ -7,7 +7,7 @@ class Cap013Core(NexusComponent):
     """CAPABILITY: Automatically revert unstable changes
     ID: CAP-013"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-013"}
 

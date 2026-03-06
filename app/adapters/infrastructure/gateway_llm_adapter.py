@@ -27,13 +27,9 @@ logger = logging.getLogger(__name__)
 
 
 class GatewayLLMCommandAdapter(AutoRepairMixin):
-    def execute(self, context: dict):
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
-
     """
     Enhanced LLM Command Adapter that uses AI Gateway for intelligent provider routing.
-    
+
     Features:
     - Uses Groq by default for fast, cost-effective processing
     - Automatically escalates to Gemini for large payloads (>10k tokens)
@@ -132,7 +128,44 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
             self.github_adapter = None
         
         logger.info("Gateway LLM Command Adapter initialized with AI Gateway")
-    
+
+    def execute(self, context: dict) -> dict:
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
+
+    def _interpret_sync(self, raw_input: str) -> Intent:
+        """Synchronous interpretation calling the Gemini client directly.
+
+        Avoids calling ``self.interpret()`` to prevent infinite recursion when
+        an asyncio event loop is already active.  Mirrors the logic of
+        ``interpret_async`` but executes synchronously via the underlying
+        Gemini adapter's ``_interpret_sync``, bypassing any asyncio machinery.
+
+        Args:
+            raw_input: Raw text from voice or text input.
+
+        Returns:
+            Intent object with command type and parameters.
+        """
+        # Delegate to gemini_adapter._interpret_sync which calls the Gemini
+        # client directly without going through asyncio.to_thread.
+        if self.gemini_adapter is not None:
+            sync_fn = getattr(self.gemini_adapter, "_interpret_sync", None)
+            if sync_fn is not None:
+                return sync_fn(raw_input)
+
+        # Fallback: return unknown intent when no synchronous path is available.
+        command = raw_input.lower().strip()
+        if self.wake_word in command:
+            command = command.replace(self.wake_word, "").strip()
+        logger.warning("[GatewayLLM] _interpret_sync: no synchronous Gemini client available")
+        return Intent(
+            command_type=CommandType.UNKNOWN,
+            parameters={"raw_command": command},
+            raw_input=raw_input,
+            confidence=0.0,
+        )
+
     def interpret(self, raw_input: str) -> Intent:
         """
         Interpret a raw text command into a structured Intent.

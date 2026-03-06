@@ -7,7 +7,7 @@ class Cap047Core(NexusComponent):
     """CAPABILITY: Select strategies with optimal cost-benefit
     ID: CAP-047"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-047"}
 

@@ -7,7 +7,7 @@ class Cap006Core(NexusComponent):
     """CAPABILITY: Prioritize objectives by failure reduction
     ID: CAP-006"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-006"}
 

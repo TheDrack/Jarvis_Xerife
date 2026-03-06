@@ -7,7 +7,7 @@ class Cap021Core(NexusComponent):
     """CAPABILITY: Map impact of one capability over others
     ID: CAP-021"""
 
-    def execute(context=None):
+    def execute(self, context=None):
         # JARVIS INITIAL STATE
         return {"status": "initialized", "id": "CAP-021"}
 

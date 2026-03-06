@@ -4,7 +4,7 @@ class Cap053Core(NexusComponent):
         pass
 
 
-    def execute(context=None):
+    def execute(self, context=None):
         # Verificar se o contexto é válido
         if context is None:
             raise ValueError('Contexto inválido')

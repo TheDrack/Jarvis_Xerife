@@ -95,6 +95,11 @@ class EvolutionOrchestrator(NexusComponent):
         system_ctx = self._read_context()
         if meta_ctx:
             system_ctx["self_knowledge"] = meta_ctx
+            # Injeta rejection_patterns no self_knowledge para que o LLM evite
+            # propor mudanças em arquivos historicamente rejeitados.
+            rejection_patterns = meta_ctx.get("rejection_patterns")
+            if rejection_patterns:
+                system_ctx["self_knowledge"]["rejection_patterns"] = rejection_patterns
 
         # 2a. Seleciona a capability-alvo via CapabilityManager (Etapa 5)
         target_cap = self._select_target_capability()

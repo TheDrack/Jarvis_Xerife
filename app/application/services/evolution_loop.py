@@ -12,26 +12,22 @@ logger = logging.getLogger(__name__)
 
 
 class EvolutionLoopService(NexusComponent):
-    def execute(self, context: dict):
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
-
     """
     Service for managing JARVIS evolution through Reinforcement Learning.
-    
+
     This service implements the feedback loop:
     1. Tracks actions (pytest, deploy, roadmap progress)
     2. Assigns rewards (positive/negative based on outcomes)
     3. Analyzes reward history to guide future decisions
     4. Provides evolution status and efficiency metrics
-    
+
     Designed to run:
     - After each deployment (success/failure)
     - After each test run (pass/fail)
     - On roadmap progress updates
     - On HUD login to show status
     """
-    
+
     # Reward values for different actions
     REWARDS = {
         'pytest_pass': 10.0,
@@ -44,16 +40,48 @@ class EvolutionLoopService(NexusComponent):
         'capability_partial': 5.0,
     }
 
-    def __init__(self, reward_provider: RewardProvider, ai_gateway=None):
+    def __init__(self, reward_provider: Optional[RewardProvider] = None, ai_gateway=None):
         """
         Initialize the evolution loop service.
-        
+
+        When instantiated by the Nexus (zero arguments), call ``configure()`` to
+        inject the reward adapter before using the service.
+
         Args:
-            reward_provider: Implementation of RewardProvider port
-            ai_gateway: Optional AI Gateway for policy engine (High Gear analysis)
+            reward_provider: Implementation of RewardProvider port (optional; can be
+                set later via ``configure()``).
+            ai_gateway: Optional AI Gateway for policy engine (High Gear analysis).
         """
         self.reward_provider = reward_provider
         self.ai_gateway = ai_gateway
+
+    def configure(self, config: Dict[str, Any]) -> None:
+        """Injects dependencies after zero-arg construction by the Nexus.
+
+        Args:
+            config: Dictionary that may contain ``reward_adapter`` key with a
+                RewardProvider instance, and ``ai_gateway`` key.
+        """
+        if "reward_adapter" in config:
+            self.reward_provider = config["reward_adapter"]
+        if "reward_provider" in config:
+            self.reward_provider = config["reward_provider"]
+        if "ai_gateway" in config:
+            self.ai_gateway = config["ai_gateway"]
+        if self.reward_provider is None:
+            try:
+                from app.core.nexus import nexus
+                self.reward_provider = nexus.resolve("reward_adapter")
+            except Exception as exc:
+                logger.warning("[EvolutionLoopService] configure: reward_adapter unavailable: %s", exc)
+
+    def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
+        """Returns False when no reward_provider is configured."""
+        return self.reward_provider is not None
+
+    def execute(self, context: dict) -> dict:
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     def log_pytest_result(
         self,

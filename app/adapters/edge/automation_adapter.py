@@ -12,10 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class AutomationAdapter(ActionProvider):
-    def execute(self, context: dict):
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
-
     """
     Edge adapter for system automation using PyAutoGUI.
     Depends on display server (X11, Wayland, etc.).
@@ -41,6 +37,10 @@ class AutomationAdapter(ActionProvider):
         except ImportError:
             self._pyautogui = None
             self._pyautogui_available = False
+
+    def execute(self, context: dict) -> dict:
+        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
+        return {"success": False, "not_implemented": True}
 
     def type_text(self, text: str) -> None:
         """
