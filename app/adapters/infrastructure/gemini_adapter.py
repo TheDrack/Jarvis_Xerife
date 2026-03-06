@@ -10,12 +10,15 @@ Default model is 'gemini-flash-latest' for improved performance.
 import asyncio
 import logging
 import os
-from datetime import datetime
 from typing import Optional
 
-import httpx
 from google import genai
 
+from app.adapters.infrastructure.gemini_response_helpers import (
+    build_context_message,
+    convert_function_call_to_intent,
+)
+from app.adapters.infrastructure.github_issue_mixin import GitHubIssueMixin
 from app.application.ports import VoiceProvider
 from app.domain.models import CommandType, Intent
 from app.domain.services.agent_service import AgentService
@@ -23,7 +26,7 @@ from app.domain.services.agent_service import AgentService
 logger = logging.getLogger(__name__)
 
 
-class LLMCommandAdapter(NexusComponent):
+class LLMCommandAdapter(GitHubIssueMixin):
     def execute(self, context: dict):
         logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
         return {"success": False, "not_implemented": True}
@@ -334,73 +337,8 @@ class LLMCommandAdapter(NexusComponent):
             )
 
     def _convert_function_call_to_intent(self, function_call, raw_input: str) -> Intent:
-        """
-        Convert a Gemini function call to an Intent object.
-
-        Args:
-            function_call: The function call from Gemini response
-            raw_input: Original user input
-
-        Returns:
-            Intent object
-        """
-        function_name = function_call.name
-        function_args = dict(function_call.args) if function_call.args else {}
-
-        # Map function name to command type
-        command_type = AgentService.map_function_to_command_type(function_name)
-
-        # Build parameters
-        parameters = self._build_parameters(command_type, function_args)
-
-        logger.info(
-            f"LLM function call: {function_name} with args: {function_args} -> {command_type}"
-        )
-
-        return Intent(
-            command_type=command_type,
-            parameters=parameters,
-            raw_input=raw_input,
-            confidence=0.9,  # High confidence when LLM provides a function call
-        )
-
-    def _build_parameters(self, command_type: CommandType, function_args: dict) -> dict:
-        """
-        Build parameters dictionary based on command type and function arguments.
-
-        Args:
-            command_type: Type of command
-            function_args: Arguments from function call
-
-        Returns:
-            Dictionary of parameters
-        """
-        if command_type == CommandType.TYPE_TEXT:
-            return {"text": function_args.get("text", "")}
-
-        elif command_type == CommandType.PRESS_KEY:
-            return {"key": function_args.get("key", "")}
-
-        elif command_type == CommandType.OPEN_BROWSER:
-            return {}
-
-        elif command_type == CommandType.OPEN_URL:
-            url = function_args.get("url", "")
-            # Add https:// if not present
-            if url and not url.startswith("http"):
-                url = f"https://{url}"
-            return {"url": url}
-
-        elif command_type == CommandType.SEARCH_ON_PAGE:
-            return {"search_text": function_args.get("search_text", "")}
-
-        elif command_type == CommandType.REPORT_ISSUE:
-            return {
-                "issue_description": function_args.get("issue_description", ""),
-                "context": function_args.get("context", ""),
-            }
-
-        return function_args
+        """Delegate to module-level helper in gemini_response_helpers."""
+        return convert_function_call_to_intent(function_call, raw_input)
 
     def _ask_for_clarification(self, clarification_text: str) -> None:
         """
@@ -446,218 +384,8 @@ class LLMCommandAdapter(NexusComponent):
         return any(keyword in command for keyword in cancel_keywords)
 
     def _build_context_message(self) -> str:
-        """
-        Build context message from the last 3 commands in history.
-
-        Returns:
-            Formatted context string or empty string if no history
-        """
-        if not self.history_provider:
-            return ""
-
-        try:
-            # Get last 3 commands from history
-            recent_history = self.history_provider.get_recent_history(limit=3)
-            if not recent_history:
-                return ""
-
-            # Build context message
-            context_lines = ["Contexto (últimos comandos executados):"]
-            for item in reversed(recent_history):  # Show oldest first
-                command_type = item.get("command_type", "unknown")
-                user_input = item.get("user_input", "")
-                success = item.get("success", False)
-                status = "sucesso" if success else "falhou"
-                context_lines.append(f"- '{user_input}' -> {command_type} ({status})")
-
-            return "\n".join(context_lines)
-        except Exception as e:
-            logger.warning(f"Error building context message: {e}")
-            return ""
-
-    async def _create_github_issue_for_infra_failure(
-        self, error: Exception, error_details: str
-    ) -> None:
-        """
-        Create a GitHub Issue for infrastructure failures (503 errors).
-
-        Args:
-            error: The exception that was caught
-            error_details: Detailed error message
-        """
-        try:
-            # Get GitHub token from environment
-            github_token = os.getenv("GITHUB_TOKEN")
-            if not github_token:
-                logger.warning(
-                    "GITHUB_TOKEN not available, cannot create issue for infrastructure failure"
-                )
-                return
-
-            # Get repository information from environment
-            github_repo = os.getenv("GITHUB_REPOSITORY", "")
-            if not github_repo or "/" not in github_repo:
-                logger.warning(
-                    "GITHUB_REPOSITORY not available, cannot create issue for infrastructure failure"
-                )
-                return
-
-            repo_owner, repo_name = github_repo.split("/", 1)
-
-            # Prepare issue data
-            timestamp = datetime.now().isoformat()
-            title = "🔴 [NEEDS_HUMAN] Falha Crítica de Infraestrutura: Gemini 503"
-            body = f"""## Falha de Infraestrutura Detectada
-
-**Timestamp:** {timestamp}
-**Erro:** Gemini API retornou status 503 (UNAVAILABLE)
-
-### ⚠️ AVISO IMPORTANTE
-
-**O sistema de auto-reparo NÃO deve intervir em erros de demanda da API.**
-
-Este é um erro de infraestrutura externa (Google Gemini API) e requer análise humana.
-
-### Detalhes do Erro
-
-```
-{error_details}
-```
-
-### Ação Necessária
-
-- Verificar status da API do Google Gemini
-- Verificar limites de rate-limiting
-- Verificar configuração da API key
-- Aguardar restauração do serviço se for problema temporário
-
----
-*Issue criada automaticamente pelo sistema de monitoramento de infraestrutura*
-"""
-
-            # Create the issue using httpx
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues",
-                    headers={
-                        "Accept": "application/vnd.github+json",
-                        "Authorization": f"Bearer {github_token}",
-                        "X-GitHub-Api-Version": "2022-11-28",
-                    },
-                    json={
-                        "title": title,
-                        "body": body,
-                        "labels": ["bug", "infrastructure"],
-                    },
-                    timeout=30.0,
-                )
-
-                if response.status_code == 201:
-                    logger.info(
-                        f"Successfully created GitHub issue for infrastructure failure: {response.json().get('html_url')}"
-                    )
-                else:
-                    logger.error(
-                        f"Failed to create GitHub issue: {response.status_code} - {response.text}"
-                    )
-
-        except Exception as e:
-            logger.error(
-                f"Error creating GitHub issue for infrastructure failure: {e}",
-                exc_info=True,
-            )
-
-    def _create_github_issue_for_infra_failure_sync(
-        self, error: Exception, error_details: str
-    ) -> None:
-        """
-        Synchronous version: Create a GitHub Issue for infrastructure failures (503 errors).
-
-        Args:
-            error: The exception that was caught
-            error_details: Detailed error message
-        """
-        try:
-            # Get GitHub token from environment
-            github_token = os.getenv("GITHUB_TOKEN")
-            if not github_token:
-                logger.warning(
-                    "GITHUB_TOKEN not available, cannot create issue for infrastructure failure"
-                )
-                return
-
-            # Get repository information from environment
-            github_repo = os.getenv("GITHUB_REPOSITORY", "")
-            if not github_repo or "/" not in github_repo:
-                logger.warning(
-                    "GITHUB_REPOSITORY not available, cannot create issue for infrastructure failure"
-                )
-                return
-
-            repo_owner, repo_name = github_repo.split("/", 1)
-
-            # Prepare issue data
-            timestamp = datetime.now().isoformat()
-            title = "🔴 [NEEDS_HUMAN] Falha Crítica de Infraestrutura: Gemini 503"
-            body = f"""## Falha de Infraestrutura Detectada
-
-**Timestamp:** {timestamp}
-**Erro:** Gemini API retornou status 503 (UNAVAILABLE)
-
-### ⚠️ AVISO IMPORTANTE
-
-**O sistema de auto-reparo NÃO deve intervir em erros de demanda da API.**
-
-Este é um erro de infraestrutura externa (Google Gemini API) e requer análise humana.
-
-### Detalhes do Erro
-
-```
-{error_details}
-```
-
-### Ação Necessária
-
-- Verificar status da API do Google Gemini
-- Verificar limites de rate-limiting
-- Verificar configuração da API key
-- Aguardar restauração do serviço se for problema temporário
-
----
-*Issue criada automaticamente pelo sistema de monitoramento de infraestrutura*
-"""
-
-            # Create the issue using httpx (synchronous)
-            with httpx.Client() as client:
-                response = client.post(
-                    f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues",
-                    headers={
-                        "Accept": "application/vnd.github+json",
-                        "Authorization": f"Bearer {github_token}",
-                        "X-GitHub-Api-Version": "2022-11-28",
-                    },
-                    json={
-                        "title": title,
-                        "body": body,
-                        "labels": ["bug", "infrastructure"],
-                    },
-                    timeout=30.0,
-                )
-
-                if response.status_code == 201:
-                    logger.info(
-                        f"Successfully created GitHub issue for infrastructure failure: {response.json().get('html_url')}"
-                    )
-                else:
-                    logger.error(
-                        f"Failed to create GitHub issue: {response.status_code} - {response.text}"
-                    )
-
-        except Exception as e:
-            logger.error(
-                f"Error creating GitHub issue for infrastructure failure: {e}",
-                exc_info=True,
-            )
+        """Delegate to module-level helper in gemini_response_helpers."""
+        return build_context_message(self.history_provider)
 
     def generate_conversational_response(self, user_input: str) -> str:
         """
