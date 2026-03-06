@@ -113,7 +113,7 @@ class LLMCapabilityDetector(NexusComponent):
         """
         self.ai_gateway = ai_gateway
         self.repository_root = repository_root or Path.cwd()
-        self._forced_provider = self._resolve_provider(LLMConfig.CAPABILITY_LLM_PROVIDER)
+        self._forced_provider = self._resolve_provider(LLMConfig.capability_llm_provider())
         
         if not self.ai_gateway:
             logger.warning("No AI Gateway provided for LLM capability detection")
@@ -512,7 +512,7 @@ class EnhancedCapabilityManager(NexusComponent):
         logger.info("Starting enhanced LLM-based capability status scan...")
         
         updated_capabilities = []
-        max_scan = LLMConfig.MAX_CAPABILITIES_PER_SCAN
+        max_scan = LLMConfig.max_capabilities_per_scan()
         
         with Session(self.base_manager.engine) as session:
             capabilities = session.exec(select(JarvisCapability)).all()
@@ -531,7 +531,7 @@ class EnhancedCapabilityManager(NexusComponent):
                     confidence = analysis.get("confidence", 0.0)
                     
                     # Only update if LLM is confident
-                    if confidence >= LLMConfig.MIN_CAPABILITY_CONFIDENCE and new_status and new_status != capability.status:
+                    if confidence >= LLMConfig.min_capability_confidence() and new_status and new_status != capability.status:
                         logger.info(
                             f"Updating capability {capability.id}: "
                             f"{capability.status} -> {new_status} "

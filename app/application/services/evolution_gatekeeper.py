@@ -16,9 +16,11 @@ Método principal::
     gatekeeper.approve_evolution(proposed_change) → (True, "approved") | (False, reason)
 """
 
+import json
 import logging
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -106,30 +108,35 @@ class EvolutionGatekeeper(NexusComponent):
         ok, reason = self._check_test_count()
         if not ok:
             self._log_decision(proposed_change, approved=False, reason=reason)
+            self._persist_rejection(proposed_change, reason=reason, check_failed="test_count")
             return False, reason
 
         # (b) Estabilidade recente
         ok, reason = self._check_recent_stability()
         if not ok:
             self._log_decision(proposed_change, approved=False, reason=reason)
+            self._persist_rejection(proposed_change, reason=reason, check_failed="recent_stability")
             return False, reason
 
         # (c) Proteção de arquivos frozen
         ok, reason = self._check_frozen_files(proposed_change)
         if not ok:
             self._log_decision(proposed_change, approved=False, reason=reason)
+            self._persist_rejection(proposed_change, reason=reason, check_failed="frozen_files")
             return False, reason
 
         # (d) Proteção do núcleo
         ok, reason = self._check_core_protection(proposed_change)
         if not ok:
             self._log_decision(proposed_change, approved=False, reason=reason)
+            self._persist_rejection(proposed_change, reason=reason, check_failed="core_protection")
             return False, reason
 
         # (e) Sandbox de execução (EvolutionSandbox)
         ok, reason = self._check_sandbox(proposed_change)
         if not ok:
             self._log_decision(proposed_change, approved=False, reason=reason)
+            self._persist_rejection(proposed_change, reason=reason, check_failed="sandbox")
             return False, reason
 
         self._log_decision(proposed_change, approved=True, reason="approved")
@@ -273,6 +280,27 @@ class EvolutionGatekeeper(NexusComponent):
                 )
         except Exception as exc:
             logger.debug("[EvolutionGatekeeper] AuditLogger indisponível: %s", exc)
+
+    def _persist_rejection(
+        self,
+        proposed_change: Dict[str, Any],
+        reason: str,
+        check_failed: str,
+    ) -> None:
+        """Persiste rejeição em data/gatekeeper_rejections.jsonl para análise futura."""
+        entry = {
+            "timestamp": time.time(),
+            "reason": reason,
+            "check_failed": check_failed,
+            "files_modified": proposed_change.get("files_modified", []),
+        }
+        try:
+            _rejections_file = Path("data/gatekeeper_rejections.jsonl")
+            _rejections_file.parent.mkdir(parents=True, exist_ok=True)
+            with _rejections_file.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception as exc:
+            logger.debug("[EvolutionGatekeeper] Falha ao persistir rejeição: %s", exc)
 
 
 # ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ import os
 import shutil
 import subprocess
 import sys
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -99,7 +100,7 @@ class EvolutionSandbox(NexusComponent):
             logger.info("[EvolutionSandbox] Sandbox desabilitado (SANDBOX_ENABLED=false).")
             return {"passed": True, "test_output": "sandbox_disabled", "errors": []}
 
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_" + uuid.uuid4().hex[:8]
         sandbox_dir = self.sandbox_base / ts
         errors: List[str] = []
         test_output = ""

@@ -89,6 +89,7 @@ class SemanticMemory(NexusComponent):
             facts = self.query_facts(
                 fact_type=str(ctx.get("fact_type", "")),
                 min_confidence=float(ctx.get("min_confidence", 0.0)),
+                keyword=ctx.get("keyword"),
             )
             return {"success": True, "action": "query_facts", "facts": facts}
 
@@ -151,21 +152,25 @@ class SemanticMemory(NexusComponent):
         self,
         fact_type: str = "",
         min_confidence: float = 0.0,
+        keyword: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Consulta fatos por tipo e confiança mínima.
+        """Consulta fatos por tipo, confiança mínima e keyword opcional.
 
         Args:
             fact_type:      Filtro de tipo (vazio = todos os tipos).
             min_confidence: Confiança mínima (0.0 = sem filtro).
+            keyword:        Substring case-insensitive para filtrar por conteúdo (opcional).
 
         Returns:
             Lista de fatos que satisfazem os critérios, ordenados por confiança desc.
         """
+        kw_lower = keyword.lower() if keyword else None
         results = [
             fact
             for fact in self._facts.values()
             if (not fact_type or fact["fact_type"] == fact_type)
             and fact["confidence"] >= min_confidence
+            and (kw_lower is None or kw_lower in fact["content"].lower())
         ]
         return sorted(results, key=lambda f: f["confidence"], reverse=True)
 

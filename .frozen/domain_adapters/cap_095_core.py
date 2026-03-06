@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 class Cap095Core(NexusComponent):
     def __init__(self, *args, **kwargs):
         pass
@@ -6,7 +6,7 @@ class Cap095Core(NexusComponent):
     # -*- coding: utf-8 -*-
     '''CAPABILITY: Propose solutions before explicit requests'''
 
-    def execute(context=None):
+    def execute(self, context=None):
         # Template gerado pelo Crystallizer
         return {'status': 'active', 'id': 'CAP-095'}
 

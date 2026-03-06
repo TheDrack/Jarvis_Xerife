@@ -15,73 +15,69 @@ logger = logging.getLogger(__name__)
 class LLMConfig:
     """Configuration for LLM-based identification features"""
 
-    # Enable/disable LLM-based command interpretation
-    # When False, uses traditional keyword-based interpretation
-    USE_LLM_COMMAND_INTERPRETATION = os.getenv(
-        "JARVIS_USE_LLM_COMMANDS", 
-        "true"
-    ).lower() == "true"
+    @classmethod
+    def use_llm_command_interpretation(cls) -> bool:
+        """Returns whether LLM-based command interpretation is enabled."""
+        return os.getenv("JARVIS_USE_LLM_COMMANDS", "true").lower() == "true"
 
-    # Enable/disable LLM-based capability detection
-    # When False, uses traditional keyword-based detection
-    USE_LLM_CAPABILITY_DETECTION = os.getenv(
-        "JARVIS_USE_LLM_CAPABILITIES",
-        "true"
-    ).lower() == "true"
+    @classmethod
+    def use_llm_capability_detection(cls) -> bool:
+        """Returns whether LLM-based capability detection is enabled."""
+        return os.getenv("JARVIS_USE_LLM_CAPABILITIES", "true").lower() == "true"
 
-    # Enable/disable GitHub Copilot context generation
-    # When False, does not generate repository context for GitHub Agents
-    USE_COPILOT_CONTEXT = os.getenv(
-        "JARVIS_USE_COPILOT_CONTEXT",
-        "true"
-    ).lower() == "true"
+    @classmethod
+    def use_copilot_context(cls) -> bool:
+        """Returns whether GitHub Copilot context generation is enabled."""
+        return os.getenv("JARVIS_USE_COPILOT_CONTEXT", "true").lower() == "true"
 
-    # LLM provider preference for command interpretation
-    # Options: "groq", "gemini", "auto" (auto uses AI Gateway's logic)
-    COMMAND_LLM_PROVIDER = os.getenv(
-        "JARVIS_COMMAND_LLM_PROVIDER",
-        "auto"
-    )
+    @classmethod
+    def command_llm_provider(cls) -> str:
+        """Returns the LLM provider for command interpretation."""
+        return os.getenv("JARVIS_COMMAND_LLM_PROVIDER", "auto")
 
-    # LLM provider preference for capability detection
-    # Options: "groq", "gemini", "auto"
-    CAPABILITY_LLM_PROVIDER = os.getenv(
-        "JARVIS_CAPABILITY_LLM_PROVIDER",
-        "auto"
-    )
+    @classmethod
+    def capability_llm_provider(cls) -> str:
+        """Returns the LLM provider for capability detection."""
+        return os.getenv("JARVIS_CAPABILITY_LLM_PROVIDER", "auto")
 
-    # Minimum confidence threshold for LLM-based command interpretation
-    # Commands with confidence below this threshold will use fallback
-    MIN_COMMAND_CONFIDENCE = float(os.getenv(
-        "JARVIS_MIN_COMMAND_CONFIDENCE",
-        "0.6"
-    ))
+    @classmethod
+    def min_command_confidence(cls) -> float:
+        """Returns the minimum confidence threshold for command interpretation."""
+        return float(os.getenv("JARVIS_MIN_COMMAND_CONFIDENCE", "0.6"))
 
-    # Minimum confidence threshold for LLM-based capability detection
-    # Capability status updates with confidence below this threshold are ignored
-    MIN_CAPABILITY_CONFIDENCE = float(os.getenv(
-        "JARVIS_MIN_CAPABILITY_CONFIDENCE",
-        "0.7"
-    ))
+    @classmethod
+    def min_capability_confidence(cls) -> float:
+        """Returns the minimum confidence threshold for capability detection."""
+        return float(os.getenv("JARVIS_MIN_CAPABILITY_CONFIDENCE", "0.7"))
 
-    # Maximum number of capabilities to scan in a single batch
-    # This helps manage LLM API costs and processing time
-    MAX_CAPABILITIES_PER_SCAN = int(os.getenv(
-        "JARVIS_MAX_CAPABILITIES_PER_SCAN",
-        "10"
-    ))
+    @classmethod
+    def max_capabilities_per_scan(cls) -> int:
+        """Returns the maximum number of capabilities per scan batch."""
+        return int(os.getenv("JARVIS_MAX_CAPABILITIES_PER_SCAN", "10"))
+
+    # ---------------------------------------------------------------------------
+    # Backward-compatible class-level aliases (read at import time)
+    # ---------------------------------------------------------------------------
+    USE_LLM_COMMAND_INTERPRETATION: bool = os.getenv("JARVIS_USE_LLM_COMMANDS", "true").lower() == "true"
+    USE_LLM_CAPABILITY_DETECTION: bool = os.getenv("JARVIS_USE_LLM_CAPABILITIES", "true").lower() == "true"
+    USE_COPILOT_CONTEXT: bool = os.getenv("JARVIS_USE_COPILOT_CONTEXT", "true").lower() == "true"
+    COMMAND_LLM_PROVIDER: str = os.getenv("JARVIS_COMMAND_LLM_PROVIDER", "auto")
+    CAPABILITY_LLM_PROVIDER: str = os.getenv("JARVIS_CAPABILITY_LLM_PROVIDER", "auto")
+    MIN_COMMAND_CONFIDENCE: float = float(os.getenv("JARVIS_MIN_COMMAND_CONFIDENCE", "0.6"))
+    MIN_CAPABILITY_CONFIDENCE: float = float(os.getenv("JARVIS_MIN_CAPABILITY_CONFIDENCE", "0.7"))
+    MAX_CAPABILITIES_PER_SCAN: int = int(os.getenv("JARVIS_MAX_CAPABILITIES_PER_SCAN", "10"))
 
     @classmethod
     def get_config_summary(cls) -> dict:
         """Get a summary of current LLM configuration"""
         return {
-            "llm_command_interpretation": cls.USE_LLM_COMMAND_INTERPRETATION,
-            "llm_capability_detection": cls.USE_LLM_CAPABILITY_DETECTION,
-            "copilot_context_generation": cls.USE_COPILOT_CONTEXT,
-            "command_llm_provider": cls.COMMAND_LLM_PROVIDER,
-            "capability_llm_provider": cls.CAPABILITY_LLM_PROVIDER,
-            "min_command_confidence": cls.MIN_COMMAND_CONFIDENCE,
-            "min_capability_confidence": cls.MIN_CAPABILITY_CONFIDENCE,
+            "llm_command_interpretation": cls.use_llm_command_interpretation(),
+            "llm_capability_detection": cls.use_llm_capability_detection(),
+            "copilot_context_generation": cls.use_copilot_context(),
+            "command_llm_provider": cls.command_llm_provider(),
+            "capability_llm_provider": cls.capability_llm_provider(),
+            "min_command_confidence": cls.min_command_confidence(),
+            "min_capability_confidence": cls.min_capability_confidence(),
         }
 
     @classmethod
@@ -95,39 +91,39 @@ class LLMConfig:
         valid = True
 
         # Check confidence thresholds
-        if not (0.0 <= cls.MIN_COMMAND_CONFIDENCE <= 1.0):
+        if not (0.0 <= cls.min_command_confidence() <= 1.0):
             logger.error(
-                f"Invalid MIN_COMMAND_CONFIDENCE: {cls.MIN_COMMAND_CONFIDENCE}. "
+                f"Invalid MIN_COMMAND_CONFIDENCE: {cls.min_command_confidence()}. "
                 "Must be between 0.0 and 1.0"
             )
             valid = False
 
-        if not (0.0 <= cls.MIN_CAPABILITY_CONFIDENCE <= 1.0):
+        if not (0.0 <= cls.min_capability_confidence() <= 1.0):
             logger.error(
-                f"Invalid MIN_CAPABILITY_CONFIDENCE: {cls.MIN_CAPABILITY_CONFIDENCE}. "
+                f"Invalid MIN_CAPABILITY_CONFIDENCE: {cls.min_capability_confidence()}. "
                 "Must be between 0.0 and 1.0"
             )
             valid = False
 
         # Check provider values
         valid_providers = ["groq", "gemini", "auto"]
-        if cls.COMMAND_LLM_PROVIDER not in valid_providers:
+        if cls.command_llm_provider() not in valid_providers:
             logger.warning(
-                f"Invalid COMMAND_LLM_PROVIDER: {cls.COMMAND_LLM_PROVIDER}. "
+                f"Invalid COMMAND_LLM_PROVIDER: {cls.command_llm_provider()}. "
                 f"Valid options: {valid_providers}. Using 'auto'."
             )
 
-        if cls.CAPABILITY_LLM_PROVIDER not in valid_providers:
+        if cls.capability_llm_provider() not in valid_providers:
             logger.warning(
-                f"Invalid CAPABILITY_LLM_PROVIDER: {cls.CAPABILITY_LLM_PROVIDER}. "
+                f"Invalid CAPABILITY_LLM_PROVIDER: {cls.capability_llm_provider()}. "
                 f"Valid options: {valid_providers}. Using 'auto'."
             )
 
         # Warn if all LLM features are disabled
         if not any([
-            cls.USE_LLM_COMMAND_INTERPRETATION,
-            cls.USE_LLM_CAPABILITY_DETECTION,
-            cls.USE_COPILOT_CONTEXT
+            cls.use_llm_command_interpretation(),
+            cls.use_llm_capability_detection(),
+            cls.use_copilot_context()
         ]):
             logger.warning(
                 "All LLM features are disabled. Using traditional keyword-based systems."
@@ -148,7 +144,7 @@ def create_command_interpreter(wake_word: str = "xerife", ai_gateway=None):
         Either LLMCommandInterpreter or CommandInterpreter based on configuration
     """
     # Check if LLM is enabled AND ai_gateway is provided
-    if LLMConfig.USE_LLM_COMMAND_INTERPRETATION and ai_gateway is not None:
+    if LLMConfig.use_llm_command_interpretation() and ai_gateway is not None:
         from app.domain.services.llm_command_interpreter import LLMCommandInterpreter
         logger.info("Creating LLM-based command interpreter")
         return LLMCommandInterpreter(wake_word=wake_word, ai_gateway=ai_gateway)
@@ -173,7 +169,7 @@ def create_capability_manager(engine, ai_gateway=None):
 
     base_manager = CapabilityManager(engine)
 
-    if LLMConfig.USE_LLM_CAPABILITY_DETECTION and ai_gateway:
+    if LLMConfig.use_llm_capability_detection() and ai_gateway:
         from app.application.services.llm_capability_detector import EnhancedCapabilityManager
         logger.info("Creating LLM-enhanced capability manager")
         return EnhancedCapabilityManager(base_manager=base_manager, ai_gateway=ai_gateway)
@@ -193,7 +189,7 @@ def create_copilot_context_provider(repository_root=None, ai_gateway=None):
     Returns:
         GitHubCopilotContextProvider instance or None if disabled
     """
-    if LLMConfig.USE_COPILOT_CONTEXT and ai_gateway:
+    if LLMConfig.use_copilot_context() and ai_gateway:
         from app.adapters.infrastructure.copilot_context_provider import GitHubCopilotContextProvider
         logger.info("Creating GitHub Copilot context provider")
         return GitHubCopilotContextProvider(

@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """Tests for WorkingMemory and SemanticMemory."""
 
+import time
 import pytest
 
-from app.domain.memory.working_memory import WorkingMemory
+from app.domain.memory.working_memory import WorkingMemory, WorkingMemoryEntry
 from app.domain.memory.semantic_memory import SemanticMemory
 
 
@@ -74,6 +75,55 @@ class TestWorkingMemory:
         wm.push({"x": 1})
         wm.push({"x": 2})
         assert len(wm) == 2
+
+    def test_iter(self):
+        """__iter__ deve iterar sobre todas as entradas."""
+        wm = WorkingMemory(maxlen=10)
+        wm.push({"x": 1})
+        wm.push({"x": 2})
+        items = list(wm)
+        assert len(items) == 2
+
+    def test_bool_empty(self):
+        """WorkingMemory vazia deve ser falsy."""
+        wm = WorkingMemory()
+        assert not wm
+
+    def test_bool_non_empty(self):
+        """WorkingMemory com entradas deve ser truthy."""
+        wm = WorkingMemory()
+        wm.push({"x": 1})
+        assert wm
+
+    def test_to_list(self):
+        """to_list() deve retornar lista com todas as entradas."""
+        wm = WorkingMemory(maxlen=5)
+        wm.push({"a": 1})
+        wm.push({"b": 2})
+        lst = wm.to_list()
+        assert isinstance(lst, list)
+        assert len(lst) == 2
+
+    def test_push_working_memory_entry(self):
+        """push() deve aceitar WorkingMemoryEntry além de dict."""
+        wm = WorkingMemory(maxlen=10)
+        entry = WorkingMemoryEntry(
+            user_input="olá",
+            response="olá de volta",
+            timestamp=time.time(),
+        )
+        wm.push(entry)
+        assert wm.size == 1
+        stored = wm.get_recent(1)[0]
+        assert stored["user_input"] == "olá"
+        assert stored["response"] == "olá de volta"
+        assert "_ts" in stored
+
+    def test_push_rejects_non_dict_non_entry(self):
+        """push() deve rejeitar tipos não suportados."""
+        wm = WorkingMemory()
+        with pytest.raises(TypeError):
+            wm.push("não é dict")  # type: ignore[arg-type]
 
 
 class TestSemanticMemory:
@@ -206,3 +256,31 @@ class TestSemanticMemory:
         assert result["success"] is True
         assert result["total_facts"] == 1
         assert "solution" in result["fact_types"]
+
+    def test_query_by_keyword(self):
+        """query_facts() com keyword deve filtrar por conteúdo (case-insensitive)."""
+        sm = SemanticMemory()
+        sm.add_fact("solution", "ImportError no módulo xyz", 0.9)
+        sm.add_fact("solution", "falha de conexão HTTP", 0.8)
+        sm.add_fact("failure_pattern", "timeout em ImportError", 0.7)
+
+        results = sm.query_facts(keyword="importerror")
+        assert len(results) == 2
+        assert all("importerror" in f["content"].lower() for f in results)
+
+    def test_query_keyword_no_match(self):
+        """query_facts() com keyword inexistente retorna lista vazia."""
+        sm = SemanticMemory()
+        sm.add_fact("solution", "algo completamente diferente", 0.9)
+        results = sm.query_facts(keyword="inexistente_xyz")
+        assert results == []
+
+    def test_query_keyword_combined_with_type(self):
+        """query_facts() combina keyword com fact_type."""
+        sm = SemanticMemory()
+        sm.add_fact("solution", "solução para timeout", 0.9)
+        sm.add_fact("failure_pattern", "falha por timeout recorrente", 0.8)
+
+        results = sm.query_facts(fact_type="solution", keyword="timeout")
+        assert len(results) == 1
+        assert results[0]["fact_type"] == "solution"

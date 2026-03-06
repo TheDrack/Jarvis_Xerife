@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 
 from concurrent.futures import ThreadPoolExecutor
 from app.domain.capabilities import Capability

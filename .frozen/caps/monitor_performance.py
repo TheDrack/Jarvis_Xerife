@@ -1,4 +1,4 @@
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split

@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any
 
 from google import genai
 from app.core.nexus import nexus
-from app.core.nexuscomponent import NexusComponent
+from app.core.nexus import NexusComponent
 from app.domain.models import CommandType, Intent
 from app.domain.services.agent_service import AgentService
 

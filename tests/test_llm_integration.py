@@ -279,7 +279,7 @@ class TestLLMConfig(NexusComponent):
         from app.domain.services.command_interpreter import CommandInterpreter
         from app.core.llm_config import LLMConfig
         
-        if LLMConfig.USE_LLM_COMMAND_INTERPRETATION:
+        if LLMConfig.use_llm_command_interpretation():
             # If LLM is enabled, should get LLM interpreter
             assert isinstance(interpreter, LLMCommandInterpreter)
         else:

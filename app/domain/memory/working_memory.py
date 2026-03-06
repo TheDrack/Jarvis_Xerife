@@ -16,8 +16,19 @@ Uso::
 """
 
 from collections import deque
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Deque, Dict, List
+from typing import Any, Deque, Dict, List, Union
+
+
+@dataclass(slots=True)
+class WorkingMemoryEntry:
+    """Entrada tipada para a memória de trabalho."""
+
+    user_input: str
+    response: str
+    timestamp: float
+    metadata: dict = field(default_factory=dict)
 
 
 class WorkingMemory:
@@ -35,18 +46,27 @@ class WorkingMemory:
     # Public API
     # ------------------------------------------------------------------
 
-    def push(self, entry: Dict[str, Any]) -> None:
+    def push(self, entry: Union[Dict[str, Any], WorkingMemoryEntry]) -> None:
         """Adiciona uma entrada à fila circular.
 
+        Aceita tanto ``dict`` quanto ``WorkingMemoryEntry`` para compatibilidade.
         Entradas mais antigas são descartadas automaticamente quando
         a capacidade máxima é atingida.
 
         Args:
-            entry: Dicionário com dados da interação.
+            entry: Dicionário ou WorkingMemoryEntry com dados da interação.
         """
-        if not isinstance(entry, dict):
-            raise TypeError(f"entry deve ser dict, recebido: {type(entry)}")
-        stamped = {**entry, "_ts": datetime.now(timezone.utc).isoformat()}
+        if isinstance(entry, WorkingMemoryEntry):
+            stamped: Dict[str, Any] = {
+                "user_input": entry.user_input,
+                "response": entry.response,
+                "_ts": datetime.fromtimestamp(entry.timestamp, tz=timezone.utc).isoformat(),
+                **entry.metadata,
+            }
+        elif isinstance(entry, dict):
+            stamped = {**entry, "_ts": datetime.now(timezone.utc).isoformat()}
+        else:
+            raise TypeError(f"entry deve ser dict ou WorkingMemoryEntry, recebido: {type(entry)}")
         self._store.append(stamped)
 
     def get_recent(self, n: int) -> List[Dict[str, Any]]:
@@ -81,6 +101,16 @@ class WorkingMemory:
 
     def __len__(self) -> int:
         return len(self._store)
+
+    def __iter__(self):
+        return iter(self._store)
+
+    def __bool__(self) -> bool:
+        return len(self._store) > 0
+
+    def to_list(self) -> list:
+        """Retorna todas as entradas como lista — útil para serialização."""
+        return list(self._store)
 
     def __repr__(self) -> str:
         return f"WorkingMemory(size={len(self._store)}, maxlen={self._maxlen})"

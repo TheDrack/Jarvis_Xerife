@@ -41,8 +41,8 @@ class LLMCommandInterpreter(NexusComponent):
         # Always initialize fallback interpreter for reliability
         from app.domain.services.command_interpreter import CommandInterpreter
         self._fallback_interpreter = CommandInterpreter(wake_word=wake_word)
-        self._min_confidence = LLMConfig.MIN_COMMAND_CONFIDENCE
-        self._forced_provider = self._resolve_provider(LLMConfig.COMMAND_LLM_PROVIDER)
+        self._min_confidence = LLMConfig.min_command_confidence()
+        self._forced_provider = self._resolve_provider(LLMConfig.command_llm_provider())
         
         if not self.ai_gateway:
             logger.warning("No AI Gateway provided, will use keyword-based fallback")
