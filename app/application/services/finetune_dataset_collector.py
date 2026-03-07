@@ -28,6 +28,52 @@ class FineTuneDatasetCollector(NexusComponent):
         self._global_dir.mkdir(parents=True, exist_ok=True)
         self._users_dir.mkdir(parents=True, exist_ok=True)
     
+    def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """NexusComponent entry-point.
+        
+        Args:
+            context: Dict com ações suportadas:
+                - "collect": {min_reward}
+                - "collect_from_interaction": {user_id, prompt, completion, outcome, source, feedback}
+                - "export_dataset": {output_path, user_id}
+                - "classify_scope": {prompt, completion}
+                
+        Returns:
+            Dict com resultado da operação.
+        """
+        action = context.get("action", "")
+        
+        if action == "collect":
+            min_reward = context.get("min_reward", 0.7)
+            samples = self.collect(min_reward)
+            return {"success": True, "samples": samples, "count": len(samples)}
+            
+        elif action == "collect_from_interaction":
+            self.collect_from_interaction(
+                user_id=context.get("user_id", ""),
+                prompt=context.get("prompt", ""),
+                completion=context.get("completion", ""),
+                outcome=context.get("outcome", ""),
+                source=context.get("source", ""),
+                feedback=context.get("feedback")
+            )
+            return {"success": True, "collected": True}
+            
+        elif action == "export_dataset":
+            output_path = context.get("output_path", "data/finetune/dataset.json")
+            user_id = context.get("user_id")
+            path = self.export_dataset(output_path, user_id)
+            return {"success": True, "exported_to": path}
+            
+        elif action == "classify_scope":
+            scope = self._classify_scope(
+                context.get("prompt", ""),
+                context.get("completion", "")
+            )
+            return {"success": True, "scope": scope}
+            
+        return {"success": False, "error": f"Ação desconhecida: {action}"}
+    
     def collect(self, min_reward: float = 0.7) -> List[dict]:
         """Coleta pares com reward >= min_reward do ThoughtLog."""
         thought_log = nexus.resolve("thought_log_service")
