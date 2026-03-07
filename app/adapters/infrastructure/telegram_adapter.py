@@ -5,7 +5,8 @@
 Integrado com FineTuneDatasetCollector para coleta automática de dados.
 """
 import logging
-from typing import Optional, Dict, Any, Callable
+import os
+from typing import Optional, Dict, Any
 from app.core.nexus import NexusComponent, nexus
 
 logger = logging.getLogger(__name__)
@@ -15,39 +16,91 @@ class TelegramAdapter(NexusComponent):
 
     def __init__(self):
         super().__init__()
-        self._bot_token = None
+        self._bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+        self._chat_id = os.getenv("TELEGRAM_ADMIN_CHAT_ID")
         self._finetune_collector = None
-        self._polling_task = None
 
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """NexusComponent entry-point."""
+        """NexusComponent entry-point — suporta backup de arquivo via Telegram.
+        
+        Ações suportadas:
+        - "configure": {telegram_bot_token, chat_id}
+        - "process_message": {message}
+        - "send_message": {chat_id, text}
+        - "send_document": {chat_id, file_path, caption}  ← ADIÇÃO PARA BACKUP
+        - "start_polling": {}
+        """
         action = context.get("action", "")
 
         if action == "configure":
             config = context.get("config", {})
-            self._bot_token = config.get("telegram_bot_token")
+            self._bot_token = config.get("telegram_bot_token") or os.getenv("TELEGRAM_BOT_TOKEN")
+            self._chat_id = config.get("chat_id") or os.getenv("TELEGRAM_ADMIN_CHAT_ID")
             self._finetune_collector = nexus.resolve("finetune_dataset_collector")
-            return {"success": True, "configured": bool(self._bot_token)}
+            return {"success": True, "configured": bool(self._bot_token and self._chat_id)}
+
+        elif action == "send_document":
+            # ← ADIÇÃO CRÍTICA: Suporte a upload de arquivo para backup
+            chat_id = context.get("chat_id") or self._chat_id
+            file_path = context.get("file_path")
+            caption = context.get("caption", "📦 Backup do Jarvis")
+            
+            if not self._bot_token or not chat_id or not file_path:
+                logger.warning("[TelegramAdapter] send_document: parâmetros ausentes")
+                return {"success": False, "error": "Token, chat_id ou file_path ausente"}
+            
+            if not os.path.exists(file_path):
+                logger.error(f"[TelegramAdapter] Arquivo não encontrado: {file_path}")
+                return {"success": False, "error": f"Arquivo não encontrado: {file_path}"}
+            
+            try:
+                import aiohttp
+                url = f"https://api.telegram.org/bot{self._bot_token}/sendDocument"
+                
+                with open(file_path, "rb") as f:
+                    form = aiohttp.FormData()
+                    form.add_field("chat_id", chat_id)
+                    form.add_field("document", f, filename=os.path.basename(file_path))
+                    if caption:
+                        form.add_field("caption", caption)
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, data=form) as resp:
+                            if resp.status == 200:
+                                result = await resp.json()
+                                logger.info(f"[TelegramAdapter] Backup enviado: {file_path}")
+                                return {"success": True, "message_id": result.get("result", {}).get("message_id")}
+                            else:
+                                error_text = await resp.text()
+                                logger.error(f"[TelegramAdapter] Falha no upload: {resp.status} — {error_text}")
+                                return {"success": False, "error": f"HTTP {resp.status}: {error_text}"}
+                                
+            except Exception as e:
+                logger.error(f"[TelegramAdapter] Erro ao enviar documento: {e}")
+                return {"success": False, "error": str(e)}
 
         elif action == "process_message":
             message = context.get("message", {})
             return {"success": True, "message_received": message.get("text", "")}
 
         elif action == "send_message":
-            chat_id = context.get("chat_id")
+            chat_id = context.get("chat_id") or self._chat_id
             text = context.get("text")
             if self._bot_token and chat_id and text:
                 return {"success": True, "queued": True, "chat_id": chat_id}
             return {"success": False, "error": "Token, chat_id ou texto ausente"}
 
         elif action == "start_polling":
-            return {"success": True, "polling": "webhook_mode"}
+            callback = context.get("callback")  # Aceita callback opcional
+            logger.info("[TelegramAdapter] Polling iniciado (modo webhook).")
+            return {"success": True, "mode": "webhook"}
 
         return {"success": False, "error": f"Ação desconhecida: {action}"}
 
     def configure(self, config: dict):
-        """Configura token do bot."""
-        self._bot_token = config.get("telegram_bot_token")
+        """Configura token e chat_id do bot."""
+        self._bot_token = config.get("telegram_bot_token") or os.getenv("TELEGRAM_BOT_TOKEN")
+        self._chat_id = config.get("chat_id") or os.getenv("TELEGRAM_ADMIN_CHAT_ID")
         self._finetune_collector = nexus.resolve("finetune_dataset_collector")
 
     async def process_message(self, message: dict) -> Dict[str, Any]:
@@ -95,7 +148,7 @@ class TelegramAdapter(NexusComponent):
             return {"success": False, "error": str(e)}
 
     async def send_message(self, chat_id: str, text: str):
-        """Envia mensagem para usuário no Telegram."""
+        """Envia mensagem de texto para usuário no Telegram."""
         if not self._bot_token:
             logger.warning("[TelegramAdapter] Bot token não configurado")
             return
@@ -115,21 +168,12 @@ class TelegramAdapter(NexusComponent):
             logger.error("[TelegramAdapter] Erro ao enviar: %s", e)
 
     # ------------------------------------------------------------------
-    # ADIÇÃO: Métodos faltantes exigidos pelo main.py
+    # Métodos de polling (stub para compatibilidade)
     # ------------------------------------------------------------------
 
-    def start_polling(self, callback: Optional[Callable] = None):
-        """Inicia polling do Telegram (modo webhook — polling é gerenciado externamente).
-        
-        ADIÇÃO: Método stub para compatibilidade com bootstrap do main.py.
-        
-        Args:
-            callback: Função opcional para processar mensagens recebidas (modo polling).
-                     No modo webhook, este parâmetro é ignorado.
-        """
+    def start_polling(self, callback: Optional[callable] = None):
+        """Inicia polling do Telegram (modo webhook)."""
         logger.info("[TelegramAdapter] Polling iniciado (modo webhook).")
-        # Webhook é gerenciado pelo endpoint /v1/telegram/webhook no api_server.py
-        # Callback é usado apenas se implementarmos polling ativo no futuro
         if callback:
             logger.debug("[TelegramAdapter] Callback registrado para modo polling futuro.")
         return {"success": True, "mode": "webhook"}
