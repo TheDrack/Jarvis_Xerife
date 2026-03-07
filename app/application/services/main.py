@@ -80,7 +80,8 @@ def start_polling_services():
         telegram = nexus.resolve("telegram_adapter")
         if telegram and hasattr(telegram, "start_polling"):
             # start_polling é síncrono (stub webhook) — seguro chamar aqui
-            telegram.start_polling()
+            # Aceita callback opcional para compatibilidade
+            telegram.start_polling(callback=None)
     except Exception as e:
         print(f"⚠️ Falha ao iniciar polling: {e}")
 
@@ -90,7 +91,8 @@ if __name__ == "__main__":
     try:
         asyncio.run(send_startup_notification())
     except RuntimeError:
-        # Já existe um event loop (ex: em testes) — ignora silenciosamente
+        # Já existe um event loop (ex: em testes ou integrado ao Uvicorn)
+        # Ignora silenciosamente para não quebrar o bootstrap
         pass
 
     # 2. Iniciar serviços em background
