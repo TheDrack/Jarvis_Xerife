@@ -6,12 +6,13 @@ from typing import Any, Dict, List, Optional
 
 from app.application.services.dependency_manager import DependencyManager
 from app.core.config import settings
-from app.core.nexus import nexus, NexusComponent
+from app.core.nexus import nexus, NexusComponent, CloudMock
 from app.domain.models import Response
 
 logger = logging.getLogger(__name__)
 
 _HEALTH_CHECK_INTERVAL = 300  # 5 minutos
+
 
 class AssistantService(NexusComponent):
     """
@@ -46,8 +47,7 @@ class AssistantService(NexusComponent):
         self._history_adapter = None
         self._memory_manager = None
         self._field_vision = None
-        self._vector_memory = None
-        self._decision_engine = None
+        self._vector_memory = None        self._decision_engine = None
         self.is_running = False
         self.wake_word = wake_word or getattr(settings, "wake_word", "xerife")
         self._command_history: List[Dict[str, Any]] = []
@@ -96,6 +96,9 @@ class AssistantService(NexusComponent):
             self._decision_engine = nexus.resolve("decision_engine")
         return self._decision_engine
 
+    def _is_component_available(self, component) -> bool:        """Verifica se um componente resolvido é utilizável (não é None nem CloudMock)."""
+        return component is not None and not isinstance(component, CloudMock)
+
     def start_health_check(self) -> None:
         """Inicia o loop de verificação de saúde em background (non-blocking)."""
         try:
@@ -123,11 +126,12 @@ class AssistantService(NexusComponent):
         """Executa um único ciclo de verificação de saúde."""
         logger.info("👁️ [HealthCheck] Iniciando varredura de sinais vitais…")
         field_vision = self._get_field_vision()
-        if not field_vision:
+        if not self._is_component_available(field_vision):
             logger.debug("👁️ [HealthCheck] FieldVision indisponível no Nexus.")
             return
 
-        result = await asyncio.to_thread(field_vision.scan_vitals)
+        # Chama scan_vitals em thread para não bloquear o event loop
+        result = await asyncio.to_thread(field_vision.execute, {})
         action = result.get("action", "none")
 
         if action == "none":
@@ -141,8 +145,7 @@ class AssistantService(NexusComponent):
         action = result.get("action", "unknown")
         snippet = result.get("error_snippet", "")
         if action == "memory_resolved":
-            return (
-                "🧠 *JARVIS Health Check*\n"
+            return (                "🧠 *JARVIS Health Check*\n"
                 f"Anomalia detectada nos logs e resolvida pela memória semântica "
                 f"({result.get('known_solutions', 0)} solução(ões) encontrada(s))."
             )
@@ -164,7 +167,7 @@ class AssistantService(NexusComponent):
         """Envia notificação via NotificationService (Telegram/WhatsApp/Discord)."""
         try:
             notification_service = nexus.resolve("notification_service")
-            if notification_service and hasattr(notification_service, "broadcast_startup"):
+            if self._is_component_available(notification_service) and hasattr(notification_service, "broadcast_startup"):
                 await asyncio.to_thread(notification_service.broadcast_startup, message)
                 logger.info("📨 [HealthCheck] Notificação enviada com sucesso.")
         except Exception as exc:
@@ -174,7 +177,7 @@ class AssistantService(NexusComponent):
         """Recupera o histórico recente de TODOS os canais (hive mind)."""
         try:
             adapter = self._get_history_adapter()
-            if adapter and hasattr(adapter, "get_recent_hive_history"):
+            if self._is_component_available(adapter) and hasattr(adapter, "get_recent_hive_history"):
                 return adapter.get_recent_hive_history(limit=limit)
         except Exception as e:
             logger.debug(f"Hive context unavailable: {e}")
@@ -184,15 +187,14 @@ class AssistantService(NexusComponent):
         """Persiste a interação no banco compartilhado (hive mind)."""
         try:
             adapter = self._get_history_adapter()
-            if adapter and hasattr(adapter, "save_interaction"):
+            if self._is_component_available(adapter) and hasattr(adapter, "save_interaction"):
                 adapter.save_interaction(
                     user_input=user_input,
                     command_type=response.data.get("command_type", "unknown") if response.data else "unknown",
                     parameters=response.data or {},
                     success=response.success,
                     response_text=response.message,
-                    channel=channel,
-                )
+                    channel=channel,                )
         except Exception as e:
             logger.debug(f"Failed to save to hive memory: {e}")
 
@@ -204,26 +206,57 @@ class AssistantService(NexusComponent):
         channel = context.get("channel", "api")
         return self.process_command(context["command"], channel=channel)
 
+    def _create_response(self, success: bool, message: str,  Optional[Dict] = None, error: Optional[str] = None) -> Response:
+        """Cria uma instância de Response com fallback seguro."""
+        try:
+            return Response(success=success, message=message, data=data or {}, error=error)
+        except TypeError:
+            # Fallback para schema alternativo
+            return Response(success=success, message=message)
+
+    def _get_intent_command_type(self, intent) -> str:
+        """Extrai o tipo de comando de um intent, suportando objeto ou dicionário."""
+        if isinstance(intent, dict):
+            return intent.get("command_type", intent.get("type", "unknown"))
+        return getattr(intent, "command_type", getattr(intent, "type", "unknown"))
+
+    def _get_intent_parameters(self, intent) -> Dict[str, Any]:
+        """Extrai parâmetros de um intent, suportando objeto ou dicionário."""
+        if isinstance(intent, dict):
+            return intent.get("parameters", intent.get("params", {}))
+        return getattr(intent, "parameters", getattr(intent, "params", {}))
+
+    def _get_intent_raw_input(self, intent) -> str:
+        """Extrai o input bruto de um intent, suportando objeto ou dicionário."""
+        if isinstance(intent, dict):
+            return intent.get("raw_input", intent.get("text", ""))
+        return getattr(intent, "raw_input", getattr(intent, "text", ""))
+
     def process_command(
         self,
         text: str,
         channel: str = "api",
-        request_metadata: Optional[Dict[str, Any]] = None,
+        request_meta Optional[Dict[str, Any]] = None,
     ) -> Response:
         """
         Processa um texto, interpreta a intenção e executa a ação.
         Blindado contra erros de NoneType através de resolução dinâmica.
         """
         try:
-            # Direct providers path (for test/injection use)
-            if self._action is not None or self._web is not None or self._voice is not None:
+            # Direct providers path (for test/injection use)            if self._action is not None or self._web is not None or self._voice is not None:
                 interpreter = self._get_interpreter()
-                if not interpreter:
-                    return Response(success=False, message="Interpreter unavailable", error="INIT_FAILURE")
+                if not self._is_component_available(interpreter):
+                    return self._create_response(False, "Interpreter unavailable", error="INIT_FAILURE")
+                
+                # Executa interpretação com fallback para dict ou objeto
                 if hasattr(interpreter, "interpret"):
                     intent = interpreter.interpret(text)
+                elif hasattr(interpreter, "execute"):
+                    result = interpreter.execute({"text": text})
+                    intent = result if isinstance(result, (dict, type(None))) else {"command_type": "unknown", "parameters": {}, "raw_input": text}
                 else:
-                    intent = interpreter.execute({"text": text})
+                    return self._create_response(False, "Interpreter sem método válido", error="INIT_FAILURE")
+                
                 response = self._dispatch_with_providers(intent)
                 self._command_history.insert(0, {
                     "command": text,
@@ -240,16 +273,16 @@ class AssistantService(NexusComponent):
             interpreter = self._get_interpreter()
             intent_processor = self._get_intent_processor()
 
-            if not interpreter or not intent_processor:
+            if not self._is_component_available(interpreter) or not self._is_component_available(intent_processor):
                 error_msg = "Componentes internos (Interpreter/Processor) não localizados pelo Nexus."
                 logger.error(f"❌ {error_msg}")
-                return Response(success=False, message=error_msg, error="INIT_FAILURE")
+                return self._create_response(False, error_msg, error="INIT_FAILURE")
 
             # 1b. Consulta DecisionEngine para seleção de LLM/ferramenta (com fallback gracioso)
             decision_meta: Dict[str, Any] = {}
             try:
                 de = self._get_decision_engine()
-                if de is not None and hasattr(de, "decide"):
+                if self._is_component_available(de) and hasattr(de, "decide"):
                     decision = de.decide({"command": text, "channel": channel})
                     decision_meta = {
                         "chosen": decision.chosen,
@@ -259,8 +292,7 @@ class AssistantService(NexusComponent):
                     logger.debug(
                         "🧠 [DecisionEngine] chosen=%s score=%.3f jrvs_version=%s",
                         decision.chosen,
-                        decision.score,
-                        decision.jrvs_version,
+                        decision.score,                        decision.jrvs_version,
                     )
             except Exception as de_exc:
                 logger.warning("⚠️ [DecisionEngine] Indisponível, usando lógica padrão: %s", de_exc)
@@ -269,7 +301,7 @@ class AssistantService(NexusComponent):
             vector_context_lines: List[str] = []
             try:
                 vec_mem = self._get_vector_memory()
-                if vec_mem is not None:
+                if self._is_component_available(vec_mem):
                     similar = vec_mem.query_similar(text, top_k=3, days_back=30)
                     if similar:
                         vector_context_lines = [
@@ -287,14 +319,15 @@ class AssistantService(NexusComponent):
             memory_context_lines: List[str] = []
             try:
                 memory_manager = self._get_memory_manager()
-                relevant = memory_manager.get_relevant_context(text)
-                if relevant:
-                    memory_context_lines = [
-                        f"- [{item.get('timestamp', '')}] Usuário: {item.get('user', '')} | "
-                        f"JARVIS: {item.get('jarvis', '')}"
-                        for item in relevant
-                    ]
-                    logger.debug(f"🧠 [MEMORY] {len(relevant)} interação(ões) relevante(s) recuperada(s)")
+                if self._is_component_available(memory_manager):
+                    relevant = memory_manager.get_relevant_context(text)
+                    if relevant:
+                        memory_context_lines = [
+                            f"- [{item.get('timestamp', '')}] Usuário: {item.get('user', '')} | "
+                            f"JARVIS: {item.get('jarvis', '')}"
+                            for item in relevant
+                        ]
+                        logger.debug(f"🧠 [MEMORY] {len(relevant)} interação(ões) relevante(s) recuperada(s)")
             except Exception as e:
                 logger.debug(f"Memory context unavailable: {e}")
 
@@ -305,19 +338,29 @@ class AssistantService(NexusComponent):
                 interpret_ctx["system_prompt_extra"] = (
                     "### MEMÓRIA DE CONTEXTO ###\n" + "\n".join(all_context_lines)
                 )
-            intent = interpreter.execute(interpret_ctx)
+            
+            # Executa interpretação com fallback para dict ou objeto
+            if hasattr(interpreter, "interpret"):
+                intent = interpreter.interpret(text)            elif hasattr(interpreter, "execute"):
+                intent = interpreter.execute(interpret_ctx)
+            else:
+                return self._create_response(False, "Interpreter sem método interpret/execute", error="INIT_FAILURE")
 
             # 4. Processa a intenção
-            result = intent_processor.execute({"intent": intent})
+            if hasattr(intent_processor, "execute"):
+                result = intent_processor.execute({"intent": intent})
+            else:
+                result = None
 
             # 5. Constrói a resposta unificada
-            response = Response(
+            command_type = self._get_intent_command_type(intent)
+            response = self._create_response(
                 success=True,
                 message=str(result) if result else "Comando executado com sucesso.",
                 data={
                     "intent": str(intent),
                     "result": result,
-                    "command_type": getattr(intent, 'type', 'unknown') if intent else "unknown",
+                    "command_type": command_type,
                     **decision_meta,
                 },
             )
@@ -325,7 +368,7 @@ class AssistantService(NexusComponent):
             # 6a. Vetoriza e armazena comando + resposta na memória vetorial
             try:
                 vec_mem = self._get_vector_memory()
-                if vec_mem is not None:
+                if self._is_component_available(vec_mem):
                     vec_mem.store_event(
                         text,
                         metadata={"role": "user", "channel": channel},
@@ -340,13 +383,14 @@ class AssistantService(NexusComponent):
 
             # 6b. Persiste na memória semântica de longo prazo
             try:
-                self._get_memory_manager().store_interaction(text, response.message)
+                memory_manager = self._get_memory_manager()
+                if self._is_component_available(memory_manager):
+                    memory_manager.store_interaction(text, response.message)
             except Exception as e:
                 logger.debug(f"Failed to store in semantic memory: {e}")
 
             # 7. Persiste na memória compartilhada
-            self._save_to_hive(text, response, channel=channel)
-            self._command_history.insert(0, {
+            self._save_to_hive(text, response, channel=channel)            self._command_history.insert(0, {
                 "command": text,
                 "success": response.success,
                 "timestamp": _dt.now().isoformat(),
@@ -356,7 +400,7 @@ class AssistantService(NexusComponent):
 
         except Exception as e:
             logger.error(f"💥 Erro ao processar comando: {e}")
-            response = Response(success=False, message=f"Erro interno: {str(e)}", error=str(e))
+            response = self._create_response(success=False, message=f"Erro interno: {str(e)}", error=str(e))
             self._save_to_hive(text, response, channel=channel)
             self._command_history.insert(0, {
                 "command": text,
@@ -370,14 +414,14 @@ class AssistantService(NexusComponent):
         self,
         text: str,
         channel: str = "api",
-        request_metadata: Optional[Dict[str, Any]] = None,
+        request_meta Optional[Dict[str, Any]] = None,
     ) -> Response:
         """Versão assíncrona para compatibilidade com o API Server."""
         return await asyncio.to_thread(
             self.process_command, text, channel=channel, request_metadata=request_metadata
         )
 
-    def on_event(self, event_type: str, data: Any) -> None:
+    def on_event(self, event_type: str,  Any) -> None:
         """Reage a eventos globais disparados pelo Nexus."""
         if event_type == "wake_word_detected":
             logger.info("👂 Assistente em prontidão para ouvir...")
@@ -393,43 +437,48 @@ class AssistantService(NexusComponent):
     def _dispatch_with_providers(self, intent) -> Response:
         """Direct dispatch to injected providers based on intent command type."""
         from app.domain.models import CommandType
-        cmd_type = intent.command_type
-        params = intent.parameters
+        
+        # Suporta intent como objeto ou dicionário
+        cmd_type = self._get_intent_command_type(intent)
+        params = self._get_intent_parameters(intent)
+        raw_input = self._get_intent_raw_input(intent)
+        
         try:
-            if cmd_type == CommandType.TYPE_TEXT:
+            if cmd_type == CommandType.TYPE_TEXT or cmd_type == "type_text":
                 text_val = params.get("text", "")
-                if self._action:
+                if self._action and self._is_component_available(self._action):
                     self._action.type_text(text_val)
-                return Response(success=True, message=f"Typed: {text_val}", data={"command_type": "type_text"})
-            elif cmd_type == CommandType.PRESS_KEY:
+                return self._create_response(success=True, message=f"Typed: {text_val}", data={"command_type": "type_text"})
+            elif cmd_type == CommandType.PRESS_KEY or cmd_type == "press_key":
                 key = params.get("key", "")
-                if self._action:
+                if self._action and self._is_component_available(self._action):
                     self._action.press_key(key)
-                return Response(success=True, message=f"Pressed: {key}", data={"command_type": "press_key"})
-            elif cmd_type == CommandType.OPEN_BROWSER:
-                if self._action:
+                return self._create_response(success=True, message=f"Pressed: {key}", data={"command_type": "press_key"})
+            elif cmd_type == CommandType.OPEN_BROWSER or cmd_type == "open_browser":
+                if self._action and self._is_component_available(self._action):
                     self._action.hotkey("ctrl", "shift", "c")
-                return Response(success=True, message="Opened browser", data={"command_type": "open_browser"})
-            elif cmd_type == CommandType.OPEN_URL:
+                return self._create_response(success=True, message="Opened browser", data={"command_type": "open_browser"})
+            elif cmd_type == CommandType.OPEN_URL or cmd_type == "open_url":
                 url = params.get("url", "")
-                if self._web:
+                if self._web and self._is_component_available(self._web):
                     self._web.open_url(url)
-                return Response(success=True, message=f"Opened: {url}", data={"command_type": "open_url"})
-            elif cmd_type == CommandType.SEARCH_ON_PAGE:
+                return self._create_response(success=True, message=f"Opened: {url}", data={"command_type": "open_url"})
+            elif cmd_type == CommandType.SEARCH_ON_PAGE or cmd_type == "search_on_page":
                 query = params.get("search_text", params.get("query", ""))
-                if self._web:
+                if self._web and self._is_component_available(self._web):
                     self._web.search_on_page(query)
-                return Response(success=True, message=f"Searched: {query}", data={"command_type": "search_on_page"})
-            elif cmd_type == CommandType.UNKNOWN:
+                return self._create_response(success=True, message=f"Searched: {query}", data={"command_type": "search_on_page"})
+            elif cmd_type == CommandType.UNKNOWN or cmd_type == "unknown":
                 interpreter = self._interpreter
-                if hasattr(interpreter, "generate_conversational_response"):
+                if self._is_component_available(interpreter) and hasattr(interpreter, "generate_conversational_response"):
                     try:
-                        response_text = interpreter.generate_conversational_response(intent.raw_input)
-                        return Response(success=True, message=response_text, data={"command_type": "chat"})
+                        response_text = interpreter.generate_conversational_response(raw_input)
+                        return self._create_response(success=True, message=response_text, data={"command_type": "chat"})
                     except Exception:
                         pass
-                return Response(success=False, message="Unknown command", error="UNKNOWN_COMMAND")
+                return self._create_response(success=False, message="Unknown command", error="UNKNOWN_COMMAND")
             else:
-                return Response(success=False, message="Unhandled command type", error="UNKNOWN_COMMAND")
+                return self._create_response(success=False, message="Unhandled command type", error="UNKNOWN_COMMAND")
         except Exception as e:
-            return Response(success=False, message=str(e), error="EXECUTION_ERROR")
+            logger.error(f"💥 Erro em _dispatch_with_providers: {e}")
+            return self._create_response(success=False, message=str(e), error="EXECUTION_ERROR")
