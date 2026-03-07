@@ -2,7 +2,7 @@
 """JRVS Cloud Storage Adapter — Supabase Storage backend for .jrvs snapshots.
 
 Provides upload / download / list / delete operations against the
-``jrvs-snapshots`` bucket in Supabase Storage.
+jrvs-snapshots bucket in Supabase Storage.
 
 The bucket must be created in the Supabase Dashboard first:
     - Name:        jrvs-snapshots
@@ -10,7 +10,7 @@ The bucket must be created in the Supabase Dashboard first:
     - Max file:    100 MB
 
 All methods degrade gracefully when Supabase is not configured, returning
-``None`` / empty results without raising exceptions.
+None / empty results without raising exceptions.
 """
 
 import json
