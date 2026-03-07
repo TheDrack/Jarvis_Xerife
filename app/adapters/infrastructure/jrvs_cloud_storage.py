@@ -13,155 +13,128 @@ All methods degrade gracefully when Supabase is not configured, returning
 ``None`` / empty results without raising exceptions.
 """
 
-import logging
-from typing import List, Optional
+"""JrvsCloudStorage — Armazenamento de arquivos .jrvs no Supabase Storage.
 
+Permite backup na nuvem e sincronização entre dispositivos.
+"""
+import json
+import logging
+import hashlib
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional, List, Dict, Any
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_BUCKET = "jrvs-snapshots"
-_CONTENT_TYPE = "application/octet-stream"
-
+try:
+    from supabase import create_client, Client
+    _SUPABASE_AVAILABLE = True
+except ImportError:
+    _SUPABASE_AVAILABLE = False
+    logger.warning("[JrvsCloudStorage] supabase não instalado — funcionalidade cloud desabilitada")
 
 class JrvsCloudStorage(NexusComponent):
-    """Supabase Storage adapter for .jrvs snapshot files.
-
-    Usage::
-
-        storage = JrvsCloudStorage()
-        storage.upload("jrvs-snapshots", "data/nexus_registry.jrvs", raw_bytes)
-        data = storage.download("jrvs-snapshots", "data/nexus_registry.jrvs")
-    """
-
-    def __init__(self, bucket: str = _DEFAULT_BUCKET) -> None:
-        self._bucket = bucket
-
-    def execute(self, context: dict) -> dict:
-        """NexusComponent entry-point.  Dispatches to upload/download based on context."""
-        action = (context or {}).get("action", "")
-        path = (context or {}).get("path", "")
-
-        if action == "upload":
-            data = context.get("data")
-            if isinstance(data, str):
-                data = data.encode()
-            ok = self.upload(self._bucket, path, data) is not None
-            return {"success": ok}
-        if action == "download":
-            data = self.download(self._bucket, path)
-            return {"success": data is not None, "data": data}
-        if action == "list":
-            files = self.list(self._bucket, context.get("prefix", ""))
-            return {"success": True, "files": files}
-        if action == "delete":
-            ok = self.delete(self._bucket, path)
-            return {"success": ok}
-
-        return {"success": False, "error": f"Ação desconhecida: {action!r}"}
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def upload(self, bucket: str, path: str, data: bytes) -> Optional[str]:
-        """Upload *data* to *bucket*/*path* in Supabase Storage.
-
-        Args:
-            bucket: Supabase Storage bucket name.
-            path:   Remote path inside the bucket (e.g. ``"data/registry.jrvs"``).
-            data:   Raw bytes to upload.
-
-        Returns:
-            The storage path on success, or ``None`` on failure.
-        """
-        client = self._get_client()
-        if client is None or not data:
-            return None
-        try:
-            client.storage.from_(bucket).upload(
-                path,
-                data,
-                {"content-type": _CONTENT_TYPE, "upsert": "true"},
-            )
-            logger.debug("☁️  [JrvsCloud] Uploaded %s → %s/%s", len(data), bucket, path)
-            return path
-        except Exception as exc:
-            logger.error("❌ [JrvsCloud] upload(%s/%s) falhou: %s", bucket, path, exc)
-            return None
-
-    def download(self, bucket: str, path: str) -> Optional[bytes]:
-        """Download *path* from *bucket* and return raw bytes.
-
-        Args:
-            bucket: Supabase Storage bucket name.
-            path:   Remote path inside the bucket.
-
-        Returns:
-            File bytes or ``None`` if the file does not exist / Supabase
-            is unavailable.
-        """
-        client = self._get_client()
-        if client is None:
-            return None
-        try:
-            data = client.storage.from_(bucket).download(path)
-            logger.debug("☁️  [JrvsCloud] Downloaded %s bytes from %s/%s", len(data), bucket, path)
-            return data
-        except Exception as exc:
-            logger.debug("[JrvsCloud] download(%s/%s): %s", bucket, path, exc)
-            return None
-
-    def list(self, bucket: str, prefix: str = "") -> List[str]:
-        """List files under *prefix* in *bucket*.
-
-        Args:
-            bucket: Supabase Storage bucket name.
-            prefix: Optional path prefix to filter results.
-
-        Returns:
-            List of file paths (strings).  Empty list on error.
-        """
-        client = self._get_client()
-        if client is None:
-            return []
-        try:
-            response = client.storage.from_(bucket).list(prefix)
-            return [item.get("name", "") for item in (response or []) if item.get("name")]
-        except Exception as exc:
-            logger.error("❌ [JrvsCloud] list(%s/%s) falhou: %s", bucket, prefix, exc)
-            return []
-
-    def delete(self, bucket: str, path: str) -> bool:
-        """Delete *path* from *bucket*.
-
-        Args:
-            bucket: Supabase Storage bucket name.
-            path:   Remote path to delete.
-
-        Returns:
-            ``True`` on success, ``False`` otherwise.
-        """
-        client = self._get_client()
-        if client is None:
+    """Armazena e sincroniza arquivos .jrvs no Supabase Storage."""
+    
+    def __init__(self):
+        super().__init__()
+        self._client: Optional[Client] = None
+        self._bucket_global = "jrvs-global"
+        self._bucket_users = "jrvs-users"
+    
+    def configure(self, config: dict):
+        """Configura cliente Supabase."""
+        if not _SUPABASE_AVAILABLE:
+            return
+        
+        supabase_url = config.get("supabase_url")
+        supabase_key = config.get("supabase_key")
+        
+        if supabase_url and supabase_key:
+            try:
+                self._client = create_client(supabase_url, supabase_key)
+                logger.info("[JrvsCloudStorage] Conectado ao Supabase Storage")
+            except Exception as e:
+                logger.error("[JrvsCloudStorage] Falha ao conectar: %s", e)
+    
+    def upload(self, bucket: str, path: str, data: bytes) -> bool:
+        """Upload de arquivo para Supabase Storage."""
+        if not self._client:
+            logger.warning("[JrvsCloudStorage] Cliente não configurado — upload local apenas")
             return False
+        
         try:
-            client.storage.from_(bucket).remove([path])
-            logger.debug("🗑️  [JrvsCloud] Deleted %s/%s", bucket, path)
+            self._client.storage.from_(bucket).upload(path, data, {"content-type": "application/octet-stream"})
+            logger.debug("[JrvsCloudStorage] Upload: %s/%s", bucket, path)
             return True
-        except Exception as exc:
-            logger.error("❌ [JrvsCloud] delete(%s/%s) falhou: %s", bucket, path, exc)
+        except Exception as e:
+            logger.error("[JrvsCloudStorage] Upload falhou: %s", e)
             return False
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _get_client(self):
-        """Return the shared Supabase client or ``None``."""
-        try:
-            from app.adapters.infrastructure.supabase_client import get_supabase_client
-
-            return get_supabase_client()
-        except Exception:
+    
+    def download(self, bucket: str, path: str) -> Optional[bytes]:
+        """Download de arquivo do Supabase Storage."""
+        if not self._client:
             return None
+        
+        try:
+            data = self._client.storage.from_(bucket).download(path)
+            logger.debug("[JrvsCloudStorage] Download: %s/%s", bucket, path)
+            return data
+        except Exception as e:
+            logger.warning("[JrvsCloudStorage] Download falhou: %s", e)
+            return None
+    
+    def list_files(self, bucket: str, prefix: str = "") -> List[str]:
+        """Lista arquivos no bucket."""
+        if not self._client:
+            return []
+        
+        try:
+            files = self._client.storage.from_(bucket).list(path=prefix)
+            return [f["name"] for f in files] if files else []
+        except Exception as e:
+            logger.error("[JrvsCloudStorage] List falhou: %s", e)
+            return []
+    
+    def delete(self, bucket: str, path: str) -> bool:
+        """Remove arquivo do Supabase Storage."""
+        if not self._client:
+            return False
+        
+        try:
+            self._client.storage.from_(bucket).remove([path])
+            logger.debug("[JrvsCloudStorage] Delete: %s/%s", bucket, path)
+            return True
+        except Exception as e:
+            logger.error("[JrvsCloudStorage] Delete falhou: %s", e)
+            return False
+    
+    def save_training_sample(self, sample: dict, user_id: str, scope: str):
+        """Salva sample de treino no bucket apropriado."""
+        bucket = self._bucket_global if scope == "global" else self._bucket_users
+        path = f"training/{user_id}/{datetime.now().strftime('%Y/%m/%d')}/{sample.get('timestamp', 'unknown')}.json"
+        
+        data = f"{json.dumps(sample)}\n".encode("utf-8")
+        self.upload(bucket, path, data)
+    
+    def sync_local_to_cloud(self, local_path: Path, bucket: str, cloud_prefix: str) -> int:
+        """Sincroniza arquivos locais para cloud."""
+        if not self._client:
+            return 0
+        
+        synced = 0
+        for file_path in local_path.glob("*.jrvs"):
+            data = file_path.read_bytes()
+            cloud_path = f"{cloud_prefix}/{file_path.name}"
+            
+            # Verifica se já existe (hash comparison)
+            existing = self.download(bucket, cloud_path)
+            if existing and hashlib.sha256(existing).hexdigest() == hashlib.sha256(data).hexdigest():
+                continue
+            
+            if self.upload(bucket, cloud_path, data):
+                synced += 1
+        
+        logger.info("[JrvsCloudStorage] %d arquivos sincronizados", synced)
+        return synced
