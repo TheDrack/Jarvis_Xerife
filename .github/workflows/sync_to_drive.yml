@@ -25,7 +25,8 @@ jobs:
             google-api-python-client \
             google-auth-httplib2 \
             google-auth-oauthlib \
-            pyyaml
+            pyyaml \
+            aiohttp>=3.9.0
 
       - name: ☁️ Run JARVIS Pipeline (Sync Drive & Backups)
         env:
