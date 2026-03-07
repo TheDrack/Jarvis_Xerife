@@ -1,226 +1,176 @@
+
 # -*- coding: utf-8 -*-
 """FineTuneDatasetCollector — coleta e formata pares de treino para fine-tuning LoRA.
 
 Responsabilidade: coletar pares (prompt, código gerado) aprovados pelo sistema de
 recompensa e formatá-los no padrão de fine-tuning do Qwen/Llama.
-
-Método principal::
-
-    collector.collect(min_reward=0.7) → List[dict]
-    collector.export_dataset(output_path) → str
 """
-
 import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-
 from app.core.nexus import NexusComponent, nexus
 
 logger = logging.getLogger(__name__)
 
+_DATASET_DIR = Path("data/finetune")
+_GLOBAL_DIR = _DATASET_DIR / "global"
+_USERS_DIR = _DATASET_DIR / "users"
 
 class FineTuneDatasetCollector(NexusComponent):
-    """Coleta pares de treino para fine-tuning do modelo local.
-
-    Configurável via ``configure(config)``:
-        min_reward (float, padrão 0.7): threshold mínimo de reward para incluir o ciclo.
-        max_thoughts (int, padrão 500): limite de ThoughtLogs a consultar por coleta.
-
-    Filtragem de reward — dois limiares são aplicados em conjunto:
-        _REWARD_FLOOR (0.6): mínimo absoluto inviolável para o campo ``reward_received``
-            do ThoughtLog (produzido pelo sistema de métricas reais).
-        min_reward (padrão 0.7): threshold configurável; o limiar efetivo é
-            ``max(min_reward, _REWARD_FLOOR)``.
-
-    Cada par JSONL inclui campo "reward" com o valor de ``reward_received`` do ThoughtLog.
-    """
-
-    # Limiar absoluto para o campo reward do novo sistema de métricas reais
-    _REWARD_FLOOR: float = 0.6
-
-    def __init__(self) -> None:
-        self.min_reward: float = 0.7
-        self.max_thoughts: int = 500
-        self._last_reward: Optional[float] = None
-
-    def configure(self, config: Dict[str, Any]) -> None:
-        """Configura o coletor via dicionário."""
-        self.min_reward = float(config.get("min_reward", self.min_reward))
-        self.max_thoughts = int(config.get("max_thoughts", self.max_thoughts))
-
-    def set_last_reward(self, reward: float) -> None:
-        """Registra o reward calculado pelo RewardSignalProvider para o ciclo atual.
-
-        Chamado pelo EvolutionGatekeeper após aprovar uma evolução.
-
-        Args:
-            reward: Reward normalizado (0.0–1.0) calculado com métricas reais.
-        """
-        self._last_reward = reward
-        logger.debug("[FineTuneDatasetCollector] Last reward registrado: %.4f", reward)
-
-    def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
-        """Sempre pronto para executar."""
-        return True
-
-    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Executa coleta e exportação.
-
-        Campos aceitos em *context*:
-            min_reward (float): sobrescreve o threshold mínimo de reward.
-            output_path (str):  caminho para exportação (padrão auto-gerado).
-
-        Returns:
-            ``{"success": bool, "pair_count": int, "output_path": str}``
-        """
-        ctx = context or {}
-        min_reward = float(ctx.get("min_reward", self.min_reward))
-        pairs = self.collect(min_reward=min_reward)
-
-        output_path = ctx.get("output_path")
-        if not output_path:
-            ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            output_path = f"data/finetune/dataset_{ts}.jsonl"
-
-        exported = self.export_dataset(output_path, pairs=pairs)
-        return {"success": True, "pair_count": len(pairs), "output_path": exported}
-
-    def collect(self, min_reward: Optional[float] = None) -> List[Dict[str, Any]]:
-        """Coleta pares de treino com reward total acima de ``min_reward``.
-
-        Para cada ciclo aprovado, recupera do ThoughtLogService o par
-        (prompt enviado ao LLM, código gerado) e formata no padrão de
-        fine-tuning do Qwen/Llama.
-
-        Args:
-            min_reward: Threshold mínimo de reward (None = usa self.min_reward).
-
-        Returns:
-            Lista de pares ``{"instruction": str, "output": str}``.
-        """
-        threshold = min_reward if min_reward is not None else self.min_reward
-        pairs: List[Dict[str, Any]] = []
-
-        # Obtém ThoughtLogs de ciclos bem-sucedidos
-        thoughts = self._get_successful_thoughts(threshold)
-
-        for thought in thoughts:
-            prompt = self._extract_prompt(thought)
-            code = self._extract_code(thought)
-            if prompt and code:
-                reward_value = self._extract_reward(thought)
-                pairs.append({
-                    "instruction": prompt,
-                    "output": code,
-                    "reward": reward_value,
-                })
-
-        logger.info("[FineTuneDatasetCollector] Coletados %d pares (threshold=%.2f).", len(pairs), threshold)
-        return pairs
-
-    def export_dataset(
-        self, output_path: str, pairs: Optional[List[Dict[str, Any]]] = None
-    ) -> str:
-        """Serializa os pares coletados em formato JSONL.
-
-        Args:
-            output_path: Caminho do arquivo de saída (incluindo extensão .jsonl).
-            pairs:       Pares a exportar. Se None, chama ``collect()`` primeiro.
-
-        Returns:
-            Caminho absoluto do arquivo gerado.
-        """
-        if pairs is None:
-            pairs = self.collect()
-
-        path = Path(output_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-
-        with path.open("w", encoding="utf-8") as f:
-            for pair in pairs:
-                f.write(json.dumps(pair, ensure_ascii=False) + "\n")
-
-        logger.info("[FineTuneDatasetCollector] Dataset exportado: %s (%d pares).", path, len(pairs))
-        return str(path.resolve())
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _get_successful_thoughts(self, min_reward: float) -> List[Any]:
-        """Obtém ThoughtLogs de ciclos bem-sucedidos com reward acima do threshold."""
-        try:
-            tls = nexus.resolve("thought_log_service")
-            if tls is None:
-                logger.debug("[FineTuneDatasetCollector] ThoughtLogService indisponível.")
-                return []
-
-            # Obtém todos os pensamentos recentes (sem filtro de status — filtramos abaixo)
-            if hasattr(tls, "get_recent_thoughts"):
-                thoughts = tls.get_recent_thoughts(limit=self.max_thoughts)
-            else:
-                return []
-
-            # Filtra apenas os bem-sucedidos
-            successful = [t for t in thoughts if self._is_successful(t, min_reward)]
-            return successful
-        except Exception as exc:
-            logger.debug("[FineTuneDatasetCollector] Erro ao obter ThoughtLogs: %s", exc)
+    """Coleta pares de treino para fine-tuning do modelo local."""
+    
+    def __init__(self):
+        super().__init__()
+        self._global_dir = _GLOBAL_DIR
+        self._users_dir = _USERS_DIR
+        self._global_dir.mkdir(parents=True, exist_ok=True)
+        self._users_dir.mkdir(parents=True, exist_ok=True)
+    
+    def collect(self, min_reward: float = 0.7) -> List[dict]:
+        """Coleta pares com reward >= min_reward do ThoughtLog."""
+        thought_log = nexus.resolve("thought_log_service")
+        if thought_log is None:
+            logger.warning("[FineTuneCollector] ThoughtLogService indisponível.")
             return []
-
-    def _is_successful(self, thought: Any, min_reward: float) -> bool:
-        """Verifica se o ThoughtLog representa um ciclo de sucesso."""
-        # Verifica campo success direto
-        if hasattr(thought, "success"):
-            success = thought.success
+        
+        samples = []
+        logs = thought_log.get_last_n_entries(1000)
+        for log in logs:
+            reward = log.get("reward", 0.0)
+            if reward >= min_reward:
+                sample = {
+                    "prompt": log.get("prompt", ""),
+                    "completion": log.get("completion", ""),
+                    "reward": reward,
+                    "scope": self._classify_scope(log.get("prompt", ""), log.get("completion", "")),
+                    "user_id": log.get("user_id", "system"),
+                    "timestamp": log.get("timestamp", datetime.now(timezone.utc).isoformat())
+                }
+                samples.append(sample)
+        
+        logger.info("[FineTuneCollector] %d pares coletados com reward >= %.2f", len(samples), min_reward)
+        return samples
+    
+    def collect_from_interaction(self, user_id: str, prompt: str, 
+                                  completion: str, outcome: str, 
+                                  source: str, feedback: Optional[str] = None):
+        """Coleta interações de Telegram/HUD para fine-tuning.
+        
+        ADIÇÃO: Método novo para integração com interfaces.
+        """
+        reward_signal = nexus.resolve("reward_signal_provider")
+        if reward_signal is None:
+            logger.warning("[FineTuneCollector] RewardSignalProvider indisponível.")
+            return
+        
+        reward = reward_signal.calculate_interaction_reward(outcome, feedback)
+        if reward >= 0.6:
+            sample = {
+                "user_id": user_id,
+                "prompt": prompt,
+                "completion": completion,
+                "reward": reward,
+                "scope": self._classify_scope(prompt, completion),
+                "source": source,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            self._append_to_jsonl(sample, user_id=user_id)
+            
+            # Data augmentation se reward >= 0.7
+            if reward >= 0.7:
+                self._augment_with_llm(sample, user_id)
+    
+    def _classify_scope(self, prompt: str, completion: str) -> str:
+        """Define se o aprendizado é pessoal ou global."""
+        personal_keywords = ["prefiro", "meu", "minha", "eu gosto", "para mim", "meu estilo"]
+        global_keywords = ["bug", "performance", "arquitetura", "teste", "api", "capability", "cap-"]
+        
+        text = f"{prompt} {completion}".lower()
+        
+        if any(kw in text for kw in personal_keywords):
+            return "personal"
+        elif any(kw in text for kw in global_keywords):
+            return "global"
         else:
-            success = thought.get("success", False) if isinstance(thought, dict) else False
-
-        if not success:
-            return False
-
-        # Verifica reward se disponível
-        reward = None
-        if hasattr(thought, "reward_received"):
-            reward = thought.reward_received
-        elif hasattr(thought, "reward_value"):
-            reward = thought.reward_value
-        elif isinstance(thought, dict):
-            reward = thought.get("reward_received", thought.get("reward_value"))
-
-        if reward is not None:
-            # Aplica threshold mínimo configurado E o floor absoluto de 0.6
-            return float(reward) >= max(min_reward, self._REWARD_FLOOR)
-
-        # Sem reward registrado = inclui (ciclo bem-sucedido)
-        return True
-
-    def _extract_reward(self, thought: Any) -> float:
-        """Extrai o valor de reward do ThoughtLog."""
-        if hasattr(thought, "reward_received"):
-            val = thought.reward_received
-        elif hasattr(thought, "reward_value"):
-            val = thought.reward_value
-        elif isinstance(thought, dict):
-            val = thought.get("reward_received", thought.get("reward_value", 0.0))
+            return "global"
+    
+    def _append_to_jsonl(self, sample: dict, user_id: str):
+        """Armazena sample em arquivo JSONL separado por usuário/escopo."""
+        scope = sample.get("scope", "global")
+        
+        if scope == "global":
+            file_path = self._global_dir / f"experiences_{datetime.now().strftime('%Y%m')}.jsonl"
         else:
-            val = 0.0
-        return float(val) if val is not None else 0.0
-
-    def _extract_prompt(self, thought: Any) -> str:
-        """Extrai o prompt enviado ao LLM do ThoughtLog."""
-        if hasattr(thought, "problem_description"):
-            return str(thought.problem_description or "")
-        if isinstance(thought, dict):
-            return str(thought.get("problem_description", thought.get("prompt", "")))
-        return ""
-
-    def _extract_code(self, thought: Any) -> str:
-        """Extrai o código gerado do ThoughtLog."""
-        if hasattr(thought, "solution_attempt"):
-            return str(thought.solution_attempt or "")
-        if isinstance(thought, dict):
-            return str(thought.get("solution_attempt", thought.get("code", "")))
-        return ""
+            user_dir = self._users_dir / user_id
+            user_dir.mkdir(parents=True, exist_ok=True)
+            file_path = user_dir / f"preferences_{datetime.now().strftime('%Y%m')}.jsonl"
+        
+        with open(file_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(sample, ensure_ascii=False) + "\n")
+        
+        logger.debug("[FineTuneCollector] Sample salvo em %s", file_path)
+    
+    async def _augment_with_llm(self, base_sample: dict, user_id: str):
+        """Gera 3 variações sintéticas de um exemplo válido via LLM."""
+        llm_router = nexus.resolve("llm_router")
+        if llm_router is None:
+            return
+        
+        prompt = f"""Base: "{base_sample['prompt']}" → "{base_sample['completion']}"
+Gere 3 variações do comando do usuário com mesma intenção, formuladas diferente.
+Retorne apenas JSON: {{"variations": ["var1", "var2", "var3"]}}"""
+        
+        try:
+            result = await llm_router.execute({
+                "prompt": prompt,
+                "task_type": "data_augmentation",
+                "require_json": True
+            })
+            
+            variations = json.loads(result.get("response", "{}")).get("variations", [])
+            for var in variations[:3]:
+                aug_sample = {**base_sample, "prompt": var, "synthetic": True}
+                self._append_to_jsonl(aug_sample, user_id=user_id)
+            
+            logger.info("[FineTuneCollector] %d variações geradas via LLM", len(variations[:3]))
+        except Exception as e:
+            logger.warning("[FineTuneCollector] Augmentation falhou: %s", e)
+    
+    def export_dataset(self, output_path: str, user_id: Optional[str] = None) -> str:
+        """Exporta dataset consolidado para fine-tuning."""
+        samples = []
+        
+        # Global samples
+        for file_path in self._global_dir.glob("*.jsonl"):
+            with open(file_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    samples.append(json.loads(line))
+        
+        # User samples se especificado
+        if user_id:
+            user_dir = self._users_dir / user_id
+            for file_path in user_dir.glob("*.jsonl"):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        samples.append(json.loads(line))
+        
+        # Formato Qwen/Llama
+        formatted = []
+        for sample in samples:
+            formatted.append({
+                "messages": [
+                    {"role": "user", "content": sample["prompt"]},
+                    {"role": "assistant", "content": sample["completion"]}
+                ],
+                "reward": sample["reward"]
+            })
+        
+        output_file = Path(output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(formatted, f, indent=2, ensure_ascii=False)
+        
+        logger.info("[FineTuneCollector] Dataset exportado: %s (%d samples)", output_path, len(formatted))
+        return output_path
