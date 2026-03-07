@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 import os
 import yaml
@@ -57,13 +58,16 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False):
             if hasattr(instance, "configure"):
                 instance.configure(component_config)
 
+            # ← ADIÇÃO CRÍTICA: Injeta config do YAML no contexto para o componente acessar
+            context["config"] = component_config
+
             # Verifica pré-condição antes de executar
             if hasattr(instance, "can_execute") and not instance.can_execute(context):
                 logging.info("[PIPELINE] Componente '%s' pulado (can_execute=False)", name)
                 continue
 
             logging.info(f"⚙️ Executando: {name}...")
-            
+
             # Execução do componente
             updated_context = instance.execute(context)
 
@@ -79,7 +83,7 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False):
             if is_strict:
                 logging.error("🛑 Strict Mode Ativo: Interrompendo pipeline.")
                 raise e
-            
+
             # Se não for strict, limpa o result para o próximo componente não tentar ler lixo
             context["result"] = {"error": str(e), "source": name}
             logging.warning(f"⚠️ {name} falhou, mas o pipeline continua (Strict: False).")
