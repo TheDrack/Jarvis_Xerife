@@ -165,3 +165,20 @@ class JrvsCloudStorage(NexusComponent):
             return get_supabase_client()
         except Exception:
             return None
+# ------------------------------------------------------------------
+    # ADIÇÃO OPCIONAL: Método para salvar samples de treino
+    # ------------------------------------------------------------------
+    
+    def save_training_sample(self, sample: dict, user_id: str, scope: str):
+        """Salva sample de treino no bucket apropriado.
+        
+        ADIÇÃO: Método novo para integração com FineTuneDatasetCollector.
+        """
+        import json
+        from datetime import datetime
+        
+        bucket = "jrvs-global" if scope == "global" else "jrvs-users"
+        path = f"training/{user_id}/{datetime.now().strftime('%Y/%m/%d')}/{sample.get('timestamp', 'unknown')}.json"
+        
+        data = f"{json.dumps(sample)}\n".encode("utf-8")
+        self.upload(bucket, path, data)
