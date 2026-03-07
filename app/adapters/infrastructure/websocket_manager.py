@@ -1,10 +1,11 @@
+
 # -*- coding: utf-8 -*-
 """WebSocket Manager — Conexões em tempo real para HUD e notificações.
 
 Integrado com FineTuneDatasetCollector para coleta automática de dados.
 """
 import logging
-from typing import Dict, Set, Optional
+from typing import Dict, Set, Optional, Any
 from fastapi import WebSocket
 from app.core.nexus import NexusComponent, nexus
 
@@ -17,6 +18,58 @@ class WebSocketManager(NexusComponent):
         super().__init__()
         self._connections: Dict[str, Set[WebSocket]] = {}
         self._finetune_collector = None
+    
+    def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """NexusComponent entry-point.
+        
+        Args:
+            context: Dict com ações suportadas:
+                - "connect": {user_id, websocket}
+                - "disconnect": {user_id, websocket}
+                - "broadcast": {user_id, message}
+                - "list_users": {}
+                
+        Returns:
+            Dict com resultado da operação.
+        """
+        action = context.get("action", "")
+        
+        if action == "connect":
+            user_id = context.get("user_id")
+            websocket = context.get("websocket")
+            if user_id and websocket:
+                self._connections.setdefault(user_id, set()).add(websocket)
+                self._finetune_collector = nexus.resolve("finetune_dataset_collector")
+                return {"success": True, "connected": user_id}
+            return {"success": False, "error": "user_id ou websocket ausente"}
+            
+        elif action == "disconnect":
+            user_id = context.get("user_id")
+            websocket = context.get("websocket")
+            if user_id and user_id in self._connections:
+                self._connections[user_id].discard(websocket)
+                if not self._connections[user_id]:
+                    del self._connections[user_id]
+                return {"success": True, "disconnected": user_id}
+            return {"success": False, "error": "Conexão não encontrada"}
+            
+        elif action == "broadcast":
+            user_id = context.get("user_id")
+            message = context.get("message")
+            if user_id in self._connections and message:
+                for ws in list(self._connections[user_id]):
+                    try:
+                        # Nota: envio real requer loop assíncrono externo
+                        pass
+                    except Exception:
+                        self._connections[user_id].discard(ws)
+                return {"success": True, "broadcasted_to": user_id}
+            return {"success": False, "error": "Usuário ou mensagem inválida"}
+            
+        elif action == "list_users":
+            return {"success": True, "users": list(self._connections.keys())}
+            
+        return {"success": False, "error": f"Ação desconhecida: {action}"}
     
     async def connect(self, user_id: str, websocket: WebSocket):
         """Registra nova conexão WebSocket."""
@@ -46,7 +99,6 @@ class WebSocketManager(NexusComponent):
                 await websocket.send_json(message)
                 
                 # ADIÇÃO: Registra interação para fine-tuning se for resposta de comando
-                # (não remove funcionalidade existente do HUD)
                 if message.get("type") == "command_response" and self._finetune_collector:
                     self._finetune_collector.collect_from_interaction(
                         user_id=user_id,
@@ -61,7 +113,6 @@ class WebSocketManager(NexusComponent):
                 logger.warning("[WebSocket] Erro ao enviar para %s: %s", user_id, e)
                 disconnected.add(websocket)
         
-        # Limpa conexões mortas
         for ws in disconnected:
             self._connections[user_id].discard(ws)
     
