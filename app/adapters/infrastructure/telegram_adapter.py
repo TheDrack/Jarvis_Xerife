@@ -5,7 +5,7 @@
 Integrado com FineTuneDatasetCollector para coleta automática de dados.
 """
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from app.core.nexus import NexusComponent, nexus
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,6 @@ class TelegramAdapter(NexusComponent):
             return {"success": False, "error": "Token, chat_id ou texto ausente"}
 
         elif action == "start_polling":
-            # Polling é gerenciado externamente via webhook
             return {"success": True, "polling": "webhook_mode"}
 
         return {"success": False, "error": f"Ação desconhecida: {action}"}
@@ -119,14 +118,20 @@ class TelegramAdapter(NexusComponent):
     # ADIÇÃO: Métodos faltantes exigidos pelo main.py
     # ------------------------------------------------------------------
 
-    def start_polling(self):
+    def start_polling(self, callback: Optional[Callable] = None):
         """Inicia polling do Telegram (modo webhook — polling é gerenciado externamente).
         
         ADIÇÃO: Método stub para compatibilidade com bootstrap do main.py.
+        
+        Args:
+            callback: Função opcional para processar mensagens recebidas (modo polling).
+                     No modo webhook, este parâmetro é ignorado.
         """
         logger.info("[TelegramAdapter] Polling iniciado (modo webhook).")
         # Webhook é gerenciado pelo endpoint /v1/telegram/webhook no api_server.py
-        # Não há loop de polling ativo neste adapter
+        # Callback é usado apenas se implementarmos polling ativo no futuro
+        if callback:
+            logger.debug("[TelegramAdapter] Callback registrado para modo polling futuro.")
         return {"success": True, "mode": "webhook"}
 
     def stop_polling(self):
