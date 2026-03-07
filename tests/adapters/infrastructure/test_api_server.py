@@ -30,6 +30,12 @@ class TestAPIServer(NexusComponent):
         service.interpreter = Mock()
         return service
 
+    @pytest.fixture(autouse=True)
+    def set_admin_credentials(self, monkeypatch):
+        """Set env-var admin credentials so authentication tests work without Supabase."""
+        monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
+        monkeypatch.setenv("JARVIS_ADMIN_EMAIL", "admin@jarvis.local")
+
     @pytest.fixture
     def client(self, mock_assistant_service):
         """Create a test client with mocked service"""
@@ -433,6 +439,12 @@ class TestJarvisDispatchEndpoint(NexusComponent):
         worker = Mock()
         worker.trigger_repository_dispatch = Mock()
         return worker
+
+    @pytest.fixture(autouse=True)
+    def set_admin_credentials(self, monkeypatch):
+        """Set env-var admin credentials so authentication tests work without Supabase."""
+        monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
+        monkeypatch.setenv("JARVIS_ADMIN_EMAIL", "admin@jarvis.local")
 
     @pytest.fixture
     def client(self, mock_assistant_service, mock_github_worker):

@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 """Assistant router: /v1/execute, /v1/message, /v1/task, /v1/status, /v1/history"""
 
+import asyncio
 import logging
+from typing import Any, Dict
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 
@@ -21,6 +24,25 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+
+def _ws_notify(user: User, event_type: str, data: Dict[str, Any]) -> None:
+    """Fire-and-forget WebSocket notification to the user's HUD."""
+    try:
+        from app.core.nexus import nexus
+
+        manager = nexus.resolve("websocket_manager")
+        user_id = getattr(user, "user_id", None) or getattr(user, "username", "")
+        if not user_id or not manager.is_connected(user_id):
+            return
+        payload = {"type": event_type, "data": data}
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(manager.broadcast_to_user(user_id, payload))
+        else:
+            loop.run_until_complete(manager.broadcast_to_user(user_id, payload))
+    except Exception as exc:
+        logger.debug("[assistant] _ws_notify falhou silenciosamente: %s", exc)
 
 
 def create_assistant_router(assistant_service, db_adapter, get_current_user, limiter=None) -> APIRouter:
@@ -100,12 +122,15 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
                 f"Response for '{current_user.username}': success={response.success}, "
                 f"len={len(response.message) if response.message else 0}"
             )
-            return ExecuteResponse(
+            result = ExecuteResponse(
                 success=response.success,
                 message=response.message,
                 data=response.data,
                 error=response.error,
             )
+            # Push real-time status update to connected HUD (best-effort)
+            _ws_notify(current_user, "execute_complete", result.model_dump())
+            return result
         except Exception as e:
             logger.error(f"Error executing command: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

@@ -2,9 +2,10 @@
 """FastAPI Server for Headless Control Interface"""
 
 import logging
+from datetime import datetime as _datetime, timezone as _timezone
 from pathlib import Path
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, status
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import HTMLResponse, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -15,7 +16,6 @@ from slowapi.util import get_remote_address
 
 from app.adapters.infrastructure import api_models
 from app.adapters.infrastructure.api_models import Token, User
-from app.adapters.infrastructure.auth_adapter import AuthAdapter
 from app.adapters.infrastructure.routers.assistant import create_assistant_router
 from app.adapters.infrastructure.routers.bridge import create_bridge_router
 from app.adapters.infrastructure.routers.dev_agent import create_dev_agent_router
@@ -36,7 +36,8 @@ from app.core.nexus import nexus
 logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-auth_adapter = AuthAdapter()
+# All component instances are resolved through the Nexus DI container
+auth_adapter = nexus.resolve("auth_adapter")
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
@@ -56,6 +57,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         username=username,
         email=payload.get("email"),
         full_name=payload.get("full_name"),
+        user_id=payload.get("user_id"),
     )
 
 
@@ -154,6 +156,7 @@ def create_api_server(
                 "sub": user["username"],
                 "email": user["email"],
                 "full_name": user["full_name"],
+                "user_id": user.get("user_id", ""),
             }
         )
         return Token(access_token=access_token, token_type="bearer")
@@ -209,6 +212,36 @@ def create_api_server(
     app.include_router(create_bridge_router())
     app.include_router(create_utility_router(db_adapter, get_current_user))
     app.include_router(create_dev_agent_router())
+
+    # -- WebSocket endpoint for real-time HUD / notifications -------------------
+    ws_manager = nexus.resolve("websocket_manager")
+
+    @app.websocket("/ws/{user_id}")
+    async def websocket_endpoint(websocket: WebSocket, user_id: str):
+        """Real-time WebSocket channel for a specific user.
+
+        The HUD frontend connects here on mount and receives push notifications
+        for: ``evolution_complete``, ``error_alert``, ``mission_update``, and
+        any other events broadcast via :class:`WebSocketManager`.
+
+        Query Parameters:
+            user_id: Unique user identifier (UUID or username).
+
+        Messages sent by the server are JSON objects with at least a ``type``
+        field, e.g. ``{"type": "mission_update", "data": {...}}``.
+        """
+        await ws_manager.connect(user_id, websocket)
+        try:
+            while True:
+                data = await websocket.receive_text()
+                # Echo back a simple ack for keep-alive pings
+                await ws_manager.broadcast_to_user(
+                    user_id,
+                    {"type": "ack", "echo": data, "timestamp": _datetime.now(_timezone.utc).isoformat()},
+                )
+        except WebSocketDisconnect:
+            ws_manager.disconnect(user_id, websocket)
+            logger.info("WS disconnected: user=%s", user_id)
 
     return app
 

@@ -233,6 +233,60 @@ class DeviceOrchestratorService(SoldierProvider):
         """Shortcut: return only ONLINE Soldiers."""
         return self.list_soldiers(status_filter=SoldierStatus.ONLINE)
 
+    def dispatch(
+        self, task: Dict[str, Any], capability: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Route *task* to an available soldier that supports *capability*.
+
+        Lookup order:
+        1. :class:`~app.application.services.soldier_registry.SoldierRegistry`
+           — checks connected bridge devices by capability tag.
+        2. In-memory ``_registry`` — falls back to any ONLINE soldier when the
+           SoldierRegistry has no match or is unavailable.
+        3. Local / cloud execution — returns a fallback dict when no soldier
+           is reachable.
+
+        Args:
+            task:       Task dict with at least an ``"action"`` key.
+            capability: Optional capability tag to filter eligible soldiers.
+
+        Returns:
+            Dispatch result dict.
+        """
+        # --- 1. Try SoldierRegistry via Nexus (connected bridge soldiers) ---
+        try:
+            from app.core.nexus import nexus
+
+            registry = nexus.resolve("soldier_registry")
+            candidates = registry.get_available_soldiers(capability)
+            if candidates:
+                soldier_id = candidates[0]["soldier_id"]
+                logger.info(
+                    "🚀 [C2] dispatch → SoldierRegistry soldier '%s' (cap=%s)", soldier_id, capability
+                )
+                return {"success": True, "dispatched_to": soldier_id, "via": "soldier_registry", "task": task}
+        except Exception as exc:
+            logger.debug("[C2] SoldierRegistry lookup falhou: %s", exc)
+
+        # --- 2. Fallback: in-memory registry ---
+        online = self.list_active_soldiers()
+        if capability:
+            # DeviceOrchestratorService does not store capabilities — skip filter
+            pass
+        if online:
+            soldier_id = online[0].soldier_id
+            logger.info("🚀 [C2] dispatch → local registry soldier '%s'", soldier_id)
+            return {"success": True, "dispatched_to": soldier_id, "via": "local_registry", "task": task}
+
+        # --- 3. No soldiers available ---
+        logger.warning("⚠️ [C2] dispatch: nenhum soldado disponível para capability='%s'", capability)
+        return {
+            "success": False,
+            "error": "no_soldiers_available",
+            "capability": capability,
+            "task": task,
+        }
+
     def apply_telemetry(self, payload: TelemetryPayload) -> bool:
         """
         Merge a telemetry bundle into the registry entry for the sender.
