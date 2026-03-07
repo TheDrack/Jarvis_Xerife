@@ -24,6 +24,7 @@ json-repair>=0.25.0
 tiktoken>=0.5.0
 
 # API server
+slowapi>=0.1.9
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
