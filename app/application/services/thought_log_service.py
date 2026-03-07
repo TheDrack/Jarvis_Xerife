@@ -32,14 +32,16 @@ class ThoughtLogService(NexusComponent):
     
     MAX_RETRIES = 3  # Maximum retries before escalating to human
     
-    def __init__(self, engine):
-        """
-        Initialize the ThoughtLogService
-        
-        Args:
-            engine: SQLModel engine for database operations
-        """
-        self.engine = engine
+    def __init__(self, engine=None):  # ← engine é opcional (default=None)
+        super().__init__()
+        # CORREÇÃO: Lógica explícita para resolver engine via Nexus se não injetado
+        if engine is not None:
+            self.engine = engine
+        else:
+            db_adapter = nexus.resolve("db_adapter")
+            self.engine = getattr(db_adapter, "engine", None) if db_adapter else None
+    
+  
     
     def create_thought(
         self,
