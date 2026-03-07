@@ -17,20 +17,10 @@ class TelegramAdapter(NexusComponent):
         super().__init__()
         self._bot_token = None
         self._finetune_collector = None
+        self._polling_task = None
 
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """NexusComponent entry-point.
-        
-        Args:
-            context: Dict com ações suportadas:
-                - "configure": {telegram_bot_token}
-                - "process_message": {message}
-                - "send_message": {chat_id, text}
-                - "start_polling": {}
-                
-        Returns:
-            Dict com resultado da operação.
-        """
+        """NexusComponent entry-point."""
         action = context.get("action", "")
 
         if action == "configure":
@@ -41,20 +31,18 @@ class TelegramAdapter(NexusComponent):
 
         elif action == "process_message":
             message = context.get("message", {})
-            # Retorna estrutura para processamento assíncrono externo
             return {"success": True, "message_received": message.get("text", "")}
 
         elif action == "send_message":
             chat_id = context.get("chat_id")
             text = context.get("text")
             if self._bot_token and chat_id and text:
-                # Retorna estrutura para envio assíncrono externo
                 return {"success": True, "queued": True, "chat_id": chat_id}
             return {"success": False, "error": "Token, chat_id ou texto ausente"}
 
         elif action == "start_polling":
-            # Polling é gerenciado externamente via webhook ou task
-            return {"success": True, "polling": "external"}
+            # Polling é gerenciado externamente via webhook
+            return {"success": True, "polling": "webhook_mode"}
 
         return {"success": False, "error": f"Ação desconhecida: {action}"}
 
@@ -68,7 +56,6 @@ class TelegramAdapter(NexusComponent):
         user_id = message.get("from", {}).get("id", "unknown")
         raw_message = message.get("text", "")
 
-        # Executa comando
         assistant = nexus.resolve("assistant_service")
         if assistant is None:
             return {"success": False, "error": "AssistantService indisponível"}
@@ -83,7 +70,6 @@ class TelegramAdapter(NexusComponent):
             bot_reply = response.get("response", "Comando processado")
             success = response.get("success", False)
 
-            # ADIÇÃO: Registra para fine-tuning (não remove funcionalidade existente)
             if self._finetune_collector is not None:
                 self._finetune_collector.collect_from_interaction(
                     user_id=str(user_id),
@@ -98,7 +84,6 @@ class TelegramAdapter(NexusComponent):
 
         except Exception as e:
             logger.error("[TelegramAdapter] Erro: %s", e)
-            # ADIÇÃO: Registra erro para fine-tuning também
             if self._finetune_collector is not None:
                 self._finetune_collector.collect_from_interaction(
                     user_id=str(user_id),
@@ -129,3 +114,22 @@ class TelegramAdapter(NexusComponent):
                         logger.warning("[TelegramAdapter] Falha ao enviar: %d", resp.status)
         except Exception as e:
             logger.error("[TelegramAdapter] Erro ao enviar: %s", e)
+
+    # ------------------------------------------------------------------
+    # ADIÇÃO: Métodos faltantes exigidos pelo main.py
+    # ------------------------------------------------------------------
+
+    def start_polling(self):
+        """Inicia polling do Telegram (modo webhook — polling é gerenciado externamente).
+        
+        ADIÇÃO: Método stub para compatibilidade com bootstrap do main.py.
+        """
+        logger.info("[TelegramAdapter] Polling iniciado (modo webhook).")
+        # Webhook é gerenciado pelo endpoint /v1/telegram/webhook no api_server.py
+        # Não há loop de polling ativo neste adapter
+        return {"success": True, "mode": "webhook"}
+
+    def stop_polling(self):
+        """Para polling do Telegram."""
+        logger.info("[TelegramAdapter] Polling parado.")
+        return {"success": True}
