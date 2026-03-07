@@ -1,102 +1,163 @@
-
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-JARVIS - Ponto de Entrada Principal (Ignição)
-Seguindo o Protocolo de Simbiose: "Operamos como um só."
+Jarvis Assistant - Main Entry Point (Cloud/Edge)
+Versão 2026.03: Nexus Auto-Cura + Notificação Dinâmica de Startup.
 """
-
 import asyncio
+import logging
 import os
 import sys
+import threading
 import time
+import uvicorn
+from fastapi import FastAPI
+
+# Imports de configuração e núcleo
+from app.adapters.infrastructure import create_api_server
+from app.bootstrap_edge import main as edge_main
+from app.core.config import settings
 from app.core.nexus import nexus
 
-def bootstrap():
+# Proactive core (Overwatch Daemon)
+try:
+    from app.adapters.infrastructure.overwatch_adapter import OverwatchDaemon
+    _OVERWATCH_AVAILABLE = True
+except ImportError:
+    _OVERWATCH_AVAILABLE = False
+
+# Configuração de Log otimizada
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+def is_running_on_cloud():
+    return (
+        os.getenv("RENDER") == "true" or
+        os.getenv("PYTHON_ENV") == "production" or
+        not sys.stdin.isatty()
+    )
+
+
+async def send_dynamic_startup_notification():
     """
-    Prepara a carga e o destino. 
-    O Nexus fornece o veículo (Componentes) e o trajeto (Orquestração).
+    Tenta localizar qualquer interface ativa para avisar que o Jarvis subiu.
+    Função async para await correto de corrotinas de adaptadores.
     """
-    print("\n" + "="*50)
-    print("  JARVIS - PROTOCOLO DE IGNIÇÃO INICIADO")
-    print("="*50)
-
-    try:
-        # 1. Resolver o Orquestrador (Isso dispara o discovery automático do Nexus)
-        orchestrator = nexus.resolve("orchestrator_service")
-
-        # 2. Capturar Ordem Inicial
-        user_order = input("\n👤 Senhor, qual a sua ordem? ")
-
-        # 3. Preparar Contexto de Execução
-        context = {
-            "input_text": user_order,
-            "metadata": {
-                "session_id": "jarvis_session_001",
-                "timestamp": time.time()
-            }
-        }
-
-        # 4. Execução Incondicional
-        result = orchestrator.execute(context)
-
-        # 5. Saída e Sincronização
-        if result.get("success"):
-            nexus.commit_memory()
-            print(f"\n🤖 [JARVIS]: {result.get('result', 'Missão cumprida.')}")
-        else:
-            print(f"\n💥 [ERRO]: {result.get('error')}")
-
-    except Exception as e:
-        print(f"❌ FALHA CRÍTICA NO BOOTSTRAP: {e}")
-        sys.exit(1)
-
-
-async def send_startup_notification():
-    """Envia notificação de inicialização via Telegram (assíncrono)."""
-    try:
-        adapter = nexus.resolve("telegram_adapter")
+    # Procura por qualquer componente que tenha o método de envio padrão    # Isso torna o sistema agnóstico: funciona com Telegram, WhatsApp, Discord, etc.
+    interfaces_to_try = ["telegram_adapter", "whatsapp_adapter", "discord_adapter"]
+    for interface_id in interfaces_to_try:
+        adapter = nexus.resolve(interface_id)
         if adapter and hasattr(adapter, "send_message"):
-            # Envia em background sem bloquear o bootstrap
-            task = asyncio.create_task(
-                adapter.send_message(
-                    chat_id=os.getenv("TELEGRAM_ADMIN_CHAT_ID", ""),
-                    text="🤖 Jarvis online. Sistemas operacionais."
+            # Tenta obter o ID de destino do ambiente
+            target_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("ADMIN_CHAT_ID")
+            if not target_id:
+                continue
+            try:
+                # CORREÇÃO CRÍTICA: await para coroutine async do adaptador
+                await adapter.send_message(
+                    target_id,
+                    "🤖 **JARVIS Online**\nSistemas cloud ativos e Nexus sincronizado."
                 )
-            )
-            # Aguarda brevemente para não travar o startup
-            await asyncio.wait_for(task, timeout=2.0)
-    except asyncio.TimeoutError:
-        # Timeout é aceitável — notificação é best-effort
-        pass
-    except Exception as e:
-        # Falha na notificação não deve quebrar o bootstrap
-        print(f"⚠️ Notificação Telegram falhou: {e}")
+                logger.info(f"📢 Notificação de inicialização enviada via {interface_id}.")
+                return True
+            except Exception as e:
+                logger.debug(f"Falha ao enviar via {interface_id}: {e}")
+    return False
 
 
-def start_polling_services():
-    """Inicia serviços em background (polling, daemons, etc.)."""
+def bootstrap_background_services():
+    """
+    THREAD ISOLADA: Realiza a varredura pesada (os.walk),
+    notifica o usuário e ativa o polling.
+    """
+    logger.info("🧵 [BOOTSTRAP] Iniciando varredura dinâmica do Nexus...")
+    
+    # Delay para estabilização no Render
+    if os.getenv("RENDER") == "true":
+        time.sleep(5)
+    
+    # PASSO 1: Inicia o Núcleo Proativo PRIMEIRO (não depende do Telegram)
+    _daemon_instance = None
+    if _OVERWATCH_AVAILABLE:
+        try:
+            _daemon_instance = OverwatchDaemon()
+            _daemon_instance.start()
+            logger.info("[PROACTIVE_CORE] OverwatchDaemon ativo em background.")
+        except Exception as e:
+            logger.warning(f"[PROACTIVE_CORE] Falha ao iniciar OverwatchDaemon: {e}")
+    
+    # PASSO 2: Resolve componentes de interface e inicia polling (bloqueante — deve ser último)
     try:
-        # Telegram polling (se configurado para modo polling)
+        assistant = nexus.resolve("assistant_service")
         telegram = nexus.resolve("telegram_adapter")
-        if telegram and hasattr(telegram, "start_polling"):
-            # start_polling é síncrono (stub webhook) — seguro chamar aqui
-            # Aceita callback opcional para compatibilidade
-            telegram.start_polling(callback=None)
+        
+        if assistant and telegram:
+            # Notificação Inteligente de Startup (async)            try:
+                # Executa a coroutine em um loop de evento temporário
+                asyncio.run(send_dynamic_startup_notification())
+            except RuntimeError:
+                # Já existe um event loop rodando (ex: Uvicorn)
+                # Cria task sem await para execução em background best-effort
+                try:
+                    loop = asyncio.get_event_loop()
+                    loop.create_task(send_dynamic_startup_notification())
+                except RuntimeError:
+                    # Fallback: ignora se não conseguir obter loop
+                    logger.debug("⚠️ Event loop indisponível para notificação startup")
+            
+            logger.info("✅ [NEXUS] Ecossistema localizado. Ativando Polling...")
+            
+            # Início do Loop de Interface
+            def telegram_callback(text, chat_id):
+                if _daemon_instance is not None:
+                    _daemon_instance.notify_activity()
+                return assistant.process_command(text, channel="telegram")
+            
+            # start_polling é bloqueante — deve ser a última chamada nesta thread
+            telegram.start_polling(callback=telegram_callback)
+        else:
+            logger.error("⚠️ [NEXUS] Falha crítica: Componentes vitais não localizados.")
     except Exception as e:
-        print(f"⚠️ Falha ao iniciar polling: {e}")
+        logger.error(f"❌ [BOOTSTRAP] Erro fatal na thread de serviços: {e}")
+
+
+def start_cloud_service():
+    print("=" * 60)
+    print("🤖 JARVIS ASSISTANT - MODO CLOUD ATIVO (API + NEXUS)")
+    print("=" * 60)
+    
+    # 1. Inicialização do Container e API Server (Imediato para Health Check)
+    from app.container import create_edge_container
+    container = create_edge_container(
+        wake_word=settings.wake_word,
+        language=settings.language,
+    )
+    
+    # Cria o servidor web imediatamente para o Render não dar timeout (Porta 10000)
+    app = create_api_server(container.assistant_service)
+    
+    # 2. DISPARO DO BOOTSTRAP EM SEGUNDO PLANO
+    # A thread cuida da busca pesada enquanto a porta 10000 responde /health
+    t = threading.Thread(
+        target=bootstrap_background_services,
+        daemon=True,
+        name="JarvisDiscovery"    )
+    t.start()
+    
+    # 3. Execução do Servidor Uvicorn
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 10000))
+    logger.info(f"🚀 [SERVER] Uvicorn subindo em {host}:{port}")
+    uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
 
 
 if __name__ == "__main__":
-    # 1. Enviar notificação de startup (assíncrono, non-blocking)
-    try:
-        asyncio.run(send_startup_notification())
-    except RuntimeError:
-        # Já existe um event loop (ex: em testes ou integrado ao Uvicorn)
-        # Ignora silenciosamente para não quebrar o bootstrap
-        pass
-
-    # 2. Iniciar serviços em background
-    start_polling_services()
-
-    # 3. Executar bootstrap principal (síncrono)
-    bootstrap()
+    if is_running_on_cloud():
+        start_cloud_service()
+    else:
+        # Modo Local/Edge (Bootstrap original para uso em hardware local)
+        edge_main()
