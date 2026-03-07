@@ -13,7 +13,9 @@ All methods degrade gracefully when Supabase is not configured, returning
 ``None`` / empty results without raising exceptions.
 """
 
+import json
 import logging
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from app.core.nexus import NexusComponent
@@ -35,6 +37,7 @@ class JrvsCloudStorage(NexusComponent):
     """
 
     def __init__(self, bucket: str = _DEFAULT_BUCKET) -> None:
+        super().__init__()
         self._bucket = bucket
 
     def execute(self, context: dict) -> dict:
@@ -44,8 +47,7 @@ class JrvsCloudStorage(NexusComponent):
 
         if action == "upload":
             data = context.get("data")
-            if isinstance(data, str):
-                data = data.encode()
+            if isinstance(data, str):                data = data.encode()
             ok = self.upload(self._bucket, path, data) is not None
             return {"success": ok}
         if action == "download":
@@ -94,8 +96,7 @@ class JrvsCloudStorage(NexusComponent):
         """Download *path* from *bucket* and return raw bytes.
 
         Args:
-            bucket: Supabase Storage bucket name.
-            path:   Remote path inside the bucket.
+            bucket: Supabase Storage bucket name.            path:   Remote path inside the bucket.
 
         Returns:
             File bytes or ``None`` if the file does not exist / Supabase
@@ -144,8 +145,7 @@ class JrvsCloudStorage(NexusComponent):
         """
         client = self._get_client()
         if client is None:
-            return False
-        try:
+            return False        try:
             client.storage.from_(bucket).remove([path])
             logger.debug("🗑️  [JrvsCloud] Deleted %s/%s", bucket, path)
             return True
@@ -161,7 +161,37 @@ class JrvsCloudStorage(NexusComponent):
         """Return the shared Supabase client or ``None``."""
         try:
             from app.adapters.infrastructure.supabase_client import get_supabase_client
-
             return get_supabase_client()
         except Exception:
             return None
+
+    # ------------------------------------------------------------------
+    # ADIÇÃO: Método para salvar samples de treino
+    # ------------------------------------------------------------------
+
+    def save_training_sample(self, sample: dict, user_id: str, scope: str) -> Optional[str]:
+        """Salva sample de treino no bucket apropriado.
+        
+        ADIÇÃO: Método novo para integração com FineTuneDatasetCollector.
+        
+        Args:
+            sample: Dicionário com dados do treino (prompt, completion, reward, etc.)
+            user_id: Identificador do usuário (para isolamento de dados pessoais)
+            scope: "global" ou "personal" — define o bucket de destino
+            
+        Returns:
+            Path do arquivo no bucket, ou None em caso de falha.
+        """
+        # Define bucket baseado no escopo
+        bucket = "jrvs-global" if scope == "global" else "jrvs-users"
+
+        # Gera path com estrutura hierárquica por usuário/data
+        timestamp = sample.get("timestamp", datetime.now(timezone.utc).isoformat())
+        safe_user_id = user_id.replace("/", "_")  # Previne path traversal
+        path = f"training/{safe_user_id}/{datetime.now(timezone.utc).strftime('%Y/%m/%d')}/{timestamp}.json"
+
+        # Converte sample para JSONL (uma linha por registro)
+        data = f"{json.dumps(sample, ensure_ascii=False)}\n".encode("utf-8")
+
+        # Upload via método existente (reusa lógica de retry, logging, etc.)
+        return self.upload(bucket, path, data)
