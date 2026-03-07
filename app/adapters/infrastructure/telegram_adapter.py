@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Optional, Dict, Any, Callable
 
-# Fallback seguro para aiohttp (permite import mesmo sem a lib instalada)
+# Fallback seguro para aiohttp
 try:
     import aiohttp
     _AIOHTTP_AVAILABLE = True
@@ -26,7 +26,6 @@ class TelegramAdapter(NexusComponent):
 
     def __init__(self):
         super().__init__()
-        # Fallback para variáveis de ambiente
         self._bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or os.getenv("TELEGRAM_TOKEN")
         self._chat_id = os.getenv("TELEGRAM_ADMIN_CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID")
         self._finetune_collector = None
@@ -86,13 +85,23 @@ class TelegramAdapter(NexusComponent):
             return {"success": False, "error": f"Arquivo não encontrado: {file_path}"}
 
         try:
-            url = f"https://api.telegram.org/bot{self._bot_token}/sendDocument"
+            # ← CORREÇÃO: Ler o conteúdo do arquivo para memória ANTES de abrir a sessão
             with open(file_path, "rb") as f:
-                form = aiohttp.FormData()
-                form.add_field("chat_id", chat_id)
-                form.add_field("document", f, filename=os.path.basename(file_path))
-                if caption:
-                    form.add_field("caption", caption)
+                file_content = f.read()
+            
+            url = f"https://api.telegram.org/bot{self._bot_token}/sendDocument"
+            
+            # Criar FormData com o conteúdo em memória (não file object)
+            form = aiohttp.FormData()
+            form.add_field("chat_id", chat_id)
+            form.add_field(
+                "document",
+                file_content,
+                filename=os.path.basename(file_path),
+                content_type="application/octet-stream"
+            )
+            if caption:
+                form.add_field("caption", caption)
 
             # Execução assíncrona em thread separada para não bloquear
             import asyncio
