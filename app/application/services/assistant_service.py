@@ -47,7 +47,8 @@ class AssistantService(NexusComponent):
         self._history_adapter = None
         self._memory_manager = None
         self._field_vision = None
-        self._vector_memory = None        self._decision_engine = None
+        self._vector_memory = None
+        self._decision_engine = None
         self.is_running = False
         self.wake_word = wake_word or getattr(settings, "wake_word", "xerife")
         self._command_history: List[Dict[str, Any]] = []
