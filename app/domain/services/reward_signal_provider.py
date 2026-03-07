@@ -1,3 +1,24 @@
+class FineTuneDatasetCollector:
+    """Coleta dados para fine-tuning."""
+    
+    def __init__(self):
+        pass
+    
+    def execute(self):
+        """Método de execução."""
+        raise NotImplementedError("Método execute não implementado")
+
+class FineTuneDatasetCollectorImpl(FineTuneDatasetCollector):
+    """Implementação do coletor de dados para fine-tuning."""
+    
+    def __init__(self):
+        super().__init__()
+    
+    def execute(self):
+        """Método de execução."""
+        # Implementação do método execute
+        pass
+
 # -*- coding: utf-8 -*-
 """RewardSignalProvider — calcula rewards baseados em métricas reais.
 
