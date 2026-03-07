@@ -161,24 +161,40 @@ class JrvsCloudStorage(NexusComponent):
         """Return the shared Supabase client or ``None``."""
         try:
             from app.adapters.infrastructure.supabase_client import get_supabase_client
-
             return get_supabase_client()
         except Exception:
             return None
-# ------------------------------------------------------------------
-    # ADIÇÃO OPCIONAL: Método para salvar samples de treino
+
     # ------------------------------------------------------------------
-    
-    def save_training_sample(self, sample: dict, user_id: str, scope: str):
+    # ADIÇÃO: Método para salvar samples de treino
+    # ------------------------------------------------------------------
+
+    def save_training_sample(self, sample: dict, user_id: str, scope: str) -> Optional[str]:
         """Salva sample de treino no bucket apropriado.
         
         ADIÇÃO: Método novo para integração com FineTuneDatasetCollector.
+        
+        Args:
+            sample: Dicionário com dados do treino (prompt, completion, reward, etc.)
+            user_id: Identificador do usuário (para isolamento de dados pessoais)
+            scope: "global" ou "personal" — define o bucket de destino
+            
+        Returns:
+            Path do arquivo no bucket, ou None em caso de falha.
         """
-        import json
         from datetime import datetime
         
+        # Define bucket baseado no escopo
         bucket = "jrvs-global" if scope == "global" else "jrvs-users"
-        path = f"training/{user_id}/{datetime.now().strftime('%Y/%m/%d')}/{sample.get('timestamp', 'unknown')}.json"
         
-        data = f"{json.dumps(sample)}\n".encode("utf-8")
-        self.upload(bucket, path, data)
+        # Gera path com estrutura hierárquica por usuário/data
+        timestamp = sample.get("timestamp", datetime.now().isoformat())
+        safe_user_id = user_id.replace("/", "_")  # Previne path traversal
+        path = f"training/{safe_user_id}/{datetime.now().strftime('%Y/%m/%d')}/{timestamp}.json"
+        
+        # Converte sample para JSONL (uma linha por registro)
+        import json
+        data = f"{json.dumps(sample, ensure_ascii=False)}\n".encode("utf-8")
+        
+        # Upload via método existente (reusa lógica de retry, logging, etc.)
+        return self.upload(bucket, path, data)
