@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 JARVIS - Ponto de Entrada Principal (Ignição)
@@ -6,6 +7,7 @@ Seguindo o Protocolo de Simbiose: "Operamos como um só."
 
 import os
 import sys
+import time  # ← ADIÇÃO: Import necessário para time.time()
 from app.core.nexus import nexus
 
 def bootstrap():
@@ -21,7 +23,7 @@ def bootstrap():
         # 1. Resolver o Orquestrador (Isso dispara o discovery automático do Nexus)
         # O Nexus já sabe olhar no seu disco e no Gist para achar o orchestrator_service.
         orchestrator = nexus.resolve("orchestrator_service")
-        
+
         # 2. Capturar Ordem Inicial
         user_order = input("\n👤 Senhor, qual a sua ordem? ")
 
@@ -30,7 +32,7 @@ def bootstrap():
             "input_text": user_order,
             "metadata": {
                 "session_id": "jarvis_session_001",
-                "timestamp": time.time() if 'time' in sys.modules else None
+                "timestamp": time.time()  # ← Agora funciona corretamente
             }
         }
 
