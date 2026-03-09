@@ -1,0 +1,91 @@
+name: 🧹 Cleanup Repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Simular limpeza sem deletar (dry-run)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      categories:
+        description: 'Categorias para limpar (ALL, frozen, demo_scripts, orphan_tests, empty_files)'
+        required: false
+        default: 'ALL'
+        type: string
+      create_backup:
+        description: 'Criar backup antes de deletar'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: 📥 Checkout do repositório
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: 🧹 Executar script de limpeza
+        id: cleanup
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          CATEGORIES: ${{ github.event.inputs.categories }}
+          CREATE_BACKUP: ${{ github.event.inputs.create_backup }}
+        run: |
+          python scripts/cleanup_repo.py \
+            --no-interactive \
+            --github-output \
+            --categories $CATEGORIES \
+            $([ "$DRY_RUN" = "true" ] && echo "--dry-run") \
+            $([ "$CREATE_BACKUP" = "true" ] && echo "--backup")
+
+      - name: 📊 Upload do backup (se criado)
+        if: steps.cleanup.outputs.backup_path != 'none' && github.event.inputs.create_backup == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanup-backup-${{ github.run_id }}
+          path: .backups/cleanup/*.tar.gz
+          retention-days: 30
+
+      - name: 📝 Commit das mudanças (se não for dry-run)
+        if: github.event.inputs.dry_run == 'false'
+        run: |
+          git config --local user.email "jarvis-bot@github.com"
+          git config --local user.name "JARVIS Cleanup Bot"
+          git add -A
+          git diff --staged --quiet || git commit -m "🧹 [JARVIS] Cleanup: removed $(echo ${{ steps.cleanup.outputs.files_deleted }}) useless files"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📋 Resumo no Step Summary
+        run: |
+          echo "## 🧹 Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Métrica | Valor |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Arquivos deletados | ${{ steps.cleanup.outputs.files_deleted }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Espaço liberado | ${{ steps.cleanup.outputs.size_freed_mb }} MB |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backup | ${{ steps.cleanup.outputs.backup_path }} |" >> $GITHUB_STEP_SUMMARY
