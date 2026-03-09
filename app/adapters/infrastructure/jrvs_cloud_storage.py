@@ -1,197 +1,203 @@
 # -*- coding: utf-8 -*-
-"""JRVS Cloud Storage Adapter — Supabase Storage backend for .jrvs snapshots.
-
-Provides upload / download / list / delete operations against the
-jrvs-snapshots bucket in Supabase Storage.
-
-The bucket must be created in the Supabase Dashboard first:
-    - Name:        jrvs-snapshots
-    - Public:      no
-    - Max file:    100 MB
-
-All methods degrade gracefully when Supabase is not configured, returning
-None / empty results without raising exceptions.
 """
-
-import json
+JRVS Cloud Storage Adapter — Supabase Storage backend for .jrvs snapshots.
+Responsabilidade: sincronizar arquivos .jrvs entre local e cloud (Supabase).
+Registrado no Nexus como: jrvs_cloud_storage
+"""
 import logging
-from datetime import datetime, timezone
-from typing import List, Optional
+import os
+from pathlib import Path
+from typing import List, Tuple, Optional, Dict, Any
+from datetime import datetime
 
+import requests
 from app.core.nexus import NexusComponent
+from app.utils.document_store import document_store
 
 logger = logging.getLogger(__name__)
 
+# Configurações padrão
 _DEFAULT_BUCKET = "jrvs-snapshots"
-_CONTENT_TYPE = "application/octet-stream"
+_DEFAULT_SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+_DEFAULT_SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 
 class JrvsCloudStorage(NexusComponent):
-    """Supabase Storage adapter for .jrvs snapshot files.
-
-    Usage::
-
-        storage = JrvsCloudStorage()
-        storage.upload("jrvs-snapshots", "data/nexus_registry.jrvs", raw_bytes)
-        data = storage.download("jrvs-snapshots", "data/nexus_registry.jrvs")
+    """
+    Adaptador de armazenamento em nuvem para snapshots .jrvs.
+    Implementa sincronização bidirecional com Supabase Storage.
     """
 
-    def __init__(self, bucket: str = _DEFAULT_BUCKET) -> None:
+    def __init__(self, bucket: str = _DEFAULT_BUCKET):
         super().__init__()
-        self._bucket = bucket
+        self.bucket = bucket
+        self.supabase_url = _DEFAULT_SUPABASE_URL
+        self.supabase_key = _DEFAULT_SUPABASE_KEY
+        self._enabled = bool(self.supabase_url and self.supabase_key)
 
-    def execute(self, context: dict) -> dict:
-        """NexusComponent entry-point.  Dispatches to upload/download based on context."""
-        action = (context or {}).get("action", "")
-        path = (context or {}).get("path", "")
+        if not self._enabled:
+            logger.warning("[JrvsCloudStorage] Credenciais Supabase não configuradas. Modo disabled.")
 
-        if action == "upload":
-            data = context.get("data")
-            if isinstance(data, str):                data = data.encode()
-            ok = self.upload(self._bucket, path, data) is not None
-            return {"success": ok}
-        if action == "download":
-            data = self.download(self._bucket, path)
-            return {"success": data is not None, "data": data}
-        if action == "list":
-            files = self.list(self._bucket, context.get("prefix", ""))
-            return {"success": True, "files": files}
-        if action == "delete":
-            ok = self.delete(self._bucket, path)
-            return {"success": ok}
+    def configure(self, config: Dict[str, Any]) -> None:
+        """Configura o adaptador via dicionário."""
+        self.bucket = config.get("bucket", self.bucket)
+        self.supabase_url = config.get("supabase_url", self.supabase_url)
+        self.supabase_key = config.get("supabase_key", self.supabase_key)
+        self._enabled = bool(self.supabase_url and self.supabase_key)
+        logger.info(f"[JrvsCloudStorage] Configurado: bucket={self.bucket}, enabled={self._enabled}")
 
-        return {"success": False, "error": f"Ação desconhecida: {action!r}"}
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def upload(self, bucket: str, path: str, data: bytes) -> Optional[str]:
-        """Upload *data* to *bucket*/*path* in Supabase Storage.
-
-        Args:
-            bucket: Supabase Storage bucket name.
-            path:   Remote path inside the bucket (e.g. ``"data/registry.jrvs"``).
-            data:   Raw bytes to upload.
-
-        Returns:
-            The storage path on success, or ``None`` on failure.
+    def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """        Executa sincronização baseada no contexto.
+        Ações suportadas: upload, download, sync_all, list
         """
-        client = self._get_client()
-        if client is None or not data:
-            return None
+        if not self._enabled:
+            return {"success": False, "error": "Cloud storage disabled - missing credentials"}
+
+        action = context.get("action", "sync_all")
+        data_dir = context.get("data_dir", "data")
+
         try:
-            client.storage.from_(bucket).upload(
-                path,
-                data,
-                {"content-type": _CONTENT_TYPE, "upsert": "true"},
-            )
-            logger.debug("☁️  [JrvsCloud] Uploaded %s → %s/%s", len(data), bucket, path)
-            return path
-        except Exception as exc:
-            logger.error("❌ [JrvsCloud] upload(%s/%s) falhou: %s", bucket, path, exc)
-            return None
+            if action == "upload":
+                files = self._upload_file(context.get("path"))
+                return {"success": True, "uploaded": files}
+            elif action == "download":
+                files = self._download_file(context.get("path"))
+                return {"success": True, "downloaded": files}
+            elif action == "sync_all":
+                uploaded, downloaded = self._sync_all(data_dir)
+                return {"success": True, "uploaded": uploaded, "downloaded": downloaded}
+            elif action == "list":
+                files = self._list_files()
+                return {"success": True, "files": files}
+            else:
+                return {"success": False, "error": f"Ação desconhecida: {action}"}
+        except Exception as e:
+            logger.error(f"[JrvsCloudStorage] Erro na execução: {e}")
+            return {"success": False, "error": str(e)}
 
-    def download(self, bucket: str, path: str) -> Optional[bytes]:
-        """Download *path* from *bucket* and return raw bytes.
+    def _get_headers(self) -> Dict[str, str]:
+        """Retorna headers de autenticação para Supabase."""
+        return {
+            "apikey": self.supabase_key,
+            "Authorization": f"Bearer {self.supabase_key}",
+            "Content-Type": "application/json"
+        }
 
-        Args:
-            bucket: Supabase Storage bucket name.            path:   Remote path inside the bucket.
-
-        Returns:
-            File bytes or ``None`` if the file does not exist / Supabase
-            is unavailable.
+    def _upload_file(self, file_path: Optional[str] = None) -> List[str]:
         """
-        client = self._get_client()
-        if client is None:
-            return None
+        Faz upload de um arquivo .jrvs específico ou de todos no diretório data.
+        """
+        uploaded = []
+
+        if file_path:
+            paths = [Path(file_path)]
+        else:
+            data_dir = Path("data")
+            paths = list(data_dir.rglob("*.jrvs"))
+
+        for path in paths:
+            try:                relative_path = path.as_posix()
+                cloud_path = relative_path.replace("/", "-")  # Normaliza para cloud
+
+                with open(path, "rb") as f:
+                    file_content = f.read()
+
+                # Supabase Storage API (upload)
+                url = f"{self.supabase_url}/storage/v1/object/{self.bucket}/{cloud_path}"
+                headers = self._get_headers()
+                headers["Content-Type"] = "application/octet-stream"
+
+                response = requests.put(url, headers=headers, data=file_content)
+
+                if response.status_code in (200, 201, 409):  # 409 = já existe
+                    uploaded.append(relative_path)
+                    logger.info(f"☁️ [JrvsCloudStorage] Upload: {relative_path}")
+                else:
+                    logger.error(f"❌ [JrvsCloudStorage] Upload falhou {relative_path}: {response.status_code}")
+                    response.raise_for_status()
+
+            except requests.exceptions.RequestException as e:
+                if not (hasattr(e, 'response') and e.response is not None and e.response.status_code == 409):
+                    logger.error(f"❌ [JrvsCloudStorage] Erro na requisição upload: {e}")
+                raise e
+
+        return uploaded
+
+    def _download_file(self, file_path: Optional[str] = None) -> List[str]:
+        """
+        Faz download de um arquivo .jrvs específico ou de todos do bucket.
+        """
+        downloaded = []
+
+        if file_path:
+            cloud_paths = [file_path.replace("/", "-")]
+        else:
+            # Lista todos os arquivos do bucket
+            cloud_paths = self._list_files()
+
+        for cloud_path in cloud_paths:
+            try:
+                # Converte de volta para path local
+                local_path = Path(cloud_path.replace("-", "/"))
+
+                url = f"{self.supabase_url}/storage/v1/object/{self.bucket}/{cloud_path}"
+                headers = self._get_headers()
+
+                response = requests.get(url, headers=headers)
+
+                if response.status_code == 200:                    local_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(local_path, "wb") as f:
+                        f.write(response.content)
+                    downloaded.append(cloud_path)
+                    logger.info(f"⬇️ [JrvsCloudStorage] Download: {cloud_path}")
+                else:
+                    logger.warning(f"⚠️ [JrvsCloudStorage] Download falhou {cloud_path}: {response.status_code}")
+
+            except requests.exceptions.RequestException as e:
+                if not (hasattr(e, 'response') and e.response is not None and e.response.status_code == 404):
+                    logger.error(f"❌ [JrvsCloudStorage] Erro na requisição download: {e}")
+                raise e
+
+        return downloaded
+
+    def _sync_all(self, data_dir: str = "data") -> Tuple[List[str], List[str]]:
+        """
+        Sincronização bidirecional completa.
+        - Upload de arquivos locais que não existem na cloud
+        - Download de arquivos da cloud que não existem localmente
+        """
+        logger.info(f"🔄 [JrvsCloudStorage] Iniciando sync_all em {data_dir}")
+
+        # Upload phase
+        uploaded = self._upload_file()
+
+        # Download phase
+        downloaded = self._download_file()
+
+        logger.info(f"✅ [JrvsCloudStorage] Sync completo: {len(uploaded)} uploads, {len(downloaded)} downloads")
+        return uploaded, downloaded
+
+    def _list_files(self) -> List[str]:
+        """
+        Lista todos os arquivos .jrvs no bucket cloud.
+        """
         try:
-            data = client.storage.from_(bucket).download(path)
-            logger.debug("☁️  [JrvsCloud] Downloaded %s bytes from %s/%s", len(data), bucket, path)
-            return data
-        except Exception as exc:
-            logger.debug("[JrvsCloud] download(%s/%s): %s", bucket, path, exc)
-            return None
+            url = f"{self.supabase_url}/storage/v1/object/list/{self.bucket}"
+            headers = self._get_headers()
+            headers["Content-Type"] = "application/json"
 
-    def list(self, bucket: str, prefix: str = "") -> List[str]:
-        """List files under *prefix* in *bucket*.
+            response = requests.post(url, headers=headers, json={"limit": 1000})
 
-        Args:
-            bucket: Supabase Storage bucket name.
-            prefix: Optional path prefix to filter results.
-
-        Returns:
-            List of file paths (strings).  Empty list on error.
-        """
-        client = self._get_client()
-        if client is None:
+            if response.status_code == 200:
+                files = response.json()
+                return [f.get("name", "") for f in files if f.get("name", "").endswith(".jrvs")]
+            else:
+                logger.error(f"❌ [JrvsCloudStorage] List falhou: {response.status_code}")
+                return []
+        except requests.exceptions.RequestException as e:
+            logger.error(f"❌ [JrvsCloudStorage] Erro ao listar arquivos: {e}")
             return []
-        try:
-            response = client.storage.from_(bucket).list(prefix)
-            return [item.get("name", "") for item in (response or []) if item.get("name")]
-        except Exception as exc:
-            logger.error("❌ [JrvsCloud] list(%s/%s) falhou: %s", bucket, prefix, exc)
-            return []
 
-    def delete(self, bucket: str, path: str) -> bool:
-        """Delete *path* from *bucket*.
-
-        Args:
-            bucket: Supabase Storage bucket name.
-            path:   Remote path to delete.
-
-        Returns:
-            ``True`` on success, ``False`` otherwise.
-        """
-        client = self._get_client()
-        if client is None:
-            return False        try:
-            client.storage.from_(bucket).remove([path])
-            logger.debug("🗑️  [JrvsCloud] Deleted %s/%s", bucket, path)
-            return True
-        except Exception as exc:
-            logger.error("❌ [JrvsCloud] delete(%s/%s) falhou: %s", bucket, path, exc)
-            return False
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _get_client(self):
-        """Return the shared Supabase client or ``None``."""
-        try:
-            from app.adapters.infrastructure.supabase_client import get_supabase_client
-            return get_supabase_client()
-        except Exception:
-            return None
-
-    # ------------------------------------------------------------------
-    # ADIÇÃO: Método para salvar samples de treino
-    # ------------------------------------------------------------------
-
-    def save_training_sample(self, sample: dict, user_id: str, scope: str) -> Optional[str]:
-        """Salva sample de treino no bucket apropriado.
-        
-        ADIÇÃO: Método novo para integração com FineTuneDatasetCollector.
-        
-        Args:
-            sample: Dicionário com dados do treino (prompt, completion, reward, etc.)
-            user_id: Identificador do usuário (para isolamento de dados pessoais)
-            scope: "global" ou "personal" — define o bucket de destino
-            
-        Returns:
-            Path do arquivo no bucket, ou None em caso de falha.
-        """
-        # Define bucket baseado no escopo
-        bucket = "jrvs-global" if scope == "global" else "jrvs-users"
-
-        # Gera path com estrutura hierárquica por usuário/data
-        timestamp = sample.get("timestamp", datetime.now(timezone.utc).isoformat())
-        safe_user_id = user_id.replace("/", "_")  # Previne path traversal
-        path = f"training/{safe_user_id}/{datetime.now(timezone.utc).strftime('%Y/%m/%d')}/{timestamp}.json"
-
-        # Converte sample para JSONL (uma linha por registro)
-        data = f"{json.dumps(sample, ensure_ascii=False)}\n".encode("utf-8")
-
-        # Upload via método existente (reusa lógica de retry, logging, etc.)
-        return self.upload(bucket, path, data)
+    def is_available(self) -> bool:
+        """Verifica se o armazenamento em nuvem está disponível."""
+        return self._enabled
