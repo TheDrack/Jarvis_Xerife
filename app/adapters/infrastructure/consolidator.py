@@ -79,7 +79,7 @@ class Consolidator(NexusComponent):
             return "APPLICATION (Casos de Uso)"
         if "app/adapters" in p:
             return "ADAPTERS (Infra/IO)"
-        return "CONFIG/SUPPORT"
+        return "SUPPORT (Config/Docs)"
 
     def _get_skeleton(self, file_path: str) -> str:
         """Extrai a assinatura de classes e funções usando AST."""
