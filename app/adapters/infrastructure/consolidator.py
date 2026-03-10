@@ -2,11 +2,6 @@
 """
 Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense.
 Gera um snapshot do repositório otimizado para janelas de contexto longas.
-
-Atualizado: 2026-03-10
-- Removidas referências a .frozen/ (pasta não existe mais)
-- Adicionados .md, .txt, .jrvs às extensões relevantes
-- Adicionados logs, data aos diretórios ignorados
 """
 import ast
 import logging
@@ -39,7 +34,7 @@ _IGNORED_DIRS = {
     "build",
     "node_modules",
     ".github",
-    ".frozen",  # Segurança: ignora se existir
+    ".frozen",
     "logs",
     "data",
     ".backups",
@@ -47,12 +42,12 @@ _IGNORED_DIRS = {
 
 # Extensões relevantes para consolidação
 _RELEVANT_EXT = (
-    ".py",    ".yml",
+    ".py",
+    ".yml",
     ".yaml",
     ".json",
     ".md",
-    ".txt",
-    ".dockerfile",
+    ".txt",    ".dockerfile",
     ".jrvs",
 )
 
@@ -83,7 +78,7 @@ class Consolidator(NexusComponent):
         if "app/application" in p:
             return "APPLICATION (Casos de Uso)"
         if "app/adapters" in p:
-            return "ADAPTERS (Infraestrutura/IO)"
+            return "ADAPTERS (Infra/IO)"
         return "CONFIG/SUPPORT"
 
     def _get_skeleton(self, file_path: str) -> str:
@@ -96,30 +91,27 @@ class Consolidator(NexusComponent):
                     return "[ERRO DE SINTAXE]"
 
             skeleton = []
-            for node in ast.walk(tree):                if isinstance(node, ast.ClassDef):
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
                     skeleton.append(f"class {node.name}")
                 elif isinstance(node, ast.FunctionDef):
                     skeleton.append(f"def {node.name}()")
-            return " | ".join(skeleton[:10])  # Limita a 10 itens
-        except Exception as e:
+            return " | ".join(skeleton[:10])        except Exception as e:
             logger.warning(f"Erro ao extrair skeleton de {file_path}: {e}")
             return "[ERRO]"
 
     def execute(self, context: dict) -> dict:
         """Gera o arquivo consolidado."""
-        logger.info(f"📝 [NEXUS] Iniciando Consolidação Skeleton-Dense: {datetime.now()}")
+        logger.info("[NEXUS] Iniciando Consolidação Skeleton-Dense")
         try:
             file_path = os.path.abspath(self.output_file)
             base_dir = os.getcwd()
 
-            # Buffers de escrita
             skeleton_lines = []
             content_lines = []
-
-            # Coleta de arquivos
             all_files = []
+
             for root, dirs, files in os.walk(base_dir):
-                # Filtra diretórios ignorados
                 dirs[:] = [d for d in dirs if d not in _IGNORED_DIRS]
 
                 for f in sorted(files):
@@ -128,13 +120,11 @@ class Consolidator(NexusComponent):
                         rel_path = os.path.relpath(full_path, base_dir)
                         all_files.append((rel_path, full_path))
 
-            # 1. Gera Skeleton (mapa estrutural)
             for rel_path, full_path in all_files:
                 layer = self._get_layer_info(rel_path)
                 skel_info = self._get_skeleton(full_path)
                 skeleton_lines.append(f"[{layer}] {rel_path} -> {skel_info}")
 
-            # 2. Gera Conteúdo Denso
             for rel_path, full_path in all_files:
                 layer = self._get_layer_info(rel_path)
                 try:
@@ -145,34 +135,29 @@ class Consolidator(NexusComponent):
                         f"ARQUIVO: {rel_path}\n"
                         f"CAMADA: {layer}\n"
                         f"{'#' * 80}\n"
-                        f"{content}\n"                    )
+                        f"{content}\n"
+                    )
                 except Exception as e:
-                    logger.warning(f"⚠️ [CONSOLIDATOR] Erro ao processar {rel_path}: {e}")
+                    logger.warning(f"[CONSOLIDATOR] Erro ao processar {rel_path}: {e}")
                     content_lines.append(f"[ERRO CRÍTICO NO ARQUIVO {rel_path}: {e}]\n")
 
-            # Escrita Final
             with open(file_path, "w", encoding="utf-8") as out:
-                # Header
                 out.write("=" * 80 + "\n")
                 out.write("JARVIS CONTEXT SNAPSHOT - ESTRATÉGIA SKELETON-DENSE\n")
                 out.write(f"TIMESTAMP: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
-                out.write("PADRÃO: Arquitetura Hexagonal + Nexus DI\n")
-                out.write("=" * 80 + "\n\n")
+                out.write("PADRÃO: Arquitetura Hexagonal + Nexus DI\n")                out.write("=" * 80 + "\n\n")
 
-                # Seção 1: Mapa Estrutural
                 out.write("SEÇÃO 1 — MAPA ESTRUTURAL (SKELETON)\n")
                 out.write("-" * 40 + "\n")
                 out.write("\n".join(skeleton_lines))
                 out.write("\n\n")
 
-                # Seção 2: Conteúdo Denso
                 out.write("SEÇÃO 2 — CONTEÚDO DENSO (FULL LOGIC)\n")
                 out.write("-" * 40 + "\n")
                 out.write("\n".join(content_lines))
 
-            logger.info(f"✅ [NEXUS] Consolidação técnica finalizada: {file_path}")
+            logger.info(f"[NEXUS] Consolidação finalizada: {file_path}")
 
-            # Atualiza contexto do Nexus
             res_payload = {
                 "status": "success",
                 "file_path": file_path,
@@ -185,5 +170,5 @@ class Consolidator(NexusComponent):
             return context
 
         except Exception as e:
-            logger.error(f"💥 [CONSOLIDATOR] Falha na Homeostase do arquivo: {e}")
+            logger.error(f"[CONSOLIDATOR] Falha na Homeostase: {e}")
             raise e
