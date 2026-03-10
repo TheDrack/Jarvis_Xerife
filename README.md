@@ -4,131 +4,119 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-> Assistente de voz distribuído com orquestração multi-dispositivo, integração com LLMs e arquitetura hexagonal.
+
+
+**Versão:** 2.0.0  
+**Última Atualização:** 2026-03-10  
+**Status:** ✅ Operacional
 
 ---
 
-## 🎯 O que é o JARVIS?
+## 🎯 Visão Geral
 
-O JARVIS é uma plataforma de automação e assistência que:
+JARVIS é um sistema de software autônomo que combina **Arquitetura Hexagonal**, **Injeção de Dependência (Nexus DI)** e **Auto-Evolução Assistida por LLM**.
 
-- 🧠 **Interpreta comandos** em português usando LLMs (Groq/Gemini)
-- 🎤 **Reconhece voz** com Google Speech Recognition
-- 🌐 **Orquestra múltiplos dispositivos** (PC, celular, IoT) por capacidade e proximidade
-- 🔧 **Auto-repara erros** via GitHub Copilot (self-healing)
-- 💾 **Memória biográfica vetorial** – recorda interações dos últimos 30 dias (FAISS)
-- 👁️ **Visão computacional** – descreve o contexto visual atual via Gemini 1.5 Flash
-- 🔭 **Núcleo Proativo (Overwatch)** – monitora CPU/RAM, contexto e inatividade do usuário
-- 🏗️ **Arquitetura Hexagonal** – domínio puro, testável e cloud-ready
-- 🧬 **Nexus** – container de injeção de dependência com discovery automático e Circuit Breaker
+O sistema é capaz de:
+- Interpretar comandos em linguagem natural
+- Executar ações via adapters (Telegram, GitHub, APIs)
+- Auto-corriger erros via self-healing
+- Evoluir capacidades através do EvolutionOrchestrator
 
 ---
 
-## ⚙️ Status Atual
-
-| Componente | Status |
-|---|---|
-| API REST (FastAPI) | ✅ Ativo |
-| Nexus (DI + Circuit Breaker) | ✅ Ativo |
-| Nexus Meta Layer (PolicyStore, JrvsCompiler, DecisionEngine) | ✅ Ativo |
-| Adaptadores LLM (Groq, Gemini, Ollama) | ✅ Ativo |
-| Reconhecimento de voz | ✅ Ativo |
-| Orquestração de dispositivos | ✅ Ativo |
-| **Memória Vetorial (FAISS)** | ✅ **Ativo** |
-| **Visão Computacional (Gemini Flash)** | ✅ **Ativo** |
-| **Overwatch Daemon (Núcleo Proativo)** | ✅ **Ativo** |
-| **LocalRepairAgent (Self-Healing Local)** | ✅ **Ativo** |
-| **DocumentStore (I/O Universal)** | ✅ **Ativo** |
-| **Formato .jrvs (binário interno)** | ✅ **Ativo** |
-| **JrvsTranslator (fluxo tradutivo)** | ✅ **Ativo** |
-| Auto-Evolução | ✅ **Ativo (loop completo com Gatekeeper)** |
-
-> Auto-evolução está **ativa** com loop completo: MetaReflection → CapabilityManager → Gatekeeper (5 verificações) → Proposta → PR. Execução diária às 02:00 UTC.
-
----
-
-## 🗂️ Estrutura do Projeto
+## 🏗️ Arquitetura
 
 ```
-app/
-├── core/               # Nexus, configuração, criptografia
-├── domain/             # Lógica de negócio (modelos, serviços, LLM gears)
-├── application/        # Casos de uso e portas (interfaces)
-│   ├── ports/          # Contratos dos adaptadores
-│   └── services/       # Orquestrador, assistente, etc.
-├── adapters/
-│   ├── edge/           # Hardware (voz, teclado, automação)
-│   └── infrastructure/ # Cloud (LLM, DB, GitHub, API)
-├── plugins/            # Plugins dinâmicos
-└── runtime/            # Pipeline runner declarativo
-
-.frozen/                # Código inativo (aguardando uso ou descarte)
-config/                 # Configurações de LLM e pipelines
-data/                   # Registry Nexus, capabilities, regras
-docs/                   # Documentação
-tests/                  # Testes automatizados
+┌─────────────────────────────────────────┐
+│         INTERFACE / CI-CD               │
+├─────────────────────────────────────────┤
+│         ADAPTERS (Infra/Edge)           │
+│   - gateway_llm_adapter.py              │
+│   - telegram_adapter.py                 │
+│   - github_adapter.py                   │
+├─────────────────────────────────────────┤
+│         APPLICATION (Services)          │
+│   - assistant_service.py                │
+│   - evolution_orchestrator.py           │
+│   - metabolism_core.py                  │
+├─────────────────────────────────────────┤
+│         DOMAIN (Regras de Negócio)      │
+│   - capabilities/ (102 capabilities)    │
+│   - services/ (llm_command_interpreter) │
+├─────────────────────────────────────────┤
+│         CORE (Nexus/DI)                 │
+│   - nexus.py                            │
+│   - nexus_exceptions.py                 │
+│   - nexus_discovery.py                  │
+│   - nexus_registry.py                   │
+└─────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Como Executar
+## 🚀 Início Rápido
 
-### Modo Cloud (API REST)
-
+### Pré-requisitos
 ```bash
-# Instalar dependências
-pip install -r requirements.txt
-
-# Configurar variáveis de ambiente
-cp .env.example .env
-# edite .env com suas chaves de API
-
-# Iniciar servidor
-python -m app.application.services.serve
-# ou
-uvicorn app.adapters.infrastructure.api_server:app --reload
+Python 3.12+
+pip install -r requirements/core.txt
+pip install -r requirements/dev.txt  # Para testes
 ```
 
-### Docker
-
+### Configuração
 ```bash
-docker-compose up --build
-# API disponível em http://localhost:8000
+# Variáveis de ambiente necessárias
+export GROQ_API_KEY="sua-chave-groq"
+export GEMINI_API_KEY="sua-chave-gemini"
+export GITHUB_TOKEN="seu-token-github"
+export TELEGRAM_BOT_TOKEN="seu-token-telegram"
+export TELEGRAM_CHAT_ID="seu-chat-id"
 ```
 
-### Modo Edge (dispositivo local)
-
+### Execução
 ```bash
-python app/bootstrap_edge.py
+# Rodar testes do domínio
+pytest tests/domain/ -v
+
+# Rodar todos os testes
+pytest tests/ -v
+
+# Validar arquitetura
+python scripts/validate_architecture.py
 ```
 
 ---
 
-## 🧬 Nexus – Sistema de Instanciação
+## 📦 Nexus DI — Injeção de Dependência
 
-O **Nexus** é o container de DI do JARVIS, dividido em quatro módulos focados:
-`nexus.py`, `nexus_exceptions.py`, `nexus_discovery.py`, `nexus_registry.py`.
-
-Todo componente ativo deve ser registrado:
+**Todos os componentes ativos devem ser NexusComponent e registrados no Nexus.**
 
 ```python
 from app.core.nexus import nexus
 
 # Resolve e instancia um componente
-component = nexus.resolve("audit_logger")
+component = nexus.resolve("assistant_service")
 component.execute(context)
 ```
 
-Componentes não utilizados ficam em `.frozen/` até serem necessários.
+### Módulos do Nexus
 
-→ Veja [docs/NEXUS.md](docs/NEXUS.md) para detalhes.
+| Módulo | Responsabilidade |
+|--------|------------------|
+| `nexus.py` | Container principal, API pública |
+| `nexus_exceptions.py` | CloudMock, exceções, circuit breaker |
+| `nexus_discovery.py` | Discovery em disco, instanciação |
+| `nexus_registry.py` | I/O do registry local `.jrvs` |
+
+**Registry local:** `data/nexus_registry.json` / `data/nexus_registry.jrvs`
+
+→ Veja [docs/NEXUS.md](docs/NEXUS.md) para detalhes completos.
 
 ---
 
 ## 📦 DocumentStore & Formato .jrvs
 
 O **DocumentStore** é o sistema universal de leitura/escrita de documentos.
-Ele detecta automaticamente o formato pelo sufixo do arquivo:
 
 ```python
 from app.utils.document_store import document_store
@@ -140,48 +128,20 @@ data = document_store.read("data/nexus_registry.json")
 document_store.write("data/nexus_registry.jrvs", data)
 ```
 
-### Formato `.jrvs`
+### Formato .jrvs
 
-O `.jrvs` é o formato binário interno do JARVIS — compacto, verificado por CRC32
-e ~5–10× mais rápido para leitura do que JSON para arquivos grandes.
+Arquivos `.jrvs` são JSON comprimido com zlib, com cabeçalho binário:
 
 ```
-┌──────────────────────────────────────────────────┐
-│  Magic  │ Version │  Flags  │  CRC32  │   Len   │
-│ 4 bytes │ 2 bytes │ 2 bytes │ 4 bytes │ 4 bytes │
-├──────────────────────────────────────────────────┤
-│          Dados (JSON + zlib comprimido)           │
-└──────────────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│ Magic │ Version │ Flags │ CRC32 │ Len  │
+│ 4 bytes│ 2 bytes │ 2 bytes │ 4 bytes │ 4 bytes │
+├─────────────────────────────────────────┤
+│ Dados (JSON + zlib comprimido)          │
+└─────────────────────────────────────────┘
 ```
 
-### Fluxo de Atualização Tradutiva
-
-O **JrvsTranslator** sincroniza arquivos `.jrvs` com seus equivalentes legíveis.
-Pode ser ativado manualmente ou via webhook:
-
-```bash
-# Via API (requer autenticação)
-curl -X POST /v1/translate/jrvs \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"action": "sync_all", "data_dir": "data"}'
-```
-
-```python
-from app.application.services.jrvs_translator import JrvsTranslator
-
-translator = JrvsTranslator()
-translator.execute({"action": "to_jrvs", "data_dir": "data"})
-```
-
-> ⚠️ Arquivos `.json`/`.yml` são a **fonte de verdade**. Edite sempre o formato
-> legível e execute a tradução para atualizar o `.jrvs`.
-
----
-
-## 🧊 Política Frozen
-
-Arquivos em `.frozen/` são código preservado mas inativo.  
-Para reativar: mova para `app/`, registre no Nexus, documente.
+→ Veja [data/README.md](data/README.md) para detalhes.
 
 ---
 
@@ -196,6 +156,9 @@ pytest tests/domain/ -v
 
 # Executar todos os testes
 pytest tests/ -v
+
+# Validar arquitetura
+python scripts/validate_architecture.py
 ```
 
 ---
@@ -203,7 +166,7 @@ pytest tests/ -v
 ## 📖 Documentação
 
 | Documento | Descrição |
-|---|---|
+|-----------|-----------|
 | [docs/STATUS.md](docs/STATUS.md) | Situação atual do projeto |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitetura do sistema |
 | [docs/NEXUS.md](docs/NEXUS.md) | Sistema de injeção de dependência |
@@ -222,7 +185,5 @@ Veja [CONTRIBUTING.md](CONTRIBUTING.md) para diretrizes.
 ## 📄 Licença
 
 MIT – veja [LICENSE](LICENSE).
-
----
 
 **Made with ❤️ by the Jarvis Team**
