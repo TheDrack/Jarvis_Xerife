@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from datetime import datetime
-from typing import List
+from typing import List, Set, Tuple
 
 from app.core.nexus import NexusComponent
 
@@ -25,7 +25,7 @@ DOCS_ORDER = [
 ]
 
 # Diretórios ignorados na consolidação
-_IGNORED_DIRS = {
+_IGNORED_DIRS: Set[str] = {
     ".git",
     "__pycache__",
     ".venv",
@@ -41,7 +41,7 @@ _IGNORED_DIRS = {
 }
 
 # Extensões relevantes para consolidação
-_RELEVANT_EXT = (
+_RELEVANT_EXT: Tuple[str, ...] = (
     ".py",
     ".yml",
     ".yaml",
@@ -109,7 +109,7 @@ class Consolidator(NexusComponent):
 
             skeleton_lines = []
             content_lines = []
-            all_files = []
+            all_files: List[Tuple[str, str]] = []
 
             for root, dirs, files in os.walk(base_dir):
                 dirs[:] = [d for d in dirs if d not in _IGNORED_DIRS]
