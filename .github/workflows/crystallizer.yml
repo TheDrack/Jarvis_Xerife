@@ -1,74 +1,84 @@
-name: "💎 JARVIS: Crystallizer"
+name: 🔧 Fix Inconsistencies
 
 on:
   workflow_dispatch:
-  
+    inputs:
+      dry_run:
+        description: 'Simular correções sem aplicar (dry-run)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      validate:
+        description: 'Validar registry após correções'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  PYTHON_VERSION: '3.12'
 
 jobs:
-  organize:
-    name: "💎 Ciclo de Cristalização DNA"
+  fix:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
     steps:
-      - name: 🛰️ Checkout
+      - name: 📥 Checkout do repositório
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GIT_PAT }}
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 📦 Setup UV
-        uses: astral-sh/setup-uv@v5
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
         with:
-          enable-cache: true
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 🏗️ Prepare Environment & Structural Crystallization
+      - name: 🔧 Executar script de correção
+        id: fix
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          VALIDATE: ${{ github.event.inputs.validate }}
         run: |
-          uv venv --clear --python 3.11
-          # Adicionado libcst para evitar o ModuleNotFoundError
-          uv pip install requests sqlmodel pydantic python-dotenv libcst
-          
-          echo "🛠️ Rodando Sanidade Estrutural (__init__.py e Classes)..."
-          # Garantindo que o diretório atual está no path
-          export PYTHONPATH=$PYTHONPATH:$(pwd)
-          uv run python scripts/cristalize_project.py
+          python scripts/fix_inconscistences.py \
+            $([ "$DRY_RUN" = "true" ] && echo "--dry-run" || echo "--apply") \
+            $([ "$VALIDATE" = "true" ] && echo "--validate")
 
-      - name: 🧠 Run Crystallizer Engine (Full Cycle)
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      - name: 📊 Upload do log de correção
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fix-inconsistencies-log-${{ github.run_id }}
+          path: |
+            *.log
+            nexus_di_migration_report.txt
+          retention-days: 30
+
+      - name: 📝 Commit das mudanças (se não for dry-run)
+        if: github.event.inputs.dry_run == 'false'
         run: |
-          uv run python - << 'PYCODE'
-          import sys
-          import os
-          sys.path.append(os.getcwd())
-          
-          from app.application.services.crystallization.crystallizer_engine import CrystallizerEngine
-          
-          try:
-              print("💎 Iniciando Full Cycle do Crystallizer Engine...")
-              engine = CrystallizerEngine()
-              engine.run_full_cycle()
-              print("✨ Cristalização lógica concluída.")
-          except Exception as e:
-              print(f"❌ Erro: {e}")
-              sys.exit(1)
-          PYCODE
-          
-      - name: 🔄 Sync DNA Map & Containers
+          git config --local user.email "jarvis-bot@github.com"
+          git config --local user.name "JARVIS Fix Bot"
+          git add -A
+          git diff --staged --quiet || git commit -m "🔧 [JARVIS] Fix inconsistencies between docs and code"
+          git push
         env:
-          TOKEN: ${{ secrets.GIT_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📋 Resumo no Step Summary
         run: |
-          git config --global user.name "Jarvis-Crystallizer"
-          git config --global user.email "jarvis@bot.com"
-          
-          git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git
-          
-          git add .
-          
-          if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "chore: [Crystallizer] DNA Mapping & Structural Synchronization [Auto-Cura]"
-            git pull origin main --rebase
-            git push origin main
-          else
-            echo "✅ DNA e Estrutura já estão sincronizados e estáveis."
-          fi
+          echo "## 🔧 Fix Inconsistencies Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Métrica | Valor |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Modo | ${{ github.event.inputs.dry_run == 'true' && 'DRY-RUN' || 'APPLY' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Validação | ${{ github.event.inputs.validate }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Verifique os artefatos para detalhes completos." >> $GITHUB_STEP_SUMMARY
