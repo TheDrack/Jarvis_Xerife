@@ -1,178 +1,163 @@
-# JARVIS – Nexus
+# JARVIS — Nexus DI (Injeção de Dependência)
 
-> O Nexus é o container de injeção de dependência do JARVIS.  
-> **Regra:** Todo componente ativo deve ser instanciado pelo Nexus.
-
----
-
-## Módulos do Nexus
-
-O `nexus.py` original foi dividido em quatro módulos focados (≤ 250 linhas cada):
-
-| Arquivo | Responsabilidade |
-|---|---|
-| `app/core/nexus.py` | Classe principal `JarvisNexus`, API pública (`resolve`, `resolve_class`, `commit_memory`). Re-exporta `NexusComponent` e `CloudMock`. |
-| `app/core/nexus_exceptions.py` | `CloudMock`, `_CircuitBreakerEntry`, exceções customizadas (`ImportTimeoutError`, `InstantiateTimeoutError`, `AmbiguousComponentError`), timeouts configuráveis e `nexus_guarded_instantiate`. |
-| `app/core/nexus_discovery.py` | `_NexusDiscoveryMixin` – lógica de busca em disco e instanciação com timeout. |
-| `app/core/nexus_registry.py` | `_NexusRegistryMixin` – leitura/escrita do registry local `.jrvs` e sincronização com GitHub Gist. |
+**Versão:** 2.0.0  
+**Atualizado em:** 2026-03-10
 
 ---
 
-## Como funciona
+## 🎯 Visão Geral
+
+O **Nexus** é o container de injeção de dependência do JARVIS.
+
+**Todos os componentes ativos devem ser `NexusComponent` e registrados no Nexus.**
+
+---
+
+## 📦 Módulos do Nexus
+
+O Nexus foi dividido em quatro módulos focados:
+
+| Módulo | Responsabilidade |
+|--------|------------------|
+| `nexus.py` | Container principal, API pública |
+| `nexus_exceptions.py` | CloudMock, exceções, timeouts, circuit breaker |
+| `nexus_discovery.py` | Discovery em disco, localização e instanciação |
+| `nexus_registry.py` | I/O do registry local `.jrvs` e sync com Gist |
+
+---
+
+## 🔧 API Pública
+
+### `nexus.resolve(component_id, use_cache=True)`
+
+Resolve e instancia um componente pelo ID.
 
 ```python
 from app.core.nexus import nexus
 
-# Instancia (ou reutiliza singleton) um componente pelo ID
-component = nexus.resolve("audit_logger")
-component.execute({"metadata": {...}, "artifacts": {...}})
+# Resolve um componente
+assistant = nexus.resolve("assistant_service")
+assistant.execute({"command": "hello"})
+
+# Sem cache (força re-instanciação)
+assistant = nexus.resolve("assistant_service", use_cache=False)
+```
+
+### `nexus.list_loaded_ids()`
+
+Lista todos os IDs de componentes carregados.
+
+```pythonids = nexus.list_loaded_ids()
+print(f"Componentes: {len(ids)}")
+```
+
+### `nexus.invalidate_component(component_id)`
+
+Invalida o cache de um componente específico.
+
+```python
+nexus.invalidate_component("assistant_service")
+```
+
+### `nexus.commit_memory()`
+
+Persiste o estado atual do Nexus.
+
+```python
+nexus.commit_memory()
 ```
 
 ---
 
-## Registrar um novo componente
+## 📋 Registry
 
-1. Crie uma classe que herda de `NexusComponent`:
+### Registry Local
 
-```python
-# app/adapters/infrastructure/meu_componente.py
-from app.core.nexus import NexusComponent  # Importar sempre de app.core.nexus
-
-class MeuComponente(NexusComponent):
-    def execute(self, context):
-        # implementação
-        return {"success": True}
-```
-
-2. Adicione ao `data/nexus_registry.json`:
+**Arquivos:** `data/nexus_registry.json` / `data/nexus_registry.jrvs`
 
 ```json
 {
   "components": {
-    "meu_componente": "app.adapters.infrastructure.meu_componente.MeuComponente"
+    "assistant_service": "app.application.services.assistant_service.AssistantService",
+    "evolution_orchestrator": "app.application.services.evolution_orchestrator.EvolutionOrchestrator",
+    "metabolism_core": "app.application.services.metabolism_core.MetabolismCore"
   }
 }
 ```
 
-3. Resolva via Nexus:
+### Tradução Automática
 
-```python
-comp = nexus.resolve("meu_componente")
-comp.execute(context)
+O **JrvsTranslator** sincroniza `.json`/`.yml` com `.jrvs`:
+
+```bash
+# Via API
+curl -X POST /v1/translate/jrvs \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"action": "sync_all", "data_dir": "data"}'
 ```
 
----
+```pythonfrom app.application.services.jrvs_translator import JrvsTranslator
 
-## Componentes Registrados
-
-| ID | Classe | Localização |
-|---|---|---|
-| `cognitive_router` | `CognitiveRouter` | `app/domain/gears/cognitive_router.py` |
-| `llm_engine` | `LlmEngine` | `app/domain/gears/llm_engine.py` |
-| `system_executor` | `SystemExecutor` | `app/adapters/infrastructure/system_executor.py` |
-| `orchestrator` | `OrchestratorService` | `app/application/services/orchestrator_service.py` |
-| `context_memory` | `ContextMemory` | `app/domain/capabilities/context_memory.py` |
-| `interface_bridge` | `InterfaceBridge` | `app/application/services/interface_bridge.py` |
-| `audit_logger` | `AuditLogger` | `app/adapters/infrastructure/audit_logger.py` |
-| `consolidator` | `Consolidator` | `app/adapters/infrastructure/consolidator.py` |
-| `telegram_adapter` | `TelegramAdapter` | `app/adapters/infrastructure/telegram_adapter.py` |
-| `gist_uploader` | `GistUploader` | `app/adapters/infrastructure/gist_uploader.py` |
-| `drive_uploader` | `DriveUploader` | `app/adapters/infrastructure/drive_uploader.py` |
-| `vector_memory_adapter` | `VectorMemoryAdapter` | `app/adapters/infrastructure/vector_memory_adapter.py` |
-| `vision_adapter` | `VisionAdapter` | `app/adapters/infrastructure/vision_adapter.py` |
-| `document_store` | `DocumentStore` | `app/utils/document_store.py` |
-| `jrvs_translator` | `JrvsTranslator` | `app/application/services/jrvs_translator.py` |
-| `policy_store` | `PolicyStore` | `app/core/meta/policy_store.py` |
-| `jrvs_compiler` | `JrvsCompiler` | `app/core/meta/jrvs_compiler.py` |
-| `decision_engine` | `DecisionEngine` | `app/core/meta/decision_engine.py` |
-| `exploration_controller` | `ExplorationController` | `app/core/meta/exploration_controller.py` |
-| `notification_service` | `NotificationService` | `app/application/services/notification_service.py` |
-| `overwatch_daemon` | `OverwatchDaemon` | `app/adapters/infrastructure/overwatch_adapter.py` |
-| `auto_evolution_service` | `AutoEvolutionServiceV2` | `app/application/services/auto_evolutionV2.py` |
-| `local_repair_agent` | `LocalRepairAgent` | `app/application/services/local_repair_agent.py` |
-| `metabolism_core` | `MetabolismCore` | `app/application/services/metabolism_core.py` |
-| `evolution_loop` | `EvolutionLoopService` | `app/application/services/evolution_loop.py` |
-| `ollama_adapter` | `OllamaAdapter` | `app/adapters/infrastructure/ollama_adapter.py` |
-| `evolution_orchestrator` | `EvolutionOrchestrator` | `app/application/services/evolution_orchestrator.py` |
-| `procedural_memory_adapter` | `ProceduralMemoryAdapter` | `app/adapters/infrastructure/procedural_memory_adapter.py` |
-| `capability_index_service` | `CapabilityIndexService` | `app/application/services/capability_index_service.py` |
-| `cost_tracker_adapter` | `CostTrackerAdapter` | `app/adapters/infrastructure/cost_tracker_adapter.py` |
-
-> **Nota:** `context_memory` ainda está em `app/domain/capabilities/` – pendente de revisão.
-
----
-
-## Discovery automático
-
-Se um componente não está no registry local, o Nexus faz discovery percorrendo `app/`:
-
-```python
-nexus.resolve("meu_componente", use_cache=True)
+translator = JrvsTranslator()
+translator.execute({"action": "to_jrvs", "data_dir": "data"})
 ```
 
-O parâmetro `hint_path` acelera a busca limitando o diretório.
-
-Quando mais de um arquivo candidato é encontrado para o mesmo ID, o Nexus lança `AmbiguousComponentError` em vez de resolver silenciosamente.
+> ⚠️ Arquivos `.json`/`.yml` são a **fonte de verdade**. Edite sempre o formato legível.
 
 ---
 
-## Circuit Breaker
+## 🛡️ Circuit Breaker
 
-O Nexus possui um mecanismo de Circuit Breaker embutido para proteger o sistema de travamentos causados por componentes lentos ou indisponíveis.
+O Nexus implementa Circuit Breaker para falhas de import/instanciação:
 
-**Comportamento:**
-- Se o **import** do módulo demorar mais de **`NEXUS_IMPORT_TIMEOUT`** (padrão: **10 s**), lança `ImportTimeoutError`.
-- Se a **instanciação** da classe demorar mais de **`NEXUS_INSTANTIATE_TIMEOUT`** (padrão: **5 s**), lança `InstantiateTimeoutError`.
-- Se qualquer timeout ocorrer, o circuito abre por **`CIRCUIT_BREAKER_TIMEOUT`** (padrão: **30 s**). Durante esse período, `nexus.resolve()` retorna imediatamente um `CloudMock`.
-- Após o timeout do circuit breaker (padrão **60 s de reset**), o circuito fecha e a próxima chamada tenta instanciar novamente.
+| Configuração | Variável de Ambiente | Padrão |
+|--------------|---------------------|--------|
+| Timeout de Import | `NEXUS_TIMEOUT` | 30s |
+| Timeout de Instanciação | `NEXUS_INSTANTIATE_TIMEOUT` | 30s |
+| Reset do Circuit Breaker | `NEXUS_CIRCUIT_RESET` | 300s |
+| Modo Estrito | `NEXUS_STRICT_MODE` | false |
 
-Todos os timeouts são configuráveis via variáveis de ambiente:
+### CloudMock
 
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `NEXUS_IMPORT_TIMEOUT` | `10.0` | Timeout de import do módulo (s) |
-| `NEXUS_INSTANTIATE_TIMEOUT` | `5.0` | Timeout de instanciação da classe (s) |
-| `NEXUS_TIMEOUT` | `30.0` | Janela de abertura do circuit breaker (s) |
-| `NEXUS_CIRCUIT_RESET` | `60.0` | Cooldown antes do circuito fechar (s) |
-| `NEXUS_STRICT_MODE` | `false` | Se `true`, desabilita discovery em disco |
-
-**`CloudMock`** é um absorvedor transparente: aceita qualquer chamada de método sem erro, permitindo que o sistema continue operando em modo degradado.
+Quando um componente falha, o Nexus injeta um `CloudMock`:
 
 ```python
 from app.core.nexus import nexus, CloudMock
 
-component = nexus.resolve("algum_componente")
+component = nexus.resolve("componente_que_nao_existe")
 if isinstance(component, CloudMock):
-    # componente indisponível — modo fallback
-    pass
+    print("Componente indisponível — usando mock")
 ```
 
 ---
 
-## NexusComponent – Interface
+## 📊 Componentes Registrados
 
-> **Import correto:** sempre use `from app.core.nexus import NexusComponent`.
-
-```python
-class NexusComponent(ABC):
-    def configure(self, config: dict) -> None:
-        """Configuração opcional antes da execução."""
-        pass
-
-    @abstractmethod
-    def execute(self, context: dict) -> dict:
-        """Execução principal. Deve retornar evidência de efeito."""
-        pass
-```
+| ID | Classe | Localização |
+|----|--------|-------------|
+| `assistant_service` | `AssistantService` | `app/application/services/assistant_service.py` |
+| `evolution_orchestrator` | `EvolutionOrchestrator` | `app/application/services/evolution_orchestrator.py` |
+| `metabolism_core` | `MetabolismCore` | `app/application/services/metabolism_core.py` |
+| `llm_router` | `LLMRouter` | `app/application/services/llm_router.py` |
+| `gateway_llm_adapter` | `GatewayLLMCommandAdapter` | `app/adapters/infrastructure/gateway_llm_adapter.py` |
+| `telegram_adapter` | `TelegramAdapter` | `app/adapters/infrastructure/telegram_adapter.py` |
+| `github_adapter` | `GitHubAdapter` | `app/adapters/infrastructure/github_adapter.py` |
+| `consolidator` | `Consolidator` | `app/adapters/infrastructure/consolidator.py` |
+| `crystallizer_engine` | `CrystallizerEngine` | `app/application/services/crystallization/crystallizer_engine.py` |
+| `structured_logger` | `StructuredLogger` | `app/application/services/structured_logger.py` |
+→ Veja [docs/ARQUIVO_MAP.md](docs/ARQUIVO_MAP.md) para lista completa.
 
 ---
 
-## Política Frozen
+## 🧪 Validação
 
-Componentes não registrados no Nexus e não importados em nenhum arquivo ativo  
-devem ser movidos para `.frozen/`.
+```bash
+# Validar registry vs código
+python scripts/validate_registry_vs_code.py
 
-Para reativar:
-1. Mova o arquivo para o local correto em `app/`
-2. Adicione ao `data/nexus_registry.json`
-3. Documente em `docs/ARQUIVO_MAP.md`
+# Validar docs vs código
+python scripts/validate_docs_vs_code.py
+
+# Validar arquitetura
+python scripts/validate_architecture.py
+```
