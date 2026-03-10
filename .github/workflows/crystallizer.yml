@@ -47,7 +47,7 @@ jobs:
           DRY_RUN: ${{ github.event.inputs.dry_run }}
           VALIDATE: ${{ github.event.inputs.validate }}
         run: |
-          python scripts/fix_inconscistences.py \
+          python scripts/fix_inconcistences.py \
             $([ "$DRY_RUN" = "true" ] && echo "--dry-run" || echo "--apply") \
             $([ "$VALIDATE" = "true" ] && echo "--validate")
 
@@ -55,7 +55,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fix-inconsistencies-log-${{ github.run_id }}
+          name: fix-inconcistences-log-${{ github.run_id }}
           path: |
             *.log
             nexus_di_migration_report.txt
