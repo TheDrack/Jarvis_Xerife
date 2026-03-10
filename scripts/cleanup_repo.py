@@ -24,6 +24,7 @@ import os
 import shutil
 import sys
 import tarfile
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
@@ -47,7 +48,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Categorias de arquivos para limpeza
 CLEANUP_CATEGORIES = {
     'frozen': {
-        'description': 'Pasta .frozen/ — código legado não usado',        'paths': [REPO_ROOT / '.frozen'],
+        'description': 'Pasta .frozen/ — código legado não usado',
+        'paths': [REPO_ROOT / '.frozen'],
         'safe_to_delete': True,
     },
     'demo_scripts': {
@@ -94,9 +96,13 @@ PROTECTED_PATHS = {
 # ---------------------------------------------------------------------------
 def _is_protected(path: Path) -> bool:
     """Verifica se o caminho está na lista de protegidos."""
-    path_str = str(path.relative_to(REPO_ROOT)).replace('\\', '/')
+    try:
+        path_str = str(path.relative_to(REPO_ROOT)).replace('\\', '/')
+    except ValueError:
+        path_str = str(path)
+        
     return any(
-        protected in path_str or path.name == protected        for protected in PROTECTED_PATHS
+        protected in path_str or path.name == protected for protected in PROTECTED_PATHS
     )
 
 def _is_empty_or_stub(path: Path) -> bool:
@@ -148,7 +154,6 @@ def _count_test_functions(path: Path) -> int:
         return 0    
     try:
         content = path.read_text(encoding='utf-8')
-        import re
         test_funcs = re.findall(r'def (test_\w+)\s*\(', content)
         test_classes = re.findall(r'class (Test\w+)\s*\(', content)
         return len(test_funcs) + len(test_classes)
@@ -194,7 +199,8 @@ def scan_category(category: str) -> List[Path]:
         if check_func:
             candidates = [c for c in candidates if check_func(c)]
     
-    # Filtra tests órfãos (categoria especial)    if category == 'orphan_tests':
+    # Filtra tests órfãos (categoria especial)
+    if category == 'orphan_tests':
         candidates = [c for c in candidates if _count_test_functions(c) == 0]
     
     return candidates
@@ -207,7 +213,7 @@ def create_backup(files: List[Path], backup_dir: Path) -> Path:
     
     with tarfile.open(archive_path, 'w:gz') as tar:
         for file in files:
-            if file.exists():
+            if file.exists() and file.is_file():
                 tar.add(file, arcname=str(file.relative_to(REPO_ROOT)))
     
     logger.info(f"Backup criado: {archive_path}")
@@ -243,7 +249,8 @@ def cleanup_files(files: List[Path], dry_run: bool = False) -> Dict[str, int]:
                     file.unlink()
                     logger.info(f"🗑️  Arquivo removido: {file}")
                 stats['deleted'] += 1
-                stats['size_freed'] += size        except Exception as e:
+                stats['size_freed'] += size
+        except Exception as e:
             logger.error(f"❌ Erro ao remover {file}: {e}")
             stats['errors'] += 1
     
@@ -280,7 +287,7 @@ def main():
     
     # Determina categorias
     categories = (
-        [c for c in CLEANUP_CATEGORIES.keys()]
+        list(CLEANUP_CATEGORIES.keys())
         if 'ALL' in args.categories
         else args.categories
     )
@@ -292,7 +299,8 @@ def main():
     logger.info(f"Dry-run: {args.dry_run}")
     logger.info(f"Backup: {args.backup}")
     logger.info("=" * 70)
-        # Escaneia todas as categorias
+
+    # Escaneia todas as categorias
     all_candidates = []
     for category in categories:
         logger.info(f"\n📋 Escaneando categoria: {category}")
@@ -340,8 +348,9 @@ def main():
     
     # GitHub Actions output
     if args.github_output:
-        github_output = os.getenv('GITHUB_OUTPUT')
-        if github_output:            with open(github_output, 'a') as f:
+        github_output_path = os.getenv('GITHUB_OUTPUT')
+        if github_output_path:
+            with open(github_output_path, 'a') as f:
                 f.write(f"files_deleted={stats['deleted']}\n")
                 f.write(f"size_freed_mb={stats['size_freed']/1024/1024:.2f}\n")
                 f.write(f"backup_path={backup_path or 'none'}\n")
