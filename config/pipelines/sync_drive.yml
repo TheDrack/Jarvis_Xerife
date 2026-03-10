@@ -1,22 +1,20 @@
-# JARVIS Pipeline: Sincronização e Backup de DNA
+
 components:
   consolidator:
     id: "consolidator"
-    hint_path: "adapters/infrastructure/consolidator"
-
-  drive_uploader:
-    id: "drive_uploader"
-    hint_path: "adapters/infrastructure/drive_uploader"
+    hint_path: "app/adapters/infrastructure/consolidator.py"
     singleton: true
     config:
       strict_mode: false
-
+  drive_uploader:
+    id: "drive_uploader"
+    hint_path: "app/adapters/infrastructure/drive_uploader.py"
+    singleton: true
   telegram_backup:
     id: "telegram_adapter"
-    hint_path: "adapters/infrastructure/telegram_adapter"
+    hint_path: "app/adapters/infrastructure/telegram_adapter.py"
     config:
       action: "upload_backup"
-
   gist_backup:
     id: "gist_uploader"
-    hint_path: "adapters/infrastructure/gist_uploader"
+    hint_path: "app/adapters/infrastructure/gist_uploader.py"
