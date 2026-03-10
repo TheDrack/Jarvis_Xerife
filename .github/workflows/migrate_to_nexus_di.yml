@@ -1,0 +1,93 @@
+name: 🔄 Migrate to Nexus DI
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Simular migração sem modificar (dry-run)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      create_backup:
+        description: 'Criar backup antes de migrar'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: 📥 Checkout do repositório
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 🔄 Executar migração Nexus DI
+        id: migrate
+        env:
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          CREATE_BACKUP: ${{ github.event.inputs.create_backup }}
+        run: |
+          python scripts/migrate_to_nexus_di.py \
+            $([ "$DRY_RUN" = "true" ] && echo "--dry-run" || echo "--apply") \
+            $([ "$CREATE_BACKUP" = "true" ] && echo "--backup") \
+            --report nexus_di_migration_report.txt
+
+      - name: 📊 Upload do relatório
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-di-migration-report-${{ github.run_id }}
+          path: |
+            nexus_di_migration_report.txt
+            migrate_nexus_di.log
+          retention-days: 30
+
+      - name: 📦 Upload do backup (se criado)
+        if: github.event.inputs.create_backup == 'true' && github.event.inputs.dry_run == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-di-backup-${{ github.run_id }}
+          path: .backups/nexus_di_migration/*.py
+          retention-days: 30
+
+      - name: 📝 Commit das mudanças (se não for dry-run)
+        if: github.event.inputs.dry_run == 'false'
+        run: |
+          git config --local user.email "jarvis-bot@github.com"
+          git config --local user.name "JARVIS Nexus DI Migration"
+          git add -A
+          git diff --staged --quiet || git commit -m "🔄 [JARVIS] Migrate to Nexus DI: removed direct imports"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📋 Resumo no Step Summary
+        run: |
+          echo "## 🔄 Nexus DI Migration Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Verifique o relatório completo nos artefatos." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Métrica | Valor |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Modo | ${{ github.event.inputs.dry_run == 'true' && 'DRY-RUN' || 'APPLY' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Backup | ${{ github.event.inputs.create_backup }} |" >> $GITHUB_STEP_SUMMARY
