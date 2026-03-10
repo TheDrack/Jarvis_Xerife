@@ -8,9 +8,9 @@ import logging
 import os
 import re
 from datetime import datetime
-from typing import List, Set, Tuple
+from typing import List, Set
 
-from app.core.nexus import NexusComponent
+from app.core.nexus import NexusComponent  # ← IMPORT CORRETO
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ _IGNORED_DIRS: Set[str] = {
 }
 
 # Extensões relevantes para consolidação
-_RELEVANT_EXT: Tuple[str, ...] = (
+_RELEVANT_EXT: tuple = (
     ".py",
     ".yml",
     ".yaml",
@@ -61,7 +61,7 @@ _ARCH_PATTERNS = {
 }
 
 
-class Consolidator(NexusComponent):
+class Consolidator(NexusComponent):  # ← HERANÇA CORRETA
     """Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense."""
 
     def __init__(self):
@@ -100,7 +100,7 @@ class Consolidator(NexusComponent):
             logger.warning(f"Erro ao extrair skeleton de {file_path}: {e}")
             return "[ERRO]"
 
-    def execute(self, context: dict) -> dict:
+    def execute(self, context: dict) -> dict:  # ← MÉTODO EXECUTE PRESENTE
         """Gera o arquivo consolidado."""
         logger.info("[NEXUS] Iniciando Consolidação Skeleton-Dense")
         try:
@@ -109,7 +109,7 @@ class Consolidator(NexusComponent):
 
             skeleton_lines = []
             content_lines = []
-            all_files: List[Tuple[str, str]] = []
+            all_files = []
 
             for root, dirs, files in os.walk(base_dir):
                 dirs[:] = [d for d in dirs if d not in _IGNORED_DIRS]
