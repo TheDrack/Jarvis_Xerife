@@ -243,7 +243,8 @@ def cleanup_files(files: List[Path], dry_run: bool = False) -> Dict[str, int]:
                     file.unlink()
                     logger.info(f"🗑️  Arquivo removido: {file}")
                 stats['deleted'] += 1
-                stats['size_freed'] += size        except Exception as e:
+                stats['size_freed'] += size
+        except Exception as e:
             logger.error(f"❌ Erro ao remover {file}: {e}")
             stats['errors'] += 1
     
