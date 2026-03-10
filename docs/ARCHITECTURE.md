@@ -1,112 +1,190 @@
-# JARVIS – Arquitetura
 
-> Arquitetura Hexagonal (Ports & Adapters) com Nexus como container de DI.
+# JARVIS — Arquitetura do Sistema
 
----
-
-## Visão Geral
-
-```
-┌─────────────────────────────────────────────────────┐
-│                    INTERFACE / CI-CD                 │
-│        (GitHub Actions, API REST, Terminal)          │
-└─────────────────┬───────────────────────────────────┘
-                  │
-┌─────────────────▼───────────────────────────────────┐
-│               ADAPTADORES (app/adapters/)            │
-│  ┌─────────────────┐   ┌────────────────────────┐   │
-│  │   edge/         │   │   infrastructure/      │   │
-│  │  voz, teclado   │   │  LLM, DB, GitHub, API  │   │
-│  └────────┬────────┘   └──────────┬─────────────┘   │
-└───────────┼──────────────────────┼─────────────────┘
-            │                      │
-┌───────────▼──────────────────────▼─────────────────┐
-│            APLICAÇÃO (app/application/)              │
-│  ┌──────────────────┐  ┌──────────────────────────┐ │
-│  │     ports/       │  │       services/           │ │
-│  │  (interfaces)    │  │   (casos de uso)          │ │
-│  └──────────────────┘  └──────────────────────────┘ │
-└─────────────────────────────────────────────────────┘
-            │
-┌───────────▼─────────────────────────────────────────┐
-│               DOMÍNIO (app/domain/)                  │
-│  models/ │ services/ │ gears/ │ context/ │ missions/ │
-└─────────────────────────────────────────────────────┘
-            │
-┌───────────▼─────────────────────────────────────────┐
-│               NÚCLEO (app/core/)                     │
-│          Nexus │ Config │ Encryption │ LLM Config    │
-└─────────────────────────────────────────────────────┘
-```
+**Versão:** 2.0.0  
+**Atualizado em:** 2026-03-10
 
 ---
 
-## Camadas
+## 🏗️ Visão Geral
 
-### Core (`app/core/`)
-Núcleo do sistema. Sem dependências externas.
-- **Nexus** (`nexus.py`): Container de DI com discovery automático e sincronização via Gist
-- **NexusExceptions** (`nexus_exceptions.py`): CloudMock, timeouts, circuit breaker
-- **NexusDiscovery** (`nexus_discovery.py`): Busca em disco e instanciação com timeout
-- **NexusRegistry** (`nexus_registry.py`): I/O do registry local e Gist sync
-- **NexusComponent** (`nexuscomponent.py`): Interface base para todos os componentes
-- **Config/Encryption**: Configuração segura do sistema
-- **meta/**: Camada cognitiva adaptativa
-  - `PolicyStore`, `JrvsCompiler`, `DecisionEngine`, `ExplorationController`
-
-### Domain (`app/domain/`)
-Lógica de negócio pura. Sem dependências de infraestrutura.
-- **models/**: Entidades do domínio (Pydantic/dataclasses)
-- **services/**: Serviços de domínio (interpretação de comandos, estado)
-- **gears/**: Sistema de engrenagens LLM (multi-tier)
-
-### Application (`app/application/`)
-Casos de uso. Depende apenas do domínio via portas.
-- **ports/**: Interfaces (ABCs) que os adaptadores implementam
-- **services/**: Orchestration, assistente, evolução, etc.
-
-### Adapters (`app/adapters/`)
-Implementações concretas das portas.
-- **edge/**: Hardware (voz, teclado, câmera, automação desktop)
-- **infrastructure/**: Cloud (LLM, GitHub, banco de dados, API REST)
-
----
-
-## Nexus – Fluxo de Resolução
+JARVIS segue **Arquitetura Hexagonal** com **Injeção de Dependência (Nexus DI)**.
 
 ```
-nexus.resolve("component_id")
-    │
-    ├── 1. Cache local (já instanciado antes?) → retorna instância
-    ├── 2. nexus_registry.jrvs → busca module_path no registry local
-    ├── 3. Remoto (Gist) → busca module_path no mapa remoto
-    └── 4. Discovery local → percorre app/ procurando {component_id}.py
-              └── AmbiguousComponentError se >1 candidato encontrado
-```
-
-Timeouts (configuráveis via env):
-- Import: `NEXUS_IMPORT_TIMEOUT` (padrão 10 s)
-- Instantiação: `NEXUS_INSTANTIATE_TIMEOUT` (padrão 5 s)
-- Circuit open: `NEXUS_TIMEOUT` (padrão 30 s), reset: `NEXUS_CIRCUIT_RESET` (padrão 60 s)
-
----
-
-## Pipeline Runner – Fluxo
-
-```
-GitHub Actions
-    └── pipeline: build_installer
-        └── python app/runtime/pipeline_runner.py
-            └── lê config/pipelines/build_installer.yml
-                └── nexus.resolve("pyinstaller_builder")
-                    └── executa PyinstallerBuilder.execute(context)
+┌─────────────────────────────────────────┐
+│         INTERFACE / CI-CD               │
+│   - GitHub Actions                      │
+│   - API REST                            │
+│   - Telegram Bot                        │
+├─────────────────────────────────────────┤
+│         ADAPTERS (Infra/Edge)           │
+│   - gateway_llm_adapter.py              │
+│   - telegram_adapter.py                 │
+│   - github_adapter.py                   │
+│   - ollama_adapter.py                   │
+├─────────────────────────────────────────┤
+│         APPLICATION (Services)          │
+│   - assistant_service.py                │
+│   - evolution_orchestrator.py           │
+│   - metabolism_core.py                  │
+│   - llm_router.py                       │
+├─────────────────────────────────────────┤
+│         DOMAIN (Regras de Negócio)      │
+│   - capabilities/ (102 capabilities)    │
+│   - services/ (llm_command_interpreter) │
+│   - models/ (thought_log, device)       │
+├─────────────────────────────────────────┤
+│         CORE (Nexus/DI)                 │
+│   - nexus.py                            │
+│   - nexus_exceptions.py                 │
+│   - nexus_discovery.py                  │
+│   - nexus_registry.py                   │
+└─────────────────────────────────────────┘
 ```
 
 ---
 
-## Princípios
+## 🔄 Fluxo de Execução
 
-1. **Nexus instancia tudo** – nenhum `import` direto de adaptadores no domínio
-2. **Portas definem contratos** – domínio depende de interfaces, não implementações
-3. **Pipelines são declarativos** – lógica de build/deploy fica nos componentes, não no CI
-4. **Frozen para código inativo** – nada morto no código ativo
+```
+1. Comando do Usuário (Telegram/API)
+         ↓
+2. GatewayLLMAdapter → interpreta comando
+         ↓
+3. AssistantService → processa comando
+         ↓
+4. Nexus DI → resolve componentes necessários
+         ↓
+5. Adapters → executam ações (GitHub, Telegram, etc.)
+         ↓
+6. Response → retorna ao usuário
+```
+
+---
+
+## 🧬 Auto-Evolução
+
+```
+1. Erro/Gap detectado (FieldVision ou usuário)
+         ↓
+2. EvolutionOrchestrator → inicia ciclo
+         ↓
+3. EvolutionGatekeeper → valida proposta
+         ↓
+4. EvolutionSandbox → testa código gerado
+         ↓
+5. GitHubWorker → cria PR
+         ↓
+6. CI/CD → valida e mergeia
+```
+
+---
+
+## 🧠 Multi-LLM com Fallback
+
+O **MetabolismCore** gerencia uma frota de LLMs:
+
+| Provider | Modelo | Uso |
+|----------|--------|-----|
+| Groq | llama-3.3-70b-versatile | Padrão (rápido, barato) |
+| Gemini | gemini-2.0-flash | Fallback para payloads grandes |
+| Ollama | qwen2.5-coder:14b | Local, zero custo |
+
+**Roteamento:** `LLMRouter` seleciona o melhor adapter por `task_type`.
+
+---
+
+## 📦 Nexus DI — Injeção de Dependência
+
+### Componentes Registrados
+
+| ID | Classe | Localização |
+|----|--------|-------------|
+| `assistant_service` | `AssistantService` | `app/application/services/assistant_service.py` |
+| `evolution_orchestrator` | `EvolutionOrchestrator` | `app/application/services/evolution_orchestrator.py` |
+| `metabolism_core` | `MetabolismCore` | `app/application/services/metabolism_core.py` |
+| `llm_router` | `LLMRouter` | `app/application/services/llm_router.py` |
+| `gateway_llm_adapter` | `GatewayLLMCommandAdapter` | `app/adapters/infrastructure/gateway_llm_adapter.py` |
+| `telegram_adapter` | `TelegramAdapter` | `app/adapters/infrastructure/telegram_adapter.py` |
+| `github_adapter` | `GitHubAdapter` | `app/adapters/infrastructure/github_adapter.py` |
+| `consolidator` | `Consolidator` | `app/adapters/infrastructure/consolidator.py` |
+| `crystallizer_engine` | `CrystallizerEngine` | `app/application/services/crystallization/crystallizer_engine.py` |
+| `structured_logger` | `StructuredLogger` | `app/application/services/structured_logger.py` |
+| `thought_log_service` | `ThoughtLogService` | `app/application/services/thought_log_service.py` |
+| `capability_manager` | `CapabilityManager` | `app/domain/services/capability_manager.py` |
+| `llm_command_interpreter` | `LLMCommandInterpreter` | `app/domain/services/llm_command_interpreter.py` |
+| `semantic_memory` | `SemanticMemory` | `app/application/services/semantic_memory.py` |
+| `field_vision` | `FieldVision` | `app/application/services/field_vision.py` |
+| `local_repair_agent` | `LocalRepairAgent` | `app/application/services/local_repair_agent.py` |
+| `jarvis_dev_agent` | `JarvisDevAgent` | `app/application/services/jarvis_dev_agent.py` |
+| `evolution_gatekeeper` | `EvolutionGatekeeper` | `app/application/services/evolution_gatekeeper.py` |
+| `evolution_sandbox` | `EvolutionSandbox` | `app/application/services/evolution_sandbox.py` |
+| `cost_tracker_adapter` | `CostTrackerAdapter` | `app/adapters/infrastructure/cost_tracker_adapter.py` |
+| `sqlite_history_adapter` | `SQLiteHistoryAdapter` | `app/adapters/infrastructure/sqlite_history_adapter.py` |
+| `ai_gateway` | `AIGateway` | `app/adapters/infrastructure/ai_gateway.py` |
+| `ollama_adapter` | `OllamaAdapter` | `app/adapters/infrastructure/ollama_adapter.py` |
+| `github_worker` | `GitHubWorker` | `app/adapters/infrastructure/github_worker.py` |
+| `audit_logger` | `AuditLogger` | `app/application/services/audit_logger.py` |
+| `finetune_dataset_collector` | `FineTuneDatasetCollector` | `app/application/services/finetune_dataset_collector.py` |
+| `jrvs_translator` | `JrvsTranslator` | `app/application/services/jrvs_translator.py` |
+| `capability_index_service` | `CapabilityIndexService` | `app/application/services/capability_index_service.py` |
+| `proactive_core` | `ProactiveCore` | `app/application/services/proactive_core.py` |
+| `overwatch_daemon` | `OverwatchDaemon` | `app/application/services/overwatch_daemon.py` |
+| `jrvs_cloud_storage` | `JrvsCloudStorage` | `app/adapters/infrastructure/jrvs_cloud_storage.py` |
+| `drive_uploader` | `DriveUploader` | `app/adapters/infrastructure/drive_uploader.py` |
+| `gist_uploader` | `GistUploader` | `app/adapters/infrastructure/gist_uploader.py` |
+
+→ Veja [docs/NEXUS.md](docs/NEXUS.md) para detalhes completos.
+
+---
+
+## 🔒 Segurança
+
+| Componente | Responsabilidade |
+|------------|------------------|
+| `CapabilityAuthorizer` | Allowlist de capabilities + payload injection detection |
+| `SafetyGuardian` | Resource quotas + emergency stop |
+| `EnvSecretsProvider` | Único ponto de acesso a secrets |
+| `PiiRedactor` | Redação de PII antes de indexar |
+
+---
+
+## 📊 Monitoramento
+
+| Componente | Responsabilidade |
+|------------|------------------|
+| `FieldVision` | Monitoramento de logs e saúde |
+| `OverwatchDaemon` | Daemon de monitoramento de recursos |
+| `ThoughtLogService` | Log de raciocínio interno |
+| `AuditLogger` | Log de auditoria imutável |
+
+---
+
+## 🧪 Testes
+
+```bash
+# Testes de domínio (sem hardware)
+pytest tests/domain/ -v
+
+# Testes de aplicação
+pytest tests/application/ -v
+
+# Testes de adapters
+pytest tests/adapters/ -v
+
+# Todos os testes
+pytest tests/ -v
+```
+
+**Cobertura atual:** ~60% (alvo: 80%)
+
+---
+
+## 📈 Roadmap
+
+| Fase | Status | Descrição |
+|------|--------|-----------|
+| Phase 1 | ✅ Completo | Arquitetura Hexagonal + Nexus DI |
+| Phase 2 | 🟡 Em Progresso | Auto-Evolução + Self-Healing |
+| Phase 3 | ⚪ Pendente | Soldier Mesh (Edge Computing) |
+| Phase 4 | ⚪ Pendente | Fine-Tuning Contínuo |
