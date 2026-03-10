@@ -47,7 +47,8 @@ _RELEVANT_EXT: tuple = (
     ".yaml",
     ".json",
     ".md",
-    ".txt",    ".dockerfile",
+    ".txt",
+    ".dockerfile",
     ".jrvs",
 )
 
@@ -96,7 +97,8 @@ class Consolidator(NexusComponent):  # ← HERANÇA CORRETA
                     skeleton.append(f"class {node.name}")
                 elif isinstance(node, ast.FunctionDef):
                     skeleton.append(f"def {node.name}()")
-            return " | ".join(skeleton[:10])        except Exception as e:
+            return " | ".join(skeleton[:10])
+        except Exception as e:
             logger.warning(f"Erro ao extrair skeleton de {file_path}: {e}")
             return "[ERRO]"
 
@@ -145,7 +147,8 @@ class Consolidator(NexusComponent):  # ← HERANÇA CORRETA
                 out.write("=" * 80 + "\n")
                 out.write("JARVIS CONTEXT SNAPSHOT - ESTRATÉGIA SKELETON-DENSE\n")
                 out.write(f"TIMESTAMP: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
-                out.write("PADRÃO: Arquitetura Hexagonal + Nexus DI\n")                out.write("=" * 80 + "\n\n")
+                out.write("PADRÃO: Arquitetura Hexagonal + Nexus DI\n")
+                out.write("=" * 80 + "\n\n")
 
                 out.write("SEÇÃO 1 — MAPA ESTRUTURAL (SKELETON)\n")
                 out.write("-" * 40 + "\n")
