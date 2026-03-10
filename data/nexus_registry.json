@@ -11,8 +11,8 @@
     "telegram_adapter": "app.adapters.infrastructure.telegram_adapter.TelegramAdapter",
     "gist_uploader": "app.adapters.infrastructure.gist_uploader.GistUploader",
     "drive_uploader": "app.adapters.infrastructure.drive_uploader.DriveUploader",
-    "vector_memory_adapter": "app.adapters.infrastructure.vector_memory_adapter.VectorMemoryAdapter",
-    "vision_adapter": "app.adapters.infrastructure.vision_adapter.VisionAdapter",
+    
+    
     "document_store": "app.utils.document_store.DocumentStore",
     "jrvs_translator": "app.application.services.jrvs_translator.JrvsTranslator",
     "policy_store": "app.core.meta.policy_store.PolicyStore",
@@ -27,7 +27,7 @@
     "evolution_loop": "app.application.services.evolution_loop.EvolutionLoopService",
     "ollama_adapter": "app.adapters.infrastructure.ollama_adapter.OllamaAdapter",
     "evolution_orchestrator": "app.application.services.evolution_orchestrator.EvolutionOrchestrator",
-    "procedural_memory_adapter": "app.adapters.infrastructure.procedural_memory_adapter.ProceduralMemoryAdapter",
+    
     "capability_index_service": "app.application.services.capability_index_service.CapabilityIndexService",
     "cost_tracker_adapter": "app.adapters.infrastructure.cost_tracker_adapter.CostTrackerAdapter",
     "llm_router": "app.application.services.llm_router.LLMRouter",
@@ -44,11 +44,11 @@
     "safety_guardian": "app.domain.services.safety_guardian.SafetyGuardian",
     "command_interpreter": "app.domain.services.command_interpreter.CommandInterpreter",
     "intent_processor": "app.domain.services.intent_processor.IntentProcessor",
-    "extension_manager": "app.adapters.infrastructure.extension_manager.ExtensionManager",
+    
     "auth_adapter": "app.adapters.infrastructure.auth_adapter.AuthAdapter",
     "jrvs_cloud_storage": "app.adapters.infrastructure.jrvs_cloud_storage.JrvsCloudStorage",
-    "websocket_manager": "app.adapters.infrastructure.websocket_manager.WebSocketManager",
-    "soldier_bridge": "app.adapters.infrastructure.soldier_bridge.SoldierBridgeManager",
+    
+    
     "soldier_registry": "app.application.services.soldier_registry.SoldierRegistry"
   }
 }

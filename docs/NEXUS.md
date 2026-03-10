@@ -107,7 +107,7 @@ comp.execute(context)
 Se um componente não está no registry local, o Nexus faz discovery percorrendo `app/`:
 
 ```python
-nexus.resolve("meu_componente", hint_path="adapters/infrastructure")
+nexus.resolve("meu_componente", use_cache=True)
 ```
 
 O parâmetro `hint_path` acelera a busca limitando o diretório.

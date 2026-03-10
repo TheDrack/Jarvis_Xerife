@@ -1,7 +1,7 @@
 from app.core.nexus import NexusComponent
 import scapy.all as scapy
-from app.domain.models.device import Device
-from app.application.services.location_service import LocationService
+# REMOVIDO: usar nexus.resolve("device_service")
+# REMOVIDO: usar nexus.resolve("device_location_service")
 import logging
 logger = logging.getLogger(__name__)
 

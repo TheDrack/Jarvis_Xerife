@@ -1,5 +1,5 @@
 import json
-from app.core.interfaces import NexusComponent
+from app.core.nexus import NexusComponent
 
 class RewardLogger(NexusComponent):
     """
