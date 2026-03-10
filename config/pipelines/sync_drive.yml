@@ -2,21 +2,21 @@
 components:
   consolidator:
     id: "consolidator"
-    hint_path: "adapters/infrastructure"
+    hint_path: "adapters/infrastructure/consolidator"
 
   drive_uploader:
     id: "drive_uploader"
-    hint_path: "adapters/infrastructure"
+    hint_path: "adapters/infrastructure/drive_uploader"
     singleton: true
     config:
       strict_mode: false
 
   telegram_backup:
     id: "telegram_adapter"
-    hint_path: "adapters/infrastructure"
+    hint_path: "adapters/infrastructure/telegram_adapter"
     config:
       action: "upload_backup"
 
   gist_backup:
     id: "gist_uploader"
-    hint_path: "adapters/infrastructure"
+    hint_path: "adapters/infrastructure/gist_uploader"
