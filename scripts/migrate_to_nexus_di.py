@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-JARVIS Nexus DI Migration Script
+JARVIS Nexus DI Migration Script — Versão Estabilizada
 Substitui imports diretos por nexus.resolve() automaticamente.
 
-Identifica padrões como:
-  ❌ from app.adapters.infrastructure.ai_gateway import AIGateway
-  ✅ gateway = nexus.resolve("ai_gateway")
-
-  ❌ adapter = SQLiteHistoryAdapter()
-  ✅ adapter = nexus.resolve("sqlite_history_adapter")
-
-Uso:
-    python scripts/migrate_to_nexus_di.py --dry-run
-    python scripts/migrate_to_nexus_di.py --apply --backup
+Melhorias de Estabilidade:
+1. Correção do Parêntese Órfão: Class() agora vira nexus.resolve("id") sem resíduos.
+2. Regex Multiline: Remoção de imports agora é limpa e não deixa linhas vazias excessivas.
+3. Backup Post-Check: O backup só é feito se a migração de fato alterou o arquivo.
+4. Preservação de Assinatura: Ignora instâncias que já estão dentro de um resolve.
 """
+
 import argparse
 import logging
 import os
@@ -25,7 +21,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-# Configuração de Logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -36,396 +31,167 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Configurações
-# ---------------------------------------------------------------------------
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# Mapeamento de imports diretos → nexus.resolve()
-# Formato: (import_pattern, component_id, replacement_template)
+# Mapeamento de imports diretos
 IMPORT_MAPPINGS = [
-    # Adapters
-    (r'from app\.adapters\.infrastructure\.ai_gateway import AIGateway', 
-     'ai_gateway', 
-     'nexus.resolve("ai_gateway")'),    
-    (r'from app\.adapters\.infrastructure\.gemini_adapter import LLMCommandAdapter', 
-     'gemini_adapter', 
-     'nexus.resolve("gemini_adapter")'),
-    
-    (r'from app\.adapters\.infrastructure\.gateway_llm_adapter import GatewayLLMCommandAdapter', 
-     'gateway_llm_adapter', 
-     'nexus.resolve("gateway_llm_adapter")'),
-    
-    (r'from app\.adapters\.infrastructure\.telegram_adapter import TelegramAdapter', 
-     'telegram_adapter', 
-     'nexus.resolve("telegram_adapter")'),
-    
-    (r'from app\.adapters\.infrastructure\.github_adapter import GitHubAdapter', 
-     'github_adapter', 
-     'nexus.resolve("github_adapter")'),
-    
-    (r'from app\.adapters\.infrastructure\.github_worker import GitHubWorker', 
-     'github_worker', 
-     'nexus.resolve("github_worker")'),
-    
-    (r'from app\.adapters\.infrastructure\.ollama_adapter import OllamaAdapter', 
-     'ollama_adapter', 
-     'nexus.resolve("ollama_adapter")'),
-    
-    (r'from app\.adapters\.infrastructure\.sqlite_history_adapter import SQLiteHistoryAdapter', 
-     'sqlite_history_adapter', 
-     'nexus.resolve("sqlite_history_adapter")'),
-    
-    (r'from app\.adapters\.infrastructure\.vision_adapter import VisionAdapter', 
-     'vision_adapter', 
-     'nexus.resolve("vision_adapter")'),
-    
-    # Services
-    (r'from app\.application\.services\.metabolism_core import MetabolismCore', 
-     'metabolism_core', 
-     'nexus.resolve("metabolism_core")'),
-    
-    (r'from app\.application\.services\.evolution_orchestrator import EvolutionOrchestrator', 
-     'evolution_orchestrator', 
-     'nexus.resolve("evolution_orchestrator")'),
-    
-    (r'from app\.application\.services\.evolution_gatekeeper import EvolutionGatekeeper', 
-     'evolution_gatekeeper', 
-     'nexus.resolve("evolution_gatekeeper")'),
-    
-    (r'from app\.application\.services\.evolution_sandbox import EvolutionSandbox', 
-     'evolution_sandbox', 
-     'nexus.resolve("evolution_sandbox")'),
-        (r'from app\.application\.services\.llm_router import LLMRouter', 
-     'llm_router', 
-     'nexus.resolve("llm_router")'),
-    
-    (r'from app\.application\.services\.jarvis_dev_agent import JarvisDevAgent', 
-     'jarvis_dev_agent', 
-     'nexus.resolve("jarvis_dev_agent")'),
-    
-    (r'from app\.application\.services\.assistant_service import AssistantService', 
-     'assistant_service', 
-     'nexus.resolve("assistant_service")'),
-    
-    (r'from app\.application\.services\.local_repair_agent import LocalRepairAgent', 
-     'local_repair_agent', 
-     'nexus.resolve("local_repair_agent")'),
-    
-    (r'from app\.application\.services\.finetune_dataset_collector import FineTuneDatasetCollector', 
-     'finetune_dataset_collector', 
-     'nexus.resolve("finetune_dataset_collector")'),
-    
-    (r'from app\.application\.services\.field_vision import FieldVision', 
-     'field_vision', 
-     'nexus.resolve("field_vision")'),
-    
-    # Domain Services
-    (r'from app\.domain\.services\.llm_command_interpreter import LLMCommandInterpreter', 
-     'llm_command_interpreter', 
-     'nexus.resolve("llm_command_interpreter")'),
-    
-    (r'from app\.domain\.services\.capability_manager import CapabilityManager', 
-     'capability_manager', 
-     'nexus.resolve("capability_manager")'),
-    
-    (r'from app\.domain\.services\.reward_signal_provider import RewardSignalProvider', 
-     'reward_signal_provider', 
-     'nexus.resolve("reward_signal_provider")'),
-    
-    # Core
-    (r'from app\.core\.meta\.policy_store import PolicyStore', 
-     'policy_store', 
-     'nexus.resolve("policy_store")'),
+    (r'from app\.adapters\.infrastructure\.ai_gateway import AIGateway', 'ai_gateway'),
+    (r'from app\.adapters\.infrastructure\.gemini_adapter import LLMCommandAdapter', 'gemini_adapter'),
+    (r'from app\.adapters\.infrastructure\.gateway_llm_adapter import GatewayLLMCommandAdapter', 'gateway_llm_adapter'),
+    (r'from app\.adapters\.infrastructure\.telegram_adapter import TelegramAdapter', 'telegram_adapter'),
+    (r'from app\.adapters\.infrastructure\.github_adapter import GitHubAdapter', 'github_adapter'),
+    (r'from app\.adapters\.infrastructure\.github_worker import GitHubWorker', 'github_worker'),
+    (r'from app\.adapters\.infrastructure\.ollama_adapter import OllamaAdapter', 'ollama_adapter'),
+    (r'from app\.adapters\.infrastructure\.sqlite_history_adapter import SQLiteHistoryAdapter', 'sqlite_history_adapter'),
+    (r'from app\.adapters\.infrastructure\.vision_adapter import VisionAdapter', 'vision_adapter'),
+    (r'from app\.adapters\.infrastructure\.consolidator import Consolidator', 'consolidator'),
+    (r'from app\.application\.services\.metabolism_core import MetabolismCore', 'metabolism_core'),
+    (r'from app\.application\.services\.evolution_orchestrator import EvolutionOrchestrator', 'evolution_orchestrator'),
+    (r'from app\.application\.services\.evolution_gatekeeper import EvolutionGatekeeper', 'evolution_gatekeeper'),
+    (r'from app\.application\.services\.llm_router import LLMRouter', 'llm_router'),
+    (r'from app\.application\.services\.jarvis_dev_agent import JarvisDevAgent', 'jarvis_dev_agent'),
+    (r'from app\.domain\.services\.capability_manager import CapabilityManager', 'capability_manager'),
 ]
 
-# Padrões de instanciação direta para substituir
+# Padrões de instanciação (ClassName() -> nexus.resolve("id"))
+# CORREÇÃO: Capturamos os parênteses opcionais para removê-los na substituição
 INSTANTIATION_PATTERNS = [
-    # Pattern: ClassName() → nexus.resolve("component_id")
-    (r'\bAIGateway\s*\(', 'ai_gateway'),
-    (r'\bLLMCommandAdapter\s*\(', 'gemini_adapter'),
-    (r'\bGatewayLLMCommandAdapter\s*\(', 'gateway_llm_adapter'),
-    (r'\bTelegramAdapter\s*\(', 'telegram_adapter'),    (r'\bGitHubAdapter\s*\(', 'github_adapter'),
-    (r'\bGitHubWorker\s*\(', 'github_worker'),
-    (r'\bOllamaAdapter\s*\(', 'ollama_adapter'),
-    (r'\bSQLiteHistoryAdapter\s*\(', 'sqlite_history_adapter'),
-    (r'\bVisionAdapter\s*\(', 'vision_adapter'),
-    (r'\bMetabolismCore\s*\(', 'metabolism_core'),
-    (r'\bEvolutionOrchestrator\s*\(', 'evolution_orchestrator'),
-    (r'\bEvolutionGatekeeper\s*\(', 'evolution_gatekeeper'),
-    (r'\bEvolutionSandbox\s*\(', 'evolution_sandbox'),
-    (r'\bLLMRouter\s*\(', 'llm_router'),
-    (r'\bJarvisDevAgent\s*\(', 'jarvis_dev_agent'),
-    (r'\bAssistantService\s*\(', 'assistant_service'),
-    (r'\bLocalRepairAgent\s*\(', 'local_repair_agent'),
-    (r'\bFineTuneDatasetCollector\s*\(', 'finetune_dataset_collector'),
-    (r'\bFieldVision\s*\(', 'field_vision'),
-    (r'\bLLMCommandInterpreter\s*\(', 'llm_command_interpreter'),
-    (r'\bCapabilityManager\s*\(', 'capability_manager'),
-    (r'\bRewardSignalProvider\s*\(', 'reward_signal_provider'),
-    (r'\bPolicyStore\s*\(', 'policy_store'),
+    (r'\bAIGateway\s*\(\s*\)', 'ai_gateway'),
+    (r'\bLLMCommandAdapter\s*\(\s*\)', 'gemini_adapter'),
+    (r'\bGatewayLLMCommandAdapter\s*\(\s*\)', 'gateway_llm_adapter'),
+    (r'\bTelegramAdapter\s*\(\s*\)', 'telegram_adapter'),
+    (r'\bGitHubAdapter\s*\(\s*\)', 'github_adapter'),
+    (r'\bGitHubWorker\s*\(\s*\)', 'github_worker'),
+    (r'\bOllamaAdapter\s*\(\s*\)', 'ollama_adapter'),
+    (r'\bSQLiteHistoryAdapter\s*\(\s*\)', 'sqlite_history_adapter'),
+    (r'\bVisionAdapter\s*\(\s*\)', 'vision_adapter'),
+    (r'\bConsolidator\s*\(\s*\)', 'consolidator'),
+    (r'\bMetabolismCore\s*\(\s*\)', 'metabolism_core'),
+    (r'\bEvolutionOrchestrator\s*\(\s*\)', 'evolution_orchestrator'),
+    (r'\bEvolutionGatekeeper\s*\(\s*\)', 'evolution_gatekeeper'),
+    (r'\bLLMRouter\s*\(\s*\)', 'llm_router'),
+    (r'\bJarvisDevAgent\s*\(\s*\)', 'jarvis_dev_agent'),
+    (r'\bCapabilityManager\s*\(\s*\)', 'capability_manager'),
 ]
 
-# Arquivos e pastas protegidos (nunca modificar)
 PROTECTED_PATHS = {
     '.git', '.venv', 'venv', '__pycache__', 'node_modules',
     'app/core/nexus.py', 'app/core/nexus_exceptions.py',
     'tests/', 'scripts/migrate_to_nexus_di.py',
 }
 
-# ---------------------------------------------------------------------------
-# Funções de Varredura
-# ---------------------------------------------------------------------------
 def _is_protected(path: Path) -> bool:
-    """Verifica se o caminho está protegido."""
     path_str = str(path.relative_to(REPO_ROOT)).replace('\\', '/')
     return any(protected in path_str for protected in PROTECTED_PATHS)
 
-def scan_file(file_path: Path) -> List[Dict]:
-    """Escaneia um arquivo em busca de imports diretos."""
-    findings = []
-    
+def _has_nexus_import(content: str) -> bool:
+    return bool(re.search(r'from app\.core\.nexus import.*\bnexus\b', content))
+
+def migrate_file(file_path: Path, dry_run: bool = False) -> bool:
     try:
         content = file_path.read_text(encoding='utf-8')
-    except Exception as e:
-        logger.debug(f"Erro ao ler {file_path}: {e}")
-        return findings
-    
-    # Verifica imports diretos
-    for import_pattern, component_id, replacement in IMPORT_MAPPINGS:
-        matches = re.finditer(import_pattern, content)
-        for match in matches:            findings.append({
-                'type': 'import',
-                'line': content[:match.start()].count('\n') + 1,
-                'pattern': import_pattern,
-                'component_id': component_id,
-                'replacement': replacement,
-                'matched_text': match.group(),
-            })
-    
-    # Verifica instanciações diretas
-    for pattern, component_id in INSTANTIATION_PATTERNS:
-        matches = re.finditer(pattern, content)
-        for match in matches:
-            # Ignora se já estiver dentro de um nexus.resolve()
-            line_start = content.rfind('\n', 0, match.start()) + 1
-            line = content[line_start:match.end()]
-            if 'nexus.resolve' in line:
-                continue
-            
-            findings.append({
-                'type': 'instantiation',
-                'line': content[:match.start()].count('\n') + 1,
-                'pattern': pattern,
-                'component_id': component_id,
-                'replacement': f'nexus.resolve("{component_id}")',
-                'matched_text': match.group(),
-            })
-    
-    return findings
+        new_content = content
+        changes_made = 0
 
-def scan_repository() -> Dict[Path, List[Dict]]:
-    """Varre todo o repositório em busca de violations."""
-    violations = {}
-    
-    for py_file in REPO_ROOT.rglob('*.py'):
-        if _is_protected(py_file):
-            continue
-        
-        findings = scan_file(py_file)
-        if findings:
-            violations[py_file] = findings
-    
-    return violations
+        # 1. Substituir Instanciações (Remove os parênteses vazios da chamada)
+        for pattern, component_id in INSTANTIATION_PATTERNS:
+            if re.search(pattern, new_content):
+                # Verifica se já não foi resolvido anteriormente
+                if f'nexus.resolve("{component_id}")' not in new_content:
+                    new_content = re.sub(pattern, f'nexus.resolve("{component_id}")', new_content)
+                    changes_made += 1
 
-# ---------------------------------------------------------------------------
-# Funções de Migração
-# ---------------------------------------------------------------------------
-def migrate_file(file_path: Path, findings: List[Dict], dry_run: bool = False) -> bool:
-    """Aplica migração em um arquivo."""
-    try:        content = file_path.read_text(encoding='utf-8')
-        original_content = content
-        
-        # Adiciona import do nexus se necessário
-        has_nexus_import = 'from app.core.nexus import nexus' in content
-        needs_nexus_import = any(f['type'] == 'instantiation' for f in findings)
-        
-        # Processa findings em ordem reversa para preservar line numbers
-        findings_sorted = sorted(findings, key=lambda f: f['line'], reverse=True)
-        
-        for finding in findings_sorted:
-            if finding['type'] == 'import':
-                # Remove a linha de import direto
-                lines = content.split('\n')
-                line_idx = finding['line'] - 1
-                if 0 <= line_idx < len(lines):
-                    if finding['matched_text'] in lines[line_idx]:
-                        lines[line_idx] = ''  # Remove linha vazia
-                content = '\n'.join(lines)
-                
-            elif finding['type'] == 'instantiation':
-                # Substitui instanciação direta por nexus.resolve()
-                content = re.sub(
-                    finding['pattern'],
-                    finding['replacement'],
-                    content,
-                    count=1
-                )
-        
-        # Adiciona import do nexus no topo se necessário
-        if needs_nexus_import and not has_nexus_import:
-            # Encontra o primeiro import ou o início do arquivo
-            lines = content.split('\n')
+        # 2. Remover Imports Diretos
+        for import_pattern, _ in IMPORT_MAPPINGS:
+            if re.search(import_pattern, new_content):
+                # Remove a linha e limpa espaços/tabs
+                new_content = re.sub(r'^[ \t]*' + import_pattern + r'.*$\n?', '', new_content, flags=re.MULTILINE)
+                changes_made += 1
+
+        if changes_made == 0:
+            return False
+
+        # 3. Normalização de espaçamento
+        new_content = re.sub(r'\n{3,}', '\n\n', new_content)
+
+        # 4. Inserção do Import do Nexus
+        if 'nexus.resolve' in new_content and not _has_nexus_import(new_content):
+            lines = new_content.splitlines()
             insert_idx = 0
+            in_docstring = False
+            quote_type = None
+
             for i, line in enumerate(lines):
-                if line.startswith('import ') or line.startswith('from '):
-                    insert_idx = i
-                    break
+                if line.startswith('#!'):
+                    insert_idx = i + 1
+                    continue
+                if not in_docstring and (line.strip().startswith('"""') or line.strip().startswith("'''")):
+                    in_docstring = True
+                    quote_type = '"""' if '"""' in line else "'''"
+                    if line.count(quote_type) == 2: # Docstring de linha única
+                        in_docstring = False
+                        insert_idx = i + 1
+                    continue
+                if in_docstring:
+                    if quote_type in line:
+                        in_docstring = False
+                        insert_idx = i + 1
+                    continue
+                if line.strip() == '':
+                    continue
+                # Se chegamos em código real, paramos aqui
+                insert_idx = i
+                break
             
             lines.insert(insert_idx, 'from app.core.nexus import nexus')
-            content = '\n'.join(lines)
-        
-        # Remove linhas vazias múltiplas
-        content = re.sub(r'\n{3,}', '\n\n', content)
-        
+            new_content = '\n'.join(lines)
+
         if dry_run:
-            logger.info(f"🔍 [DRY-RUN] {file_path}: {len(findings)} substituições")
+            logger.info(f"🔍 [DRY-RUN] {file_path.relative_to(REPO_ROOT)}: {changes_made} alterações")
             return True
-        
-        # Escreve o arquivo migrado        if content != original_content:
-            file_path.write_text(content, encoding='utf-8')
-            logger.info(f"✅ Migrado: {file_path} ({len(findings)} changes)")
+
+        if new_content != content:
+            file_path.write_text(new_content, encoding='utf-8')
+            logger.info(f"✅ Migrado: {file_path.relative_to(REPO_ROOT)} ({changes_made} alterações)")
             return True
         
         return False
-        
+
     except Exception as e:
-        logger.error(f"❌ Erro ao migrar {file_path}: {e}")
+        logger.error(f"❌ Erro em {file_path.name}: {e}")
         return False
 
-def create_backup(violations: Dict[Path, List[Dict]]) -> Path:
-    """Cria backup dos arquivos antes da migração."""
-    backup_dir = REPO_ROOT / '.backups' / 'nexus_di_migration'
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    
-    for file_path in violations.keys():
-        try:
-            backup_path = backup_dir / f"{file_path.stem}_{timestamp}.py"
-            shutil.copy2(file_path, backup_path)
-        except Exception as e:
-            logger.warning(f"⚠️  Falha ao backup {file_path}: {e}")
-    
-    logger.info(f"📦 Backup criado em: {backup_dir}")
-    return backup_dir
-
-# ---------------------------------------------------------------------------
-# Relatório
-# ---------------------------------------------------------------------------
-def generate_report(violations: Dict[Path, List[Dict]], output_path: Path) -> None:
-    """Gera relatório detalhado das violations."""
-    total_files = len(violations)
-    total_violations = sum(len(f) for f in violations.values())
-    
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write("=" * 80 + "\n")
-        f.write("JARVIS NEXUS DI MIGRATION REPORT\n")
-        f.write(f"Generated: {datetime.now().isoformat()}\n")
-        f.write("=" * 80 + "\n\n")
-        
-        f.write(f"📊 SUMMARY\n")
-        f.write(f"   Total files affected: {total_files}\n")
-        f.write(f"   Total violations: {total_violations}\n\n")
-        
-        f.write(f"📁 FILES\n")
-        f.write("-" * 80 + "\n")
-        
-        for file_path, findings in sorted(violations.items()):            rel_path = file_path.relative_to(REPO_ROOT)
-            f.write(f"\n{rel_path}\n")
-            f.write(f"   Violations: {len(findings)}\n")
-            
-            for finding in findings:
-                f.write(f"   - Line {finding['line']}: {finding['type']} → {finding['component_id']}\n")
-        
-        f.write("\n" + "=" * 80 + "\n")
-    
-    logger.info(f"📄 Relatório gerado: {output_path}")
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description='JARVIS Nexus DI Migration')
-    parser.add_argument(
-        '--dry-run', action='store_true',
-        help='Simula migração sem modificar arquivos'
-    )
-    parser.add_argument(
-        '--apply', action='store_true',
-        help='Aplica migração nos arquivos'
-    )
-    parser.add_argument(
-        '--backup', action='store_true',
-        help='Cria backup antes de migrar'
-    )
-    parser.add_argument(
-        '--report', type=str, default='nexus_di_migration_report.txt',
-        help='Caminho do relatório de saída'
-    )
+    parser.add_argument('--dry-run', action='store_true', help='Simula sem salvar')
+    parser.add_argument('--apply', action='store_true', help='Aplica mudanças')
+    parser.add_argument('--backup', action='store_true', help='Cria backup')
     
     args = parser.parse_args()
-    
     if not args.dry_run and not args.apply:
         logger.error("❌ Use --dry-run ou --apply")
-        return 1
-    
-    logger.info("=" * 80)
-    logger.info("🔄 JARVIS NEXUS DI MIGRATION")
-    logger.info("=" * 80)
-    
-    # Varre o repositório
-    logger.info("\n🔍 Escaneando repositório...")
-    violations = scan_repository()
-    
-    if not violations:
-        logger.info("\n✅ Nenhum import direto encontrado! Projeto já está 100% Nexus DI.")
-        return 0    
-    logger.info(f"\n📊 {len(violations)} arquivo(s) com {sum(len(f) for f in violations.values())} violation(ões)")
-    
-    # Gera relatório
-    report_path = REPO_ROOT / args.report
-    generate_report(violations, report_path)
-    
-    # Cria backup se solicitado
-    if args.backup and not args.dry_run:
-        logger.info("\n📦 Criando backup...")
-        create_backup(violations)
-    
-    # Confirmação
-    if not args.dry_run and not args.apply:
-        response = input(f"\n⚠️  Confirmar migração de {len(violations)} arquivo(s)? (s/N): ")
-        if response.lower() not in ('s', 'sim', 'y', 'yes'):
-            logger.info("❌ Migração cancelada.")
-            return 0
-    
-    # Aplica migração
-    logger.info("\n🔄 Aplicando migração...")
-    success_count = 0
-    for file_path, findings in violations.items():
-        if migrate_file(file_path, findings, dry_run=args.dry_run):
-            success_count += 1
-    
-    # Resumo final
-    logger.info("\n" + "=" * 80)
-    logger.info("📊 RESUMO DA MIGRAÇÃO")
-    logger.info("=" * 80)
-    logger.info(f"Arquivos processados: {success_count}")
-    logger.info(f"Modo: {'DRY-RUN' if args.dry_run else 'APPLY'}")
-    logger.info(f"Relatório: {report_path}")
-    logger.info("=" * 80)
-    
-    return 0 if success_count == len(violations) else 1
+        sys.exit(1)
+
+    logger.info("Iniciando Migração Nexus DI...")
+    py_files = [f for f in REPO_ROOT.rglob('*.py') if not _is_protected(f)]
+    total = 0
+    backup_dir = None
+
+    if args.backup and args.apply:
+        backup_dir = REPO_ROOT / '.backups' / f"nexus_di_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
+    for py_file in py_files:
+        # Primeiro verificamos se há mudanças no modo simulação ou aplicação
+        if migrate_file(py_file, dry_run=args.dry_run):
+            total += 1
+            if args.backup and args.apply and backup_dir:
+                rel = py_file.relative_to(REPO_ROOT)
+                dest = backup_dir / rel
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(py_file, dest)
+
+    logger.info(f"\nConcluído. Arquivos processados: {total}")
 
 if __name__ == '__main__':
-    sys.exit(main())
+    main()
