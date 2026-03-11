@@ -21,7 +21,7 @@ def _class_to_component_id(class_name: str) -> str:
 class NexusComponent(ABC):
     """
     Interface do DNA JARVIS.
-    COM GUARDIÃO GLOBAL + AUTO-CURA EMBUTIDA.
+    Implementa a Blindagem Global (Self-Healing) via Metaprogramação.
     """
 
     @classmethod
@@ -29,6 +29,7 @@ class NexusComponent(ABC):
         super().__init_subclass__(**kwargs)
 
         # 1. Guardião de Instanciação
+        # Garante que os componentes passem pelo nexus.resolve()
         original_init = cls.__dict__.get("__init__")
         if original_init is not None:
             @functools.wraps(original_init)
@@ -43,11 +44,13 @@ class NexusComponent(ABC):
                 original_init(self, *args, **kw)
             cls.__init__ = _guarded_init
 
-        # 2. Guardião de Execução + Auto-Cura
+        # 2. Guardião de Execução + Auto-Cura (CORRIGIDO)
         original_execute = cls.__dict__.get("execute")
         if original_execute is not None:
             @functools.wraps(original_execute)
-            def _guarded_execute(self, context: Optional[Dict[str, Any]] = None, **kw: Any) -> Any:                try:
+            def _guarded_execute(self, context: Optional[Dict[str, Any]] = None, **kw: Any) -> Any:
+                try:
+                    # Executa a lógica original do componente
                     return original_execute(self, context, **kw)
                 except Exception as e:
                     error_type = type(e).__name__
@@ -58,16 +61,21 @@ class NexusComponent(ABC):
                         f"💥 [NEXUS GUARD] {cls.__name__}: {error_type} - {error_msg}"
                     )
 
-                    # Anti-loop: componentes de cura não se auto-curam
-                    anti_loop = {"LocalRepairAgent", "FieldVision", "EvolutionOrchestrator", 
-                                 "SelfHealingTriggerService", "JarvisDevAgent"}
+                    # Anti-loop: Componentes do núcleo de cura não devem tentar curar a si mesmos
+                    anti_loop = {
+                        "LocalRepairAgent", 
+                        "FieldVision", 
+                        "EvolutionOrchestrator", 
+                        "SelfHealingTriggerService", 
+                        "JarvisDevAgent"
+                    }
                     
                     if cls.__name__ not in anti_loop:
                         _nexus_component_logger.info(f"🧬 [NEXUS GUARD] Trigger self-healing para {cls.__name__}...")
                         try:
                             from app.core.nexus import nexus
                             
-                            # Descobre arquivo físico automaticamente (Gemini)
+                            # Identifica o arquivo físico para o Agente de Reparo
                             file_path = None
                             module = sys.modules.get(cls.__module__)
                             if module and hasattr(module, '__file__'):
@@ -89,28 +97,39 @@ class NexusComponent(ABC):
                                 elif repair_result and repair_result.get("escalate_to_ci"):
                                     _nexus_component_logger.warning(f"⚠️ [NEXUS GUARD] {cls.__name__} escalado para CI.")
                         except Exception as healing_err:
-                            _nexus_component_logger.error(f"❌ [NEXUS GUARD] Falha no self-healing: {healing_err}")
+                            _nexus_component_logger.error(f"❌ [NEXUS GUARD] Falha catastrófica no motor de cura: {healing_err}")
 
-                    # Retorno rico em informações (minha solução)
+                    # Retorno estruturado para que o sistema não quebre (Fail-Safe)
                     return {
                         "success": False,
                         "error": error_msg,
                         "error_type": error_type,
-                        "traceback": error_tb,                        "component": cls.__name__,
+                        "traceback": error_tb,
+                        "component": cls.__name__,
                         "nexus_guarded": True,
                     }
 
             cls.execute = _guarded_execute
 
     def configure(self, config: Dict[str, Any]) -> None:
-        """Configuração opcional."""
+        """Configuração opcional de runtime."""
         pass
 
     def can_execute(self, context: Dict[str, Any]) -> bool:
-        """Pré-condições de execução."""
+        """Verificação de pré-condições."""
         return True
 
     @abstractmethod
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Retorna evidência de efeito."""
+        """Contrato obrigatório de execução."""
         pass
+
+    def wrap_uncertainty(self, result: Dict[str, Any], evidence_found: bool) -> Dict[str, Any]:
+        """Gerencia a incerteza do efeito colateral."""
+        if not evidence_found:
+            result["execution_state"] = "uncertain"
+            result["success"] = False
+        else:
+            result["execution_state"] = "confirmed"
+            result["success"] = True
+        return result
