@@ -1,26 +1,15 @@
 # -*- coding: utf-8 -*-
-"""
-Consolidated Context Service — Fonte de Verdade para Autoconsciência do JARVIS.
-Substitui buscas vetoriais por leitura direta do snapshot consolidado.
-"""
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
-
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONSOLIDATED_PATH = "CORE_LOGIC_CONSOLIDATED.txt"
-MAX_CONTEXT_TOKENS = 100000  # Limite seguro para modelos com janela longa
-
+MAX_CONTEXT_TOKENS = 100000 
 
 class ConsolidatedContextService(NexusComponent):
-    """
-    Serviço de contexto consolidado para autoconsciência do JARVIS.
-    Fornece o código-fonte completo do sistema para o LLM.
-    """
-
     def __init__(self, consolidated_path: str = DEFAULT_CONSOLIDATED_PATH):
         super().__init__()
         self._consolidated_path = Path(consolidated_path)
@@ -28,78 +17,59 @@ class ConsolidatedContextService(NexusComponent):
         self._cache_version: int = 0
 
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Retorna o contexto consolidado atual."""
-        ctx = context or {}
-        action = ctx.get("action", "read")
+        """
+        Retorna o contexto mantendo as chaves originais do pipeline.
+        """
+        # Garante que o dicionário original do pipeline persista
+        ctx = context if context is not None else {}
+        
+        # O runner do pipeline pode passar configurações aqui
+        config = ctx.get("config", {})
+        action = config.get("action") or ctx.get("action", "read")
 
         if action == "read":
-            return {"success": True, "context": self.get_context()}
+            # Adicionamos o conteúdo sem apagar o 'result' ou 'artifacts' do Consolidator
+            ctx["context_content"] = self.get_context()
+            ctx["context_loaded"] = True
+            return ctx
+            
         elif action == "refresh":
             self._cache = None
-            return {"success": True, "context": self.get_context()}
+            ctx["context_content"] = self.get_context()
+            return ctx
+            
         elif action == "info":
-            return {"success": True, "info": self.get_info()}
+            # Adiciona info ao contexto em vez de substituir o dicionário
+            ctx["context_info"] = self.get_info()
+            return ctx
 
-        return {"success": False, "error": "Ação desconhecida"}
+        return ctx # Retorna o contexto íntegro mesmo se a ação for desconhecida
 
     def get_context(self, max_tokens: int = MAX_CONTEXT_TOKENS) -> str:
-        """
-        Lê o arquivo consolidado e retorna o contexto completo.
-        Usa cache para evitar leituras repetidas.
-        """
-        if self._cache is not None:            return self._cache
+        """Lê o arquivo consolidado respeitando o arquivo físico no disco."""
+        # Se o cache existe, usamos. Se não, lemos o arquivo criado pelo Consolidator.
+        if self._cache is not None:
+            return self._cache
 
         if not self._consolidated_path.exists():
-            logger.warning(f"[CONTEXT] Arquivo consolidado não encontrado: {self._consolidated_path}")
-            return self._generate_fallback_context()
+            logger.warning(f"[CONTEXT] Arquivo não encontrado: {self._consolidated_path}")
+            return "Arquivo de contexto não disponível."
 
         try:
             content = self._consolidated_path.read_text(encoding="utf-8")
-
-            # Limita por tokens (estimativa: 1 token ≈ 4 caracteres)
             if len(content) > max_tokens * 4:
                 content = content[: max_tokens * 4]
-                logger.info(f"[CONTEXT] Contexto truncado para {max_tokens} tokens")
-
+            
             self._cache = content
-            self._cache_version += 1
-            logger.info(f"[CONTEXT] Contexto carregado: {len(content)} chars (v{self._cache_version})")
             return content
-
         except Exception as e:
-            logger.error(f"[CONTEXT] Erro ao ler consolidado: {e}")
-            return self._generate_fallback_context()
+            logger.error(f"[CONTEXT] Erro: {e}")
+            return str(e)
 
     def get_info(self) -> Dict[str, Any]:
-        """Retorna metadados sobre o contexto consolidado."""
-        if not self._consolidated_path.exists():
-            return {"exists": False, "error": "Arquivo não encontrado"}
-
-        stat = self._consolidated_path.stat()
+        stat = self._consolidated_path.stat() if self._consolidated_path.exists() else None
         return {
-            "exists": True,
-            "path": str(self._consolidated_path),
-            "size_bytes": stat.st_size,
-            "size_tokens": stat.st_size // 4,
-            "cached": self._cache is not None,
-            "cache_version": self._cache_version,
+            "path": str(self._consolidated_path.absolute()),
+            "exists": self._consolidated_path.exists(),
+            "size": stat.st_size if stat else 0
         }
-
-    def _generate_fallback_context(self) -> str:
-        """Gera contexto fallback se o consolidado não existir."""
-        return """
-# JARVIS CONSOLIDATED CONTEXT — FALLBACK
-# O arquivo CORE_LOGIC_CONSOLIDATED.txt não foi encontrado.
-# Execute o pipeline 'sync_drive' ou o consolidator para gerar o snapshot.
-
-## Estrutura Esperada:
-- SEÇÃO 1: Mapa Estrutural (Skeleton)
-- SEÇÃO 2: Conteúdo Denso (Full Logic)
-
-## Ação Necessária:python app/runtime/pipeline_runner.py --pipeline sync_drive
-"""
-
-    def invalidate_cache(self) -> None:
-        """Invalida o cache para forçar releitura."""
-        self._cache = None
-        logger.info("[CONTEXT] Cache invalidado")
