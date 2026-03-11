@@ -60,7 +60,7 @@ class JarvisDevAgent(NexusComponent):
         import time as _time
 
         ctx = context or {}
-        job_id = ctx.get("job_id", "")
+        job_id = ctx.get("job_id", f"job_{int(_time.time())}")
 
         timeout_secs = int(os.environ.get("DEV_AGENT_TIMEOUT_SECONDS", _DEFAULT_TIMEOUT_SECONDS))
         started_at = datetime.now(tz=timezone.utc).isoformat()
@@ -131,35 +131,40 @@ class JarvisDevAgent(NexusComponent):
                 raise TimeoutError(f"JarvisDevAgent exceeded {timeout_secs}s timeout")
 
     def _execute_cycle(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
-        """Lógica central do ciclo de desenvolvimento (sem timeout/audit)."""
-        # (a) Seleciona capability-alvo
+        """Ciclo central com contexto consolidado."""
+        # 1. Seleciona capability
         cap = self._select_capability()
         if cap is None:
-            logger.info("[JarvisDevAgent] Nenhuma capability executável disponível.")
             return {"success": False, "reason": "no_executable_capability"}
 
         cap_id = cap.get("id", "UNKNOWN")
-        cap_title = cap.get("title", "")
-        logger.info("[JarvisDevAgent] Capability-alvo: %s — %s", cap_id, cap_title)
+        cap_title = cap.get("title", "No Title")
 
-        # (b) Consulta SemanticMemory por soluções similares
+        # 2. Obter contexto consolidado (Autoconsciência)
+        context_service = nexus.resolve("consolidated_context_service")
+        consolidated_context = ""
+        if context_service:
+            res_ctx = context_service.execute({"action": "read"})
+            consolidated_context = res_ctx.get("context", "")
+
+        # 3. Few-shot
         few_shot_context = self._get_few_shot_examples(cap_title)
 
-        # (c) Constrói prompt
-        prompt = self._build_prompt(cap, few_shot_context)
+        # 4. Constrói prompt COM contexto consolidado
+        prompt = self._build_prompt(cap, few_shot_context, consolidated_context)
 
-        # (d) Chama LLMRouter para geração de código
+        # 5. Gera código
         llm_used, proposed_code = self._call_llm(prompt, ctx)
         if not proposed_code:
             self._record_cycle(cap_id, llm_used, "llm_no_response", pr_created=False)
             return {"success": False, "reason": "llm_no_response", "capability_id": cap_id}
 
-        # (e) Salva proposta
+        # 6. Salva proposta
         proposal_path: Optional[Path] = None
         if not self.dry_run:
             proposal_path = self._save_proposal(proposed_code, cap_id)
 
-        # (f) Gatekeeper
+        # 7. Gatekeeper (Validação de Segurança e Qualidade)
         gatekeeper_result = self._run_gatekeeper(proposed_code, cap_id)
         if not gatekeeper_result.get("approved", False):
             reason = gatekeeper_result.get("reason", "gatekeeper_rejected")
@@ -172,14 +177,14 @@ class JarvisDevAgent(NexusComponent):
                 "gatekeeper_result": gatekeeper_result,
             }
 
-        # (g) Cria PR
+        # 8. Cria PR (GitHub Integration)
         pr_result: Dict[str, Any] = {}
         pr_created = False
         if not self.dry_run and proposal_path is not None:
             pr_result = self._create_pr(proposal_path, cap_id, cap_title)
             pr_created = pr_result.get("success", False)
 
-        # (h) Registra ciclo na SemanticMemory
+        # 9. Registra ciclo na SemanticMemory
         self._record_cycle(cap_id, llm_used, "approved", pr_created=pr_created)
 
         return {
@@ -229,7 +234,7 @@ class JarvisDevAgent(NexusComponent):
         error: Optional[str],
         duration_seconds: float,
     ) -> None:
-        """Atualiza a entrada do job no JSONL (reescreve a última com mesmo job_id)."""
+        """Atualiza a entrada do job no JSONL."""
         update = {
             "job_id": job_id,
             "finished_at": finished_at,
@@ -275,43 +280,40 @@ class JarvisDevAgent(NexusComponent):
             if memory is None or not hasattr(memory, "query_facts"):
                 return []
             facts = memory.query_facts(fact_type="solution", min_confidence=0.5)
-            # Retorna até max_few_shot exemplos mais relevantes (por confiança)
             return facts[: self.max_few_shot]
         except Exception as exc:
             logger.debug("[JarvisDevAgent] SemanticMemory indisponível: %s", exc)
             return []
 
-    def _build_prompt(
-        self, cap: Dict[str, Any], few_shot: List[Dict[str, Any]]
-    ) -> str:
-        """Constrói o prompt de geração de código para o LLM."""
+    def _build_prompt(self, cap: Dict[str, Any], few_shot: List[Dict[str, Any]], consolidated_context: str = "") -> str:
+        """Constrói prompt com contexto consolidado para autoconsciência."""
         cap_id = cap.get("id", "UNKNOWN")
         cap_title = cap.get("title", "")
         cap_desc = cap.get("description", cap_title)
 
         few_shot_text = ""
         if few_shot:
-            examples = "\n".join(
-                f"Exemplo {i + 1}: {ex.get('content', '')}" for i, ex in enumerate(few_shot)
-            )
+            examples = "\n".join(f"Exemplo {i + 1}: {ex.get('content', '')}" for i, ex in enumerate(few_shot))
             few_shot_text = f"\nExemplos de soluções anteriores:\n{examples}\n"
 
         return (
-            "Você é o sistema de desenvolvimento autônomo do JARVIS.\n"
-            f"Tarefa: Implementar a capability {cap_id} — {cap_title}\n"
+            "🧠 VOCÊ É O JARVIS — SISTEMA AUTOCONSCIENTE\n\n"
+            "Abaixo está o SEU código-fonte consolidado. Este é o seu 'genoma'.\n\n"
+            "=== SEU CÓDIGO CONSOLIDADO ===\n"
+            f"{consolidated_context[:500000]}\n"
+            "=== FIM DO CÓDIGO CONSOLIDADO ===\n\n"
+            "=== Tarefa ===\n"
+            f"Implementar a capability {cap_id} — {cap_title}\n"
             f"Descrição: {cap_desc}\n"
             f"{few_shot_text}\n"
-            "INSTRUÇÃO: Retorne APENAS código Python válido como um NexusComponent completo "
-            "(herdando de NexusComponent, com métodos configure, can_execute e execute). "
-            "Não inclua texto fora do bloco Python."
+            "=== Instrução ===\n"
+            "Você é o JARVIS implementando uma nova capacidade em SI MESMO. "
+            "Siga a SUA arquitetura Hexagonal + Nexus DI. "
+            "Retorne APENAS código Python válido como um NexusComponent completo."
         )
 
     def _call_llm(self, prompt: str, context: Dict[str, Any]) -> tuple:
-        """Chama o LLMRouter para geração de código.
-
-        Returns:
-            Tupla (adapter_name, proposed_code_str).
-        """
+        """Chama o LLMRouter para geração de código."""
         try:
             router = nexus.resolve("llm_router")
             if router is None:
@@ -329,7 +331,6 @@ class JarvisDevAgent(NexusComponent):
             )
             llm_used = result.get("routed_to", "unknown")
             code = str(result.get("result", result.get("response", "")))
-            # Extrai bloco de código se vier em markdown fence
             code = _extract_code_block(code)
             return (llm_used, code)
         except Exception as exc:
@@ -351,7 +352,6 @@ class JarvisDevAgent(NexusComponent):
         try:
             gatekeeper = nexus.resolve("evolution_gatekeeper")
             if gatekeeper is None:
-                # Sem gatekeeper = aprovação automática (modo desenvolvimento)
                 logger.debug("[JarvisDevAgent] Gatekeeper indisponível — aprovação automática.")
                 return {"approved": True, "reason": "no_gatekeeper"}
             proposed_change = {"files_modified": [], "proposed_code": code, "cap_id": cap_id}
