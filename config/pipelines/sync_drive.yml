@@ -2,25 +2,28 @@
 components:
   consolidator:
     id: "consolidator"
-    hint_path: "adapters/infrastructure"
+    hint_path: "app/adapters/infrastructure/consolidator"
+    singleton: true
+    config:
+      strict_mode: true
 
   consolidated_context_service:
     id: "consolidated_context_service"
-    hint_path: "application/services"
+    hint_path: "app/application/services/consolidated_context_service"
 
   drive_uploader:
     id: "drive_uploader"
-    hint_path: "adapters/infrastructure"
+    hint_path: "app/adapters/infrastructure/drive_uploader"
     singleton: true
     config:
       strict_mode: false
 
   telegram_backup:
     id: "telegram_adapter"
-    hint_path: "adapters/infrastructure"
+    hint_path: "app/adapters/infrastructure/telegram_adapter"
     config:
       action: "upload_backup"
 
   gist_backup:
     id: "gist_uploader"
-    hint_path: "adapters/infrastructure"
+    hint_path: "app/adapters/infrastructure/gist_uploader"
