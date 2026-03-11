@@ -37,7 +37,7 @@ _IGNORED_DIRS: Set[str] = {
     ".frozen",
     "logs",
     "data",
-    ".backups",
+    ".backups"
 }
 
 # Extensões relevantes para consolidação
@@ -48,8 +48,7 @@ _RELEVANT_EXT: tuple = (
     ".json",
     ".md",
     ".txt",
-    ".dockerfile",
-    ".jrvs",
+    ".dockerfile"
 )
 
 # Padrões de camadas arquiteturais
