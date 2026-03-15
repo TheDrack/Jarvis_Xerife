@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Pipeline Runner — Orquestra execução de pipelines YAML.
-CORRIGIDO: Chave 'current_config' para compatibilidade com adapters.
+Versão 2026.03: CORREÇÃO DE SINTAXE (IndentationError).
 """
 import os
 import yaml
@@ -10,6 +10,7 @@ from typing import Any, Dict
 
 from app.core.nexus import nexus, CloudMock
 
+# Configuração de Log
 logging.basicConfig(
     level=logging.INFO, 
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -18,7 +19,7 @@ logging.basicConfig(
 logger = logging.getLogger("PipelineRunner")
 
 def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, Any]:
-    """Executa pipeline com proteção contra perda de chaves de contexto."""
+    """Executa pipeline com correção de indentação e proteção de estado."""
     logger.info(f"🚀 INICIANDO RUNNER: {pipeline_name}")
 
     config_path = os.path.join("config", "pipelines", f"{pipeline_name}.yml")
@@ -26,15 +27,18 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
         logger.error(f"❌ Pipeline '{pipeline_name}' não encontrado.")
         return {"success": False}
 
-    with open(config_path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+    except Exception as e:
+        logger.error(f"❌ Erro ao ler YAML: {e}")
+        return {"success": False}
 
-    # Inicialização do Contexto
     context = {
         "artifacts": {},
         "metadata": {"pipeline": pipeline_name},
         "env": dict(os.environ),
-        "results": []  # Histórico de passos
+        "results": []
     }
 
     components = config.get("components", {})
@@ -47,17 +51,19 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
         logger.info(f"🔍 Resolvendo: {step_name} (ID: {target_id})")
         instance = nexus.resolve(target_id=target_id, hint_path=meta.get("hint_path"))
 
-        if not instance or getattr(instance, "__is_cloud_mock__", False):            msg = f"Componente '{target_id}' indisponível."
+        # CORREÇÃO DE INDENTAÇÃO AQUI (Linha 51 aproximada)
+        if not instance or getattr(instance, "__is_cloud_mock__", False):
+            msg = f"Componente '{target_id}' indisponível."
             logger.warning(f"☁️ {msg}")
             if is_strict:
                 raise RuntimeError(f"❌ [STRICT] {msg}")
+            context.setdefault("results", []).append({"step": step_name, "status": "skipped"})
             continue
 
         try:
             if hasattr(instance, "configure"):
                 instance.configure(comp_config)
 
-            # ← CORREÇÃO CRÍTICA: Usar 'current_config' (não 'config')
             context["current_config"] = comp_config
 
             if hasattr(instance, "can_execute") and not instance.can_execute(context):
@@ -65,41 +71,42 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
                 continue
 
             logger.info(f"⚙️ Executando: {step_name}...")
+            
+            # Backup preventivo para o State Recovery
+            prev_results = context.get("results", [])
+            prev_artifacts = context.get("artifacts", {})
+            
             updated_context = instance.execute(context)
 
-            # --- CORREÇÃO: Garantir que 'results' exista após a execução ---
             if isinstance(updated_context, dict):
-                # Se o componente retornou um novo dict, garantimos que as chaves vitais voltem
+                # State Recovery: evita KeyError se o componente retornar dict parcial
                 if "results" not in updated_context:
-                    updated_context["results"] = context.get("results", [])
+                    updated_context["results"] = prev_results
                 if "artifacts" not in updated_context:
-                    updated_context["artifacts"] = context.get("artifacts", {})
-
+                    updated_context["artifacts"] = prev_artifacts
+                
                 context = updated_context
-                # Uso do setdefault para segurança tripla
-                context.setdefault("results", []).append({
-                    "step": step_name,
-                    "status": "success"
-                })
+                context.setdefault("results", []).append({"step": step_name, "status": "success"})
                 logger.info(f"✅ {step_name} finalizado.")
             else:
-                logger.warning(f"⚠️ {step_name} não retornou um dict válido.")
+                logger.warning(f"⚠️ {step_name} retornou tipo inválido.")
+                context.setdefault("results", []).append({"step": step_name, "status": "invalid_return"})
 
         except Exception as e:
             logger.error(f"💥 ERRO EM '{step_name}': {e}", exc_info=True)
-            # Proteção aqui também
-            context.setdefault("results", []).append({
-                "step": step_name,
-                "status": "error",
-                "msg": str(e)
-            })
+            context.setdefault("results", []).append({"step": step_name, "status": "error", "msg": str(e)})
             if is_strict:
                 raise e
 
-    logger.info(f"🏁 PIPELINE '{pipeline_name}' FINALIZADO.")    return context
+    logger.info(f"🏁 PIPELINE '{pipeline_name}' FINALIZADO.")
+    return context
 
 if __name__ == "__main__":
     p_name = os.getenv("PIPELINE")
     g_strict = os.getenv("PIPELINE_STRICT", "false").lower() == "true"
     if p_name:
-        run_pipeline(p_name, g_strict)
+        try:
+            run_pipeline(p_name, g_strict)
+        except Exception as fatal:
+            logger.critical(f"💀 Falha fatal: {fatal}")
+            sys.exit(1)
