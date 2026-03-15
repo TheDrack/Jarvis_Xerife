@@ -38,7 +38,7 @@ class JarvisDevAgent(NexusComponent):
         ctx = context or {}
         task = self._create_task(ctx)
         
-        logger.info(f"🤖 [JarvisDevAgent] task_id={task.task_id} source={task.source.value}")
+        logger.info(f" [JarvisDevAgent] task_id={task.task_id} source={task.source.value}")
         
         self._trajectory = AgentTrajectory(task=task)
         
@@ -47,7 +47,7 @@ class JarvisDevAgent(NexusComponent):
             self._consolidate(result)
             return result
         except Exception as e:
-            logger.error(f"❌ [JarvisDevAgent] Erro: {e}", exc_info=True)            return {"success": False, "task_id": task.task_id, "reason": str(e)}
+            logger.error(f" [JarvisDevAgent] Erro: {e}", exc_info=True)            return {"success": False, "task_id": task.task_id, "reason": str(e)}
     
     def _create_task(self, ctx: Dict[str, Any]) -> AgentTask:
         return AgentTask(
@@ -65,7 +65,7 @@ class JarvisDevAgent(NexusComponent):
         
         while iteration < self.max_iterations:
             iteration += 1
-            logger.info(f"🔄 Iteração {iteration}/{self.max_iterations}")
+            logger.info(f" Iteração {iteration}/{self.max_iterations}")
             
             prompt = self._prompt_builder.build(task, self._trajectory, iteration)
             action = self._decide_action(prompt)
@@ -73,7 +73,7 @@ class JarvisDevAgent(NexusComponent):
             if not action:
                 return self._fail(task.task_id, "LLM não retornou ação válida", iteration)
             
-            logger.info(f"🎯 Ação: {action.action_type.value} - {action.reasoning[:100]}")
+            logger.info(f" Ação: {action.action_type.value} - {action.reasoning[:100]}")
             
             observation = self._executor.execute(action)
             self._trajectory.add_step(action, observation)
@@ -111,7 +111,7 @@ class JarvisDevAgent(NexusComponent):
                 step_number=len(self._trajectory.actions) + 1,
             )
         except Exception as e:
-            logger.error(f"❌ Erro ao decidir ação: {e}")
+            logger.error(f" Erro ao decidir ação: {e}")
             return None
     
     def _extract_json(self, response: str) -> Optional[str]:

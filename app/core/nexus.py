@@ -41,7 +41,7 @@ __all__ = [
 
 class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
     """Contêiner DI Thread-safe com Circuit-Breaker e Descoberta Dinâmica."""
-    
+
     def __init__(self) -> None:
         self._instances: Dict[str, Any] = {}
         self._cache: Dict[str, str] = {}
@@ -54,7 +54,7 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
         self._metrics_collector: Optional[Any] = None
         self.gist_id: str = os.getenv("NEXUS_GIST_ID", "")
         self.base_dir: str = os.path.abspath(os.getcwd())
-        
+
         # Inicializa registro local herdado de RegistryMixin
         try:
             self._cache.update(self._load_local_registry())
@@ -134,7 +134,7 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
     def resolve(self, target_id: str, hint_path: Optional[str] = None, **kwargs) -> Any:
         """Resolve, instancia e faz cache do componente com proteção de circuit-breaker."""
         start = time.time()
-        
+
         # 1. Fast Path: Já existe?
         with self._lock:
             inst = self._instances.get(target_id)
@@ -144,25 +144,25 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
         # 2. Slow Path: Coalescência de Threads (Double-Checked Locking)
         am_builder = False
         pending_future: Optional[concurrent.futures.Future] = None
-        
+
         with self._lock:
             inst = self._instances.get(target_id)
             # Re-check após lock
             if inst is not None and not isinstance(inst, concurrent.futures.Future):
                 return inst
-            
+
             if isinstance(inst, concurrent.futures.Future):
                 pending_future = inst
             else:
                 # Verifica Circuit Breaker antes de tentar criar
                 if self._is_circuit_open(target_id):
                     return CloudMock(target_id)
-                
+
                 # Registra que esta thread vai construir o objeto
                 pending_future = concurrent.futures.Future()
                 self._instances[target_id] = pending_future
                 am_builder = True
-        
+
         # 3. Se não sou o construtor, espero o resultado do outro
         if not am_builder:
             try:
@@ -171,7 +171,7 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
             except Exception:
                 logger.warning("☁️ [NEXUS] Timeout esperando resolução de '%s'.", target_id)
                 return CloudMock(target_id)
-        
+
         # 4. Sou o construtor: executo a construção
         instance = None
         try:
@@ -179,10 +179,10 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
         except Exception as err:
             logger.error("❌ [NEXUS] Erro crítico construindo '%s': %s", target_id, err)
             instance = CloudMock(target_id)
-        
+
         # 5. Finalização e Métricas
         duration_ms = int((time.time() - start) * 1000)
-        
+
         with self._lock:
             # Se for um sucesso real, guarda a instância. Se for Mock, limpa para tentar de novo no futuro
             if instance and not getattr(instance, "__is_cloud_mock__", False):
@@ -191,19 +191,19 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
                 # Se falhou, removemos o Future para que a próxima chamada dispare o Circuit Breaker
                 if self._instances.get(target_id) is pending_future:
                     del self._instances[target_id]
-            
+
             # Notifica todas as threads que estavam esperando no .result()
             pending_future.set_result(instance)
 
         # Log e Telemetria
         result_label = "mock" if getattr(instance, "__is_cloud_mock__", False) else "ok"
         logger.info("⚡ [NEXUS] resolve('%s') → %s (%dms)", target_id, result_label, duration_ms)
-        
+
         if self._metrics_collector:
             try:
                 self._metrics_collector.observe("nexus.resolve_duration_ms", duration_ms)
             except Exception: pass
-            
+
         return instance
 
     def _build_instance(self, target_id: str, hint_path: Optional[str]) -> Any:
@@ -211,7 +211,7 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
         executor = self._get_executor()
         # _resolve_internal vem de DiscoveryMixin/RegistryMixin
         future = executor.submit(self._resolve_internal, target_id, hint_path)
-        
+
         try:
             return future.result(timeout=CIRCUIT_BREAKER_TIMEOUT)
         except concurrent.futures.TimeoutError:

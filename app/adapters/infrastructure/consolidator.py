@@ -115,7 +115,7 @@ class Consolidator(NexusComponent):
         
         # Verifica se alguma parte do path está na lista de ignorados
         for ignored in _IGNORED_DIRS:
-            if ignored in parts:  # ✅ Comparação exata de partes
+            if ignored in parts:  # Comparação exata de partes
                 return True
             
             # Também verifica se é um diretório completo no path
@@ -137,7 +137,7 @@ class Consolidator(NexusComponent):
         # Varre TODOS os arquivos relevantes recursivamente
         all_files = []
         for pattern in _RELEVANT_EXT:
-            # ✅ rglob é recursivo infinito
+            # rglob é recursivo infinito
             for file_path in Path(".").rglob(f"*{pattern}"):
                 if not self._should_ignore(file_path):
                     all_files.append(file_path)
