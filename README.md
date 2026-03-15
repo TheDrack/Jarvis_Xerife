@@ -1,10 +1,8 @@
-# JARVIS – Plataforma de Assistente e Automação Distribuída
+# 🤖 JARVIS – Plataforma de Assistente e Automação Distribuída
 
 [![🧬 JARVIS: PyTest e Auto-Cura](https://github.com/TheDrack/Jarvis_Xerife/actions/workflows/homeostase.yml/badge.svg?branch=main)](https://github.com/TheDrack/Jarvis_Xerife/actions/workflows/homeostase.yml)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-
-
 
 **Versão:** 2.0.0  
 **Última Atualização:** 2026-03-10  
@@ -17,10 +15,13 @@
 JARVIS é um sistema de software autônomo que combina **Arquitetura Hexagonal**, **Injeção de Dependência (Nexus DI)** e **Auto-Evolução Assistida por LLM**.
 
 O sistema é capaz de:
-- Interpretar comandos em linguagem natural
-- Executar ações via adapters (Telegram, GitHub, APIs)
-- Auto-corriger erros via self-healing
-- Evoluir capacidades através do EvolutionOrchestrator
+- ✅ Interpretar comandos em linguagem natural
+- ✅ Executar código existente (prioritário sobre criar)
+- ✅ Criar novo código apenas se necessário (JarvisDevAgent)
+- ✅ Testar em sandbox isolado (Docker ou local)
+- ✅ Aprender com cada interação (ProceduralMemory)
+- ✅ Auto-corrigir erros (Self-Healing)
+- ✅ Evoluir autonomamente (EvolutionOrchestrator)
 
 ---
 
@@ -29,161 +30,209 @@ O sistema é capaz de:
 ```
 ┌─────────────────────────────────────────┐
 │         INTERFACE / CI-CD               │
+│  - GitHub Actions                       │
+│  - API REST                             │
+│  - Telegram Bot                         │
 ├─────────────────────────────────────────┤
 │         ADAPTERS (Infra/Edge)           │
-│   - gateway_llm_adapter.py              │
-│   - telegram_adapter.py                 │
-│   - github_adapter.py                   │
+│  - gateway_llm_adapter.py               │
+│  - telegram_adapter.py                  │
+│  - github_adapter.py                    │
+│  - ollama_adapter.py                    │
+│  - docker_sandbox.py                    │
+│  - persistent_shell_adapter.py          │
 ├─────────────────────────────────────────┤
-│         APPLICATION (Services)          │
-│   - assistant_service.py                │
-│   - evolution_orchestrator.py           │
-│   - metabolism_core.py                  │
+│        APPLICATION (Services)           │
+│  - assistant_service.py                 │
+│  - jarvis_dev_agent.py                  │
+│  - evolution_orchestrator.py            │
+│  - metabolism_core.py                   │
+│  - llm_router.py                        │
+│  - pipeline_builder.py                  │
 ├─────────────────────────────────────────┤
-│         DOMAIN (Regras de Negócio)      │
-│   - capabilities/ (102 capabilities)    │
-│   - services/ (llm_command_interpreter) │
+│          DOMAIN (Core)                  │
+│  - capability_manager.py                │
+│  - memory/ (semantic, procedural, etc)  │
+│  - models/ (agent, adapter_registry)    │
 ├─────────────────────────────────────────┤
-│         CORE (Nexus/DI)                 │
-│   - nexus.py                            │
-│   - nexus_exceptions.py                 │
-│   - nexus_discovery.py                  │
-│   - nexus_registry.py                   │
+│       CORE (Nexus DI)                   │
+│  - nexus.py                             │
+│  - nexus_exceptions.py                  │
+│  - nexuscomponent.py                    │
 └─────────────────────────────────────────┘
 ```
 
 ---
 
-## 🚀 Início Rápido
+## 🤖 JarvisDevAgent (Fluxo Principal)
 
-### Pré-requisitos
-```bash
-Python 3.12+
-pip install -r requirements/core.txt
-pip install -r requirements/dev.txt  # Para testes
+**Inspirado no Devin/OpenHands**, o JarvisDevAgent é o **motor autônomo de desenvolvimento** que agora orquestra todo o fluxo do JARVIS:
+
+### Fluxo de Execução
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    USUÁRIO SOLICITA                             │
+│  "Crie pipeline para enviar notificação no Telegram"            │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│              JARVIS DEV AGENT (Analisa)                         │
+│  1. Consulta AdapterRegistry (o que existe?)                    │
+│  2. Verifica: telegram_adapter existe? → SIM                    │
+│  3. Decide: Não preciso criar, só usar                          │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│              PIPELINE BUILDER (Cria)                            │
+│  Gera: config/pipelines/auto_telegram_notification.yml          │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│              PIPELINE RUNNER (Executa)                          │
+│  python app/runtime/pipeline_runner.py --pipeline auto_telegram │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│                    RESULTADO                                    │
+│  ✅ Notificação enviada                                         │
+│  ✅ Pipeline salvo para reuso                                   │
+│  ✅ Aprendizado registrado em ProceduralMemory                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Configuração
+### Casos de Uso
+
+| Fonte | Exemplo | Endpoint |
+|-------|---------|----------|
+| **User Request** | "Crie script de backup" | POST /v1/dev-agent/run |
+| **Self-Healing** | Erro detectado → corrigir | Auto-trigger |
+| **Auto-Evolution** | Gap de capability → implementar | EvolutionOrchestrator |
+| **Proactive** | Oportunidade → otimizar | ProactiveCore |
+
+### Exemplo de Uso
+
 ```bash
-# Variáveis de ambiente necessárias
-export GROQ_API_KEY="sua-chave-groq"
-export GEMINI_API_KEY="sua-chave-gemini"
-export GITHUB_TOKEN="seu-token-github"
-export TELEGRAM_BOT_TOKEN="seu-token-telegram"
-export TELEGRAM_CHAT_ID="seu-chat-id"
-```
+# Via API
+curl -X POST http://localhost:8000/v1/dev-agent/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "user_request",
+    "description": "Crie pipeline para backup automático no Drive"
+  }'
 
-### Execução
-```bash
-# Rodar testes do domínio
-pytest tests/domain/ -v
+# Via Python
+from app.core.nexus import nexus
 
-# Rodar todos os testes
-pytest tests/ -v
-
-# Validar arquitetura
-python scripts/validate_architecture.py
+agent = nexus.resolve("jarvis_dev_agent")
+result = agent.execute({
+    "description": "Envie notificação no Telegram",
+    "source": "user_request"
+})
 ```
 
 ---
 
-## 📦 Nexus DI — Injeção de Dependência
+## 📦 AdapterRegistry
 
-**Todos os componentes ativos devem ser NexusComponent e registrados no Nexus.**
+Registro simplificado do que o Jarvis **PODE fazer** (5KB vs 500KB do consolidated context):
 
 ```python
 from app.core.nexus import nexus
 
-# Resolve e instancia um componente
-component = nexus.resolve("assistant_service")
-component.execute(context)
+registry = nexus.resolve("adapter_registry")
+
+# Lista todos os adapters
+adapters = registry.execute({"action": "list"})
+
+# Verifica se adapter existe
+adapter = registry.execute({
+    "action": "get",
+    "adapter_id": "telegram_adapter"
+})
+
+# Identifica gaps (o que falta criar)
+gap = registry.execute({
+    "action": "find_gap",
+    "capability": "enviar email"
+})
 ```
 
-### Módulos do Nexus
+### Adapters Registrados
 
-| Módulo | Responsabilidade |
-|--------|------------------|
-| `nexus.py` | Container principal, API pública |
-| `nexus_exceptions.py` | CloudMock, exceções, circuit breaker |
-| `nexus_discovery.py` | Discovery em disco, instanciação |
-| `nexus_registry.py` | I/O do registry local `.jrvs` |
-
-**Registry local:** `data/nexus_registry.json` / `data/nexus_registry.jrvs`
-
-→ Veja [docs/NEXUS.md](docs/NEXUS.md) para detalhes completos.
+| Adapter ID | Descrição | Capabilities |
+|------------|-----------|--------------|
+| `llm_router` | Roteamento de LLMs | code_generation, self_repair, planning |
+| `github_worker` | Operações GitHub | create_pull_request, create_issue |
+| `telegram_adapter` | Interface Telegram | send_message, send_voice |
+| `persistent_shell_adapter` | Terminal stateful | run_shell_command, run_tests |
+| `docker_sandbox` | Sandbox Docker | run_tests_isolated |
+| `evolution_sandbox` | Sandbox local | test_proposal, validate_code |
+| `pipeline_builder` | Criador de pipelines | create_pipeline, run_pipeline |
 
 ---
 
-## 📦 DocumentStore & Formato .jrvs
-
-O **DocumentStore** é o sistema universal de leitura/escrita de documentos.
-
-```python
-from app.utils.document_store import document_store
-
-# Lê qualquer formato (.json, .yml, .txt, .jrvs)
-data = document_store.read("data/nexus_registry.json")
-
-# Grava no formato correto para o sufixo
-document_store.write("data/nexus_registry.jrvs", data)
-```
-
-### Formato .jrvs
-
-Arquivos `.jrvs` são JSON comprimido com zlib, com cabeçalho binário:
-
-```
-┌─────────────────────────────────────────┐
-│ Magic │ Version │ Flags │ CRC32 │ Len  │
-│ 4 bytes│ 2 bytes │ 2 bytes │ 4 bytes │ 4 bytes │
-├─────────────────────────────────────────┤
-│ Dados (JSON + zlib comprimido)          │
-└─────────────────────────────────────────┘
-```
-
-→ Veja [data/README.md](data/README.md) para detalhes.
-
----
-
-## 🧪 Testes
+## 🧪 Validação
 
 ```bash
-# Instalar dependências de dev
-pip install -r requirements/dev.txt
+# Validar registry vs código
+python scripts/validate_registry_vs_code.py
 
-# Executar testes do domínio (sem hardware)
-pytest tests/domain/ -v
-
-# Executar todos os testes
-pytest tests/ -v
+# Validar docs vs código
+python scripts/validate_docs_vs_code.py
 
 # Validar arquitetura
 python scripts/validate_architecture.py
+
+# Testar JarvisDevAgent
+python -c "from app.application.services.jarvis_dev_agent import JarvisDevAgent; print('✅ OK')"
+python -c "from app.domain.models.adapter_registry import AdapterRegistry; print('✅ OK')"
+python -c "from app.adapters.infrastructure.docker_sandbox import DockerSandbox; print('✅ OK')"
 ```
 
 ---
 
-## 📖 Documentação
+## 📊 Status
 
-| Documento | Descrição |
-|-----------|-----------|
-| [docs/STATUS.md](docs/STATUS.md) | Situação atual do projeto |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Arquitetura do sistema |
-| [docs/NEXUS.md](docs/NEXUS.md) | Sistema de injeção de dependência |
-| [docs/ARQUIVO_MAP.md](docs/ARQUIVO_MAP.md) | Mapa de todos os arquivos ativos |
-| [data/README.md](data/README.md) | Formatos de dados: JSON, YAML, .jrvs |
-| [padrão_estrutural.md](padrão_estrutural.md) | Padrão de pipelines e arquitetura |
+| Fase | Status | Descrição |
+|------|--------|-----------|
+| Phase 1 | ✅ Completo | Arquitetura Hexagonal + Nexus DI |
+| Phase 2 | ✅ Completo | Auto-Evolução + Self-Healing |
+| Phase 3 | ✅ Completo | JarvisDevAgent + AdapterRegistry |
+| Phase 4 | 🟡 Em Progresso | Soldier Mesh (Edge Computing) |
 
 ---
 
-## 🤝 Contribuindo
+## 📚 Documentação
 
-Veja [CONTRIBUTING.md](CONTRIBUTING.md) para diretrizes.
+- → Veja [docs/ARQUIVO_MAP.md](docs/ARQUIVO_MAP.md) para lista completa de arquivos
+- → Veja [docs/STATUS.md](docs/STATUS.md) para status detalhado
+- → Veja [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para arquitetura completa
+- → Veja [docs/NEXUS.md](docs/NEXUS.md) para documentação do Nexus DI
+
+---
+
+## 🚀 Quick Start
+
+```bash
+# 1. Instalar dependências
+pip install -r requirements/core.txt
+
+# 2. Configurar variáveis de ambiente
+cp .env.example .env
+# Edite .env com suas chaves de API
+
+# 3. Iniciar o JARVIS
+python main.py
+
+# 4. Testar via API
+curl http://localhost:8000/health
+```
 
 ---
 
 ## 📄 Licença
 
-MIT – veja [LICENSE](LICENSE).
+MIT License — veja [LICENSE](LICENSE) para detalhes.
 
 **Made with ❤️ by the Jarvis Team**
