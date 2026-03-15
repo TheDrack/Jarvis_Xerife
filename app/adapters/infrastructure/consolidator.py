@@ -1,201 +1,150 @@
 # -*- coding: utf-8 -*-
 """Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense.
-CORRIGIDO: Varredura recursiva de subdiretórios aninhados.
+Versão 2026: Otimizada para performance e extração de assinaturas.
 """
 import ast
 import logging
 import os
-import re
 from datetime import datetime
 from pathlib import Path
-from typing import List, Set
+from typing import List, Set, Dict, Any
 
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
-# Ordem de documentação no consolidado
-DOCS_ORDER = [
-    "README.md",
-    "padrão_estrutural.md",
-    "docs/STATUS.md",
-    "docs/ARCHITECTURE.md",
-    "docs/NEXUS.md",
-    "docs/ARQUIVO_MAP.md",
-]
-
-# Diretórios ignorados na consolidação (COMPARAÇÃO EXATA DE PATH)
+# Diretórios ignorados na consolidação
 _IGNORED_DIRS: Set[str] = {
-    ".git",
-    "__pycache__",
-    ".venv",
-    "venv",
-    "dist",
-    "build",
-    "node_modules",
-    ".github",
-    ".frozen",
-    "logs",
-    "data",
-    ".backups",
-    "tests",  # Opcional: ignorar testes para reduzir tamanho
+    ".git", "__pycache__", ".venv", "venv", "dist", "build", 
+    "node_modules", ".github", ".frozen", "logs", "data", 
+    ".backups", "tests", ".pytest_cache", ".idea", ".vscode"
 }
 
-# Extensões relevantes para consolidação
-_RELEVANT_EXT: tuple = (
-    ".py",
-    ".yml",
-    ".yaml",
-    ".json",
-    ".md",    ".txt",
-    ".dockerfile",
-)
-
-# Padrões de camadas arquiteturais
-_ARCH_PATTERNS = {
-    "CORE": [r"app/core", r"nexus"],
-    "DOMAIN": [r"app/domain", r"capabilities", r"services", r"models"],
-    "APPLICATION": [r"app/application", r"ports", r"usecases"],
-    "ADAPTERS": [r"app/adapters", r"infrastructure", r"edge"],
-    "SUPPORT": [r"\.py$", r"\.yml", r"\.json", r"\.md"],
+# Extensões relevantes
+_RELEVANT_EXT: Set[str] = {
+    ".py", ".yml", ".yaml", ".json", ".md", ".txt", ".dockerfile"
 }
-
 
 class Consolidator(NexusComponent):
     """Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense.
     
-    CORRIGIDO: Agora varre corretamente subdiretórios aninhados como:
-    - app/application/services/jarvis_dev_agent/
-    - app/application/services/jarvis_dev_agent/*.py
+    Extrai a estrutura (skeleton) de arquivos Python e o conteúdo completo (dense)
+    de todos os arquivos relevantes para fornecer contexto total à IA.
     """
-    
+
     def __init__(self):
         super().__init__()
         self.output_file = "CORE_LOGIC_CONSOLIDATED.txt"
-    
-    def _get_layer_info(self, path: str) -> str:
-        """Determina a camada arquitetural de um arquivo."""
-        p = path.lower()
-        if "app/core" in p:
-            return "CORE (Motor/Nexus)"
-        if "app/domain" in p:
-            return "DOMAIN (Regras de Negócio)"
-        if "app/application" in p:
-            return "APPLICATION (Casos de Uso)"
-        if "app/adapters" in p:
-            return "ADAPTERS (Infra/IO)"
+        self.root_path = Path(".").resolve()
+
+    def _get_layer_info(self, rel_path: str) -> str:
+        """Determina a camada arquitetural baseada no path."""
+        p = rel_path.lower().replace("\\", "/")
+        if "app/core" in p: return "CORE (Motor/Nexus)"
+        if "app/domain" in p: return "DOMAIN (Regras/Modelos)"
+        if "app/application" in p: return "APPLICATION (Casos de Uso)"
+        if "app/adapters" in p: return "ADAPTERS (Infra/IO)"
         return "SUPPORT (Config/Docs)"
-    
-    def _get_skeleton(self, file_path: str) -> str:
-        """Gera skeleton de um arquivo (apenas assinatura)."""
+
+    def _get_skeleton(self, file_path: Path) -> str:
+        """Gera skeleton de arquivos Python (classes e funções)."""
+        if file_path.suffix != ".py":
+            return "# (Skeleton disponível apenas para arquivos .py)"
+        
         try:
-            content = Path(file_path).read_text(encoding="utf-8")
+            content = file_path.read_text(encoding="utf-8")
             tree = ast.parse(content)
-            
             skeleton = []
-            for node in ast.walk(tree):
+            
+            for node in tree.body:
                 if isinstance(node, ast.ClassDef):
                     skeleton.append(f"class {node.name}:")
-                elif isinstance(node, ast.FunctionDef):                    args = ", ".join(arg.arg for arg in node.args.args[:3])
-                    skeleton.append(f"def {node.name}({args}): ...")
+                    # Métodos de primeira ordem dentro da classe
+                    for item in node.body:
+                        if isinstance(item, ast.FunctionDef):
+                            args = [a.arg for a in item.args.args[:3]]
+                            skeleton.append(f"    def {item.name}({', '.join(args)}...): ...")
+                elif isinstance(node, ast.FunctionDef):
+                    args = [a.arg for a in node.args.args[:3]]
+                    skeleton.append(f"def {node.name}({', '.join(args)}...): ...")
             
-            return "\n".join(skeleton[:20])  # Limita a 20 linhas
+            return "\n".join(skeleton) if skeleton else "# (Nenhuma classe ou função definida)"
         except Exception as e:
-            return f"# Erro ao gerar skeleton: {e}"
-    
+            return f"# Erro ao gerar skeleton: {str(e)}"
+
     def _should_ignore(self, file_path: Path) -> bool:
-        """
-        Verifica se arquivo deve ser ignorado.
-        
-        CORRIGIDO: Usa comparação de partes do path, não substring.
-        """
-        # Converte para partes do path
-        parts = set(file_path.parts)
-        path_str = str(file_path)
-        
-        # Verifica se alguma parte do path está na lista de ignorados
-        for ignored in _IGNORED_DIRS:
-            if ignored in parts:  # Comparação exata de partes
-                return True
-            
-            # Também verifica se é um diretório completo no path
-            if f"/{ignored}/" in path_str or path_str.startswith(f"{ignored}/"):
-                return True
-        
-        return False
-    
-    def execute(self, context: dict) -> dict:
-        """Gera o arquivo consolidado.
-        
-        CORRIGIDO: Varredura recursiva completa de todos os subdiretórios.
-        """
+        """Verifica se o arquivo ou qualquer parte de seu diretório deve ser ignorado."""
+        parts = file_path.parts
+        return any(ignored in parts for ignored in _IGNORED_DIRS)
+
+    def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Gera o snapshot consolidado de contexto."""
         logger.info("[NEXUS] Iniciando Consolidação Skeleton-Dense")
+
+        skeleton_sections = []
+        content_sections = []
         
-        skeleton_lines = []
-        content_lines = []
-        
-        # Varre TODOS os arquivos relevantes recursivamente
-        all_files = []
-        for pattern in _RELEVANT_EXT:
-            # rglob é recursivo infinito
-            for file_path in Path(".").rglob(f"*{pattern}"):
-                if not self._should_ignore(file_path):
-                    all_files.append(file_path)
-        
-        # Remove duplicatas e ordena
-        all_files = sorted(set(all_files), key=lambda p: str(p))
-        
-        logger.info(f"[NEXUS] {len(all_files)} arquivos encontrados para consolidação")        
-        # Processa cada arquivo
+        # Coleta de arquivos em uma única passada (mais performático)
+        all_files = [
+            p for p in self.root_path.rglob("*") 
+            if p.is_file() and p.suffix in _RELEVANT_EXT and not self._should_ignore(p)
+        ]
+        all_files.sort(key=lambda x: str(x))
+
+        logger.info(f"[NEXUS] {len(all_files)} arquivos validados para processamento.")
+
         for file_path in all_files:
             try:
-                rel_path = str(file_path.relative_to(Path(".").resolve()))
+                rel_path = str(file_path.relative_to(self.root_path))
                 layer = self._get_layer_info(rel_path)
                 size = file_path.stat().st_size
                 
-                # Adiciona ao skeleton
-                skeleton_lines.append(f"[{layer}] {rel_path} ({size} bytes)\n")
-                
-                # Adiciona conteúdo completo
-                content = file_path.read_text(encoding="utf-8")
-                content_lines.append(f"\n{'#'*80}\n")
-                content_lines.append(f"# ARQUIVO: {rel_path}\n")
-                content_lines.append(f"# CAMADA: {layer}\n")
-                content_lines.append(f"{'#'*80}\n\n")
-                content_lines.append(content)
-                content_lines.append("\n\n")
-                
+                # --- Seção 1: Skeleton (Mapa Estrutural) ---
+                skeleton_info = self._get_skeleton(file_path)
+                skeleton_sections.append(
+                    f"[{layer}] {rel_path} ({size} bytes):\n{skeleton_info}\n" + "-"*30
+                )
+
+                # --- Seção 2: Dense (Conteúdo Completo) ---
+                content = file_path.read_text(encoding="utf-8", errors="replace")
+                content_sections.append(
+                    f"{'#'*80}\n"
+                    f"# ARQUIVO: {rel_path}\n"
+                    f"# CAMADA: {layer}\n"
+                    f"{'#'*80}\n\n"
+                    f"{content}\n\n"
+                )
+
             except Exception as e:
-                logger.error(f"[CONSOLIDATOR] Erro ao processar {file_path}: {e}")
-                content_lines.append(f"[ERRO CRÍTICO NO ARQUIVO {file_path}: {e}]\n")
-        
-        # Escreve arquivo consolidado
-        file_path = Path(self.output_file)
-        with open(file_path, "w", encoding="utf-8") as out:
+                logger.error(f"[CONSOLIDATOR] Erro em {file_path}: {e}")
+
+        # Escrita Final
+        output_path = self.root_path / self.output_file
+        with open(output_path, "w", encoding="utf-8") as out:
             out.write("=" * 80 + "\n")
-            out.write("JARVIS CONTEXT SNAPSHOT - ESTRATÉGIA SKELETON-DENSE\n")
+            out.write("JARVIS CONTEXT SNAPSHOT - SKELETON-DENSE STRATEGY\n")
             out.write(f"TIMESTAMP: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
-            out.write("PADRÃO: Arquitetura Hexagonal + Nexus DI\n")
+            out.write(f"ROOT: {self.root_path}\n")
             out.write("=" * 80 + "\n\n")
-            
-            out.write("SEÇÃO 1 — MAPA ESTRUTURAL (SKELETON)\n")
-            out.write("-" * 40 + "\n")
-            out.write("".join(skeleton_lines))
-            out.write("\n")
-            
-            out.write("SEÇÃO 2 — CONTEÚDO DENSO (FULL LOGIC)\n")
-            out.write("-" * 40 + "\n")
-            out.write("".join(content_lines))
-        
-        logger.info(f"[NEXUS] Consolidação finalizada: {file_path}")
-        
+
+            out.write("SECTION 1 — STRUCTURAL SKELETON (MAPA DE ASSINATURAS)\n")
+            out.write("=" * 80 + "\n")
+            out.write("\n".join(skeleton_sections))
+            out.write("\n\n" + "=" * 80 + "\n")
+            out.write("SECTION 2 — DENSE CONTENT (CÓDIGO FONTE COMPLETO)\n")
+            out.write("=" * 80 + "\n\n")
+            out.write("".join(content_sections))
+
+        logger.info(f"[NEXUS] Snapshot salvo em: {output_path}")
+
+        # Atualiza contexto com segurança
         res_payload = {
             "status": "success",
-            "file_path": str(file_path),
-            "timestamp": datetime.now().isoformat(),
+            "file_path": str(output_path),
             "files_processed": len(all_files),
-        }        
-        context["result"] = res_payload
-        context["artifacts"]["consolidator"] = res_payload
+        }
         
+        context.setdefault("artifacts", {})["consolidator"] = res_payload
+        context["result"] = res_payload
+
         return context
