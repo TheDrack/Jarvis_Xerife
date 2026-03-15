@@ -96,7 +96,8 @@ class JrvsCloudStorage(NexusComponent):
             paths = list(data_dir.rglob("*.jrvs"))
 
         for path in paths:
-            try:                relative_path = path.as_posix()
+            try:
+                relative_path = path.as_posix()
                 cloud_path = relative_path.replace("/", "-")  # Normaliza para cloud
 
                 with open(path, "rb") as f:
@@ -111,14 +112,14 @@ class JrvsCloudStorage(NexusComponent):
 
                 if response.status_code in (200, 201, 409):  # 409 = já existe
                     uploaded.append(relative_path)
-                    logger.info(f"☁️ [JrvsCloudStorage] Upload: {relative_path}")
+                    logger.info(f" [JrvsCloudStorage] Upload: {relative_path}")
                 else:
-                    logger.error(f"❌ [JrvsCloudStorage] Upload falhou {relative_path}: {response.status_code}")
+                    logger.error(f" [JrvsCloudStorage] Upload falhou {relative_path}: {response.status_code}")
                     response.raise_for_status()
 
             except requests.exceptions.RequestException as e:
                 if not (hasattr(e, 'response') and e.response is not None and e.response.status_code == 409):
-                    logger.error(f"❌ [JrvsCloudStorage] Erro na requisição upload: {e}")
+                    logger.error(f" [JrvsCloudStorage] Erro na requisição upload: {e}")
                 raise e
 
         return uploaded
@@ -145,17 +146,18 @@ class JrvsCloudStorage(NexusComponent):
 
                 response = requests.get(url, headers=headers)
 
-                if response.status_code == 200:                    local_path.parent.mkdir(parents=True, exist_ok=True)
+                if response.status_code == 200:
+                    local_path.parent.mkdir(parents=True, exist_ok=True)
                     with open(local_path, "wb") as f:
                         f.write(response.content)
                     downloaded.append(cloud_path)
-                    logger.info(f"⬇️ [JrvsCloudStorage] Download: {cloud_path}")
+                    logger.info(f" [JrvsCloudStorage] Download: {cloud_path}")
                 else:
-                    logger.warning(f"⚠️ [JrvsCloudStorage] Download falhou {cloud_path}: {response.status_code}")
+                    logger.warning(f" [JrvsCloudStorage] Download falhou {cloud_path}: {response.status_code}")
 
             except requests.exceptions.RequestException as e:
                 if not (hasattr(e, 'response') and e.response is not None and e.response.status_code == 404):
-                    logger.error(f"❌ [JrvsCloudStorage] Erro na requisição download: {e}")
+                    logger.error(f" [JrvsCloudStorage] Erro na requisição download: {e}")
                 raise e
 
         return downloaded
@@ -166,7 +168,7 @@ class JrvsCloudStorage(NexusComponent):
         - Upload de arquivos locais que não existem na cloud
         - Download de arquivos da cloud que não existem localmente
         """
-        logger.info(f"🔄 [JrvsCloudStorage] Iniciando sync_all em {data_dir}")
+        logger.info(f" [JrvsCloudStorage] Iniciando sync_all em {data_dir}")
 
         # Upload phase
         uploaded = self._upload_file()
@@ -174,7 +176,7 @@ class JrvsCloudStorage(NexusComponent):
         # Download phase
         downloaded = self._download_file()
 
-        logger.info(f"✅ [JrvsCloudStorage] Sync completo: {len(uploaded)} uploads, {len(downloaded)} downloads")
+        logger.info(f" [JrvsCloudStorage] Sync completo: {len(uploaded)} uploads, {len(downloaded)} downloads")
         return uploaded, downloaded
 
     def _list_files(self) -> List[str]:
@@ -192,10 +194,10 @@ class JrvsCloudStorage(NexusComponent):
                 files = response.json()
                 return [f.get("name", "") for f in files if f.get("name", "").endswith(".jrvs")]
             else:
-                logger.error(f"❌ [JrvsCloudStorage] List falhou: {response.status_code}")
+                logger.error(f" [JrvsCloudStorage] List falhou: {response.status_code}")
                 return []
         except requests.exceptions.RequestException as e:
-            logger.error(f"❌ [JrvsCloudStorage] Erro ao listar arquivos: {e}")
+            logger.error(f" [JrvsCloudStorage] Erro ao listar arquivos: {e}")
             return []
 
     def is_available(self) -> bool:

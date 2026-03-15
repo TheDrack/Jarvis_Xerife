@@ -56,7 +56,7 @@ class NexusComponent(ABC):
                     error_type = type(e).__name__
                     error_msg = str(e)
                     error_tb = traceback.format_exc()
-                    
+
                     _nexus_component_logger.error(
                         f"💥 [NEXUS GUARD] {cls.__name__}: {error_type} - {error_msg}"
                     )
@@ -69,12 +69,12 @@ class NexusComponent(ABC):
                         "SelfHealingTriggerService", 
                         "JarvisDevAgent"
                     }
-                    
+
                     if cls.__name__ not in anti_loop:
                         _nexus_component_logger.info(f"🧬 [NEXUS GUARD] Trigger self-healing para {cls.__name__}...")
                         try:
                             from app.core.nexus import nexus
-                            
+
                             # Identifica o arquivo físico para o Agente de Reparo
                             file_path = None
                             module = sys.modules.get(cls.__module__)
@@ -91,7 +91,7 @@ class NexusComponent(ABC):
                                     "component": cls.__name__,
                                 }
                                 repair_result = local_agent.execute(repair_ctx)
-                                
+
                                 if repair_result and repair_result.get("fixed"):
                                     _nexus_component_logger.info(f"✅ [NEXUS GUARD] {cls.__name__} curado localmente!")
                                 elif repair_result and repair_result.get("escalate_to_ci"):

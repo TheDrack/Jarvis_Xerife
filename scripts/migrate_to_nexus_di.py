@@ -108,7 +108,7 @@ def migrate_file(file_path: Path, dry_run: bool = False) -> int:
 
         if not dry_run and new_content != content:
             file_path.write_text(new_content, encoding='utf-8')
-        
+
         return changes_made
 
     except Exception as e:
@@ -121,7 +121,7 @@ def main():
     parser.add_argument('--apply', action='store_true', help='Aplica mudanças')
     parser.add_argument('--backup', action='store_true', help='Cria backup')
     parser.add_argument('--report', type=str, default='nexus_di_migration_report.txt', help='Caminho do relatório')
-    
+
     args = parser.parse_args()
     if not args.dry_run and not args.apply:
         logger.error("❌ Use --dry-run ou --apply")
@@ -129,7 +129,7 @@ def main():
 
     logger.info(f"Iniciando Migração Nexus DI (Modo: {'DRY-RUN' if args.dry_run else 'APPLY'})")
     py_files = [f for f in REPO_ROOT.rglob('*.py') if not _is_protected(f)]
-    
+
     report_data = []
     total_files = 0
     backup_dir = REPO_ROOT / '.backups' / f"nexus_{datetime.now().strftime('%Y%m%d_%H%M%S')}" if args.backup and args.apply else None
@@ -140,12 +140,12 @@ def main():
             total_files += 1
             rel_path = py_file.relative_to(REPO_ROOT)
             report_data.append({'file': str(rel_path), 'changes': changes})
-            
+
             if backup_dir:
                 dest = backup_dir / rel_path
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(py_file, dest)
-            
+
             logger.info(f"✅ {'[Simulado]' if args.dry_run else 'Migrado'}: {rel_path} ({changes} alt.)")
 
     generate_report(report_data, REPO_ROOT / args.report)
