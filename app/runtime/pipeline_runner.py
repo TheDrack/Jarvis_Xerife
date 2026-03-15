@@ -47,7 +47,6 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
         target_id = meta.get("id")
         comp_config = meta.get("config", {})
         is_strict = comp_config.get("strict_mode", global_strict)
-
         logger.info(f"🔍 Resolvendo: {step_name} (ID: {target_id})")
         instance = nexus.resolve(target_id=target_id, hint_path=meta.get("hint_path"))
 
@@ -97,7 +96,6 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
             context.setdefault("results", []).append({"step": step_name, "status": "error", "msg": str(e)})
             if is_strict:
                 raise e
-
     logger.info(f"🏁 PIPELINE '{pipeline_name}' FINALIZADO.")
     return context
 
