@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Pipeline Runner — Orquestra execução de pipelines YAML.
-Versão 2026.03: CORREÇÃO DE SINTAXE (IndentationError).
+CORRIGIDO: Passa 'config' E 'current_config' para compatibilidade com adapters.
 """
 import os
 import yaml
@@ -10,7 +10,6 @@ from typing import Any, Dict
 
 from app.core.nexus import nexus, CloudMock
 
-# Configuração de Log
 logging.basicConfig(
     level=logging.INFO, 
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -19,7 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger("PipelineRunner")
 
 def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, Any]:
-    """Executa pipeline com correção de indentação e proteção de estado."""
+    """Executa pipeline com correção de contexto para adapters."""
     logger.info(f"🚀 INICIANDO RUNNER: {pipeline_name}")
 
     config_path = os.path.join("config", "pipelines", f"{pipeline_name}.yml")
@@ -38,7 +37,8 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
         "artifacts": {},
         "metadata": {"pipeline": pipeline_name},
         "env": dict(os.environ),
-        "results": []
+        "results": [],
+        "config": {}  # ← ADICIONADO: Para compatibilidade com adapters
     }
 
     components = config.get("components", {})
@@ -50,7 +50,6 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
         logger.info(f"🔍 Resolvendo: {step_name} (ID: {target_id})")
         instance = nexus.resolve(target_id=target_id, hint_path=meta.get("hint_path"))
 
-        # CORREÇÃO DE INDENTAÇÃO AQUI (Linha 51 aproximada)
         if not instance or getattr(instance, "__is_cloud_mock__", False):
             msg = f"Componente '{target_id}' indisponível."
             logger.warning(f"☁️ {msg}")
@@ -63,7 +62,9 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
             if hasattr(instance, "configure"):
                 instance.configure(comp_config)
 
-            context["current_config"] = comp_config
+            # ← CORREÇÃO CRÍTICA: Passa AMBOS para compatibilidade
+            context["config"] = comp_config  # Para adapters que leem context.get("config")
+            context["current_config"] = comp_config  # Para adapters que leem context.get("current_config")
 
             if hasattr(instance, "can_execute") and not instance.can_execute(context):
                 logger.info(f"⏭️ Passo '{step_name}' pulado.")
@@ -71,18 +72,18 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
 
             logger.info(f"⚙️ Executando: {step_name}...")
             
-            # Backup preventivo para o State Recovery
             prev_results = context.get("results", [])
             prev_artifacts = context.get("artifacts", {})
             
             updated_context = instance.execute(context)
 
             if isinstance(updated_context, dict):
-                # State Recovery: evita KeyError se o componente retornar dict parcial
                 if "results" not in updated_context:
                     updated_context["results"] = prev_results
                 if "artifacts" not in updated_context:
                     updated_context["artifacts"] = prev_artifacts
+                if "config" not in updated_context:
+                    updated_context["config"] = context.get("config", {})
                 
                 context = updated_context
                 context.setdefault("results", []).append({"step": step_name, "status": "success"})
