@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""JarvisDevAgent — Agente autônomo principal."""
+"""JarvisDevAgent — Agente autônomo principal (ATUALIZADO)."""
 import json
 import logging
 import re
@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from app.core.nexus import NexusComponent, nexus
-from app.domain.models.agent import AgentAction, AgentTask, TaskSource, TaskPriority
+from app.domain.models.agent import AgentAction, AgentTask, TaskSource, TaskPriority, ActionType
 
 from .trajectory import AgentTrajectory
 from .actions import ActionExecutor
