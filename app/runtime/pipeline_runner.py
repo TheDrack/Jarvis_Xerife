@@ -19,11 +19,11 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False):
         pipeline_name: Nome do pipeline (sem .yml)
         global_strict: Se True, interrompe no primeiro erro
     """
-    logging.info(f"🚀 INICIANDO RUNNER: {pipeline_name}")
+    logging.info(f" INICIANDO RUNNER: {pipeline_name}")
     
     config_path = os.path.join("config", "pipelines", f"{pipeline_name}.yml")
     if not os.path.exists(config_path):
-        logging.error(f"❌ Pipeline {pipeline_name} não encontrado em {config_path}")
+        logging.error(f" Pipeline {pipeline_name} não encontrado em {config_path}")
         return
     
     with open(config_path, "r", encoding="utf-8") as f:
@@ -43,23 +43,23 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False):
         component_config = meta.get("config", {})
         is_strict = component_config.get("strict_mode", global_strict)
         
-        logging.info(f"🔍 Resolvendo componente: {name} (ID: {t_id})")
+        logging.info(f" Resolvendo componente: {name} (ID: {t_id})")
         instance = nexus.resolve(target_id=t_id, hint_path=meta.get("hint_path"))
         
         if not instance:
-            msg = f"❌ Falha crítica: Instância de {t_id} não encontrada."            if is_strict:
+            msg = f" Falha crítica: Instância de {t_id} não encontrada."            if is_strict:
                 raise RuntimeError(msg)
             logging.error(msg)
             continue
         
         if getattr(instance, "__is_cloud_mock__", False):
             msg = (
-                f"⚠️ Componente '{t_id}' indisponível (Circuit Breaker ativo). "
+                f" Componente '{t_id}' indisponível (Circuit Breaker ativo). "
                 "Execução real foi substituída por CloudMock – verifique o componente."
             )
             logging.error(msg)
             if is_strict:
-                raise RuntimeError(f"❌ Falha crítica: '{t_id}' retornou CloudMock em strict mode.")
+                raise RuntimeError(f" Falha crítica: '{t_id}' retornou CloudMock em strict mode.")
             context["result"] = {"error": "component_unavailable", "source": t_id}
             continue
         
@@ -77,33 +77,33 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False):
                 continue
             
             # Executa componente
-            logging.info(f"⚙️ Executando: {name}...")
+            logging.info(f" Executando: {name}...")
             updated_context = instance.execute(context)
             
             # Valida retorno
             if isinstance(updated_context, dict):
                 context = updated_context
-                logging.info(f"✅ {name} finalizado.")
+                logging.info(f" {name} finalizado.")
             else:
-                logging.warning(f"⚠️ {name} retornou tipo {type(updated_context)}. Mantendo contexto anterior.")
+                logging.warning(f" {name} retornou tipo {type(updated_context)}. Mantendo contexto anterior.")
         
         except Exception as e:
-            logging.error(f"💥 ERRO NA EXECUÇÃO DE {name}: {e}")
+            logging.error(f" ERRO NA EXECUÇÃO DE {name}: {e}")
             if is_strict:
-                logging.error("🛑 Strict Mode Ativo: Interrompendo pipeline.")
+                logging.error(" Strict Mode Ativo: Interrompendo pipeline.")
                 raise e
             
             context["result"] = {"error": str(e), "source": name}
-            logging.warning(f"⚠️ {name} falhou, mas o pipeline continua (Strict: False).")
+            logging.warning(f" {name} falhou, mas o pipeline continua (Strict: False).")
     
-    logging.info("🏁 PIPELINE FINALIZADO")
+    logging.info(" PIPELINE FINALIZADO")
 
 if __name__ == "__main__":
     p_name = os.getenv("PIPELINE")
     g_strict = os.getenv("PIPELINE_STRICT", "false").lower() == "true"
     
     if not p_name:
-        logging.error("❌ Variável PIPELINE não definida. Use: export PIPELINE=sync_drive")
+        logging.error(" Variável PIPELINE não definida. Use: export PIPELINE=sync_drive")
         sys.exit(1)
     
     run_pipeline(p_name, g_strict)
