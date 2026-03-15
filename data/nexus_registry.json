@@ -77,14 +77,6 @@
     "github_workflow_adapter": "app.adapters.infrastructure.github_workflow_adapter.GitHubWorkflowAdapter",
     "persistent_shell_adapter": "app.adapters.infrastructure.persistent_shell_adapter.PersistentShellAdapter",
     "adapter_registry": "app.domain.models.adapter_registry.AdapterRegistry",
-    "docker_sandbox": "app.adapters.infrastructure.docker_sandbox.DockerSandbox",
-    "proactive_core": "app.application.services.proactive_core.ProactiveCore",
-    "proactive_core_v2": "app.application.services.proactive_core_v2.ProactiveCoreV2",
-    "curiosity_engine": "app.application.services.curiosity_engine.CuriosityEngine",
-    "learning_loop": "app.application.services.learning_loop.LearningLoop",
-    "agent_models": "app.domain.models.agent.AgentModels",
-    "prospective_memory": "app.domain.memory.prospective_memory.ProspectiveMemory",
-    "capability_authorizer": "app.application.security.capability_authorizer.CapabilityAuthorizer",
-    "safety_guardian": "app.application.security.safety_guardian.SafetyGuardian"
+    "docker_sandbox": "app.adapters.infrastructure.docker_sandbox.DockerSandbox"
   }
 }
