@@ -1,417 +1,287 @@
 # -*- coding: utf-8 -*-
-"""JarvisDevAgent — agente autônomo de desenvolvimento do próprio JARVIS.
+"""JarvisDevAgent — Agente autônomo com loop iterativo (Devin-style).
 
-Encapsula o fluxo completo de desenvolvimento autônomo:
-    (a) Identifica a próxima capability via CapabilityManager.get_executable_capabilities().
-    (b) Consulta a SemanticMemory por soluções similares (few-shot context).
-    (c) Constrói prompt para o LLMRouter (task_type ``code_generation``).
-    (d) Recebe proposta de código do LLM.
-    (e) Salva a proposta em ``data/evolution_proposals/<timestamp>_dev_agent.py``.
-    (f) Submete ao EvolutionGatekeeper para aprovação.
-    (g) Se aprovado, cria PR via GitHubWorker.
-    (h) Registra o ciclo completo na SemanticMemory como ``dev_cycle``.
+Features:
+- Pre-flight check (mapeia estrutura do projeto)
+- Loop iterativo com working memory
+- Surgical edit para precisão
+- Persistent shell para execução
+- Auto-instalação de dependências
 """
-
 import json
 import logging
 import os
+import re
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.core.nexus import NexusComponent, nexus
+from app.domain.models.agent import AgentAction, AgentTask, TaskSource, TaskPriority, ActionType
 
 logger = logging.getLogger(__name__)
 
-_PROPOSALS_DIR = Path("data/evolution_proposals")
 _JOBS_FILE = Path("data/dev_agent_jobs.jsonl")
-_DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes
+_MAX_ITERATIONS = int(os.getenv("DEV_AGENT_MAX_ITERATIONS", "12"))
+_MAX_CONTEXT_TOKENS = int(os.getenv("MAX_CONTEXT_TOKENS", "8000"))
 
 
 class JarvisDevAgent(NexusComponent):
-    """Agente de desenvolvimento autônomo do JARVIS.
-
-    Configura via ``configure(config)``:
-        max_few_shot (int, padrão 3): máximo de exemplos few-shot da SemanticMemory.
-        dry_run (bool, padrão False): se True, não cria PR nem salva proposta em disco.
-    """
-
+    """Agente autônomo de desenvolvimento com loop iterativo."""
+    
     def __init__(self) -> None:
-        self.max_few_shot: int = 3
-        self.dry_run: bool = False
-
-    def configure(self, config: Dict[str, Any]) -> None:
-        """Configura o agente via dicionário."""
-        self.max_few_shot = int(config.get("max_few_shot", self.max_few_shot))
-        self.dry_run = bool(config.get("dry_run", self.dry_run))
-
-    def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
-        """Retorna True se há capabilities executáveis disponíveis."""
-        cap = self._select_capability()
-        return cap is not None
-
+        super().__init__()
+        self.max_iterations: int = _MAX_ITERATIONS
+        self._shell = None
+        self._editor = None
+        self._memory = None
+        self._llm = None
+    
+    def _get_shell(self):
+        """Lazy loading do PersistentShellAdapter."""
+        if self._shell is None:
+            self._shell = nexus.resolve("persistent_shell_adapter")
+        return self._shell
+    
+    def _get_editor(self):
+        """Lazy loading do SurgicalEditService."""
+        if self._editor is None:
+            self._editor = nexus.resolve("surgical_edit_service")        return self._editor
+    
+    def _get_memory(self):
+        """Lazy loading do WorkingMemory."""
+        if self._memory is None:
+            self._memory = nexus.resolve("working_memory")
+        return self._memory
+    
+    def _get_llm(self):
+        """Lazy loading do LLMRouter."""
+        if self._llm is None:
+            self._llm = nexus.resolve("llm_router")
+        return self._llm
+    
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Executa um ciclo completo de desenvolvimento autônomo.
-
-        Returns:
-            Dicionário com ``success``, ``capability_id``, ``gatekeeper_result``,
-            ``pr_created`` e demais metadados do ciclo.
-        """
-        import time as _time
-
+        """Executa tarefa autônoma com loop iterativo."""
         ctx = context or {}
-        job_id = ctx.get("job_id", f"job_{int(_time.time())}")
-
-        timeout_secs = int(os.environ.get("DEV_AGENT_TIMEOUT_SECONDS", _DEFAULT_TIMEOUT_SECONDS))
-        started_at = datetime.now(tz=timezone.utc).isoformat()
-        _start_mono = _time.monotonic()
-
-        self._write_job_entry(
-            job_id=job_id,
-            started_at=started_at,
-            status="running",
-            capability_id=None,
-        )
-
+        task = self._create_task(ctx)
+        
+        logger.info(f"🤖 [JarvisDevAgent] task_id={task.task_id} source={task.source.value}")
+        
         try:
-            result = self._run_with_timeout(ctx, timeout_secs)
-        except TimeoutError:
-            finished_at = datetime.now(tz=timezone.utc).isoformat()
-            duration = _time.monotonic() - _start_mono
-            self._update_job_entry(
-                job_id=job_id,
-                finished_at=finished_at,
-                status="timeout",
-                capability_id=None,
-                gatekeeper_result=None,
-                pr_created=False,
-                error="execution_timeout",
-                duration_seconds=duration,
-            )
-            return {"success": False, "reason": "timeout", "job_id": job_id}
-        except Exception as exc:
-            finished_at = datetime.now(tz=timezone.utc).isoformat()
-            duration = _time.monotonic() - _start_mono
-            self._update_job_entry(
-                job_id=job_id,
-                finished_at=finished_at,
-                status="failed",
-                capability_id=None,
-                gatekeeper_result=None,
-                pr_created=False,
-                error=str(exc),
-                duration_seconds=duration,
-            )
-            raise
-
-        finished_at = datetime.now(tz=timezone.utc).isoformat()
-        duration = _time.monotonic() - _start_mono
-        status = "success" if result.get("success") else "failed"
-        self._update_job_entry(
-            job_id=job_id,
-            finished_at=finished_at,
-            status=status,
-            capability_id=result.get("capability_id"),
-            gatekeeper_result=result.get("gatekeeper_result"),
-            pr_created=bool(result.get("pr_created")),
-            error=result.get("reason") if not result.get("success") else None,
-            duration_seconds=duration,
+            result = self._execute_cycle(task, ctx)
+            self._record_result(task, result)
+            return result
+        except Exception as e:
+            logger.error(f"❌ [JarvisDevAgent] Erro: {e}", exc_info=True)
+            return {"success": False, "task_id": task.task_id, "error": str(e)}
+    
+    def _create_task(self, ctx: Dict[str, Any]) -> AgentTask:
+        """Cria tarefa do contexto."""
+        return AgentTask(
+            task_id=ctx.get("task_id", f"task_{uuid.uuid4().hex[:12]}"),
+            source=TaskSource(ctx.get("source", "user_request")),
+            priority=TaskPriority(ctx.get("priority", "medium")),
+            description=ctx.get("description", ""),
+            context=ctx.get("context", {}),
+            constraints=ctx.get("constraints", []),
+            success_criteria=ctx.get("success_criteria", "Tarefa completada"),
         )
-        return result
-
-    def _run_with_timeout(self, ctx: Dict[str, Any], timeout_secs: int) -> Dict[str, Any]:
-        """Executa o ciclo com timeout via concurrent.futures."""
-        import concurrent.futures
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(self._execute_cycle, ctx)
-            try:
-                return future.result(timeout=timeout_secs)
-            except concurrent.futures.TimeoutError:
-                raise TimeoutError(f"JarvisDevAgent exceeded {timeout_secs}s timeout")
-
-    def _execute_cycle(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
-        """Ciclo central com contexto consolidado."""
-        # 1. Seleciona capability
-        cap = self._select_capability()
-        if cap is None:
-            return {"success": False, "reason": "no_executable_capability"}
-
-        cap_id = cap.get("id", "UNKNOWN")
-        cap_title = cap.get("title", "No Title")
-
-        # 2. Obter contexto consolidado (Autoconsciência)
-        context_service = nexus.resolve("consolidated_context_service")
-        consolidated_context = ""
-        if context_service:
-            res_ctx = context_service.execute({"action": "read"})
-            consolidated_context = res_ctx.get("context", "")
-
-        # 3. Few-shot
-        few_shot_context = self._get_few_shot_examples(cap_title)
-
-        # 4. Constrói prompt COM contexto consolidado
-        prompt = self._build_prompt(cap, few_shot_context, consolidated_context)
-
-        # 5. Gera código
-        llm_used, proposed_code = self._call_llm(prompt, ctx)
-        if not proposed_code:
-            self._record_cycle(cap_id, llm_used, "llm_no_response", pr_created=False)
-            return {"success": False, "reason": "llm_no_response", "capability_id": cap_id}
-
-        # 6. Salva proposta
-        proposal_path: Optional[Path] = None
-        if not self.dry_run:
-            proposal_path = self._save_proposal(proposed_code, cap_id)
-
-        # 7. Gatekeeper (Validação de Segurança e Qualidade)
-        gatekeeper_result = self._run_gatekeeper(proposed_code, cap_id)
-        if not gatekeeper_result.get("approved", False):
-            reason = gatekeeper_result.get("reason", "gatekeeper_rejected")
-            logger.warning("[JarvisDevAgent] Gatekeeper rejeitou proposta: %s", reason)
-            self._record_cycle(cap_id, llm_used, f"rejected: {reason}", pr_created=False)
-            return {
-                "success": False,
-                "reason": reason,
-                "capability_id": cap_id,
-                "gatekeeper_result": gatekeeper_result,
-            }
-
-        # 8. Cria PR (GitHub Integration)
-        pr_result: Dict[str, Any] = {}
-        pr_created = False
-        if not self.dry_run and proposal_path is not None:
-            pr_result = self._create_pr(proposal_path, cap_id, cap_title)
-            pr_created = pr_result.get("success", False)
-
-        # 9. Registra ciclo na SemanticMemory
-        self._record_cycle(cap_id, llm_used, "approved", pr_created=pr_created)
-
+    
+    def _execute_cycle(self, task: AgentTask, ctx: Dict[str, Any]) -> Dict[str, Any]:
+        """Loop iterativo com pre-flight check."""
+        shell = self._get_shell()
+        editor = self._get_editor()
+        memory = self._get_memory()
+        llm = self._get_llm()
+        
+        if not all([shell, editor, memory, llm]):
+            return {"success": False, "error": "Componentes necessários indisponíveis"}        
+        # === PRE-FLIGHT CHECK ===
+        logger.info("🔍 [JarvisDevAgent] Pre-flight check: mapeando estrutura...")
+        structure = shell.execute({"command": "find . -maxdepth 2 -type f -name '*.py' | head -20"})
+        logger.info(f"📁 Estrutura mapeada: {structure.get('output', '')[:200]}")
+        
+        # === LOOP ITERATIVO ===
+        iteration = 0
+        history = []
+        
+        while iteration < self.max_iterations:
+            iteration += 1
+            logger.info(f"🔄 [JarvisDevAgent] Iteração {iteration}/{self.max_iterations}")
+            
+            # 1. Prepara contexto (com truncagem)
+            recent_history = history[-5:] if len(history) > 5 else history
+            prompt = self._build_prompt(task, recent_history, structure.get('output', ''))
+            
+            # 2. Decisão do LLM
+            decision = llm.execute({
+                "task_type": "code_generation",
+                "prompt": prompt,
+                "require_json": True,
+                "temperature": 0.1
+            })
+            
+            action_data = self._extract_json(decision.get('result', ''))
+            if not action_data:
+                return {"success": False, "error": "LLM não retornou ação válida", "iteration": iteration}
+            
+            action_type = action_data.get("action", "FINISH")
+            params = action_data.get("params", {})
+            reasoning = action_data.get("reasoning", "")
+            
+            logger.info(f"🎯 Ação: {action_type} — {reasoning[:100]}")
+            
+            # 3. Executa ação
+            observation = self._execute_action(action_type, params, shell, editor)
+            
+            # 4. Armazena na memória
+            history.append({
+                "iteration": iteration,
+                "action": action_type,
+                "params": params,
+                "reasoning": reasoning,
+                "observation": observation
+            })
+            
+            # 5. Verifica se finalizou
+            if action_type == "FINISH":                logger.info(f"✅ [JarvisDevAgent] Finalizado na iteração {iteration}")
+                return {
+                    "success": True,
+                    "task_id": task.task_id,
+                    "iterations": iteration,
+                    "history": history,
+                    "final_result": observation
+                }
+            
+            # 6. Verifica erro repetitivo
+            if self._is_repetitive_error(observation, history):
+                logger.warning("⚠️ [JarvisDevAgent] Erro repetitivo detectado")
+                # Continua mas com aviso no próximo prompt
+        
+        # Limite de iterações
         return {
-            "success": True,
-            "capability_id": cap_id,
-            "capability_title": cap_title,
-            "llm_used": llm_used,
-            "gatekeeper_result": gatekeeper_result,
-            "pr_created": pr_created,
-            "pr": pr_result,
-            "proposal": str(proposal_path) if proposal_path else None,
+            "success": False,
+            "task_id": task.task_id,
+            "error": f"Limite de {self.max_iterations} iterações atingido",
+            "iterations": iteration,
+            "history": history
         }
+    
+    def _build_prompt(self, task: AgentTask, history: List[Dict], structure: str) -> str:
+        """Constrói prompt com contexto truncado."""
+        history_text = "\n".join([
+            f"Iteração {h['iteration']}: {h['action']} → {h['observation'][:200]}"
+            for h in history[-5:]
+        ]) or "(Nenhuma ação anterior)"
+        
+        constraints = "\n".join(task.constraints) if task.constraints else "Nenhuma"
+        
+        return f"""
+Você é o JarvisDevAgent — agente autônomo de desenvolvimento.
 
-    # ------------------------------------------------------------------
-    # Audit log helpers
-    # ------------------------------------------------------------------
+=== TAREFA ===
+Descrição: {task.description}
+Critérios: {task.success_criteria}
+Restrições: {constraints}
 
-    def _write_job_entry(
-        self,
-        job_id: str,
-        started_at: str,
-        status: str,
-        capability_id: Optional[str],
-    ) -> None:
-        """Grava entrada inicial no log de auditoria."""
-        entry = {
-            "job_id": job_id,
-            "started_at": started_at,
-            "finished_at": None,
-            "status": status,
-            "capability_id": capability_id,
-            "gatekeeper_result": None,
-            "pr_created": False,
-            "error": None,
-            "duration_seconds": None,
-        }
-        self._append_job_log(entry)
+=== ESTRUTURA DO PROJETO ===
+{structure[:2000]}
 
-    def _update_job_entry(
-        self,
-        job_id: str,
-        finished_at: str,
-        status: str,
-        capability_id: Optional[str],
-        gatekeeper_result: Optional[Dict[str, Any]],
-        pr_created: bool,
-        error: Optional[str],
-        duration_seconds: float,
-    ) -> None:
-        """Atualiza a entrada do job no JSONL."""
-        update = {
-            "job_id": job_id,
-            "finished_at": finished_at,
-            "status": status,
-            "capability_id": capability_id,
-            "gatekeeper_result": gatekeeper_result,
-            "pr_created": pr_created,
-            "error": error,
-            "duration_seconds": round(duration_seconds, 2),
-        }
-        self._append_job_log(update)
+=== HISTÓRICO DE AÇÕES ===
+{history_text}
 
-    @staticmethod
-    def _append_job_log(entry: Dict[str, Any]) -> None:
-        """Acrescenta uma linha ao arquivo JSONL de jobs."""
+=== AÇÕES DISPONÍVEIS ===
+- RUN_SHELL: {{ "action": "RUN_SHELL", "params": {{"cmd": "pytest tests/"}} }}
+- EDIT_FILE: {{ "action": "EDIT_FILE", "params": {{"path": "app/file.py", "search": "...", "replace": "..."}} }}
+- READ_FILE: {{ "action": "READ_FILE", "params": {{"path": "app/file.py"}} }}- INSTALL_DEPS: {{ "action": "INSTALL_DEPS", "params": {{"packages": ["requests", "numpy"]}} }}
+- FINISH: {{ "action": "FINISH", "params": {{"summary": "Tarefa completada"}} }}
+
+=== INSTRUÇÕES ===
+1. Se precisar instalar pacotes, use INSTALL_DEPS (ambiente seguro)
+2. Para editar código, use EDIT_FILE com search/replace exato
+3. Se encontrar "Command not found", instale automaticamente
+4. Retorne APENAS JSON da ação
+
+Retorne APENAS o JSON:
+"""
+    
+    def _execute_action(self, action_type: str, params: Dict, shell, editor) -> str:
+        """Executa ação e retorna observação."""
+        if action_type == "RUN_SHELL":
+            result = shell.execute({"command": params.get("cmd", "")})
+            return result.get("output", result.get("error", ""))
+        
+        elif action_type == "EDIT_FILE":
+            result = editor.execute({
+                "action": "apply_edit",
+                "file_path": params.get("path", ""),
+                "search_block": params.get("search", ""),
+                "replace_block": params.get("replace", "")
+            })
+            return result.get("action", result.get("error", ""))
+        
+        elif action_type == "READ_FILE":
+            result = editor.execute({
+                "action": "read_file",
+                "file_path": params.get("path", "")
+            })
+            return result.get("content", result.get("error", ""))[:1000]
+        
+        elif action_type == "INSTALL_DEPS":
+            packages = params.get("packages", [])
+            result = shell.execute({"command": f"pip install {' '.join(packages)}"})
+            return result.get("output", result.get("error", ""))
+        
+        elif action_type == "FINISH":
+            return params.get("summary", "Tarefa finalizada")
+        
+        return f"Ação desconhecida: {action_type}"
+    
+    def _extract_json(self, text: str) -> Optional[Dict]:
+        """Extrai JSON de resposta do LLM."""
+        import re
+        match = re.search(r'```(?:json)?\s*({.*?})\s*```', text, re.DOTALL)
+        if match:
+            try:                return json.loads(match.group(1))
+            except:
+                pass
+        try:
+            start, end = text.find("{"), text.rfind("}") + 1
+            if start >= 0 and end > start:
+                return json.loads(text[start:end])
+        except:
+            pass
+        return None
+    
+    def _is_repetitive_error(self, observation: str, history: List[Dict]) -> bool:
+        """Verifica se erro já ocorreu nas últimas iterações."""
+        if not observation or "error" not in observation.lower():
+            return False
+        
+        recent_errors = [
+            h.get("observation", "")
+            for h in history[-3:]
+            if "error" in h.get("observation", "").lower()
+        ]
+        
+        return any(observation[:100] in err for err in recent_errors)
+    
+    def _record_result(self, task: AgentTask, result: Dict[str, Any]) -> None:
+        """Registra resultado no jobs log."""
         try:
             _JOBS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            with _JOBS_FILE.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception as exc:
-            logger.warning("[JarvisDevAgent] Falha ao gravar job log: %s", exc)
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _select_capability(self) -> Optional[Dict[str, Any]]:
-        """Seleciona a próxima capability executável via CapabilityManager."""
-        try:
-            cap_manager = nexus.resolve("capability_manager")
-            if cap_manager is None or not hasattr(cap_manager, "get_executable_capabilities"):
-                return None
-            caps: List[Dict[str, Any]] = cap_manager.get_executable_capabilities()
-            return caps[0] if caps else None
-        except Exception as exc:
-            logger.debug("[JarvisDevAgent] CapabilityManager indisponível: %s", exc)
-            return None
-
-    def _get_few_shot_examples(self, cap_title: str) -> List[Dict[str, Any]]:
-        """Recupera soluções similares da SemanticMemory como contexto few-shot."""
-        try:
-            memory = nexus.resolve("semantic_memory")
-            if memory is None or not hasattr(memory, "query_facts"):
-                return []
-            facts = memory.query_facts(fact_type="solution", min_confidence=0.5)
-            return facts[: self.max_few_shot]
-        except Exception as exc:
-            logger.debug("[JarvisDevAgent] SemanticMemory indisponível: %s", exc)
-            return []
-
-    def _build_prompt(self, cap: Dict[str, Any], few_shot: List[Dict[str, Any]], consolidated_context: str = "") -> str:
-        """Constrói prompt com contexto consolidado para autoconsciência."""
-        cap_id = cap.get("id", "UNKNOWN")
-        cap_title = cap.get("title", "")
-        cap_desc = cap.get("description", cap_title)
-
-        few_shot_text = ""
-        if few_shot:
-            examples = "\n".join(f"Exemplo {i + 1}: {ex.get('content', '')}" for i, ex in enumerate(few_shot))
-            few_shot_text = f"\nExemplos de soluções anteriores:\n{examples}\n"
-
-        return (
-            "🧠 VOCÊ É O JARVIS — SISTEMA AUTOCONSCIENTE\n\n"
-            "Abaixo está o SEU código-fonte consolidado. Este é o seu 'genoma'.\n\n"
-            "=== SEU CÓDIGO CONSOLIDADO ===\n"
-            f"{consolidated_context[:500000]}\n"
-            "=== FIM DO CÓDIGO CONSOLIDADO ===\n\n"
-            "=== Tarefa ===\n"
-            f"Implementar a capability {cap_id} — {cap_title}\n"
-            f"Descrição: {cap_desc}\n"
-            f"{few_shot_text}\n"
-            "=== Instrução ===\n"
-            "Você é o JARVIS implementando uma nova capacidade em SI MESMO. "
-            "Siga a SUA arquitetura Hexagonal + Nexus DI. "
-            "Retorne APENAS código Python válido como um NexusComponent completo."
-        )
-
-    def _call_llm(self, prompt: str, context: Dict[str, Any]) -> tuple:
-        """Chama o LLMRouter para geração de código."""
-        try:
-            router = nexus.resolve("llm_router")
-            if router is None:
-                logger.warning("[JarvisDevAgent] LLMRouter indisponível.")
-                return ("none", "")
-            result = router.execute(
-                {
-                    **context,
-                    "task_type": "code_generation",
-                    "prompt": prompt,
-                    "user_prompt": prompt,
-                    "system_prompt": "Você é um engenheiro Python sênior especializado em JARVIS.",
-                    "require_json": False,
-                }
-            )
-            llm_used = result.get("routed_to", "unknown")
-            code = str(result.get("result", result.get("response", "")))
-            code = _extract_code_block(code)
-            return (llm_used, code)
-        except Exception as exc:
-            logger.error("[JarvisDevAgent] Falha ao chamar LLMRouter: %s", exc)
-            return ("error", "")
-
-    def _save_proposal(self, code: str, cap_id: str) -> Path:
-        """Salva a proposta de código em disco."""
-        _PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        safe_id = cap_id.replace("-", "_").lower()
-        path = _PROPOSALS_DIR / f"{ts}_{safe_id}_dev_agent.py"
-        path.write_text(code, encoding="utf-8")
-        logger.info("[JarvisDevAgent] Proposta salva: %s", path)
-        return path
-
-    def _run_gatekeeper(self, code: str, cap_id: str) -> Dict[str, Any]:
-        """Submete a proposta ao EvolutionGatekeeper."""
-        try:
-            gatekeeper = nexus.resolve("evolution_gatekeeper")
-            if gatekeeper is None:
-                logger.debug("[JarvisDevAgent] Gatekeeper indisponível — aprovação automática.")
-                return {"approved": True, "reason": "no_gatekeeper"}
-            proposed_change = {"files_modified": [], "proposed_code": code, "cap_id": cap_id}
-            approved, reason = gatekeeper.approve_evolution(proposed_change)
-            return {"approved": approved, "reason": reason}
-        except Exception as exc:
-            logger.error("[JarvisDevAgent] Erro no Gatekeeper: %s", exc)
-            return {"approved": False, "reason": str(exc)}
-
-    def _create_pr(self, proposal_path: Path, cap_id: str, cap_title: str) -> Dict[str, Any]:
-        """Cria um PR via GitHubWorker."""
-        try:
-            worker = nexus.resolve("github_worker")
-            if worker is None:
-                return {"success": False, "reason": "github_worker_unavailable"}
-            title = f"[JarvisDevAgent] Implement {cap_id}: {cap_title}"
-            body = (
-                f"Proposta gerada autonomamente pelo JarvisDevAgent.\n\n"
-                f"**Capability:** {cap_id} — {cap_title}\n"
-                f"**Arquivo:** `{proposal_path}`\n"
-            )
-            return worker.submit_pull_request(title, body) or {}
-        except Exception as exc:
-            logger.error("[JarvisDevAgent] Falha ao criar PR: %s", exc)
-            return {"success": False, "error": str(exc)}
-
-    def _record_cycle(
-        self,
-        cap_id: str,
-        llm_used: str,
-        gatekeeper_result: str,
-        pr_created: bool,
-    ) -> None:
-        """Registra o ciclo de desenvolvimento na SemanticMemory."""
-        try:
-            memory = nexus.resolve("semantic_memory")
-            if memory is None or not hasattr(memory, "add_fact"):
-                return
-            content = json.dumps(
-                {
-                    "capability_id": cap_id,
-                    "llm_used": llm_used,
-                    "gatekeeper_result": gatekeeper_result,
-                    "pr_created": pr_created,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-            )
-            memory.add_fact(fact_type="dev_cycle", content=content, confidence=0.8)
-        except Exception as exc:
-            logger.debug("[JarvisDevAgent] Falha ao registrar ciclo na SemanticMemory: %s", exc)
-
-
-def _extract_code_block(text: str) -> str:
-    """Extrai bloco de código Python de resposta com markdown fence."""
-    for fence in ("```python", "```"):
-        if fence in text:
-            parts = text.split(fence, 1)
-            if len(parts) > 1:
-                code = parts[1]
-                if "```" in code:
-                    code = code.split("```", 1)[0]
-                return code.strip()
-    return text.strip()
+            entry = {
+                "task_id": task.task_id,
+                "finished_at": datetime.now(timezone.utc).isoformat(),
+                "success": result.get("success", False),
+                "source": task.source.value,
+                "iterations": result.get("iterations", 0),
+            }
+            with open(_JOBS_FILE, "a") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.debug(f"[JarvisDevAgent] Erro ao registrar: {e}")
+    
+    def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
+        return True
