@@ -1,143 +1,129 @@
 # -*- coding: utf-8 -*-
-"""ThoughtLogService - Manages internal reasoning logs and self-healing cycles"""
-
-from app.core.nexus import NexusComponent, nexus
-
+"""ThoughtLogService — Gerencia logs de raciocínio e Thought Stream.
+Versão 2026.03: Otimização de consultas SQL e integridade de Reward.
+"""
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-
-from sqlmodel import Session, select
-
+from sqlmodel import Session, select, func
+from app.core.nexus import NexusComponent, nexus
 from app.domain.models.thought_log import InteractionStatus, ThoughtLog
+from .thought_log_types import ThoughtType, DEFAULT_CONFIG
+from .thought_log_renderer import ThoughtRenderer
+from .thought_log_storage import ThoughtStorage
 
 logger = logging.getLogger(__name__)
 
 
 class ThoughtLogService(NexusComponent):
-    def execute(self, context: dict):
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
-
     """
-    Service for managing thought logs and implementing self-healing logic.
+    Service for managing thought logs and visual feedback.
     
-    Features:
-    - Store internal reasoning separate from user interactions
-    - Track retry counts for auto-correction cycles
-    - Escalate to human after 3 failed attempts
-    - Generate consolidated logs for commander review
+    Orquestra o fluxo de pensamento (Stream) e a persistência de auto-cura.
     """
     
-    MAX_RETRIES = 3  # Maximum retries before escalating to human
+    MAX_RETRIES = 3
     
-    def __init__(self, engine=None):  # ← engine é opcional (default=None)
+    def __init__(self, engine=None):
         super().__init__()
-        # CORREÇÃO: Lógica explícita para resolver engine via Nexus se não injetado
+        config = DEFAULT_CONFIG.copy()
+        
         if engine is not None:
             self.engine = engine
         else:
+            # Resolução dinâmica via Nexus para desacoplamento
             db_adapter = nexus.resolve("db_adapter")
             self.engine = getattr(db_adapter, "engine", None) if db_adapter else None
-    
-  
-    
-    def create_thought(
-        self,
-        mission_id: str,
-        session_id: str,
-        thought_process: str,
-        problem_description: str = "",
-        solution_attempt: str = "",
-        status: InteractionStatus = InteractionStatus.INTERNAL_MONOLOGUE,
-        success: bool = False,
-        error_message: str = "",
-        context_data: Optional[Dict[str, Any]] = None,
-        system_state: Optional[Dict[str, Any]] = None,
-        discarded_alternatives: Optional[list] = None,
-        expected_result: str = "",
-        actual_result: str = "",
-        reward_received: float = 0.0,
-    ) -> Optional[ThoughtLog]:
-        """
-        Create a new thought log entry
         
-        Args:
-            mission_id: Unique mission identifier
-            session_id: Session identifier for grouping
-            thought_process: Technical reasoning
-            problem_description: What problem is being solved
-            solution_attempt: What solution was tried
-            status: Interaction status (USER_INTERACTION or INTERNAL_MONOLOGUE)
-            success: Did this attempt succeed
-            error_message: Error if failed
-            context_data: Additional context (logs, stack traces, etc.)
-            system_state: Snapshot do estado do sistema no momento da decisão
-            discarded_alternatives: Alternativas descartadas antes da ação escolhida
-            expected_result: O que se esperava que acontecesse
-            actual_result: O que realmente aconteceu
-            reward_received: Valor de reward do RewardSignalProvider
-            
-        Returns:
-            Created ThoughtLog or None if failed
-        """
+        self._enabled = config["enabled"]
+        self._max_obs_length = config["max_observation_length"]
+        self._stream_to_console = config["stream_to_console"]
+        
+        self._renderer = ThoughtRenderer(
+            color_enabled=config["color_enabled"],
+            show_timestamp=config["show_timestamp"]
+        )
+        self._storage = ThoughtStorage(
+            engine=self.engine,
+            max_history=config["max_history"]
+        )
+    
+    def execute(self, context: dict):
+        """NexusComponent entry-point para orquestração via contratos."""
+        action = context.get("action", "create_thought")
+        
+        if action == "create_thought":
+            return {"success": True, "thought": self.create_thought(**context)}
+        elif action == "stream":
+            return self.stream_thought(
+                context.get("thought_type", "info"),
+                context.get("message", ""),
+                context.get("data", {})
+            )
+        elif action == "get_mission_thoughts":
+            return {"success": True, "thoughts": self.get_mission_thoughts(
+                context.get("mission_id"), context.get("limit")
+            )}
+        elif action == "check_requires_human":
+            return {"success": True, "requires_human": self.check_requires_human(
+                context.get("mission_id")
+            )}
+        
+        return {"success": False, "error": "Action not implemented"}
+    
+    def create_thought(self, mission_id: str, session_id: str,
+                       thought_process: str, **kwargs) -> Optional[ThoughtLog]:
+        """Cria um log de pensamento persistente e verifica necessidade de escalonamento."""
         try:
             with Session(self.engine) as session:
-                # Get retry count for this mission
+                # Obtém contagem de falhas para lógica de escalonamento
                 retry_count = self._get_mission_retry_count(session, mission_id)
                 
-                # Check if we should escalate to human
+                success_status = kwargs.get("success", False)
                 requires_human = False
                 escalation_reason = ""
                 
-                if not success and retry_count >= self.MAX_RETRIES:
+                # Lógica de Escalonamento: Se falhou e atingiu o limite
+                if not success_status and retry_count >= self.MAX_RETRIES:
                     requires_human = True
-                    escalation_reason = f"Auto-correction failed {self.MAX_RETRIES} times. Human intervention required."
-                    logger.warning(f"Mission {mission_id} escalated to human after {retry_count} failures")
+                    escalation_reason = (
+                        f"Auto-correction failed {retry_count} times. "
+                        "Human intervention required."
+                    )
                 
+                # Montagem do Modelo
                 thought_log = ThoughtLog(
                     mission_id=mission_id,
                     session_id=session_id,
-                    status=status.value if isinstance(status, InteractionStatus) else status,
+                    status=kwargs.get("status", InteractionStatus.INTERNAL_MONOLOGUE.value),
                     thought_process=thought_process,
-                    problem_description=problem_description,
-                    solution_attempt=solution_attempt,
-                    success=success,
-                    error_message=error_message,
-                    retry_count=retry_count if not success else 0,
-                    context_data=json.dumps(context_data or {}),
+                    problem_description=kwargs.get("problem_description", ""),
+                    solution_attempt=kwargs.get("solution_attempt", ""),
+                    success=success_status,
+                    error_message=kwargs.get("error_message", ""),
+                    # Reseta retry se teve sucesso, caso contrário incrementa
+                    retry_count=retry_count if not success_status else 0,
+                    context_data=json.dumps(kwargs.get("context_data", {})),
                     requires_human=requires_human,
                     escalation_reason=escalation_reason,
-                    system_state=json.dumps(system_state or {}),
-                    discarded_alternatives=json.dumps(discarded_alternatives or []),
-                    expected_result=expected_result,
-                    actual_result=actual_result,
-                    reward_received=reward_received,
+                    system_state=json.dumps(kwargs.get("system_state", {})),
+                    discarded_alternatives=json.dumps(
+                        kwargs.get("discarded_alternatives", [])
+                    ),
+                    expected_result=kwargs.get("expected_result", ""),
+                    actual_result=kwargs.get("actual_result", ""),
+                    reward_received=kwargs.get("reward_received", 0.0),
+                    reward_value=kwargs.get("reward_value", kwargs.get("reward_received", 0.0)),
                 )
                 
                 session.add(thought_log)
                 session.commit()
                 session.refresh(thought_log)
-
-                # Indexa thought na memória vetorial (não-bloqueante)
-                try:
-                    vector_memory = nexus.resolve("vector_memory_adapter")
-                    if vector_memory:
-                        vector_memory.execute({
-                            "action": "store",
-                            "text": f"[{status}] {thought_process}",
-                            "metadata": {
-                                "mission_id": mission_id,
-                                "thought_type": status.value
-                                if isinstance(status, InteractionStatus)
-                                else status,
-                            },
-                        })
-                except Exception as exc:
-                    logger.debug("Falha ao indexar thought na memória vetorial: %s", exc)
-
-                logger.info(f"Created thought log for mission {mission_id}, retry {retry_count}")
+                
+                # Indexação em Memória Vetorial (Opcional)
+                self._index_to_vector_memory(mission_id, thought_process, kwargs.get("status"))
+                
                 return thought_log
                 
         except Exception as e:
@@ -145,291 +131,74 @@ class ThoughtLogService(NexusComponent):
             return None
     
     def _get_mission_retry_count(self, session: Session, mission_id: str) -> int:
-        """
-        Get the number of failed attempts for a mission
-        
-        Args:
-            session: Database session
-            mission_id: Mission identifier
-            
-        Returns:
-            Number of failed attempts
-        """
+        """Contagem performática de falhas (usando COUNT no DB em vez de carregar objetos)."""
         statement = (
-            select(ThoughtLog)
+            select(func.count(ThoughtLog.id))
             .where(ThoughtLog.mission_id == mission_id)
             .where(ThoughtLog.success == False)
         )
-        failed_attempts = session.exec(statement).all()
-        return len(failed_attempts)
+        return session.exec(statement).one() or 0
     
-    def get_mission_thoughts(
-        self,
-        mission_id: str,
-        limit: Optional[int] = None
-    ) -> List[ThoughtLog]:
-        """
-        Get all thought logs for a specific mission
-        
-        Args:
-            mission_id: Mission identifier
-            limit: Optional limit on number of logs
-            
-        Returns:
-            List of thought logs
-        """
+    def _index_to_vector_memory(self, mission_id: str, text: str, status: str):
+        """Tenta enviar o raciocínio para a memória de longo prazo."""
         try:
-            with Session(self.engine) as session:
-                statement = (
-                    select(ThoughtLog)
-                    .where(ThoughtLog.mission_id == mission_id)
-                    .order_by(ThoughtLog.created_at.asc())
-                )
-                
-                if limit:
-                    statement = statement.limit(limit)
-                
-                return session.exec(statement).all()
-                
-        except Exception as e:
-            logger.error(f"Error getting mission thoughts: {e}")
-            return []
-    
-    def get_session_thoughts(
-        self,
-        session_id: str,
-        limit: Optional[int] = None
-    ) -> List[ThoughtLog]:
-        """
-        Get all thought logs for a specific session
-        
-        Args:
-            session_id: Session identifier
-            limit: Optional limit on number of logs
-            
-        Returns:
-            List of thought logs
-        """
-        try:
-            with Session(self.engine) as session_db:
-                statement = (
-                    select(ThoughtLog)
-                    .where(ThoughtLog.session_id == session_id)
-                    .order_by(ThoughtLog.created_at.asc())
-                )
-                
-                if limit:
-                    statement = statement.limit(limit)
-                
-                return session_db.exec(statement).all()
-                
-        except Exception as e:
-            logger.error(f"Error getting session thoughts: {e}")
-            return []
-    
-    def check_requires_human(self, mission_id: str) -> bool:
-        """
-        Check if a mission requires human intervention
-        
-        Args:
-            mission_id: Mission identifier
-            
-        Returns:
-            True if human intervention is required
-        """
-        try:
-            with Session(self.engine) as session:
-                statement = (
-                    select(ThoughtLog)
-                    .where(ThoughtLog.mission_id == mission_id)
-                    .where(ThoughtLog.requires_human == True)
-                    .limit(1)
-                )
-                
-                result = session.exec(statement).first()
-                return result is not None
-                
-        except Exception as e:
-            logger.error(f"Error checking human requirement: {e}")
-            return False
-    
-    def generate_consolidated_log(self, mission_id: str) -> str:
-        """
-        Generate a consolidated log of all attempts for a mission.
-        Used when escalating to human for review.
-        
-        Args:
-            mission_id: Mission identifier
-            
-        Returns:
-            Formatted consolidated log
-        """
-        thoughts = self.get_mission_thoughts(mission_id)
-        
-        if not thoughts:
-            return f"No thought logs found for mission {mission_id}"
-        
-        log_lines = [
-            f"=== Consolidated Log for Mission: {mission_id} ===",
-            f"Total Attempts: {len(thoughts)}",
-            f"Status: {'ESCALATED TO HUMAN' if thoughts[-1].requires_human else 'IN PROGRESS'}",
-            "",
-        ]
-        
-        for i, thought in enumerate(thoughts, 1):
-            log_lines.extend([
-                f"--- Attempt {i} ({thought.created_at.isoformat()}) ---",
-                f"Problem: {thought.problem_description}",
-                f"Reasoning: {thought.thought_process}",
-                f"Solution: {thought.solution_attempt}",
-                f"Result: {'SUCCESS' if thought.success else 'FAILED'}",
-            ])
-            
-            if thought.error_message:
-                log_lines.append(f"Error: {thought.error_message}")
-            
-            if thought.context_data and thought.context_data != "{}":
-                try:
-                    context = json.loads(thought.context_data)
-                    log_lines.append(f"Context: {json.dumps(context, indent=2)}")
-                except json.JSONDecodeError:
-                    log_lines.append(f"Context: {thought.context_data}")
-            
-            log_lines.append("")
-        
-        if thoughts[-1].requires_human:
-            log_lines.extend([
-                "=== COMMANDER INTERVENTION REQUIRED ===",
-                f"Reason: {thoughts[-1].escalation_reason}",
-                "",
-            ])
-        
-        return "\n".join(log_lines)
-    
-    def get_pending_escalations(self) -> List[ThoughtLog]:
-        """
-        Get all missions that require human intervention
-        
-        Returns:
-            List of thought logs requiring human help
-        """
-        try:
-            with Session(self.engine) as session:
-                statement = (
-                    select(ThoughtLog)
-                    .where(ThoughtLog.requires_human == True)
-                    .order_by(ThoughtLog.created_at.desc())
-                )
-                
-                return session.exec(statement).all()
-                
-        except Exception as e:
-            logger.error(f"Error getting pending escalations: {e}")
-            return []
-    
-    def get_recent_thoughts(
-        self,
-        status: Optional[InteractionStatus] = None,
-        limit: int = 50
-    ) -> List[ThoughtLog]:
-        """
-        Get recent thought logs, optionally filtered by status
-        
-        Args:
-            status: Optional filter by interaction status
-            limit: Maximum number of logs to return
-            
-        Returns:
-            List of recent thought logs
-        """
-        try:
-            with Session(self.engine) as session:
-                statement = select(ThoughtLog).order_by(ThoughtLog.created_at.desc())
-                
-                if status:
-                    statement = statement.where(
-                        ThoughtLog.status == (status.value if isinstance(status, InteractionStatus) else status)
-                    )
-                
-                statement = statement.limit(limit)
-                
-                return session.exec(statement).all()
-                
-        except Exception as e:
-            logger.error(f"Error getting recent thoughts: {e}")
-            return []
-
-    def get_learning_patterns(self, limit: int = 100) -> Dict[str, Any]:
-        """
-        Identifica padrões de sucesso e falha recorrentes nos thought logs.
-
-        Analisa os logs recentes para extrair insights de aprendizado contínuo:
-        - Taxa de sucesso por tipo de status
-        - Missões com maior número de tentativas
-        - Reward médio recebido
-        - Alternativas descartadas mais comuns
-
-        Args:
-            limit: Número de thought logs recentes a analisar.
-
-        Returns:
-            Dicionário com padrões identificados.
-        """
-        thoughts = self.get_recent_thoughts(limit=limit)
-        if not thoughts:
-            return {"total": 0, "success_rate": 0.0, "avg_reward": 0.0, "patterns": []}
-
-        total = len(thoughts)
-        successes = sum(1 for t in thoughts if t.success)
-        success_rate = round(successes / total, 4) if total else 0.0
-
-        rewards = [t.reward_received for t in thoughts]
-        avg_reward = round(sum(rewards) / total, 4)
-
-        # Missões com mais falhas consecutivas (potenciais loops)
-        mission_failures: Dict[str, int] = {}
-        for t in thoughts:
-            if not t.success:
-                mission_failures[t.mission_id] = mission_failures.get(t.mission_id, 0) + 1
-        top_failing = sorted(mission_failures.items(), key=lambda x: x[1], reverse=True)[:5]
-
-        # Patterns: tuplas (mission_id, failure_count) com falhas repetidas
-        patterns = [
-            {"mission_id": m, "failure_count": c, "pattern": "repeated_failure"}
-            for m, c in top_failing
-            if c >= 2
-        ]
-
-        return {
-            "total": total,
-            "success_rate": success_rate,
-            "avg_reward": avg_reward,
-            "top_failing_missions": [{"mission_id": m, "count": c} for m, c in top_failing],
-            "patterns": patterns,
-        }
-
-    def find_similar_repairs(self, error_description: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        """
-        Busca reparos similares na memória vetorial.
-
-        Args:
-            error_description: Descrição do erro para busca semântica.
-            top_k: Número máximo de resultados a retornar.
-
-        Returns:
-            Lista de resultados similares ou lista vazia se memória indisponível.
-        """
-        try:
-            vm = nexus.resolve("vector_memory_adapter")
-            if not vm:
-                return []
-            result = vm.execute({
-                "action": "query",
-                "text": error_description,
-                "top_k": top_k,
-                "days_back": 30,
-            })
-            return result.get("results", [])
+            vector_memory = nexus.resolve("vector_memory_adapter")
+            if vector_memory:
+                vector_memory.execute({
+                    "action": "store",
+                    "text": f"[{status or 'internal'}] {text}",
+                    "metadata": {"mission_id": mission_id},
+                })
         except Exception as exc:
-            logger.debug("Falha ao buscar reparos similares na memória vetorial: %s", exc)
-            return []
+            logger.debug("Falha ao indexar thought na memória vetorial: %s", exc)
+
+    def get_mission_thoughts(self, mission_id: str, limit: int = None) -> List[ThoughtLog]:
+        return self._storage.get_mission_thoughts(mission_id, limit)    
+
+    def check_requires_human(self, mission_id: str) -> bool:
+        return self._storage.check_requires_human(mission_id)
+    
+    def stream_thought(self, thought_type: str, message: str,
+                       data: Optional[Dict] = None) -> Dict[str, Any]:
+        """Transmite pensamento em tempo real para o console/HUD."""
+        if not self._enabled:
+            return {"success": False, "error": "ThoughtLogService disabled"}
+        
+        # Truncagem de observações longas
+        if thought_type == ThoughtType.OBSERVATION and len(message) > self._max_obs_length:
+            message = message[:self._max_obs_length] + "..."
+        
+        thought = {
+            "thought_id": f"thought_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}",
+            "mission_id": self._storage._mission_id,
+            "thought_type": thought_type,
+            "message": message,
+            "data": data or {},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        
+        self._storage.add(thought)
+        
+        if self._stream_to_console:
+            self._renderer.print(thought)
+        
+        return {"success": True, "streamed": True}
+
+    # Atalhos semânticos para o Stream
+    def stream_planning(self, message: str, data: Optional[Dict] = None):
+        return self.stream_thought(ThoughtType.PLANNING, message, data)
+    
+    def stream_action(self, message: str, data: Optional[Dict] = None):
+        return self.stream_thought(ThoughtType.ACTION, message, data)
+    
+    def stream_observation(self, message: str, data: Optional[Dict] = None):
+        return self.stream_thought(ThoughtType.OBSERVATION, message, data)
+    
+    def stream_error(self, message: str, data: Optional[Dict] = None):
+        return self.stream_thought(ThoughtType.ERROR, message, data)
+    
+    def stream_success(self, message: str, data: Optional[Dict] = None):
+        return self.stream_thought(ThoughtType.SUCCESS, message, data)
+    
+    def can_execute(self, context: dict = None) -> bool:
+        return True
