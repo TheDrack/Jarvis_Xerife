@@ -1,193 +1,100 @@
 # -*- coding: utf-8 -*-
-"""JarvisDevAgent — Agente autônomo principal (ATUALIZADO)."""
-import json
 import logging
-import re
-import uuid
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, Optional
-
-from app.core.nexus import NexusComponent, nexus
-from app.domain.models.agent import AgentAction, AgentTask, TaskSource, TaskPriority, ActionType
-
-from .trajectory import AgentTrajectory
-from .actions import ActionExecutor
-from .prompt_builder import PromptBuilder
-from .pipeline_builder import PipelineBuilder
+import traceback
+from typing import Dict, Any, List
+from app.core.nexus import Nexus
+from app.domain.models.thought_log import ThoughtLog
 
 logger = logging.getLogger(__name__)
 
-_JOBS_FILE = Path("data/dev_agent_jobs.jsonl")
-_MAX_ITERATIONS = 15
+class JarvisDevAgent:
+    """
+    Agente de Desenvolvimento Autônomo.
+    Responsável por analisar gaps, propor soluções e aplicar correções via SurgicalEdit.
+    """
 
+    def __init__(self, nexus: Nexus):
+        self.nexus = nexus
+        # CORREÇÃO: Inicialização protegida. A resolução ocorre no momento do uso 
+        # para garantir que o Nexus já completou o ciclo de bootstrap.
+        self._memory = None
+        self._gateway = None
 
-class JarvisDevAgent(NexusComponent):
-    """Agente autônomo que usa AdapterRegistry + Pipeline Runner."""
-    
-    def __init__(self) -> None:
-        super().__init__()
-        self.max_iterations: int = _MAX_ITERATIONS
-        self._trajectory: Optional[AgentTrajectory] = None
-        self._executor = ActionExecutor()
-        self._prompt_builder = PromptBuilder()
-        self._pipeline_builder = PipelineBuilder()
-    
-    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Executa tarefa autônoma."""
-        ctx = context or {}
-        task = self._create_task(ctx)
+    @property
+    def memory(self):
+        if not self._memory:
+            self._memory = self.nexus.resolve("working_memory")
+        return self._memory
+
+    @property
+    def gateway(self):
+        if not self._gateway:
+            self._gateway = self.nexus.resolve("metabolism_core")
+        return self._gateway
+
+    async def analyze_and_fix(self, issue_description: str) -> Dict[str, Any]:
+        """Ciclo principal de Pensamento -> Ação -> Verificação."""
+        logger.info(f"[DevAgent] Analisando problema: {issue_description}")
         
-        logger.info(f" [JarvisDevAgent] task_id={task.task_id} source={task.source.value}")
-        
-        self._trajectory = AgentTrajectory(task=task)
-        
-        try:
-            result = self._run_cycle(task)
-            self._consolidate(result)
-            return result
-        except Exception as e:
-            logger.error(f" [JarvisDevAgent] Erro: {e}", exc_info=True)            return {"success": False, "task_id": task.task_id, "reason": str(e)}
-    
-    def _create_task(self, ctx: Dict[str, Any]) -> AgentTask:
-        return AgentTask(
-            task_id=ctx.get("task_id", f"task_{uuid.uuid4().hex[:12]}"),
-            source=TaskSource(ctx.get("source", "user_request")),
-            priority=TaskPriority(ctx.get("priority", "medium")),
-            description=ctx.get("description", ""),
-            context=ctx.get("context", {}),
-            constraints=ctx.get("constraints", []),
-            success_criteria=ctx.get("success_criteria", "Tarefa completada"),
+        # 1. Registro do pensamento inicial
+        thought = ThoughtLog(
+            step="initial_analysis",
+            thought=f"Detectado problema: {issue_description}. Iniciando varredura de código.",
+            target_file="multiple"
         )
-    
-    def _run_cycle(self, task: AgentTask) -> Dict[str, Any]:
-        iteration = 0
-        
-        while iteration < self.max_iterations:
-            iteration += 1
-            logger.info(f" Iteração {iteration}/{self.max_iterations}")
-            
-            prompt = self._prompt_builder.build(task, self._trajectory, iteration)
-            action = self._decide_action(prompt)
-            
-            if not action:
-                return self._fail(task.task_id, "LLM não retornou ação válida", iteration)
-            
-            logger.info(f" Ação: {action.action_type.value} - {action.reasoning[:100]}")
-            
-            observation = self._executor.execute(action)
-            self._trajectory.add_step(action, observation)
-            
-            if action.action_type.value == "finish":
-                return self._success(task.task_id, task, iteration, observation.output)
-            
-            if not observation.success and self._is_critical(observation):
-                return self._fail(task.task_id, f"Falha crítica: {observation.error}", iteration)
-        
-        return self._fail(task.task_id, f"Limite de {self.max_iterations} iterações", iteration)
-    
-    def _decide_action(self, prompt: str) -> Optional[AgentAction]:
+        await self.memory.add_event("thought", thought.dict())
+
         try:
-            router = nexus.resolve("llm_router")
-            if not router or getattr(router, "__is_cloud_mock__", False):
-                return None
-            
-            result = router.execute({
-                "task_type": "code_generation",
-                "prompt": prompt,
-                "require_json": True,
-                "temperature": 0.1,            })
-            
-            response = result.get("result", result.get("response", ""))
-            json_str = self._extract_json(response)
-            if not json_str:
-                return None
-            
-            data = json.loads(json_str)
-            return AgentAction(
-                action_type=ActionType(data.get("action_type", "finish")),
-                parameters=data.get("parameters", {}),
-                reasoning=data.get("reasoning", ""),
-                step_number=len(self._trajectory.actions) + 1,
+            # 2. Descoberta de código (Code Discovery)
+            discovery = self.nexus.resolve("code_discovery_service")
+            relevant_files = await discovery.find_relevant_context(issue_description)
+
+            # 3. Solicitação de solução ao MetabolismCore (LLM)
+            # O prompt instrui o LLM a usar o SurgicalEditService
+            proposal = await self.gateway.generate_fix_proposal(
+                issue=issue_description,
+                context=relevant_files
             )
-        except Exception as e:
-            logger.error(f" Erro ao decidir ação: {e}")
-            return None
-    
-    def _extract_json(self, response: str) -> Optional[str]:
-        match = re.search(r'```(?:json)?\s*({.*?})\s*```', response, re.DOTALL)
-        if match:
-            return match.group(1)
-        try:
-            start, end = response.find("{"), response.rfind("}") + 1
-            if start >= 0 and end > start:
-                return response[start:end]
-        except Exception:
-            pass
-        return None
-    
-    def _is_critical(self, observation) -> bool:
-        if not observation.error:
-            return False
-        critical = ["permission denied", "no such file", "syntax error", "import error"]
-        return any(ind in observation.error.lower() for ind in critical)
-    
-    def _success(self, task_id: str, task: AgentTask, iterations: int, output: str) -> Dict[str, Any]:
-        self._trajectory.success = True
-        self._trajectory.final_result = output
-        self._trajectory.completed_at = datetime.now(timezone.utc)
-        self._record_learning(task)
-        
-        return {
-            "success": True,
-            "task_id": task_id,
-            "task_source": task.source.value,
-            "iterations": iterations,
-            "trajectory": self._trajectory.to_dict(),
-            "final_output": output[:500],
-        }    
-    def _fail(self, task_id: str, reason: str, iterations: int) -> Dict[str, Any]:
-        if self._trajectory:
-            self._trajectory.success = False
-            self._trajectory.final_result = reason
-            self._trajectory.completed_at = datetime.now(timezone.utc)
-        
-        return {
-            "success": False,
-            "task_id": task_id,
-            "reason": reason,
-            "iterations": iterations,
-            "trajectory": self._trajectory.to_dict() if self._trajectory else None,
-        }
-    
-    def _consolidate(self, result: Dict[str, Any]) -> None:
-        try:
-            _JOBS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            entry = {
-                "task_id": result.get("task_id"),
-                "finished_at": datetime.now(timezone.utc).isoformat(),
-                "success": result.get("success", False),
-                "source": result.get("task_source"),
+
+            # 4. Execução das Ações
+            results = []
+            for action in proposal.get("actions", []):
+                res = await self.execute_action(action)
+                results.append(res)
+
+            return {
+                "success": all(r.get("success") for r in results),
+                "actions_performed": results
             }
-            with open(_JOBS_FILE, "a") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
-    
-    def _record_learning(self, task: AgentTask) -> None:
-        try:
-            memory = nexus.resolve("procedural_memory")
-            if memory and not getattr(memory, "__is_cloud_mock__", False):
-                memory.execute({
-                    "action": "store_pattern",
-                    "command_pattern": f"{task.source.value}_{task.description[:50]}",
-                    "task_type": f"dev_agent_{task.source.value}",
-                    "solution": self._trajectory.final_result,
-                    "success": True,
-                    "confidence": 0.8,
-                })
-        except Exception:
-            pass
-    
-    def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
-        return True
+
+        except Exception as e:
+            # CORREÇÃO: Linha 99 - Sincronização de erro com a WorkingMemory
+            # Sem isso, o JARVIS entra em loop pois não "lembra" do erro técnico.
+            error_trace = traceback.format_exc()
+            logger.error(f"[DevAgent] Falha crítica no ciclo de reparo: {e}")
+            
+            await self.memory.add_event("error", {
+                "exception": str(e),
+                "traceback": error_trace,
+                "context": "analyze_and_fix"
+            })
+            
+            return {"success": False, "error": str(e)}
+
+    async def execute_action(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        """Executa uma ação específica (edit, shell, create)."""
+        action_type = action.get("type")
+        
+        if action_type == "surgical_edit":
+            editor = self.nexus.resolve("surgical_edit_service")
+            return editor.apply_surgical_edit(
+                file_path=action["file"],
+                search_block=action["search"],
+                replace_block=action["replace"]
+            )
+        
+        elif action_type == "shell_command":
+            shell = self.nexus.resolve("persistent_shell_adapter")
+            return await shell.execute(action["command"])
+
+        return {"success": False, "error": f"Tipo de ação '{action_type}' não suportado."}
