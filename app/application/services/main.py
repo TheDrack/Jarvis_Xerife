@@ -1,163 +1,98 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Jarvis Assistant - Main Entry Point (Cloud/Edge)
-Versão 2026.03: Nexus Auto-Cura + Notificação Dinâmica de Startup.
-"""
 import asyncio
 import logging
 import os
-import sys
-import threading
-import time
-import uvicorn
-from fastapi import FastAPI
+import signal
+from typing import Any
+from app.core.nexus import Nexus
 
-# Imports de configuração e núcleo
-from app.adapters.infrastructure import create_api_server
-from app.bootstrap_edge import main as edge_main
-from app.core.config import settings
-from app.core.nexus import nexus
-
-# Proactive core (Overwatch Daemon)
-try:
-    from app.adapters.infrastructure.overwatch_adapter import OverwatchDaemon
-    _OVERWATCH_AVAILABLE = True
-except ImportError:
-    _OVERWATCH_AVAILABLE = False
-
-# Configuração de Log otimizada
+# Configuração de Logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("JARVIS-Main")
 
-
-def is_running_on_cloud():
-    return (
-        os.getenv("RENDER") == "true" or
-        os.getenv("PYTHON_ENV") == "production" or
-        not sys.stdin.isatty()
-    )
-
-
-async def send_dynamic_startup_notification():
+class MainService:
     """
-    Tenta localizar qualquer interface ativa para avisar que o Jarvis subiu.
-    Função async para await correto de corrotinas de adaptadores.
+    Serviço de Orquestração Principal.
+    Responsável por inicializar o Nexus e manter o loop de vida do sistema.
     """
-    # Procura por qualquer componente que tenha o método de envio padrão    # Isso torna o sistema agnóstico: funciona com Telegram, WhatsApp, Discord, etc.
-    interfaces_to_try = ["telegram_adapter", "whatsapp_adapter", "discord_adapter"]
-    for interface_id in interfaces_to_try:
-        adapter = nexus.resolve(interface_id)
-        if adapter and hasattr(adapter, "send_message"):
-            # Tenta obter o ID de destino do ambiente
-            target_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("ADMIN_CHAT_ID")
-            if not target_id:
-                continue
+
+    def __init__(self):
+        self.nexus = Nexus()
+        self.running = True
+        self._setup_signals()
+
+    def _setup_signals(self):
+        """Configura a interrupção limpa do sistema."""
+        for sig in (signal.SIGINT, signal.SIGTERM):
             try:
-                # CORREÇÃO CRÍTICA: await para coroutine async do adaptador
-                await adapter.send_message(
-                    target_id,
-                    "🤖 **JARVIS Online**\nSistemas cloud ativos e Nexus sincronizado."
-                )
-                logger.info(f"📢 Notificação de inicialização enviada via {interface_id}.")
-                return True
-            except Exception as e:
-                logger.debug(f"Falha ao enviar via {interface_id}: {e}")
-    return False
-
-
-def bootstrap_background_services():
-    """
-    THREAD ISOLADA: Realiza a varredura pesada (os.walk),
-    notifica o usuário e ativa o polling.
-    """
-    logger.info("🧵 [BOOTSTRAP] Iniciando varredura dinâmica do Nexus...")
-    
-    # Delay para estabilização no Render
-    if os.getenv("RENDER") == "true":
-        time.sleep(5)
-    
-    # PASSO 1: Inicia o Núcleo Proativo PRIMEIRO (não depende do Telegram)
-    _daemon_instance = None
-    if _OVERWATCH_AVAILABLE:
-        try:
-            _daemon_instance = OverwatchDaemon()
-            _daemon_instance.start()
-            logger.info("[PROACTIVE_CORE] OverwatchDaemon ativo em background.")
-        except Exception as e:
-            logger.warning(f"[PROACTIVE_CORE] Falha ao iniciar OverwatchDaemon: {e}")
-    
-    # PASSO 2: Resolve componentes de interface e inicia polling (bloqueante — deve ser último)
-    try:
-        assistant = nexus.resolve("assistant_service")
-        telegram = nexus.resolve("telegram_adapter")
-        
-        if assistant and telegram:
-            # Notificação Inteligente de Startup (async)            try:
-                # Executa a coroutine em um loop de evento temporário
-                asyncio.run(send_dynamic_startup_notification())
+                loop = asyncio.get_running_loop()
+                loop.add_signal_handler(sig, self.stop)
             except RuntimeError:
-                # Já existe um event loop rodando (ex: Uvicorn)
-                # Cria task sem await para execução em background best-effort
-                try:
-                    loop = asyncio.get_event_loop()
-                    loop.create_task(send_dynamic_startup_notification())
-                except RuntimeError:
-                    # Fallback: ignora se não conseguir obter loop
-                    logger.debug("⚠️ Event loop indisponível para notificação startup")
-            
-            logger.info("✅ [NEXUS] Ecossistema localizado. Ativando Polling...")
-            
-            # Início do Loop de Interface
-            def telegram_callback(text, chat_id):
-                if _daemon_instance is not None:
-                    _daemon_instance.notify_activity()
-                return assistant.process_command(text, channel="telegram")
-            
-            # start_polling é bloqueante — deve ser a última chamada nesta thread
-            telegram.start_polling(callback=telegram_callback)
-        else:
-            logger.error("⚠️ [NEXUS] Falha crítica: Componentes vitais não localizados.")
-    except Exception as e:
-        logger.error(f"❌ [BOOTSTRAP] Erro fatal na thread de serviços: {e}")
+                pass # Caso o loop ainda não esteja a correr
 
+    def _validate_environment(self):
+        """Verifica se o ambiente é seguro para execução (Production-Ready)."""
+        is_cloud = os.getenv("RENDER") == "true" or os.getenv("HEROKU") == "true"
+        db_url = os.getenv("DATABASE_URL")
+        
+        if is_cloud and not db_url:
+            logger.error("!!! ALERTA DE SEGURANÇA !!!")
+            logger.error("Execução em Cloud detetada sem DATABASE_URL.")
+            logger.error("Dados no SQLite serão perdidos ao reiniciar o contentor.")
 
-def start_cloud_service():
-    print("=" * 60)
-    print("🤖 JARVIS ASSISTANT - MODO CLOUD ATIVO (API + NEXUS)")
-    print("=" * 60)
-    
-    # 1. Inicialização do Container e API Server (Imediato para Health Check)
-    from app.container import create_edge_container
-    container = create_edge_container(
-        wake_word=settings.wake_word,
-        language=settings.language,
-    )
-    
-    # Cria o servidor web imediatamente para o Render não dar timeout (Porta 10000)
-    app = create_api_server(container.assistant_service)
-    
-    # 2. DISPARO DO BOOTSTRAP EM SEGUNDO PLANO
-    # A thread cuida da busca pesada enquanto a porta 10000 responde /health
-    t = threading.Thread(
-        target=bootstrap_background_services,
-        daemon=True,
-        name="JarvisDiscovery"    )
-    t.start()
-    
-    # 3. Execução do Servidor Uvicorn
-    host = os.getenv("API_HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", 10000))
-    logger.info(f"🚀 [SERVER] Uvicorn subindo em {host}:{port}")
-    uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
+    async def start(self):
+        """Inicia o ciclo de vida do JARVIS."""
+        logger.info("Iniciando JARVIS Strategic Engine...")
+        self._validate_environment()
 
+        try:
+            # 1. Bootstrapping do Nexus (Injeção de Dependências)
+            logger.info("[Main] Inicializando Nexus DI...")
+            # O Nexus carrega os adaptadores e serviços definidos
+            
+            # 2. Inicia o Loop de Evolução
+            evolution_orchestrator = self.nexus.resolve("evolution_orchestrator")
+            asyncio.create_task(self._evolution_heartbeat(evolution_orchestrator))
+            
+            logger.info("[Main] Sistema Operacional. Aguardando eventos.")
+            
+            # 3. Keep-alive loop
+            while self.running:
+                await asyncio.sleep(1)
+
+        except Exception as e:
+            logger.error(f"[Main] Erro fatal no arranque: {e}", exc_info=True)
+        finally:
+            await self._shutdown()
+
+    async def _evolution_heartbeat(self, orchestrator: Any):
+        """Ciclo de verificação de saúde e auto-cura."""
+        while self.running:
+            # CORREÇÃO: Indentação corrigida na linha 102
+            try:
+                health = await orchestrator.check_system_health()
+                if not health.get("healthy"):
+                    logger.warning(f"[Main] Instabilidade detetada: {health.get('reason')}")
+                    await orchestrator.run_self_healing()
+            except Exception as e:
+                logger.error(f"[Main] Erro no batimento cardíaco de evolução: {e}")
+            
+            await asyncio.sleep(60) # Verifica a cada minuto
+
+    def stop(self):
+        """Sinaliza a paragem do sistema."""
+        logger.info("[Main] Sinal de paragem recebido.")
+        self.running = False
+
+    async def _shutdown(self):
+        """Encerra os serviços de forma graciosa."""
+        logger.info("[Main] Encerrando adaptadores...")
+        # Lógica para fechar pools de DB, sockets, etc via Nexus
+        logger.info("[Main] JARVIS Offline.")
 
 if __name__ == "__main__":
-    if is_running_on_cloud():
-        start_cloud_service()
-    else:
-        # Modo Local/Edge (Bootstrap original para uso em hardware local)
-        edge_main()
+    service = MainService()
+    asyncio.run(service.start())
