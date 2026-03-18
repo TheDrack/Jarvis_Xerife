@@ -29,7 +29,7 @@ class CodeDiscovery:
         discovered = {"functions": [], "classes": [], "services": []}
         
         context_data = self._discover_from_context()
-        if context_
+        if context_:
             discovered.update(context_data)
         
         ast_data = self._discover_from_ast()
