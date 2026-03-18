@@ -1,62 +1,64 @@
-from app.core.nexus import NexusComponent
-import logging
-logger = logging.getLogger(__name__)
 # -*- coding: utf-8 -*-
-"""ThoughtLog model for storing internal reasoning and self-healing cycles"""
-
+"""ThoughtLog SQLModel — Armazena raciocínios internos do JARVIS."""
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Optional
-
 from sqlmodel import Field, SQLModel
+from enum import Enum
 
 
 class InteractionStatus(str, Enum):
-    """Status types for interaction modes"""
+    """Status da interação."""
+    USER_INTERACTION = "user_interaction"
+    INTERNAL_MONOLOGUE = "internal_monologue"
+
+
+class ThoughtLog(SQLModel, table=True):
+    """
+    ThoughtLog — Armazena raciocínios internos e ciclos de auto-cura.
     
-    USER_INTERACTION = "user_interaction"  # Response visible to user
-    INTERNAL_MONOLOGUE = "internal_monologue"  # Internal reasoning, not shown to user
-
-
-class ThoughtLog(NexusComponent, SQLModel, table=True):
-    def execute(self, context: dict):
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
-
+    Campos:
+    - mission_id: Identificador único da missão
+    - session_id: Sessão para agrupamento
+    - status: USER_INTERACTION ou INTERNAL_MONOLOGUE
+    - thought_process: Raciocínio técnico interno
+    - problem_description: Problema sendo resolvido
+    - solution_attempt: Solução tentada
+    - success: Se a tentativa funcionou
+    - error_message: Erro se falhou
+    - retry_count: Número de tentativas para esta missão
+    - requires_human: Se precisa de intervenção humana
+    - escalation_reason: Motivo do escalonamento
+    - context_ JSON com logs, stack traces, etc.
+    - system_state: Snapshot do sistema no momento
+    - discarded_alternatives: Alternativas descartadas
+    - expected_result: O que se esperava
+    - actual_result: O que realmente aconteceu
+    - reward_received: Valor do RewardSignalProvider
     """
-    SQLModel table for storing Jarvis's internal reasoning process.
-    Used for debugging, self-healing, and tracking problem-solving attempts.
-    Does not pollute user interface - only visible in admin/debug views.
-    """
-
     __tablename__ = "thought_logs"
-
+    __table_args__ = {'extend_existing': True}
+    
     id: Optional[int] = Field(default=None, primary_key=True)
-    mission_id: str = Field(nullable=False, index=True)  # Links related thoughts to same mission
-    session_id: str = Field(nullable=False, index=True)  # Groups thoughts in same session
-    status: str = Field(default=InteractionStatus.INTERNAL_MONOLOGUE.value, nullable=False)  # USER_INTERACTION or INTERNAL_MONOLOGUE
-    
-    # Reasoning content
-    thought_process: str = Field(default="", nullable=False)  # Technical reasoning
-    problem_description: str = Field(default="", nullable=False)  # What problem is being solved
-    solution_attempt: str = Field(default="", nullable=False)  # What solution was tried
-    
-    # Execution tracking
-    success: bool = Field(default=False, nullable=False)  # Did this attempt succeed
-    error_message: str = Field(default="", nullable=False)  # Error if failed
-    retry_count: int = Field(default=0, nullable=False)  # Number of retries for this mission
-    
-    # Metadata
-    context_data: str = Field(default="{}", nullable=False)  # JSON string for additional context (logs, stack traces, etc.)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
-    
-    # Auto-healing tracking
-    requires_human: bool = Field(default=False, nullable=False)  # Escalated to human after 3 failures
-    escalation_reason: str = Field(default="", nullable=False)  # Why escalation was needed
-
-    # RL / learning fields (Etapa 5)
-    system_state: str = Field(default="{}", nullable=False)  # JSON snapshot do estado do sistema pré-decisão
-    discarded_alternatives: str = Field(default="[]", nullable=False)  # JSON lista de alternativas descartadas
-    expected_result: str = Field(default="", nullable=False)  # Resultado esperado antes da ação
-    actual_result: str = Field(default="", nullable=False)  # Resultado real observado pós-ação
-    reward_received: float = Field(default=0.0, nullable=False)  # Reward do RewardSignalProvider
+    mission_id: str = Field(nullable=False, index=True)
+    session_id: str = Field(nullable=False, index=True)
+    status: str = Field(default=InteractionStatus.INTERNAL_MONOLOGUE.value)
+    thought_process: str = Field(nullable=False)
+    problem_description: str = Field(default="")
+    solution_attempt: str = Field(default="")
+    success: bool = Field(default=False, index=True)
+    error_message: str = Field(default="")
+    retry_count: int = Field(default=0, index=True)
+    requires_human: bool = Field(default=False, index=True)
+    escalation_reason: str = Field(default="")
+    context_ str = Field(default="{}")
+    system_state: str = Field(default="{}")
+    discarded_alternatives: str = Field(default="[]")
+    expected_result: str = Field(default="")
+    actual_result: str = Field(default="")
+    reward_received: float = Field(default=0.0)
+    reward_value: float = Field(default=0.0)
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        index=True
+    )
+    updated_at: Optional[datetime] = Field(default=None)
