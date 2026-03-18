@@ -47,7 +47,8 @@ class PersistentShellAdapter(NexusComponent):
                     stderr=slave_fd,
                     preexec_fn=os.setsid,
                     env=os.environ
-                )                os.close(slave_fd)
+                )
+                os.close(slave_fd)
                 self._initialized = True
                 logger.info("[PersistentShell] Bash iniciado com PTY")
                 return True
@@ -96,7 +97,8 @@ class PersistentShellAdapter(NexusComponent):
         
         output = ""
         start_time = time.time()
-                while True:
+        
+        while True:
             elapsed = time.time() - start_time
             if elapsed > timeout:
                 logger.warning(f"[PersistentShell] Timeout após {timeout}s")
@@ -118,6 +120,7 @@ class PersistentShellAdapter(NexusComponent):
                         clean = output.replace(full_command.strip(), "")
                         clean = clean.replace(self._delimiter, "").strip()
                         logger.info(f"[PersistentShell] Comando executado: {command[:50]}...")
+                        
                         return {"success": True, "output": clean, "command": command}
             except OSError as e:
                 logger.error(f"[PersistentShell] Erro de leitura: {e}")
@@ -145,7 +148,8 @@ class PersistentShellAdapter(NexusComponent):
                 "output": output,
                 "command": command,
                 "returncode": result.returncode
-            }        except subprocess.TimeoutExpired:
+            }
+        except subprocess.TimeoutExpired:
             return {"success": False, "error": f"Timeout após {timeout}s", "timeout": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
