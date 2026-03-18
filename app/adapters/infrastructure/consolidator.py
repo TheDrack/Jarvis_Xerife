@@ -47,11 +47,12 @@ class Consolidator(NexusComponent):
         """Determina a camada arquitetural baseada no path."""
         p = rel_path.lower().replace("\\", "/")
         if "app/core" in p:
-            return "CORE (Motor/Nexus)"        if "app/domain" in p:
+            return "CORE (Motor/Nexus)"        
+        elif "app/domain" in p:
             return "DOMAIN (Regras/Modelos)"
-        if "app/application" in p:
+        elif "app/application" in p:
             return "APPLICATION (Casos de Uso)"
-        if "app/adapters" in p:
+        elif "app/adapters" in p:
             return "ADAPTERS (Infra/IO)"
         return "SUPPORT (Config/Docs)"
     
@@ -145,7 +146,7 @@ class Consolidator(NexusComponent):
             out.write(f"TIMESTAMP: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
             out.write(f"ROOT: {self.root_path}\n")
             out.write("=" * 80 + "\n\n")
-                        out.write("SECTION 1 — STRUCTURAL SKELETON (MAPA DE ASSINATURAS)\n")
+            out.write("SECTION 1 — STRUCTURAL SKELETON (MAPA DE ASSINATURAS)\n")
             out.write("=" * 80 + "\n")
             out.write("\n".join(skeleton_sections))
             out.write("\n\n" + "=" * 80 + "\n")
@@ -155,7 +156,7 @@ class Consolidator(NexusComponent):
         
         logger.info(f"[NEXUS] Snapshot salvo em: {output_path}")
         
-        # ✅ CRÍTICO: Atualiza contexto para pipeline
+        # CRÍTICO: Atualiza contexto para pipeline
         res_payload = {
             "status": "success",
             "file_path": str(output_path),
