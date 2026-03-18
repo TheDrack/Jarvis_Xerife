@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense.
-Gera um snapshot do repositório otimizado para janelas de contexto longas.
-"""
+"""Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense."""
 import ast
 import logging
 import os
@@ -12,47 +10,44 @@ from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
-# Diretórios ignorados na consolidação
 _IGNORED_DIRS: Set[str] = {
     ".git", "__pycache__", ".venv", "venv", "dist", "build",
     "node_modules", ".github", ".frozen", "logs", "data",
     ".backups", "tests", ".pytest_cache", ".idea", ".vscode"
 }
 
-# Extensões relevantes
 _RELEVANT_EXT: Set[str] = {
     ".py", ".yml", ".yaml", ".json", ".md", ".txt", ".dockerfile"
 }
 
 
 class Consolidator(NexusComponent):
-    """
-    Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense.
-    
-    Extrai a estrutura (skeleton) de arquivos Python e o conteúdo completo (dense)
-    de todos os arquivos relevantes para fornecer contexto total à IA.
-    
-    Saída:
-    - Gera arquivo físico: CORE_LOGIC_CONSOLIDATED.txt
-    - Atualiza context["result"]["file_path"]
-    - Atualiza context["artifacts"]["consolidator"]
-    """
+    """Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense."""
     
     def __init__(self):
         super().__init__()
         self.output_file = "CORE_LOGIC_CONSOLIDATED.txt"
         self.root_path = Path(".").resolve()
     
+    def can_execute(self, context: Dict[str, Any] = None) -> bool:
+        """NexusComponent contract — verifica se pode executar."""
+        return True
+    
+    def configure(self, config: Dict[str, Any] = None) -> None:
+        """Opcional: Configuração via Pipeline YAML."""
+        if config:
+            pass
+    
     def _get_layer_info(self, rel_path: str) -> str:
         """Determina a camada arquitetural baseada no path."""
         p = rel_path.lower().replace("\\", "/")
         if "app/core" in p:
-            return "CORE (Motor/Nexus)"        if "app/domain" in p:
+            return "CORE (Motor/Nexus)"
+        if "app/domain" in p:
             return "DOMAIN (Regras/Modelos)"
         if "app/application" in p:
             return "APPLICATION (Casos de Uso)"
-        if "app/adapters" in p:
-            return "ADAPTERS (Infra/IO)"
+        if "app/adapters" in p:            return "ADAPTERS (Infra/IO)"
         return "SUPPORT (Config/Docs)"
     
     def _get_skeleton(self, file_path: Path) -> str:
@@ -96,12 +91,12 @@ class Consolidator(NexusComponent):
         
         Atualiza:
         - context["result"]["file_path"]
-        - context["artifacts"]["consolidator"]        """
+        - context["artifacts"]["consolidator"]
+        """
         logger.info("[NEXUS] Iniciando Consolidação Skeleton-Dense")
         
         skeleton_sections = []
-        content_sections = []
-        
+        content_sections = []        
         # Coleta de arquivos em uma única passada
         all_files = [
             p for p in self.root_path.rglob("*")
@@ -145,12 +140,12 @@ class Consolidator(NexusComponent):
             out.write(f"TIMESTAMP: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
             out.write(f"ROOT: {self.root_path}\n")
             out.write("=" * 80 + "\n\n")
-                        out.write("SECTION 1 — STRUCTURAL SKELETON (MAPA DE ASSINATURAS)\n")
+            
+            out.write("SECTION 1 — STRUCTURAL SKELETON (MAPA DE ASSINATURAS)\n")
             out.write("=" * 80 + "\n")
             out.write("\n".join(skeleton_sections))
             out.write("\n\n" + "=" * 80 + "\n")
-            out.write("SECTION 2 — DENSE CONTENT (CÓDIGO FONTE COMPLETO)\n")
-            out.write("=" * 80 + "\n\n")
+            out.write("SECTION 2 — DENSE CONTENT (CÓDIGO FONTE COMPLETO)\n")            out.write("=" * 80 + "\n\n")
             out.write("".join(content_sections))
         
         logger.info(f"[NEXUS] Snapshot salvo em: {output_path}")
@@ -169,7 +164,3 @@ class Consolidator(NexusComponent):
         context["result"] = res_payload
         
         return context
-    
-    def can_execute(self, context: Dict[str, Any] = None) -> bool:
-        """NexusComponent contract."""
-        return True
