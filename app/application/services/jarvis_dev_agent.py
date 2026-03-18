@@ -1,13 +1,5 @@
 # -*- coding: utf-8 -*-
-"""JarvisDevAgent — Agente autônomo com loop iterativo (Devin-style).
-
-Features:
-- Pre-flight check (mapeia estrutura do projeto)
-- Loop iterativo com working memory
-- Surgical edit para precisão
-- Persistent shell para execução
-- Auto-instalação de dependências
-"""
+"""JarvisDevAgent — Agente autônomo com Thought Stream."""
 import json
 import logging
 import os
@@ -18,232 +10,236 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from app.core.nexus import NexusComponent, nexus
-from app.domain.models.agent import AgentAction, AgentTask, TaskSource, TaskPriority, ActionType
 
 logger = logging.getLogger(__name__)
 
 _JOBS_FILE = Path("data/dev_agent_jobs.jsonl")
 _MAX_ITERATIONS = int(os.getenv("DEV_AGENT_MAX_ITERATIONS", "12"))
-_MAX_CONTEXT_TOKENS = int(os.getenv("MAX_CONTEXT_TOKENS", "8000"))
 
 
 class JarvisDevAgent(NexusComponent):
-    """Agente autônomo de desenvolvimento com loop iterativo."""
+    """Agente autônomo com Thought Stream blindado contra falhas de I/O e LLM."""
     
     def __init__(self) -> None:
         super().__init__()
         self.max_iterations: int = _MAX_ITERATIONS
+        self._thought_log = None
         self._shell = None
         self._editor = None
-        self._memory = None
         self._llm = None
     
+    def _get_thought_log(self):
+        if self._thought_log is None:
+            self._thought_log = nexus.resolve("thought_log_service")
+        return self._thought_log
+    
     def _get_shell(self):
-        """Lazy loading do PersistentShellAdapter."""
         if self._shell is None:
             self._shell = nexus.resolve("persistent_shell_adapter")
         return self._shell
     
     def _get_editor(self):
-        """Lazy loading do SurgicalEditService."""
         if self._editor is None:
-            self._editor = nexus.resolve("surgical_edit_service")        return self._editor
-    
-    def _get_memory(self):
-        """Lazy loading do WorkingMemory."""
-        if self._memory is None:
-            self._memory = nexus.resolve("working_memory")
-        return self._memory
+            self._editor = nexus.resolve("surgical_edit_service")
+        return self._editor
     
     def _get_llm(self):
-        """Lazy loading do LLMRouter."""
         if self._llm is None:
             self._llm = nexus.resolve("llm_router")
         return self._llm
-    
+
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Executa tarefa autônoma com loop iterativo."""
+        """Executa tarefa com Thought Stream."""
         ctx = context or {}
-        task = self._create_task(ctx)
+        task_id = ctx.get("task_id", f"task_{uuid.uuid4().hex[:12]}")
+        description = ctx.get("description", "")
         
-        logger.info(f"🤖 [JarvisDevAgent] task_id={task.task_id} source={task.source.value}")
+        thought_log = self._get_thought_log()
+        if thought_log:
+            thought_log.stream_planning(f"🚀 Missão: {description[:100]}")
+            thought_log.execute({
+                "action": "create_thought",
+                "mission_id": task_id,
+                "session_id": f"session_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+                "thought_process": f"Iniciando missão: {description}",
+                "problem_description": description,
+                "success": True,
+            })
+        
+        logger.info(f"🤖 [JarvisDevAgent] task_id={task_id}")
         
         try:
-            result = self._execute_cycle(task, ctx)
-            self._record_result(task, result)
+            result = self._run_loop(task_id, description, ctx)
+            
+            if thought_log:
+                if result.get("success"):
+                    thought_log.stream_success(
+                        f"✅ Completado em {result.get('iterations', 0)} iterações"
+                    )
+                else:
+                    thought_log.stream_error(f"❌ Falha: {result.get('error', 'Erro desconhecido')}")
+            
             return result
+            
         except Exception as e:
-            logger.error(f"❌ [JarvisDevAgent] Erro: {e}", exc_info=True)
-            return {"success": False, "task_id": task.task_id, "error": str(e)}
+            logger.error(f"Erro fatal no JarvisDevAgent: {e}", exc_info=True)
+            if thought_log:
+                thought_log.stream_error(f"💥 Erro fatal: {str(e)}")
+            return {"success": False, "task_id": task_id, "error": str(e)}
     
-    def _create_task(self, ctx: Dict[str, Any]) -> AgentTask:
-        """Cria tarefa do contexto."""
-        return AgentTask(
-            task_id=ctx.get("task_id", f"task_{uuid.uuid4().hex[:12]}"),
-            source=TaskSource(ctx.get("source", "user_request")),
-            priority=TaskPriority(ctx.get("priority", "medium")),
-            description=ctx.get("description", ""),
-            context=ctx.get("context", {}),
-            constraints=ctx.get("constraints", []),
-            success_criteria=ctx.get("success_criteria", "Tarefa completada"),
-        )
-    
-    def _execute_cycle(self, task: AgentTask, ctx: Dict[str, Any]) -> Dict[str, Any]:
-        """Loop iterativo com pre-flight check."""
+    def _run_loop(self, task_id: str, description: str, ctx: Dict) -> Dict[str, Any]:
+        """Loop iterativo com Thought Stream e tolerância a falhas."""
         shell = self._get_shell()
         editor = self._get_editor()
-        memory = self._get_memory()
         llm = self._get_llm()
+        thought_log = self._get_thought_log()
         
-        if not all([shell, editor, memory, llm]):
-            return {"success": False, "error": "Componentes necessários indisponíveis"}        
-        # === PRE-FLIGHT CHECK ===
-        logger.info("🔍 [JarvisDevAgent] Pre-flight check: mapeando estrutura...")
-        structure = shell.execute({"command": "find . -maxdepth 2 -type f -name '*.py' | head -20"})
-        logger.info(f"📁 Estrutura mapeada: {structure.get('output', '')[:200]}")
+        if thought_log:
+            thought_log.stream_planning("🔍 Mapeando estrutura...")
         
-        # === LOOP ITERATIVO ===
+        # Prevenção contra retornos nulos do shell
+        structure_res = shell.execute({"command": "find . -maxdepth 2 -name '*.py' | head -20"}) or {}
+        structure_output = str(structure_res.get('output', ''))
+        
+        if thought_log and structure_output:
+            thought_log.stream_observation(f"📁 {structure_output[:200]}")
+        
         iteration = 0
-        history = []
+        history: List[Dict[str, Any]] = []
         
         while iteration < self.max_iterations:
             iteration += 1
-            logger.info(f"🔄 [JarvisDevAgent] Iteração {iteration}/{self.max_iterations}")
             
-            # 1. Prepara contexto (com truncagem)
-            recent_history = history[-5:] if len(history) > 5 else history
-            prompt = self._build_prompt(task, recent_history, structure.get('output', ''))
+            if thought_log:
+                thought_log.stream_info(f"🔄 Iteração {iteration}/{self.max_iterations}")
+                thought_log.stream_planning("🧠 LLM decidindo...")
             
-            # 2. Decisão do LLM
-            decision = llm.execute({
-                "task_type": "code_generation",
-                "prompt": prompt,
-                "require_json": True,
-                "temperature": 0.1
-            })
+            prompt = self._build_prompt(description, history[-5:], structure_output)
             
-            action_data = self._extract_json(decision.get('result', ''))
+            # Execução segura do LLM
+            decision_res = llm.execute({"prompt": prompt, "require_json": True}) or {}
+            raw_result = str(decision_res.get('result', ''))
+            
+            action_data = self._extract_json(raw_result)
+            
             if not action_data:
-                return {"success": False, "error": "LLM não retornou ação válida", "iteration": iteration}
+                if thought_log:
+                    thought_log.stream_error("❌ LLM não retornou um JSON de ação válido")
+                return {
+                    "success": False, 
+                    "error": "LLM retornou formato inválido", 
+                    "iteration": iteration,
+                    "raw_response": raw_result[:500]
+                }
             
             action_type = action_data.get("action", "FINISH")
-            params = action_data.get("params", {})
-            reasoning = action_data.get("reasoning", "")
+            params = action_data.get("params") or {} # Garante que params seja um dict, mesmo se o LLM enviar null
             
-            logger.info(f"🎯 Ação: {action_type} — {reasoning[:100]}")
+            if thought_log:
+                thought_log.stream_action(f"⚡ {action_type}")
             
-            # 3. Executa ação
+            # Executa a ação isolando possíveis quebras
             observation = self._execute_action(action_type, params, shell, editor)
             
-            # 4. Armazena na memória
+            if thought_log:
+                obs_preview = observation[:200] + "..." if len(observation) > 200 else observation
+                thought_log.stream_observation(f"👁️ {obs_preview}")
+            
             history.append({
-                "iteration": iteration,
-                "action": action_type,
-                "params": params,
-                "reasoning": reasoning,
+                "iteration": iteration, 
+                "action": action_type, 
                 "observation": observation
             })
             
-            # 5. Verifica se finalizou
-            if action_type == "FINISH":                logger.info(f"✅ [JarvisDevAgent] Finalizado na iteração {iteration}")
+            if action_type == "FINISH":
+                if thought_log:
+                    thought_log.stream_success("✅ Finalizado")
                 return {
-                    "success": True,
-                    "task_id": task.task_id,
-                    "iterations": iteration,
-                    "history": history,
-                    "final_result": observation
+                    "success": True, 
+                    "task_id": task_id, 
+                    "iterations": iteration, 
+                    "history": history
                 }
-            
-            # 6. Verifica erro repetitivo
-            if self._is_repetitive_error(observation, history):
-                logger.warning("⚠️ [JarvisDevAgent] Erro repetitivo detectado")
-                # Continua mas com aviso no próximo prompt
         
-        # Limite de iterações
+        if thought_log:
+            thought_log.stream_error(f"⚠️ Limite de iterações atingido ({self.max_iterations})")
+        
         return {
-            "success": False,
-            "task_id": task.task_id,
-            "error": f"Limite de {self.max_iterations} iterações atingido",
-            "iterations": iteration,
-            "history": history
+            "success": False, 
+            "task_id": task_id, 
+            "error": f"Limite de {self.max_iterations} iterações", 
+            "iterations": iteration
         }
     
-    def _build_prompt(self, task: AgentTask, history: List[Dict], structure: str) -> str:
-        """Constrói prompt com contexto truncado."""
-        history_text = "\n".join([
-            f"Iteração {h['iteration']}: {h['action']} → {h['observation'][:200]}"
-            for h in history[-5:]
-        ]) or "(Nenhuma ação anterior)"
+    def _build_prompt(self, description: str, history: List[Dict], structure: str) -> str:
+        """Constrói prompt robusto para o LLM."""
+        formatted_history = []
+        for h in history:
+            act = h.get('action', 'UNKNOWN')
+            obs = str(h.get('observation', ''))[:150].replace('\n', ' ')
+            formatted_history.append(f"Iter {h.get('iteration', '?')}: {act} → {obs}")
+            
+        history_text = "\n".join(formatted_history) or "(Nenhuma)"
         
-        constraints = "\n".join(task.constraints) if task.constraints else "Nenhuma"
-        
-        return f"""
-Você é o JarvisDevAgent — agente autônomo de desenvolvimento.
-
-=== TAREFA ===
-Descrição: {task.description}
-Critérios: {task.success_criteria}
-Restrições: {constraints}
-
-=== ESTRUTURA DO PROJETO ===
-{structure[:2000]}
-
-=== HISTÓRICO DE AÇÕES ===
-{history_text}
-
-=== AÇÕES DISPONÍVEIS ===
-- RUN_SHELL: {{ "action": "RUN_SHELL", "params": {{"cmd": "pytest tests/"}} }}
-- EDIT_FILE: {{ "action": "EDIT_FILE", "params": {{"path": "app/file.py", "search": "...", "replace": "..."}} }}
-- READ_FILE: {{ "action": "READ_FILE", "params": {{"path": "app/file.py"}} }}- INSTALL_DEPS: {{ "action": "INSTALL_DEPS", "params": {{"packages": ["requests", "numpy"]}} }}
-- FINISH: {{ "action": "FINISH", "params": {{"summary": "Tarefa completada"}} }}
-
-=== INSTRUÇÕES ===
-1. Se precisar instalar pacotes, use INSTALL_DEPS (ambiente seguro)
-2. Para editar código, use EDIT_FILE com search/replace exato
-3. Se encontrar "Command not found", instale automaticamente
-4. Retorne APENAS JSON da ação
-
-Retorne APENAS o JSON:
-"""
+        return (
+            f"Tarefa: {description}\n"
+            f"Estrutura:\n{structure[:1000]}\n"
+            f"Histórico Recente:\n{history_text}\n\n"
+            f"Ações válidas: RUN_SHELL, EDIT_FILE, READ_FILE, INSTALL_DEPS, FINISH\n"
+            f"Obrigatório retornar JSON EXATAMENTE neste formato: {{\"action\": \"...\", \"params\": {{}}}}"
+        )
     
     def _execute_action(self, action_type: str, params: Dict, shell, editor) -> str:
-        """Executa ação e retorna observação."""
-        if action_type == "RUN_SHELL":
-            result = shell.execute({"command": params.get("cmd", "")})
-            return result.get("output", result.get("error", ""))
-        
-        elif action_type == "EDIT_FILE":
-            result = editor.execute({
-                "action": "apply_edit",
-                "file_path": params.get("path", ""),
-                "search_block": params.get("search", ""),
-                "replace_block": params.get("replace", "")
-            })
-            return result.get("action", result.get("error", ""))
-        
-        elif action_type == "READ_FILE":
-            result = editor.execute({
-                "action": "read_file",
-                "file_path": params.get("path", "")
-            })
-            return result.get("content", result.get("error", ""))[:1000]
-        
-        elif action_type == "INSTALL_DEPS":
-            packages = params.get("packages", [])
-            result = shell.execute({"command": f"pip install {' '.join(packages)}"})
-            return result.get("output", result.get("error", ""))
-        
-        elif action_type == "FINISH":
-            return params.get("summary", "Tarefa finalizada")
-        
-        return f"Ação desconhecida: {action_type}"
+        """Executa ação baseada no tipo, blindada contra erros de I/O e tipagem."""
+        try:
+            if action_type == "RUN_SHELL":
+                cmd = params.get("cmd", "")
+                res = shell.execute({"command": cmd}) or {}
+                return str(res.get("output", "Sem saída no terminal."))[:1500]
+                
+            elif action_type == "EDIT_FILE":
+                res = editor.execute({
+                    "file_path": params.get("path"), 
+                    "search_block": params.get("search"), 
+                    "replace_block": params.get("replace")
+                }) or {}
+                # Captura de resposta adaptativa caso o editor retorne chaves diferentes
+                return str(res.get("action", res.get("status", res.get("message", "Edição solicitada."))))
+                
+            elif action_type == "READ_FILE":
+                res = editor.execute({"file_path": params.get("path")}) or {}
+                return str(res.get("content", "Arquivo vazio ou não encontrado."))[:1500]
+                
+            elif action_type == "INSTALL_DEPS":
+                pkgs = params.get('packages', [])
+                # Tratamento caso o LLM envie string ou tipo inesperado
+                if isinstance(pkgs, str):
+                    pkgs = [pkgs]
+                elif not isinstance(pkgs, list):
+                    pkgs = []
+                    
+                pkgs_str = " ".join(str(p) for p in pkgs)
+                if not pkgs_str:
+                    return "Nenhum pacote especificado para instalação."
+                    
+                res = shell.execute({"command": f"pip install {pkgs_str}"}) or {}
+                return str(res.get("output", "Instalação concluída."))[:1500]
+                
+            elif action_type == "FINISH":
+                return str(params.get("summary", "Fluxo finalizado com sucesso."))
+                
+            return f"Ação desconhecida ou não suportada: {action_type}"
+            
+        except Exception as e:
+            logger.error(f"Falha ao executar ação {action_type}: {e}")
+            return f"Erro interno ao executar a ação {action_type}: {str(e)}"
     
     def _extract_json(self, text: str) -> Optional[Dict]:
-        """Extrai JSON de resposta do LLM."""
-        import re
+        """Extrai JSON de resposta."""
         match = re.search(r'```(?:json)?\s*({.*?})\s*```', text, re.DOTALL)
         if match:
-            try:                return json.loads(match.group(1))
+            try:
+                return json.loads(match.group(1))
             except:
                 pass
         try:
@@ -253,35 +249,6 @@ Retorne APENAS o JSON:
         except:
             pass
         return None
-    
-    def _is_repetitive_error(self, observation: str, history: List[Dict]) -> bool:
-        """Verifica se erro já ocorreu nas últimas iterações."""
-        if not observation or "error" not in observation.lower():
-            return False
-        
-        recent_errors = [
-            h.get("observation", "")
-            for h in history[-3:]
-            if "error" in h.get("observation", "").lower()
-        ]
-        
-        return any(observation[:100] in err for err in recent_errors)
-    
-    def _record_result(self, task: AgentTask, result: Dict[str, Any]) -> None:
-        """Registra resultado no jobs log."""
-        try:
-            _JOBS_FILE.parent.mkdir(parents=True, exist_ok=True)
-            entry = {
-                "task_id": task.task_id,
-                "finished_at": datetime.now(timezone.utc).isoformat(),
-                "success": result.get("success", False),
-                "source": task.source.value,
-                "iterations": result.get("iterations", 0),
-            }
-            with open(_JOBS_FILE, "a") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception as e:
-            logger.debug(f"[JarvisDevAgent] Erro ao registrar: {e}")
     
     def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
         return True
