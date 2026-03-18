@@ -56,7 +56,7 @@ class Consolidator(NexusComponent):
             return "# (Skeleton disponível apenas para arquivos .py)"
         
         try:
-            content = file_path.read_text(encoding="utf-8")
+            content = file_path.read_text(encoding="utf-8", errors="replace")
             tree = ast.parse(content)
             skeleton = []
             
@@ -150,7 +150,7 @@ class Consolidator(NexusComponent):
         
         logger.info(f"[NEXUS] Snapshot salvo em: {output_path}")
         
-        # ✅ CRÍTICO: Atualiza contexto para pipeline
+        # CRÍTICO: Atualiza contexto para pipeline
         res_payload = {
             "status": "success",
             "file_path": str(output_path),
