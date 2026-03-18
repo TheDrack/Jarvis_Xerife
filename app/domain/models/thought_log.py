@@ -50,7 +50,7 @@ class ThoughtLog(SQLModel, table=True):
     retry_count: int = Field(default=0, index=True)
     requires_human: bool = Field(default=False, index=True)
     escalation_reason: str = Field(default="")
-    context_ str = Field(default="{}")
+    context_data str = Field(default="{}")
     system_state: str = Field(default="{}")
     discarded_alternatives: str = Field(default="[]")
     expected_result: str = Field(default="")
