@@ -34,14 +34,14 @@ class ProspectiveNeed(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     need_id: str = Field(nullable=False, index=True, unique=True)
     category: str = Field(nullable=False, index=True)  # env, location, identity, preference
-    known_ Dict[str, Any] = Field(default_factory=dict, sa_column_kwargs={"nullable": True})
+    known_data Dict[str, Any] = Field(default_factory=dict, sa_column_kwargs={"nullable": True})
     missing_data_desc: str = Field(nullable=False)
     relevance_keywords: List[str] = Field(default_factory=list, sa_column_kwargs={"nullable": True})
     status: str = Field(default="pending", index=True)  # pending, asked, resolved
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     asked_at: Optional[datetime] = Field(default=None)
     resolved_at: Optional[datetime] = Field(default=None)
-    resolved_ Optional[str] = Field(default=None)
+    resolved_data Optional[str] = Field(default=None)
     user_response: Optional[str] = Field(default=None)
 
 class ProspectiveAgenda(SQLModel, table=True):
