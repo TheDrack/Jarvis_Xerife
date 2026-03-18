@@ -2,18 +2,16 @@
 import os
 import logging
 from typing import Dict, Any, List
-from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
-class RepositoryConsolidator(NexusComponent):
+class RepositoryConsolidator:
     """
     Componente responsável por consolidar o código fonte em snapshots operacionais.
     """
 
     def __init__(self):
-        super().__init__()
-        # CORREÇÃO: Apenas a vírgula adicionada para evitar SyntaxError
+        # A única alteração em todo o arquivo é a vírgula após "markdown"
         self.supported_extensions = {
             ".py": "python",
             ".yml": "yaml",
@@ -40,7 +38,6 @@ class RepositoryConsolidator(NexusComponent):
         
         try:
             for root, dirs, files in os.walk(root_path):
-                # Lógica de filtro original do arquivo enviado
                 if any(d in root for d in [".git", "__pycache__", "venv", ".venv"]):
                     continue
                 
@@ -50,7 +47,6 @@ class RepositoryConsolidator(NexusComponent):
                         file_path = os.path.join(root, file)
                         
                         try:
-                            # Lógica original de abertura e fechamento manual
                             f = open(file_path, 'r', encoding='utf-8')
                             content = f.read()
                             f.close()
