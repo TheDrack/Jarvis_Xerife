@@ -9,12 +9,13 @@ logger = logging.getLogger(__name__)
 class RepositoryConsolidator(NexusComponent):
     """
     Componente responsável por consolidar o código fonte em snapshots operacionais.
-    Essencial para fornecer contexto denso ao MetabolismCore.
+    Restaurado para a versão funcional original.
     """
 
     def __init__(self):
         super().__init__()
-        # CORREÇÃO: Sintaxe corrigida na linha 37 (mapeamento de extensões)
+        # CORREÇÃO SINTÁTICA: Adicionada a vírgula para não quebrar o interpretador,
+        # mas mantendo as extensões originais do seu arquivo funcional.
         self.supported_extensions = {
             ".py": "python",
             ".yml": "yaml",
@@ -22,7 +23,6 @@ class RepositoryConsolidator(NexusComponent):
             ".json": "json",
             ".md": "markdown"
         }
-        self.max_file_size = 500 * 1024  # Limite de 500KB por ficheiro
 
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Entry-point via Nexus DI."""
@@ -32,36 +32,36 @@ class RepositoryConsolidator(NexusComponent):
             root_path = context.get("root_path", os.getcwd())
             return self.run_consolidation(root_path)
         
-        return {"success": False, "error": f"Ação '{action}' não suportada."}
+        return {"success": False, "not_implemented": True}
 
     def run_consolidation(self, root_path: str) -> Dict[str, Any]:
-        """Varre o repositório e gera um snapshot do código."""
+        """Varre o repositório e gera um snapshot do código conforme original."""
         logger.info(f"[Consolidator] Iniciando consolidação em: {root_path}")
         
         consolidated_data = []
         
         try:
             for root, dirs, files in os.walk(root_path):
-                # Ignora diretórios ocultos e de build
-                dirs[:] = [d for d in dirs if not d.startswith('.') and d != 'venv']
+                # Mantendo a lógica de filtro original
+                if any(d in root for d in [".git", "__pycache__", "venv", ".venv"]):
+                    continue
                 
                 for file in files:
                     ext = os.path.splitext(file)[1]
                     if ext in self.supported_extensions:
                         file_path = os.path.join(root, file)
                         
-                        # CORREÇÃO: Verificação de tamanho e gestão de fecho de ficheiro
-                        if os.path.getsize(file_path) > self.max_file_size:
-                            continue
-                            
                         try:
-                            with open(file_path, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                                consolidated_data.append({
-                                    "file": os.path.relpath(file_path, root_path),
-                                    "type": self.supported_extensions[ext],
-                                    "content": content
-                                })
+                            # Retornando à lógica de leitura original que você confirmou que funciona
+                            f = open(file_path, 'r', encoding='utf-8')
+                            content = f.read()
+                            f.close()
+                            
+                            consolidated_data.append({
+                                "file": os.path.relpath(file_path, root_path),
+                                "type": self.supported_extensions[ext],
+                                "content": content
+                            })
                         except Exception as e:
                             logger.warning(f"[Consolidator] Erro ao ler {file}: {e}")
 
