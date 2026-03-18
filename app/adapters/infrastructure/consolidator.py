@@ -1,70 +1,175 @@
 # -*- coding: utf-8 -*-
-import os
+"""Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense.
+Gera um snapshot do repositório otimizado para janelas de contexto longas.
+"""
+import ast
 import logging
-from typing import Dict, Any, List
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import List, Set, Dict, Any
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
-class RepositoryConsolidator:
-    """
-    Componente responsável por consolidar o código fonte em snapshots operacionais.
-    """
+# Diretórios ignorados na consolidação
+_IGNORED_DIRS: Set[str] = {
+    ".git", "__pycache__", ".venv", "venv", "dist", "build",
+    "node_modules", ".github", ".frozen", "logs", "data",
+    ".backups", "tests", ".pytest_cache", ".idea", ".vscode"
+}
 
+# Extensões relevantes
+_RELEVANT_EXT: Set[str] = {
+    ".py", ".yml", ".yaml", ".json", ".md", ".txt", ".dockerfile"
+}
+
+
+class Consolidator(NexusComponent):
+    """
+    Consolidador de Contexto JARVIS — Estratégia Skeleton-Dense.
+    
+    Extrai a estrutura (skeleton) de arquivos Python e o conteúdo completo (dense)
+    de todos os arquivos relevantes para fornecer contexto total à IA.
+    
+    Saída:
+    - Gera arquivo físico: CORE_LOGIC_CONSOLIDATED.txt
+    - Atualiza context["result"]["file_path"]
+    - Atualiza context["artifacts"]["consolidator"]
+    """
+    
     def __init__(self):
-        # A única alteração em todo o arquivo é a vírgula após "markdown"
-        self.supported_extensions = {
-            ".py": "python",
-            ".yml": "yaml",
-            ".yaml": "yaml",
-            ".json": "json",
-            ".md": "markdown"
-        }
-
-    def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Entry-point via Nexus DI."""
-        action = context.get("action", "consolidate")
-        
-        if action == "consolidate":
-            root_path = context.get("root_path", os.getcwd())
-            return self.run_consolidation(root_path)
-        
-        return {"success": False, "not_implemented": True}
-
-    def run_consolidation(self, root_path: str) -> Dict[str, Any]:
-        """Varre o repositório e gera um snapshot do código."""
-        logger.info(f"[Consolidator] Iniciando consolidação em: {root_path}")
-        
-        consolidated_data = []
+        super().__init__()
+        self.output_file = "CORE_LOGIC_CONSOLIDATED.txt"
+        self.root_path = Path(".").resolve()
+    
+    def _get_layer_info(self, rel_path: str) -> str:
+        """Determina a camada arquitetural baseada no path."""
+        p = rel_path.lower().replace("\\", "/")
+        if "app/core" in p:
+            return "CORE (Motor/Nexus)"        if "app/domain" in p:
+            return "DOMAIN (Regras/Modelos)"
+        if "app/application" in p:
+            return "APPLICATION (Casos de Uso)"
+        if "app/adapters" in p:
+            return "ADAPTERS (Infra/IO)"
+        return "SUPPORT (Config/Docs)"
+    
+    def _get_skeleton(self, file_path: Path) -> str:
+        """Gera skeleton de arquivos Python (classes e funções)."""
+        if file_path.suffix != ".py":
+            return "# (Skeleton disponível apenas para arquivos .py)"
         
         try:
-            for root, dirs, files in os.walk(root_path):
-                if any(d in root for d in [".git", "__pycache__", "venv", ".venv"]):
-                    continue
-                
-                for file in files:
-                    ext = os.path.splitext(file)[1]
-                    if ext in self.supported_extensions:
-                        file_path = os.path.join(root, file)
-                        
-                        try:
-                            f = open(file_path, 'r', encoding='utf-8')
-                            content = f.read()
-                            f.close()
-                            
-                            consolidated_data.append({
-                                "file": os.path.relpath(file_path, root_path),
-                                "type": self.supported_extensions[ext],
-                                "content": content
-                            })
-                        except Exception as e:
-                            logger.warning(f"[Consolidator] Erro ao ler {file}: {e}")
-
-            return {
-                "success": True,
-                "snapshot_size": len(consolidated_data),
-                "data": consolidated_data
-            }
-
+            content = file_path.read_text(encoding="utf-8")
+            tree = ast.parse(content)
+            skeleton = []
+            
+            for node in tree.body:
+                if isinstance(node, ast.ClassDef):
+                    skeleton.append(f"class {node.name}:")
+                    for item in node.body:
+                        if isinstance(item, ast.FunctionDef):
+                            args = [a.arg for a in item.args.args[:3]]
+                            skeleton.append(
+                                f"    def {item.name}({', '.join(args)}...): ..."
+                            )
+                elif isinstance(node, ast.FunctionDef):
+                    args = [a.arg for a in node.args.args[:3]]
+                    skeleton.append(
+                        f"def {node.name}({', '.join(args)}...): ..."
+                    )
+            
+            return "\n".join(skeleton) if skeleton else "# (Nenhuma classe ou função)"
+            
         except Exception as e:
-            logger.error(f"[Consolidator] Falha crítica: {e}")
-            return {"success": False, "error": str(e)}
+            return f"# Erro ao gerar skeleton: {str(e)}"
+    
+    def _should_ignore(self, file_path: Path) -> bool:
+        """Verifica se arquivo deve ser ignorado."""
+        parts = file_path.parts
+        return any(ignored in parts for ignored in _IGNORED_DIRS)
+    
+    def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Gera o snapshot consolidado de contexto.
+        
+        Atualiza:
+        - context["result"]["file_path"]
+        - context["artifacts"]["consolidator"]        """
+        logger.info("[NEXUS] Iniciando Consolidação Skeleton-Dense")
+        
+        skeleton_sections = []
+        content_sections = []
+        
+        # Coleta de arquivos em uma única passada
+        all_files = [
+            p for p in self.root_path.rglob("*")
+            if p.is_file() and p.suffix in _RELEVANT_EXT
+            and not self._should_ignore(p)
+        ]
+        all_files.sort(key=lambda x: str(x))
+        
+        logger.info(f"[NEXUS] {len(all_files)} arquivos validados para processamento.")
+        
+        for file_path in all_files:
+            try:
+                rel_path = str(file_path.relative_to(self.root_path))
+                layer = self._get_layer_info(rel_path)
+                size = file_path.stat().st_size
+                
+                # Seção 1: Skeleton
+                skeleton_info = self._get_skeleton(file_path)
+                skeleton_sections.append(
+                    f"[{layer}] {rel_path} ({size} bytes):\n{skeleton_info}\n" + "-"*30
+                )
+                
+                # Seção 2: Conteúdo completo
+                content = file_path.read_text(encoding="utf-8", errors="replace")
+                content_sections.append(
+                    f"{'#'*80}\n"
+                    f"# ARQUIVO: {rel_path}\n"
+                    f"# CAMADA: {layer}\n"
+                    f"{'#'*80}\n\n"
+                    f"{content}\n\n"
+                )
+                
+            except Exception as e:
+                logger.error(f"[CONSOLIDATOR] Erro em {file_path}: {e}")
+        
+        # Escrita do arquivo físico
+        output_path = self.root_path / self.output_file
+        with open(output_path, "w", encoding="utf-8") as out:
+            out.write("=" * 80 + "\n")
+            out.write("JARVIS CONTEXT SNAPSHOT - SKELETON-DENSE STRATEGY\n")
+            out.write(f"TIMESTAMP: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
+            out.write(f"ROOT: {self.root_path}\n")
+            out.write("=" * 80 + "\n\n")
+                        out.write("SECTION 1 — STRUCTURAL SKELETON (MAPA DE ASSINATURAS)\n")
+            out.write("=" * 80 + "\n")
+            out.write("\n".join(skeleton_sections))
+            out.write("\n\n" + "=" * 80 + "\n")
+            out.write("SECTION 2 — DENSE CONTENT (CÓDIGO FONTE COMPLETO)\n")
+            out.write("=" * 80 + "\n\n")
+            out.write("".join(content_sections))
+        
+        logger.info(f"[NEXUS] Snapshot salvo em: {output_path}")
+        
+        # ✅ CRÍTICO: Atualiza contexto para pipeline
+        res_payload = {
+            "status": "success",
+            "file_path": str(output_path),
+            "files_processed": len(all_files),
+        }
+        
+        # Atualiza context["artifacts"]["consolidator"]
+        context.setdefault("artifacts", {})["consolidator"] = res_payload
+        
+        # Atualiza context["result"]
+        context["result"] = res_payload
+        
+        return context
+    
+    def can_execute(self, context: Dict[str, Any] = None) -> bool:
+        """NexusComponent contract."""
+        return True
