@@ -9,13 +9,11 @@ logger = logging.getLogger(__name__)
 class RepositoryConsolidator(NexusComponent):
     """
     Componente responsável por consolidar o código fonte em snapshots operacionais.
-    Restaurado para a versão funcional original.
     """
 
     def __init__(self):
         super().__init__()
-        # CORREÇÃO SINTÁTICA: Adicionada a vírgula para não quebrar o interpretador,
-        # mas mantendo as extensões originais do seu arquivo funcional.
+        # CORREÇÃO: Apenas a vírgula adicionada para evitar SyntaxError
         self.supported_extensions = {
             ".py": "python",
             ".yml": "yaml",
@@ -35,14 +33,14 @@ class RepositoryConsolidator(NexusComponent):
         return {"success": False, "not_implemented": True}
 
     def run_consolidation(self, root_path: str) -> Dict[str, Any]:
-        """Varre o repositório e gera um snapshot do código conforme original."""
+        """Varre o repositório e gera um snapshot do código."""
         logger.info(f"[Consolidator] Iniciando consolidação em: {root_path}")
         
         consolidated_data = []
         
         try:
             for root, dirs, files in os.walk(root_path):
-                # Mantendo a lógica de filtro original
+                # Lógica de filtro original do arquivo enviado
                 if any(d in root for d in [".git", "__pycache__", "venv", ".venv"]):
                     continue
                 
@@ -52,7 +50,7 @@ class RepositoryConsolidator(NexusComponent):
                         file_path = os.path.join(root, file)
                         
                         try:
-                            # Retornando à lógica de leitura original que você confirmou que funciona
+                            # Lógica original de abertura e fechamento manual
                             f = open(file_path, 'r', encoding='utf-8')
                             content = f.read()
                             f.close()
