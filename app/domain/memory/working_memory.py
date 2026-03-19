@@ -1,116 +1,93 @@
 # -*- coding: utf-8 -*-
 """WorkingMemory — memória de trabalho volátil de curto prazo.
-
-Estrutura de fila circular (deque com maxlen configurável) que armazena
-as interações da sessão atual em RAM. Volátil por design — não persiste
-em disco.
-
-Uso::
-
-    from app.domain.memory.working_memory import WorkingMemory
-
-    wm = WorkingMemory(maxlen=50)
-    wm.push({"role": "user", "content": "Olá"})
-    recent = wm.get_recent(5)
-    wm.clear()
+CORREÇÃO: Sintaxe de dataclass, nomes de campos e desacoplamento do Nexus.
 """
-
+import logging
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Deque, Dict, List, Union
+from datetime import datetime, timezone, timedelta
+from typing import Any, Deque, Dict, List, Union, Optional
 
+logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class WorkingMemoryEntry:
     """Entrada tipada para a memória de trabalho."""
-
     user_input: str
     response: str
     timestamp: float
-    metadata: dict = field(default_factory=dict)
-
+    meta: Dict[str, Any] = field(default_factory=dict)
 
 class WorkingMemory:
-    """Memória de trabalho volátil de curto prazo.
-
-    Args:
-        maxlen: Capacidade máxima da fila circular (padrão 50).
-    """
-
+    """Memória de trabalho volátil (Short-term memory) baseada em Deque."""
+    
     def __init__(self, maxlen: int = 50) -> None:
         self._maxlen = maxlen
         self._store: Deque[Dict[str, Any]] = deque(maxlen=maxlen)
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
+    
     def push(self, entry: Union[Dict[str, Any], WorkingMemoryEntry]) -> None:
-        """Adiciona uma entrada à fila circular.
-
-        Aceita tanto ``dict`` quanto ``WorkingMemoryEntry`` para compatibilidade.
-        Entradas mais antigas são descartadas automaticamente quando
-        a capacidade máxima é atingida.
-
-        Args:
-            entry: Dicionário ou WorkingMemoryEntry com dados da interação.
-        """
+        """Adiciona uma entrada à memória, garantindo timestamp ISO8601."""
         if isinstance(entry, WorkingMemoryEntry):
             stamped: Dict[str, Any] = {
                 "user_input": entry.user_input,
                 "response": entry.response,
                 "_ts": datetime.fromtimestamp(entry.timestamp, tz=timezone.utc).isoformat(),
-                **entry.metadata,
+                **entry.meta, # CORREÇÃO: Alinhado com o nome no dataclass
             }
         elif isinstance(entry, dict):
-            stamped = {**entry, "_ts": datetime.now(timezone.utc).isoformat()}
+            stamped = entry.copy()
+            if "_ts" not in stamped:
+                stamped["_ts"] = datetime.now(timezone.utc).isoformat()
         else:
-            raise TypeError(f"entry deve ser dict ou WorkingMemoryEntry, recebido: {type(entry)}")
+            raise TypeError(f"Entrada inválida: {type(entry)}. Esperado dict ou WorkingMemoryEntry.")
+        
         self._store.append(stamped)
-
+    
     def get_recent(self, n: int) -> List[Dict[str, Any]]:
-        """Retorna as n entradas mais recentes.
-
-        Args:
-            n: Número de entradas a retornar.
-
-        Returns:
-            Lista das n entradas mais recentes (ordem cronológica).
-        """
-        entries = list(self._store)
-        return entries[-n:] if n > 0 else []
-
+        """Retorna as N entradas mais recentes."""
+        return list(self._store)[-n:] if n > 0 else []
+    
     def clear(self) -> None:
-        """Limpa todas as entradas da memória de trabalho."""
         self._store.clear()
-
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
-
+    
+    def cleanup_old_entries(self, max_age_hours: int = 24) -> int:
+        """
+        Remove entradas mais antigas que max_age_hours.
+        CORREÇÃO: Removida dependência direta do Nexus para evitar circular imports.
+        """
+        if not self._store:
+            return 0
+            
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
+        removed = 0
+        
+        # Como o deque mantém a ordem de inserção, o mais antigo está sempre no índice 0
+        while self._store:
+            first_ts = self._store[0].get('_ts', '')
+            if first_ts and first_ts < cutoff:
+                self._store.popleft()
+                removed += 1
+            else:
+                break
+        
+        if removed > 0:
+            logger.info(f"[WorkingMemory] Cleanup executado: {removed} itens removidos (> {max_age_hours}h).")
+            
+        return removed
+    
     @property
     def size(self) -> int:
-        """Número atual de entradas armazenadas."""
         return len(self._store)
-
+    
     @property
     def maxlen(self) -> int:
-        """Capacidade máxima configurada."""
         return self._maxlen
+    
+    def to_list(self) -> List[Dict[str, Any]]:
+        return list(self._store)
 
     def __len__(self) -> int:
         return len(self._store)
-
-    def __iter__(self):
-        return iter(self._store)
-
-    def __bool__(self) -> bool:
-        return len(self._store) > 0
-
-    def to_list(self) -> list:
-        """Retorna todas as entradas como lista — útil para serialização."""
-        return list(self._store)
-
+    
     def __repr__(self) -> str:
-        return f"WorkingMemory(size={len(self._store)}, maxlen={self._maxlen})"
+        return f"WorkingMemory(items={len(self._store)}/{self._maxlen})"
