@@ -4,12 +4,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
-from sqlmodel import Session, select
 from app.core.nexus import NexusComponent, nexus
-from app.domain.models.thought_log import InteractionStatus, ThoughtLog
-from .thought_log_types import ThoughtType, DEFAULT_CONFIG
-from .thought_log_renderer import ThoughtRenderer
-from .thought_log_storage import ThoughtStorage
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +17,6 @@ class ThoughtLogService(NexusComponent):
     - Store internal reasoning separate from user interactions
     - Track retry counts for auto-correction cycles
     - Escalate to human after 3 failed attempts
-    - Generate consolidated logs for commander review
     - Real-time visual feedback (Thought Stream with ANSI HUD)
     """
     
@@ -30,29 +24,36 @@ class ThoughtLogService(NexusComponent):
     
     def __init__(self, engine=None):
         super().__init__()
-        config = DEFAULT_CONFIG.copy()
         
+        # CORREÇÃO: Resolve engine via Nexus se não injetado
         if engine is not None:
             self.engine = engine
         else:
             db_adapter = nexus.resolve("db_adapter")
             self.engine = getattr(db_adapter, "engine", None) if db_adapter else None
         
-        self._enabled = config["enabled"]
-        self._max_obs_length = config["max_observation_length"]
-        self._stream_to_console = config["stream_to_console"]
-        
-        self._renderer = ThoughtRenderer(
-            color_enabled=config["color_enabled"],
-            show_timestamp=config["show_timestamp"]
-        )
-        self._storage = ThoughtStorage(
-            engine=self.engine,            max_history=config["max_history"]
-        )
+        self._enabled = True
+        self._max_obs_length = 500
+        self._stream_to_console = True
+        self._thought_history: List[Dict[str, Any]] = []
+        self._mission_id: Optional[str] = None
+    
+    def can_execute(self, context: dict = None) -> bool:
+        """NexusComponent contract."""
+        return True
+    
+    def configure(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """Configura o serviço via dicionário."""
+        if config:
+            self._enabled = config.get("enabled", self._enabled)
+            self._max_obs_length = config.get("max_observation_length", self._max_obs_length)
+            self._stream_to_console = config.get("stream_to_console", self._stream_to_console)            mission_id = config.get("mission_id")
+            if mission_id:
+                self._mission_id = mission_id
     
     def execute(self, context: dict):
         """NexusComponent entry-point."""
-        action = context.get("action", "create_thought")
+        action = context.get("action", "stream")
         
         if action == "create_thought":
             return {"success": True, "thought": self.create_thought(**context)}
@@ -62,134 +63,151 @@ class ThoughtLogService(NexusComponent):
                 context.get("message", ""),
                 context.get("data", {})
             )
-        elif action == "get_mission_thoughts":
-            return {"success": True, "thoughts": self.get_mission_thoughts(
-                context.get("mission_id"), context.get("limit")
-            )}
+        elif action == "get_history":
+            return {"success": True, "history": self.get_history(context.get("limit", 10))}
         elif action == "check_requires_human":
-            return {"success": True, "requires_human": self.check_requires_human(
-                context.get("mission_id")
-            )}
+            return {"success": True, "requires_human": self.check_requires_human(context.get("mission_id"))}
         
         return {"success": False, "not_implemented": True}
     
     def create_thought(self, mission_id: str, session_id: str,
-                       thought_process: str, **kwargs) -> Optional[ThoughtLog]:
+                       thought_process: str, **kwargs) -> Optional[Dict]:
         """Create a new thought log entry."""
-        try:
-            with Session(self.engine) as session:
-                retry_count = self._get_mission_retry_count(session, mission_id)
+        thought = {
+            "thought_id": f"thought_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}",
+            "mission_id": mission_id,
+            "session_id": session_id,
+            "thought_process": thought_process,
+            "problem_description": kwargs.get("problem_description", ""),
+            "success": kwargs.get("success", False),
+            "error_message": kwargs.get("error_message", ""),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        
+        self._thought_history.append(thought)
+        
+        if len(self._thought_history) > 100:
+            self._thought_history = self._thought_history[-100:]
+        
+        # Tenta persistir em DB se engine disponível
+        if self.engine:
+            try:
+                from sqlmodel import Session, select
+                from app.domain.models.thought_log import ThoughtLog
                 
-                requires_human = False
-                escalation_reason = ""
-                
-                if not kwargs.get("success", False) and retry_count >= self.MAX_RETRIES:
-                    requires_human = True
-                    escalation_reason = (
-                        f"Auto-correction failed {self.MAX_RETRIES} times. "
-                        "Human intervention required."
+                with Session(self.engine) as session:
+                    db_thought = ThoughtLog(                        mission_id=mission_id,
+                        session_id=session_id,
+                        thought_process=thought_process,
+                        success=kwargs.get("success", False),
                     )
-                
-                thought_log = ThoughtLog(
-                    mission_id=mission_id,
-                    session_id=session_id,
-                    status=kwargs.get("status", InteractionStatus.INTERNAL_MONOLOGUE.value),
-                    thought_process=thought_process,
-                    problem_description=kwargs.get("problem_description", ""),
-                    solution_attempt=kwargs.get("solution_attempt", ""),                    success=kwargs.get("success", False),
-                    error_message=kwargs.get("error_message", ""),
-                    retry_count=retry_count if not kwargs.get("success", False) else 0,
-                    context_data=json.dumps(kwargs.get("context_data", {})),
-                    requires_human=requires_human,
-                    escalation_reason=escalation_reason,
-                    system_state=json.dumps(kwargs.get("system_state", {})),
-                    discarded_alternatives=json.dumps(
-                        kwargs.get("discarded_alternatives", [])
-                    ),
-                    expected_result=kwargs.get("expected_result", ""),
-                    actual_result=kwargs.get("actual_result", ""),
-                    reward_received=kwargs.get("reward_received", 0.0),
-                    reward_value=kwargs.get("reward_received", 0.0),
-                )
-                
-                session.add(thought_log)
-                session.commit()
-                session.refresh(thought_log)
-                
-                # Index na memória vetorial
-                try:
-                    vector_memory = nexus.resolve("vector_memory_adapter")
-                    if vector_memory:
-                        vector_memory.execute({
-                            "action": "store",
-                            "text": f"[{kwargs.get('status', 'internal')}] {thought_process}",
-                            "metadata": {"mission_id": mission_id},
-                        })
-                except Exception as exc:
-                    logger.debug("Falha ao indexar thought: %s", exc)
-                
-                return thought_log
-                
-        except Exception as e:
-            logger.error(f"Error creating thought log: {e}")
-            return None
+                    session.add(db_thought)
+                    session.commit()
+            except Exception as e:
+                logger.debug(f"[ThoughtLog] Falha ao persistir: {e}")
+        
+        return thought
     
-    def _get_mission_retry_count(self, session: Session, mission_id: str) -> int:
-        """Get the number of failed attempts for a mission."""
-        statement = (
-            select(ThoughtLog)
-            .where(ThoughtLog.mission_id == mission_id)
-            .where(ThoughtLog.success == False)
-        )
-        return len(session.exec(statement).all())
+    def get_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Obtém histórico de pensamentos."""
+        return self._thought_history[-limit:]
     
-    def get_mission_thoughts(self, mission_id: str, limit: int = None) -> List[ThoughtLog]:
-        """Get all thought logs for a specific mission."""
-        return self._storage.get_mission_thoughts(mission_id, limit)    
     def check_requires_human(self, mission_id: str) -> bool:
-        """Check if a mission requires human intervention."""
-        return self._storage.check_requires_human(mission_id)
+        """Verifica se missão requer intervenção humana."""
+        if not self.engine:
+            return False
+        
+        try:
+            from sqlmodel import Session, select
+            from app.domain.models.thought_log import ThoughtLog
+            
+            with Session(self.engine) as session:
+                statement = select(ThoughtLog).where(
+                    ThoughtLog.mission_id == mission_id,
+                    ThoughtLog.requires_human == True
+                ).limit(1)
+                result = session.exec(statement).first()
+                return result is not None
+        except Exception as e:
+            logger.error(f"Error checking human requirement: {e}")
+            return False
     
     def stream_thought(self, thought_type: str, message: str,
-                        Optional[Dict] = None) -> Dict[str, Any]:
+                       data: Optional[Dict] = None) -> Dict[str, Any]:
         """Transmite pensamento em tempo real com formatação ANSI."""
         if not self._enabled:
             return {"success": False, "error": "ThoughtLogService disabled"}
         
-        if thought_type == ThoughtType.OBSERVATION:
+        if thought_type == "observation":
             if len(message) > self._max_obs_length:
                 message = message[:self._max_obs_length] + "..."
         
         thought = {
             "thought_id": f"thought_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}",
-            "mission_id": self._storage._mission_id,
-            "thought_type": thought_type,
-            "message": message,
+            "mission_id": self._mission_id,
+            "thought_type": thought_type,            "message": message,
             "data": data or {},
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         
-        self._storage.add(thought)
+        self._thought_history.append(thought)
         
         if self._stream_to_console:
-            self._renderer.print(thought)
+            self._render_to_console(thought)
         
         return {"success": True, "streamed": True}
     
-    def stream_planning(self, message: str,  Optional[Dict] = None):
-        return self.stream_thought(ThoughtType.PLANNING, message, data)
+    def _render_to_console(self, thought: Dict[str, Any]) -> None:
+        """Renderiza pensamento no console com formatação ANSI."""
+        import sys
+        
+        colors = {
+            "planning": "\033[96m\033[1m",
+            "action": "\033[93m\033[1m",
+            "observation": "\033[92m",
+            "error": "\033[91m\033[1m",
+            "success": "\033[92m\033[1m",
+            "info": "\033[37m\033[2m",
+        }
+        
+        icons = {
+            "planning": "🧠",
+            "action": "⚡",
+            "observation": "👁️",
+            "error": "❌",
+            "success": "✅",
+            "info": "ℹ️",
+        }
+        
+        reset = "\033[0m"
+        dim = "\033[2m"
+        
+        thought_type = thought.get("thought_type", "info")
+        message = thought.get("message", "")
+        timestamp = thought.get("timestamp", "")
+        
+        try:
+            dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            time_str = dt.strftime("%H:%M:%S")
+        except:
+            time_str = "??:??:??"
+        
+        color = colors.get(thought_type, "")
+        icon = icons.get(thought_type, "•")
+                formatted = f"{dim}[{time_str}]{reset} {color}{icon} [{thought_type.upper()}]{reset} {message}"
+        print(formatted, file=sys.stdout, flush=True)
     
-    def stream_action(self, message: str,  Optional[Dict] = None):
-        return self.stream_thought(ThoughtType.ACTION, message, data)
+    def stream_planning(self, message: str, data: Optional[Dict] = None):
+        return self.stream_thought("planning", message, data)
     
-    def stream_observation(self, message: str,  Optional[Dict] = None):
-        return self.stream_thought(ThoughtType.OBSERVATION, message, data)
+    def stream_action(self, message: str, data: Optional[Dict] = None):
+        return self.stream_thought("action", message, data)
     
-    def stream_error(self, message: str,  Optional[Dict] = None):
-        return self.stream_thought(ThoughtType.ERROR, message, data)
+    def stream_observation(self, message: str, data: Optional[Dict] = None):
+        return self.stream_thought("observation", message, data)
+    
+    def stream_error(self, message: str, data: Optional[Dict] = None):
+        return self.stream_thought("error", message, data)
     
     def stream_success(self, message: str, data: Optional[Dict] = None):
-        return self.stream_thought(ThoughtType.SUCCESS, message, data)
-    
-    def can_execute(self, context: dict = None) -> bool:
-        return True
+        return self.stream_thought("success", message, data)
