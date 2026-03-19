@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Pipeline Runner — Orquestra execução de pipelines YAML.
-CORRIGIDO: Passa 'config' E 'current_config' para compatibilidade com adapters.
-"""
+"""Pipeline Runner — Orquestra execução de pipelines YAML."""
 import os
 import yaml
 import logging
@@ -16,6 +14,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S"
 )
 logger = logging.getLogger("PipelineRunner")
+
 
 def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, Any]:
     """Executa pipeline com correção de contexto para adapters."""
@@ -38,7 +37,8 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
         "metadata": {"pipeline": pipeline_name},
         "env": dict(os.environ),
         "results": [],
-        "config": {}  # ← ADICIONADO: Para compatibilidade com adapters
+        "config": {},  # ← ADICIONADO: Para compatibilidade com adapters
+        "current_config": {}  # ← ADICIONADO: Para compatibilidade com adapters
     }
 
     components = config.get("components", {})
@@ -63,8 +63,8 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
                 instance.configure(comp_config)
 
             # ← CORREÇÃO CRÍTICA: Passa AMBOS para compatibilidade
-            context["config"] = comp_config  # Para adapters que leem context.get("config")
-            context["current_config"] = comp_config  # Para adapters que leem context.get("current_config")
+            context["config"] = comp_config
+            context["current_config"] = comp_config
 
             if hasattr(instance, "can_execute") and not instance.can_execute(context):
                 logger.info(f"⏭️ Passo '{step_name}' pulado.")
@@ -99,6 +99,7 @@ def run_pipeline(pipeline_name: str, global_strict: bool = False) -> Dict[str, A
                 raise e
     logger.info(f"🏁 PIPELINE '{pipeline_name}' FINALIZADO.")
     return context
+
 
 if __name__ == "__main__":
     p_name = os.getenv("PIPELINE")
