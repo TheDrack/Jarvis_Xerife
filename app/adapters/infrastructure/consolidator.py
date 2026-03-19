@@ -103,7 +103,7 @@ class Consolidator(NexusComponent):
         
         logger.info(f"[NEXUS] Snapshot salvo em: {output_path}")
         
-        # ✅ CRÍTICO: Atualiza contexto para pipeline
+        # CRÍTICO: Atualiza contexto para pipeline
         res_payload = {
             "status": "success",
             "file_path": str(output_path),
