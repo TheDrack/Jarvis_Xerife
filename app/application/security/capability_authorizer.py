@@ -1,33 +1,30 @@
 # -*- coding: utf-8 -*-
 """Capability Authorizer - Security layer for capability execution.
-
-No capability may be executed without passing through explicit authorization.
-Implements allowlist checking, remote execution blocking, human confirmation
-requirements for sensitive commands, and payload injection detection.
-
-Implements :class:`app.core.nexuscomponent.NexusComponent` so it can be
-resolved via ``nexus.resolve("capability_authorizer")``.
+CORREÇÃO: Scan recursivo de payload e conformidade com Nexus.
 """
-
 import logging
 import re
-from typing import Any, Dict, Optional, Set
-
+from typing import Any, Dict, Optional, Set, Union
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
-# Patterns that indicate shell injection or command execution attempts
-_INJECTION_PATTERNS: list = [
-    re.compile(r"[;&|`$]"),                   # shell metacharacters
-    re.compile(r"\.\./"),                      # path traversal
-    re.compile(r"<\s*\("),                     # process substitution
-    re.compile(r"\$\(.*\)"),                   # command substitution
+# Padrões expandidos para cobrir vetores de injeção
+_INJECTION_PATTERNS = [
+    re.compile(r"[;&|`]"),                     # Metacaracteres de shell (removido $ isolado)
+    re.compile(r"\.\./"),                      # Path traversal
+    re.compile(r"<\s*\("),                     # Process substitution
+    re.compile(r"\$\(.*\)"),                   # Command substitution
+    re.compile(r"\$\{[^}]+\}"),                # Variable expansion
+    re.compile(r"`[^`]+`"),                    # Backtick execution
     re.compile(r"\b(eval|exec|system|popen|subprocess|os\.system)\b", re.IGNORECASE),
     re.compile(r"\b(rm\s+-rf|chmod|chown|sudo|su\s+)\b", re.IGNORECASE),
+    re.compile(r"\\x[0-9a-f]{2}", re.IGNORECASE),  # Hex escapes
+    re.compile(r"\\u[0-9a-f]{4}", re.IGNORECASE),  # Unicode escapes
+    re.compile(r"%00"),                        # Null byte injection
 ]
 
-# Capabilities that require explicit human confirmation before execution
+# Capabilities que exigem confirmação humana explícita
 _SENSITIVE_CAPABILITIES: Set[str] = {
     "system_executor",
     "auto_evolution",
@@ -38,67 +35,34 @@ _SENSITIVE_CAPABILITIES: Set[str] = {
     "delete_file",
     "format_disk",
     "osint_search",
-    "evolution_orchestrator",  # pode criar arquivos e abrir PRs
-}
-
-# Default allowlist of approved capabilities
-_DEFAULT_ALLOWLIST: Set[str] = {
-    "assistant_service",
-    "command_interpreter",
-    "intent_processor",
-    "memory_manager",
-    "vector_memory_adapter",
-    "notification_service",
-    "telegram_adapter",
-    "gemini_adapter",
-    "gateway_llm_adapter",
-    "sqlite_history_adapter",
-    "vision_adapter",
-    "field_vision",
-    "thought_log_service",
-    "strategist_service",
-    "task_runner",
-    "browser_manager",
-    "github_worker",
-    "system_executor",
-    "auto_evolution",
-    "audit_logger",
-    "capability_authorizer",
-    "pii_redactor",
-    "env_secrets_provider",
-    "osint_search",
-    "eagle_osint_adapter",
-    # Fase anterior — novos componentes de auto-evolução
     "evolution_orchestrator",
-    "ollama_adapter",
-    "cost_tracker_adapter",
-    "procedural_memory_adapter",
-    "capability_index_service",
-    "capability_blueprint_service",
-    "capability_gap_reporter",
-    "capability_detectors",
-    "overwatch_daemon",
 }
 
+# Allowlist padrão de capabilities aprovadas
+_DEFAULT_ALLOWLIST: Set[str] = {
+    "assistant_service", "command_interpreter", "intent_processor",
+    "memory_manager", "vector_memory_adapter", "notification_service",
+    "telegram_adapter", "gemini_adapter", "gateway_llm_adapter",
+    "sqlite_history_adapter", "vision_adapter", "field_vision",
+    "thought_log_service", "strategist_service", "task_runner",
+    "browser_manager", "github_worker", "system_executor",
+    "auto_evolution", "audit_logger", "capability_authorizer",
+    "pii_redactor", "env_secrets_provider", "osint_search",
+    "eagle_osint_adapter", "evolution_orchestrator", "ollama_adapter",
+    "cost_tracker_adapter", "procedural_memory_adapter",
+    "capability_index_service", "capability_blueprint_service",
+    "capability_gap_reporter", "capability_detectors", "overwatch_daemon",
+}
 
 class CapabilityAuthorizer(NexusComponent):
-    """Authorization layer that guards capability execution.
-
-    Implements :class:`NexusComponent` so it is resolvable via
-    ``nexus.resolve("capability_authorizer")``.
-
-    Args:
-        allowlist: Set of capability names permitted to execute.
-            Defaults to the project-wide ``_DEFAULT_ALLOWLIST``.
-        require_confirmation_for: Set of capability names that need explicit
-            human confirmation via the *context* payload.
-    """
-
+    """Camada de autorização que protege a execução de capacidades."""
+    
     def __init__(
         self,
         allowlist: Optional[Set[str]] = None,
         require_confirmation_for: Optional[Set[str]] = None,
     ) -> None:
+        super().__init__()
         self._allowlist: Set[str] = allowlist if allowlist is not None else set(_DEFAULT_ALLOWLIST)
         self._sensitive: Set[str] = (
             require_confirmation_for
@@ -106,141 +70,74 @@ class CapabilityAuthorizer(NexusComponent):
             else set(_SENSITIVE_CAPABILITIES)
         )
 
-    # ------------------------------------------------------------------
-    # NexusComponent interface
-    # ------------------------------------------------------------------
-
+    def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
+        """Verifica se o autorizador está operacional."""
+        return True
+    
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Authorize a capability execution described by *context*.
-
-        Expected context keys:
-            - ``user`` (str): Identifier of the requesting user/session.
-            - ``capability_name`` (str): Name of the capability to authorize.
-            - ``payload`` (dict, optional): Execution parameters to scan.
-
-        Returns:
-            ``{"success": True, "authorized": True}`` when authorized.
-            ``{"success": False, "error": "<reason>"}`` when blocked
-            (no exception propagated through this interface).
-        """
+        """Autoriza uma execução descrita pelo contexto do Nexus."""
         ctx = context or {}
         user = ctx.get("user", "anonymous")
         capability_name = ctx.get("capability_name", "")
         payload = ctx.get("payload", {})
-
+        
         if not capability_name:
-            return {"success": False, "error": "Campo 'capability_name' obrigatório no contexto."}
-
+            return {"success": False, "error": "Campo 'capability_name' obrigatório."}
+        
         try:
             self.authorize(user, capability_name, payload)
             return {"success": True, "authorized": True, "capability": capability_name}
         except (PermissionError, ValueError) as exc:
+            logger.error(f"[Authorizer] Bloqueio: {str(exc)}")
             return {"success": False, "authorized": False, "error": str(exc)}
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
+    
     def authorize(
         self,
         user: str,
         capability_name: str,
         payload: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Evaluate whether *user* may execute *capability_name* with *payload*.
-
-        Args:
-            user: Identifier of the requesting user/session.
-            capability_name: Name of the capability to authorize.
-            payload: Execution context / parameters. May be ``None``.
-
-        Returns:
-            ``True`` when the execution is authorized.
-
-        Raises:
-            PermissionError: When the capability is not in the allowlist or
-                execution is blocked for another security reason.
-            ValueError: When the payload contains suspicious patterns.
-        """
+        """Avalia permissões para o usuário e capacidade fornecidos."""
         payload = payload or {}
-
-        # 1. Allowlist check
+        
+        # 1. Check Allowlist
         if capability_name not in self._allowlist:
-            logger.warning(
-                "🚫 [Authorizer] Capability '%s' não está na allowlist. Usuário: %s",
-                capability_name,
-                user,
-            )
-            raise PermissionError(
-                f"Capability '{capability_name}' não autorizada: não está na allowlist."
-            )
-
-        # 2. Block unauthorized remote execution
+            raise PermissionError(f"Capability '{capability_name}' não está na allowlist.")
+        
+        # 2. Block Unauthorized Remote
         if payload.get("remote", False) and not payload.get("remote_authorized", False):
-            logger.warning(
-                "🚫 [Authorizer] Execução remota não autorizada de '%s'. Usuário: %s",
-                capability_name,
-                user,
-            )
-            raise PermissionError(
-                f"Execução remota de '{capability_name}' bloqueada: autorização remota ausente."
-            )
-
-        # 3. Sensitive capabilities require human confirmation
+            raise PermissionError(f"Execução remota de '{capability_name}' exige 'remote_authorized': true.")
+        
+        # 3. Sensitive Protection
         if capability_name in self._sensitive and not payload.get("human_confirmed", False):
-            logger.warning(
-                "🚫 [Authorizer] Capability sensível '%s' requer confirmação humana. Usuário: %s",
-                capability_name,
-                user,
-            )
-            raise PermissionError(
-                f"Capability '{capability_name}' requer confirmação humana explícita "
-                f"(payload 'human_confirmed': true)."
-            )
-
-        # 4. Payload injection scan
-        self._check_payload_for_injection(capability_name, payload)
-
-        logger.info(
-            "✅ [Authorizer] '%s' autorizada para usuário '%s'.", capability_name, user
-        )
+            raise PermissionError(f"Capability sensível '{capability_name}' exige confirmação humana.")
+        
+        # 4. Deep Payload Injection Scan
+        self._deep_scan_injection(capability_name, payload)
+        
+        logger.info(f"✅ [Authorizer] '{capability_name}' autorizada para '{user}'.")
         return True
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    def _check_payload_for_injection(
-        self, capability_name: str, payload: Dict[str, Any]
-    ) -> None:
-        """Scan all string values in *payload* for injection patterns.
-
-        Raises:
-            ValueError: When a suspicious pattern is detected.
-        """
-        for key, value in payload.items():
-            if not isinstance(value, str):
-                continue
+    
+    def _deep_scan_injection(self, capability_name: str, data: Any) -> None:
+        """Varredura recursiva em busca de padrões de injeção em qualquer nível do payload."""
+        if isinstance(data, str):
             for pattern in _INJECTION_PATTERNS:
-                if pattern.search(value):
-                    logger.error(
-                        "💉 [Authorizer] Payload suspeito detectado em '%s.%s': padrão '%s'.",
-                        capability_name,
-                        key,
-                        pattern.pattern,
-                    )
-                    raise ValueError(
-                        f"Payload bloqueado: campo '{key}' contém padrão suspeito de injeção."
-                    )
-
+                if pattern.search(data):
+                    raise ValueError(f"Injeção detectada em '{capability_name}': padrão '{pattern.pattern}'")
+        
+        elif isinstance(data, dict):
+            for v in data.values():
+                self._deep_scan_injection(capability_name, v)
+        
+        elif isinstance(data, list):
+            for item in data:
+                self._deep_scan_injection(capability_name, item)
+    
     def add_to_allowlist(self, capability_name: str) -> None:
-        """Dynamically add a capability to the allowlist."""
         self._allowlist.add(capability_name)
-
+    
     def remove_from_allowlist(self, capability_name: str) -> None:
-        """Dynamically remove a capability from the allowlist."""
         self._allowlist.discard(capability_name)
 
     def is_allowed(self, capability_name: str) -> bool:
-        """Return ``True`` if *capability_name* is in the allowlist."""
         return capability_name in self._allowlist
