@@ -1,29 +1,39 @@
 # JARVIS Pipeline: Sincronização e Backup de DNA
+# Este pipeline é executado no CI/CD para backup automático
+
+description: "Sincroniza CORE_LOGIC_CONSOLIDATED.txt com Drive, Telegram e Gist"
+strict: false
+
 components:
+  # 1. Gerar snapshot consolidado
   consolidator:
     id: "consolidator"
     hint_path: "app/adapters/infrastructure/consolidator"
     singleton: true
     config:
       strict_mode: true
-
+  
+  # 2. Carregar contexto para serviços downstream
   consolidated_context_service:
     id: "consolidated_context_service"
     hint_path: "app/application/services/consolidated_context_service"
-
+  
+  # 3. Backup no Google Drive
   drive_uploader:
     id: "drive_uploader"
     hint_path: "app/adapters/infrastructure/drive_uploader"
     singleton: true
     config:
       strict_mode: false
-
+  
+  # 4. Backup no Telegram
   telegram_backup:
     id: "telegram_adapter"
     hint_path: "app/adapters/infrastructure/telegram_adapter"
-    config:
-      action: "upload_backup"
-
+    action: "backup"
+  
+  # 5. Backup no GitHub Gist
   gist_backup:
     id: "gist_uploader"
     hint_path: "app/adapters/infrastructure/gist_uploader"
+    singleton: true
