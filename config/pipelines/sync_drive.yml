@@ -1,4 +1,6 @@
 # JARVIS Pipeline: Sincronização e Backup de DNA
+# STATUS: Validado para NexusDiscovery Mode: Filesystem
+strict: false
 components:
   consolidator:
     id: "consolidator"
@@ -6,24 +8,29 @@ components:
     singleton: true
     config:
       strict_mode: true
-
+  
   consolidated_context_service:
     id: "consolidated_context_service"
     hint_path: "app/application/services/consolidated_context_service"
-
+  
   drive_uploader:
     id: "drive_uploader"
     hint_path: "app/adapters/infrastructure/drive_uploader"
     singleton: true
     config:
       strict_mode: false
-
+  
   telegram_backup:
-    id: "telegram_adapter"
+    id: "telegram_adapter" # ID consistente com o RegistryMixin
     hint_path: "app/adapters/infrastructure/telegram_adapter"
-    config:
-      action: "upload_backup"
-
+  
   gist_backup:
     id: "gist_uploader"
     hint_path: "app/adapters/infrastructure/gist_uploader"
+
+# Configurações de Ambiente para Execução Simbiótica
+env:
+  PYTHONPATH: "."
+  NEXUS_DISCOVERY_MODE: "filesystem"
+  NEXUS_STRICT_MODE: "false"
+  LOG_LEVEL: "DEBUG" # Recomendado para validar o Discovery em CI/CD
