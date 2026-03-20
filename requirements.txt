@@ -1,58 +1,47 @@
-# Jarvis Assistant - Cloud/Lightweight Requirements
-# This is the lightweight cloud version without heavy hardware dependencies
-# For modular requirements strategy, see requirements/README.md
+# ==============================================================================
+# J.A.R.V.I.S. ASSISTANT - CLOUD REQUIREMENTS (RENDER OPTIMIZED)
+# Versão: 2026.03 - Suporte a Workflows e Auto-Cura Nexus
+# ==============================================================================
 
-# For edge deployment with hardware support, use:
-#   pip install -r requirements/edge.txt
-#
-# For production edge deployment:
-#   pip install -r requirements/prod-edge.txt
-#
-# For production cloud deployment:
-#   pip install -r requirements/prod-cloud.txt
-
-# Core dependencies (cloud-ready, no hardware requirements)
+# Core & Environment
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 
-# LLM dependencies
+# LLM & AI Logic
 google-genai
 groq>=0.4.0
 instructor>=1.3.0
 json-repair>=0.25.0
 tiktoken>=0.5.0
 
-# API server
-slowapi>=0.1.9
+# API Server (FastAPI + Uvicorn)
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
+slowapi>=0.1.9
 python-multipart>=0.0.6
 
-# Security and Authentication
+# Render Native Features (Workflows Beta)
+# Necessário para os decorators @task no EvolutionOrchestrator
+render-python-sdk>=0.1.0
+
+# Security & Authentication
 bcrypt>=4.0.1,<5.0.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 cryptography>=41.0.0
 
-# Database ORM
+# Database & Persistence
+# Utiliza psycopg2-binary para conexão nativa com o PostgreSQL do Render
 sqlmodel>=0.0.14
-psycopg2-binary>=2.9.0  # PostgreSQL driver for production deployments
+psycopg2-binary>=2.9.0
+supabase>=2.0.0
 
-# NOTE: Heavy libraries removed for cloud deployment:
-# - pyttsx3, SpeechRecognition (voice/TTS - use edge.txt if needed)
-# - PyAutoGUI, pynput, pyperclip (hardware automation - use edge.txt if needed)
-# - pandas, openpyxl (data analysis - use edge.txt if needed)
-# All imports of these libraries in the code are optional with try/except blocks
-
-# Vector memory (optional - lightweight local vector store)
-# When faiss-cpu is not installed, VectorMemoryAdapter falls back to pure-Python
-# cosine-similarity over an in-memory list (slower but fully functional).
+# Vector Memory & Processing (Lightweight)
+# Nota: faiss-cpu é incluído para busca semântica veloz no Nexus
 numpy>=1.24.0
 faiss-cpu>=1.7.4
-
-# Knowledge graph for SemanticMemory (optional - falls back to pure-Python dict)
 networkx>=3.0
 
-# Supabase – cloud database, auth and storage (optional; code falls back gracefully)
-supabase>=2.0.0
+# Telemetria e Logs
+httpx>=0.25.0
