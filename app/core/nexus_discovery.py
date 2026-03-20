@@ -17,7 +17,7 @@ from app.core.nexus_exceptions import (
 logger = logging.getLogger(__name__)
 
 class _NexusDiscoveryMixin:
-    """Helper de descoberta otimizado para ambientes Cloud (Render/Docker)."""
+    """Helper de descoberta flexível para ambientes Cloud e Local."""
 
     def _resolve_internal(self, target_id: str, hint_path: Optional[str] = None) -> Any:
         cls, path = self._locate_class(target_id, hint_path)
@@ -26,23 +26,20 @@ class _NexusDiscoveryMixin:
         return nexus_guarded_instantiate(cls)
 
     def _locate_class(self, target_id: str, hint_path: Optional[str] = None) -> Tuple[Optional[type], Optional[str]]:
-        # 1. Busca Global
         return self._global_search_with_path(target_id)
 
     def _global_search_with_path(self, target_id: str) -> Tuple[Optional[type], Optional[str]]:
-        # Garante que a raiz do projeto está no sys.path para imports relativos
         root_dir = os.getcwd()
         if root_dir not in sys.path:
             sys.path.insert(0, root_dir)
 
-        # No Render, buscamos a partir de 'app'
         search_root = os.path.join(root_dir, "app")
         if not os.path.exists(search_root):
             search_root = root_dir
 
         matches: List[Tuple[type, str]] = []
-        # Normalização para match (ex: assistant_service -> assistantservice)
-        norm_target = target_id.replace("_", "").lower()
+        # Normalização para comparação (remove underscores e coloca em lowercase)
+        norm_target = target_id.lower().replace("_", "")
 
         for root, _, files in os.walk(search_root):
             if "__pycache__" in root or ".git" in root:
@@ -50,51 +47,57 @@ class _NexusDiscoveryMixin:
             
             for fname in files:
                 if fname.endswith(".py") and not fname.startswith("__"):
-                    full_path = os.path.join(root, fname)
-                    
-                    # Tenta encontrar a classe dentro deste arquivo
-                    cls = self._find_class_from_path(full_path, target_id)
-                    if cls:
-                        matches.append((cls, full_path))
+                    # Se o nome do arquivo contém o target_id (ex: telegram_adapter.py contendo 'telegram')
+                    # OU se o target_id está contido no nome do arquivo (ex: drive_uploader vs google_drive_uploader)
+                    file_norm = fname.lower().replace("_", "")
+                    if norm_target in file_norm or file_norm.replace(".py", "") in norm_target:
+                        full_path = os.path.join(root, fname)
+                        cls = self._find_class_from_path(full_path, target_id)
+                        if cls:
+                            matches.append((cls, full_path))
 
         if not matches:
             logger.error(f"❌ [NEXUS] Nenhum arquivo em '{search_root}' contém um match para '{target_id}'")
             return None, None
         
-        # Se houver mais de um, tenta o nome mais próximo
+        # Priorização em caso de múltiplos matches
         if len(matches) > 1:
             for cls, path in matches:
-                if cls.__name__.lower() == target_id.lower().replace("_", ""):
+                cls_name_low = cls.__name__.lower()
+                # 1. Prioridade: Nome da classe bate com o ID (ex: TelegramAdapter == telegram_adapter)
+                if cls_name_low == norm_target:
                     return cls, path
-            return matches[0] # Fallback para o primeiro
+                # 2. Prioridade: ID é sufixo ou prefixo da classe (ex: GoogleDriveUploader contém drive_uploader)
+                if norm_target in cls_name_low:
+                    return cls, path
+            return matches[0]
 
         return matches[0]
 
     def _find_class_from_path(self, file_path: str, target_id: str) -> Optional[type]:
         try:
-            # Converte path absoluto em path de módulo python
-            # Ex: /opt/render/project/src/app/core/nexus.py -> app.core.nexus
             rel_path = os.path.relpath(file_path, os.getcwd())
             module_name = rel_path.replace(os.path.sep, ".").replace(".py", "")
             
-            # Importa o módulo dinamicamente
+            # Importa o módulo
             module = importlib.import_module(module_name)
-            
-            norm_target = target_id.replace("_", "").lower()
+            norm_target = target_id.lower().replace("_", "")
             
             for name, obj in inspect.getmembers(module, inspect.isclass):
-                # Critérios de Match:
-                # 1. Nome exato (TelegramAdapter == telegram_adapter)
-                # 2. Nome contido (SQLiteHistoryAdapter contém 'database' ou 'history')
                 name_low = name.lower()
                 
-                # Match especial para Database/Adapter
-                is_db_match = (target_id == "database_adapter" and "adapter" in name_low and ("sqlite" in name_low or "postgres" in name_low or "history" in name_low))
-                
-                if name_low == norm_target or name_low == target_id.replace("_", "") or is_db_match:
-                    # Verifica se a classe foi definida no módulo (evita imports)
-                    if obj.__module__ == module_name:
-                        return obj
+                # Match mais permissivo:
+                # - Se o nome da classe normalizado for igual ao target normalizado
+                # - OU se o target_id é uma parte fundamental do nome da classe
+                if (name_low == norm_target or 
+                    norm_target in name_low or 
+                    name_low in norm_target):
+                    
+                    # Verificação de segurança: não instanciar classes base ou abstratas
+                    if name.startswith("Base") or name.endswith("Mixin"):
+                        continue
+                        
+                    return obj
         except Exception:
             pass
         return None
