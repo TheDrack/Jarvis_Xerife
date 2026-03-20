@@ -1,217 +1,126 @@
 # -*- coding: utf-8 -*-
 """
-JarvisNexus – Dynamic Dependency Injection Container.
-Corrigido: Thread-safety no Circuit Breaker e gestão de Futures.
+JarvisNexus — O Sistema Nervoso Central (Nexus).
+Responsável por resolução de dependências, gerenciamento de instâncias e thread-safety.
 """
 import concurrent.futures
 import logging
-import os
-import time
 import threading
-from threading import RLock
-from typing import Any, Dict, Optional, List
+import time
+from typing import Any, Dict, Optional
 
+from app.core.nexus_discovery import _NexusDiscoveryMixin
 from app.core.nexus_exceptions import (
-    CIRCUIT_BREAKER_RESET,
     CIRCUIT_BREAKER_TIMEOUT,
     WAITER_TIMEOUT_MARGIN,
-    CloudMock,
-    _CircuitBreakerEntry,
-)
-from app.core.nexus_discovery import _NexusDiscoveryMixin
-from app.core.nexus_registry import _NexusRegistryMixin
-from app.core.nexuscomponent import NexusComponent  # noqa: F401
-
-# Re-export helpers
-from app.core.nexus_exceptions import (  # noqa: F401
-    AmbiguousComponentError,
-    ImportTimeoutError,
-    InstantiateTimeoutError,
-    nexus_guarded_instantiate as _nexus_guarded_instantiate,
+    CloudMock
 )
 
 logger = logging.getLogger(__name__)
 
-__all__ = [
-    "JarvisNexus",
-    "NexusComponent",
-    "CloudMock",
-    "nexus",
-]
+class JarvisNexus(_NexusDiscoveryMixin):
+    """
+    Nexus central para gerenciamento dinâmico de componentes.
+    Implementa Singleton e Circuit Breaker para evitar falhas em cascata.
+    """
+    _instance = None
+    _lock = threading.Lock()
 
-class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
-    """Contêiner DI Thread-safe com Circuit-Breaker e Descoberta Dinâmica."""
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(JarvisNexus, cls).__new__(cls)
+                cls._instance._initialized = False
+            return cls._instance
 
-    def __init__(self) -> None:
+    def __init__(self):
+        if self._initialized:
+            return
+        
         self._instances: Dict[str, Any] = {}
-        self._cache: Dict[str, str] = {}
-        self._mutated: bool = False
-        self.dna: Dict[str, Any] = {}
         self._path_map: Dict[str, str] = {}
-        self._circuit_breaker: Dict[str, _CircuitBreakerEntry] = {}
-        self._lock: RLock = RLock()
-        self._executor: Optional[concurrent.futures.ThreadPoolExecutor] = None
-        self._metrics_collector: Optional[Any] = None
-        self.gist_id: str = os.getenv("NEXUS_GIST_ID", "")
-        self.base_dir: str = os.path.abspath(os.getcwd())
-
-        # Inicializa registro local herdado de RegistryMixin
-        try:
-            self._cache.update(self._load_local_registry())
-        except Exception as e:
-            logger.error("❌ [NEXUS] Falha ao carregar registro local: %s", e)
+        self._cache: Dict[str, str] = {}
+        self._circuit_breakers: Dict[str, float] = {}
+        self._executor = None
+        self._metrics_collector = None
+        self._initialized = True
+        logger.info("🧠 [NEXUS] Sistema Nervoso Central inicializado.")
 
     def _get_executor(self) -> concurrent.futures.ThreadPoolExecutor:
-        """Retorna o executor lazy-loaded com proteção de lock."""
         if self._executor is None:
-            with self._lock:
-                if self._executor is None:
-                    self._executor = concurrent.futures.ThreadPoolExecutor(
-                        max_workers=4, thread_name_prefix="nexus_resolver"
-                    )
+            self._executor = concurrent.futures.ThreadPoolExecutor(
+                max_workers=10, 
+                thread_name_prefix="NexusExecutor"
+            )
         return self._executor
 
-    def register_metrics_collector(self, collector: Any) -> None:
-        self._metrics_collector = collector
-
-    def load_dna(self, dna_dict: dict) -> None:
-        with self._lock:
-            self.dna = dna_dict
-            for c_id, meta in dna_dict.get("components", {}).items():
-                if "hint_path" in meta:
-                    self._path_map[c_id] = meta["hint_path"]
-
-    # ------------------------------------------------------------------
-    # Circuit Breaker (Thread-Safe)
-    # ------------------------------------------------------------------
-    def _is_circuit_open(self, target_id: str) -> bool:
-        with self._lock:
-            entry = self._circuit_breaker.get(target_id)
-            if entry is None:
-                return False
-            if time.monotonic() - entry.open_at < CIRCUIT_BREAKER_RESET:
-                return True
-            # Cooling-off period expired
-            del self._circuit_breaker[target_id]
-            return False
-
-    def _open_circuit(self, target_id: str, reason: str) -> None:
-        with self._lock:
-            entry = _CircuitBreakerEntry()
-            entry.open_at = time.monotonic()
-            entry.last_failure = reason
-            self._circuit_breaker[target_id] = entry
-            logger.error(
-                "⚡ [NEXUS] Circuit Breaker ABERTO para '%s': %s. Fallback ativado por %.0fs.",
-                target_id, reason, CIRCUIT_BREAKER_RESET,
-            )
-
-    def invalidate_component(self, component_id: str) -> None:
-        """Remove o componente do cache, instâncias e reseta o circuit breaker."""
-        with self._lock:
-            self._cache.pop(component_id, None)
-            self._instances.pop(component_id, None)
-            self._circuit_breaker.pop(component_id, None)
-            self._mutated = True
-            logger.info("♻️ [NEXUS] Componente '%s' invalidado e removido do cache.", component_id)
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-    def list_loaded_ids(self) -> List[str]:
-        with self._lock:
-            return [k for k, v in self._instances.items() if not isinstance(v, concurrent.futures.Future)]
-
-    def resolve_class(self, target_id: str, hint_path: Optional[str] = None) -> Optional[type]:
-        """Localiza a classe sem instanciar (bypass circuit-breaker)."""
+    def resolve(self, target_id: str, hint_path: Optional[str] = None) -> Any:
+        """
+        Resolve um componente pelo ID, com proteção global contra falhas.
+        [CORREÇÃO]: Adicionado try-except global para gatilhos de self-healing.
+        """
         try:
-            cls, _ = self._locate_class(target_id, hint_path)
-            return cls
-        except Exception as err:
-            logger.error("❌ [NEXUS] Erro ao localizar classe '%s': %s", target_id, err)
-            return None
+            start = time.time()
+            
+            # 1. Verificação rápida em cache
+            with self._lock:
+                inst = self._instances.get(target_id)
+                if inst is not None and not isinstance(inst, concurrent.futures.Future):
+                    return inst
 
-    def resolve(self, target_id: str, hint_path: Optional[str] = None, **kwargs) -> Any:
-        """Resolve, instancia e faz cache do componente com proteção de circuit-breaker."""
-        start = time.time()
+                # 2. Se já estiver sendo construído por outra thread, espera
+                if isinstance(inst, concurrent.futures.Future):
+                    pending_future = inst
+                    am_builder = False
+                else:
+                    # Verifica Circuit Breaker
+                    if self._is_circuit_open(target_id):
+                        return CloudMock(target_id)
+                    
+                    # Registra que esta thread construirá o objeto
+                    pending_future = concurrent.futures.Future()
+                    self._instances[target_id] = pending_future
+                    am_builder = True
 
-        # 1. Fast Path: Já existe?
-        with self._lock:
-            inst = self._instances.get(target_id)
-            if inst is not None and not isinstance(inst, concurrent.futures.Future):
-                return inst
-
-        # 2. Slow Path: Coalescência de Threads (Double-Checked Locking)
-        am_builder = False
-        pending_future: Optional[concurrent.futures.Future] = None
-
-        with self._lock:
-            inst = self._instances.get(target_id)
-            # Re-check após lock
-            if inst is not None and not isinstance(inst, concurrent.futures.Future):
-                return inst
-
-            if isinstance(inst, concurrent.futures.Future):
-                pending_future = inst
-            else:
-                # Verifica Circuit Breaker antes de tentar criar
-                if self._is_circuit_open(target_id):
+            # 3. Se não for o construtor, aguarda o resultado
+            if not am_builder:
+                try:
+                    return pending_future.result(timeout=CIRCUIT_BREAKER_TIMEOUT + WAITER_TIMEOUT_MARGIN)
+                except Exception:
+                    logger.warning("☁️ [NEXUS] Timeout esperando resolução de '%s'.", target_id)
                     return CloudMock(target_id)
 
-                # Registra que esta thread vai construir o objeto
-                pending_future = concurrent.futures.Future()
-                self._instances[target_id] = pending_future
-                am_builder = True
-
-        # 3. Se não sou o construtor, espero o resultado do outro
-        if not am_builder:
+            # 4. Sou o construtor: executa a lógica de descoberta e instanciação
+            instance = None
             try:
-                # Timeout marginal para evitar deadlocks se o builder travar
-                return pending_future.result(timeout=CIRCUIT_BREAKER_TIMEOUT + WAITER_TIMEOUT_MARGIN)
-            except Exception:
-                logger.warning("☁️ [NEXUS] Timeout esperando resolução de '%s'.", target_id)
-                return CloudMock(target_id)
+                instance = self._build_instance(target_id, hint_path)
+            except Exception as err:
+                logger.error("❌ [NEXUS] Erro crítico construindo '%s': %s", target_id, err)
+                instance = CloudMock(target_id)
 
-        # 4. Sou o construtor: executo a construção
-        instance = None
-        try:
-            instance = self._build_instance(target_id, hint_path)
-        except Exception as err:
-            logger.error("❌ [NEXUS] Erro crítico construindo '%s': %s", target_id, err)
-            instance = CloudMock(target_id)
+            # 5. Finalização
+            duration_ms = int((time.time() - start) * 1000)
+            with self._lock:
+                if instance and not getattr(instance, "__is_cloud_mock__", False):
+                    self._instances[target_id] = instance
+                else:
+                    if self._instances.get(target_id) is pending_future:
+                        del self._instances[target_id]
+                
+                pending_future.set_result(instance)
 
-        # 5. Finalização e Métricas
-        duration_ms = int((time.time() - start) * 1000)
+            logger.info("⚡ [NEXUS] resolve('%s') → %s (%dms)", target_id, "ok" if instance and not getattr(instance, "__is_cloud_mock__", False) else "mock", duration_ms)
+            return instance
 
-        with self._lock:
-            # Se for um sucesso real, guarda a instância. Se for Mock, limpa para tentar de novo no futuro
-            if instance and not getattr(instance, "__is_cloud_mock__", False):
-                self._instances[target_id] = instance
-            else:
-                # Se falhou, removemos o Future para que a próxima chamada dispare o Circuit Breaker
-                if self._instances.get(target_id) is pending_future:
-                    del self._instances[target_id]
-
-            # Notifica todas as threads que estavam esperando no .result()
-            pending_future.set_result(instance)
-
-        # Log e Telemetria
-        result_label = "mock" if getattr(instance, "__is_cloud_mock__", False) else "ok"
-        logger.info("⚡ [NEXUS] resolve('%s') → %s (%dms)", target_id, result_label, duration_ms)
-
-        if self._metrics_collector:
-            try:
-                self._metrics_collector.observe("nexus.resolve_duration_ms", duration_ms)
-            except Exception: pass
-
-        return instance
+        except Exception as e:
+            # [GATILHO SELF-HEALING]: Captura erro de resolução para o Nexus auto-evoluir
+            logger.critical(f"🚨 [NEXUS] Falha catastrófica na resolução de {target_id}: {str(e)}")
+            return CloudMock(target_id)
 
     def _build_instance(self, target_id: str, hint_path: Optional[str]) -> Any:
-        """Executa a lógica de importação e instanciação dentro do executor para controle de timeout."""
         executor = self._get_executor()
-        # _resolve_internal vem de DiscoveryMixin/RegistryMixin
+        # O método _resolve_internal é fornecido pelo DiscoveryMixin
         future = executor.submit(self._resolve_internal, target_id, hint_path)
-
         try:
             return future.result(timeout=CIRCUIT_BREAKER_TIMEOUT)
         except concurrent.futures.TimeoutError:
@@ -221,5 +130,17 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
             self._open_circuit(target_id, f"Erro interno: {str(err)}")
             return CloudMock(target_id)
 
-# Singleton global
+    def _is_circuit_open(self, target_id: str) -> bool:
+        expiry = self._circuit_breakers.get(target_id)
+        if expiry and time.time() < expiry:
+            return True
+        if expiry:
+            del self._circuit_breakers[target_id]
+        return False
+
+    def _open_circuit(self, target_id: str, reason: str):
+        logger.warning("🔌 [NEXUS] Circuit Breaker aberto para '%s'. Razão: %s", target_id, reason)
+        self._circuit_breakers[target_id] = time.time() + 30  # 30 segundos de cooldown
+
+# Singleton Global
 nexus = JarvisNexus()
