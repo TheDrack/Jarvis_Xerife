@@ -175,16 +175,7 @@ class VectorMemoryAdapter(MemoryProvider):
         days_back: Optional[int] = 30,
         user_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Return the *top_k* most similar stored events.
-
-        Args:
-            query_text: The text to find similar events for.
-            top_k:      Maximum number of results to return.
-            days_back:  Restrict results to the last N days.  ``None`` means
-                        no time filter.
-            user_id:    When provided, only return events that belong to this
-                        user (biographical memory is per-user).
-        """
+        """Return the *top_k* most similar stored events."""
         if not self._events:
             return []
 
@@ -193,7 +184,6 @@ class VectorMemoryAdapter(MemoryProvider):
 
         if days_back is not None:
             from datetime import timedelta
-
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days_back)
             cutoff_ts = cutoff.isoformat()
 
@@ -246,6 +236,18 @@ class VectorMemoryAdapter(MemoryProvider):
             results.append(ev)
 
         return results
+        
+    def get_recent_entries(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        CORREÇÃO: Retorna as entradas mais recentes.
+        Usado pela consolidação semântica para ejetar dados ao Córtex.
+        """
+        if not self._events:
+            return []
+            
+        # Ordena as entradas por timestamp em ordem decrescente (mais novas primeiro)
+        sorted_events = sorted(self._events, key=lambda x: x.get("timestamp", ""), reverse=True)
+        return sorted_events[:limit]
 
     def clear(self) -> None:
         """Remove all stored events."""
