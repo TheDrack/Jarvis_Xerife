@@ -3,13 +3,12 @@
 import logging
 import time
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Optional, Callable, Any  # CORREÇÃO: 'Any' adicionado aqui
 from app.utils.document_store import document_store
 
 logger = logging.getLogger(__name__)
 
 _CONTEXT_FILE = Path("data/context.jrvs")
-
 
 class ContextMonitor:
     """Monitora mudanças no arquivo de contexto."""
@@ -24,12 +23,6 @@ class ContextMonitor:
     ) -> bool:
         """
         Verifica se o contexto mudou e chama callback se mudou.
-        
-        Args:
-            on_change_callback: Callback quando contexto muda.
-        
-        Returns:
-            True se houve mudança, False caso contrário.
         """
         if not self._context_file.exists():
             return False
@@ -55,7 +48,6 @@ class ContextMonitor:
             logger.debug("[Overwatch] Erro ao verificar contexto: %s", exc)
             return False
 
-
 def load_context() -> dict:
     """Carrega o contexto atual."""
     if not _CONTEXT_FILE.exists():
@@ -65,13 +57,11 @@ def load_context() -> dict:
     except Exception:
         return {}
 
-
 def get_pending_tasks(limit: int = 5) -> list:
     """Retorna tarefas pendentes do contexto."""
     ctx = load_context()
     raw = ctx.get("pending_tasks", [])
     return [str(t) for t in raw[:limit]]
-
 
 def update_context_field(field: str, value: Any) -> bool:
     """Atualiza um campo no contexto."""
