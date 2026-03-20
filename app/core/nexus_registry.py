@@ -12,6 +12,7 @@ import time
 from typing import Dict
 
 from app.utils.jrvs_codec import JrvsDecodeError, read_file as _jrvs_read, write_file as _jrvs_write
+from app.core.nexus_exceptions import nexus_context  # CORREÇÃO: Importado para silenciar aviso
 
 logger = logging.getLogger(__name__)
 
@@ -40,13 +41,16 @@ class _NexusRegistryMixin:
             pass
 
         # --- Supabase fallback: download registry from cloud if local file missing ---
-        # NOTE: Direct instantiation here is intentional — this code runs during Nexus
-        # bootstrap (__init__), before nexus.resolve() is available. Using nexus.resolve()
-        # here would create a circular dependency.
         try:
-            from app.adapters.infrastructure.jrvs_cloud_storage import JrvsCloudStorage
+            # CORREÇÃO: Silencia o aviso do NexusComponent já que esta instanciação 
+            # direta é intencional durante o boot do Nexus (evita loop circular).
+            nexus_context.resolving = True
+            try:
+                from app.adapters.infrastructure.jrvs_cloud_storage import JrvsCloudStorage
+                cloud = JrvsCloudStorage()
+            finally:
+                nexus_context.resolving = False
 
-            cloud = JrvsCloudStorage()
             raw = cloud.download("jrvs-snapshots", "data/nexus_registry.jrvs")
             if raw:
                 os.makedirs(os.path.dirname(registry_path), exist_ok=True)
@@ -68,11 +72,7 @@ class _NexusRegistryMixin:
         return {}
 
     def _update_local_registry(self) -> None:
-        """Write _cache back to nexus_registry.jrvs with a ``.ClassName`` suffix.
-
-        After a successful local write, uploads the file to Supabase Storage
-        in the background as an automatic backup (non-blocking).
-        """
+        """Write _cache back to nexus_registry.jrvs with a ``.ClassName`` suffix."""
         components: Dict[str, str] = {}
         for component_id, module_path in self._cache.items():
             last_segment = module_path.rsplit(".", 1)[-1]
@@ -81,7 +81,6 @@ class _NexusRegistryMixin:
         registry_path = os.path.join(self.base_dir, "data", "nexus_registry.jrvs")
         _jrvs_write(registry_path, {"components": components})
 
-        # --- Parallel cloud backup via Nexus-resolved JrvsCloudStorage (best-effort, never blocks) ---
         try:
             import threading
 
@@ -90,12 +89,10 @@ class _NexusRegistryMixin:
 
             def _upload() -> None:
                 try:
-                    # Resolve via Nexus — safe here because _update_local_registry is
-                    # called AFTER the Nexus has finished bootstrapping.
                     from app.core.nexus import nexus as _nexus
-
                     cloud = _nexus.resolve("jrvs_cloud_storage")
-                    cloud.upload("jrvs-snapshots", "data/nexus_registry.jrvs", raw)
+                    if cloud and not getattr(cloud, "__is_cloud_mock__", False):
+                        cloud.upload("jrvs-snapshots", "data/nexus_registry.jrvs", raw)
                 except Exception as exc:
                     logger.debug("[NEXUS] Supabase backup falhou silenciosamente: %s", exc)
 
@@ -123,11 +120,7 @@ class _NexusRegistryMixin:
     # ------------------------------------------------------------------
 
     def commit_memory(self) -> None:
-        """Push _cache to the configured GitHub Gist.
-
-        Retries up to 3 times with exponential back-off (0.1 s → 0.2 s).
-        ``_update_local_registry()`` is called *only* after a confirmed 200.
-        """
+        """Push _cache to the configured GitHub Gist."""
         import requests  # noqa: PLC0415
 
         if not getattr(self, "_mutated", False):
