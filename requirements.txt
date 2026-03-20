@@ -1,6 +1,5 @@
 # ==============================================================================
-# J.A.R.V.I.S. ASSISTANT - CLOUD REQUIREMENTS (RENDER OPTIMIZED)
-# Versão: 2026.03 - Suporte a Workflows e Auto-Cura Nexus
+# J.A.R.V.I.S. ASSISTANT - CLOUD REQUIREMENTS (FIXED)
 # ==============================================================================
 
 # Core & Environment
@@ -21,10 +20,6 @@ uvicorn[standard]>=0.24.0
 slowapi>=0.1.9
 python-multipart>=0.0.6
 
-# Render Native Features (Workflows Beta)
-# Necessário para os decorators @task no EvolutionOrchestrator
-render-python-sdk>=0.1.0
-
 # Security & Authentication
 bcrypt>=4.0.1,<5.0.0
 python-jose[cryptography]>=3.3.0
@@ -32,16 +27,14 @@ passlib[bcrypt]>=1.7.4
 cryptography>=41.0.0
 
 # Database & Persistence
-# Utiliza psycopg2-binary para conexão nativa com o PostgreSQL do Render
 sqlmodel>=0.0.14
 psycopg2-binary>=2.9.0
 supabase>=2.0.0
 
-# Vector Memory & Processing (Lightweight)
-# Nota: faiss-cpu é incluído para busca semântica veloz no Nexus
+# Vector Memory & Processing
 numpy>=1.24.0
 faiss-cpu>=1.7.4
 networkx>=3.0
 
-# Telemetria e Logs
+# Telemetria e Chamadas API (Substitui o SDK do Render)
 httpx>=0.25.0
