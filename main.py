@@ -6,64 +6,61 @@ import logging
 import threading
 import uvicorn
 
-# Garantir Path correto na raiz do Render
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.insert(0, current_dir)
+# Forçar o diretório atual no Path
+sys.path.insert(0, os.getcwd())
 
 from app.core.nexus import nexus
-from app.core.config import settings
 from app.adapters.infrastructure import create_api_server
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-async def start_background_tasks(assistant_service):
-    """Inicializa serviços proativos via Nexus para evitar avisos de instanciação direta."""
-    logger.info("🧵 [BOOTSTRAP] Sincronizando ecossistema Nexus...")
+async def notify_online():
+    """Tenta enviar a notificação via Telegram após o Nexus estabilizar."""
+    await asyncio.sleep(5) # Delay para garantir que a rede subiu
     
-    # Resolve componentes via Nexus (evita o warning de instanciação direta)
-    overwatch = nexus.resolve("overwatch_daemon")
-    
-    # CORREÇÃO: Envio de notificação aguardando a corrotina (fix RuntimeWarning)
+    # Resolve explicitamente o adapter do telegram
     telegram = nexus.resolve("telegram_adapter")
-    if telegram:
-        try:
-            # Se for um método assíncrono, usamos await
-            await telegram.send_message(
-                chat_id=os.getenv("TELEGRAM_ADMIN_ID"),
-                text="🤖 **J.A.R.V.I.S. ONLINE**\nAmbiente: Render Cloud\nNexus: Sincronizado"
-            )
-            logger.info("📢 Notificação de inicialização enviada via Telegram.")
-        except Exception as e:
-            logger.error(f"Falha ao enviar notificação: {e}")
+    
+    if telegram and not getattr(telegram, "__is_cloud_mock__", False):
+        admin_id = os.getenv("TELEGRAM_ADMIN_ID")
+        if admin_id:
+            try:
+                await telegram.send_message(
+                    chat_id=admin_id,
+                    text="🚀 **J.A.R.V.I.S. ONLINE**\nStatus: Cloud Ativo\nNexus: Operacional"
+                )
+                logger.info("📢 Notificação de inicialização enviada com sucesso.")
+            except Exception as e:
+                logger.error(f"Erro ao enviar mensagem Telegram: {e}")
+        else:
+            logger.warning("⚠️ TELEGRAM_ADMIN_ID não configurado nas variáveis de ambiente.")
+    else:
+        logger.error("❌ Nexus resolveu 'telegram_adapter' como MOCK. Notificação cancelada.")
 
 def run_api():
-    """Entry point para o Uvicorn no Render."""
-    # 1. Resolve o serviço principal
+    # 1. Inicializa o Assistant
     assistant = nexus.resolve("assistant_service")
     
-    # 2. Cria o app FastAPI
+    # 2. Cria o App
     app = create_api_server(assistant)
     
-    # 3. Dispara as tarefas proativas em uma thread separada para não travar o loop da API
-    # Usamos um novo loop de eventos para as tarefas de background do Nexus
-    def bg_loop():
+    # 3. Thread para notificações e daemons
+    def background_bootstrap():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(start_background_tasks(assistant))
+        loop.run_until_complete(notify_online())
+        # Inicia o daemon do Overwatch se resolvido
+        overwatch = nexus.resolve("overwatch_daemon")
+        if overwatch and hasattr(overwatch, "start"):
+            overwatch.start()
         loop.run_forever()
 
-    threading.Thread(target=bg_loop, daemon=True, name="NexusProactive").start()
+    threading.Thread(target=background_bootstrap, daemon=True).start()
 
-    # 4. Inicia o servidor
+    # 4. Inicia Uvicorn
     port = int(os.getenv("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    if os.getenv("RENDER") == "true":
-        run_api()
-    else:
-        # Modo local/Edge
-        from app.bootstrap_edge import main as edge_main
-        edge_main()
+    run_api()
