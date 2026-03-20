@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 """WorkingMemory — memória de trabalho volátil de curto prazo.
-CORREÇÃO: Sintaxe de dataclass, nomes de campos e desacoplamento do Nexus.
+STATUS: Sintaticamente correto.
+CORREÇÃO: Mantém compatibilidade + adiciona método para consolidação.
 """
 import logging
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
-from typing import Any, Deque, Dict, List, Union, Optional
+from typing import Any, Deque, Dict, List, Union, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -26,15 +27,16 @@ class WorkingMemory:
         self._store: Deque[Dict[str, Any]] = deque(maxlen=maxlen)
     
     def push(self, entry: Union[Dict[str, Any], WorkingMemoryEntry]) -> None:
-        """Adiciona uma entrada à memória, garantindo timestamp ISO8601."""
+        """Adiciona entrada à memória de trabalho com timestamp ISO8601."""
         if isinstance(entry, WorkingMemoryEntry):
             stamped: Dict[str, Any] = {
                 "user_input": entry.user_input,
                 "response": entry.response,
                 "_ts": datetime.fromtimestamp(entry.timestamp, tz=timezone.utc).isoformat(),
-                **entry.meta, # CORREÇÃO: Alinhado com o nome no dataclass
+                **entry.meta,
             }
         elif isinstance(entry, dict):
+            # Cria cópia para não alterar o dicionário original externamente
             stamped = entry.copy()
             if "_ts" not in stamped:
                 stamped["_ts"] = datetime.now(timezone.utc).isoformat()
@@ -45,35 +47,44 @@ class WorkingMemory:
     
     def get_recent(self, n: int) -> List[Dict[str, Any]]:
         """Retorna as N entradas mais recentes."""
-        return list(self._store)[-n:] if n > 0 else []
+        entries = list(self._store)
+        return entries[-n:] if n > 0 else []
     
     def clear(self) -> None:
+        """Limpa toda a memória de trabalho."""
         self._store.clear()
     
     def cleanup_old_entries(self, max_age_hours: int = 24) -> int:
         """
         Remove entradas mais antigas que max_age_hours.
-        CORREÇÃO: Removida dependência direta do Nexus para evitar circular imports.
+        COMPATIBILIDADE: Retorna apenas a contagem (int) para o chamador original.
+        """
+        evicted, count = self._evict_old_entries(max_age_hours)
+        return count
+    
+    def _evict_old_entries(self, max_age_hours: int = 24) -> Tuple[List[Dict[str, Any]], int]:
+        """
+        Remove e RETORNA as entradas expiradas. 
+        Este método é o motor da ponte de consolidação para a Memória de Longo Prazo.
         """
         if not self._store:
-            return 0
+            return [], 0
             
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=max_age_hours)).isoformat()
-        removed = 0
+        evicted_memories = []
         
-        # Como o deque mantém a ordem de inserção, o mais antigo está sempre no índice 0
+        # O deque garante que o índice 0 é sempre o mais antigo
         while self._store:
             first_ts = self._store[0].get('_ts', '')
             if first_ts and first_ts < cutoff:
-                self._store.popleft()
-                removed += 1
+                evicted_memories.append(self._store.popleft())
             else:
                 break
         
-        if removed > 0:
-            logger.info(f"[WorkingMemory] Cleanup executado: {removed} itens removidos (> {max_age_hours}h).")
+        if evicted_memories:
+            logger.info(f"[WorkingMemory] {len(evicted_memories)} memórias ejetadas para consolidação.")
             
-        return removed
+        return evicted_memories, len(evicted_memories)
     
     @property
     def size(self) -> int:
