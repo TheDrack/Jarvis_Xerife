@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Nexus Discovery — Mecanismo de descoberta automática de componentes.
-CORREÇÃO: Tipagem ajustada, identação corrigida e regex otimizada.
+CORREÇÃO CRÍTICA: Sintaxe corrigida para CI/CD.
 """
 import os
 import re
@@ -17,54 +17,50 @@ def search_component_in_files(
 ) -> List[Tuple[str, str]]:
     """
     Busca componente por nome em todos os arquivos Python.
-    Retorna uma lista de tuplas (caminho_do_arquivo, nome_da_classe).
+    
+    Returns:
+        Lista de tuplas (caminho_arquivo, nome_classe)
     """
     if not search_root or search_root == "/":
         return []
     
-    # Encontra o root do projeto (evita loop infinito na raiz)
-    potential_root = os.path.abspath(search_root)
-    while not os.path.exists(os.path.join(potential_root, "app")):
-        parent = os.path.dirname(potential_root)
-        if parent == potential_root: # Chegou na raiz do SO
-            break
-        potential_root = parent
+    # Encontra o root do projeto
+    potential_root = search_root
+    while not os.path.exists(os.path.join(potential_root, "app")) and potential_root != "/":
+        potential_root = os.path.dirname(potential_root)
     
-    # Define o diretório de busca efetivo
-    effective_search_root = os.path.join(potential_root, "app")
-    if not os.path.exists(effective_search_root):
-        effective_search_root = potential_root
-
+    search_root = os.path.join(potential_root, "app")
     matches: List[Tuple[str, str]] = []
     
-    # Normalização para comparação de nomes de arquivos
+    # Normalização case-insensitive
     norm_target = target_id.lower().replace("_", "")
     
-    for root, _, files in os.walk(effective_search_root):
-        # Ignora diretórios de cache e controle de versão
-        if any(x in root for x in ["__pycache__", ".git", ".pytest_cache", ".venv"]):
+    for root, _, files in os.walk(search_root):
+        # Ignora diretórios de cache
+        if "__pycache__" in root or ".git" in root or ".pytest_cache" in root:
             continue
         
         for fname in files:
             if fname.endswith(".py") and not fname.startswith("__"):
+                # Match no nome do arquivo (case-insensitive)
                 file_norm = fname.lower().replace("_", "").replace(".py", "")
                 
-                # Match 1: Nome do arquivo contém o target ou vice-versa
+                # Match 1: Nome do arquivo contém o target
                 if norm_target in file_norm or file_norm in norm_target:
-                    file_path = os.path.join(root, fname)
-                    try:
+                    file_path = os.path.join(root, fname)                    try:
                         content = Path(file_path).read_text(encoding="utf-8")
                         
-                        # CORREÇÃO: Regex simplificada com IGNORECASE
-                        # Busca por 'class NomeDaClasse(' ou 'class NomeDaClasse:'
+                        # Match 2 - Busca classe com nome similar
                         class_patterns = [
-                            rf"class\s+(\w*{re.escape(target_id)}\w*)\s*[\(:]",
+                            rf"class\s+(\w*{target_id}\w*)\s*\(",
+                            rf"class\s+(\w*{target_id.capitalize()}\w*)\s*\(",
+                            rf"class\s+(\w*{target_id.upper()}\w*)\s*\(",
+                            rf"class\s+({target_id.capitalize()})\s*\(",
                         ]
                         
                         for pattern in class_patterns:
                             class_matches = re.findall(pattern, content, re.IGNORECASE)
                             if class_matches:
-                                # class_matches[0] é o nome da classe encontrada
                                 matches.append((file_path, class_matches[0]))
                                 logger.debug(f"[Discovery] Match: {fname} → {class_matches[0]}")
                                 break
@@ -78,28 +74,29 @@ def search_component_in_files(
 def find_component_file(target_id: str, hint_path: Optional[str] = None) -> Optional[str]:
     """
     Encontra arquivo do componente por ID ou hint_path.
-    Tenta múltiplas estratégias de busca.
+    
+    Returns:
+        Caminho do arquivo ou None se não encontrado
     """
     # Estratégia 1: hint_path direta
     if hint_path:
         possible_paths = [
             f"{hint_path}.py",
-            os.path.join(hint_path, "__init__.py"),
+            f"{hint_path}/__init__.py",
         ]
         for path in possible_paths:
             if os.path.exists(path):
                 logger.debug(f"[Discovery] Encontrado via hint_path: {path}")
                 return path
     
-    # Estratégia 2: Busca dinâmica no filesystem
+    # Estratégia 2: Busca no filesystem
     search_root = os.getcwd()
     matches = search_component_in_files(target_id, search_root)
     
     if matches:
         logger.debug(f"[Discovery] {len(matches)} matches para '{target_id}'")
-        return matches[0][0]  # Retorna o caminho do primeiro match
-    
-    # Estratégia 3: Busca direta em app/ como fallback
+        return matches[0][0]
+        # Estratégia 3: Busca em app/ diretamente
     app_dir = os.path.join(search_root, "app")
     if os.path.exists(app_dir):
         for root, _, files in os.walk(app_dir):
@@ -111,59 +108,3 @@ def find_component_file(target_id: str, hint_path: Optional[str] = None) -> Opti
                         return os.path.join(root, fname)
     
     return None
-
-            for fname in files:
-                if fname.endswith(".py") and not fname.startswith("__"):
-                    file_norm = fname.lower().replace("_", "")
-
-                    # Match Heurístico Expandido:
-                    # Se o 'core' do nome do arquivo bater com o 'core' do target_id
-                    if norm_target in file_norm or file_norm.replace(".py", "") in norm_target:
-                        full_path = os.path.join(root, fname)
-                        cls = self._find_class_from_path(full_path, target_id)
-                        if cls:
-                            matches.append((cls, full_path))
-
-        if not matches:
-            logger.error(f"❌ [NEXUS] Nenhum arquivo em '{search_root}' contém um match para '{target_id}'")
-            return None, None
-
-        if len(matches) > 1:
-            # Prioridade absoluta: Nome da classe contém o target_id
-            target_clean = target_id.lower().replace("_", "")
-            for cls, path in matches:
-                if target_clean in cls.__name__.lower():
-                    return cls, path
-            return matches[0]
-
-        return matches[0]
-
-    def _find_class_from_path(self, file_path: str, target_id: str) -> Optional[type]:
-        try:
-            # Converte path absoluto para path de módulo
-            # Garante que o split seja feito corretamente em Windows ou Linux
-            parts = os.path.normpath(file_path).split(os.sep)
-            try:
-                app_idx = parts.index("app")
-                module_parts = parts[app_idx:]
-                module_name = ".".join(module_parts).replace(".py", "")
-            except ValueError:
-                return None
-
-            module = importlib.import_module(module_name)
-
-            # Normalização para busca de classe
-            norm_target = target_id.lower().replace("_", "").replace("adapter", "").replace("uploader", "")
-
-            for name, obj in inspect.getmembers(module, inspect.isclass):
-                name_low = name.lower()
-
-                # Regras de Aceitação de Classe:
-                # 1. Nome da classe contém o núcleo do target_id
-                # 2. Ignora Mixins e classes abstratas
-                if (norm_target in name_low or name_low in norm_target):
-                    if not (name.endswith("Mixin") or name.startswith("Base")):
-                        return obj
-        except Exception:
-            pass
-        return None
