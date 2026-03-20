@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Nexus Discovery — Mecanismo de descoberta automática de componentes.
-CORREÇÃO CRÍTICA: Sintaxe corrigida para CI/CD.
+CORREÇÃO CRÍTICA: Sintaxe corrigida, tratamento de paths e regex otimizada.
 """
 import os
 import re
@@ -24,20 +24,26 @@ def search_component_in_files(
     if not search_root or search_root == "/":
         return []
     
-    # Encontra o root do projeto
-    potential_root = search_root
-    while not os.path.exists(os.path.join(potential_root, "app")) and potential_root != "/":
-        potential_root = os.path.dirname(potential_root)
+    # Encontra o root do projeto (evita loop infinito na raiz)
+    potential_root = os.path.abspath(search_root)
+    while not os.path.exists(os.path.join(potential_root, "app")):
+        parent = os.path.dirname(potential_root)
+        if parent == potential_root:
+            break
+        potential_root = parent
     
-    search_root = os.path.join(potential_root, "app")
+    effective_search_root = os.path.join(potential_root, "app")
+    if not os.path.exists(effective_search_root):
+        effective_search_root = potential_root
+
     matches: List[Tuple[str, str]] = []
     
-    # Normalização case-insensitive
+    # Normalização case-insensitive para comparação de strings
     norm_target = target_id.lower().replace("_", "")
     
-    for root, _, files in os.walk(search_root):
-        # Ignora diretórios de cache
-        if "__pycache__" in root or ".git" in root or ".pytest_cache" in root:
+    for root, _, files in os.walk(effective_search_root):
+        # Ignora diretórios de cache e controle de versão
+        if any(x in root for x in ["__pycache__", ".git", ".pytest_cache", ".venv"]):
             continue
         
         for fname in files:
@@ -45,17 +51,16 @@ def search_component_in_files(
                 # Match no nome do arquivo (case-insensitive)
                 file_norm = fname.lower().replace("_", "").replace(".py", "")
                 
-                # Match 1: Nome do arquivo contém o target
+                # Match 1: Nome do arquivo contém o target ou vice-versa
                 if norm_target in file_norm or file_norm in norm_target:
-                    file_path = os.path.join(root, fname)                    try:
+                    file_path = os.path.join(root, fname)
+                    try:
                         content = Path(file_path).read_text(encoding="utf-8")
                         
-                        # Match 2 - Busca classe com nome similar
+                        # Match 2 - Busca classe com nome similar usando regex robusta
+                        # O uso de re.IGNORECASE simplifica os padrões necessários
                         class_patterns = [
-                            rf"class\s+(\w*{target_id}\w*)\s*\(",
-                            rf"class\s+(\w*{target_id.capitalize()}\w*)\s*\(",
-                            rf"class\s+(\w*{target_id.upper()}\w*)\s*\(",
-                            rf"class\s+({target_id.capitalize()})\s*\(",
+                            rf"class\s+(\w*{re.escape(target_id)}\w*)\s*[\(:]",
                         ]
                         
                         for pattern in class_patterns:
@@ -73,30 +78,31 @@ def search_component_in_files(
 
 def find_component_file(target_id: str, hint_path: Optional[str] = None) -> Optional[str]:
     """
-    Encontra arquivo do componente por ID ou hint_path.
+    Encontra arquivo do componente por ID ou hint_path utilizando múltiplas estratégias.
     
     Returns:
         Caminho do arquivo ou None se não encontrado
     """
-    # Estratégia 1: hint_path direta
+    search_root = os.getcwd()
+
+    # Estratégia 1: hint_path direta (Maior prioridade)
     if hint_path:
         possible_paths = [
             f"{hint_path}.py",
-            f"{hint_path}/__init__.py",
+            os.path.join(hint_path, "__init__.py"),
         ]
         for path in possible_paths:
             if os.path.exists(path):
                 logger.debug(f"[Discovery] Encontrado via hint_path: {path}")
                 return path
     
-    # Estratégia 2: Busca no filesystem
-    search_root = os.getcwd()
+    # Estratégia 2: Busca profunda no filesystem (Baseado em similaridade)
     matches = search_component_in_files(target_id, search_root)
-    
     if matches:
         logger.debug(f"[Discovery] {len(matches)} matches para '{target_id}'")
         return matches[0][0]
-        # Estratégia 3: Busca em app/ diretamente
+        
+    # Estratégia 3: Busca direta em app/ como fallback de emergência
     app_dir = os.path.join(search_root, "app")
     if os.path.exists(app_dir):
         for root, _, files in os.walk(app_dir):
@@ -105,6 +111,7 @@ def find_component_file(target_id: str, hint_path: Optional[str] = None) -> Opti
             for fname in files:
                 if fname.endswith(".py"):
                     if target_id.lower() in fname.lower():
+                        logger.debug(f"[Discovery] Encontrado via scan de fallback: {fname}")
                         return os.path.join(root, fname)
     
     return None
