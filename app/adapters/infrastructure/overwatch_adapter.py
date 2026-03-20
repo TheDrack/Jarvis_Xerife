@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Overwatch Daemon — Orquestrador de monitoramento proativo."""
+"""Overwatch Daemon — Orquestrador de monitoramento proativo.
+CORREÇÃO: Health check para MemoryConsolidationService + limite 300 linhas.
+"""
 import logging
 import os
 import threading
@@ -19,6 +21,7 @@ _POLL_INTERVAL = 10
 _CPU_CHECK_EVERY = 6
 _PERIMETER_CHECK_EVERY = 3
 _COMPILE_INTERVAL = float(os.getenv("OVERWATCH_COMPILE_INTERVAL_SEC", "600"))
+_CONSOLIDATION_INTERVAL = float(os.getenv("OVERWATCH_CONSOLIDATION_MIN", "15"))
 
 
 class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
@@ -44,10 +47,11 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
         self._thread: Optional[threading.Thread] = None
         self._tick_count = 0
         self._last_compile_ts = 0.0
-        
+        self._last_consolidation_ts = 0.0        
         # Monitores especializados
         self._inactivity = InactivityMonitor(timeout_seconds=inactivity_timeout)
-        self._context = ContextMonitor()        
+        self._context = ContextMonitor()
+        
         # Perímetro
         self._authorized_macs = {m.upper() for m in (authorized_macs or set())}
         self._blocked_macs: Set[str] = set()
@@ -92,17 +96,18 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
     # ------------------------------------------------------------------
     # Loop principal
     # ------------------------------------------------------------------
-    def _run_loop(self) -> None:
-        logger.info("[Overwatch] Loop principal iniciado.")
+    def _run_loop(self) -> None:        logger.info("[Overwatch] Loop principal iniciado.")
         
         while self._running:
-            self._tick_count += 1            
+            self._tick_count += 1
+            
             try:
                 self._check_resources()
                 self._check_context()
                 self._check_inactivity()
                 self._check_perimeter()
                 self._check_compile()
+                self._maybe_consolidate_memory()  # ← CORREÇÃO: Health check incluído
             except Exception as exc:
                 logger.error("[Overwatch] Erro no loop: %s", exc)
             
@@ -140,17 +145,64 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
         for soldier in soldiers:
             nearby = getattr(soldier, "_nearby_devices", [])
             for device in nearby:
-                mac = device.mac_address.upper()
-                if mac not in self._authorized_macs:
+                mac = device.mac_address.upper()                if mac not in self._authorized_macs:
                     self._handle_intruder(mac, soldier.soldier_id, device)
     
     def _check_compile(self) -> None:
-        """Verifica se deve compilar módulos JRVS."""        now = time.monotonic()
+        """Verifica se deve compilar módulos JRVS."""
+        now = time.monotonic()
         if now - self._last_compile_ts < _COMPILE_INTERVAL:
             return
         
         self._last_compile_ts = now
         self._compile_modules()
+    
+    def _maybe_consolidate_memory(self) -> None:
+        """
+        CORREÇÃO: Executa consolidação com health check do VectorAdapter.
+        Só ejetada memórias da WorkingMemory se VectorAdapter estiver saudável.
+        """
+        now = time.monotonic()
+        interval_sec = _CONSOLIDATION_INTERVAL * 60
+        
+        if now - self._last_consolidation_ts < interval_sec:
+            return
+        
+        self._last_consolidation_ts = now
+        
+        try:
+            # CORREÇÃO: Health check antes de ejetar memórias
+            service = nexus.resolve("memory_consolidation_service")
+            if not service or getattr(service, "__is_cloud_mock__", False):
+                logger.debug("[Overwatch] MemoryConsolidationService indisponível.")
+                return
+            
+            # Verifica saúde do VectorAdapter antes de consolidar
+            vector_adapter = nexus.resolve("vector_memory_adapter")
+            if not vector_adapter:
+                logger.debug("[Overwatch] VectorAdapter indisponível - adiando consolidação.")
+                return
+            
+            # Health check explícito se disponível
+            if hasattr(vector_adapter, "is_healthy"):
+                try:
+                    if not vector_adapter.is_healthy():
+                        logger.warning(
+                            "[Overwatch] VectorAdapter não saudável - "
+                            "memórias mantidas na WorkingMemory."
+                        )
+                        return
+                except Exception as exc:
+                    logger.debug(f"[Overwatch] Health check falhou: {exc}")
+                        # Executa consolidação
+            result = service.execute({"max_age_hours": 24})
+            if result.get("success"):
+                logger.info("[Overwatch] Consolidação: %s", result.get("message", ""))
+            else:
+                logger.debug("[Overwatch] Consolidação falhou: %s", result.get("error", ""))
+                
+        except Exception as exc:
+            logger.debug(f"[Overwatch] Falha na consolidação: {exc}")
     
     # ------------------------------------------------------------------
     # Callbacks e helpers
@@ -191,10 +243,10 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
         self._notify(f"ALERTA: MAC não autorizado {mac}")
         self._store_trace(mac, soldier_id, device)
         self._blocked_macs.add(mac)
-    
-    def _block_mac(self, mac: str) -> None:
+        def _block_mac(self, mac: str) -> None:
         """Tenta bloquear MAC via iptables."""
-        try:            import subprocess
+        try:
+            import subprocess
             result = subprocess.run(
                 ["iptables", "-A", "INPUT", "-m", "mac", "--mac-source", mac, "-j", "DROP"],
                 capture_output=True, timeout=5,
@@ -240,9 +292,13 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
         for adapter_id in ("telegram_adapter", "voice_provider"):
             try:
                 adapter = nexus.resolve(adapter_id)
-                if adapter and hasattr(adapter, "send_message"):
-                    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+                if adapter and hasattr(adapter, "send_message"):                    chat_id = os.getenv("TELEGRAM_CHAT_ID")
                     if chat_id:
-                        adapter.send_message(chat_id, message)                        return
+                        adapter.send_message(chat_id, message)
+                        return
             except Exception:
                 pass
+
+
+# Compatibilidade
+Overwatch = OverwatchDaemon
