@@ -36,7 +36,7 @@ class JarvisNexus(_NexusDiscoveryMixin):
     def __init__(self):
         if self._initialized:
             return
-        
+
         self._instances: Dict[str, Any] = {}
         self._path_map: Dict[str, str] = {}
         self._cache: Dict[str, str] = {}
@@ -61,7 +61,7 @@ class JarvisNexus(_NexusDiscoveryMixin):
         """
         try:
             start = time.time()
-            
+
             # 1. Verificação rápida em cache
             with self._lock:
                 inst = self._instances.get(target_id)
@@ -76,7 +76,7 @@ class JarvisNexus(_NexusDiscoveryMixin):
                     # Verifica Circuit Breaker
                     if self._is_circuit_open(target_id):
                         return CloudMock(target_id)
-                    
+
                     # Registra que esta thread construirá o objeto
                     pending_future = concurrent.futures.Future()
                     self._instances[target_id] = pending_future
@@ -106,7 +106,7 @@ class JarvisNexus(_NexusDiscoveryMixin):
                 else:
                     if self._instances.get(target_id) is pending_future:
                         del self._instances[target_id]
-                
+
                 pending_future.set_result(instance)
 
             logger.info("⚡ [NEXUS] resolve('%s') → %s (%dms)", target_id, "ok" if instance and not getattr(instance, "__is_cloud_mock__", False) else "mock", duration_ms)

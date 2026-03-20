@@ -111,3 +111,59 @@ def find_component_file(target_id: str, hint_path: Optional[str] = None) -> Opti
                         return os.path.join(root, fname)
     
     return None
+
+            for fname in files:
+                if fname.endswith(".py") and not fname.startswith("__"):
+                    file_norm = fname.lower().replace("_", "")
+
+                    # Match Heurístico Expandido:
+                    # Se o 'core' do nome do arquivo bater com o 'core' do target_id
+                    if norm_target in file_norm or file_norm.replace(".py", "") in norm_target:
+                        full_path = os.path.join(root, fname)
+                        cls = self._find_class_from_path(full_path, target_id)
+                        if cls:
+                            matches.append((cls, full_path))
+
+        if not matches:
+            logger.error(f"❌ [NEXUS] Nenhum arquivo em '{search_root}' contém um match para '{target_id}'")
+            return None, None
+
+        if len(matches) > 1:
+            # Prioridade absoluta: Nome da classe contém o target_id
+            target_clean = target_id.lower().replace("_", "")
+            for cls, path in matches:
+                if target_clean in cls.__name__.lower():
+                    return cls, path
+            return matches[0]
+
+        return matches[0]
+
+    def _find_class_from_path(self, file_path: str, target_id: str) -> Optional[type]:
+        try:
+            # Converte path absoluto para path de módulo
+            # Garante que o split seja feito corretamente em Windows ou Linux
+            parts = os.path.normpath(file_path).split(os.sep)
+            try:
+                app_idx = parts.index("app")
+                module_parts = parts[app_idx:]
+                module_name = ".".join(module_parts).replace(".py", "")
+            except ValueError:
+                return None
+
+            module = importlib.import_module(module_name)
+
+            # Normalização para busca de classe
+            norm_target = target_id.lower().replace("_", "").replace("adapter", "").replace("uploader", "")
+
+            for name, obj in inspect.getmembers(module, inspect.isclass):
+                name_low = name.lower()
+
+                # Regras de Aceitação de Classe:
+                # 1. Nome da classe contém o núcleo do target_id
+                # 2. Ignora Mixins e classes abstratas
+                if (norm_target in name_low or name_low in norm_target):
+                    if not (name.endswith("Mixin") or name.startswith("Base")):
+                        return obj
+        except Exception:
+            pass
+        return None
