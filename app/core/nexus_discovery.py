@@ -17,7 +17,7 @@ from app.core.nexus_exceptions import (
 logger = logging.getLogger(__name__)
 
 class _NexusDiscoveryMixin:
-    """Helper de descoberta flexível para ambientes Cloud e Local."""
+    """Helper de descoberta ultra-flexível para ambientes Cloud, CI/CD e Local."""
 
     def _resolve_internal(self, target_id: str, hint_path: Optional[str] = None) -> Any:
         cls, path = self._locate_class(target_id, hint_path)
@@ -29,17 +29,23 @@ class _NexusDiscoveryMixin:
         return self._global_search_with_path(target_id)
 
     def _global_search_with_path(self, target_id: str) -> Tuple[Optional[type], Optional[str]]:
-        root_dir = os.getcwd()
-        if root_dir not in sys.path:
-            sys.path.insert(0, root_dir)
+        # Força a raiz do projeto no PYTHONPATH
+        current_dir = os.path.abspath(os.getcwd())
+        if current_dir not in sys.path:
+            sys.path.insert(0, current_dir)
 
-        search_root = os.path.join(root_dir, "app")
+        # Localiza a pasta 'app' independentemente de onde o script foi chamado
+        search_root = os.path.join(current_dir, "app")
         if not os.path.exists(search_root):
-            search_root = root_dir
+            # Se não achar /app no CWD, tenta subir um nível (fallback para execução interna)
+            potential_root = os.path.dirname(os.path.abspath(__file__))
+            while "app" not in os.listdir(potential_root) and potential_root != "/":
+                potential_root = os.path.dirname(potential_root)
+            search_root = os.path.join(potential_root, "app")
 
         matches: List[Tuple[type, str]] = []
-        # Normalização para comparação (remove underscores e coloca em lowercase)
-        norm_target = target_id.lower().replace("_", "")
+        # Normalização agressiva: remove prefixos/sufixos comuns e underscores
+        norm_target = target_id.lower().replace("_", "").replace("adapter", "").replace("service", "").replace("uploader", "").replace("backup", "")
 
         for root, _, files in os.walk(search_root):
             if "__pycache__" in root or ".git" in root:
@@ -47,9 +53,10 @@ class _NexusDiscoveryMixin:
             
             for fname in files:
                 if fname.endswith(".py") and not fname.startswith("__"):
-                    # Se o nome do arquivo contém o target_id (ex: telegram_adapter.py contendo 'telegram')
-                    # OU se o target_id está contido no nome do arquivo (ex: drive_uploader vs google_drive_uploader)
                     file_norm = fname.lower().replace("_", "")
+                    
+                    # Match Heurístico Expandido:
+                    # Se o 'core' do nome do arquivo bater com o 'core' do target_id
                     if norm_target in file_norm or file_norm.replace(".py", "") in norm_target:
                         full_path = os.path.join(root, fname)
                         cls = self._find_class_from_path(full_path, target_id)
@@ -60,15 +67,11 @@ class _NexusDiscoveryMixin:
             logger.error(f"❌ [NEXUS] Nenhum arquivo em '{search_root}' contém um match para '{target_id}'")
             return None, None
         
-        # Priorização em caso de múltiplos matches
         if len(matches) > 1:
+            # Prioridade absoluta: Nome da classe contém o target_id
+            target_clean = target_id.lower().replace("_", "")
             for cls, path in matches:
-                cls_name_low = cls.__name__.lower()
-                # 1. Prioridade: Nome da classe bate com o ID (ex: TelegramAdapter == telegram_adapter)
-                if cls_name_low == norm_target:
-                    return cls, path
-                # 2. Prioridade: ID é sufixo ou prefixo da classe (ex: GoogleDriveUploader contém drive_uploader)
-                if norm_target in cls_name_low:
+                if target_clean in cls.__name__.lower():
                     return cls, path
             return matches[0]
 
@@ -76,28 +79,30 @@ class _NexusDiscoveryMixin:
 
     def _find_class_from_path(self, file_path: str, target_id: str) -> Optional[type]:
         try:
-            rel_path = os.path.relpath(file_path, os.getcwd())
-            module_name = rel_path.replace(os.path.sep, ".").replace(".py", "")
-            
-            # Importa o módulo
+            # Converte path absoluto para path de módulo
+            # Garante que o split seja feito corretamente em Windows ou Linux
+            parts = os.path.normpath(file_path).split(os.sep)
+            try:
+                app_idx = parts.index("app")
+                module_parts = parts[app_idx:]
+                module_name = ".".join(module_parts).replace(".py", "")
+            except ValueError:
+                return None
+
             module = importlib.import_module(module_name)
-            norm_target = target_id.lower().replace("_", "")
+            
+            # Normalização para busca de classe
+            norm_target = target_id.lower().replace("_", "").replace("adapter", "").replace("uploader", "")
             
             for name, obj in inspect.getmembers(module, inspect.isclass):
                 name_low = name.lower()
                 
-                # Match mais permissivo:
-                # - Se o nome da classe normalizado for igual ao target normalizado
-                # - OU se o target_id é uma parte fundamental do nome da classe
-                if (name_low == norm_target or 
-                    norm_target in name_low or 
-                    name_low in norm_target):
-                    
-                    # Verificação de segurança: não instanciar classes base ou abstratas
-                    if name.startswith("Base") or name.endswith("Mixin"):
-                        continue
-                        
-                    return obj
+                # Regras de Aceitação de Classe:
+                # 1. Nome da classe contém o núcleo do target_id
+                # 2. Ignora Mixins e classes abstratas
+                if (norm_target in name_low or name_low in norm_target):
+                    if not (name.endswith("Mixin") or name.startswith("Base")):
+                        return obj
         except Exception:
             pass
         return None
