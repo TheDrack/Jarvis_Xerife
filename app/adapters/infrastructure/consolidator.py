@@ -47,7 +47,8 @@ class Consolidator(NexusComponent):
         if "app/core" in p:
             return "CORE (Motor/Nexus)"
         if "app/domain" in p:
-            return "DOMAIN (Regras/Modelos)"        if "app/application" in p:
+            return "DOMAIN (Regras/Modelos)"
+        if "app/application" in p:
             return "APPLICATION (Casos de Uso)"
         if "app/adapters" in p:
             return "ADAPTERS (Infra/IO)"
@@ -96,7 +97,8 @@ class Consolidator(NexusComponent):
         output_path = self.root_path / self.output_file
         
         all_files = [
-            p for p in self.root_path.rglob("*")            if p.is_file() and p.suffix in _RELEVANT_EXT
+            p for p in self.root_path.rglob("*") 
+            if p.is_file() and p.suffix in _RELEVANT_EXT
             and not self._should_ignore(p)
         ]
         all_files.sort(key=lambda x: str(x))
@@ -145,7 +147,8 @@ class Consolidator(NexusComponent):
                 "status": "success",
                 "file_path": str(output_path),
                 "files_processed": len(all_files),
-                "timestamp": datetime.now().isoformat()            }
+                "timestamp": datetime.now().isoformat()            
+            }
             
             context.setdefault("artifacts", {})["consolidator"] = res_payload
             context["result"] = res_payload

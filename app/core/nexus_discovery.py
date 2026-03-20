@@ -50,11 +50,11 @@ class _NexusDiscoveryMixin:
         for root, _, files in os.walk(search_root):
             if "__pycache__" in root or ".git" in root:
                 continue
-            
+
             for fname in files:
                 if fname.endswith(".py") and not fname.startswith("__"):
                     file_norm = fname.lower().replace("_", "")
-                    
+
                     # Match Heurístico Expandido:
                     # Se o 'core' do nome do arquivo bater com o 'core' do target_id
                     if norm_target in file_norm or file_norm.replace(".py", "") in norm_target:
@@ -66,7 +66,7 @@ class _NexusDiscoveryMixin:
         if not matches:
             logger.error(f"❌ [NEXUS] Nenhum arquivo em '{search_root}' contém um match para '{target_id}'")
             return None, None
-        
+
         if len(matches) > 1:
             # Prioridade absoluta: Nome da classe contém o target_id
             target_clean = target_id.lower().replace("_", "")
@@ -90,13 +90,13 @@ class _NexusDiscoveryMixin:
                 return None
 
             module = importlib.import_module(module_name)
-            
+
             # Normalização para busca de classe
             norm_target = target_id.lower().replace("_", "").replace("adapter", "").replace("uploader", "")
-            
+
             for name, obj in inspect.getmembers(module, inspect.isclass):
                 name_low = name.lower()
-                
+
                 # Regras de Aceitação de Classe:
                 # 1. Nome da classe contém o núcleo do target_id
                 # 2. Ignora Mixins e classes abstratas

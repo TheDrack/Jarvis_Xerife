@@ -47,7 +47,8 @@ class TelegramAdapter(NexusComponent):
                 json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
                 timeout=30
             )
-            return {"success": response.status_code == 200}        except Exception as e:
+            return {"success": response.status_code == 200}
+        except Exception as e:
             return {"success": False, "error": str(e)}
     
     def _action_send_message(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -82,7 +83,7 @@ class TelegramAdapter(NexusComponent):
     
     def _action_backup(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
         """Ação: backup via Telegram."""
-        logger.info("📤 [TELEGRAM] Executando ação de backup.")
+        logger.info(" [TELEGRAM] Executando ação de backup.")
         res_data = ctx.get("result", {})
         file_path = res_data.get("file_path") if isinstance(res_data, dict) else None
         
@@ -96,20 +97,20 @@ class TelegramAdapter(NexusComponent):
         if not file_path:
             logger.warning("[TELEGRAM] Arquivo de backup não localizado no contexto.")
             return ctx
-                if not os.path.exists(file_path):
+        if not os.path.exists(file_path):
             logger.error(f"[TELEGRAM] Arquivo não encontrado: {file_path}")
             return ctx
         
         result = self._action_send_document({
             "chat_id": self._chat_id,
             "file_path": file_path,
-            "caption": "🤖 Jarvis — Backup de DNA"
+            "caption": " Jarvis — Backup de DNA"
         })
         
         if result.get("success"):
-            logger.info("✅ [TELEGRAM] Backup enviado com sucesso!")
+            logger.info("[TELEGRAM] Backup enviado com sucesso!")
         else:
-            logger.error(f"❌ [TELEGRAM] Falha: {result.get('error')}")
+            logger.error(f"[TELEGRAM] Falha: {result.get('error')}")
         
         return ctx
 
