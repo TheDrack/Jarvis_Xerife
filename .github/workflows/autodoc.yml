@@ -1,0 +1,39 @@
+name: 🏗️ Auto-Documentation JARVIS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - 'scripts/autodoc.py'
+  workflow_dispatch: # Permite rodar manualmente se necessário
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    # Permissões necessárias para o bot fazer commit
+    permissions:
+      contents: write
+
+    steps:
+      - name: 📥 Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: ⚙️ Gerar Arquitetura Visual
+        run: python scripts/autodoc.py
+
+      - name: 💾 Commit da Documentação
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add ARCHITECTURE.md
+          # Só faz commit se houver mudanças para evitar loops
+          git diff --quiet && git diff --staged --quiet || git commit -m "docs: 🤖 mapa de arquitetura atualizado [skip ci]"
+          git push
