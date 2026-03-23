@@ -47,7 +47,8 @@ IGNORECASE_FLAG = re.IGNORECASE
 def extract_files_from_log(log_content: str) -> List[Path]:
     """Extrai caminhos de arquivos .py existentes no log de erro."""
     matches = re.findall(r'File "([^"]+\.py)"', log_content)
-    found_files = []    for f in matches:
+    found_files = []    
+    for f in matches:
         p = Path(f).absolute()
         if p.exists() and ".venv" not in str(p) and "lib/python" not in str(p):
             found_files.append(p)
