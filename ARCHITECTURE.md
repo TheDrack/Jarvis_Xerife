@@ -105,6 +105,9 @@ graph LR
     app_adapters_edge["<b>edge</b><br/><hr/>📄 automation_adapter.py: AutomationAdapter, execute<br/>📄 security_audit_adapter.py: TacticalCommandPort, NearbyDevice<br/>📄 combined_voice_provider.py: CombinedVoiceProvider, execute<br/>📄 active_recruiter_adapter.py: ActiveRecruiterAdapter, execute<br/>📄 voice_engine.py: JarvisEngine, execute<br/>📄 voice_adapter.py: VoiceAdapter, execute<br/>📄 web_adapter.py: WebAdapter, execute<br/>📄 keyboard_adapter.py: KeyboardAdapter, execute, type_text<br/>📄 worker_pc.py: main<br/>📄 hardware_controller.py: HardwareController, execute<br/>📄 jarvis_local_agent.py: JarvisLocalAgent, execute<br/>📄 tts_adapter.py: TTSAdapter, execute"]
     class app_adapters_edge adapter
     app_adapters --> app_adapters_edge
+    app_adapters_api["<b>api</b><br/><hr/>📄 voice_endpoint.py: voice_stream"]
+    class app_adapters_api adapter
+    app_adapters --> app_adapters_api
     app_plugins["<b>plugins</b><br/><hr/>📄 plugin_loader.py: PluginLoader, execute"]
     class app_plugins support
     app --> app_plugins
