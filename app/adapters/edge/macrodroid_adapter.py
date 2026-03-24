@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""MacroDroid Adapter — Disparador de Webhooks para automação Android.
-PASSO 2: Transforma intenção abstrata em chamada de rede real.
+"""MacroDroid Adapter — Comunicação Bidirecional JARVIS ↔ Android.
+ARQUITETURA: Edge Soldier do JARVIS (telemetry + comando).
 """
 import logging
 import requests
@@ -13,68 +13,66 @@ logger = logging.getLogger(__name__)
 
 class MacroDroidAdapter(NexusComponent, DeviceControlPort):
     """
-    Adapter para MacroDroid via Webhooks.
+    Adapter bidirecional para MacroDroid.
     
-    Funcionamento:
-    - Recebe DeviceIntent do sistema
-    - Monta URL de webhook com parâmetros dinâmicos
-    - Envia HTTP GET para MacroDroid
-    - Retorna status da execução
+    Funcionalidades:
+    - Envia comandos para o dispositivo
+    - Recebe telemetry (battery, location, network, etc.)
+    - Cache de status do dispositivo
     """
     
     def __init__(self, device_id: Optional[str] = None, api_key: Optional[str] = None):
         super().__init__()
-        # Busca do ambiente se não fornecido
         self.device_id = device_id or ""
         self.api_key = api_key or ""
         self.base_url = "https://trigger.macrodroid.com"
-        self._cache_available: Dict[str, bool] = {}
-    
-    def configure(self, config: Optional[Dict[str, Any]] = None) -> None:
-        """Configuração via Nexus/Pipeline."""
-        if config:
-            self.device_id = config.get("device_id", self.device_id)
-            self.api_key = config.get("api_key", self.api_key)
+        self._device_cache: Dict[str, Any] = {}
+        self._cache_ttl = 300  # 5 minutos
     
     def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
-        """NexusComponent contract."""
         return bool(self.device_id and self.api_key)
     
     def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Entry-point via Nexus DI."""
         ctx = context or {}
         action = ctx.get("action")
-        params = ctx.get("params", {})
         
-        if not action:
-            return {"success": False, "error": "Ação obrigatória"}        
-        intent = DeviceIntent(
-            action=action,
-            device_id=params.get("device_id", self.device_id),
-            data=params.get("data"),
-            timeout=params.get("timeout", 5)
-        )
-        
-        return self.execute_intent(intent)
+        if action == "get_telemetry":
+            return self.get_device_telemetry()
+        elif action == "execute_command":
+            intent = DeviceIntent(
+                action=ctx.get("command_action"),
+                device_id=ctx.get("device_id", self.device_id),
+                 ctx.get("command_data"),
+                timeout=ctx.get("timeout", 5)
+            )
+            return self.execute_intent(intent)
+        else:            # Default: execute command
+            intent = DeviceIntent(
+                action=action,
+                device_id=self.device_id,
+                 ctx.get("params", {}).get("data")
+            )
+            return self.execute_intent(intent)
     
     def execute_intent(self, intent: DeviceIntent) -> Dict[str, Any]:
         """
-        PASSO 2: Transforma intenção em webhook real.
-        
-        Tratamento de falhas:
-        - Timeout de 5s padrão
-        - Retry único em caso de falha
-        - Log de erros sem travar o assistente
+        Envia comando E recebe telemetry de volta.
         """
         if not intent.device_id:
             return {"success": False, "error": "device_id obrigatório"}
         
-        # Monta URL do webhook
+        # URL do webhook universal
         webhook_url = f"{self.base_url}/{intent.device_id}/jarvis-exec"
         
-        # Parâmetros dinâmicos
-        payload = {"action": intent.action}
-        if intent.data:
+        # Payload com ação + solicitação de telemetry
+        payload = {
+            "action": intent.action,
+            "request_telemetry": "true",  # ← Solicita dados de volta
+            "callback_id": f"jarvis_{intent.action}_{id(intent)}"
+        }
+        
+        if intent.
             payload.update(intent.data)
         
         try:
@@ -82,57 +80,103 @@ class MacroDroidAdapter(NexusComponent, DeviceControlPort):
                 webhook_url,
                 params=payload,
                 timeout=intent.timeout,
-                headers={"User-Agent": "JARVIS-Xerife/1.0"}
+                headers={"User-Agent": "JARVIS-Xerife/2.0"}
             )
             
             if response.status_code == 200:
-                logger.info(f"✅ [MacroDroid] Ação '{intent.action}' executada")
-                return {
-                    "success": True,
-                    "message": f"Ação '{intent.action}' executada com sucesso",
-                    "action": intent.action,
-                    "device_id": intent.device_id
-                }
+                # MacroDroid pode retornar JSON com telemetry
+                try:
+                    result_data = response.json()
+                    telemetry = result_data.get("telemetry", {})
+                    
+                    # Atualiza cache do dispositivo
+                    self._update_device_cache(telemetry)
+                    
+                    return {
+                        "success": True,
+                        "message": result_data.get("message", "Ação executada"),
+                        "action": intent.action,
+                        "device_id": intent.device_id,                        "telemetry": telemetry  # ← Dados do dispositivo
+                    }
+                except:
+                    # Resposta simples (sem JSON)
+                    return {
+                        "success": True,
+                        "message": "Ação executada",
+                        "action": intent.action,
+                        "device_id": intent.device_id
+                    }
             else:
-                logger.warning(f"⚠️ [MacroDroid] Status {response.status_code}")
                 return {
-                    "success": False,                    "message": f"MacroDroid retornou status {response.status_code}",
+                    "success": False,
+                    "message": f"MacroDroid retornou status {response.status_code}",
                     "action": intent.action
                 }
                 
         except requests.Timeout:
-            logger.error(f"❌ [MacroDroid] Timeout para '{intent.action}'")
             return {"success": False, "error": "Timeout - dispositivo offline?"}
         except requests.ConnectionError:
-            logger.error(f"❌ [MacroDroid] Erro de conexão")
             return {"success": False, "error": "Erro de conexão - celular offline?"}
         except Exception as e:
-            logger.error(f"❌ [MacroDroid] Erro: {e}")
             return {"success": False, "error": str(e)}
     
-    def is_available(self, device_id: str) -> bool:
-        """Verifica disponibilidade com cache de 5 minutos."""
-        import time
-        cache_key = f"{device_id}_available"
+    def get_device_telemetry(self) -> Dict[str, Any]:
+        """
+        Coleta telemetry completa do dispositivo.
+        """
+        if not self.device_id:
+            return {"success": False, "error": "device_id não configurado"}
         
-        # Check cache simples (em produção usar Redis)
-        if hasattr(self, '_cache_timestamp'):
-            if time.time() - self._cache_timestamp < 300:
-                return self._cache_available.get(device_id, False)
+        # Webhook específico para telemetry
+        telemetry_url = f"{self.base_url}/{self.device_id}/jarvis-telemetry"
         
-        # Teste real de conectividade
-        test_url = f"{self.base_url}/{device_id}/jarvis-ping"
         try:
-            response = requests.get(test_url, timeout=3)
-            result = response.status_code == 200
+            response = requests.get(telemetry_url, timeout=10)
+            
+            if response.status_code == 200:
+                telemetry = response.json() if response.text else {}
+                self._update_device_cache(telemetry)
+                
+                return {
+                    "success": True,
+                    "telemetry": telemetry,
+                    "device_id": self.device_id,
+                    "cached_at": telemetry.get("timestamp")
+                }
+            else:
+                return {"success": False, "error": f"Status {response.status_code}"}
+                        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def _update_device_cache(self, telemetry: Dict[str, Any]) -> None:
+        """Atualiza cache local com dados do dispositivo."""
+        import time
+        self._device_cache = {
+            **telemetry,
+            "_last_update": time.time(),
+            "_ttl": self._cache_ttl
+        }
+    
+    def get_cached_telemetry(self) -> Optional[Dict[str, Any]]:
+        """Retorna telemetry em cache (se não expirou)."""
+        import time
+        if not self._device_cache:
+            return None
+        
+        last_update = self._device_cache.get("_last_update", 0)
+        if time.time() - last_update > self._cache_ttl:
+            return None
+        
+        return {k: v for k, v in self._device_cache.items() if not k.startswith("_")}
+    
+    def is_available(self, device_id: str) -> bool:
+        """Verifica disponibilidade via ping."""
+        ping_url = f"{self.base_url}/{device_id}/jarvis-ping"
+        try:
+            response = requests.get(ping_url, timeout=3)
+            return response.status_code == 200
         except:
-            result = False
-        
-        # Atualiza cache
-        self._cache_available = {device_id: result}
-        self._cache_timestamp = time.time()
-        
-        return result
+            return False
 
 
 # Compatibilidade
