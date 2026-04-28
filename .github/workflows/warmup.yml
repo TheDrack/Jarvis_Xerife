@@ -1,11 +1,11 @@
 # .github/workflows/warmup.yml
-name: Warmup Render
-on:
-  schedule:
-    - cron: '*/10 * * * *'  # A cada 10 minutos
-jobs:
-  warmup:
-    runs-on: ubuntu-latest
-    steps:
+#name: Warmup Render
+#on:
+#  schedule:
+#    - cron: '*/10 * * * *'  # A cada 10 minutos
+#jobs:
+#  warmup:
+#    runs-on: ubuntu-latest
+#    steps:
       - name: Call warmup endpoint
         run: curl -s https://jarvis-api-c47i.onrender.com/warmup
