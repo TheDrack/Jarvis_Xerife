@@ -1,117 +1,91 @@
 # -*- coding: utf-8 -*-
-"""
-Nexus-backed compatibility shim for Jarvis service resolution.
-
-Service instantiation is owned by JarvisNexus (app.core.nexus).
-This module exposes _is_headless_environment(), Container, and
-create_edge_container() for backward compatibility with existing tests
-and scripts that import from app.container.
-"""
-
+import asyncio
+import logging
 import os
-import sys
-from typing import Optional
+import signal
+from typing import Any
 
-from app.core.config import settings
-from app.core.nexus import nexus
+from app.core.nexus import JarvisNexus
 
-
-def _is_headless_environment() -> bool:
-    """
-    Detect whether the current runtime is a headless (non-interactive) environment.
-
-    Returns True when running in:
-    - pytest (test runner)
-    - CI/CD pipelines (CI env var)
-    - GitHub Actions (GITHUB_ACTIONS env var)
-    - Cloud platforms: Render (RENDER), Heroku (DYNO), Railway (RAILWAY_ENVIRONMENT)
-
-    Returns:
-        True if the environment is headless/cloud, False otherwise.
-    """
-    if "pytest" in sys.modules:
-        return True
-    if os.environ.get("CI"):
-        return True
-    if os.environ.get("GITHUB_ACTIONS"):
-        return True
-    if os.environ.get("RENDER"):
-        return True
-    if os.environ.get("DYNO"):
-        return True
-    if os.environ.get("RAILWAY_ENVIRONMENT"):
-        return True
-    return False
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("JARVIS-Main")
 
 
-class Container:
-    """
-    Thin compatibility wrapper around JarvisNexus.
+class MainService:
+    """Serviço de Orquestração Principal."""
 
-    All service resolution is delegated to nexus.resolve().
-    Kept for backward compatibility with tests and scripts that
-    reference Container directly.
-    """
+    def __init__(self):
+        self.nexus = JarvisNexus()
+        self.running = True
+        self._setup_signals()
 
-    def __init__(
-        self,
-        wake_word: Optional[str] = None,
-        language: Optional[str] = None,
-        use_llm: bool = False,
-        gemini_api_key: Optional[str] = None,
-    ):
-        self.wake_word = wake_word or settings.wake_word
-        self.language = language or settings.language
-        self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY") or settings.gemini_api_key
-        # Auto-enable LLM when an API key is available
-        self.use_llm = use_llm or bool(self.gemini_api_key)
+    def _setup_signals(self):
+        """Configura a interrupção limpa do sistema."""
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop = asyncio.get_running_loop()
+                loop.add_signal_handler(sig, self.stop)
+            except RuntimeError:
+                pass
 
-    @property
-    def voice_provider(self):
-        if _is_headless_environment():
-            from app.adapters.infrastructure.dummy_voice_provider import DummyVoiceProvider
-            return DummyVoiceProvider()
-        resolved = nexus.resolve("voice_adapter")
-        if resolved is None:
-            from app.adapters.infrastructure.dummy_voice_provider import DummyVoiceProvider
-            return DummyVoiceProvider()
-        return resolved
+    def _validate_environment(self):
+        """Verifica se o ambiente é seguro para execução."""
+        is_cloud = os.getenv("RENDER") == "true" or os.getenv("HEROKU") == "true"
+        db_url = os.getenv("DATABASE_URL")
 
-    @property
-    def assistant_service(self):
-        """Resolve via JarvisNexus. Returns None if the service cannot be located."""
-        return nexus.resolve("assistant_service")
+        if is_cloud and not db_url:
+            logger.error("!!! ALERTA DE SEGURANÇA !!!")
+            logger.error("Execução em Cloud detetada sem DATABASE_URL.")
+            logger.error("Dados no SQLite serão perdidos ao reiniciar o contentor.")
 
-    @property
-    def extension_manager(self):
-        """Resolve via JarvisNexus. Returns None if the service cannot be located."""
-        return nexus.resolve("extension_manager")
+    async def start(self):
+        """Inicia o ciclo de vida do JARVIS."""
+        logger.info("Iniciando JARVIS Strategic Engine...")
+        self._validate_environment()
+
+        try:
+            logger.info("[Main] Inicializando Nexus DI...")
+            evolution_orchestrator = self.nexus.resolve("evolution_orchestrator")
+            if evolution_orchestrator and not getattr(evolution_orchestrator, "__is_cloud_mock__", False):
+                asyncio.create_task(self._evolution_heartbeat(evolution_orchestrator))
+
+            logger.info("[Main] Sistema Operacional. Aguardando eventos.")
+
+            while self.running:
+                await asyncio.sleep(1)
+
+        except Exception as e:
+            logger.error(f"[Main] Erro fatal no arranque: {e}", exc_info=True)
+        finally:
+            await self._shutdown()
+
+    async def _evolution_heartbeat(self, orchestrator: Any):
+        """Ciclo de verificação de saúde e auto-cura."""
+        while self.running:
+            try:
+                health = await orchestrator.check_system_health()
+                if not health.get("healthy"):
+                    logger.warning(f"[Main] Instabilidade detetada: {health.get('reason')}")
+                    await orchestrator.run_self_healing()
+            except Exception as e:
+                logger.error(f"[Main] Erro no batimento cardíaco de evolução: {e}")
+
+            await asyncio.sleep(60)
+
+    def stop(self):
+        """Sinaliza a paragem do sistema."""
+        logger.info("[Main] Sinal de paragem recebido.")
+        self.running = False
+
+    async def _shutdown(self):
+        """Encerra os serviços de forma graciosa."""
+        logger.info("[Main] Encerrando adaptadores...")
+        logger.info("[Main] JARVIS Offline.")
 
 
-# Alias for backward compatibility
-EdgeContainer = Container
-
-
-def create_edge_container(
-    wake_word: Optional[str] = None,
-    language: Optional[str] = None,
-    use_llm: bool = False,
-) -> Container:
-    """
-    Create a Nexus-backed Container.
-
-    Args:
-        wake_word: Wake word for voice activation.
-        language: Language code (e.g. 'pt-BR').
-        use_llm: Whether to enable LLM integration.
-                 Will be auto-enabled when an API key is available.
-
-    Returns:
-        Container that delegates service resolution to JarvisNexus.
-    """
-    return Container(
-        wake_word=wake_word,
-        language=language,
-        use_llm=use_llm,
-    )
-
+if __name__ == "__main__":
+    service = MainService()
+    asyncio.run(service.start())

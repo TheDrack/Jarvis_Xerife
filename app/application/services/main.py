@@ -2,97 +2,94 @@
 import asyncio
 import logging
 import os
-import signal
-from typing import Any
-from app.core.nexus import Nexus
+import sys
+import threading
 
-# Configuração de Logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
-logger = logging.getLogger("JARVIS-Main")
+sys.path.insert(0, os.getcwd())
 
-class MainService:
-    """
-    Serviço de Orquestração Principal.
-    Responsável por inicializar o Nexus e manter o loop de vida do sistema.
-    """
+from app.adapters.infrastructure import create_api_server
+from app.core.nexus import nexus
 
-    def __init__(self):
-        self.nexus = Nexus()
-        self.running = True
-        self._setup_signals()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-    def _setup_signals(self):
-        """Configura a interrupção limpa do sistema."""
-        for sig in (signal.SIGINT, signal.SIGTERM):
+
+async def notify_online():
+    """Tenta enviar a notificação via Telegram após o Nexus estabilizar."""
+    await asyncio.sleep(5)
+
+    telegram = nexus.resolve("telegram_adapter")
+    if telegram and not getattr(telegram, "__is_cloud_mock__", False):
+        admin_id = os.getenv("TELEGRAM_ADMIN_ID")
+        if admin_id:
             try:
-                loop = asyncio.get_running_loop()
-                loop.add_signal_handler(sig, self.stop)
-            except RuntimeError:
-                pass # Caso o loop ainda não esteja a correr
-
-    def _validate_environment(self):
-        """Verifica se o ambiente é seguro para execução (Production-Ready)."""
-        is_cloud = os.getenv("RENDER") == "true" or os.getenv("HEROKU") == "true"
-        db_url = os.getenv("DATABASE_URL")
-        
-        if is_cloud and not db_url:
-            logger.error("!!! ALERTA DE SEGURANÇA !!!")
-            logger.error("Execução em Cloud detetada sem DATABASE_URL.")
-            logger.error("Dados no SQLite serão perdidos ao reiniciar o contentor.")
-
-    async def start(self):
-        """Inicia o ciclo de vida do JARVIS."""
-        logger.info("Iniciando JARVIS Strategic Engine...")
-        self._validate_environment()
-
-        try:
-            # 1. Bootstrapping do Nexus (Injeção de Dependências)
-            logger.info("[Main] Inicializando Nexus DI...")
-            # O Nexus carrega os adaptadores e serviços definidos
-            
-            # 2. Inicia o Loop de Evolução
-            evolution_orchestrator = self.nexus.resolve("evolution_orchestrator")
-            asyncio.create_task(self._evolution_heartbeat(evolution_orchestrator))
-            
-            logger.info("[Main] Sistema Operacional. Aguardando eventos.")
-            
-            # 3. Keep-alive loop
-            while self.running:
-                await asyncio.sleep(1)
-
-        except Exception as e:
-            logger.error(f"[Main] Erro fatal no arranque: {e}", exc_info=True)
-        finally:
-            await self._shutdown()
-
-    async def _evolution_heartbeat(self, orchestrator: Any):
-        """Ciclo de verificação de saúde e auto-cura."""
-        while self.running:
-            # CORREÇÃO: Indentação corrigida na linha 102
-            try:
-                health = await orchestrator.check_system_health()
-                if not health.get("healthy"):
-                    logger.warning(f"[Main] Instabilidade detetada: {health.get('reason')}")
-                    await orchestrator.run_self_healing()
+                await telegram.send_message(
+                    chat_id=admin_id,
+                    text="🚀 **J.A.R.V.I.S. ONLINE**\nStatus: Cloud Ativo\nNexus: Operacional"
+                )
+                logger.info("📢 Notificação de inicialização enviada com sucesso.")
             except Exception as e:
-                logger.error(f"[Main] Erro no batimento cardíaco de evolução: {e}")
-            
-            await asyncio.sleep(60) # Verifica a cada minuto
+                logger.error(f"Erro ao enviar mensagem Telegram: {e}")
+        else:
+            logger.warning("⚠️ TELEGRAM_ADMIN_ID não configurado nas variáveis de ambiente.")
+    else:
+        logger.warning("⚠️ Telegram adapter não resolvido. Notificação cancelada.")
 
-    def stop(self):
-        """Sinaliza a paragem do sistema."""
-        logger.info("[Main] Sinal de paragem recebido.")
-        self.running = False
 
-    async def _shutdown(self):
-        """Encerra os serviços de forma graciosa."""
-        logger.info("[Main] Encerrando adaptadores...")
-        # Lógica para fechar pools de DB, sockets, etc via Nexus
-        logger.info("[Main] JARVIS Offline.")
+def run_api():
+    """Gerencia corretamente o event loop e threads do boot."""
+    assistant = nexus.resolve("assistant_service")
+    if assistant is None or getattr(assistant, "__is_cloud_mock__", False):
+        logger.error("❌ AssistantService não resolvido. Abortando inicialização.")
+        sys.exit(1)
+
+    app = create_api_server(assistant)
+    background_thread_shutdown = threading.Event()
+
+    def background_bootstrap():
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(notify_online())
+            except Exception as e:
+                logger.error(f"Erro ao notificar online: {e}")
+
+            try:
+                overwatch = nexus.resolve("overwatch_daemon")
+                if overwatch and not getattr(overwatch, "__is_cloud_mock__", False) and hasattr(overwatch, "start"):
+                    logger.info("🔍 Iniciando OverwatchDaemon...")
+                    overwatch.start()
+            except Exception as e:
+                logger.error(f"Erro ao iniciar OverwatchDaemon: {e}")
+
+            while not background_thread_shutdown.wait(1):
+                pass
+        except Exception as e:
+            logger.error(f"Erro fatal em background_bootstrap: {e}")
+        finally:
+            try:
+                loop.close()
+            except Exception:
+                pass
+
+    background_thread = threading.Thread(target=background_bootstrap, daemon=True, name="JarvisBackground")
+    background_thread.start()
+
+    try:
+        import uvicorn
+        port = int(os.getenv("PORT", 10000))
+        logger.info(f"🚀 Iniciando API server na porta {port}...")
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    except KeyboardInterrupt:
+        logger.info("⏹️ Shutdown iniciado...")
+    except Exception as e:
+        logger.error(f"Erro no servidor API: {e}", exc_info=True)
+    finally:
+        background_thread_shutdown.set()
+        background_thread.join(timeout=5)
+        logger.info("✅ API server encerrado.")
+
 
 if __name__ == "__main__":
-    service = MainService()
-    asyncio.run(service.start())
+    run_api()
