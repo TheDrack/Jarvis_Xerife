@@ -28,23 +28,25 @@ class ConsolidatedContextService(NexusComponent):
     
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Retorna o contexto mantendo as chaves originais do pipeline."""
-        ctx = context if context is not None else {}
-        config = ctx.get("config", {})
-        action = config.get("action") or ctx.get("action", "read")
-        
+        if context is None:
+            context = {}
+
+        config = context.get("config", {})
+        action = config.get("action") or context.get("action", "read")
+
         if action == "read":
-            ctx["context_content"] = self.get_context()
-            ctx["context_loaded"] = True
-            return ctx
+            context["context_content"] = self.get_context()
+            context["context_loaded"] = True
+            return context
         elif action == "refresh":
             self._cache = None
-            ctx["context_content"] = self.get_context()
-            return ctx
+            context["context_content"] = self.get_context()
+            return context
         elif action == "info":
-            ctx["context_info"] = self.get_info()
-            return ctx
-        
-        return ctx
+            context["context_info"] = self.get_info()
+            return context
+
+        return context
     
     def get_context(self, max_tokens: int = MAX_CONTEXT_TOKENS) -> str:
         """Lê o arquivo consolidado respeitando o arquivo físico no disco."""

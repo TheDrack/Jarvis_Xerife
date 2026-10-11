@@ -26,6 +26,7 @@ jobs:
             google-auth-httplib2 \
             google-auth-oauthlib \
             pyyaml \
+            requests \
             aiohttp>=3.9.0
 
       - name: 🔍 Verificar sintaxe Python antes do pipeline

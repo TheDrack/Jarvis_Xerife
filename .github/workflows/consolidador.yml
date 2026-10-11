@@ -25,7 +25,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --quiet pyyaml
+          pip install --quiet pyyaml requests
 
       - name: 🔍 Verificar sintaxe Python antes do pipeline
         run: |

@@ -129,24 +129,24 @@ def _execute_step(
     # Executar componente
     logger.info(f"⚙️ Executando: {step_name}...")
     try:
-        if hasattr(component, "execute"):
+        if hasattr(component, "execute") and callable(getattr(component, "execute", None)):
             result = component.execute(context)
         elif callable(component):
             result = component(context)
         else:
             raise TypeError(f"Componente '{component_id}' não possui método execute() e não é callable")
-        
+
         # Atualizar contexto se o retorno for dicionário
         if isinstance(result, dict):
             # Evita sobrepor chaves estruturais do runner
             for k, v in result.items():
                 if k not in ["results", "pipeline", "status"]:
                     context[k] = v
-        
+
         context["results"].append({"step": step_name, "status": "success", "result": "OK"})
         logger.info(f"✅ {step_name} finalizado.")
         return True
-        
+
     except Exception as e:
         logger.error(f"💥 ERRO EM '{step_name}': {e}", exc_info=True)
         context["results"].append({"step": step_name, "status": "error", "msg": str(e)})
