@@ -142,5 +142,15 @@ class JarvisNexus(_NexusDiscoveryMixin):
         logger.warning("🔌 [NEXUS] Circuit Breaker aberto para '%s'. Razão: %s", target_id, reason)
         self._circuit_breakers[target_id] = time.time() + 30  # 30 segundos de cooldown
 
+
+
+# Public API re-exports aligned with the rest of the codebase expectations
+from app.core.nexuscomponent import NexusComponent
+from app.core.nexus_exceptions import AmbiguousComponentError, CIRCUIT_BREAKER_RESET
+
+
+# Public alias used by service layer and API code
+Nexus = JarvisNexus
+
 # Singleton Global
 nexus = JarvisNexus()

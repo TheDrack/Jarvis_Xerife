@@ -1,3 +1,4 @@
+import importlib
 # -*- coding: utf-8 -*-
 """Nexus Discovery — Mecanismo de descoberta automática de componentes.
 STATUS: Sintaxe validada e lógica de paths reforçada.
@@ -6,7 +7,7 @@ import os
 import re
 import logging
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Any
 
 logger = logging.getLogger(__name__)
 
@@ -102,3 +103,68 @@ def find_component_file(target_id: str, hint_path: Optional[str] = None) -> Opti
                     return os.path.join(root, fname)
 
     return None
+
+
+
+class _NexusDiscoveryMixin:
+    """
+    Mixin de descoberta para JarvisNexus.
+
+    O Nexus espera que esse mixin exporte `_resolve_internal`, usado por
+    `_build_instance` para localizar e preparar o componente solicitado.
+    """
+
+    def _resolve_internal(self, target_id: str, hint_path: Optional[str]) -> Any:
+        """
+        Descobre e retorna o componente correspondente ao target_id.
+
+        Retorna a classe encontrada para que o Nexus possa instanciá-la ou,
+        em caso de falha, propaga a exceção para que o Nexus a trate como
+        falha de resolução e abra o circuit breaker.
+        """
+        from pathlib import Path as _Path
+
+        file_path = find_component_file(target_id, hint_path)
+        if file_path is None:
+            raise RuntimeError(f"Componente nao encontrado: {target_id}")
+
+        module_dir = os.path.dirname(file_path)
+        module_file = os.path.basename(file_path)
+        module_name, _ = os.path.splitext(module_file)
+
+        # Tenta achar a raiz do app para calcular o package
+        relative_root = None
+        potential_root = os.path.abspath(module_dir)
+        for _ in range(10):
+            if os.path.exists(os.path.join(potential_root, "app")):
+                relative_root = potential_root
+                break
+            parent = os.path.dirname(potential_root)
+            if parent == potential_root:
+                break
+            potential_root = parent
+
+        try:
+            if not relative_root:
+                module = importlib.import_module(module_name)
+            else:
+                rel = os.path.relpath(module_dir, relative_root).replace(os.sep, ".")
+                package = (rel + "." if rel != "." else "") + module_name
+                module = importlib.import_module(package)
+        except Exception as exc:
+            logger.exception("[Discovery] Falha ao importar modulo para %s: %s", target_id, exc)
+            raise RuntimeError(f"Falha ao importar modulo para {target_id}: {exc}") from exc
+
+        # Tenta identificar a classe correspondente ao target_id
+        candidates = search_component_in_files(target_id, module_dir or ".")
+        if candidates:
+            _, class_name = candidates[0]
+            try:
+                cls = getattr(module, class_name)
+            except AttributeError as exc:
+                logger.exception("[Discovery] Classe %s nao encontrada no modulo %s", class_name, module_name)
+                raise RuntimeError(f"Classe nao encontrada no modulo: {class_name}") from exc
+            return cls
+
+        # Fallback: retorna o proprio modulo quando a classe nao foi identificada
+        return module

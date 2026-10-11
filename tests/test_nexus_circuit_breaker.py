@@ -9,9 +9,9 @@ import pytest
 
 from app.core.nexus import (
     AmbiguousComponentError,
+    CIRCUIT_BREAKER_RESET,
     CloudMock,
     JarvisNexus,
-    _CIRCUIT_BREAKER_RESET,
 )
 
 
@@ -76,7 +76,7 @@ class TestJarvisNexusCircuitBreaker:
 
         # Simulate time passing beyond the reset window
         entry = nexus._circuit_breaker["aging_svc"]
-        entry.open_at -= _CIRCUIT_BREAKER_RESET + 1
+        entry.open_at -= CIRCUIT_BREAKER_RESET + 1
 
         # Now the circuit should be considered closed
         is_open = nexus._is_circuit_open("aging_svc")

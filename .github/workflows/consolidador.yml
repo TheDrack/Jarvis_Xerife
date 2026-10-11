@@ -1,0 +1,41 @@
+name: Consolidador JARVIS — Snapshot a cada 30 min
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consolidar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install --quiet pyyaml
+
+      - name: Run consolidador -> Drive -> Telegram -> Gist
+        env:
+          G_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GIST_PAT: ${{ secrets.GIST_PAT }}
+          PIPELINE: sync_drive
+          PIPELINE_STRICT: "false"
+        run: |
+          export PYTHONPATH="$(pwd)"
+          python app/runtime/pipeline_runner.py
