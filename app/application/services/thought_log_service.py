@@ -47,7 +47,8 @@ class ThoughtLogService(NexusComponent):
         if config:
             self._enabled = config.get("enabled", self._enabled)
             self._max_obs_length = config.get("max_observation_length", self._max_obs_length)
-            self._stream_to_console = config.get("stream_to_console", self._stream_to_console)            mission_id = config.get("mission_id")
+            self._stream_to_console = config.get("stream_to_console", self._stream_to_console)
+            mission_id = config.get("mission_id")
             if mission_id:
                 self._mission_id = mission_id
     
@@ -96,7 +97,8 @@ class ThoughtLogService(NexusComponent):
                 from app.domain.models.thought_log import ThoughtLog
                 
                 with Session(self.engine) as session:
-                    db_thought = ThoughtLog(                        mission_id=mission_id,
+                    db_thought = ThoughtLog(
+                        mission_id=mission_id,
                         session_id=session_id,
                         thought_process=thought_process,
                         success=kwargs.get("success", False),
@@ -145,7 +147,8 @@ class ThoughtLogService(NexusComponent):
         thought = {
             "thought_id": f"thought_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}",
             "mission_id": self._mission_id,
-            "thought_type": thought_type,            "message": message,
+            "thought_type": thought_type,
+            "message": message,
             "data": data or {},
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
@@ -194,7 +197,7 @@ class ThoughtLogService(NexusComponent):
         
         color = colors.get(thought_type, "")
         icon = icons.get(thought_type, "•")
-                formatted = f"{dim}[{time_str}]{reset} {color}{icon} [{thought_type.upper()}]{reset} {message}"
+        formatted = f"{dim}[{time_str}]{reset} {color}{icon} [{thought_type.upper()}]{reset} {message}"
         print(formatted, file=sys.stdout, flush=True)
     
     def stream_planning(self, message: str, data: Optional[Dict] = None):

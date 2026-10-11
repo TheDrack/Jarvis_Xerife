@@ -43,7 +43,7 @@ class MacroDroidAdapter(NexusComponent, DeviceControlPort):
             intent = DeviceIntent(
                 action=ctx.get("command_action"),
                 device_id=ctx.get("device_id", self.device_id),
-                 ctx.get("command_data"),
+                data=ctx.get("command_data"),
                 timeout=ctx.get("timeout", 5)
             )
             return self.execute_intent(intent)
@@ -51,7 +51,7 @@ class MacroDroidAdapter(NexusComponent, DeviceControlPort):
             intent = DeviceIntent(
                 action=action,
                 device_id=self.device_id,
-                 ctx.get("params", {}).get("data")
+                data=ctx.get("params", {}).get("data")
             )
             return self.execute_intent(intent)
     
@@ -72,7 +72,7 @@ class MacroDroidAdapter(NexusComponent, DeviceControlPort):
             "callback_id": f"jarvis_{intent.action}_{id(intent)}"
         }
         
-        if intent.
+        if intent.data:
             payload.update(intent.data)
         
         try:
@@ -96,7 +96,8 @@ class MacroDroidAdapter(NexusComponent, DeviceControlPort):
                         "success": True,
                         "message": result_data.get("message", "Ação executada"),
                         "action": intent.action,
-                        "device_id": intent.device_id,                        "telemetry": telemetry  # ← Dados do dispositivo
+                        "device_id": intent.device_id,
+                        "telemetry": telemetry  # ← Dados do dispositivo
                     }
                 except:
                     # Resposta simples (sem JSON)
@@ -112,31 +113,31 @@ class MacroDroidAdapter(NexusComponent, DeviceControlPort):
                     "message": f"MacroDroid retornou status {response.status_code}",
                     "action": intent.action
                 }
-                
+
         except requests.Timeout:
             return {"success": False, "error": "Timeout - dispositivo offline?"}
         except requests.ConnectionError:
             return {"success": False, "error": "Erro de conexão - celular offline?"}
         except Exception as e:
             return {"success": False, "error": str(e)}
-    
+
     def get_device_telemetry(self) -> Dict[str, Any]:
         """
         Coleta telemetry completa do dispositivo.
         """
         if not self.device_id:
             return {"success": False, "error": "device_id não configurado"}
-        
+
         # Webhook específico para telemetry
         telemetry_url = f"{self.base_url}/{self.device_id}/jarvis-telemetry"
-        
+
         try:
             response = requests.get(telemetry_url, timeout=10)
-            
+
             if response.status_code == 200:
                 telemetry = response.json() if response.text else {}
                 self._update_device_cache(telemetry)
-                
+
                 return {
                     "success": True,
                     "telemetry": telemetry,
@@ -145,7 +146,8 @@ class MacroDroidAdapter(NexusComponent, DeviceControlPort):
                 }
             else:
                 return {"success": False, "error": f"Status {response.status_code}"}
-                        except Exception as e:
+
+        except Exception as e:
             return {"success": False, "error": str(e)}
     
     def _update_device_cache(self, telemetry: Dict[str, Any]) -> None:

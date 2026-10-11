@@ -47,7 +47,8 @@ class PipelineBuilder:
                 "action": "get",
                 "adapter_id": adapter_id,
             }).get("adapter")
-                        if adapter_info:
+
+            if adapter_info:
                 step_config = {
                     "id": adapter_id,
                     "config": {**config, "strict_mode": strict_mode}
@@ -55,11 +56,11 @@ class PipelineBuilder:
                 if adapter_info.get("hint_path"):
                     step_config["hint_path"] = adapter_info["hint_path"]
                 pipeline["components"][f"step_{i}_{adapter_id}"] = step_config
-        
+
         file_path = _PIPELINES_DIR / f"{name}.yml"
         with open(file_path, "w", encoding="utf-8") as f:
             yaml.dump(pipeline, f, allow_unicode=True, default_flow_style=False)
-        
+
         logger.info(f"📝 [PipelineBuilder] Pipeline criado: {file_path}")
         return file_path
     
@@ -96,8 +97,9 @@ class PipelineBuilder:
             run_pipeline(pipeline_name)
             return {"success": True, "pipeline": pipeline_name}
         except Exception as e:
-            logger.error(f"❌ [PipelineBuilder] Erro: {e}")            return {"success": False, "error": str(e)}
-    
+            logger.error(f"❌ [PipelineBuilder] Erro: {e}")
+            return {"success": False, "error": str(e)}
+
     def list_existing_pipelines(self) -> List[str]:
         """Lista pipelines existentes."""
         if not _PIPELINES_DIR.exists():

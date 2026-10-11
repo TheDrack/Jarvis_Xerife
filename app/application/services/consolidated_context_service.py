@@ -62,3 +62,19 @@ class ConsolidatedContextService(NexusComponent):
             self._cache = content
             return content
         except Exception as e:
+            logger.error(f"[CONTEXT] Falha ao ler contexto: {e}")
+            return "Arquivo de contexto não disponível."
+
+    def get_info(self) -> Dict[str, Any]:
+        """Retorna informação resumida do contexto consolidado."""
+        path = self._consolidated_path
+        info = {
+            "consolidated_path": str(path),
+            "exists": path.exists(),
+        }
+        if path.exists():
+            try:
+                info["size_bytes"] = path.stat().st_size
+            except Exception:
+                info["size_bytes"] = None
+        return info

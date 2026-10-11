@@ -35,7 +35,7 @@ class ThoughtRenderer:
                 time_str, icon, thought_type, message
             )
         
-        if 
+        if data:
             formatted += self._format_data(data)
         
         return formatted

@@ -47,7 +47,8 @@ class MemoryConsolidationService(NexusComponent):
                 logger.debug(f"[ConsolidationService] VectorAdapter indisponível: {exc}")
                 return None
         return self._vector_adapter
-        def _check_vector_health(self) -> bool:
+
+    def _check_vector_health(self) -> bool:
         """
         CORREÇÃO: Health check do VectorAdapter antes de consolidar.
         Returns:
@@ -95,26 +96,27 @@ class MemoryConsolidationService(NexusComponent):
         except Exception as exc:
             logger.debug(f"[ConsolidationService] Health check falhou: {exc}")
             return False
-    
-    def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:        """NexusComponent contract."""
+
+    def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
+        """NexusComponent contract."""
         working_memory = self._get_working_memory()
         vector_adapter = self._get_vector_adapter()
-        
+
         if working_memory is None:
             logger.debug("[ConsolidationService] WorkingMemory indisponível.")
             return False
-        
+
         if vector_adapter is None:
             logger.debug("[ConsolidationService] VectorAdapter indisponível.")
             return False
-        
+
         return True
-    
+
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Executa a consolidação via Nexus."""
         ctx = context or {}
         max_age_hours = ctx.get("max_age_hours", 24)
-        
+
         try:
             count = self.consolidate_memories(max_age_hours)
             return {
@@ -125,11 +127,11 @@ class MemoryConsolidationService(NexusComponent):
         except Exception as e:
             logger.error(f"[ConsolidationService] Falha na consolidação: {e}")
             return {"success": False, "error": str(e)}
-    
+
     def consolidate_memories(self, max_age_hours: int = 24) -> int:
         """
         Puxa memórias expiradas e injeta no vetor COM HEALTH CHECK.
-        
+
         Fluxo:
         1. Health check do VectorAdapter
         2. Extração (WorkingMemory ejeta)
@@ -144,13 +146,14 @@ class MemoryConsolidationService(NexusComponent):
                 "adiando consolidação (memórias mantidas na WorkingMemory)."
             )
             return 0
-        
-        working_memory = self._get_working_memory()        vector_adapter = self._get_vector_adapter()
-        
+
+        working_memory = self._get_working_memory()
+        vector_adapter = self._get_vector_adapter()
+
         if not working_memory or not vector_adapter:
             logger.warning("[ConsolidationService] Dependências não disponíveis.")
             return 0
-        
+
         # 1. Extração (WorkingMemory ejeta memórias expiradas)
         try:
             evicted_entries, count = working_memory._evict_old_entries(
@@ -159,19 +162,19 @@ class MemoryConsolidationService(NexusComponent):
         except Exception as exc:
             logger.error(f"[ConsolidationService] Falha ao ejetar memórias: {exc}")
             return 0
-        
+
         if not evicted_entries:
             return 0
-        
+
         logger.info(f"[ConsolidationService] {len(evicted_entries)} memórias ejetadas para consolidação.")
-        
+
         # 2. Transformação Semântica
         documents_to_embed = []
         for entry in evicted_entries:
             user_input = entry.get("user_input", "")
             response = entry.get("response", "")
             timestamp = entry.get("_ts", "")
-            
+
             # Metadados limpos para busca futura
             meta = {
                 k: v for k, v in entry.items()
@@ -179,22 +182,23 @@ class MemoryConsolidationService(NexusComponent):
             }
             meta["source"] = "working_memory_consolidation"
             meta["original_timestamp"] = timestamp
-            
+
             # Formatação para maximizar similaridade vetorial
             semantic_text = (
                 f"Contexto Histórico ({timestamp}):\n"
                 f"Usuário: {user_input}\n"
                 f"Jarvis: {response}"
             )
-            
+
             documents_to_embed.append({
                 "text": semantic_text,
                 "metadata": meta
             })
-        
+
         # 3. Persistência (VectorAdapter armazena)
         consolidated = 0
-        failed_entries = []        
+        failed_entries = []
+
         for doc in documents_to_embed:
             try:
                 vector_adapter.store_event(
@@ -206,7 +210,7 @@ class MemoryConsolidationService(NexusComponent):
                 logger.error(f"[ConsolidationService] Falha ao gravar vetor: {e}")
                 # Guarda entrada falha para recuperação
                 failed_entries.append(doc)
-        
+
         # 4. CORREÇÃO: Recuperação - devolve falhas para WorkingMemory
         if failed_entries:
             logger.warning(
@@ -223,7 +227,7 @@ class MemoryConsolidationService(NexusComponent):
                        if k not in ["source", "original_timestamp"]}
                 }
                 working_memory.push(original_entry)
-        
+
         logger.info(f"🧠 [ConsolidationService] {consolidated}/{len(documents_to_embed)} memórias consolidadas.")
         return consolidated
 
