@@ -146,7 +146,8 @@ def _call_groq_direct(file_content: str, error_log: str, is_production_file: boo
     try:
         import httpx
         
-        api_key = os.getenv("GROQ_API_KEY")        if not api_key:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
             logger.warning("[Healer] GROQ_API_KEY não configurada")
             return None
         
@@ -191,11 +192,14 @@ def call_groq_healer(file_content: str, error_log: str, is_production_file: bool
     return _call_groq_direct(file_content, error_log, is_production_file)
 
 
-def _build_healer_prompt(file_content: str, error_log: str, is_production_file: bool) -> str:
-    """
-    Constrói prompt para o healer.
+def _build_healer_prompt(
+    file_content: str, error_log: str, is_production_file: bool
+) -> str:
+    """Constrói prompt para o healer.
+
     CORREÇÃO: Strings formatadas de forma segura.
-    """    production_rule = (
+    """
+    production_rule = (
         "IMPORTANTE: Este é um arquivo de PRODUÇÃO (não é um arquivo de testes). "
         "NÃO adicione 'import pytest', decoradores '@pytest.mark.*' nem funções 'def test_*()'."
     ) if is_production_file else ""
@@ -216,7 +220,9 @@ def _build_healer_prompt(file_content: str, error_log: str, is_production_file: 
     return "\n".join(prompt_parts)
 
 
-def apply_fixes(file_path: Path, fixes: List[Dict[str, Any]], dry_run: bool = False) -> tuple:
+def apply_fixes(
+    file_path: Path, fixes: List[Dict[str, Any]], dry_run: bool = False
+) -> tuple:
     """Aplica correções ao arquivo."""
     success = 0
     fail = 0

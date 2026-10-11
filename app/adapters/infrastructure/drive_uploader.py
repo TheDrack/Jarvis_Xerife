@@ -4,7 +4,7 @@ CORREÇÃO: Mantido padrão original do CORE para compatibilidade com Nexus Disc
 """
 import os
 import logging
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
