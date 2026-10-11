@@ -223,8 +223,12 @@ jobs:
           git config user.name  "JARVIS Evolution Bot"
           git config user.email "jarvis-bot@noreply.github.com"
           git add .
-          git diff --cached --quiet || git commit -m "🧬 evolução em lote"
-          git push
+          if ! git diff --staged --quiet; then
+            git commit -m "🧬 evolução em lote"
+            git push
+          else
+            echo "Nenhuma mudança para comitar no lote."
+          fi
 
   testes:
     name: 🧪 Pytest

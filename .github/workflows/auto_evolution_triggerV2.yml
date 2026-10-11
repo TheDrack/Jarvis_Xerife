@@ -157,7 +157,7 @@ jobs:
             echo "📢 Criando Pull Request..."
             PR_URL=$(gh pr create \
                          --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
-                         --body "### 🧠 Evolução JARVIS \n**Missão:** ${{ steps.flow.outputs.mission_desc }} \n\n*Aguardando validação da Homeostase.*" \
+                         --body "### 🧠 Evolução JARVIS\n**Missão:** ${{ steps.flow.outputs.mission_desc }}\n\n*Aguardando validação da Homeostase.*" \
                          --base main --head "$BRANCH_NAME")
             
             echo "pr_number=$(echo $PR_URL | awk -F'/' '{print $6}')" >> $GITHUB_OUTPUT

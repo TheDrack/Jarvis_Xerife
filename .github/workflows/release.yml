@@ -35,14 +35,21 @@ jobs:
           if (Test-Path "requirements.txt") { uv pip install -r requirements.txt }
         shell: pwsh
 
-      - name: 🔍 Debug Path (Verify main.py existence)
+      - name: 🔍 Verificar estrutura do projeto
         run: |
-          if (Test-Path "app/application/services/main.py") {
-            Write-Host "[OK] main.py found at app/application/services/main.py"
+          Write-Host "📁 Workspace: $(Get-Location)"
+          Write-Host "Verificando arquivos esperados..."
+          if (Test-Path "app/runtime/pipeline_runner.py") {
+            Write-Host "[OK] pipeline_runner.py encontrado."
           } else {
-            Write-Host "[ERROR] main.py NOT found! Check folder structure."
+            Write-Host "[ERROR] pipeline_runner.py não encontrado em app/runtime/"
             ls -Recurse
             exit 1
+          }
+          if (Test-Path "main.py") {
+            Write-Host "[OK] main.py encontrado na raiz."
+          } else {
+            Write-Host "[WARN] main.py não encontrado na raiz; o pipeline pode ser o ponto de entrada esperado."
           }
         shell: pwsh
 

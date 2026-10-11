@@ -76,8 +76,12 @@ jobs:
           git config --local user.email "jarvis-bot@github.com"
           git config --local user.name "JARVIS Nexus DI Migration"
           git add -A
-          git diff --staged --quiet || git commit -m "🔄 [JARVIS] Migrate to Nexus DI: removed direct imports"
-          git push
+          if ! git diff --staged --quiet; then
+            git commit -m "🔄 [JARVIS] Migrate to Nexus DI: removed direct imports"
+            git push
+          else
+            echo "Nenhuma mudança para comitar."
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

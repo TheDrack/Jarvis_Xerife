@@ -69,6 +69,7 @@ def run_pipeline(
     }
     
     # Executar cada componente em ordem
+    failed_count = 0
     for step_name, step_config in pipeline_config.items():
         success = _execute_step(
             step_name=step_name,
@@ -76,14 +77,20 @@ def run_pipeline(
             context=context,
             is_strict=pipeline_strict,
         )
-        
+
+        if not success:
+            failed_count += 1
+
         if not success and pipeline_strict:
             logger.error(f"💀 [STRICT] Falha crítica em '{step_name}'. Abortando.")
             context["status"] = "failed"
             return context
-    
+
+    if failed_count > 0:
+        logger.warning(f"⚠️ PIPELINE '{pipeline_name}' finalizado com {failed_count} passo(s) falho(s).")
+
     logger.info(f"🏁 PIPELINE '{pipeline_name}' FINALIZADO.")
-    context["status"] = "success"
+    context["status"] = "success" if failed_count == 0 else "partial"
     return context
 
 def _execute_step(

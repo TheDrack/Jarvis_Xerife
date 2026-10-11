@@ -62,4 +62,3 @@ class ConsolidatedContextService(NexusComponent):
             self._cache = content
             return content
         except Exception as e:
-            logger.error(f

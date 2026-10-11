@@ -22,7 +22,16 @@ jobs:
           echo "========================================"
           echo " Repo Lifecycle Governance"
           echo "========================================"
-          python scripts/repo_lifecycle_governance.py
+          set -o pipefail
+          python scripts/repo_lifecycle_governance.py 2>&1 | tee repo_lifecycle_governance.log
+          EXIT_CODE=${PIPESTATUS[0]}
+          if [[ $EXIT_CODE -ne 0 ]]; then
+            echo "❌ repo_lifecycle_governance.py falhou com código $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+          if grep -qiE "error|fatal|traceback|exception" repo_lifecycle_governance.log; then
+            echo "⚠️ repo_lifecycle_governance.py retornou mas contém avisos/erros no log."
+          fi
 
       - name: Commit frozen changes (no PR, no merge)
         run: |
@@ -30,8 +39,12 @@ jobs:
             git config user.name "governance-bot"
             git config user.email "governance@bot"
             git add .
-            git commit -m "chore: lifecycle governance (freeze/unfreeze)"
-            git push
+            if ! git diff --staged --quiet; then
+              git commit -m "chore: lifecycle governance (freeze/unfreeze)"
+              git push
+            else
+              echo "Arquivos marcados, mas sem mudança para comitar."
+            fi
           else
             echo "No changes to commit"
           fi

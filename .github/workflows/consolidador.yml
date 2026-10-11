@@ -27,6 +27,16 @@ jobs:
         run: |
           pip install --quiet pyyaml
 
+      - name: 🔍 Verificar sintaxe Python antes do pipeline
+        run: |
+          if python -m compileall -q app/runtime app/application app/core app/adapters > /tmp/syntax_check.txt 2>&1; then
+            echo "Sintaxe Python verificada com sucesso."
+          else
+            echo "❌ Erros de sintaxe encontrados:"
+            cat /tmp/syntax_check.txt
+            exit 1
+          fi
+
       - name: Run consolidador -> Drive -> Telegram -> Gist
         env:
           G_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
