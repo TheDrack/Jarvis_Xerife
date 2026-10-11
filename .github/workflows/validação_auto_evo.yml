@@ -1,25 +1,15 @@
 name: 🧬 Validação — Auto-Evolução e Multi-LLM
 
+# Este workflow deve CONFERIR, não iniciar mutações.
+# A criação de novas missões/evolução deve ficar com
+# `auto_evolution_triggerV2.yml`.
 on:
   workflow_dispatch:
     inputs:
       cap_id:
-        description: "CAP a evoluir (ex: CAP-001). Deixe vazio para pular evolução."
+        description: "CAP cuja mudança deve ser conferida (ex: CAP-001). Deixe vazio para conferir o estado geral."
         required: false
         default: ""
-        type: string
-      run_batch:
-        description: "Executar evolução em lote?"
-        required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
-      batch_limit:
-        description: "Limite de caps no lote"
-        required: false
-        default: "5"
         type: string
       run_tests:
         description: "Executar pytest?"
@@ -31,7 +21,7 @@ on:
           - "false"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   diagnostico-llm:
@@ -57,8 +47,10 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
         run: |
+          set -e
+
           python - <<'PYEOF'
-          import os, sys
+          import os, sys, json
           sys.path.insert(0, ".")
 
           provedores = {
@@ -67,6 +59,8 @@ jobs:
               "OpenRouter":  "OPENROUTER_API_KEY",
               "Mistral":     "MISTRAL_API_KEY",
           }
+
+          resultado = {"llms_ok": "false"}
           print("=" * 45)
           disponiveis = 0
           for nome, env in provedores.items():
@@ -81,7 +75,8 @@ jobs:
           if disponiveis == 0:
               print("⛔ Nenhum secret de LLM configurado.")
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                  f.write("llms_ok=false\n")
+                  json.dump(resultado, f)
+                  f.write("\n")
               sys.exit(1)
 
           try:
@@ -93,17 +88,20 @@ jobs:
                   require_json=True,
               )
               print(f"✅ MetabolismCore OK → {result}")
-              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                  f.write("llms_ok=true\n")
+              resultado["llms_ok"] = "true"
           except Exception as e:
               print(f"❌ MetabolismCore falhou: {e}")
-              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-                  f.write("llms_ok=false\n")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              json.dump(resultado, f)
+              f.write("\n")
+
+          if resultado["llms_ok"] != "true":
               sys.exit(1)
           PYEOF
 
   validar-stubs:
-    name: 🔧 Corrigir stubs + relatório
+    name: 🔧 Validar estrutura de capabilities
     runs-on: ubuntu-latest
     needs: diagnostico-llm
     steps:
@@ -113,11 +111,12 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: 🔧 fix_cap_stubs.py
+      - name: 🔧 Corrigir stubs
         run: python scripts/fix_cap_stubs.py
 
       - name: 🔍 Verificar templates não expandidos
         run: |
+          set -e
           python - <<'PYEOF'
           from pathlib import Path
           import sys
@@ -133,11 +132,11 @@ jobs:
           print("✅ Arquivos de capability validados.")
           PYEOF
 
-  evoluir-cap:
-    name: 🧬 Evoluir cap
+  conferir-caps:
+    name: 🧾 Conferir estado dos caps
     runs-on: ubuntu-latest
     needs: [validar-stubs, diagnostico-llm]
-    if: ${{ github.event.inputs.run_batch != 'true' }}
+    if: ${{ github.event.inputs.cap_id != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -145,90 +144,37 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar dependências
+      - name: Conferir CAP selecionado
+        env:
+          CAP_ID: ${{ github.event.inputs.cap_id }}
         run: |
-          pip install -q requests
-          pip install -q -r requirements/core.txt || pip install -q requests pydantic
-
-      - name: 🎯 Selecionar CAP
-        id: select_cap
-        run: |
-          CAP_ID="${{ github.event.inputs.cap_id }}"
-          if [ -z "$CAP_ID" ]; then
-            CAP_ID=$(python - <<'PYEOF'
-          import json, sys
+          set -e
+          python - <<'PYEOF'
+          import json, os, sys
           from pathlib import Path
-          path = Path("data/capabilities.json")
-          if not path.exists():
+
+          cap_id = os.environ.get("CAP_ID", "").strip()
+          if not cap_id:
+              print("⚠️ Nenhum CAP informado.")
               sys.exit(0)
-          caps = json.loads(path.read_text(encoding="utf-8")).get("capabilities", [])
-          pending = sorted([c for c in caps if c.get("status") not in ("complete",)], key=lambda x: x.get("priority", 99))
-          print(pending[0]["id"] if pending else "", end="")
+
+          caps_path = Path("data/capabilities.json")
+          if not caps_path.exists():
+              print("⚠️ data/capabilities.json não encontrado.")
+              sys.exit(0)
+
+          caps = json.loads(caps_path.read_text(encoding="utf-8")).get("capabilities", [])
+          found = [c for c in caps if str(c.get("id")) == cap_id]
+          if not found:
+              print(f"⚠️ CAP {cap_id} não encontrado em data/capabilities.json.")
+              sys.exit(0)
+
+          cap = found[0]
+          print(f"🧾 CAP selecionado para conferência: {cap_id}")
+          print(f"- status: {cap.get('status')}")
+          print(f"- title: {cap.get('title')}")
+          print(f"- priority: {cap.get('priority')}")
           PYEOF
-            )
-            if [ -z "$CAP_ID" ]; then
-              echo "✅ Sem caps pendentes."
-              echo "cap_id=" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          fi
-          echo "cap_id=$CAP_ID" >> "$GITHUB_OUTPUT"
-
-      - name: 🧬 Evoluir cap
-        if: steps.select_cap.outputs.cap_id != ''
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-        run: |
-          python scripts/evolution_mutator.py \
-            --cap-id "${{ steps.select_cap.outputs.cap_id }}" \
-            --roadmap-context "Gerado via GitHub Actions" \
-            --max-attempts 3
-
-      - name: 💾 Commit
-        if: steps.select_cap.outputs.cap_id != ''
-        run: |
-          git config user.name  "JARVIS Evolution Bot"
-          git config user.email "jarvis-bot@noreply.github.com"
-          git add app/domain/capabilities/ data/capabilities.json data/capabilities.jrvs
-          git diff --cached --quiet || git commit -m "🧬 evolução: ${{ steps.select_cap.outputs.cap_id }}"
-          git push
-
-  evoluir-lote:
-    name: 🚀 Lote
-    runs-on: ubuntu-latest
-    needs: [validar-stubs, diagnostico-llm]
-    if: ${{ github.event.inputs.run_batch == 'true' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Instalar dependências
-        run: pip install -q requests pydantic
-      - name: 🚀 Lote
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-        run: |
-          python scripts/evolve_all_pending.py \
-            --limit "${{ github.event.inputs.batch_limit }}" \
-            --delay 3
-      - name: 💾 Commit do lote
-        run: |
-          git config user.name  "JARVIS Evolution Bot"
-          git config user.email "jarvis-bot@noreply.github.com"
-          git add .
-          if ! git diff --staged --quiet; then
-            git commit -m "🧬 evolução em lote"
-            git push
-          else
-            echo "Nenhuma mudança para comitar no lote."
-          fi
 
   testes:
     name: 🧪 Pytest
@@ -242,13 +188,13 @@ jobs:
           python-version: "3.12"
       - name: Instalar dependências de dev
         run: pip install -q pytest pytest-asyncio pytest-cov
-      - name: 🧪 Rodar Testes
+      - name: 🧪 Rodar testes
         run: pytest tests/domain/ -v --tb=short
 
   relatorio-final:
     name: 📊 Relatório Final
     runs-on: ubuntu-latest
-    needs: [diagnostico-llm, validar-stubs, testes]
+    needs: [diagnostico-llm, validar-stubs, conferir-caps, testes]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -259,20 +205,27 @@ jobs:
         env:
           DIAGNOSTICO_LLM: ${{ needs.diagnostico-llm.result }}
           VALIDAR_STUBS: ${{ needs.validar-stubs.result }}
+          CONFERIR_CAPS: ${{ needs.conferir-caps.result }}
           TESTES: ${{ needs.testes.result }}
         run: |
+          set -e
           python - <<'PYEOF'
-          import json, os, time, sys
+          import json, os, sys
           from pathlib import Path
-          
+
           caps_path = Path("data/capabilities.json")
-          caps = json.loads(caps_path.read_text(encoding="utf-8")).get("capabilities", []) if caps_path.exists() else []
+          caps = json.loads(
+              caps_path.read_text(encoding="utf-8")
+          ).get("capabilities", []) if caps_path.exists() else []
+
           total = len(caps)
           complete = sum(1 for c in caps if c.get("status") == "complete")
-          
+
           print("=" * 50)
           print(f"📊 RELATÓRIO: {complete}/{total} completas")
-          print(f"Diagnóstico: {os.getenv('DIAGNOSTICO_LLM')}")
+          print(f"Diagnóstico LLM: {os.getenv('DIAGNOSTICO_LLM')}")
+          print(f"Validação de stubs: {os.getenv('VALIDAR_STUBS')}")
+          print(f"Conferência de CAP: {os.getenv('CONFERIR_CAPS')}")
           print(f"Testes: {os.getenv('TESTES')}")
           print("=" * 50)
           PYEOF

@@ -25,10 +25,17 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --quiet pyyaml requests
+          pip install --quiet \
+            pyyaml \
+            requests \
+            google-api-python-client \
+            google-auth-httplib2 \
+            google-auth-oauthlib \
+            aiohttp>=3.9.0
 
       - name: 🔍 Verificar sintaxe Python antes do pipeline
         run: |
+          set -o pipefail
           if python -m compileall -q app/runtime app/application app/core app/adapters > /tmp/syntax_check.txt 2>&1; then
             echo "Sintaxe Python verificada com sucesso."
           else
@@ -37,7 +44,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run consolidador -> Drive -> Telegram -> Gist
+      - name: Executar pipeline sync_drive
         env:
           G_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}

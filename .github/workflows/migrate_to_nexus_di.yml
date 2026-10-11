@@ -73,9 +73,17 @@ jobs:
       - name: 📝 Commit das mudanças (se não for dry-run)
         if: github.event.inputs.dry_run == 'false'
         run: |
+          set -e
+
           git config --local user.email "jarvis-bot@github.com"
           git config --local user.name "JARVIS Nexus DI Migration"
-          git add -A
+
+          # Evita commitear artefatos de CI e 백업s
+          git add app scripts tests data docs
+          git add *.md Dockerfile *.yml *.yaml Makefile *.ini *.toml setup.py
+          git add .github
+          git rm -r --cached .pytest_cache htmlcov .venv_tests logs backups .backups 2>/dev/null || true
+
           if ! git diff --staged --quiet; then
             git commit -m "🔄 [JARVIS] Migrate to Nexus DI: removed direct imports"
             git push

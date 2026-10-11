@@ -17,20 +17,21 @@ jobs:
       - name: 📦 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
 
       - name: 🔧 Install Dependencies
         run: |
           pip install --quiet \
+            pyyaml \
+            requests \
             google-api-python-client \
             google-auth-httplib2 \
             google-auth-oauthlib \
-            pyyaml \
-            requests \
             aiohttp>=3.9.0
 
       - name: 🔍 Verificar sintaxe Python antes do pipeline
         run: |
+          set -o pipefail
           if python -m compileall -q app/runtime app/application app/core app/adapters > /tmp/syntax_check.txt 2>&1; then
             echo "Sintaxe Python verificada com sucesso."
           else
@@ -39,7 +40,7 @@ jobs:
             exit 1
           fi
 
-      - name: ☁️ Run JARVIS Pipeline (Sync Drive & Backups)
+      - name: ☁️ Executar pipeline sync_drive
         env:
           G_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}

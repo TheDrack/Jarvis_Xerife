@@ -7,35 +7,47 @@ on:
     paths:
       - 'app/**'
       - 'scripts/autodoc.py'
-  workflow_dispatch: # Permite rodar manualmente se necessário
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-    # Permissões necessárias para o bot fazer commit
-    permissions:
-      contents: write
 
     steps:
-      - name: 📥 Checkout do Repositório
+      - name: 📥 Checkout do repositório
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 🐍 Configurar Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
-      - name: ⚙️ Gerar Arquitetura Visual
+      - name: ⚙️ Gerar mapa de arquitetura
         run: python scripts/autodoc.py
 
-      - name: 💾 Commit da Documentação
+      - name: 💾 Commit da documentação
         run: |
+          set -e
+
+          if [ ! -f ARCHITECTURE.md ]; then
+            echo "❌ O script não gerou ARCHITECTURE.md"
+            exit 1
+          fi
+
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+
           git add ARCHITECTURE.md
-          if git diff --quiet && git diff --staged --quiet; then
-            echo "Nenhuma mudança para comitar."
-          else
-            git commit -m "docs: 🤖 mapa de arquitetura atualizado [skip ci]"
-            git push
+
+          if git diff --quiet --cached ARCHITECTURE.md; then
+            echo "𝑁𝑒𝑛𝑕𝑖𝑚 𝑐𝑎𝑚𝑏𝑖𝑎𝑚𝑒𝑛𝑡𝑜 𝑟𝑒𝑎𝑙 𝑛𝑎 𝑑𝑜𝑐𝑢𝑚𝑒𝑛𝑡𝑎çã𝑜."
+            exit 0
+          fi
+
+          git commit -m "docs: 🤖 mapa de arquitetura atualizado [skip ci]"
+          git push

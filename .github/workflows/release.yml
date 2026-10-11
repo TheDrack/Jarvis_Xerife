@@ -97,8 +97,9 @@ jobs:
           path: dist/Jarvis_Installer.exe
           retention-days: 30
           if-no-files-found: error
-          compression-level: 6
-
+          compression-level: 6      # Release só é criada quando o fluxo é acionado a partir de uma tag v*.
+      # Se o objetivo for criar release também no workflow_dispatch sem tag,
+      # ajuste este `if` ou adicione um step de criação de tag antes.
       - name: 🏷️ Create Release (on tag)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1

@@ -44,21 +44,32 @@ jobs:
       - name: 🔍 Verificação de Gatilho
         id: gatekeeper
         env:
-          # Must match the git user.name set in "Configurar Identidade JARVIS" step
           HEALER_GIT_NAME: "JARVIS"
         run: |
-          LAST_COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
-          
-          # Prevent self-loop: if the last commit was made by JARVIS itself
-          # (e.g. a previous healing run), skip this run unconditionally.
-          if [[ "$LAST_COMMIT_AUTHOR" == "$HEALER_GIT_NAME" ]]; then
-            echo "authorized=false" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "pull_request" ]] || \
-             ([[ "${{ github.event_name }}" == "workflow_run" ]] && [[ "${{ github.event.workflow_run.conclusion }}" == "failure" ]]) || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "authorized=true" >> $GITHUB_OUTPUT
+          set -e
+
+          LAST_COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an' 2>/dev/null || true)
+          LAST_COMMIT_EMAIL=$(git log -1 --pretty=format:'%ae' 2>/dev/null || true)
+
+          if [[ "$LAST_COMMIT_AUTHOR" == "$HEALER_GIT_NAME" ]] || [[ "$LAST_COMMIT_EMAIL" == "jarvis@simbiose.ai" ]]; then
+            echo "authorized=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Ultimo commit foi do JARVIS. Pulando para evitar loop."
+            exit 0
+          fi
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "authorized=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "authorized=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            CONCLUSION="${{ github.event.workflow_run.conclusion }}"
+            if [[ "$CONCLUSION" == "failure" ]] || [[ "$CONCLUSION" == "timed_out" ]] || [[ "$CONCLUSION" == "cancelled" ]]; then
+              echo "authorized=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "authorized=false" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "authorized=false" >> $GITHUB_OUTPUT
+            echo "authorized=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: ⚙️ Configurar Identidade JARVIS
@@ -86,6 +97,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT || secrets.GITHUB_TOKEN }}
         run: |
+          set -e
+
           RUN_ID="${{ github.event.workflow_run.id }}"
           LOGS_FILE="failed_workflow_logs.txt"
 
@@ -93,22 +106,33 @@ jobs:
           echo "# Run ID: $RUN_ID | SHA: ${{ github.event.workflow_run.head_sha }}" >> "$LOGS_FILE"
           echo "" >> "$LOGS_FILE"
 
-          # Lista jobs com falha e captura seus logs
+          FAILED_JOBS_FILE="/tmp/failed_jobs.txt"
           gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/jobs" \
             --jq '.jobs[] | select(.conclusion=="failure") | "\(.id) \(.name)"' \
-            > /tmp/failed_jobs.txt 2>/dev/null || true
+            > "$FAILED_JOBS_FILE" 2>/dev/null || true
+
+          if [ ! -s "$FAILED_JOBS_FILE" ]; then
+            echo "⚠️ Nenhum job com falha encontrado ou indisponível." >> "$LOGS_FILE"
+          fi
 
           while IFS=' ' read -r job_id job_name; do
             [ -z "$job_id" ] && continue
             echo "=== JOB: $job_name (ID: $job_id) ===" >> "$LOGS_FILE"
-            gh api "repos/${{ github.repository }}/actions/jobs/$job_id/logs" \
-              --header "Accept: application/vnd.github.v3.raw" \
-              >> "$LOGS_FILE" 2>/dev/null || echo "Log indisponível para job $job_id" >> "$LOGS_FILE"
+            if gh api "repos/${{ github.repository }}/actions/jobs/$job_id/logs" \
+              --header "Accept: application/vnd.github.v3.raw" >> "$LOGS_FILE" 2>/dev/null; then
+              true
+            else
+              echo "Log indisponível para job $job_id" >> "$LOGS_FILE"
+            fi
             echo "" >> "$LOGS_FILE"
-          done < /tmp/failed_jobs.txt
+          done < "$FAILED_JOBS_FILE"
 
           echo "logs_file=$LOGS_FILE" >> "$GITHUB_OUTPUT"
-          echo "has_logs=$([ -s "$LOGS_FILE" ] && echo 'true' || echo 'false')" >> "$GITHUB_OUTPUT"
+          if [ -s "$LOGS_FILE" ]; then
+            echo "has_logs=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_logs=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: 🔄 Ciclo de Auto-Cura e Testes
         if: steps.gatekeeper.outputs.authorized == 'true'
@@ -155,30 +179,34 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
+          set -e
+
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          git add .
+
+          # Evita commitear lixo de CI: logs, reports, caches, envs
+          git add app scripts tests data docs *.md Dockerfile *.yml *.yaml Makefile *.ini *.toml setup.py
+          git add .github
+          git rm -r --cached .pytest_cache htmlcov .venv_tests logs backups 2>/dev/null || true
 
           if ! git diff --staged --quiet; then
             git commit -m "fix(jarvis): auto-cura aplicada via ${{ github.event_name }} [${{ steps.healing_process.outputs.status }}]"
 
             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              PUSH_TARGET=${{ github.head_ref }}
-              git push origin HEAD:$PUSH_TARGET
+              PUSH_TARGET="${{ github.head_ref }}"
+              git push origin HEAD:"$PUSH_TARGET" || true
               if [[ "${{ steps.healing_process.outputs.status }}" == "success" ]]; then
                 gh pr merge ${{ github.event.pull_request.number }} --auto --merge || true
               fi
             elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-              # Cria PR com as correções — evita push direto sem revisão
               HEAL_BRANCH="jarvis/heal-${{ github.run_id }}"
               git checkout -b "$HEAL_BRANCH"
-              git push origin HEAD:"$HEAL_BRANCH"
+              git push origin HEAD:"$HEAL_BRANCH" || true
               gh pr create \
                 --title "🛡️ JARVIS: Auto-Cura após falha em '${{ github.event.workflow_run.name }}'" \
                 --body "Correções automáticas aplicadas pelo healer após falha no workflow." \
                 --head "$HEAL_BRANCH" --base main || true
             else
-              # Modo Dispatch: Push na branch onde foi disparado
-              git push origin HEAD:$CURRENT_BRANCH
+              git push origin HEAD:"$CURRENT_BRANCH" || true
             fi
           else
             echo "Nenhuma alteração necessária no DNA."

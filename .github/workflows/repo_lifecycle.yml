@@ -35,10 +35,18 @@ jobs:
 
       - name: Commit frozen changes (no PR, no merge)
         run: |
+          set -e
+
           if [[ -n "$(git status --porcelain)" ]]; then
             git config user.name "governance-bot"
             git config user.email "governance@bot"
-            git add .
+
+            # Evita commitear lixo de CI: logs, caches, artefatos, envs
+            git add app scripts tests data docs
+            git add *.md Dockerfile *.yml *.yaml Makefile *.ini *.toml setup.py
+            git add .github
+            git rm -r --cached .pytest_cache htmlcov .venv_tests logs backups .backups 2>/dev/null || true
+
             if ! git diff --staged --quiet; then
               git commit -m "chore: lifecycle governance (freeze/unfreeze)"
               git push
