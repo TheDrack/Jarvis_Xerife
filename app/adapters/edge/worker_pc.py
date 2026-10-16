@@ -13,6 +13,7 @@ import os
 import sys
 import time
 
+from app.adapters.infrastructure.sqlite_history_adapter import SQLiteHistoryAdapter
 from app.core.config import settings
 from app.core.nexus import nexus
 

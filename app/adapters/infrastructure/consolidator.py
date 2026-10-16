@@ -3,6 +3,7 @@
 CORREÇÃO: Mantido padrão original do CORE para compatibilidade com Nexus Discovery.
 """
 import ast
+import json
 import logging
 import os
 from datetime import datetime

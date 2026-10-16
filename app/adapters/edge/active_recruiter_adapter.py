@@ -1,4 +1,6 @@
 from app.core.nexus import NexusComponent
+from app.application.services.location_service import LocationService
+from app.domain.models.device import Device
 import scapy.all as scapy
 # REMOVIDO: usar nexus.resolve("device_service")
 # REMOVIDO: usar nexus.resolve("device_location_service")

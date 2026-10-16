@@ -7,7 +7,7 @@ Supports both SQLite (default/fallback) and PostgreSQL based on DATABASE_URL con
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, delete
@@ -19,6 +19,19 @@ from app.domain.models.thought_log import ThoughtLog
 from app.domain.models.capability import JarvisCapability
 
 logger = logging.getLogger(__name__)
+
+
+def _ensure_aware(value: Optional[datetime]) -> datetime:
+    """Return a timezone-aware UTC datetime.
+
+    SQLModel maps ``datetime`` columns to ``DateTime(timezone=True)``, so naive
+    values must be coerced before persistence, otherwise the driver rejects them.
+    """
+    if value is None:
+        return datetime.now(timezone.utc)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 class Interaction(NexusComponent, SQLModel, table=True):
@@ -34,7 +47,7 @@ class Interaction(NexusComponent, SQLModel, table=True):
     __table_args__ = {'extend_existing': True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    timestamp: datetime = Field(default_factory=datetime.now, nullable=False)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
     user_input: str = Field(nullable=False)
     command_type: str = Field(nullable=False)
     parameters: str = Field(default="{}", nullable=False)  # JSON string
@@ -152,7 +165,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
         try:
             with Session(self.engine) as session:
                 interaction = Interaction(
-                    timestamp=timestamp or datetime.now(),
+                    timestamp=_ensure_aware(timestamp),
                     user_input=user_input,
                     command_type=command_type,
                     parameters=json.dumps(parameters),
@@ -296,7 +309,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
         try:
             with Session(self.engine) as session:
                 interaction = Interaction(
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     user_input=user_input,
                     command_type=command_type,
                     parameters=json.dumps(parameters),
@@ -372,7 +385,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
                     interaction.status = status
                     interaction.success = success
                     interaction.response_text = response_text
-                    interaction.processed_at = datetime.now()
+                    interaction.processed_at = datetime.now(timezone.utc)
                     session.add(interaction)
                     session.commit()
                     logger.info(f"Updated command {command_id} status to {status}")

@@ -3,7 +3,7 @@ from app.core.nexus import NexusComponent
 """Reward Adapter - Database implementation of RewardProvider port"""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
 from sqlalchemy import func
@@ -66,7 +66,7 @@ class RewardAdapter(RewardProvider):
             ID of the logged reward
         """
         # Adjust reward based on cost efficiency (INTEGRAÇÃO 2)
-        reward_value, cost_factor = self._apply_cost_factor(reward_value, action_type)
+        reward_value, cost_factor = self._apply_cost_factor(reward_value, action_type, context_data)
         if metadata is None:
             metadata = {}
         metadata["cost_factor_applied"] = cost_factor
@@ -77,7 +77,7 @@ class RewardAdapter(RewardProvider):
                 reward_value=reward_value,
                 context_data=context_data or {},
                 meta_data=metadata or {},
-                created_at=datetime.now()
+                created_at=datetime.now(timezone.utc)
             )
             session.add(reward)
             session.commit()
@@ -89,7 +89,12 @@ class RewardAdapter(RewardProvider):
             )
             return reward.id
 
-    def _apply_cost_factor(self, reward_value: float, task_type: str) -> tuple:
+    def _apply_cost_factor(
+        self,
+        reward_value: float,
+        task_type: str,
+        context_data: Optional[Dict[str, Any]] = None,
+    ) -> tuple:
         """Adjust reward based on cost efficiency from CostTrackerAdapter.
 
         Returns (adjusted_reward, factor_applied).

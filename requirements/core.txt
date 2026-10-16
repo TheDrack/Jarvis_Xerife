@@ -22,4 +22,5 @@ psycopg2-binary>=2.9.9
 
 # HTTP Client
 httpx>=0.24.0
+requests>=2.31.0
 slowapi==0.1.9

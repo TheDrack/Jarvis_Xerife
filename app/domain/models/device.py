@@ -4,7 +4,7 @@ logger = logging.getLogger(__name__)
 # -*- coding: utf-8 -*-
 """Device and Capability models for distributed orchestration"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 import json
 
@@ -32,8 +32,8 @@ class Device(NexusComponent, SQLModel, table=True):
     lat: Optional[float] = Field(default=None, nullable=True)  # Latitude for geolocation
     lon: Optional[float] = Field(default=None, nullable=True)  # Longitude for geolocation
     last_ip: Optional[str] = Field(default=None, nullable=True)  # Last known IP address
-    last_seen: datetime = Field(default_factory=datetime.now, nullable=False)
-    created_at: datetime = Field(default_factory=datetime.now, nullable=False)
+    last_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
     vendor_brand: str | None = None
     
     # CORREÇÃO AQUI: Mapeando a lista para JSON para compatibilidade com SQLite
@@ -65,7 +65,7 @@ class Capability(NexusComponent, SQLModel, table=True):
     name: str = Field(nullable=False, index=True)  # e.g., 'camera', 'bluetooth_scan', 'local_http_request'
     description: str = Field(default="", nullable=False)
     meta_data: str = Field(default="{}", nullable=False)  # JSON string for technical details
-    created_at: datetime = Field(default_factory=datetime.now, nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
 
 
 class CommandResult(NexusComponent, SQLModel, table=True):
@@ -86,4 +86,4 @@ class CommandResult(NexusComponent, SQLModel, table=True):
     result_data: str = Field(default="{}", nullable=False)  # JSON string for result data
     success: bool = Field(default=False, nullable=False)
     message: str = Field(default="", nullable=False)
-    created_at: datetime = Field(default_factory=datetime.now, nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)

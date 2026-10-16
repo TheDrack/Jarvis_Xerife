@@ -20,6 +20,7 @@ from app.adapters.infrastructure.gemini_response_helpers import (
 )
 from app.adapters.infrastructure.github_issue_mixin import GitHubIssueMixin
 from app.application.ports import VoiceProvider
+from app.application.ports import HistoryProvider
 from app.domain.models import CommandType, Intent
 from app.domain.services.agent_service import AgentService
 

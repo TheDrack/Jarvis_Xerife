@@ -10,9 +10,10 @@ pytest-cov>=4.1.0
 pytest-mock>=3.11.0
 anyio>=3.7.0
 
-# Type checking
+# Type checking / static analysis
 mypy>=1.5.0
 types-requests>=2.31.0
+pyflakes>=3.0.0
 
 # Code formatting and linting
 black>=23.7.0

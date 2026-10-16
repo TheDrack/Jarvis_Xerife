@@ -15,8 +15,12 @@ import time
 import traceback
 from typing import Optional
 
+from app.adapters.infrastructure.ai_gateway import AIGateway, LLMProvider
 from app.adapters.infrastructure.auto_repair_mixin import AutoRepairMixin
+from app.adapters.infrastructure.gemini_adapter import LLMCommandAdapter
+from app.adapters.infrastructure.github_adapter import GitHubAdapter  # noqa: F401 (used by self-healing / patchable)
 from app.application.ports import VoiceProvider
+from app.application.ports import HistoryProvider
 from app.domain.models import CommandType, Intent
 from app.domain.services.agent_service import AgentService
 from app.domain.services.llm_command_interpreter import LLMCommandInterpreter

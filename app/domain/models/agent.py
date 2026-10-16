@@ -47,13 +47,14 @@ class AgentAction:
     
     def to_dict(self) -> dict:
         return {
-            "action_type": self.action_type.value,            "parameters": self.parameters,
+            "action_type": self.action_type.value,
+            "parameters": self.parameters,
             "reasoning": self.reasoning,
             "step_number": self.step_number,
         }
     
     @classmethod
-    def from_dict(cls,  dict) -> "AgentAction":
+    def from_dict(cls, data: dict) -> "AgentAction":
         return cls(
             action_type=ActionType(data.get("action_type", "finish")),
             parameters=data.get("parameters", {}),

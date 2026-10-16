@@ -47,7 +47,7 @@ class AdapterRegistry(NexusComponent):
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         ctx = context or {}
         action = ctx.get("action", "list")
-                if action == "list":
+        if action == "list":
             return {"success": True, "adapters": self.list_adapters()}
         elif action == "get":
             adapter_id = ctx.get("adapter_id")
@@ -96,7 +96,8 @@ class AdapterRegistry(NexusComponent):
         
         return {
             "capability": capability,
-            "missing_adapter": True,            "suggested_id": self._suggest_adapter_id(capability),
+            "missing_adapter": True,
+            "suggested_id": self._suggest_adapter_id(capability),
             "suggested_name": self._suggest_adapter_name(capability),
         }
     
@@ -145,7 +146,8 @@ class AdapterRegistry(NexusComponent):
             },
             {
                 "adapter_id": "capability_manager",
-                "name": "Capability Manager",                "description": "Gerenciamento de capabilities",
+                "name": "Capability Manager",
+                "description": "Gerenciamento de capabilities",
                 "capabilities": ["list_capabilities", "execute_capability"],
                 "config_keys": [],
                 "example_yaml": "capability_manager:\n  id: \"capability_manager\"\n  config:\n    action: \"list_capabilities\"\n",
@@ -194,7 +196,8 @@ class AdapterRegistry(NexusComponent):
     
     def _suggest_adapter_id(self, capability: str) -> str:
         import re
-        name = capability.lower()        name = re.sub(r"[^a-z0-9]", "_", name)
+        name = capability.lower()
+        name = re.sub(r"[^a-z0-9]", "_", name)
         return f"{name}_adapter"
     
     def _suggest_adapter_name(self, capability: str) -> str:

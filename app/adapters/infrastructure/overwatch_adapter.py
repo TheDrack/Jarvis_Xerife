@@ -240,7 +240,7 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
                 if adapter and hasattr(adapter, "send_message"):
                     chat_id = os.getenv("TELEGRAM_CHAT_ID")
                     if chat_id:
-                        adapter.send_message(chat_id, message)
+                        adapter.send_message(message, chat_id=chat_id)
                         return
             except Exception:
                 pass

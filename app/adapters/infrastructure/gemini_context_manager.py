@@ -1,4 +1,5 @@
 # app/adapters/infrastructure/gemini_context_manager.py
+from app.core.nexus import NexusComponent
 import vertexai
 from vertexai.generative_models import GenerativeModel, CachedContent
 from datetime import datetime, timedelta

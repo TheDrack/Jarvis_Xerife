@@ -1,175 +1,371 @@
 # -*- coding: utf-8 -*-
-""" RewardSignalProvider — calcula rewards baseados em métricas reais.
+"""RewardSignalProvider — Sistema de recompensas para guiar a autoevolução.
 
-Versão 2026.03: Corrigida para estabilidade matemática e integração Nexus.
+Implementa RL calculando rewards baseados em métricas reais (taxa de testes,
+latência, error rate, feedback humano). Armazena tuplas (estado, ação, reward)
+em um ExperienceReplayBuffer em memória e em disco.
 """
+
 import json
 import logging
-from typing import Any, Dict, List, Optional
-from app.core.nexus import NexusComponent, nexus
+import time
+from collections import deque
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Deque, Dict, List, Optional, Tuple
+
+from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
+_REPLAY_BUFFER_FILE = Path("data/experience_replay.jsonl")
+_THOUGHT_LOG_FILE = Path("data/reward_thought_log.jsonl")
+_MAX_BUFFER_SIZE = 1000  # tuplas máximas no buffer em memória
+
+# Valores base de recompensa/penalidade (usados pelo cálculo legado)
+_REWARD_TEST_PASS = 10.0
+_REWARD_DEPLOY_SUCCESS = 50.0
+_REWARD_ROADMAP_PROGRESS = 20.0
+_REWARD_CAPABILITY_COMPLETE = 15.0
+
+_PENALTY_TEST_FAIL = -5.0
+_PENALTY_DEPLOY_FAIL = -25.0
+_PENALTY_ROLLBACK = -30.0
+_PENALTY_CRITICAL_ERROR = -15.0
+
+# Limiares de degradação para calculate_reward():
+# Aumento de latência (ms) que zera o score de latência (0 → 1 penalidade)
+_LATENCY_DEGRADATION_THRESHOLD_MS: float = 500.0
+# Aumento de error_rate que zera o score de erros (0 → 1 penalidade)
+_ERROR_RATE_DEGRADATION_THRESHOLD: float = 0.1
+
+
+class _ThoughtLogAudit:
+    """Registro auditável em JSONL para breakdowns de reward."""
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+
+    def record(self, entry: Dict[str, Any]) -> None:
+        """Persiste entrada no arquivo JSONL de auditoria."""
+        try:
+            entry["_timestamp"] = datetime.now(timezone.utc).isoformat()
+            with open(self._path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, default=str, ensure_ascii=False) + "\n")
+        except Exception as exc:
+            logger.debug("Falha ao registrar no ThoughtLog: %s", exc)
+
+
 class RewardSignalProvider(NexusComponent):
-    """Calcula rewards (recompensas) para evolução de código e interações de usuário."""
+    """Fornece sinais de recompensa para o loop de autoevolução.
 
-    def __init__(self):
-        super().__init__()
-        # Pesos padrão calibrados para o JARVIS DNA
-        self._weights = {
-            "tests": 0.4,   # Importância da estabilidade funcional
-            "latency": 0.3, # Eficiência de execução
-            "errors": 0.2,  # Confiabilidade em runtime
-            "human": 0.1    # Validação subjetiva
-        }
+    Calcula rewards baseados em métricas reais com os seguintes pesos:
+        (1) Test pass rate antes/depois  — 40%
+        (2) Latência delta               — 30%
+        (3) Error rate nas últimas 24h   — 20%
+        (4) Feedback humano (PR approve) — 10%
 
-    def calculate_reward(self, before_state: dict, after_state: dict, 
-                         human_approval: bool = True) -> float:
-        """Calcula reward baseado em métricas reais comparativas de evolução."""
+    Integra com EvolutionGatekeeper e FineTuneDatasetCollector.
 
+    Métodos principais:
+        calculate_reward()          — reward baseado em before/after state (métricas reais).
+        _calculate_legacy_reward()  — reward legado baseado em action_type.
+        calculate_penalty()         — penalidade baseada em erros introduzidos.
+        record_experience()         — armazena (estado, ação, reward) no buffer.
+        get_replay_buffer()         — retorna amostras do ExperienceReplayBuffer.
+    """
+
+    def __init__(self) -> None:
+        self._replay_buffer: Deque[Dict[str, Any]] = deque(maxlen=_MAX_BUFFER_SIZE)
+        self.thought_log = _ThoughtLogAudit(_THOUGHT_LOG_FILE)
+        _REPLAY_BUFFER_FILE.parent.mkdir(parents=True, exist_ok=True)
+        self._load_buffer_from_disk()
+
+    # ------------------------------------------------------------------
+    # NexusComponent interface
+    # ------------------------------------------------------------------
+
+    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Interface NexusComponent.
+
+        Campos aceitos em *context*:
+            action (str) — "reward" | "penalty" | "record" | "buffer". Padrão: "reward".
+
+            Para action="reward" (métricas reais):
+                before_state (dict) — estado antes da mudança (tests_passing_rate, avg_latency_ms, error_rate_24h).
+                after_state (dict)  — estado depois da mudança.
+                human_approval (bool) — aprovação humana (PR approve/reject). Padrão: True.
+
+            Para action="reward" (legado):
+                action_type (str) — tipo de ação (pytest_pass, deploy_success, etc.).
+                tests_before (int) — número de testes antes da mudança.
+                tests_after (int) — número de testes depois da mudança.
+
+            Para action="penalty":
+                errors_introduced (int) — número de erros críticos introduzidos.
+                action_type (str) — tipo de ação.
+
+            Para action="record":
+                state (dict), action_type (str), reward (float).
+
+            Para action="buffer":
+                limit (int) — quantidade de experiências a retornar.
+
+        Returns:
+            Dicionário com reward/penalty calculado ou conteúdo do buffer.
+        """
+        ctx = context or {}
+        action = ctx.get("action", "reward")
+
+        if action == "penalty":
+            penalty = self.calculate_penalty(
+                errors_introduced=int(ctx.get("errors_introduced", 0)),
+                action_type=ctx.get("action_type", "unknown"),
+            )
+            return {"success": True, "penalty": penalty}
+
+        if action == "record":
+            self.record_experience(
+                state=ctx.get("state", {}),
+                action_type=ctx.get("action_type", "unknown"),
+                reward=float(ctx.get("reward", 0.0)),
+            )
+            return {"success": True, "recorded": True}
+
+        if action == "buffer":
+            limit = int(ctx.get("limit", 50))
+            return {"success": True, "buffer": self.get_replay_buffer(limit)}
+
+        # default: reward — usa métricas reais se before/after_state presentes, senão legado
+        if "before_state" in ctx and "after_state" in ctx:
+            reward = self.calculate_reward(
+                before_state=ctx["before_state"],
+                after_state=ctx["after_state"],
+                human_approval=bool(ctx.get("human_approval", True)),
+            )
+        else:
+            reward = self._calculate_legacy_reward(
+                action_type=ctx.get("action_type", "unknown"),
+                tests_before=ctx.get("tests_before"),
+                tests_after=ctx.get("tests_after"),
+            )
+        return {"success": True, "reward": reward}
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def calculate_reward(
+        self,
+        before_state: Dict[str, Any],
+        after_state: Dict[str, Any],
+        human_approval: bool = True,
+    ) -> float:
+        """Calcula o reward baseado em métricas reais (antes/depois de uma mudança).
+
+        Pesos:
+            (1) Test pass rate delta  — 40%
+            (2) Latência delta        — 30%
+            (3) Error rate 24h delta  — 20%
+            (4) Feedback humano       — 10%
+
+        Nota: quando os testes regridem (test_delta < 0), test_score fica negativo,
+        podendo resultar em reward total abaixo de 0.0. Os demais componentes
+        são sempre >= 0.0. O valor máximo possível é 1.0.
+
+        Args:
+            before_state: Métricas antes da mudança. Campos:
+                tests_passing_rate (float 0-1): taxa de testes passando.
+                avg_latency_ms (float): latência média em ms.
+                error_rate_24h (float 0-1): taxa de erros nas últimas 24h.
+            after_state: Métricas após a mudança (mesmos campos).
+            human_approval: True se a mudança foi aprovada por humano (PR approve).
+
+        Returns:
+            Reward (float). Máximo: 1.0. Pode ser negativo se tests_passing_rate regredir.
+        """
         # 1. Test pass rate (40%)
-        # Premissa: Se os testes caírem, o reward deve sofrer uma penalidade severa.
         tests_before = before_state.get("tests_passing_rate", 0.0)
         tests_after = after_state.get("tests_passing_rate", 0.0)
         test_delta = tests_after - tests_before
-        
-        if test_delta >= 0:
-            test_score = self._weights["tests"] * tests_after
-        else:
-            # Penaliza proporcionalmente à queda
-            test_score = self._weights["tests"] * max(0.0, tests_after + test_delta)
+        test_score = 0.4 * (1.0 if test_delta >= 0 else test_delta)
 
         # 2. Latência delta (30%)
-        # Premissa: Recompensar código mais rápido.
-        latency_before = max(1, before_state.get("avg_latency_ms", 1000))
-        latency_after = max(1, after_state.get("avg_latency_ms", 1000))
-        
-        if latency_after <= latency_before:
-            latency_score = self._weights["latency"] * 1.0
-        else:
-            # Penaliza o aumento de latência
-            delta_pct = (latency_after - latency_before) / latency_before
-            latency_score = self._weights["latency"] * max(0.0, 1.0 - delta_pct)
+        latency_before = before_state.get("avg_latency_ms", 1000)
+        latency_after = after_state.get("avg_latency_ms", 1000)
+        latency_score = 0.3 * (
+            1.0 if latency_after <= latency_before
+            else max(0.0, 1.0 - (latency_after - latency_before) / _LATENCY_DEGRADATION_THRESHOLD_MS)
+        )
 
         # 3. Error rate (20%)
-        # Premissa: Queda na taxa de erros de 24h.
         errors_before = before_state.get("error_rate_24h", 0.0)
         errors_after = after_state.get("error_rate_24h", 0.0)
-        
-        if errors_after <= errors_before:
-            error_score = self._weights["errors"] * 1.0
-        else:
-            delta = errors_after - errors_before
-            # Escala de sensibilidade: 0.1 (10%) de aumento zera o score de erro
-            error_score = self._weights["errors"] * max(0.0, 1.0 - (delta / 0.1))
+        error_score = 0.2 * (
+            1.0 if errors_after <= errors_before
+            else max(0.0, 1.0 - (errors_after - errors_before) / _ERROR_RATE_DEGRADATION_THRESHOLD)
+        )
 
         # 4. Feedback humano (10%)
-        human_score = self._weights["human"] * (1.0 if human_approval else 0.0)
+        human_score = 0.1 * (1.0 if human_approval else 0.0)
 
         reward = test_score + latency_score + error_score + human_score
 
-        # Registro para auditoria do ThoughtLog
-        self._log_reward_calculation({
-            "reward_final": round(reward, 4),
+        # Log para auditoria
+        self.thought_log.record({
+            "event": "reward_calculated",
+            "reward": reward,
             "breakdown": {
-                "test_score": round(test_score, 4),
-                "latency_score": round(latency_score, 4),
-                "error_score": round(error_score, 4),
-                "human_score": round(human_score, 4)
+                "test_score": test_score,
+                "latency_score": latency_score,
+                "error_score": error_score,
+                "human_score": human_score,
             },
-            "metrics_delta": {
-                "test_diff": round(test_delta, 4),
-                "latency_diff_ms": latency_after - latency_before
-            }
         })
 
-        return round(float(reward), 4)
+        logger.debug("[RewardSignalProvider] calculate_reward → %.4f", reward)
+        return round(reward, 4)
 
-    def calculate_interaction_reward(self, outcome: str, feedback: Optional[str]) -> float:
-        """Calcula reward para interações rápidas (API/Interface)."""
-        base_map = {"executed": 0.8, "clarified": 0.5, "rejected": 0.2}
-        reward = base_map.get(outcome, 0.3)
+    def _calculate_legacy_reward(
+        self,
+        action_type: str,
+        tests_before: Optional[int] = None,
+        tests_after: Optional[int] = None,
+        **kwargs: Any,
+    ) -> float:
+        """Calcula o reward legado baseado no tipo de ação e na taxa de testes.
 
-        if feedback:
-            f_lower = feedback.lower()
-            # Positivos
-            if any(p in f_lower for p in ["👍", "bom", "ótimo", "great", "good", "perfeito"]):
-                reward += 0.15
-            # Negativos
-            elif any(p in f_lower for p in ["👎", "ruim", "lento", "bad", "wrong", "erro"]):
-                reward -= 0.2
+        Mantido para compatibilidade com EvolutionLoopService e chamadas legadas.
 
-        return max(0.0, min(1.0, round(float(reward), 4)))
+        Args:
+            action_type: Tipo de ação (pytest_pass, deploy_success, rollback, etc.).
+            tests_before: Contagem de testes antes da mudança.
+            tests_after: Contagem de testes depois da mudança.
+            **kwargs: Campos adicionais ignorados silenciosamente.
 
-    def _log_reward_calculation(self, data: dict):
-        """Notifica o serviço de ThoughtLog para manter rastreabilidade evolutiva."""
+        Returns:
+            Valor float do reward (positivo) ou 0.0 se não reconhecido.
+        """
+        base_rewards: Dict[str, float] = {
+            "pytest_pass": _REWARD_TEST_PASS,
+            "deploy_success": _REWARD_DEPLOY_SUCCESS,
+            "roadmap_progress": _REWARD_ROADMAP_PROGRESS,
+            "capability_complete": _REWARD_CAPABILITY_COMPLETE,
+            "capability_partial": _REWARD_CAPABILITY_COMPLETE / 3.0,
+        }
+        reward = base_rewards.get(action_type, 0.0)
+
+        # Amplifica reward se o número de testes cresceu
+        if reward > 0 and tests_before is not None and tests_after is not None:
+            delta = int(tests_after) - int(tests_before)
+            if delta > 0:
+                reward += min(delta * 0.5, 10.0)  # cap de bônus: +10
+            elif delta < 0:
+                reward = max(0.0, reward + delta * 1.0)  # penaliza regressão
+
+        logger.debug(
+            "[RewardSignalProvider] _calculate_legacy_reward(%s) → %.2f", action_type, reward
+        )
+        return round(reward, 4)
+
+    def calculate_penalty(
+        self,
+        errors_introduced: int = 0,
+        action_type: str = "unknown",
+        **kwargs: Any,
+    ) -> float:
+        """Calcula a penalidade baseada em erros críticos introduzidos.
+
+        Args:
+            errors_introduced: Número de erros críticos novos detectados.
+            action_type: Tipo de ação que gerou os erros.
+            **kwargs: Campos adicionais ignorados silenciosamente.
+
+        Returns:
+            Valor float da penalidade (negativo).
+        """
+        base_penalties: Dict[str, float] = {
+            "pytest_fail": _PENALTY_TEST_FAIL,
+            "deploy_fail": _PENALTY_DEPLOY_FAIL,
+            "rollback": _PENALTY_ROLLBACK,
+        }
+        penalty = base_penalties.get(action_type, 0.0)
+        penalty += errors_introduced * _PENALTY_CRITICAL_ERROR
+
+        logger.debug(
+            "[RewardSignalProvider] calculate_penalty(%s, errors=%d) → %.2f",
+            action_type, errors_introduced, penalty,
+        )
+        return round(penalty, 4)
+
+    def record_experience(
+        self,
+        state: Dict[str, Any],
+        action_type: str,
+        reward: float,
+    ) -> None:
+        """Armazena uma tupla (estado, ação, reward) no ExperienceReplayBuffer.
+
+        Args:
+            state: Estado do sistema no momento da ação (snapshot dict).
+            action_type: Tipo de ação executada.
+            reward: Reward ou penalidade associada.
+        """
+        entry: Dict[str, Any] = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "epoch": time.time(),
+            "state": state,
+            "action_type": action_type,
+            "reward": reward,
+        }
+        self._replay_buffer.append(entry)
+        self._persist_entry(entry)
+
+    def get_replay_buffer(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Retorna amostras recentes do ExperienceReplayBuffer.
+
+        Args:
+            limit: Número máximo de experiências a retornar.
+
+        Returns:
+            Lista de tuplas (estado, ação, reward), da mais recente à mais antiga.
+        """
+        buf = list(self._replay_buffer)
+        return list(reversed(buf[-limit:]))
+
+    def get_cumulative_reward(self, last_n: int = 10) -> float:
+        """Soma os rewards das últimas N experiências.
+
+        Args:
+            last_n: Número de experiências recentes a considerar.
+
+        Returns:
+            Soma dos rewards.
+        """
+        recent = list(self._replay_buffer)[-last_n:]
+        return round(sum(e.get("reward", 0.0) for e in recent), 4)
+
+    # ------------------------------------------------------------------
+    # Persistence helpers
+    # ------------------------------------------------------------------
+
+    def _persist_entry(self, entry: Dict[str, Any]) -> None:
+        """Persiste uma entrada no arquivo JSONL do buffer."""
         try:
-            thought_log = nexus.resolve("thought_log_service")
-            if thought_log and not getattr(thought_log, "__is_cloud_mock__", False):
-                thought_log.record({
-                    "component": "RewardSignalProvider",
-                    "event": "reward_calculation_audit",
-                    "payload": data
-                })
-        except Exception as e:
-            logger.debug("Falha silenciosa ao logar reward: %s", e)
+            with open(_REPLAY_BUFFER_FILE, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, default=str, ensure_ascii=False) + "\n")
+        except Exception as exc:
+            logger.debug("Falha ao persistir experiência: %s", exc)
 
-    async def optimize_weights_with_llm(self, history: List[dict]) -> dict:
-        """Utiliza o LLM para ajustar os pesos baseando-se no que gerou mais sucesso."""
-        llm_router = nexus.resolve("llm_router")
-        if not llm_router or getattr(llm_router, "__is_cloud_mock__", False):
-            return self._weights
-
-        successes = sum(1 for h in history if h.get("reward_final", 0) >= 0.7)
-        failures = sum(1 for h in history if h.get("reward_final", 0) < 0.5)
-
-        prompt = f"""Analise os pesos atuais: {self._weights}
-Contexto: {len(history)} ciclos processados. Sucessos: {successes}, Falhas: {failures}.
-Sugira novos pesos para (tests, latency, errors, human) que priorizem a estabilidade do sistema.
-A soma deve ser exatamente 1.0. 
-Retorne APENAS um JSON válido."""
-
+    def _load_buffer_from_disk(self) -> None:
+        """Carrega as entradas mais recentes do arquivo JSONL ao inicializar."""
+        if not _REPLAY_BUFFER_FILE.exists():
+            return
         try:
-            result = await llm_router.execute({
-                "prompt": prompt,
-                "require_json": True
-            })
-
-            # Tenta extrair e validar JSON da resposta do LLM
-            raw_response = result.get("response", "{}")
-            new_weights = json.loads(raw_response) if isinstance(raw_response, str) else raw_response
-            
-            if isinstance(new_weights, dict) and all(k in new_weights for k in self._weights):
-                total = sum(new_weights.values())
-                if total > 0:
-                    # Normalização para garantir que a soma seja 1.0
-                    self._weights = {k: round(v / total, 2) for k, v in new_weights.items()}
-                    logger.info("[NEXUS REWARD] Pesos otimizados via LLM: %s", self._weights)
-
-            return self._weights
-        except Exception as e:
-            logger.warning("[NEXUS REWARD] Falha na otimização de pesos: %s", e)
-            return self._weights
-
-    def update_weights(self, new_weights: dict):
-        """Atualização manual de pesos por admin ou protocolo de emergência."""
-        if abs(sum(new_weights.values()) - 1.0) < 0.01:
-            self._weights = new_weights
-            logger.info("[NEXUS REWARD] Pesos atualizados manualmente: %s", self._weights)
-        else:
-            logger.error("[NEXUS REWARD] Falha ao atualizar: Pesos não somam 1.0")
-
-    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Contrato Nexus para execução via contexto."""
-        if not context:
-            return {"success": False, "error": "Contexto vazio"}
-            
-        action = context.get("action")
-        if action == "calculate_interaction":
-            res = self.calculate_interaction_reward(
-                outcome=context.get("outcome", "unknown"),
-                feedback=context.get("feedback")
-            )
-            return {"success": True, "reward": res}
-            
-        return {"success": False, "error": f"Ação '{action}' não suportada"}
+            lines = _REPLAY_BUFFER_FILE.read_text(encoding="utf-8").splitlines()
+            for line in lines[-_MAX_BUFFER_SIZE:]:
+                if line.strip():
+                    self._replay_buffer.append(json.loads(line))
+        except Exception as exc:
+            logger.debug("Falha ao carregar replay buffer: %s", exc)

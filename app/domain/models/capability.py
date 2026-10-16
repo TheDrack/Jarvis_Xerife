@@ -4,7 +4,7 @@ logger = logging.getLogger(__name__)
 # -*- coding: utf-8 -*-
 """JARVIS Capability Model for Self-Awareness Module"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlmodel import Field, SQLModel
@@ -33,8 +33,8 @@ class JarvisCapability(NexusComponent, SQLModel, table=True):
     status: str = Field(default="nonexistent", nullable=False, index=True)  # nonexistent, partial, complete
     requirements: str = Field(default="[]", nullable=False)  # JSON array of technical requirements
     implementation_logic: str = Field(default="", nullable=False)  # How the capability is/should be implemented
-    created_at: datetime = Field(default_factory=datetime.now, nullable=False)
-    updated_at: datetime = Field(default_factory=datetime.now, nullable=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
 
 # Nexus Compatibility
 Capability = JarvisCapability

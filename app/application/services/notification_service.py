@@ -35,7 +35,7 @@ class NotificationService(NexusComponent):
                     continue
                 
                 try:
-                    adapter.send_message(chat_id, message)
+                    adapter.send_message(message, chat_id=chat_id)
                     logger.info(f"✅ Notificação enviada via {interface_id}")
                     return True # Sucesso, não precisa tentar as outras
                 except Exception as e:
