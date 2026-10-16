@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Padrões expandidos para cobrir vetores de injeção
 _INJECTION_PATTERNS = [
-    re.compile(r"[;&|`]"),                     # Metacaracteres de shell (removido $ isolado)
+    re.compile(r"[;&|`$]"),                    # Metacaracteres/expansão de shell (inclui $ isolado)
     re.compile(r"\.\./"),                      # Path traversal
     re.compile(r"<\s*\("),                     # Process substitution
     re.compile(r"\$\(.*\)"),                   # Command substitution
@@ -123,7 +123,10 @@ class CapabilityAuthorizer(NexusComponent):
         if isinstance(data, str):
             for pattern in _INJECTION_PATTERNS:
                 if pattern.search(data):
-                    raise ValueError(f"Injeção detectada em '{capability_name}': padrão '{pattern.pattern}'")
+                    raise ValueError(
+                        f"Injeção detectada em '{capability_name}': "
+                        f"padrão suspeito '{pattern.pattern}'"
+                    )
         
         elif isinstance(data, dict):
             for v in data.values():

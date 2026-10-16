@@ -18,9 +18,13 @@ class DriveUploader(NexusComponent):
         self.service_account_info = os.getenv("G_JSON") # JSON da Service Account
         self.service = None
         self.config_data = {}
+        # Em modo estrito a falha de upload deve propagar (o NexusComponent
+        # respeita este flag e não converte o erro em dict fail-safe).
+        self._raise_on_error = False
 
     def configure(self, config: dict):
         self.config_data = config
+        self._raise_on_error = config.get("strict_mode") is True
 
     def _get_service(self):
         if self.service:

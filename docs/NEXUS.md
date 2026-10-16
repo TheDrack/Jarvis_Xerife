@@ -73,7 +73,7 @@ nexus.commit_memory()
 
 ### Registry Local
 
-**Arquivos:** `data/nexus_registry.json` / `data/nexus_registry.jrvs`
+**Arquivos:** `data/nexus_registry.json` (o espelho `data/nexus_registry.jrvs` é criado sob demanda pelo `document_store`)
 
 ```json
 {
@@ -152,12 +152,9 @@ if isinstance(component, CloudMock):
 ## 🧪 Validação
 
 ```bash
-# Validar registry vs código
-python scripts/validate_registry_vs_code.py
-
-# Validar docs vs código
-python scripts/validate_docs_vs_code.py
-
-# Validar arquitetura
+# Validar arquitetura (camadas, ports, adapters, DI container)
 python scripts/validate_architecture.py
+
+# Validar autoconsciência via Long Context (snapshot consolidado + registry)
+python scripts/validate_self_awareness.py
 ```

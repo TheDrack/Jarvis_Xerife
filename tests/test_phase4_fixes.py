@@ -412,6 +412,42 @@ class TestJarvisDevAgentAuditLog:
         assert "timeout" in statuses
 
 
+class TestDevAgentConsolidatedContext:
+    """Autoconsciência: o contexto consolidado alimenta o prompt do agente."""
+
+    def test_prompt_includes_consolidated_context(self):
+        import app.application.services.jarvis_dev_agent as da_mod
+        agent = da_mod.JarvisDevAgent()
+        cap = {"id": "CAP-001", "title": "Cap", "description": "Desc"}
+
+        with patch.object(agent, "_get_consolidated_context", return_value="MAPA-DO-CODEBASE-XYZ"):
+            prompt = agent._build_prompt(cap, [])
+
+        assert "MAPA-DO-CODEBASE-XYZ" in prompt
+
+    def test_prompt_omits_section_without_context(self):
+        import app.application.services.jarvis_dev_agent as da_mod
+        agent = da_mod.JarvisDevAgent()
+        cap = {"id": "CAP-001", "title": "Cap", "description": "Desc"}
+
+        with patch.object(agent, "_get_consolidated_context", return_value=""):
+            prompt = agent._build_prompt(cap, [])
+
+        assert "Contexto consolidado" not in prompt
+
+    def test_get_consolidated_context_delegates_to_service(self):
+        import app.application.services.jarvis_dev_agent as da_mod
+        agent = da_mod.JarvisDevAgent()
+
+        with patch(
+            "app.application.services.consolidated_context_service.load_consolidated_context",
+            return_value="conteudo",
+        ) as mock_loader:
+            assert agent._get_consolidated_context() == "conteudo"
+
+        mock_loader.assert_called_once_with()
+
+
 class TestDevAgentJobsEndpoint:
     @pytest.fixture
     def client(self):

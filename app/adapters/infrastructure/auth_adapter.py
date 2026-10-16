@@ -21,15 +21,23 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.application.ports.security_provider import SecurityProvider
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Password hashing context using bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt limita o segredo a 72 bytes. Truncamos explicitamente em vez de
+# depender do backend: bcrypt >= 4.1 levanta ValueError em vez de truncar, e
+# passlib 1.7.4 (usado antes) falha na detecção de backend com esse bcrypt,
+# quebrando TODA a verificação de senha.
+_BCRYPT_MAX_BYTES = 72
+
+
+def _prepare_secret(password: str) -> bytes:
+    """Converte a senha em bytes seguros para o bcrypt (máx. 72 bytes)."""
+    raw = password.encode("utf-8")
+    return raw[:_BCRYPT_MAX_BYTES]
 
 
 class AuthAdapter(SecurityProvider):
@@ -136,7 +144,9 @@ class AuthAdapter(SecurityProvider):
             True if the password matches, False otherwise
         """
         try:
-            return pwd_context.verify(plain_password, hashed_password)
+            return bcrypt.checkpw(
+                _prepare_secret(plain_password), hashed_password.encode("utf-8")
+            )
         except Exception as e:
             logger.error(f"Error verifying password: {e}")
             return False
@@ -151,7 +161,7 @@ class AuthAdapter(SecurityProvider):
         Returns:
             The hashed password
         """
-        return pwd_context.hash(password)
+        return bcrypt.hashpw(_prepare_secret(password), bcrypt.gensalt()).decode("utf-8")
 
     def create_access_token(self, data: dict, expires_delta: Optional[int] = None) -> str:
         """

@@ -35,19 +35,32 @@ class WorkingMemory(NexusComponent):
         """NexusComponent contract."""
         return {"success": True, "size": self.size, "maxlen": self.maxlen}
     
-    def push(self, entry: Union[Dict[str, Any], Any]) -> None:
+    def push(self, entry: Union[Dict[str, Any], WorkingMemoryEntry]) -> None:
+        """Adiciona uma entrada à memória de trabalho.
+
+        Aceita apenas ``dict`` ou ``WorkingMemoryEntry``; qualquer outro tipo
+        levanta ``TypeError`` (falha explícita em vez de corromper o deque com
+        dados sem estrutura).
+        """
         with self._lock:
-            if hasattr(entry, "user_input"):
+            if isinstance(entry, WorkingMemoryEntry):
                 stamped = {
                     "user_input": entry.user_input,
                     "response": entry.response,
-                    "_ts": datetime.fromtimestamp(entry.timestamp, tz=timezone.utc).isoformat(),
+                    "_ts": datetime.fromtimestamp(
+                        entry.timestamp, tz=timezone.utc
+                    ).isoformat(),
                     **entry.meta,
                 }
-            else:
-                stamped = entry.copy()
+            elif isinstance(entry, dict):
+                stamped = dict(entry)
                 if "_ts" not in stamped:
                     stamped["_ts"] = datetime.now(timezone.utc).isoformat()
+            else:
+                raise TypeError(
+                    "WorkingMemory.push() aceita apenas dict ou WorkingMemoryEntry; "
+                    f"recebido {type(entry).__name__}."
+                )
             self._store.append(stamped)
             
     def get_recent(self, n: int) -> List[Dict[str, Any]]:
@@ -96,7 +109,17 @@ class WorkingMemory(NexusComponent):
     def __len__(self) -> int:
         with self._lock:
             return len(self._store)
-            
+
+    def __iter__(self):
+        """Itera sobre um snapshot das entradas (mais antiga → mais recente)."""
+        with self._lock:
+            snapshot = list(self._store)
+        return iter(snapshot)
+
+    def __bool__(self) -> bool:
+        with self._lock:
+            return len(self._store) > 0
+
     def __repr__(self) -> str:
         with self._lock:
             return f"WorkingMemory(items={len(self._store)}/{self._maxlen})"

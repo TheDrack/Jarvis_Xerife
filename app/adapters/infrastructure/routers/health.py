@@ -63,7 +63,9 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
                 response["database"]["connected"] = True
                 response["database"]["type"] = "sqlite"
                 response["security"]["rls_enabled"] = "n/a"
-                response["security"]["note"] = "SQLite não suporta Row Level Security"
+                response["security"]["note"] = (
+                    "SQLite does not support Row Level Security (RLS N/A)"
+                )
             elif "postgresql" in settings.database_url or "postgres" in settings.database_url:
                 response["database"]["type"] = "postgresql"
                 from sqlmodel import Session, text
@@ -108,7 +110,9 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
 
         except Exception as e:
             logger.error(f"Health check falhou: {e}", exc_info=True)
-            response["status"] = "degraded"
+            # Falha de conectividade com o banco é mais grave que um aviso de
+            # configuração (RLS ausente) — o serviço não tem onde persistir.
+            response["status"] = "unhealthy"
             response["database"]["connected"] = False
             response["error"] = str(e)
 
@@ -184,7 +188,10 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
 
         # FineTune section ----------------------------------------------------
         try:
-            ft = nexus.resolve("finetune_trigger_service")
+            # Consulta apenas instâncias já carregadas: um health check não deve
+            # bloquear no pool de resolução (timeout de 30s) nem abrir o
+            # circuit breaker por causa de um componente ausente.
+            ft = nexus.get_cached_instance("finetune_trigger_service")
             last_trigger: Optional[Any] = None
             if ft is not None and hasattr(ft, "last_trigger_at"):
                 last_trigger = ft.last_trigger_at
@@ -228,7 +235,7 @@ def create_health_router(db_adapter, get_current_user=None) -> APIRouter:
 
         # Resources section ---------------------------------------------------
         try:
-            resource_monitor = nexus.resolve("overwatch_resource_monitor")
+            resource_monitor = nexus.get_cached_instance("overwatch_daemon")
             if resource_monitor is not None and hasattr(resource_monitor, "get_resource_trends"):
                 trends = resource_monitor.get_resource_trends()
                 result["resources"] = {"available": True, **trends}

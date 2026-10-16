@@ -204,13 +204,24 @@ The test will:
 
 You can integrate the auto-fixer with GitHub Actions to automatically fix failing CI/CD builds.
 
-**Active workflow (`.github/workflows/ci-failure-to-issue.yml`):**
+**Active workflow (`.github/workflows/homeostase.yml` — "🧬 JARVIS Self Healing V3"):**
 
-The repository uses a two-step approach for CI auto-healing:
-1. `ci-failure-to-issue.yml` - Creates GitHub issues from CI failures
-2. `jarvis_code_fixer.yml` - Automatically fixes issues labeled with `auto-code`
+Triggers on pull requests, on completion of the workflows listed in its
+`workflow_run` event, and manually (`workflow_dispatch` with an `error_log`
+input). The `homeostasis` job runs the test suite and then:
 
-This approach provides better visibility and audit trails. See the actual workflow files in `.github/workflows/` for implementation details.
+```bash
+uv run python scripts/jarvis_healer.py \
+  --report report.json --log pytest_log.txt \
+  [--production-log production_error.log] \
+  [--workflow-log failed_workflow_logs.txt] [--dry-run]
+```
+
+`jarvis_healer.py` parses the reports and applies the minimal fix (use
+`--dry-run` to only list what it would change). `auto_fixer_logic.py` remains the
+issue-driven entry point: it reads `ISSUE_BODY` / `ISSUE_ID` from the environment
+(see the section above) and opens the corresponding PR, so it can be wired to a
+custom CI job as shown below.
 
 **Example minimal workflow for custom CI auto-healing:**
 
@@ -269,6 +280,20 @@ jobs:
         run: |
           python scripts/auto_fixer_logic.py
 ```
+
+## Outros scripts
+
+| Script | Descrição |
+|--------|-----------|
+| `jarvis_healer.py` | Auto-cura a partir de relatórios/logs de pytest (`--report`, `--log`, `--production-log`, `--workflow-log`, `--dry-run`) |
+| `metabolism_analyzer.py` | Classifica a mutação (intent/impacto/estratégia) e escreve os outputs do workflow em `$GITHUB_OUTPUT` |
+| `evolve_all_pending.py` | Evolui capabilities pendentes em lote via `EvolutionOrchestrator` (`--dry-run`, `--limit`, `--cap-id`, `--delay`, `--max-attempts`, `--roadmap-context`) |
+| `validate_architecture.py` | Valida camadas, ports, adapters e o container DI (marca a camada edge como skip quando as dependências de hardware não estão instaladas) |
+| `validate_self_awareness.py` | Valida a autoconsciência via Long Context (snapshot consolidado, serviço, registry do Nexus e consumidores) |
+| `overwatch_daemon.py` | Daemon do Proactive Core (CPU/RAM, inatividade, contexto) |
+| `repo_lifecycle_governance.py` | Governança do ciclo de vida do repositório |
+| `autodoc.py` | Extrai assinaturas e atualiza o mapa de arquitetura |
+| `cristalize_project.py` | Cristaliza o codebase no formato `.jrvs` |
 
 ## Error Message Patterns
 
@@ -370,8 +395,8 @@ export GOOGLE_API_KEY="your-key"
 
 ## Related Documentation
 
-- [SELF_HEALING_ARCHITECTURE.md](../SELF_HEALING_ARCHITECTURE.md) - Overall architecture
-- [demo_self_healing.py](../demo_self_healing.py) - Demo of the system
+- [ARCHITECTURE.md](../ARCHITECTURE.md) - Overall architecture
+- [docs/AGENT_GUIDE.md](../docs/AGENT_GUIDE.md) - Agent guide (Nexus IDs, files, artifacts)
 - [app/application/services/github_worker.py](../app/application/services/github_worker.py) - GitHub integration
 
 ## License

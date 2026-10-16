@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Teste de contrato da documentação (2026-10-16)
+
+- `tests/test_docs_references.py` extrai as referências a arquivos (`.py`, `.yml`,
+  `.md`, …) de `README.md`, `docs/AGENT_GUIDE.md`, `docs/STATUS.md`,
+  `docs/NEXUS.md`, `docs/PIPELINE_RUNNER.md` e `scripts/README.md` e falha quando
+  alguma aponta para um arquivo/script/workflow inexistente — a classe de erro que
+  já colocou `scripts/evolution_mutator.py`, `pipeline_builder.py` e
+  `ci-failure-to-issue.yml` na documentação.
+- Resolve caminhos relativos ao documento (`../ARCHITECTURE.md`), ao root e formas
+  abreviadas (`services/assistant_service.py`); ignora badges/URLs e placeholders
+  (`config/pipelines/<nome>.yml`).
+- Exceções (artefatos gerados em runtime, nomes usados em exemplos de log) ficam em
+  `_ALLOWED_MISSING`, cada uma com motivo, e são auditadas: exceção que voltou a
+  existir ou que nenhum doc usa mais reprova o teste.
+- `docs/ARQUIVO_MAP.md` fica fora do contrato por ser gerado pelo `scripts/autodoc.py`.
+
 #### Refactoring Estrutural – Split de Módulos Grandes (2026-03-06)
 
 **Objetivo:** Nenhum arquivo de código deve ultrapassar 300 linhas. Cada responsabilidade em seu próprio módulo, respeitando o contrato Nexus.
@@ -91,6 +107,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+#### Sincronização de documentação (2026-10-16)
+
+- `README.md`: tabela de adapters passa a refletir o registry estático; comandos de
+  validação apontam para scripts que existem; invocação do runner corrigida
+  (`PIPELINE=<nome> python app/runtime/pipeline_runner.py`).
+- `docs/AGENT_GUIDE.md`: pacote `jarvis_dev_agent/`, IDs e arquivos de `data/` reais;
+  removidas referências a módulos/scripts inexistentes
+  (`pipeline_builder`, `meteorology_core`, `notificação_service`,
+  `fix_frozen_references.py`, `validate_*_vs_code.py`).
+- `docs/STATUS.md`: métricas atualizadas (1367 testes, 87 componentes Nexus,
+  68/102 capabilities).
+- `docs/PIPELINE_RUNNER.md`: novo documento do runner (formato YAML, modos estrito,
+  `CloudMock` e códigos de saída).
+- `scripts/README.md`: workflows de auto-cura corretos (`homeostase.yml` +
+  `jarvis_healer.py`) e tabela dos demais utilitários/validadores.
+
 #### Refactoring Estrutural (2026-03-01)
 - Consolidado `app/infrastructure/adapters/` em `app/adapters/infrastructure/` (pasta única)
 - Removido `app/domain/adapters/` – adaptadores não pertencem ao domínio
@@ -101,6 +133,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentação completamente reescrita (docs/ limpa e recriada)
 - README atualizado com status atual e estrutura correta
 - `data/nexus_registry.json` atualizado com novos caminhos dos componentes
+
+### Fixed
+
+#### Coerência da auto-evolução, do runner e dos validadores (2026-10-16)
+
+**Auto-evolução sem motor de mutação** — `scripts/evolution_mutator.py` foi
+removido do repositório, mas `AutoEvolutionServiceV2`, `scripts/evolve_all_pending.py`
+e o workflow `auto_evolution_triggerV2.yml` ainda o importavam (ImportError na
+largada). Todos passaram a usar o `EvolutionOrchestrator` via Nexus:
+
+- `EvolutionOrchestrator.execute()` aceita `cap_id`/`cap_title`/`roadmap_context`,
+  permitindo evoluir uma capability explícita em vez de só a seleção automática.
+- `AutoEvolutionServiceV2` resolve o orchestrator no Nexus, tenta até
+  `max_attempts` ciclos e reporta erro explícito quando ele não existe.
+- `scripts/evolve_all_pending.py` deixou de importar o módulo removido e ganhou
+  `--roadmap-context`.
+- O workflow determina a `CAP-ID` da missão e chama `evolve_all_pending.py`
+  (em vez do script inexistente).
+
+**Inventário de capabilities ignorado** — `AutoEvolutionServiceV2` procurava
+`data/capabilities.jrvs`; como o inventário versionado é `capabilities.json`, o
+serviço respondia `empty_inventory` e nenhuma missão era encontrada. Agora há
+fallback automático `.jrvs → .json` (mesmo padrão de `evolve_all_pending.py`),
+expondo as 34 capabilities pendentes.
+
+**Pipeline Runner não importava o Nexus** — ao rodar direto
+(`PIPELINE=sync_drive python app/runtime/pipeline_runner.py`) o `sys.path` recebia
+apenas `app/runtime`, o import falhava e **todos** os passos retornavam
+"Nexus engine não inicializado" (só o CI funcionava por causa do `PYTHONPATH`
+exportado). O root do projeto agora é injetado antes do import.
+
+**Validadores quebrados** — `scripts/validate_architecture.py` rodava 0/6
+(`No module named 'app'`) e agora valida 5/6 com 1 skip justificado (camada edge
+sem as dependências de hardware). `scripts/validate_self_awareness.py`
+estourava `FileNotFoundError` por apontar para o módulo `jarvis_dev_agent.py`, que
+virou pacote, e agora valida o pacote, tolera arquivos ausentes e retorna código
+de saída adequado.
+
+**Auto-evolução sem autoconsciência** — o contexto consolidado estava registrado
+no Nexus mas nenhum consumidor o usava. `load_consolidated_context()` (tolerante a
+falhas, com truncagem) foi adicionado ao `ConsolidatedContextService` e ligado ao
+`EvolutionOrchestrator` e ao `JarvisDevAgent`, injetando o snapshot do codebase no
+prompt do LLM.
 
 ## [1.0.0] - 2024-02-05
 

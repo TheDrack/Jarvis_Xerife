@@ -123,6 +123,27 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
         with self._lock:
             return [k for k, v in self._instances.items() if not isinstance(v, concurrent.futures.Future)]
 
+    def get_cached_instance(self, target_id: str) -> Any:
+        """Retorna a instância já carregada de *target_id* — sem resolver.
+
+        Diferente de ``resolve()``, nunca dispara import/instanciação: não pode
+        bloquear no thread-pool nem abrir o circuit breaker. Use em caminhos de
+        diagnóstico (health checks, métricas) onde esperar por um componente
+        indisponível é pior do que reportá-lo como não carregado.
+
+        Returns:
+            A instância existente, ou ``None`` se o componente ainda não foi
+            instanciado (ou está em processo de resolução).
+        """
+        with self._lock:
+            instance = self._instances.get(target_id)
+            if isinstance(instance, concurrent.futures.Future):
+                return None
+            if isinstance(instance, CloudMock):
+                # CloudMock representa falha de resolução, não um componente real.
+                return None
+            return instance
+
     def resolve_class(self, target_id: str, hint_path: Optional[str] = None) -> Optional[type]:
         """Localiza a classe sem instanciar (bypass circuit-breaker)."""
         try:

@@ -19,6 +19,19 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+
+def _device_summary(device: Device) -> Dict[str, Any]:
+    """Serialize the routing-relevant fields of a device."""
+    return {
+        "id": device.id,
+        "name": device.name,
+        "network_type": device.network_type,
+        "network_id": device.network_id,
+        "lat": device.lat,
+        "lon": device.lon,
+    }
+
+
 class DeviceCapabilityService:
     """Service for capability-based device routing with optimized queries."""
     
@@ -96,6 +109,7 @@ class DeviceCapabilityService:
                             "network_type": device.network_type,
                             "lat": device.lat,
                             "lon": device.lon,
+                            "last_ip": device.last_ip,
                             "last_seen": device.last_seen.isoformat() if device.last_seen else None,
                             "capabilities": processed_caps
                         }
@@ -125,10 +139,24 @@ class DeviceCapabilityService:
                 target_device = session.get(Device, target_device_id)
                 
                 if not target_device:
-                    return {"requires_confirmation": False, "reason": "Destino não encontrado"}
-                
+                    return {
+                        "requires_confirmation": False,
+                        "reason": "Target device not found",
+                        "source_device": None,
+                        "target_device": None,
+                    }
+
                 if not source_device:
-                    return {"requires_confirmation": False, "target_device": {"id": target_device.id}}
+                    return {
+                        "requires_confirmation": False,
+                        "reason": "No source device specified",
+                        "source_device": None,
+                        "target_device": {
+                            "id": target_device.id,
+                            "name": target_device.name,
+                            "network_type": target_device.network_type,
+                        },
+                    }
                 
                 distance = None
                 if (source_device.lat is not None and source_device.lon is not None and
@@ -142,32 +170,51 @@ class DeviceCapabilityService:
                 if distance is not None and distance > 50.0:
                     return {
                         "requires_confirmation": True,
-                        "reason": f"Dispositivo a {distance:.1f}km. Executar remotamente?",
+                        "reason": (
+                            f"O dispositivo de destino ({target_device.name}) está "
+                            f"a {distance:.1f}km de distância. "
+                            "Deseja executar a ação remotamente?"
+                        ),
                         "distance": distance,
-                        "source_device": {"id": source_device.id, "name": source_device.name},
-                        "target_device": {"id": target_device.id, "name": target_device.name}
+                        "source_device": _device_summary(source_device),
+                        "target_device": _device_summary(target_device),
                     }
                 
                 # Lógica de Redes
                 requires_conf = False
                 reason = ""
-                
-                if (source_device.network_type in ["4g", "5g"] and 
-                    target_device.network_type in ["wifi", "ethernet"]):
+
+                if (source_device.network_type and target_device.network_type and
+                        source_device.network_type in ["4g", "5g"] and
+                        target_device.network_type in ["wifi", "ethernet"]):
                     requires_conf = True
-                    reason = "Você está em rede móvel e o destino está em rede fixa."
-                elif (source_device.network_id and target_device.network_id and 
+                    reason = (
+                        f"Você está no {source_device.network_type.upper()} "
+                        f"({source_device.name}) mas o dispositivo de destino "
+                        f"({target_device.name}) está na rede doméstica. "
+                        "Deseja executar mesmo assim?"
+                    )
+                elif (source_device.network_id and target_device.network_id and
                       source_device.network_id != target_device.network_id):
                     requires_conf = True
-                    reason = f"Redes diferentes: {source_device.network_id} -> {target_device.network_id}"
-                
+                    reason = (
+                        f"Você está em uma rede diferente ({source_device.network_id}) "
+                        f"do dispositivo de destino ({target_device.network_id}). "
+                        "Deseja executar mesmo assim?"
+                    )
+
                 return {
                     "requires_confirmation": requires_conf,
                     "reason": reason,
                     "distance": distance,
-                    "source_device": {"id": source_device.id, "name": source_device.name},
-                    "target_device": {"id": target_device.id, "name": target_device.name}
+                    "source_device": _device_summary(source_device),
+                    "target_device": _device_summary(target_device),
                 }
         except Exception as e:
             logger.error(f"Erro na validação de roteamento: {e}")
-            return {"requires_confirmation": False, "error": str(e)}
+            return {
+                "requires_confirmation": False,
+                "reason": f"Error during validation: {str(e)}",
+                "source_device": None,
+                "target_device": None,
+            }

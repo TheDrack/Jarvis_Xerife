@@ -5,7 +5,7 @@ Tests to validate the workflow fixes for metabolism and auto-evolution.
 
 Validates:
 1. metabolism_analyzer.py produces all required GITHUB_OUTPUT fields
-2. evolution_mutator.py handles missing cap_id gracefully
+2. evolve_all_pending.py fails loudly when no valid cap_id can be determined
 3. AutoEvolutionServiceV2 integration basics
 4. services package importable without optional dependencies (sqlmodel, etc.)
 """
@@ -106,37 +106,36 @@ def test_metabolism_analyzer_escalates_on_short_context():
             os.unlink(output_file)
 
 
-def test_evolution_mutator_missing_cap_id():
-    """evolution_mutator.py must exit non-zero when no cap_id can be determined."""
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-        output_file = f.name
+def test_evolve_all_pending_unknown_cap_id_fails():
+    """evolve_all_pending.py must exit non-zero when the target capability is unknown.
 
-    try:
-        env = os.environ.copy()
-        env['GITHUB_OUTPUT'] = output_file
-        env.pop('ISSUE_BODY', None)  # Ensure no cap-id can be inferred
+    The mutation engine must never report success when no capability could be
+    resolved (CAP-999 does not exist in data/capabilities.jrvs).
+    """
+    env = os.environ.copy()
+    env.pop('ISSUE_BODY', None)  # Ensure no cap-id can be inferred from the environment
 
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(PROJECT_ROOT / 'scripts' / 'evolution_mutator.py'),
-                '--strategy', 'minimal_change',
-                '--intent', 'test',
-                '--impact', 'test',
-            ],
-            capture_output=True,
-            text=True,
-            env=env,
-            cwd=str(PROJECT_ROOT),
-        )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(PROJECT_ROOT / 'scripts' / 'evolve_all_pending.py'),
+            '--cap-id',
+            'CAP-999',
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=str(PROJECT_ROOT),
+    )
 
-        assert result.returncode != 0, (
-            "evolution_mutator.py should exit non-zero when no cap_id is provided"
-        )
-
-    finally:
-        if os.path.exists(output_file):
-            os.unlink(output_file)
+    assert result.returncode != 0, (
+        "evolve_all_pending.py should exit non-zero when the cap_id is unknown.\n"
+        f"stderr: {result.stderr}\nstdout: {result.stdout}"
+    )
+    assert 'CAP-999' in result.stdout, (
+        "The failure message should name the unknown cap_id.\n"
+        f"stdout: {result.stdout}"
+    )
 
 
 def test_auto_evolution_service():
@@ -150,6 +149,90 @@ def test_auto_evolution_service():
 
     is_not_auto = service.is_auto_evolution_pr("Fix: regular bug fix")
     assert is_not_auto is False, "is_auto_evolution_pr() should not match regular PRs"
+
+
+def test_auto_evolution_evolve_uses_evolution_orchestrator():
+    """A mutação de capabilities deve passar pelo EvolutionOrchestrator (via Nexus).
+
+    O antigo ``scripts/evolution_mutator.py`` foi removido do projeto; a ação
+    ``evolve_next`` precisa funcionar através do orchestrator registrado.
+    """
+    from unittest.mock import MagicMock, patch
+
+    import app.application.services.auto_evolutionV2 as mod
+
+    service = mod.AutoEvolutionServiceV2(capabilities_path=str(PROJECT_ROOT / 'data' / 'capabilities.json'))
+    mission = service.find_next_mission()
+    assert mission is not None, "O inventário precisa ter ao menos uma cap pendente"
+
+    orchestrator = MagicMock()
+    orchestrator.execute.return_value = {"success": True, "proposal": "data/evolution_proposals/x.py"}
+
+    with patch.object(mod, "nexus") as mock_nexus:
+        mock_nexus.resolve.return_value = orchestrator
+        result = service.execute({"action": "evolve_next"})
+
+    assert result["success"] is True
+    assert result["evolved"] == mission["id"]
+    mock_nexus.resolve.assert_called_with("evolution_orchestrator")
+    payload = orchestrator.execute.call_args.args[0]
+    assert payload["cap_id"] == mission["id"]
+    assert payload["roadmap_context"]
+
+
+def test_auto_evolution_falls_back_to_json_inventory():
+    """Sem o ``.jrvs``, o inventário ``.json`` equivalente deve ser usado.
+
+    O serviço registrado no Nexus usa ``data/capabilities.jrvs`` por padrão; como
+    o inventário versionado está em ``capabilities.json``, o fallback evita que a
+    auto-evolução responda ``empty_inventory`` e nunca encontre missões.
+    """
+    import app.application.services.auto_evolutionV2 as mod
+
+    service = mod.AutoEvolutionServiceV2()
+    metrics = service.get_success_metrics()
+
+    assert metrics["total_missions"] > 0, "O inventário real deve ser carregado"
+    assert metrics["status"] == "operational"
+    assert service.find_next_mission() is not None
+
+
+def test_auto_evolution_resolved_path_prefers_existing_sibling(tmp_path):
+    """O caminho efetivo cai para o irmão (.json) quando o .jrvs não existe."""
+    import app.application.services.auto_evolutionV2 as mod
+
+    json_path = tmp_path / "capabilities.json"
+    json_path.write_text('{"capabilities": []}', encoding="utf-8")
+
+    service = mod.AutoEvolutionServiceV2(capabilities_path=str(tmp_path / "capabilities.jrvs"))
+    assert service._resolved_path() == json_path
+
+
+def test_auto_evolution_resolved_path_keeps_configured_jrvs(tmp_path):
+    """Quando o caminho configurado existe, ele é preservado."""
+    import app.application.services.auto_evolutionV2 as mod
+
+    jrvs_path = tmp_path / "capabilities.jrvs"
+    jrvs_path.write_bytes(b"JRVS")
+
+    service = mod.AutoEvolutionServiceV2(capabilities_path=str(jrvs_path))
+    assert service._resolved_path() == jrvs_path
+
+
+def test_auto_evolution_evolve_reports_missing_orchestrator():
+    """Sem orchestrator no Nexus, a evolução deve falhar de forma explícita."""
+    from unittest.mock import patch
+
+    import app.application.services.auto_evolutionV2 as mod
+
+    service = mod.AutoEvolutionServiceV2(capabilities_path=str(PROJECT_ROOT / 'data' / 'capabilities.json'))
+
+    with patch.object(mod, "nexus") as mock_nexus:
+        mock_nexus.resolve.side_effect = RuntimeError("component not found")
+        result = service.execute({"action": "evolve_next"})
+
+    assert result["success"] is False
+    assert "component not found" in result["error"]
 
 
 def test_services_package_importable_without_sqlmodel():

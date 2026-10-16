@@ -68,17 +68,17 @@ descobre gaps, e só cria código quando necessário.
 - `services/evolution_orchestrator.py` — orquestração de auto-evolução
 - `services/evolution_gatekeeper.py` — aprovação de mudanças
 - `services/evolution_sandbox.py` — sandbox local de testes
-- `services/jarvis_dev_agent.py` — agente autônomo de desenvolvimento
-- `services/jarvis_dev_agent/*` — pipeline_builder, actions, prompt_builder,
-  code_discovery, trajectory
+- `services/jarvis_dev_agent/agent.py` — agente autônomo de desenvolvimento
+  (pacote `services/jarvis_dev_agent/`; o antigo módulo único virou o pacote,
+  com os caminhos de artefatos em `__init__.py` para permitir override em runtime)
 - `services/llm_router.py` — roteamento dinâmico de LLMs
 - `services/consolidated_context_service.py` — snapshot do código
 - `services/thought_log_service.py` — log de pensamentos
 - `services/field_vision.py` — monitor proativo de logs
-- `services/meteorology_core.py` / `metabolism_core.py` — núcleo de metabolismo/LLM fleet
+- `services/metabolism_core.py` — núcleo de metabolismo/LLM fleet
 - `services/crystallization/crystallizer_engine.py`
 - `services/local_repair_agent.py`
-- `services/notificação_service.py`
+- `services/notification_service.py`
 - `security/` — capability_authorizer, pii_redactor, env_secrets_provider, safety_guardian
 
 #### `app/adapters/infrastructure/`
@@ -109,23 +109,22 @@ descobre gaps, e só cria código quando necessário.
 - `pipelines/*.yml` — pipelines declarativos
 
 #### `data/`
-- `nexus_registry.json` / `nexus_registry.jrvs`
-- `capabilities.jrvs`
-- `context.json`
-- `architecture_rules.yml`
-- `dev_agent_jobs.jsonl`
-- `evolution_proposals/`
-- `jrvs-snapshots/`
-- `logs/`
+- `nexus_registry.json` — registry do Nexus (o `.jrvs` correspondente é criado sob demanda)
+- `capabilities.json` — inventário de capabilities (fallback quando o `.jrvs` não existe)
+- `context.json` — estado atual do sistema
+- `architecture_rules.yml` — regras de destino da cristalização
+- `master_crystal.json` — metadados de cristalização
+- `dev_agent_jobs.jsonl` — auditoria dos ciclos do JarvisDevAgent
+- `experience_replay.jsonl` / `gatekeeper_rejections.jsonl`
+- `jrvs/` — espelhos `.jrvs` + `.json` (llm, meta, tools)
+- `evolution_proposals/` — criado em runtime (propostas de mudança)
 
 #### `scripts/`
 - `cristalize_project.py`
 - `evolve_all_pending.py`
-- `fix_frozen_references.py`
 - `migrate_to_nexus_di.py`
-- `validate_registry_vs_code.py`
-- `validate_docs_vs_code.py`
 - `validate_architecture.py`
+- `validate_self_awareness.py`
 - submódulos de auto-fixer
 
 #### `docs/`
@@ -205,7 +204,7 @@ O agente pode usar isso como ponto de partida para inspecionar o que existe.
 
 Esses IDs são documentados ou observados no sistema. Nem todo ID é exportação
 pública no registry: alguns são usados internamente pelo agente/assinante
-(por exemplo `pipeline_builder`, usado pelo JarvisDevAgent).
+(por exemplo `evolution_gatekeeper`, acionado pelo `evolution_orchestrator`).
 
 Lista completa e atualizada está em:
 
@@ -228,8 +227,8 @@ Lista completa e atualizada está em:
 | `jarvis_dev_agent` | agente autônomo de desenvolvimento |
 | `adapter_registry` | registro simplificado de adapters |
 | `docker_sandbox` | sandbox Docker |
-| `evolution_sandbox` | sandbox local |
-| `pipeline_builder` | criador de pipelines YAML (uso interno pelo agente) |
+| `evolution_gatekeeper` | aprovação/rejeição de mudanças propostas |
+| `procedural_memory_adapter` | memória procedural de soluções |
 | `consolidated_context_service` | snapshot do código consolidado |
 | `capability_manager` | gerenciamento de capabilities |
 | `procedural_memory` | memória de padrões |
@@ -396,8 +395,11 @@ Antes de ler ou alterar qualquer coisa, o agente deve preferir:
 
 ## 7) Formatos e artefatos que o agente pode encontrar
 
-- registry local: `data/nexus_registry.json` e `data/nexus_registry.jrvs`
-- inventário de capabilities: `data/capabilities.jrvs`
+- registry local: `data/nexus_registry.json` (o espelho `data/nexus_registry.jrvs`
+  é criado sob demanda pelo `document_store`)
+- inventário de capabilities: `data/capabilities.json` (consumidores como
+  `evolve_all_pending.py` e `AutoEvolutionServiceV2` caem para o `.json` quando o
+  `.jrvs` não existe)
 - contexto atual: `data/context.json`
 - regras de arquitetura: `data/architecture_rules.yml`
 - jobs do agente: `data/dev_agent_jobs.jsonl`

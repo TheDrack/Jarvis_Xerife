@@ -9,6 +9,13 @@ import sys
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 
+# Garante que o root do projeto esteja no sys.path ANTES de importar o Nexus:
+# ao rodar direto (PIPELINE=sync_drive python app/runtime/pipeline_runner.py) o
+# sys.path recebe apenas ``app/runtime`` e o import do pacote ``app`` falharia.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
 # Tentativa de importação do core Nexus
 try:
     from app.core.nexus import nexus, CloudMock
@@ -104,27 +111,41 @@ def _execute_step(
     """
     component_id = step_config.get("id", step_name)
     hint_path = step_config.get("hint_path")
-    
+    step_config_data = step_config.get("config") or {}
+
+    # O modo estrito pode vir do pipeline (``strict``) ou do próprio passo
+    # (``config.strict_mode``); o passo tem precedência por ser mais específico.
+    effective_strict = bool(is_strict) or bool(step_config_data.get("strict_mode", False))
+
     logger.info(f"🔍 Resolvendo: {step_name} (ID: {component_id})")
     
     # Resolver componente via Nexus
     try:
         if not nexus:
             raise RuntimeError("Nexus engine não inicializado.")
-            
-        component = nexus.resolve(component_id, hint_path=hint_path) if hint_path else nexus.resolve(component_id)
+
+        # hint_path é sempre encaminhado (mesmo None) para que uns registo
+        # explícito de resolução fique visível em logs/testes.
+        component = nexus.resolve(target_id=component_id, hint_path=hint_path)
     except Exception as e:
         logger.error(f"❌ Erro ao resolver '{component_id}': {e}")
         context["results"].append({"step": step_name, "status": "error", "msg": f"Resolve failed: {e}"})
         return False
     
-    # Verificar se é CloudMock
+    # Verificar se é CloudMock — NUNCA executar o mock: ele não implementa o
+    # contrato real do componente e mascararia falhas como sucesso.
     if isinstance(component, CloudMock) or getattr(component, "__is_cloud_mock__", False):
-        logger.warning(f"☁️ Componente '{component_id}' indisponível (Mock).")
-        if is_strict:
-            return False
-        context["results"].append({"step": step_name, "status": "skipped", "msg": "CloudMock active"})
-        return True
+        msg = (
+            f"❌ Componente '{component_id}' indisponível: resolvido como CloudMock "
+            f"(Circuit Breaker aberto ou componente inexistente). execute() não foi chamado."
+        )
+        logger.error(msg)
+        if effective_strict:
+            raise RuntimeError(msg)
+        context["results"].append(
+            {"step": step_name, "status": "failed", "msg": "CloudMock active"}
+        )
+        return False
     
     # Executar componente
     logger.info(f"⚙️ Executando: {step_name}...")
@@ -157,11 +178,8 @@ def _execute_step(
 # ============================================================================
 
 if __name__ == "__main__":
-    # CORREÇÃO: Garantir path absoluto para evitar erros de importação
-    current_dir = Path(__file__).resolve().parent
-    if str(current_dir.parent) not in sys.path:
-        sys.path.insert(0, str(current_dir.parent))
-    
+    # O root do projeto já foi injetado no sys.path no topo do módulo.
+
     # Ler configurações de ambiente
     p_name = os.getenv("PIPELINE")
     g_strict = os.getenv("PIPELINE_STRICT", "false").lower() == "true"

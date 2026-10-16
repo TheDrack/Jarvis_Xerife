@@ -1,95 +1,151 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import asyncio
-import logging
+"""
+Jarvis Assistant - Main Entry Point (Cloud/Edge)
+Versão 2026.03: Nexus Auto-Cura + Notificação Dinâmica de Startup.
+"""
+
 import os
 import sys
+import uvicorn
 import threading
+import logging
+import time
+from fastapi import FastAPI
 
-sys.path.insert(0, os.getcwd())
-
+# Imports de configuração e núcleo
 from app.adapters.infrastructure import create_api_server
+from app.bootstrap_edge import main as edge_main
+from app.core.config import settings
 from app.core.nexus import nexus
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Proactive core (Overwatch Daemon)
+try:
+    from app.adapters.infrastructure.overwatch_adapter import OverwatchDaemon
+    _OVERWATCH_AVAILABLE = True
+except ImportError:
+    _OVERWATCH_AVAILABLE = False
+
+# Configuração de Log otimizada
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
+def is_running_on_cloud():
+    return (
+        os.getenv("RENDER") == "true" or 
+        os.getenv("PYTHON_ENV") == "production" or
+        not sys.stdin.isatty()
+    )
 
-async def notify_online():
-    """Tenta enviar a notificação via Telegram após o Nexus estabilizar."""
-    await asyncio.sleep(5)
-
-    telegram = nexus.resolve("telegram_adapter")
-    if telegram and not getattr(telegram, "__is_cloud_mock__", False):
-        admin_id = os.getenv("TELEGRAM_ADMIN_ID")
-        if admin_id:
+def send_dynamic_startup_notification():
+    """
+    Tenta localizar qualquer interface ativa para avisar que o Jarvis subiu.
+    """
+    # Procura por qualquer componente que tenha o método de envio padrão
+    # Isso torna o sistema agnóstico: funciona com Telegram, WhatsApp, Discord, etc.
+    interfaces_to_try = ["telegram_adapter", "whatsapp_adapter", "discord_adapter"]
+    
+    for interface_id in interfaces_to_try:
+        adapter = nexus.resolve(interface_id)
+        if adapter and hasattr(adapter, "send_message"):
+            # Tenta obter o ID de destino do ambiente
+            target_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("ADMIN_CHAT_ID")
+            if not target_id:
+                continue
+                
             try:
-                await telegram.send_message(
-                    chat_id=admin_id,
-                    text="🚀 **J.A.R.V.I.S. ONLINE**\nStatus: Cloud Ativo\nNexus: Operacional"
+                adapter.send_message(
+                    target_id, 
+                    "🤖 **JARVIS Online**\nSistemas cloud ativos e Nexus sincronizado."
                 )
-                logger.info("📢 Notificação de inicialização enviada com sucesso.")
+                logger.info(f"📢 Notificação de inicialização enviada via {interface_id}.")
+                return True
             except Exception as e:
-                logger.error(f"Erro ao enviar mensagem Telegram: {e}")
-        else:
-            logger.warning("⚠️ TELEGRAM_ADMIN_ID não configurado nas variáveis de ambiente.")
-    else:
-        logger.warning("⚠️ Telegram adapter não resolvido. Notificação cancelada.")
+                logger.debug(f"Falha ao enviar via {interface_id}: {e}")
+    return False
 
+def bootstrap_background_services():
+    """
+    THREAD ISOLADA: Realiza a varredura pesada (os.walk), 
+    notifica o usuário e ativa o polling.
+    """
+    logger.info("🧵 [BOOTSTRAP] Iniciando varredura dinâmica do Nexus...")
 
-def run_api():
-    """Gerencia corretamente o event loop e threads do boot."""
-    assistant = nexus.resolve("assistant_service")
-    if assistant is None or getattr(assistant, "__is_cloud_mock__", False):
-        logger.error("❌ AssistantService não resolvido. Abortando inicialização.")
-        sys.exit(1)
+    # Delay para estabilização no Render
+    if os.getenv("RENDER") == "true":
+        time.sleep(5)
 
-    app = create_api_server(assistant)
-    background_thread_shutdown = threading.Event()
-
-    def background_bootstrap():
+    # PASSO 1: Inicia o Núcleo Proativo PRIMEIRO (não depende do Telegram)
+    _daemon_instance = None
+    if _OVERWATCH_AVAILABLE:
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(notify_online())
-            except Exception as e:
-                logger.error(f"Erro ao notificar online: {e}")
-
-            try:
-                overwatch = nexus.resolve("overwatch_daemon")
-                if overwatch and not getattr(overwatch, "__is_cloud_mock__", False) and hasattr(overwatch, "start"):
-                    logger.info("🔍 Iniciando OverwatchDaemon...")
-                    overwatch.start()
-            except Exception as e:
-                logger.error(f"Erro ao iniciar OverwatchDaemon: {e}")
-
-            while not background_thread_shutdown.wait(1):
-                pass
+            _daemon_instance = OverwatchDaemon()
+            _daemon_instance.start()
+            logger.info("[PROACTIVE_CORE] OverwatchDaemon ativo em background.")
         except Exception as e:
-            logger.error(f"Erro fatal em background_bootstrap: {e}")
-        finally:
-            try:
-                loop.close()
-            except Exception:
-                pass
+            logger.warning(f"[PROACTIVE_CORE] Falha ao iniciar OverwatchDaemon: {e}")
 
-    background_thread = threading.Thread(target=background_bootstrap, daemon=True, name="JarvisBackground")
-    background_thread.start()
-
+    # PASSO 2: Resolve componentes de interface e inicia polling (bloqueante — deve ser último)
     try:
-        import uvicorn
-        port = int(os.getenv("PORT", 10000))
-        logger.info(f"🚀 Iniciando API server na porta {port}...")
-        uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
-    except KeyboardInterrupt:
-        logger.info("⏹️ Shutdown iniciado...")
-    except Exception as e:
-        logger.error(f"Erro no servidor API: {e}", exc_info=True)
-    finally:
-        background_thread_shutdown.set()
-        background_thread.join(timeout=5)
-        logger.info("✅ API server encerrado.")
+        assistant = nexus.resolve("assistant_service")
+        telegram = nexus.resolve("telegram_adapter")
 
+        if assistant and telegram:
+            # Notificação Inteligente de Startup
+            send_dynamic_startup_notification()
+
+            logger.info("✅ [NEXUS] Ecossistema localizado. Ativando Polling...")
+
+            # Início do Loop de Interface
+            def telegram_callback(text, chat_id):
+                if _daemon_instance is not None:
+                    _daemon_instance.notify_activity()
+                return assistant.process_command(text, channel="telegram")
+
+            telegram.start_polling(callback=telegram_callback)  # bloqueante — deve ser o último call
+        else:
+            logger.error("⚠️ [NEXUS] Falha crítica: Componentes vitais não localizados.")
+
+    except Exception as e:
+        logger.error(f"❌ [BOOTSTRAP] Erro fatal na thread de serviços: {e}")
+
+def start_cloud_service():
+    print("=" * 60)
+    print("🤖 JARVIS ASSISTANT - MODO CLOUD ATIVO (API + NEXUS)")
+    print("=" * 60)
+
+    # 1. Inicialização do Container e API Server (Imediato para Health Check)
+    from app.container import create_edge_container
+    container = create_edge_container(
+        wake_word=settings.wake_word,
+        language=settings.language,
+    )
+
+    # Cria o servidor web imediatamente para o Render não dar timeout (Porta 10000)
+    app = create_api_server(container.assistant_service)
+
+    # 2. DISPARO DO BOOTSTRAP EM SEGUNDO PLANO
+    # A thread cuida da busca pesada enquanto a porta 10000 responde /health
+    t = threading.Thread(
+        target=bootstrap_background_services, 
+        daemon=True,
+        name="JarvisDiscovery"
+    )
+    t.start()
+
+    # 3. Execução do Servidor Uvicorn
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 10000))
+
+    logger.info(f"🚀 [SERVER] Uvicorn subindo em {host}:{port}")
+    uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
 
 if __name__ == "__main__":
-    run_api()
+    if is_running_on_cloud():
+        start_cloud_service()
+    else:
+        # Modo Local/Edge (Bootstrap original para uso em hardware local)
+        edge_main()

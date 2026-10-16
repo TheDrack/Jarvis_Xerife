@@ -213,6 +213,85 @@ class TestEvolutionOrchestratorFullCycle:
         assert result["success"] is False
         assert "gatekeeper_blocked" in result["reason"]
 
+    def test_explicit_cap_id_skips_capability_manager(self, orchestrator, tmp_path):
+        """Quando ``cap_id`` é informado, a cap explícita vence a seleção automática."""
+        valid_code = '"""Cap explícita."""\ndef run(): pass\n'
+
+        mock_metabolism = MagicMock()
+        mock_metabolism.execute.return_value = {"success": True, "result": f"```python\n{valid_code}```"}
+        mock_worker = MagicMock()
+        mock_worker.submit_pull_request.return_value = {"success": True}
+        mock_cap_manager = MagicMock()
+
+        resolved = []
+
+        import app.application.services.evolution_orchestrator as evo_mod
+
+        original_proposals = evo_mod._PROPOSALS_DIR
+        evo_mod._PROPOSALS_DIR = tmp_path / "proposals"
+
+        try:
+            with patch("app.application.services.evolution_orchestrator.nexus") as mock_nexus:
+                def resolve(name):
+                    resolved.append(name)
+                    if name == "capability_manager":
+                        return mock_cap_manager
+                    if name == "metabolism_core":
+                        return mock_metabolism
+                    if name == "github_worker":
+                        return mock_worker
+                    return None
+
+                mock_nexus.resolve.side_effect = resolve
+
+                result = orchestrator.execute(
+                    {"cap_id": "CAP-777", "cap_title": "Explicit capability"}
+                )
+        finally:
+            evo_mod._PROPOSALS_DIR = original_proposals
+
+        assert result["success"] is True
+        assert "capability_manager" not in resolved
+        # O prompt precisa carregar a capability explícita
+        prompt = mock_metabolism.execute.call_args.args[0]["user_prompt"]
+        assert "CAP-777" in prompt
+
+    def test_consolidated_context_is_injected_in_prompt(self, orchestrator, tmp_path):
+        """O contexto consolidado (autoconsciência) deve entrar no prompt do LLM."""
+        valid_code = '"""Com contexto."""\ndef run(): pass\n'
+
+        mock_metabolism = MagicMock()
+        mock_metabolism.execute.return_value = {"success": True, "result": f"```python\n{valid_code}```"}
+        mock_worker = MagicMock()
+        mock_worker.submit_pull_request.return_value = {"success": True}
+
+        import app.application.services.evolution_orchestrator as evo_mod
+
+        original_proposals = evo_mod._PROPOSALS_DIR
+        evo_mod._PROPOSALS_DIR = tmp_path / "proposals"
+
+        try:
+            with patch.object(
+                orchestrator, "_get_consolidated_context", return_value="MAPA-DO-CODEBASE-XYZ"
+            ):
+                with patch("app.application.services.evolution_orchestrator.nexus") as mock_nexus:
+                    def resolve(name):
+                        if name == "metabolism_core":
+                            return mock_metabolism
+                        if name == "github_worker":
+                            return mock_worker
+                        return None
+
+                    mock_nexus.resolve.side_effect = resolve
+
+                    result = orchestrator.execute({"error_snippet": "gap"})
+        finally:
+            evo_mod._PROPOSALS_DIR = original_proposals
+
+        assert result["success"] is True
+        prompt = mock_metabolism.execute.call_args.args[0]["user_prompt"]
+        assert "MAPA-DO-CODEBASE-XYZ" in prompt
+
     def test_capability_selected_via_capability_manager(self, orchestrator, tmp_path):
         """Verifica que a capability-alvo é selecionada via CapabilityManager."""
         valid_code = '"""Cap via CapabilityManager."""\ndef run(): pass\n'

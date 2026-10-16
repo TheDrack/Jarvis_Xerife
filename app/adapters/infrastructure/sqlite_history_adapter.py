@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, delete
 from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlmodel.sql.sqltypes import UTCDateTime
 
 from app.application.ports.history_provider import HistoryProvider
 from app.domain.models.device import Capability, Device
@@ -19,6 +20,28 @@ from app.domain.models.thought_log import ThoughtLog
 from app.domain.models.capability import JarvisCapability
 
 logger = logging.getLogger(__name__)
+
+
+class CoercingUTCDateTime(UTCDateTime):
+    """Armazena datetimes sempre em UTC, aceitando valores naive.
+
+    O tipo padrão do SQLModel (``UTCDateTime``) rejeita datetimes sem
+    timezone no bind, então uma única atribuição naive — vinda de script,
+    teste ou integração antiga — faz a escrita inteira falhar silenciosamente
+    (a exceção é apenas logada). Aqui a normalização acontece na fronteira do
+    banco: naive é interpretado como UTC, aware é convertido para UTC.
+    """
+
+    cache_ok = True
+
+    def process_bind_param(
+        self, value: Optional[datetime], dialect: Any
+    ) -> Optional[datetime]:
+        if value is None:
+            return None
+        if value.utcoffset() is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
 
 def _ensure_aware(value: Optional[datetime]) -> datetime:
@@ -47,14 +70,20 @@ class Interaction(NexusComponent, SQLModel, table=True):
     __table_args__ = {'extend_existing': True}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_type=CoercingUTCDateTime(),
+        nullable=False,
+    )
     user_input: str = Field(nullable=False)
     command_type: str = Field(nullable=False)
     parameters: str = Field(default="{}", nullable=False)  # JSON string
     success: bool = Field(default=False, nullable=False)
     response_text: str = Field(default="", nullable=False)
     status: str = Field(default="pending", nullable=False)  # pending, completed, failed
-    processed_at: Optional[datetime] = Field(default=None, nullable=True)
+    processed_at: Optional[datetime] = Field(
+        default=None, sa_type=CoercingUTCDateTime(), nullable=True
+    )
     channel: str = Field(default="api", nullable=False)  # interface channel: api, telegram, etc.
 
 

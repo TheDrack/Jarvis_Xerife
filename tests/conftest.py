@@ -30,6 +30,34 @@ sys.modules.setdefault("app.core.engine", MagicMock())
 sys.modules.setdefault("app.actions.system_commands", MagicMock())
 
 
+@pytest.fixture(autouse=True)
+def _restore_default_event_loop():
+    """Garante um event loop padrão utilizável para testes síncronos.
+
+    ``asyncio_mode = auto`` faz o pytest-asyncio encerrar o loop após cada
+    teste assíncrono, deixando a policy sem loop na thread principal. Testes
+    síncronos que usam ``asyncio.get_event_loop()`` então quebram com
+    ``RuntimeError: There is no current event loop`` — dependendo apenas da
+    ordem de execução (o mesmo teste passa isolado e falha na suíte completa).
+
+    Recriamos um loop padrão no teardown quando a policy ficou sem loop aberto.
+    """
+    yield
+
+    import asyncio
+
+    policy = asyncio.get_event_loop_policy()
+    try:
+        loop = policy.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("event loop closed")
+    except Exception:
+        try:
+            policy.set_event_loop(policy.new_event_loop())
+        except Exception:
+            pass
+
+
 @pytest.fixture
 def anyio_backend():
     """Configure the backend for anyio tests"""

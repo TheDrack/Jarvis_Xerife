@@ -27,7 +27,7 @@ sys.path.insert(0, str(_SCRIPTS_ROOT))
 from app.utils.document_store import document_store
 
 # Import sub-modules (must come after sys.path insertion)
-from scripts import fix_applier, pr_manager
+from scripts import fix_applier, issue_parser, pr_manager
 from scripts.state_machine import ErrorCategory, FailureReason, SelfHealingStateMachine, State
 
 logging.basicConfig(
@@ -122,6 +122,96 @@ class AutoFixer:
                 logger.info(f"✓ Set GitHub output: {name}={value}")
             except Exception as e:
                 logger.warning(f"Could not set GitHub output: {e}")
+
+    # ------------------------------------------------------------------
+    # API de conveniência
+    # ------------------------------------------------------------------
+    # A lógica vive nos módulos focados (issue_parser / fix_applier /
+    # pr_manager); estes métodos mantêm a superfície pública de AutoFixer
+    # estável para o pipeline de self-healing e para os testes existentes,
+    # injetando sempre ``self.repo_path``.
+
+    def is_documentation_request(self, issue_body: str) -> bool:
+        """True quando a issue pede alteração de documentação."""
+        return issue_parser.is_documentation_request(issue_body)
+
+    def is_feature_request(self, issue_body: str) -> bool:
+        """True quando a issue pede uma nova funcionalidade."""
+        return issue_parser.is_feature_request(issue_body)
+
+    def extract_file_from_error(self, error_message: str) -> Optional[str]:
+        """Extrai o caminho do arquivo a partir de um traceback/erro."""
+        return issue_parser.extract_file_from_error(error_message)
+
+    def extract_common_filename(self, issue_body: str) -> Optional[str]:
+        """Encontra arquivos comuns citados no texto (ex.: 'readme' → README.md)."""
+        return issue_parser.extract_common_filename(issue_body, self.repo_path)
+
+    def suggest_file_by_keywords(self, issue_body: str) -> Optional[str]:
+        """Sugere um arquivo a partir de palavras-chave da issue."""
+        return issue_parser.suggest_file_by_keywords(issue_body, self.repo_path)
+
+    def _truncate_log(self, log_text: str, max_size: int = fix_applier.MAX_LOG_SIZE) -> str:
+        """Trunca logs longos mantendo um aviso de truncamento."""
+        return fix_applier.truncate_log(log_text, max_size)
+
+    def read_file_content(self, file_path: str) -> Optional[str]:
+        """Lê o conteúdo de um arquivo do repositório."""
+        return fix_applier.read_file_content(file_path, self.repo_path)
+
+    def call_gh_copilot_explain(self, error_message: str) -> Optional[str]:
+        """Explica um erro via ``gh copilot``."""
+        return fix_applier.call_gh_copilot_explain(error_message, self.repo_path)
+
+    def call_gh_copilot_suggest(self, prompt: str) -> Optional[str]:
+        """Pede uma sugestão ao ``gh copilot``."""
+        return fix_applier.call_gh_copilot_suggest(prompt, self.repo_path)
+
+    def get_fixed_code_with_copilot(
+        self,
+        error_message: str,
+        code: str,
+        file_path: str,
+        is_doc_request: bool = False,
+        is_feature: bool = False,
+    ) -> Optional[str]:
+        """Gera o código corrigido via GitHub Copilot CLI."""
+        return fix_applier.get_fixed_code_with_copilot(
+            error_message,
+            code,
+            file_path,
+            self.repo_path,
+            is_doc_request=is_doc_request,
+            is_feature=is_feature,
+        )
+
+    def apply_fix(self, file_path: str, fixed_code: str) -> bool:
+        """Aplica o código corrigido ao arquivo alvo."""
+        return fix_applier.apply_fix(file_path, fixed_code, self.repo_path)
+
+    def create_branch(self, issue_id: str) -> bool:
+        """Cria/checkout a branch de correção da issue."""
+        return pr_manager.create_branch(issue_id, self.repo_path)
+
+    def commit_changes(self, file_path: str, issue_id: str) -> bool:
+        """Faz commit das alterações no arquivo."""
+        return pr_manager.commit_changes(file_path, issue_id, self.repo_path)
+
+    def push_branch(self, issue_id: str) -> bool:
+        """Envia a branch de correção para o remoto."""
+        return pr_manager.push_branch(issue_id, self.repo_path)
+
+    def create_pull_request(
+        self, issue_id: str, error_message: str, file_path: str
+    ) -> bool:
+        """Abre o Pull Request da correção automática."""
+        return pr_manager.create_pull_request(
+            issue_id, error_message, file_path, self.repo_path
+        )
+
+    def close_issue(self, issue_id: str) -> bool:
+        """Fecha a issue original após a correção."""
+        return pr_manager.close_issue(issue_id, self.repo_path)
 
     def run_with_state_machine(self, pytest_report_path: Optional[str] = None) -> int:
         """Run the state-machine repair loop; returns 0 on success, 1 on failure."""

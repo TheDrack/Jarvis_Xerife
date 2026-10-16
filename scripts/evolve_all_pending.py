@@ -5,7 +5,7 @@ evolve_all_pending.py — Evolução em lote de capacidades JARVIS pendentes.
 Pipeline:
   1. Carrega capabilities.jrvs e filtra as pendentes.
   2. Ordena respeitando dependências (topological sort).
-  3. Chama evolution_mutator.evolve() para cada cap.
+  3. Chama o EvolutionOrchestrator (via Nexus) para cada cap.
   4. Loga progresso e contagem de sucesso/falha ao final.
 
 Uso:
@@ -22,10 +22,61 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from app.utils.document_store import document_store
-from scripts.evolution_mutator import evolve as mutator_evolve, update_capability_status
 
 # Default priority assigned to capabilities that don't specify one
 _DEFAULT_PRIORITY = 99
+
+
+# ---------------------------------------------------------------------------
+# Motor de evolução
+# ---------------------------------------------------------------------------
+
+def _get_orchestrator():
+    """Resolve o EvolutionOrchestrator via Nexus.
+
+    Nota: o antigo motor ``scripts/evolution_mutator.py`` foi removido do
+    projeto; o ``EvolutionOrchestrator`` é hoje o caminho vivo de mutação
+    (gera o patch, valida a sintaxe, salva a proposta e abre o PR).
+    """
+    from app.core.nexus import nexus
+
+    try:
+        orchestrator = nexus.resolve("evolution_orchestrator")
+    except Exception as exc:  # pragma: no cover - depende do registry em runtime
+        print(f"❌ evolution_orchestrator indisponível no Nexus: {exc}")
+        return None
+    if orchestrator is None or not hasattr(orchestrator, "execute"):
+        print("❌ evolution_orchestrator indisponível no Nexus.")
+        return None
+    return orchestrator
+
+
+def evolve(cap_id: str, roadmap_context: str = "", max_attempts: int = 3) -> bool:
+    """Evolui uma capability, tentando até *max_attempts* ciclos.
+
+    Retorna True apenas quando o EvolutionOrchestrator conclui um ciclo com
+    sucesso (proposta válida gerada).
+    """
+    orchestrator = _get_orchestrator()
+    if orchestrator is None:
+        return False
+
+    attempts = max(1, int(max_attempts or 1))
+    for attempt in range(1, attempts + 1):
+        result = orchestrator.execute(
+            {
+                "cap_id": cap_id,
+                "mission_id": cap_id,
+                "roadmap_context": roadmap_context,
+            }
+        ) or {}
+        if result.get("success"):
+            if attempt > 1:
+                print(f"  ℹ️  Succeeded on attempt {attempt}/{attempts}")
+            return True
+        reason = result.get("reason") or result.get("error") or "unknown"
+        print(f"  ⚠️  Tentativa {attempt}/{attempts} falhou: {reason}")
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +152,11 @@ def main() -> None:
         "--delay", type=float, default=2.0, help="Segundos entre caps (padrão: 2.0)"
     )
     parser.add_argument("--max-attempts", type=int, default=3, help="Tentativas por cap")
+    parser.add_argument(
+        "--roadmap-context",
+        default=None,
+        help="Contexto textual da missão (substitui as notas da capability)",
+    )
     args = parser.parse_args()
 
     all_caps = _load_capabilities()
@@ -141,9 +197,9 @@ def main() -> None:
         print(f"\n[{idx}/{total}] 🧬 Evoluindo {cap_id} — {title}")
 
         try:
-            success = mutator_evolve(
+            success = evolve(
                 cap_id=cap_id,
-                roadmap_context=cap.get("notes", ""),
+                roadmap_context=args.roadmap_context or cap.get("notes", ""),
                 max_attempts=args.max_attempts,
             )
             if success:

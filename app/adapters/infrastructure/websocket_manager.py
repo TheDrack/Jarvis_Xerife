@@ -80,23 +80,43 @@ class WebSocketManager(NexusComponent):
         self._finetune_collector = nexus.resolve("finetune_dataset_collector")
         logger.info("[WebSocket] Usuário %s conectado. Total: %d", user_id, len(self._connections[user_id]))
     
-    async def disconnect(self, user_id: str, websocket: WebSocket):
-        """Remove conexão WebSocket."""
-        if user_id in self._connections:
+    def disconnect(self, user_id: str, websocket: Optional[WebSocket] = None) -> None:
+        """Remove a conexão WebSocket de *user_id*.
+
+        Síncrono de propósito: é chamado em blocos ``finally`` de handlers
+        WebSocket, onde um ``await`` esquecido deixaria a conexão registrada
+        para sempre (vazamento + broadcasts para sockets mortos).
+
+        Args:
+            user_id: dono da conexão.
+            websocket: socket específico a remover. Se ``None``, remove todas
+                as conexões do usuário.
+        """
+        if user_id not in self._connections:
+            return
+        if websocket is None:
+            del self._connections[user_id]
+        else:
             self._connections[user_id].discard(websocket)
             if not self._connections[user_id]:
                 del self._connections[user_id]
         logger.info("[WebSocket] Usuário %s desconectado.", user_id)
     
-    async def broadcast_to_user(self, user_id: str, message: dict):
-        """Envia mensagem para usuário específico via WebSocket."""
+    async def broadcast_to_user(self, user_id: str, message: dict) -> int:
+        """Envia mensagem para usuário específico via WebSocket.
+
+        Returns:
+            Número de sockets que receberam a mensagem com sucesso.
+        """
         if user_id not in self._connections:
-            return
+            return 0
+        sent = 0
         
         disconnected = set()
         for websocket in self._connections[user_id]:
             try:
                 await websocket.send_json(message)
+                sent += 1
                 
                 # ADIÇÃO: Registra interação para fine-tuning se for resposta de comando
                 if message.get("type") == "command_response" and self._finetune_collector:
@@ -114,17 +134,41 @@ class WebSocketManager(NexusComponent):
                 disconnected.add(websocket)
         
         for ws in disconnected:
-            self._connections[user_id].discard(ws)
+            self._connections.get(user_id, set()).discard(ws)
+        if user_id in self._connections and not self._connections[user_id]:
+            del self._connections[user_id]
+
+        return sent
     
-    async def broadcast_to_all(self, message: dict):
-        """Envia mensagem para todos os usuários conectados."""
+    async def broadcast_to_all(self, message: dict) -> int:
+        """Envia mensagem para todos os usuários conectados.
+
+        Returns:
+            Total de sockets que receberam a mensagem.
+        """
+        total = 0
         for user_id in list(self._connections.keys()):
-            await self.broadcast_to_user(user_id, message)
-    
+            total += await self.broadcast_to_user(user_id, message)
+        return total
+
+    def is_connected(self, user_id: str) -> bool:
+        """True se o usuário possui ao menos um socket ativo."""
+        return bool(self._connections.get(user_id))
+
+    def connection_count(self, user_id: Optional[str] = None) -> int:
+        """Total de conexões ativas (globais ou de um usuário específico)."""
+        if user_id is not None:
+            return len(self._connections.get(user_id, ()))
+        return sum(len(conns) for conns in self._connections.values())
+
+    def connected_users(self) -> list:
+        """Alias público de :meth:`get_connected_users`."""
+        return self.get_connected_users()
+
     def get_connected_users(self) -> list:
         """Retorna lista de usuários conectados."""
         return list(self._connections.keys())
     
     def get_connection_count(self) -> int:
         """Retorna total de conexões ativas."""
-        return sum(len(conns) for conns in self._connections.values())
+        return self.connection_count()

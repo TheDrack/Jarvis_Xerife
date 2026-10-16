@@ -1,72 +1,127 @@
 # -*- coding: utf-8 -*-
-"""Overwatch Daemon — Orquestrador de monitoramento proativo.
-CORREÇÃO: Erros de sintaxe/indentação mobile e integração de Health Check.
+"""Overwatch Daemon - JARVIS Proactive Core (Hexagonal Architecture).
+
+A background process that runs independently of the main command loop and
+monitors the system, the user's context file, and resource usage, triggering
+proactive notifications and suggestions.
+
+Monitoring responsibilities:
+- CPU / RAM usage: warns via voice / notification when consistently high.
+- ``data/context.json`` changes: reacts to context updates.
+- User inactivity (30 min): uses VisionAdapter to check if the user is present;
+  if so, suggests a pending task from the calendar.
+- Tactical Perimeter (Phase 3): detects unauthorised MACs and ARP-spoofing
+  attacks reported by Soldiers; blocks the attacker, notifies the Commander,
+  and stores the forensic trace in VectorMemoryAdapter.
+- Predictive alerts (MELHORIA 6): janela deslizante de 10 leituras; dispara
+  notificação preventiva se tendência de crescimento ultrapassar limiares.
+
+All proactive actions are logged with the ``[PROACTIVE_CORE]`` prefix.
+
+Usage (embedded in main.py):
+    from app.adapters.infrastructure.overwatch_adapter import OverwatchDaemon
+    daemon = OverwatchDaemon()
+    daemon.start()  # non-blocking, runs in a daemon thread
 """
+
+import collections
 import logging
 import os
 import threading
 import time
-import subprocess
-from typing import Optional, Set, Any, Dict
+from pathlib import Path
+from typing import Any, Deque, Dict, List, Optional, Set
 
 from app.core.nexus import nexus, NexusComponent
-from .overwatch_resource_monitor import ResourceMonitor
-from .overwatch_perimeter import PerimeterMonitor
-from .overwatch_inactivity import InactivityMonitor
-from .overwatch_context import ContextMonitor, get_pending_tasks
+from app.utils.document_store import document_store
 
 logger = logging.getLogger(__name__)
 
-# Constantes
-_POLL_INTERVAL = 10
-_PERIMETER_CHECK_EVERY = 3
-_COMPILE_INTERVAL = float(os.getenv("OVERWATCH_COMPILE_INTERVAL_SEC", "600"))
-_CONSOLIDATION_INTERVAL = float(os.getenv("OVERWATCH_CONSOLIDATION_MIN", "15"))
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+_POLL_INTERVAL_SEC = 10          # main loop tick
+_CPU_CHECK_EVERY = 6             # ticks (every ~60 s)
+_CPU_HIGH_THRESHOLD = 85.0       # %
+_RAM_HIGH_THRESHOLD = 85.0       # %
+_INACTIVITY_TIMEOUT_SEC = 1800   # 30 minutes
+_CONTEXT_FILE = Path("data/context.jrvs")
+_PERIMETER_CHECK_EVERY = 3       # ticks (every ~30 s)
+_OVERWATCH_COMPILE_INTERVAL_SEC = float(
+    os.getenv("OVERWATCH_COMPILE_INTERVAL_SEC", "600")
+)  # 10 minutes
 
-class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
-    """Daemon de monitoramento proativo do JARVIS."""
+# Predictive thresholds (MELHORIA 6)
+_PREDICTIVE_CPU_THRESHOLD = 80.0  # %
+_PREDICTIVE_RAM_THRESHOLD = 85.0  # %
+_SLIDING_WINDOW_SIZE = 10
+
+# Memory consolidation interval (minutes)
+_CONSOLIDATION_INTERVAL_MIN = float(os.getenv("OVERWATCH_CONSOLIDATION_MIN", "15"))
+
+
+class OverwatchDaemon(NexusComponent):
+    """
+    Proactive monitoring daemon for JARVIS.
+
+    Implements NexusComponent to allow resolution via nexus.resolve("overwatch_daemon").
+
+    Args:
+        poll_interval: Main loop tick in seconds (default: 10).
+        cpu_threshold: CPU % that triggers a high-usage warning (default: 85).
+        ram_threshold: RAM % that triggers a high-usage warning (default: 85).
+        inactivity_timeout: Seconds of inactivity before the user-presence check (default: 1800).
+    """
 
     def __init__(
         self,
-        poll_interval: float = _POLL_INTERVAL,
-        cpu_threshold: float = 85.0,
-        ram_threshold: float = 85.0,
-        inactivity_timeout: float = 1800,
+        poll_interval: float = _POLL_INTERVAL_SEC,
+        cpu_threshold: float = _CPU_HIGH_THRESHOLD,
+        ram_threshold: float = _RAM_HIGH_THRESHOLD,
+        inactivity_timeout: float = _INACTIVITY_TIMEOUT_SEC,
         authorized_macs: Optional[Set[str]] = None,
     ) -> None:
-        super().__init__()
-
-        # Configurações
         self._poll_interval = poll_interval
         self._cpu_threshold = cpu_threshold
         self._ram_threshold = ram_threshold
+        self._inactivity_timeout = inactivity_timeout
 
-        # Estado
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._tick_count = 0
-        self._last_compile_ts = 0.0
-        self._last_consolidation_ts = 0.0        
-        
-        # Monitores especializados
-        self._inactivity = InactivityMonitor(timeout_seconds=inactivity_timeout)
-        self._context = ContextMonitor()
 
-        # Perímetro
-        self._authorized_macs = {m.upper() for m in (authorized_macs or set())}
+        self._last_activity_ts: float = time.monotonic()
+        self._context_mtime: Optional[float] = None
+        self._tick_count: int = 0
+        self._last_compile_ts: float = 0.0  # timestamp of last compile_all run
+        self._last_consolidation_ts: float = 0.0  # timestamp of last memory consolidation
+
+        # Tactical Perimeter state
+        self._authorized_macs: Set[str] = {m.upper() for m in (authorized_macs or set())}
         self._blocked_macs: Set[str] = set()
 
+        # Predictive monitoring — sliding windows (MELHORIA 6)
+        self._cpu_history: Deque[float] = collections.deque(maxlen=_SLIDING_WINDOW_SIZE)
+        self._ram_history: Deque[float] = collections.deque(maxlen=_SLIDING_WINDOW_SIZE)
+
+    # ------------------------------------------------------------------
+    # NexusComponent contract
+    # ------------------------------------------------------------------
+
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Implementação do contrato NexusComponent."""
         ctx = context or {}
         action = ctx.get("action", "status")
-
         if action == "notify_activity":
-            self._inactivity.reset_timer()
+            self.notify_activity()
             return {"success": True, "action": "activity_notified"}
-
         return {"success": True, "running": self._running, "tick": self._tick_count}
 
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
     def start(self) -> None:
+        """Start the daemon in a background daemon thread (non-blocking)."""
         if self._running:
             return
         self._running = True
@@ -74,72 +129,236 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
             target=self._run_loop, daemon=True, name="OverwatchDaemon"
         )
         self._thread.start()
-        logger.info("[Overwatch] Daemon iniciado.")
+        logger.info("[PROACTIVE_CORE] OverwatchDaemon iniciado.")
 
     def stop(self) -> None:
+        """Signal the daemon to stop at the next tick."""
         self._running = False
-        logger.info("[Overwatch] Daemon parando...")
+        logger.info("[PROACTIVE_CORE] OverwatchDaemon parando…")
 
     def notify_activity(self) -> None:
-        self._inactivity.reset_timer()
+        """Call this whenever the user sends a command to reset the inactivity timer."""
+        self._last_activity_ts = time.monotonic()
+
+    def get_resource_trends(self) -> Dict[str, str]:
+        """Tendência atual de CPU e RAM a partir das janelas deslizantes.
+
+        Usado pelo endpoint ``/health/detail``. Retorna ``"stable"`` quando
+        ainda não há leituras suficientes.
+        """
+        return {
+            "cpu_trend": self._compute_trend(self._cpu_history, self._cpu_history),
+            "ram_trend": self._compute_trend(self._ram_history, self._ram_history),
+        }
+
+    # ------------------------------------------------------------------
+    # Main loop
+    # ------------------------------------------------------------------
 
     def _run_loop(self) -> None:
-        logger.info("[Overwatch] Loop principal iniciado.")
+        logger.info("[PROACTIVE_CORE] Loop principal iniciado.")
         while self._running:
             self._tick_count += 1
             try:
                 self._check_resources()
-                self._check_context()
+                self._check_context_file()
                 self._check_inactivity()
-                self._check_perimeter()
-                self._check_compile()
+                self._check_tactical_perimeter()
+                self._check_jrvs_compile()
                 self._maybe_consolidate_memory()
             except Exception as exc:
-                logger.error("[Overwatch] Erro no loop: %s", exc)
-
+                logger.error("[PROACTIVE_CORE] Erro no loop principal: %s", exc)
             time.sleep(self._poll_interval)
-        logger.info("[Overwatch] Loop encerrado.")
+        logger.info("[PROACTIVE_CORE] Loop principal encerrado.")
 
-    def _check_context(self) -> None:
-        changed = self._context.check_changes(
-            on_change_callback=self._on_context_changed,
-        )
-        if changed:
-            logger.info("[Overwatch] Contexto recarregado.")
+    # ------------------------------------------------------------------
+    # Monitoring tasks
+    # ------------------------------------------------------------------
 
-    def _check_inactivity(self) -> None:
-        inactive = self._inactivity.check_inactivity(
-            suggest_task_callback=self._suggest_task,
-        )
-        if inactive:
-            logger.info("[Overwatch] Inatividade detectada.")
+    def _check_resources(self) -> None:
+        """Monitor CPU and RAM; warn if either exceeds the threshold.
 
-    def _check_perimeter(self) -> None:
-        if self._tick_count % _PERIMETER_CHECK_EVERY != 0:
+        Também mantém janela deslizante e dispara alerta preditivo (MELHORIA 6).
+        """
+        if self._tick_count % _CPU_CHECK_EVERY != 0:
             return
 
-        soldiers = self._list_soldiers()
-        for soldier in soldiers:
-            nearby = getattr(soldier, "_nearby_devices", [])
-            for device in nearby:
-                mac = device.mac_address.upper()
-                if mac not in self._authorized_macs:
-                    self._handle_intruder(mac, soldier.soldier_id, device)
+        try:
+            import psutil
 
-    def _check_compile(self) -> None:
+            cpu = psutil.cpu_percent(interval=1)
+            ram = psutil.virtual_memory().percent
+
+            # Reactive alerts (threshold exceeded right now)
+            if cpu > self._cpu_threshold:
+                msg = f"⚠️ CPU em {cpu:.0f}% — uso elevado detectado."
+                logger.warning("[PROACTIVE_CORE] %s", msg)
+                self._notify(msg)
+
+            if ram > self._ram_threshold:
+                msg = f"⚠️ RAM em {ram:.0f}% — memória alta detectada."
+                logger.warning("[PROACTIVE_CORE] %s", msg)
+                self._notify(msg)
+
+            # Update sliding windows
+            self._cpu_history.append(cpu)
+            self._ram_history.append(ram)
+
+            # Predictive checks
+            trend = self._compute_trend(self._cpu_history, self._ram_history)
+            self._check_predictive_alerts(cpu, ram, trend)
+            self._write_context_trend(cpu, ram, trend)
+
+        except ImportError:
+            logger.debug("[PROACTIVE_CORE] psutil não instalado; monitoramento de recursos desativado.")
+        except Exception as exc:
+            logger.debug("[PROACTIVE_CORE] Erro ao verificar recursos: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Predictive helpers (MELHORIA 6)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _compute_trend(
+        cpu_hist: "Deque[float]",
+        ram_hist: "Deque[float]",
+    ) -> str:
+        """Calcula a tendência linear a partir das janelas deslizantes.
+
+        Compara a média das últimas 5 leituras com a média das 5 anteriores.
+        Retorna: ``'rising'``, ``'falling'``, ou ``'stable'``.
+        """
+        history = list(cpu_hist)
+        if len(history) < 10:
+            return "stable"
+        older = history[:5]
+        newer = history[5:]
+        avg_old = sum(older) / len(older)
+        avg_new = sum(newer) / len(newer)
+        delta = avg_new - avg_old
+        if delta > 5.0:
+            return "rising"
+        if delta < -5.0:
+            return "falling"
+        return "stable"
+
+    def _check_predictive_alerts(self, cpu: float, ram: float, trend: str) -> None:
+        """Dispara notificação preventiva se tendência de crescimento ultrapassar limiares."""
+        if trend != "rising":
+            return
+
+        cpu_list = list(self._cpu_history)
+        ram_list = list(self._ram_history)
+        if len(cpu_list) < 10 or len(ram_list) < 10:
+            return
+
+        # Projeção simples: última leitura + delta médio por leitura
+        cpu_delta = (cpu_list[-1] - cpu_list[0]) / (len(cpu_list) - 1)
+        ram_delta = (ram_list[-1] - ram_list[0]) / (len(ram_list) - 1)
+        cpu_proj = cpu_list[-1] + cpu_delta
+        ram_proj = ram_list[-1] + ram_delta
+
+        if cpu_proj >= _PREDICTIVE_CPU_THRESHOLD:
+            msg = (
+                f"[PROACTIVE_CORE][PREDICTIVE] ⚠️ CPU projetada em {cpu_proj:.1f}% "
+                f"no próximo ciclo — tendência de alta detectada."
+            )
+            logger.warning(msg)
+            self._notify(msg)
+
+        if ram_proj >= _PREDICTIVE_RAM_THRESHOLD:
+            msg = (
+                f"[PROACTIVE_CORE][PREDICTIVE] ⚠️ RAM projetada em {ram_proj:.1f}% "
+                f"no próximo ciclo — tendência de alta detectada."
+            )
+            logger.warning(msg)
+            self._notify(msg)
+
+    def _write_context_trend(self, cpu: float, ram: float, trend: str) -> None:
+        """Atualiza data/context.json com o campo trend e system_health (MELHORIA 6)."""
+        try:
+            from app.domain.context.context_manager import ContextManager  # lazy
+            ctx_mgr = ContextManager()
+            ctx_mgr.write_context(
+                {
+                    "system_health": {
+                        "cpu_percent": cpu,
+                        "ram_percent": ram,
+                        "status": (
+                            "critical" if cpu > self._cpu_threshold or ram > self._ram_threshold
+                            else "warning" if cpu > _PREDICTIVE_CPU_THRESHOLD or ram > _PREDICTIVE_RAM_THRESHOLD
+                            else "healthy"
+                        ),
+                    },
+                    "trend": trend,
+                }
+            )
+        except Exception as exc:
+            logger.debug("[PROACTIVE_CORE] Falha ao escrever trend no context.json: %s", exc)
+
+    def _check_context_file(self) -> None:
+        """Detect changes in data/context.jrvs and log them."""
+        try:
+            if not _CONTEXT_FILE.exists():
+                return
+            mtime = _CONTEXT_FILE.stat().st_mtime
+            if self._context_mtime is None:
+                self._context_mtime = mtime
+                return
+            if mtime != self._context_mtime:
+                self._context_mtime = mtime
+                logger.info("[PROACTIVE_CORE] data/context.jrvs atualizado. Recarregando contexto.")
+                self._on_context_changed()
+        except Exception as exc:
+            logger.debug("[PROACTIVE_CORE] Erro ao verificar context.jrvs: %s", exc)
+
+    def _check_jrvs_compile(self) -> None:
+        """Periodically run JRVSCompiler.compile_all() based on OVERWATCH_COMPILE_INTERVAL_SEC.
+
+        Uses the unified compile lock (data/jrvs/.compile.lock) to prevent concurrent runs
+        with PolicyStore threshold-triggered compilations.
+        """
         now = time.monotonic()
-        if now - self._last_compile_ts < _COMPILE_INTERVAL:
+        if now - self._last_compile_ts < _OVERWATCH_COMPILE_INTERVAL_SEC:
             return
         self._last_compile_ts = now
-        self._compile_modules()
+        try:
+            from app.core.meta.compile_lock import (  # noqa: PLC0415
+                acquire_compile_lock,
+                release_compile_lock,
+            )
+            from app.core.meta.jrvs_compiler import JRVSCompiler  # noqa: PLC0415
+
+            jrvs_dir = os.getenv("JRVS_DIR", "data/jrvs")
+            if not acquire_compile_lock(jrvs_dir):
+                logger.debug("[PROACTIVE_CORE] JRVS compile_all bloqueado pelo lock unificado.")
+                return
+            try:
+                compiler = JRVSCompiler()
+                # Compile each module directly (lock already held by this method)
+                modules = set(("llm", "tools", "meta")) | set(compiler._store.list_modules())
+                for module_name in sorted(modules):
+                    try:
+                        compiler._compile_module_locked(module_name)
+                    except Exception as exc:  # pragma: no cover
+                        logger.error(
+                            "[PROACTIVE_CORE] Falha ao compilar '%s': %s", module_name, exc
+                        )
+                logger.info("[PROACTIVE_CORE] JRVS compile_all concluído.")
+            finally:
+                release_compile_lock(jrvs_dir)
+        except Exception as exc:
+            logger.error("[PROACTIVE_CORE] Falha ao executar JRVS compile_all: %s", exc)
 
     def _maybe_consolidate_memory(self) -> None:
+        """Consolida a memória vetorial episodicamente (a cada _CONSOLIDATION_INTERVAL_MIN).
+
+        Só executa quando o MemoryConsolidationService e o VectorMemoryAdapter
+        estão saudáveis, evitando degradar dados durante indisponibilidade.
+        """
         now = time.monotonic()
-        interval_sec = _CONSOLIDATION_INTERVAL * 60
-
-        if now - self._last_consolidation_ts < interval_sec:
+        if now - self._last_consolidation_ts < _CONSOLIDATION_INTERVAL_MIN * 60:
             return
-
         self._last_consolidation_ts = now
 
         try:
@@ -151,99 +370,233 @@ class OverwatchDaemon(ResourceMonitor, PerimeterMonitor, NexusComponent):
             if not vector_adapter:
                 return
 
-            # Health Check do Adapter antes de liberar a RAM
-            if hasattr(vector_adapter, "is_healthy"):
-                if not vector_adapter.is_healthy():
-                    logger.warning("[Overwatch] VectorAdapter offline. Consolidação adiada.")
-                    return
+            if hasattr(vector_adapter, "is_healthy") and not vector_adapter.is_healthy():
+                logger.warning("[PROACTIVE_CORE] VectorAdapter offline. Consolidação adiada.")
+                return
 
             result = service.execute({"max_age_hours": 24})
-            if result.get("success"):
-                logger.info("[Overwatch] Consolidação concluída.")
+            if isinstance(result, dict) and result.get("success"):
+                logger.info("[PROACTIVE_CORE] Consolidação de memória concluída.")
         except Exception as exc:
-            logger.debug(f"[Overwatch] Falha na consolidação: {exc}")
+            logger.debug("[PROACTIVE_CORE] Falha na consolidação de memória: %s", exc)
 
-    def _handle_intruder(self, mac: str, soldier_id: str, device: Any) -> None:
-        if mac in self._blocked_macs:
+    def _check_inactivity(self) -> None:
+        """After 30 min of inactivity, check if the user is present and suggest a task."""
+        elapsed = time.monotonic() - self._last_activity_ts
+        if elapsed < self._inactivity_timeout:
             return
 
-        logger.warning("🚨 [Perímetro] MAC não autorizado: %s", mac)
-        self._block_mac(mac)
-        self._notify(f"ALERTA: MAC não autorizado {mac}")
-        self._store_trace(mac, soldier_id, device)
-        self._blocked_macs.add(mac)
+        logger.info(
+            "[PROACTIVE_CORE] Inatividade de %.0f min detectada. Verificando presença do usuário…",
+            elapsed / 60,
+        )
 
-    def _block_mac(self, mac: str) -> None:
-        """Tenta bloquear MAC via iptables."""
+        # Reset timer so we don't fire repeatedly
+        self._last_activity_ts = time.monotonic()
+
+        # Use VisionAdapter to check if user is present
         try:
-            result = subprocess.run(
-                ["iptables", "-A", "INPUT", "-m", "mac", "--mac-source", mac, "-j", "DROP"],
-                capture_output=True, timeout=5,
-            )
-            if result.returncode == 0:
-                logger.info("🛡️ [Perímetro] MAC %s bloqueado.", mac)
-        except Exception:
-            pass
+            vision = nexus.resolve("vision_adapter")
+            if vision is not None:
+                description = vision.capture_and_analyze(
+                    "O usuário está presente na frente do computador? Responda apenas 'sim' ou 'não'."
+                )
+                if description and "sim" in description.lower():
+                    logger.info("[PROACTIVE_CORE] Usuário presente. Sugerindo tarefa pendente.")
+                    self._suggest_pending_task()
+                else:
+                    logger.info("[PROACTIVE_CORE] Usuário ausente ou indeterminado: %s", description)
+        except Exception as exc:
+            logger.debug("[PROACTIVE_CORE] VisionAdapter indisponível: %s", exc)
+
+    # ------------------------------------------------------------------
+    # Reaction helpers
+    # ------------------------------------------------------------------
 
     def _on_context_changed(self) -> None:
+        """React to a context.jrvs change."""
         try:
-            ctx = self._context.load_context()
-            logger.info("[Overwatch] Contexto: %d chaves.", len(ctx))
+            ctx: Dict[str, Any] = document_store.read(_CONTEXT_FILE)
+            logger.info("[PROACTIVE_CORE] Novo contexto carregado: %s chave(s).", len(ctx))
         except Exception as exc:
-            logger.warning("[Overwatch] Falha ao ler contexto: %s", exc)
+            logger.warning("[PROACTIVE_CORE] Falha ao ler context.jrvs: %s", exc)
 
-    def _suggest_task(self) -> None:
+    def _suggest_pending_task(self) -> None:
+        """Fetch the next pending calendar task and notify the user."""
         try:
-            tasks = get_pending_tasks(limit=1)
-            if tasks:
-                self._notify(f"Tarefa pendente: {tasks[0]}")
+            pending = self._get_pending_calendar_tasks(limit=1)
+            if pending:
+                task = pending[0]
+                msg = f"📅 [PROACTIVE_CORE] Tarefa pendente: {task}"
+                logger.info(msg)
+                self._notify(msg)
+            else:
+                logger.info("[PROACTIVE_CORE] Nenhuma tarefa pendente encontrada no calendário.")
         except Exception as exc:
-            logger.debug("[Overwatch] Falha ao sugerir tarefa: %s", exc)
+            logger.debug("[PROACTIVE_CORE] Erro ao buscar tarefas: %s", exc)
 
-    def _list_soldiers(self) -> list:
+    def _get_pending_calendar_tasks(self, limit: int = 5) -> List[str]:
+        """
+        Return pending tasks from ``data/context.jrvs`` (``pending_tasks`` key)
+        or an empty list if unavailable.
+        """
+        tasks: List[str] = []
         try:
-            orch = nexus.resolve("device_orchestrator_service")
-            return orch.list_soldiers() if orch else []
-        except Exception:
-            return []
-
-    def _store_trace(self, mac: str, soldier_id: str, device: Any) -> None:
-        try:
-            vector_mem = nexus.resolve("vector_memory_adapter")
-            if vector_mem:
-                vector_mem.store_event(f"Intrusão: MAC={mac}", metadata={"mac": mac})
+            if _CONTEXT_FILE.exists():
+                ctx: Dict[str, Any] = document_store.read(_CONTEXT_FILE)
+                raw = ctx.get("pending_tasks", [])
+                tasks = [str(t) for t in raw[:limit]]
         except Exception:
             pass
-
-    def _compile_modules(self) -> None:
-        try:
-            from app.core.meta.compile_lock import acquire_compile_lock, release_compile_lock
-            from app.core.meta.jrvs_compiler import JRVSCompiler
-            jrvs_dir = os.getenv("JRVS_DIR", "data/jrvs")
-            if not acquire_compile_lock(jrvs_dir):
-                return
-            try:
-                compiler = JRVSCompiler()
-                modules = set(("llm", "tools", "meta")) | set(compiler._store.list_modules())
-                for mod in sorted(modules):
-                    compiler._compile_module_locked(mod)
-                logger.info("[Overwatch] Compile concluído.")
-            finally:
-                release_compile_lock(jrvs_dir)
-        except Exception as exc:
-            logger.error("[Overwatch] Falha no compile: %s", exc)
+        return tasks
 
     def _notify(self, message: str) -> None:
+        """
+        Send *message* through whatever notification channel is available
+        (Telegram, voice, etc.).  Fails silently if none is available.
+        """
         for adapter_id in ("telegram_adapter", "voice_provider"):
             try:
                 adapter = nexus.resolve(adapter_id)
-                if adapter and hasattr(adapter, "send_message"):
-                    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+                if adapter is None:
+                    continue
+                if adapter_id == "telegram_adapter" and hasattr(adapter, "send_message"):
+                    chat_id = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("ADMIN_CHAT_ID")
                     if chat_id:
-                        adapter.send_message(message, chat_id=chat_id)
+                        adapter.send_message(chat_id, message)
                         return
+                elif adapter_id == "voice_provider" and hasattr(adapter, "speak"):
+                    adapter.speak(message)
+                    return
             except Exception:
                 pass
 
-# Compatibilidade
-Overwatch = OverwatchDaemon
+    # ------------------------------------------------------------------
+    # Tactical Perimeter (Phase 3 - Soldier Shield & Response)
+    # ------------------------------------------------------------------
+
+    def register_authorized_mac(self, mac: str) -> None:
+        """Add *mac* to the set of authorised devices on the perimeter."""
+        self._authorized_macs.add(mac.upper())
+
+    def _check_tactical_perimeter(self) -> None:
+        """
+        Poll the Soldier registry for detected nearby devices and respond
+        to any MAC addresses that are not in the authorised list.
+
+        Runs every ``_PERIMETER_CHECK_EVERY`` ticks.
+        """
+        if self._tick_count % _PERIMETER_CHECK_EVERY != 0:
+            return
+
+        try:
+            orchestrator = nexus.resolve("device_orchestrator_service")
+            if orchestrator is None:
+                return
+            soldiers = orchestrator.list_soldiers()
+        except Exception as exc:
+            logger.debug("[PERIMETER] Orquestrador indisponível: %s", exc)
+            return
+
+        for soldier in soldiers:
+            try:
+                telemetry = nexus.resolve("soldier_telemetry_adapter")
+                if telemetry is None:
+                    continue
+                # Retrieve latest telemetry from the orchestrator record
+                # (nearby_devices are stored in the last ingest call)
+                nearby = getattr(soldier, "_nearby_devices", [])
+                for device in nearby:
+                    mac = device.mac_address.upper()
+                    if mac not in self._authorized_macs:
+                        self._handle_intruder(mac, soldier.soldier_id, device)
+            except Exception as exc:
+                logger.debug(
+                    "[PERIMETER] Erro ao verificar Soldado '%s': %s", soldier.soldier_id, exc
+                )
+
+    def _handle_intruder(self, mac: str, detected_by: str, device: Any) -> None:
+        """
+        Respond to an unauthorised device discovered on the perimeter.
+
+        Steps:
+          1. Block local communication with the intruder (Self-Defense).
+          2. Notify the Commander via the notification pipeline.
+          3. Record the forensic trace in VectorMemoryAdapter.
+        """
+        if mac in self._blocked_macs:
+            return  # already handled
+
+        logger.warning(
+            "🚨 [PERIMETER] MAC não autorizado detectado: %s (por Soldado '%s')",
+            mac,
+            detected_by,
+        )
+
+        # 1. Self-defense: attempt to block via iptables (best-effort)
+        self._block_mac(mac)
+
+        # 2. Notify Commander
+        msg = (
+            f"🚨 ALERTA DE PERÍMETRO: dispositivo não autorizado detectado! "
+            f"MAC={mac} | detectado por Soldado '{detected_by}' | "
+            f"protocolo={getattr(device, 'protocol', 'desconhecido')}"
+        )
+        self._notify(msg)
+
+        # 3. Store forensic trace in vector memory
+        self._store_intruder_trace(mac, detected_by, device)
+
+        self._blocked_macs.add(mac)
+
+    def _block_mac(self, mac: str) -> None:
+        """
+        Attempt to block traffic from *mac* using iptables (Linux only).
+
+        Fails silently on unsupported platforms or without root privileges.
+        """
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["iptables", "-A", "INPUT", "-m", "mac", "--mac-source", mac, "-j", "DROP"],
+                capture_output=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                logger.info("🛡️ [PERIMETER] MAC %s bloqueado via iptables.", mac)
+            else:
+                logger.debug(
+                    "🛡️ [PERIMETER] iptables retornou %d para MAC %s: %s",
+                    result.returncode,
+                    mac,
+                    result.stderr.decode(errors="replace"),
+                )
+        except FileNotFoundError:
+            logger.debug("🛡️ [PERIMETER] iptables não disponível nesta plataforma.")
+        except Exception as exc:
+            logger.debug("🛡️ [PERIMETER] Bloqueio de MAC falhou: %s", exc)
+
+    def _store_intruder_trace(self, mac: str, detected_by: str, device: Any) -> None:
+        """Persist the intruder's forensic trace in VectorMemoryAdapter."""
+        try:
+            vector_memory = nexus.resolve("vector_memory_adapter")
+            if vector_memory is None:
+                return
+            narrative = (
+                f"Intrusão detectada: MAC={mac}, "
+                f"protocolo={getattr(device, 'protocol', 'desconhecido')}, "
+                f"SSID={getattr(device, 'ssid', None)}, "
+                f"sinal={getattr(device, 'signal_dbm', None)} dBm, "
+                f"detectado pelo Soldado '{detected_by}'."
+            )
+            vector_memory.store_event(
+                narrative,
+                metadata={
+                    "event_type": "intruder_detected",
+                    "mac_address": mac,
+                    "detected_by": detected_by,
+                },
+            )
+            logger.info("🧠 [PERIMETER] Rasto forense armazenado para MAC %s.", mac)
+        except Exception as exc:
+            logger.debug("🧠 [PERIMETER] Falha ao armazenar rasto forense: %s", exc)

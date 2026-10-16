@@ -44,11 +44,11 @@ O sistema é capaz de:
 ├─────────────────────────────────────────┤
 │        APPLICATION (Services)           │
 │  - assistant_service.py                 │
-│  - jarvis_dev_agent.py                  │
+│  - jarvis_dev_agent/ (agent.py)         │
 │  - evolution_orchestrator.py            │
 │  - metabolism_core.py                   │
 │  - llm_router.py                        │
-│  - pipeline_builder.py                  │
+│  - consolidated_context_service.py      │
 ├─────────────────────────────────────────┤
 │          DOMAIN (Core)                  │
 │  - capability_manager.py                │
@@ -84,13 +84,13 @@ O sistema é capaz de:
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│              PIPELINE BUILDER (Cria)                            │
-│  Gera: config/pipelines/auto_telegram_notification.yml          │
+│              PIPELINE YAML (Declara)                            │
+│  Define: config/pipelines/<nome>.yml (passos + componentes)      │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │              PIPELINE RUNNER (Executa)                          │
-│  python app/runtime/pipeline_runner.py --pipeline auto_telegram │
+│  PIPELINE=<nome> python app/runtime/pipeline_runner.py          │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -162,27 +162,29 @@ gap = registry.execute({
 
 | Adapter ID | Descrição | Capabilities |
 |------------|-----------|--------------|
-| `llm_router` | Roteamento de LLMs | code_generation, self_repair, planning |
-| `github_worker` | Operações GitHub | create_pull_request, create_issue |
-| `telegram_adapter` | Interface Telegram | send_message, send_voice |
-| `persistent_shell_adapter` | Terminal stateful | run_shell_command, run_tests |
-| `docker_sandbox` | Sandbox Docker | run_tests_isolated |
-| `evolution_sandbox` | Sandbox local | test_proposal, validate_code |
-| `pipeline_builder` | Criador de pipelines | create_pipeline, run_pipeline |
+| `llm_router` | Roteamento dinâmico de LLMs | code_generation, self_repair, planning |
+| `github_worker` | Operações no GitHub | create_pull_request, create_issue, push_commits |
+| `persistent_shell_adapter` | Terminal stateful | run_shell_command, run_tests, browse_directory |
+| `telegram_adapter` | Interface via Telegram | send_message, send_voice, receive_message |
+| `consolidated_context_service` | Snapshot do código | read_context, refresh_context |
+| `capability_manager` | Gerenciamento de capabilities | list_capabilities, execute_capability |
+| `procedural_memory` | Memória de padrões | store_pattern, find_similar |
+| `semantic_memory` | Memória de eventos | store_event, query_similar |
+
+> A lista acima é a do registry estático (`app/domain/models/adapter_registry.py`).
+> O Nexus Discovery completa o registro com os demais componentes em runtime — a
+> lista viva está em `data/nexus_registry.json`.
 
 ---
 
 ## 🧪 Validação
 
 ```bash
-# Validar registry vs código
-python scripts/validate_registry_vs_code.py
-
-# Validar docs vs código
-python scripts/validate_docs_vs_code.py
-
-# Validar arquitetura
+# Validar arquitetura (camadas, ports, adapters, DI container)
 python scripts/validate_architecture.py
+
+# Validar autoconsciência via Long Context (contexto consolidado)
+python scripts/validate_self_awareness.py
 
 # Testar JarvisDevAgent
 python -c "from app.application.services.jarvis_dev_agent import JarvisDevAgent; print('✅ OK')"

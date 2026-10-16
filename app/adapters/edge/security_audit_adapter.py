@@ -185,7 +185,14 @@ class SecurityAuditAdapter(TacticalCommandPort):
         
         handler = dispatch.get(tool)
         if not handler:
-            return {"success": False, "error": f"Ferramenta '{tool}' desconhecida.", "node_id": node_id}
+            return {
+                "success": False,
+                "error": (
+                    f"Unknown tool: '{tool}' (ferramenta desconhecida). "
+                    f"Disponíveis: {sorted(dispatch)}"
+                ),
+                "node_id": node_id,
+            }
             
         result = handler(target_scope, opts)
         result.update({
@@ -226,9 +233,15 @@ class SecurityAuditAdapter(TacticalCommandPort):
             return {"success": False, "error": str(e)}
 
     def _run_full_recon(self, scope: str, opts: Dict) -> Dict[str, Any]:
+        """Reconhecimento completo: ARP + Nmap + mDNS.
+
+        As chaves usam os mesmos nomes das ferramentas na dispatch table
+        (``arp_scan``/``nmap``/``mdns``) para que os resultados possam ser
+        reutilizados por consumidores que iteram sobre as ferramentas.
+        """
         return {
             "success": True,
-            "arp": self._run_arp_scan(scope, opts),
+            "arp_scan": self._run_arp_scan(scope, opts),
             "nmap": self._run_nmap(scope, opts),
-            "mdns": self._run_mdns(scope, opts)
+            "mdns": self._run_mdns(scope, opts),
         }

@@ -30,7 +30,11 @@ def create_github_router(db_adapter, get_current_user) -> APIRouter:
     from app.application.services.github_worker import GitHubWorker
     from app.application.services.thought_log_service import ThoughtLogService
 
-    github_worker = nexus.resolve("github_worker")
+    # Instanciação explícita: o worker é construído no momento da criação do
+    # router (não via nexus.resolve) para que a dependência seja substituível
+    # e para que o router não herde uma instância cacheada com configuração
+    # antiga de token/repositório.
+    github_worker = GitHubWorker()
     thought_log_service = ThoughtLogService(engine=db_adapter.engine)
     router = APIRouter()
 

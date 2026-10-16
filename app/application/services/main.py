@@ -23,7 +23,7 @@ async def notify_online():
         admin_id = os.getenv("TELEGRAM_ADMIN_ID")
         if admin_id:
             try:
-                await telegram.send_message(
+                telegram.send_message(
                     chat_id=admin_id,
                     text="🚀 **J.A.R.V.I.S. ONLINE**\nStatus: Cloud Ativo\nNexus: Operacional"
                 )

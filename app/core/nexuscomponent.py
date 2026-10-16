@@ -53,6 +53,13 @@ class NexusComponent(ABC):
                     # Executa a lógica original do componente
                     return original_execute(self, context, **kw)
                 except Exception as e:
+                    # Opt-out do Fail-Safe: componentes em modo estrito (ex.:
+                    # DriveUploader com strict_mode) precisam que a falha chegue
+                    # ao chamador, em vez de virar um dict {success: False}.
+                    # Sem isso, um pipeline "strict" nunca aborta.
+                    if getattr(self, "_raise_on_error", False):
+                        raise
+
                     error_type = type(e).__name__
                     error_msg = str(e)
                     error_tb = traceback.format_exc()

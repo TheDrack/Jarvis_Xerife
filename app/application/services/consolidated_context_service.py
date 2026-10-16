@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONSOLIDATED_PATH = "CORE_LOGIC_CONSOLIDATED.txt"
 MAX_CONTEXT_TOKENS = 100000
+# Limite de caracteres injetados em prompts de LLM (o arquivo consolidado pode
+# chegar a vários MB; prompts precisam de um teto previsível).
+MAX_CONSOLIDATED_CHARS = 200_000
+_TRUNCATION_NOTICE = "\n... [contexto consolidado truncado]"
 
 
 class ConsolidatedContextService(NexusComponent):
@@ -80,3 +84,47 @@ class ConsolidatedContextService(NexusComponent):
             except Exception:
                 info["size_bytes"] = None
         return info
+
+
+def load_consolidated_context(max_chars: int = MAX_CONSOLIDATED_CHARS) -> str:
+    """Carrega o contexto consolidado do codebase via Nexus (autoconsciência).
+
+    Tolerante a falhas: devolve ``""`` quando o serviço não está registrado ou o
+    arquivo consolidado ainda não foi gerado, para não bloquear quem consome
+    (EvolutionOrchestrator, JarvisDevAgent). Conteúdos maiores que *max_chars*
+    são truncados antes de ir para o prompt do LLM.
+    """
+    from app.core.nexus import nexus  # import tardio: evita ciclo de importação
+
+    try:
+        service = nexus.resolve("consolidated_context_service")
+    except Exception as exc:
+        logger.debug("[CONTEXT] consolidated_context_service indisponível: %s", exc)
+        return ""
+
+    if service is None:
+        return ""
+
+    # can_execute() já sinaliza se o arquivo consolidado existe no disco
+    can_execute = getattr(service, "can_execute", None)
+    if callable(can_execute):
+        try:
+            if not can_execute({}):
+                return ""
+        except Exception:
+            return ""
+
+    try:
+        get_context = getattr(service, "get_context", None)
+        if not callable(get_context):
+            return ""
+        content = str(get_context() or "")
+    except Exception as exc:
+        logger.debug("[CONTEXT] Falha ao ler contexto consolidado: %s", exc)
+        return ""
+
+    if not content or content.startswith("Arquivo de contexto não disponível"):
+        return ""
+    if len(content) > max_chars:
+        return content[:max_chars] + _TRUNCATION_NOTICE
+    return content

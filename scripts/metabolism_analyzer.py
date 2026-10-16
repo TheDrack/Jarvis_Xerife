@@ -1,11 +1,15 @@
-from app.core.nexus import nexus
 # -*- coding: utf-8 -*-
 import argparse, json, logging, os, sys
 from pathlib import Path
 from typing import Dict, Any
 from enum import Enum
 
+# A raiz do projeto precisa estar em sys.path ANTES de qualquer import app.*:
+# ao executar ``python scripts/metabolism_analyzer.py``, o Python adiciona
+# apenas ``scripts/`` ao sys.path, então o import falhava com ModuleNotFoundError.
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from app.core.nexus import nexus  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger("MecanicoRevisionador")

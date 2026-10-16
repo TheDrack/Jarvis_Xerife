@@ -93,6 +93,41 @@ class TelegramAdapter(NexusComponent):
             logger.debug(f"Fetch updates fail: {e}")
         return []
 
+    def set_webhook(self, url: str, secret_token: Optional[str] = None) -> bool:
+        """Register *url* as the bot webhook (Telegram ``setWebhook``).
+
+        Used by the cloud entry point (``serve.py``) to let Telegram wake the
+        service. Returns ``True`` only when Telegram confirms the registration.
+        """
+        if not self.token or not url:
+            logger.error("❌ [TELEGRAM] Token ou URL ausente para setWebhook.")
+            return False
+        try:
+            payload: Dict[str, Any] = {"url": url}
+            if secret_token:
+                payload["secret_token"] = secret_token
+            response = self.http.request("POST", "/setWebhook", json=payload)
+            ok = bool(response.json().get("ok", False))
+            if ok:
+                logger.info(f"✅ [TELEGRAM] Webhook registrado em {url}")
+            else:
+                logger.error(f"❌ [TELEGRAM] setWebhook recusado: {response.text}")
+            return ok
+        except Exception as e:
+            logger.error(f"❌ [TELEGRAM] Erro ao registrar webhook: {e}")
+            return False
+
+    def delete_webhook(self) -> bool:
+        """Remove the current bot webhook (Telegram ``deleteWebhook``)."""
+        if not self.token:
+            return False
+        try:
+            response = self.http.request("POST", "/deleteWebhook")
+            return bool(response.json().get("ok", False))
+        except Exception as e:
+            logger.error(f"❌ [TELEGRAM] Erro ao remover webhook: {e}")
+            return False
+
     # ------------------------------------------------------------------
     # Update handling
     # ------------------------------------------------------------------

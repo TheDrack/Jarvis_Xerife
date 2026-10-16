@@ -6,6 +6,14 @@ Tests that core components can be imported and instantiated.
 """
 
 import sys
+from pathlib import Path
+
+# Garante que o root do projeto esteja importável mesmo quando o script é
+# executado diretamente (python scripts/validate_architecture.py): nesse caso
+# o sys.path recebe apenas o diretório ``scripts/``.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 
 def test_domain_imports():
@@ -44,7 +52,13 @@ def test_application_imports():
 
 
 def test_adapter_imports():
-    """Test adapter layer imports"""
+    """Test adapter layer imports.
+
+    Os adapters de edge dependem de hardware/desktop (PyAutoGUI, pyttsx3, …),
+    listados em ``requirements/edge.txt``. Em ambientes headless a camada é
+    marcada como SKIP (``None``) em vez de falhar: a validação de arquitetura
+    não deve exigir driver de áudio ou display server.
+    """
     print("\nTesting adapter layer imports...")
     try:
         from app.adapters.edge import (  # noqa: F401
@@ -58,6 +72,14 @@ def test_adapter_imports():
 
         print("✓ Edge adapters imported successfully")
         return True
+    except ModuleNotFoundError as e:
+        missing = (e.name or "").split(".")[0]
+        if missing and not missing.startswith("app"):
+            print(f"⚠ Edge adapters skipped: dependência opcional '{missing}' não instalada")
+            print("   Instale com: pip install -r requirements/edge.txt")
+            return None
+        print(f"✗ Adapter import failed: {e}")
+        return False
     except Exception as e:
         print(f"✗ Adapter import failed: {e}")
         return False
@@ -159,11 +181,15 @@ def main():
     for test in tests:
         results.append(test())
 
+    passed = sum(1 for r in results if r is True)
+    skipped = sum(1 for r in results if r is None)
+    failed = [r for r in results if r is False]
+
     print("\n" + "=" * 60)
-    print(f"Results: {sum(results)}/{len(results)} tests passed")
+    print(f"Results: {passed}/{len(results)} tests passed" + (f" ({skipped} skipped)" if skipped else ""))
     print("=" * 60)
 
-    if all(results):
+    if all(r is not False for r in results):
         print("\n✓ All validation tests passed!")
         print("✓ Architecture is correctly implemented")
         print("✓ Ready for deployment")

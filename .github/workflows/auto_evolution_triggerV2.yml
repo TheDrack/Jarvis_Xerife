@@ -135,13 +135,21 @@ jobs:
           BRANCH_NAME="auto-evolution/mission-$(date +%s)"
           git checkout -b "$BRANCH_NAME"
           
-          # Execução do Mutator (Criação do código funcional)
-          if ! python scripts/evolution_mutator.py \
-            --strategy "minimal_change" \
-            --intent "auto-evolution-mission" \
-            --impact "functional-improvement" \
+          # Determina a capability-alvo a partir da missão identificada
+          MISSION_DESC="${{ steps.flow.outputs.mission_desc }}"
+          CAP_ID=$(echo "$MISSION_DESC" | grep -oE 'CAP-[0-9]+' | head -1)
+
+          if [ -z "$CAP_ID" ]; then
+            echo "❌ Não foi possível determinar a capability-alvo em: $MISSION_DESC"
+            exit 1
+          fi
+
+          # Execução do motor de evolução (EvolutionOrchestrator via Nexus)
+          if ! python scripts/evolve_all_pending.py \
+            --cap-id "$CAP_ID" \
+            --max-attempts 3 \
             --roadmap-context "$(cat mission_context.txt)"; then
-              echo "❌ Falha crítica no motor de mutação."
+              echo "❌ Falha crítica no motor de evolução ($CAP_ID)."
               exit 1
           fi
 

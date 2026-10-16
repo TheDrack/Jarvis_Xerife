@@ -21,7 +21,7 @@ class AutoEvolutionServiceV2(NexusComponent):
         Despacha ações baseadas em context["action"]:
           "status"      → get_success_metrics()
           "find_next"   → find_next_mission()
-          "evolve_next" | "evolve_cap" → evolve uma cap pelo evolution_mutator
+          "evolve_next" | "evolve_cap" → evolve uma cap pelo evolution_orchestrator
         """
         if not context:
             context = {}
@@ -44,26 +44,25 @@ class AutoEvolutionServiceV2(NexusComponent):
                     if not mission:
                         return {"success": False, "error": "Nenhuma cap pendente encontrada."}
                     cap_id = mission["id"]
-
-                roadmap_context = context.get("roadmap_context", "")
-                max_attempts = context.get("max_attempts", 3)
-
-                try:
-                    from scripts.evolution_mutator import evolve as mutator_evolve
-                    success = mutator_evolve(
-                        cap_id=cap_id,
-                        roadmap_context=roadmap_context,
-                        max_attempts=max_attempts,
+                else:
+                    mission = next(
+                        (
+                            c
+                            for c in self._load_data().get("capabilities", [])
+                            if c.get("id") == cap_id
+                        ),
+                        None,
                     )
-                    if success:
-                        return {"success": True, "evolved": cap_id}
-                    return {
-                        "success": False,
-                        "error": f"Evolução de {cap_id} falhou após {max_attempts} tentativas.",
-                    }
-                except Exception as exc:
-                    logger.error("[AutoEvolutionV2] Erro na evolução de %s: %s", cap_id, exc)
-                    return {"success": False, "error": str(exc), "cap_id": cap_id}
+                    if mission is None:
+                        return {
+                            "success": False,
+                            "error": f"Capability {cap_id} não encontrada no inventário.",
+                            "cap_id": cap_id,
+                        }
+
+                roadmap_context = context.get("roadmap_context") or self.get_roadmap_context(mission)
+                max_attempts = context.get("max_attempts", 3)
+                return self._evolve_capability(cap_id, mission, roadmap_context, max_attempts)
 
             return {"success": False, "error": f"Ação desconhecida: {action!r}"}
 
@@ -71,18 +70,101 @@ class AutoEvolutionServiceV2(NexusComponent):
             logger.error("[AutoEvolutionV2] execute() falhou: %s", exc)
             return {"success": False, "error": str(exc)}
 
+    def _evolve_capability(
+        self, cap_id: str, mission: Optional[Dict], roadmap_context: str, max_attempts: int = 3
+    ) -> Dict:
+        """Evolui uma capability através do EvolutionOrchestrator (via Nexus).
+
+        O antigo motor ``scripts/evolution_mutator.py`` foi removido do projeto;
+        o caminho vivo de mutação é o ``EvolutionOrchestrator``, que gera o patch
+        via MetabolismCore, valida a sintaxe, salva a proposta em
+        ``data/evolution_proposals/`` e abre o PR pelo GitHubWorker.
+
+        Args:
+            cap_id: identificador da capability-alvo (ex.: ``CAP-042``).
+            mission: metadados da capability (título/notas) ou ``None``.
+            roadmap_context: contexto textual já montado para o LLM.
+            max_attempts: número máximo de ciclos de evolução tentados.
+        """
+        try:
+            orchestrator = nexus.resolve("evolution_orchestrator")
+        except Exception as exc:
+            logger.error("[AutoEvolutionV2] evolution_orchestrator indisponível: %s", exc)
+            return {"success": False, "error": str(exc), "cap_id": cap_id}
+
+        if orchestrator is None or not hasattr(orchestrator, "execute"):
+            return {
+                "success": False,
+                "error": "evolution_orchestrator indisponível no Nexus.",
+                "cap_id": cap_id,
+            }
+
+        attempts = max(1, int(max_attempts or 1))
+        last_result: Dict = {}
+        for attempt in range(1, attempts + 1):
+            last_result = orchestrator.execute(
+                {
+                    "cap_id": cap_id,
+                    "cap_title": (mission or {}).get("title", ""),
+                    "mission_id": cap_id,
+                    "roadmap_context": roadmap_context,
+                }
+            ) or {}
+            if last_result.get("success"):
+                return {
+                    "success": True,
+                    "evolved": cap_id,
+                    "attempts": attempt,
+                    "result": last_result,
+                }
+            logger.warning(
+                "[AutoEvolutionV2] Tentativa %d/%d de evoluir %s falhou: %s",
+                attempt,
+                attempts,
+                cap_id,
+                last_result.get("reason") or last_result.get("error"),
+            )
+
+        return {
+            "success": False,
+            "error": f"Evolução de {cap_id} falhou após {attempts} tentativas.",
+            "cap_id": cap_id,
+            "last_result": last_result,
+        }
+
+    def _resolved_path(self) -> Path:
+        """Caminho efetivo do inventário de capacidades.
+
+        Prefere o caminho configurado (``.jrvs``) quando ele existe no disco e,
+        caso contrário, cai para o irmão ``.json``/``.jrvs`` equivalente. Sem esse
+        fallback o serviço respondeia "empty_inventory" (nenhuma missão pendente)
+        mesmo com o inventário completo disponível em ``capabilities.json``.
+        """
+        path = self.capabilities_path
+        if path.exists():
+            return path
+        for alt_suffix in (".json", ".jrvs"):
+            alt = path.with_suffix(alt_suffix)
+            if alt != path and alt.exists():
+                logger.warning(
+                    "[AutoEvolutionV2] %s não encontrado — usando %s", path, alt
+                )
+                return alt
+        return path
+
     def _load_data(self) -> Dict:
         """Carrega o inventário de capacidades."""
-        if not self.capabilities_path.exists():
+        path = self._resolved_path()
+        if not path.exists():
             return {"capabilities": []}
         try:
-            return document_store.read(self.capabilities_path)
+            return document_store.read(path)
         except Exception:
             return {"capabilities": []}
 
     def _save_data(self, data: Dict):
-        """Persiste as atualizações no formato .jrvs."""
-        document_store.write(self.capabilities_path, data)
+        """Persiste as atualizações no inventário (mesmo formato lido)."""
+        document_store.write(self._resolved_path(), data)
 
     def get_success_metrics(self) -> Dict:
         """Calcula métricas reais baseadas nos itens de capacidade."""

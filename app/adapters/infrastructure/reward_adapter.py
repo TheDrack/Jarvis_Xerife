@@ -15,6 +15,20 @@ from app.domain.models.evolution_reward import EvolutionReward
 logger = logging.getLogger(__name__)
 
 
+def _ensure_aware(value: Optional[datetime]) -> Optional[datetime]:
+    """Normaliza um filtro temporal para UTC aware.
+
+    ``created_at`` é armazenado como ``UTCDateTime`` (sempre aware); comparar
+    com um valor naive levanta ValueError no bind, então qualquer filtro
+    recebido de fora é normalizado aqui.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 class RewardAdapter(RewardProvider):
     def execute(self, context: dict):
         logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
@@ -169,7 +183,9 @@ class RewardAdapter(RewardProvider):
             if action_type:
                 statement = statement.where(EvolutionReward.action_type == action_type)
             if since:
-                statement = statement.where(EvolutionReward.created_at >= since)
+                statement = statement.where(
+                    EvolutionReward.created_at >= _ensure_aware(since)
+                )
             
             # Order by most recent first
             statement = statement.order_by(EvolutionReward.created_at.desc())
@@ -214,7 +230,9 @@ class RewardAdapter(RewardProvider):
             if action_type:
                 statement = statement.where(EvolutionReward.action_type == action_type)
             if since:
-                statement = statement.where(EvolutionReward.created_at >= since)
+                statement = statement.where(
+                    EvolutionReward.created_at >= _ensure_aware(since)
+                )
             
             result = session.exec(statement).first()
             return float(result) if result else 0.0
@@ -243,7 +261,9 @@ class RewardAdapter(RewardProvider):
             )
             
             if since:
-                statement = statement.where(EvolutionReward.created_at >= since)
+                statement = statement.where(
+                    EvolutionReward.created_at >= _ensure_aware(since)
+                )
             
             result = session.exec(statement).first()
             count, total, avg, max_val, min_val = result if result else (0, 0, 0, 0, 0)
@@ -256,7 +276,9 @@ class RewardAdapter(RewardProvider):
             ).group_by(EvolutionReward.action_type)
             
             if since:
-                type_statement = type_statement.where(EvolutionReward.created_at >= since)
+                type_statement = type_statement.where(
+                    EvolutionReward.created_at >= _ensure_aware(since)
+                )
             
             type_results = session.exec(type_statement).all()
             
@@ -292,13 +314,17 @@ class RewardAdapter(RewardProvider):
         """
         # If no time filter, default to last 7 days
         if not since:
-            since = datetime.now() - timedelta(days=7)
-        
+            since = datetime.now(timezone.utc) - timedelta(days=7)
+
+        # Normaliza uma vez: o restante da função faz aritmética com 'since'
+        since = _ensure_aware(since)
+        now = datetime.now(timezone.utc)
+
         # Get current period stats
         current_stats = self.get_reward_statistics(since=since)
         
         # Get previous period stats (same duration, but before 'since')
-        duration = datetime.now() - since
+        duration = now - since
         previous_since = since - duration
         previous_stats = self.get_reward_statistics(since=previous_since)
         previous_until = since  # Previous period ends where current begins

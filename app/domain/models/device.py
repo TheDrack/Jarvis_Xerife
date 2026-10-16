@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 import json
 
-from sqlmodel import Field, SQLModel, Column, JSON
+from sqlmodel import Field, SQLModel, Column, JSON, Relationship
 
 
 class Device(NexusComponent, SQLModel, table=True):
@@ -47,6 +47,10 @@ class Device(NexusComponent, SQLModel, table=True):
     last_threat_scan: datetime | None = None
     inherited_location: bool = False # Define se a localização vem de um vizinho
 
+    # Relationship enabling eager loading (selectinload) of capabilities.
+    # Required by DeviceCapabilityService.find_device_by_capability.
+    capabilities: List["Capability"] = Relationship(back_populates="device")
+
 
 class Capability(NexusComponent, SQLModel, table=True):
     """
@@ -66,6 +70,8 @@ class Capability(NexusComponent, SQLModel, table=True):
     description: str = Field(default="", nullable=False)
     meta_data: str = Field(default="{}", nullable=False)  # JSON string for technical details
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)
+
+    device: Optional["Device"] = Relationship(back_populates="capabilities")
 
 
 class CommandResult(NexusComponent, SQLModel, table=True):
