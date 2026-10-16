@@ -154,7 +154,15 @@ class JarvisNexus(_NexusDiscoveryMixin, _NexusRegistryMixin):
             return None
 
     def resolve(self, target_id: str, hint_path: Optional[str] = None, **kwargs) -> Any:
-        """Resolve, instancia e faz cache do componente com proteção de circuit-breaker."""
+        """Resolve, instancia e faz cache do componente com proteção de circuit-breaker.
+
+        Aceita ``use_cache=False`` para invalidar o cache do componente antes da
+        resolução, garantindo uma instância nova (comportamento documentado na API
+        pública em ``docs/NEXUS.md``).
+        """
+        if kwargs.get("use_cache") is False:
+            self.invalidate_component(target_id)
+
         start = time.time()
 
         # 1. Fast Path: Já existe?

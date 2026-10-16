@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Auditoria de entregas (2026-10-16)
+
+- `docs/VERIFICACAO_ENTREGAS.md`: confronta cada promessa da documentação (README,
+  STATUS, NEXUS, SECURITY_GUARDRAILS, AUTORREGULACAO, padrões) com evidência
+  executável, classificando em entregue / parcial / não entregue. Achados
+  principais: métrica de capabilities conta stubs (78/102), ciclo de evolução não
+  detecta código existente, `AdapterRegistry` sem consumidor, `CapabilityAuthorizer`
+  fora do fluxo principal, `DockerSandbox` órfão e 35 arquivos acima de 300 linhas.
+- `tests/test_nexus_docs_contract.py`: garante que a tabela de timeouts do
+  `docs/NEXUS.md` continue igual aos defaults de `app/core/nexus_exceptions.py`.
+
 #### Teste de contrato da documentação (2026-10-16)
 
 - `tests/test_docs_references.py` extrai as referências a arquivos (`.py`, `.yml`,
@@ -135,6 +146,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `data/nexus_registry.json` atualizado com novos caminhos dos componentes
 
 ### Fixed
+
+#### Contratos quebrados entre docs e código (2026-10-16)
+
+- `nexus.resolve(..., use_cache=False)` era documentado em `docs/NEXUS.md` e
+  **silenciosamente ignorado**; agora invalida o cache antes de resolver (com
+  testes de cache e de circuit breaker aberto).
+- `docs/NEXUS.md`: tabela de timeouts alinhada ao código (`NEXUS_INSTANTIATE_TIMEOUT`
+  5s e não 30s, `NEXUS_CIRCUIT_RESET` 60s e não 300s, `NEXUS_IMPORT_TIMEOUT`
+  incluído) e assinatura de `resolve()` corrigida.
+- `README.md`/`docs/STATUS.md`: afirmações alinhadas ao comportamento real
+  (sandbox via gatekeeper, `DockerSandbox` sem consumidor, `AdapterRegistry` sem
+  consumidor automático, métrica de capabilities, `CostTrackerAdapter` já ativo).
 
 #### Coerência da auto-evolução, do runner e dos validadores (2026-10-16)
 

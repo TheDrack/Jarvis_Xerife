@@ -7,7 +7,7 @@
 
 | Métrica | Valor | Status |
 |---------|-------|--------|
-| Capabilities Implementadas | 68/102 | 🟡 Em progresso |
+| Capabilities com código | 102/102 arquivos, 68 marcadas `complete` | 🔴 78/102 são stubs (ver auditoria) |
 | Testes Automatizados | 1367 | ✅ Verde (4 skipped) |
 | Cobertura de Código | ~60% | 🟡 Em progresso |
 | Componentes Nexus | 87 | ✅ Registrados |
@@ -22,7 +22,7 @@
 | Phase 2 | ✅ Completo | Auto-Evolução + Self-Healing |
 | **Phase 3** | **✅ Completo** | **JarvisDevAgent + AdapterRegistry + PipelineRunner** |
 | Phase 4 | 🟡 Em Progresso | Soldier Mesh (Edge Computing) |
-| Phase 5 | ⚪ Pendente | Econômico (CostTracker, ResourceOptimizer) |
+| Phase 5 | 🟡 Em Progresso | Econômico (`CostTrackerAdapter` ativo no `llm_router`; `ResourceOptimizer` pendente) |
 
 ## 🎯 Destaques da Última Sprint
 
@@ -56,11 +56,13 @@
 - ✅ Exemplos YAML para cada adapter
 - ✅ Descoberta automática via Nexus
 
-### DockerSandbox (COMPLETO)
+### Sandbox de evolução (COMPLETO)
 
-- ✅ Isolamento de testes em containers Docker
-- ✅ Fallback para sandbox local se Docker indisponível
-- ✅ Segurança: sem rede, sem capabilities Linux, filesystem read-only
+- ✅ `EvolutionSandbox` testa toda proposta antes do PR (acionado pelo
+  `EvolutionGatekeeper`), com timeout e verificação sintática
+- ⚠️ `DockerSandbox` está implementado, porém **sem consumidor e sem teste** — o
+  isolamento efetivo hoje é local, não em container. Veja
+  [VERIFICACAO_ENTREGAS.md](VERIFICACAO_ENTREGAS.md)
 
 ## 🔧 Componentes Novos/Alterados
 
@@ -85,11 +87,21 @@
 
 ## 🐛 Issues Conhecidos
 
+Auditoria completa das promessas da documentação vs. código:
+[VERIFICACAO_ENTREGAS.md](VERIFICACAO_ENTREGAS.md).
+
 | Issue | Prioridade | Status |
 |-------|------------|--------|
+| Métrica de capabilities conta stubs: 78/102 arquivos são placeholders do Crystallizer e nenhum teste os exercita | 🔴 Alta | Documentado na auditoria |
+| Ciclo de evolução não detecta código já existente (34/34 pendentes já têm arquivo) | 🔴 Alta | Documentado na auditoria |
+| `AdapterRegistry` sem consumidor de produção ("consulte o que existe" não implementado) | 🟡 Média | Documentado na auditoria |
+| `CapabilityAuthorizer` não é aplicado no fluxo `AssistantService → Executor` | 🟡 Média | Documentado na auditoria |
+| Auto-evolução não bloqueia `capabilities/`, `adapters/infrastructure/`, `application/security/` (regra §7) | 🟡 Média | Documentado na auditoria |
+| 35 arquivos acima de 300 linhas (padrão do CHANGELOG 2026-03-06) | 🟡 Média | Documentado na auditoria |
+| `ARCHITECTURE.md`/`ARQUIVO_MAP.md` gerados e desatualizados (citam módulos removidos) | 🟢 Baixa | Regeneração pelo bot |
 | Cobertura de testes < 80% | 🟡 Média | Em progresso |
 | Inventário de capabilities em `.json` (sem espelho `.jrvs`) | 🟢 Baixa | Documentado (fallback automático) |
-| DockerSandbox requer Docker instalado | 🟢 Baixa | Documentado |
+| `persistent_shell_adapter` executa subprocesso com `env=os.environ` (vaza segredos para o filho) | 🟡 Média | Documentado na auditoria |
 | `validate_self_awareness.py` acusa `CORE_LOGIC_CONSOLIDATED.txt` ausente em checkout novo | 🟢 Baixa | Artefato gerado pelo pipeline `sync_drive` |
 
 ## 🚀 Próximos Passos (30 Dias)
@@ -108,3 +120,5 @@
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Arquitetura completa
 - [NEXUS.md](NEXUS.md) — Documentação do Nexus DI
 - [PIPELINE_RUNNER.md](PIPELINE_RUNNER.md) — Pipelines YAML e execução
+- [VERIFICACAO_ENTREGAS.md](VERIFICACAO_ENTREGAS.md) — Auditoria: o que a documentação promete vs. o que o código entrega
+- [AUTORREGULACAO.md](AUTORREGULACAO.md) / [AUTORREGULACAO_ESBOCO.md](AUTORREGULACAO_ESBOCO.md) — linha de estudo (camada conceitual, sem implementação)

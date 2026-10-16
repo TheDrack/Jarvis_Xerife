@@ -78,14 +78,14 @@ O sistema é capaz de:
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │              JARVIS DEV AGENT (Analisa)                         │
-│  1. Consulta AdapterRegistry (o que existe?)                    │
-│  2. Verifica: telegram_adapter existe? → SIM                    │
-│  3. Decide: Não preciso criar, só usar                          │
+│  1. Seleciona a capability executável (CapabilityManager)       │
+│  2. Consulta SemanticMemory por soluções similares (few-shot)   │
+│  3. Gera código via LLMRouter → proposta + PR (com gatekeeper)  │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │              PIPELINE YAML (Declara)                            │
-│  Define: config/pipelines/<nome>.yml (passos + componentes)      │
+│  Define: config/pipelines/<nome>.yml (passos + componentes)     │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -95,9 +95,9 @@ O sistema é capaz de:
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │                    RESULTADO                                    │
-│  ✅ Notificação enviada                                         │
-│  ✅ Pipeline salvo para reuso                                   │
-│  ✅ Aprendizado registrado em ProceduralMemory                  │
+│  ✅ Capability executada / proposta gerada                       │
+│  ✅ Gatekeeper validou (sandbox + testes)                        │
+│  ✅ Ciclo registrado em SemanticMemory                           │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -174,6 +174,11 @@ gap = registry.execute({
 > A lista acima é a do registry estático (`app/domain/models/adapter_registry.py`).
 > O Nexus Discovery completa o registro com os demais componentes em runtime — a
 > lista viva está em `data/nexus_registry.json`.
+>
+> Estado atual: o `AdapterRegistry` responde a `list`/`get`/`find_gap`, mas ainda
+> **não é consultado automaticamente** pelo agente nem pelo ciclo de evolução — a
+> integração "consulte o que já existe antes de criar" está pendente. Veja
+> [docs/VERIFICACAO_ENTREGAS.md](docs/VERIFICACAO_ENTREGAS.md).
 
 ---
 

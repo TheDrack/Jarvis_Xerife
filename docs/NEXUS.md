@@ -28,9 +28,11 @@ O Nexus foi dividido em quatro módulos focados:
 
 ## 🔧 API Pública
 
-### `nexus.resolve(component_id, use_cache=True)`
+### `nexus.resolve(target_id, hint_path=None, use_cache=True)`
 
-Resolve e instancia um componente pelo ID.
+Resolve e instancia um componente pelo ID. ``hint_path`` permite apontar o
+módulo explicitamente (usado pelos pipelines); ``use_cache=False`` invalida o
+cache do componente antes de resolver, garantindo uma instância nova.
 
 ```python
 from app.core.nexus import nexus
@@ -112,10 +114,14 @@ O Nexus implementa Circuit Breaker para falhas de import/instanciação:
 
 | Configuração | Variável de Ambiente | Padrão |
 |--------------|---------------------|--------|
-| Timeout de Import | `NEXUS_TIMEOUT` | 30s |
-| Timeout de Instanciação | `NEXUS_INSTANTIATE_TIMEOUT` | 30s |
-| Reset do Circuit Breaker | `NEXUS_CIRCUIT_RESET` | 300s |
+| Timeout de resolução (circuit breaker) | `NEXUS_TIMEOUT` | 30s |
+| Reset do Circuit Breaker | `NEXUS_CIRCUIT_RESET` | 60s |
+| Timeout de import do módulo | `NEXUS_IMPORT_TIMEOUT` | 10s |
+| Timeout de instanciação | `NEXUS_INSTANTIATE_TIMEOUT` | 5s |
 | Modo Estrito | `NEXUS_STRICT_MODE` | false |
+
+Os valores são lidos em `app/core/nexus_exceptions.py` (import time); o teste
+`tests/test_nexus_docs_contract.py` falha se esta tabela divergir do código.
 
 ### CloudMock
 

@@ -99,6 +99,42 @@ class TestJarvisNexusCircuitBreaker:
 
         assert instance1 is instance2  # same cached instance
 
+    def test_use_cache_false_forces_new_instance(self):
+        """``use_cache=False`` (documentado em docs/NEXUS.md) deve re-instanciar."""
+        nexus = JarvisNexus()
+        counter = {"built": 0}
+
+        class FakeSvc:
+            pass
+
+        def _fast_resolve(target_id, hint_path=None):
+            counter["built"] += 1
+            return FakeSvc()
+
+        with patch.object(nexus, "_resolve_internal", side_effect=_fast_resolve):
+            cached = nexus.resolve("cached_svc")
+            again = nexus.resolve("cached_svc")
+            fresh = nexus.resolve("cached_svc", use_cache=False)
+
+        assert cached is again, "sem use_cache=False o cache deve ser respeitado"
+        assert fresh is not cached, "use_cache=False deve devolver nova instância"
+        assert counter["built"] == 2
+
+    def test_use_cache_false_clears_open_circuit(self):
+        """Pedir instância nova também deve limpar um circuit breaker aberto."""
+        nexus = JarvisNexus()
+        nexus._open_circuit("flaky_svc", "erro anterior")
+        assert isinstance(nexus.resolve("flaky_svc"), CloudMock)
+
+        class FakeSvc:
+            pass
+
+        with patch.object(nexus, "_resolve_internal", return_value=FakeSvc()):
+            instance = nexus.resolve("flaky_svc", use_cache=False)
+
+        assert isinstance(instance, FakeSvc)
+        assert "flaky_svc" not in nexus._circuit_breaker
+
     def test_resolve_returns_none_for_unknown_component(self):
         """If nothing is found and no timeout occurs, resolve returns None."""
         nexus = JarvisNexus()
