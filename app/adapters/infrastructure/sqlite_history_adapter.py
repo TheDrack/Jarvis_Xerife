@@ -109,7 +109,11 @@ class SQLiteHistoryAdapter(HistoryProvider):
                          If provided, takes precedence over db_path.
                          Supports any SQLAlchemy-compatible URL (PostgreSQL, MySQL, etc.)
         """
-        # Determine which database to use
+        # Determine which database to use.
+        # Sem URL explícita, usa DATABASE_URL do ambiente (Postgres em produção).
+        if not database_url:
+            import os as _os
+            database_url = _os.getenv("DATABASE_URL", "").strip() or None
         if database_url:
             # Normalize PostgreSQL URL for compatibility
             # Heroku/Render often provide postgres:// but SQLAlchemy expects postgresql://
