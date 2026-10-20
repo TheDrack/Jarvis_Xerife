@@ -18,7 +18,10 @@ class LlmService(NexusComponent):
         super().__init__()
         self.gemini_key = os.getenv("GEMINI_API_KEY")
         self.groq_key = os.getenv("GROQ_API_KEY")
-        self.fallback_model = "llama-3.3-70b-versatile"
+        # Modelo do Groq configurável por ambiente (o llama-3.3-70b-versatile foi desativado em 16/08/2026).
+        self.fallback_model = (
+            os.getenv("GROQ_MODEL") or os.getenv("GROQ_HIGH_GEAR_MODEL") or "openai/gpt-oss-120b"
+        )
 
     def chat(self, prompt: str, system_instruction: str = "Você é o Jarvis, um assistente técnico e eficiente.") -> str:
         """Interface oficial de conversação usada pelo IntentProcessor."""
