@@ -1,0 +1,18 @@
+name: keepalive
+
+# Mantém o serviço Jarvis-api acordado no plano free do Render.
+# Sem tráfego, o Render coloca a instância em repouso e o polling do Telegram para.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar /health
+        run: |
+          curl -fsS --max-time 90 --retry 2 --retry-delay 10 \
+            -o /dev/null -w "HTTP %{http_code}\n" \
+            https://jarvis-api-c47i.onrender.com/health
