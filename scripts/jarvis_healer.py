@@ -298,8 +298,17 @@ def heal():
         error_context += f"=== WORKFLOW CI LOG ===\n{workflow_log_content}\n"
     
     if not target_files:
+        # Nenhum arquivo com erro: só é sucesso se o relatório existir e não tiver falhas.
+        try:
+            _summary = json.loads(Path(args.report).read_text(encoding="utf-8")).get("summary", {})
+            _all_green = _summary.get("failed", 1) == 0 and _summary.get("error", 0) == 0
+        except Exception:
+            _all_green = False
+        if _all_green:
+            logger.info("✅ [Healer] Testes verdes. Nenhum erro a corrigir.")
+            return 0
         logger.warning("⚠️ [Healer] Nenhum arquivo alvo identificado")
-        return 1    
+        return 1
     logger.info(f"🩹 Arquivos para correção: {len(target_files)}")
     
     total_success = 0
