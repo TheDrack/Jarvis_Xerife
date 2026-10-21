@@ -7,6 +7,22 @@ import bcrypt
 if not hasattr(bcrypt, "__about__"):
     bcrypt.__about__ = type("About", (), {"__version__": bcrypt.__version__})
 
+# Fix for: passlib 1.7.4 is incompatible with bcrypt >= 4.1, which now raises
+# "password cannot be longer than 72 bytes" instead of silently truncating.
+# bcrypt <4.1 truncated passwords to 72 bytes internally; restore that behavior
+# so hashing/verification keeps working regardless of the installed bcrypt version.
+_orig_hashpw = bcrypt.hashpw
+
+
+def _compat_hashpw(password, salt):
+    if isinstance(password, str):
+        password = password.encode("utf-8")
+    return _orig_hashpw(password[:72], salt)
+
+
+bcrypt.hashpw = _compat_hashpw
+bcrypt._bcrypt_hashpass = _compat_hashpw
+
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
