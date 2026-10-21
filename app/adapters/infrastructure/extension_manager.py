@@ -2,8 +2,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List, Any, Dict
 
-# Configuração de Log para o DNA do Jarvis
-logging.basicConfig(level=logging.INFO)
+# Library modules must not configure the root logger; the application entry
+# points (bootstrap_edge.py, scripts/*) own logging configuration.
 logger = logging.getLogger("ExtensionManager")
 
 class Extension(ABC):
