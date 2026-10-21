@@ -1,0 +1,1 @@
+{"strategy": "minimal_change", "result": {"success": true, "mutation_applied": true, "files_changed": ["app/application/services/task_runner.py"]}}

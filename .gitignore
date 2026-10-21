@@ -1,2 +1,2 @@
-.github/metabolism_logs/
-.github/metabolism_markers/
+__pycache__/
+*.pyc

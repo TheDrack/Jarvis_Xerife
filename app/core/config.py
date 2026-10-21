@@ -3,14 +3,37 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional, Union
 
-from pydantic import field_validator
+from pydantic import BeforeValidator, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.encryption import decrypt_value, is_encrypted
 
 logger = logging.getLogger(__name__)
+
+
+def _split_cors_origins(value):
+    """Normalize CORS_ORIGINS into a list of origins.
+
+    Accepts a real list, a JSON list string ('["https://a.com"]') or the more
+    human-friendly comma-separated form ('https://a.com,https://b.com').
+    pydantic-settings tries to JSON-decode complex fields *before* validators
+    run, so the annotation also allows ``str`` and we normalize here.
+    """
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return []
+        if stripped.startswith("["):  # JSON list form
+            import json
+
+            try:
+                return json.loads(stripped)
+            except ValueError:
+                pass
+        return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+    return value
 
 
 class Settings(BaseSettings):
@@ -54,8 +77,11 @@ class Settings(BaseSettings):
 
     # CORS Settings
     # Empty list (default) keeps the API same-origin only.
-    # Set CORS_ORIGINS in .env (JSON list, e.g. '["http://localhost:3000"]') to allow browsers.
-    cors_origins: list[str] = []
+    # Set CORS_ORIGINS in .env as a comma-separated list
+    # (e.g. 'http://localhost:3000,https://app.example.com') or a JSON list.
+    cors_origins: Annotated[
+        Union[list[str], str], BeforeValidator(lambda v: _split_cors_origins(v))
+    ] = []
 
     # Database Settings
     database_url: str = "sqlite:///jarvis.db"

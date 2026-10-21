@@ -100,7 +100,9 @@ def _discover_rls_protected_tables() -> list:
         rls_enabled = {m.lower() for m in rls_re.findall(content)}
         tables.update(created & rls_enabled)
 
-    return sorted(tables) if tables else list(_RLS_STATIC_FALLBACK_TABLES)
+    # Always return a sorted copy so the order is deterministic and does not
+    # depend on the (unsorted) declaration order of the static fallback list.
+    return sorted(tables) if tables else sorted(_RLS_STATIC_FALLBACK_TABLES)
 
 
 RLS_PROTECTED_TABLES = _discover_rls_protected_tables()
