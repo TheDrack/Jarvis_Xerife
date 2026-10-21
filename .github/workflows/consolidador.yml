@@ -31,7 +31,7 @@ jobs:
             google-api-python-client \
             google-auth-httplib2 \
             google-auth-oauthlib \
-            aiohttp>=3.9.0
+            'aiohttp>=3.9.0'
 
       - name: 🔍 Verificar sintaxe Python antes do pipeline
         run: |
