@@ -58,6 +58,21 @@ def _restore_default_event_loop():
             pass
 
 
+@pytest.fixture(autouse=True)
+def _ambiente_sem_chaves_de_api(monkeypatch):
+    """Os testes não podem depender de chaves reais do ambiente.
+
+    No CI, os secrets (GROQ_API_KEY, GEMINI_API_KEY...) são injetados no passo de
+    testes. Sem esta limpeza, testes que assumem "sem chave" passam localmente e
+    falham no CI. Aqui cada teste começa sem chaves, como numa máquina limpa.
+    """
+    for var in (
+        "GROQ_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY",
+        "MISTRAL_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+
 @pytest.fixture
 def anyio_backend():
     """Configure the backend for anyio tests"""
