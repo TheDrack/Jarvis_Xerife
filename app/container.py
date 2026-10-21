@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Direct OS environment variable reading for Gemini API Key
 render_key = os.environ.get('GOOGLE_API_KEY') or os.environ.get('GEMINI_API_KEY')
-print(f"DEBUG SISTEMA: Chave encontrada no OS? {'Sim' if render_key else 'Não'}")
+logger.debug(f"API key found in OS environment: {bool(render_key)}")
 
 
 def _is_headless_environment() -> bool:
@@ -220,7 +220,7 @@ class Container:
                     return self._llm_command_adapter
                 except Exception as e:
                     logger.error(f"✗ ERRO ao criar GatewayLLMCommandAdapter: {type(e).__name__}: {str(e)}")
-                    print(f"ERRO DETALHADO ao criar GatewayLLMCommandAdapter: {type(e).__name__}: {str(e)}")
+                    logger.error(f"Detailed error creating GatewayLLMCommandAdapter: {type(e).__name__}: {e}")
                     # Fall through to try basic LLM adapter
             
             # Fallback to basic LLM adapter if we have Gemini API key
@@ -238,7 +238,7 @@ class Container:
                     return self._llm_command_adapter
                 except Exception as e:
                     logger.error(f"✗ ERRO ao criar LLMCommandAdapter: {type(e).__name__}: {str(e)}")
-                    print(f"ERRO DETALHADO ao criar LLMCommandAdapter: {type(e).__name__}: {str(e)}")
+                    logger.error(f"Detailed error creating LLMCommandAdapter: {type(e).__name__}: {e}")
                     # Fall through to create rule-based interpreter
             
             # Use rule-based interpreter as fallback

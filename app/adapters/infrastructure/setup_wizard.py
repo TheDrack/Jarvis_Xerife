@@ -137,8 +137,9 @@ def get_api_key_with_clipboard() -> Optional[str]:
     initial_clipboard = ""
     try:
         initial_clipboard = pyperclip.paste()
-    except:
-        pass
+    except Exception as e:
+        # Clipboard may be unavailable in headless/CI environments; fall back to manual input
+        logger.debug(f"Clipboard unavailable on startup check: {type(e).__name__}: {e}")
     
     try:
         # Monitor clipboard for up to CLIPBOARD_TIMEOUT seconds

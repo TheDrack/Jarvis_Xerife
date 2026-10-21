@@ -735,8 +735,8 @@ Show me the corrected version of this file: {temp_code_file}"""
                 # Clean up temp file
                 try:
                     os.unlink(temp_code_file)
-                except:
-                    pass
+                except OSError as e:
+                    logger.warning(f"Could not remove temp file {temp_code_file}: {e}")
                     
         except Exception as e:
             logger.error(f"Error getting fixed code from Copilot: {e}")

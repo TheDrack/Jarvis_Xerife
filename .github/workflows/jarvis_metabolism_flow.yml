@@ -96,8 +96,8 @@ jobs:
           echo "==================================================" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          # Executar pytest
-          if pytest --json-report --json-report-file=report.json; then
+          # Executar pytest (cobertura explícita no CI; local roda sem --cov)
+          if pytest --cov=app --cov-report=term-missing --json-report --json-report-file=report.json; then
             echo "tests_passed=true" >> $GITHUB_OUTPUT
             echo "**✅ HOMEOSTASE MANTIDA** - Todos os testes passaram" >> $GITHUB_STEP_SUMMARY
             exit 0
