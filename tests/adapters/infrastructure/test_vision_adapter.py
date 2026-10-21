@@ -45,12 +45,11 @@ class TestVisionAdapter:
             desc = adapter.capture_and_analyze()
         assert desc is None
 
-    def test_analyze_with_gemini_no_api_key(self):
+    def test_analyze_with_gemini_no_api_key(self, monkeypatch):
+        # Remove as chaves ANTES de criar o adaptador (ele lê o ambiente no construtor).
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
         adapter = VisionAdapter(api_key=None)
-        # Ensure env var is not set
-        import os
-        os.environ.pop("GEMINI_API_KEY", None)
-        os.environ.pop("GOOGLE_API_KEY", None)
         result = adapter._analyze_with_gemini(b"fake", "descricao")
         assert result is None
 
