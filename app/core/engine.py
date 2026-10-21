@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Jarvis Voice Engine - Main voice recognition and synthesis engine"""
 
+import logging
 import sys
 from typing import Callable, Optional
 
@@ -17,6 +18,8 @@ except ImportError:
     SPEECH_RECOGNITION_AVAILABLE = False
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class JarvisEngine:
@@ -48,7 +51,7 @@ class JarvisEngine:
             text: Text to be spoken
         """
         if self.tts_engine is None:
-            print(f"[TTS]: {text}")
+            logger.info(f"[TTS]: {text}")
             return
 
         self.tts_engine.say(text)
@@ -65,7 +68,7 @@ class JarvisEngine:
             Recognized text in lowercase, or None if recognition failed
         """
         if self.recognizer is None or not SPEECH_RECOGNITION_AVAILABLE:
-            print("[Voice]: Voice recognition not available")
+            logger.warning("Voice recognition not available")
             return None
 
         with sr.Microphone() as source:
@@ -90,7 +93,7 @@ class JarvisEngine:
             except sr.UnknownValueError:
                 return None
             except sr.RequestError as e:
-                print(f"Could not request results from Google Speech Recognition service; {e}")
+                logger.error(f"Could not request results from Google Speech Recognition service; {e}")
                 return None
 
     def wait_for_wake_word(self, on_command: Callable[[str], None]) -> None:
@@ -101,7 +104,7 @@ class JarvisEngine:
             on_command: Callback function to process commands
         """
         if self.recognizer is None or not SPEECH_RECOGNITION_AVAILABLE:
-            print("[Voice]: Voice recognition not available - cannot use wake word mode")
+            logger.warning("Voice recognition not available - cannot use wake word mode")
             return
 
         self.is_running = True
@@ -145,7 +148,7 @@ class JarvisEngine:
                 except sr.UnknownValueError:
                     continue
                 except sr.RequestError as e:
-                    print(f"Error: {e}")
+                    logger.error(f"Speech recognition error: {e}")
                     continue
                 except KeyboardInterrupt:
                     self.stop()

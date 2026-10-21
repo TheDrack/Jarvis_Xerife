@@ -125,15 +125,15 @@ class SystemCommands:
                 location = self._pyautogui.locateCenterOnScreen(image_path)
                 if location:
                     self._pyautogui.moveTo(location)
-                    print(f"Image {image_path} found at position: {location}")
+                    logger.info(f"Image {image_path} found at position: {location}")
                     return location
             except Exception as e:
-                print(f"Error locating image: {e}")
+                logger.error(f"Error locating image: {e}")
 
             time.sleep(0.25)
             attempts += 1
 
-        print(f"Image {image_path} not found")
+        logger.warning(f"Image {image_path} not found")
         return None
 
 
@@ -218,7 +218,7 @@ class CommandProcessor:
                 handler(param if param else command)
                 return
 
-        print(f"Unknown command: {command}")
+        logger.warning(f"Unknown command: {command}")
 
     def _handle_type(self, text: str) -> None:
         """Handle type command"""

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, status, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -210,6 +211,18 @@ def create_api_server(assistant_service: AssistantService, extension_manager: Ex
         docs_url=None,  # Disable default docs
         redoc_url=None,  # Disable redoc
     )
+
+    # CORS: enabled only when explicit origins are configured (CORS_ORIGINS env var).
+    # Defaults to same-origin only, preserving previous behavior.
+    if settings.cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        logger.info(f"CORS enabled for origins: {settings.cors_origins}")
     
     # Mount static files for PWA support (manifest, service worker, icons)
     static_path = Path(__file__).parent.parent.parent.parent / "static"

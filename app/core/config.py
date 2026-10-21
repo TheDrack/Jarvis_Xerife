@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    # CORS Settings
+    # Empty list (default) keeps the API same-origin only.
+    # Set CORS_ORIGINS in .env (JSON list, e.g. '["http://localhost:3000"]') to allow browsers.
+    cors_origins: list[str] = []
+
     # Database Settings
     database_url: str = "sqlite:///jarvis.db"
 
