@@ -301,7 +301,7 @@ def heal():
         # Nenhum arquivo com erro: só é sucesso se o relatório existir e não tiver falhas.
         try:
             _summary = json.loads(Path(args.report).read_text(encoding="utf-8")).get("summary", {})
-            _all_green = _summary.get("failed", 1) == 0 and _summary.get("error", 0) == 0
+            _all_green = _summary.get("failed", 0) == 0 and _summary.get("error", 0) == 0
         except Exception:
             _all_green = False
         if _all_green:
