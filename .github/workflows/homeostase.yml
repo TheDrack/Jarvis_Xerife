@@ -184,7 +184,7 @@ jobs:
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
           # Evita commitear lixo de CI: logs, reports, caches, envs
-          git add app scripts tests data docs *.md Dockerfile *.yml *.yaml Makefile *.ini *.toml setup.py
+          git add app scripts tests docs *.md Dockerfile *.yml *.yaml Makefile *.ini setup.py
           git add .github
           git rm -r --cached .pytest_cache htmlcov .venv_tests logs backups 2>/dev/null || true
 
