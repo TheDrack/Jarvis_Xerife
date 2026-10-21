@@ -3,7 +3,7 @@
 
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.application.ports.reward_provider import RewardProvider
 
@@ -244,7 +244,7 @@ class EvolutionLoopService:
         Returns:
             Dictionary with evolution status and commander message
         """
-        since = datetime.now() - timedelta(days=days)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
         
         # Get efficiency metrics
         efficiency = self.reward_provider.get_efficiency_score(since=since)
@@ -305,7 +305,7 @@ class EvolutionLoopService:
                 'error': 'AI Gateway not configured for policy engine'
             }
         
-        since = datetime.now() - timedelta(days=days)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
         
         # Get reward history
         rewards = self.reward_provider.get_rewards(since=since, limit=100)

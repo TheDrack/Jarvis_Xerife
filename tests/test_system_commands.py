@@ -111,8 +111,8 @@ class TestCommandProcessor:
         command_processor.process("aperte enter")
         command_processor.sys_cmd.press_key.assert_called()
 
-    def test_unknown_command(self, command_processor, capsys):
-        """Test processing unknown command"""
-        command_processor.process("comando desconhecido")
-        captured = capsys.readouterr()
-        assert "Unknown command" in captured.out
+    def test_unknown_command(self, command_processor, caplog):
+        """Test processing unknown command (now logged instead of printed)"""
+        with caplog.at_level("WARNING", logger="app.actions.system_commands"):
+            command_processor.process("comando desconhecido")
+        assert "Unknown command" in caplog.text

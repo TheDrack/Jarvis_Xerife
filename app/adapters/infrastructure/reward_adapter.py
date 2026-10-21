@@ -2,7 +2,7 @@
 """Reward Adapter - Database implementation of RewardProvider port"""
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 
 from sqlalchemy import func
@@ -66,7 +66,7 @@ class RewardAdapter(RewardProvider):
                 reward_value=reward_value,
                 context_data=context_data or {},
                 meta_data=metadata or {},
-                created_at=datetime.now()
+                created_at=datetime.now(timezone.utc)
             )
             session.add(reward)
             session.commit()
@@ -225,13 +225,13 @@ class RewardAdapter(RewardProvider):
         """
         # If no time filter, default to last 7 days
         if not since:
-            since = datetime.now() - timedelta(days=7)
+            since = datetime.now(timezone.utc) - timedelta(days=7)
         
         # Get current period stats
         current_stats = self.get_reward_statistics(since=since)
         
         # Get previous period stats (same duration, but before 'since')
-        duration = datetime.now() - since
+        duration = datetime.now(timezone.utc) - since
         previous_since = since - duration
         previous_stats = self.get_reward_statistics(since=previous_since)
         previous_until = since  # Previous period ends where current begins

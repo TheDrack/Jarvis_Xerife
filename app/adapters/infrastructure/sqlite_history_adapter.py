@@ -6,7 +6,7 @@ Supports both SQLite (default/fallback) and PostgreSQL based on DATABASE_URL con
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, delete
@@ -111,7 +111,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
         try:
             with Session(self.engine) as session:
                 interaction = Interaction(
-                    timestamp=timestamp or datetime.now(),
+                    timestamp=timestamp or datetime.now(timezone.utc),
                     user_input=user_input,
                     command_type=command_type,
                     parameters=json.dumps(parameters),
@@ -216,7 +216,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
         try:
             with Session(self.engine) as session:
                 interaction = Interaction(
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                     user_input=user_input,
                     command_type=command_type,
                     parameters=json.dumps(parameters),
@@ -292,7 +292,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
                     interaction.status = status
                     interaction.success = success
                     interaction.response_text = response_text
-                    interaction.processed_at = datetime.now()
+                    interaction.processed_at = datetime.now(timezone.utc)
                     session.add(interaction)
                     session.commit()
                     logger.info(f"Updated command {command_id} status to {status}")

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Evolution Reward Model for Reinforcement Learning Module"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 
 from sqlmodel import Field, SQLModel, Column
@@ -32,4 +32,4 @@ class EvolutionReward(SQLModel, table=True):
     reward_value: float = Field(nullable=False)  # Positive or negative reward points
     context_data: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))  # Action context
     meta_data: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))  # Additional metadata (renamed from metadata to avoid SQLAlchemy conflict)
-    created_at: datetime = Field(default_factory=datetime.now, nullable=False, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False, index=True)

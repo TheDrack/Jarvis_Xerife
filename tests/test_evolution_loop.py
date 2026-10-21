@@ -2,7 +2,7 @@
 """Tests for Evolution Loop Service and Reinforcement Learning System"""
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlmodel import create_engine, Session, SQLModel
 
 from app.domain.models.evolution_reward import EvolutionReward
@@ -113,12 +113,12 @@ class TestRewardAdapter:
         reward_adapter.log_reward("pytest_pass", 10.0)
         
         # Get rewards since future (should be empty)
-        future = datetime.now() + timedelta(days=1)
+        future = datetime.now(timezone.utc) + timedelta(days=1)
         rewards = reward_adapter.get_rewards(since=future)
         assert len(rewards) == 0
         
         # Get rewards since past (should include the reward)
-        past = datetime.now() - timedelta(days=1)
+        past = datetime.now(timezone.utc) - timedelta(days=1)
         rewards = reward_adapter.get_rewards(since=past)
         assert len(rewards) == 1
     

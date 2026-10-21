@@ -4,7 +4,7 @@
 import json
 import logging
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlmodel import Session, select
@@ -104,7 +104,7 @@ class DeviceService:
                     existing_device.lat = lat
                     existing_device.lon = lon
                     existing_device.last_ip = last_ip
-                    existing_device.last_seen = datetime.now()
+                    existing_device.last_seen = datetime.now(timezone.utc)
                     session.add(existing_device)
                     session.commit()
                     session.refresh(existing_device)
@@ -121,7 +121,7 @@ class DeviceService:
                         lat=lat,
                         lon=lon,
                         last_ip=last_ip,
-                        last_seen=datetime.now(),
+                        last_seen=datetime.now(timezone.utc),
                     )
                     session.add(device)
                     session.commit()
@@ -183,7 +183,7 @@ class DeviceService:
 
                 if device:
                     device.status = status
-                    device.last_seen = datetime.now()
+                    device.last_seen = datetime.now(timezone.utc)
                     if lat is not None:
                         device.lat = lat
                     if lon is not None:

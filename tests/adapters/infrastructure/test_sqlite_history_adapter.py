@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for SQLite History Adapter"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -45,7 +45,7 @@ class TestSQLiteHistoryAdapter:
 
     def test_save_interaction_with_timestamp(self, adapter):
         """Test saving an interaction with a specific timestamp"""
-        timestamp = datetime(2024, 1, 1, 12, 0, 0)
+        timestamp = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         adapter.save_interaction(
             user_input="test command",
             command_type="test_type",
@@ -250,7 +250,7 @@ class TestSQLiteHistoryAdapter:
         # Save multiple pending commands with explicit timestamps
         from datetime import datetime, timedelta
         
-        base_time = datetime(2024, 1, 1, 12, 0, 0)
+        base_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
         
         # Create first command with earlier timestamp
         task_id_1 = adapter.save_pending_command(
