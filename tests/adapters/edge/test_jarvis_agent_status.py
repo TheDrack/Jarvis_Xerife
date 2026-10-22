@@ -14,7 +14,9 @@ class AgentStatusTests(unittest.TestCase):
         self.patches = [
             patch.object(status, "STATUS_DIR", self.root),
             patch.object(status, "STATUS_FILE", self.root / "agent_activity.json"),
+            patch.object(status, "OVERLAY_ACK_FILE", self.root / "agent_overlay_ack.json"),
             patch.object(status, "ensure_overlay_started", return_value=True),
+            patch.object(status, "_wait_for_overlay_ack", return_value=True),
         ]
         for item in self.patches:
             item.start()
@@ -33,6 +35,20 @@ class AgentStatusTests(unittest.TestCase):
         status.end_action("test action", True, "")
         done = json.loads((self.root / "agent_activity.json").read_text(encoding="utf-8"))
         self.assertEqual(done["phase"], "success")
+
+    def test_begin_action_waits_for_overlay_ack_before_returning(self):
+        with patch.object(status, "_wait_for_overlay_ack", return_value=True) as wait_for_ack:
+            status.begin_action("observe screen")
+        wait_for_ack.assert_called_once()
+        args = wait_for_ack.call_args.args
+        self.assertTrue(args[0])
+        self.assertEqual(args[1], status.OVERLAY_ACK_TIMEOUT_SECONDS)
+
+    def test_overlay_ack_is_bound_to_request_id(self):
+        status._ack_overlay_visible("request-123")
+        ack = json.loads((self.root / "agent_overlay_ack.json").read_text(encoding="utf-8"))
+        self.assertEqual(ack["request_id"], "request-123")
+        self.assertTrue(ack["visible"])
 
     def test_tracked_action_marks_failure_result(self):
         @status.tracked_action("test failure")

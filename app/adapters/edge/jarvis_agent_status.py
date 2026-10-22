@@ -19,17 +19,20 @@ import functools
 import asyncio
 import contextvars
 import inspect
+import uuid
 from pathlib import Path
 from typing import Any
 
 STATUS_DIR = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "Jarvis_Xerife"
 STATUS_FILE = STATUS_DIR / "agent_activity.json"
+OVERLAY_ACK_FILE = STATUS_DIR / "agent_overlay_ack.json"
+OVERLAY_ACK_TIMEOUT_SECONDS = 1.5
 _LOCK = threading.Lock()
 _OVERLAY_PROCESS: subprocess.Popen[Any] | None = None
 _ACTION_DEPTH = contextvars.ContextVar("jarvis_action_depth", default=0)
 
 
-def _write_status(phase: str, action: str, message: str = "") -> None:
+def _write_status(phase: str, action: str, message: str = "", request_id: str | None = None) -> None:
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
     payload = {
         "phase": phase,
@@ -37,6 +40,7 @@ def _write_status(phase: str, action: str, message: str = "") -> None:
         "message": str(message)[:180],
         "updated_at": time.time(),
         "pid": os.getpid(),
+        "request_id": request_id or uuid.uuid4().hex,
     }
     tmp = STATUS_FILE.with_suffix(".tmp")
     with _LOCK:
@@ -45,9 +49,48 @@ def _write_status(phase: str, action: str, message: str = "") -> None:
 
 
 def begin_action(action: str) -> None:
-    """Publish activity and start the optional overlay without blocking MCP."""
+    """Publish activity and wait briefly for the desktop overlay to acknowledge visibility.
+
+    The acknowledgement prevents very fast screen captures from racing ahead of the
+    Tk overlay's first repaint. If the interactive desktop cannot show the overlay,
+    preserve the diagnostic in the status file rather than silently hiding the failure.
+    """
     _write_status("working", action)
-    ensure_overlay_started()
+    request_id = str(_read_status().get("request_id", ""))
+    if not ensure_overlay_started():
+        _write_status("attention", action, "Agent overlay could not be started", request_id)
+        return
+    if os.name == "nt" and not _wait_for_overlay_ack(request_id, OVERLAY_ACK_TIMEOUT_SECONDS):
+        _write_status("working", action, "Visual indicator has not confirmed visibility", request_id)
+
+
+def _wait_for_overlay_ack(request_id: str, timeout: float) -> bool:
+    """Wait for the overlay UI thread to confirm it displayed this request."""
+    if not request_id:
+        return False
+    deadline = time.monotonic() + max(0.0, timeout)
+    while time.monotonic() < deadline:
+        try:
+            ack = json.loads(OVERLAY_ACK_FILE.read_text(encoding="utf-8"))
+            if ack.get("request_id") == request_id and ack.get("visible") is True:
+                return True
+        except (OSError, ValueError, TypeError):
+            pass
+        time.sleep(0.01)
+    return False
+
+
+def _ack_overlay_visible(request_id: str) -> None:
+    """Atomically acknowledge that the overlay has been painted for this request."""
+    if not request_id:
+        return
+    try:
+        STATUS_DIR.mkdir(parents=True, exist_ok=True)
+        tmp = OVERLAY_ACK_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"request_id": request_id, "visible": True, "updated_at": time.time()}), encoding="utf-8")
+        tmp.replace(OVERLAY_ACK_FILE)
+    except OSError:
+        pass
 
 
 def set_agent_cursor_target(x: int, y: int, event: str = "target") -> None:
@@ -211,6 +254,7 @@ def run_overlay() -> int:
         updated = float(data.get("updated_at", 0) or 0)
         action = str(data.get("action", ""))
         message = str(data.get("message", ""))
+        request_id = str(data.get("request_id", ""))
         if phase != shown_phase or updated > shown_since:
             shown_phase = phase
             shown_since = updated
@@ -270,6 +314,8 @@ def run_overlay() -> int:
                 apply_no_activate()
             else:
                 apply_no_activate()
+            if phase == "working":
+                _ack_overlay_visible(request_id)
         else:
             if root.winfo_viewable():
                 root.withdraw()
