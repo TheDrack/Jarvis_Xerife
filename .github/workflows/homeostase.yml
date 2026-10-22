@@ -89,7 +89,7 @@ jobs:
         if: steps.gatekeeper.outputs.authorized == 'true'
         run: |
           uv venv --clear --python 3.11
-          uv pip install -r requirements/core.txt pytest 'pytest-asyncio>=0.23.0' pytest-json-report pytest-cov anyio autopep8 requests pillow
+          uv pip install -r requirements/core.txt pytest 'pytest-asyncio>=0.23.0' pytest-json-report pytest-cov anyio autopep8 requests pillow opencv-python-headless
 
       - name: 🔍 Buscar Logs do Workflow com Falha
         if: steps.gatekeeper.outputs.authorized == 'true' && github.event_name == 'workflow_run'
@@ -146,7 +146,7 @@ jobs:
         run: |
           PYTEST_IGNORES="--ignore=tests/test_engine.py --ignore=tests/test_system_commands.py"
           set +e
-          uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report.json > "$RUNNER_TEMP/pytest_log.txt" 2>&1
+          uv run pytest $PYTEST_IGNORES --json-report --json-report-file="$RUNNER_TEMP/report.json" > "$RUNNER_TEMP/pytest_log.txt" 2>&1
           PYTEST_EXIT=$?
           set -e
           echo "::group::Resumo do pytest (1ª execução, exit=$PYTEST_EXIT)"
@@ -165,16 +165,16 @@ jobs:
           fi
 
           # Falha do healer não é falha de teste: a verificação final abaixo decide
-          uv run python scripts/jarvis_healer.py --report report.json --log "$RUNNER_TEMP/pytest_log.txt" $PRODUCTION_LOG_ARG $WORKFLOW_LOG_ARG \
+          uv run python scripts/jarvis_healer.py --report "$RUNNER_TEMP/report.json" --log "$RUNNER_TEMP/pytest_log.txt" $PRODUCTION_LOG_ARG $WORKFLOW_LOG_ARG \
             || echo "::warning::healer terminou sem corrigir (exit $?)"
 
           set +e
-          uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report_final.json > final_log.txt 2>&1
+          uv run pytest $PYTEST_IGNORES --json-report --json-report-file="$RUNNER_TEMP/report_final.json" > "$RUNNER_TEMP/final_log.txt" 2>&1
           FINAL_EXIT=$?
           set -e
 
           echo "::group::Resumo do pytest (final)"
-          tail -n 40 final_log.txt || true
+          tail -n 40 "$RUNNER_TEMP/final_log.txt" || true
           echo "::endgroup::"
           echo "pytest_exit_final=$FINAL_EXIT"
 
