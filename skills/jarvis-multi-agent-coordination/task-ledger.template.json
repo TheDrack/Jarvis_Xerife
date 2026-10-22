@@ -1,0 +1,11 @@
+﻿{
+  "schema_version": 1,
+  "project": "Jarvis_Xerife",
+  "policy": {
+    "max_delegation_depth": 1,
+    "max_concurrent_writers_per_file": 1,
+    "integration_requires_review": true,
+    "human_approval_required_for": ["secrets", "destructive_operations", "external_access", "release", "permission_expansion"]
+  },
+  "tasks": []
+}
