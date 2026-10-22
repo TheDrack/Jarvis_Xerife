@@ -5,6 +5,13 @@ description: Observe and control the user's Windows desktop through Jarvis visua
 
 # Jarvis Visual Navigation
 
+## Preferred remote route (highest priority)
+
+When the agent has access to the Aperture MCP gateway, prefer **RDC → Aperture → Tailscale → Jarvis**. Use the gateway `https://aperture.tail350144.ts.net/v1/mcp`; the Aperture `jarvis` connector's upstream is `https://multimetal.tail350144.ts.net/mcp`, forwarded through Tailscale Serve to the Jarvis MCP server on `127.0.0.1:8765`. Tailscale is intended to connect automatically at PC boot, while the visual tools still require an accessible interactive Windows session.
+
+Use the direct RDC JSONL bridge only as a situation-specific fallback (for example, local diagnosis when the PC is already running). Direct Aperture-to-Jarvis upstream access is another targeted fallback. Do not treat these alternatives as the default route or bypass Aperture grants/Tailscale ACLs. Any agent must be authorized for the gateway; the route is not public access. Full operational details: `docs/ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md`.
+
+
 Use this skill when the user asks to inspect or operate a Windows desktop through Jarvis.
 
 ## Choose the available connection

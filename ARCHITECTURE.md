@@ -1,3 +1,14 @@
+## Rota remota principal: RDC → Aperture → Tailscale → Jarvis
+
+**Prioridade P0.** Ao ligar o PC, o Tailscale deve conectar automaticamente à tailnet. Agentes compatíveis com MCP e autorizados usam o gateway do Aperture: `https://aperture.tail350144.ts.net/v1/mcp`. O conector `jarvis` do Aperture encaminha as chamadas ao upstream privado `https://multimetal.tail350144.ts.net/mcp`, publicado pelo Tailscale Serve para o servidor local `127.0.0.1:8765`.
+
+O Aperture centraliza grants e exposição de ferramentas; as ACLs/identidade do Tailscale limitam o alcance de rede. “Qualquer agente” significa qualquer agente compatível e autorizado, não acesso público irrestrito.
+
+RDC diretamente ao bridge JSONL e Aperture diretamente ao upstream Jarvis são alternativas para situações específicas, por exemplo diagnóstico local ou quando a rota principal não pode ser usada. Não são a metodologia padrão. A sessão visual do Windows ainda precisa estar acessível para ferramentas que controlam a interface gráfica.
+
+Detalhes, boot, segurança e critérios de aceitação: `docs/ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md`.
+
+
 # 🏗️ JARVIS_Xerife: Mapa de Arquitetura Dinâmico
 > **Protocolo de Simbiose:** Documentação gerada via análise de código real.
 
