@@ -243,3 +243,8 @@ curl http://localhost:8000/health
 MIT License — veja [LICENSE](LICENSE) para detalhes.
 
 **Made with ❤️ by the Jarvis Team**
+
+
+## Guia de uso e modos de opera??o
+
+Consulte [docs/GUIA_DE_USO.md](docs/GUIA_DE_USO.md) para os modos de opera??o e [docs/NAVEGACAO_VISUAL.md](docs/NAVEGACAO_VISUAL.md) para navega??o do desktop.
