@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """Non-activating status overlay for Jarvis desktop-agent operations.
 
 The overlay is click-through and never intentionally takes keyboard focus.
@@ -97,6 +97,8 @@ def _write_status(phase: str, action: str, message: str = "") -> None:
         "pid": os.getpid(),
     }
     _replace_status(payload)
+
+
 def begin_action(action: str) -> None:
     """Publish activity and start the optional overlay without blocking MCP."""
     _write_status("working", action)
@@ -190,7 +192,7 @@ def run_overlay() -> int:
     root.geometry(f"330x82+{x}+{y}")
     frame = tk.Frame(root, bg="#18212b", padx=12, pady=9)
     frame.pack(fill="both", expand=True)
-    title = tk.Label(frame, text="JARVIS Â· AGENTE", bg="#18212b", fg="#8bd5ff",
+    title = tk.Label(frame, text="JARVIS · AGENTE", bg="#18212b", fg="#8bd5ff",
                      font=("Segoe UI", 9, "bold"), anchor="w")
     title.pack(fill="x")
     status = tk.Label(frame, text="Aguardando atividade", bg="#18212b", fg="#ffffff",
@@ -310,10 +312,10 @@ def run_overlay() -> int:
             if phase == "working":
                 status.configure(text=f"Trabalhando: {action}", fg="#ffffff")
             elif phase == "success":
-                status.configure(text=f"ConcluÃ­do: {action}", fg="#9be7a5")
+                status.configure(text=f"Concluído: {action}", fg="#9be7a5")
             else:
                 detail = f"\n{message}" if message else ""
-                status.configure(text=f"AtenÃ§Ã£o: {action}{detail}", fg="#ffd28a")
+                status.configure(text=f"Atenção: {action}{detail}", fg="#ffd28a")
             if not root.winfo_viewable():
                 root.deiconify()
                 root.update_idletasks()
