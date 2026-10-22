@@ -319,7 +319,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
                     invoked = {**invoked, "background_input_detail": background}
             background_used = action_strategy == "background_window_messages"
             if not invoked.get("success"):
-                if not bool(step.get("allow_physical_input", True)):
+                if not bool(step.get("allow_physical_input", False)):
                     return {
                         "success": False,
                         "status": "background_input_unavailable",

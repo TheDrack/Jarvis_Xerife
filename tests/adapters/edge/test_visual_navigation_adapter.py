@@ -138,5 +138,5 @@ def test_template_recipe_does_not_use_physical_mouse_without_explicit_opt_in(tmp
     }])
 
     assert result["success"] is False
-    assert result["status"] == "ghost_input_unavailable"
+    assert result["status"] == "background_input_unavailable"
     assert gui.clicks == []

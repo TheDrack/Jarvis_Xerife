@@ -42,7 +42,7 @@ if ($existingListener) {
     # Reuse only a verified Jarvis MCP listener; never kill or adopt an unrelated process.
     $owner = Get-CimInstance Win32_Process -Filter "ProcessId=$($existingListener.OwningProcess)" -ErrorAction SilentlyContinue
     if (-not $owner -or $owner.CommandLine -notmatch 'app\.adapters\.edge\.jarvis_desktop_mcp') {
-        throw "A porta 127.0.0.1:$port est? ocupada por outro processo (PID $($existingListener.OwningProcess)); ele foi preservado."
+        throw "A porta 127.0.0.1:$port está ocupada por outro processo (PID $($existingListener.OwningProcess)); ele foi preservado."
     }
     $serverPid = [int]$owner.ProcessId
 } else {
