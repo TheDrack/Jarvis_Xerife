@@ -32,6 +32,9 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+from app.adapters.edge.jarvis_agent_status import tracked_action
 
 # Check for required dependencies
 try:
@@ -97,7 +100,18 @@ class JarvisLocalAgent(NexusComponent):
             creating the agent instance. An empty api_key will cause the
             program to exit with an error message.
         """
-        self.jarvis_url = f"{jarvis_url}?device_id={device_id}"
+        parsed = urlsplit(jarvis_url)
+        query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+        query["device_id"] = device_id
+        query.setdefault("device_type", "desktop")
+        query.setdefault(
+            "capabilities",
+            "pyautogui,screenshot,visual_templates,screen_observation,screen_stream",
+        )
+        self.jarvis_url = urlunsplit(
+            (parsed.scheme, parsed.netloc, parsed.path, urlencode(query), parsed.fragment)
+        )
+        self._visual_navigator = None
         self.device_id = device_id
         self.api_key = api_key
         self.connected = False
@@ -126,7 +140,7 @@ class JarvisLocalAgent(NexusComponent):
         
         return True
     
-    async def execute_task(self, task: Dict) -> Dict:
+    async def _execute_task_untracked(self, task: Dict) -> Dict:
         """
         Execute a task from JARVIS.
         
@@ -156,6 +170,15 @@ class JarvisLocalAgent(NexusComponent):
                 return await self._handle_type(params)
             elif action == "screenshot":
                 return await self._handle_screenshot(params)
+            elif action in {
+                "observe_screen",
+                "watch_screen",
+                "run_visual_recipe",
+                "visual_recipe",
+                "capture_visual_template",
+                "save_visual_template",
+            }:
+                return await self._handle_visual_navigation(action, params)
             elif action == "open_url":
                 return await self._handle_open_url(params)
             else:
@@ -171,6 +194,12 @@ class JarvisLocalAgent(NexusComponent):
                 "error": str(e)
             }
     
+    async def execute_task(self, task: Dict) -> Dict:
+        """Track one authenticated local-agent task from dispatch through completion."""
+        action = str(task.get("action", "unknown task"))
+        tracked = tracked_action(f"Agente local: {action}")(self._execute_task_untracked)
+        return await tracked(task)
+
     async def _handle_click(self, params: Dict) -> Dict:
         """Handle mouse click action."""
         if not HAS_PYAUTOGUI:
@@ -229,6 +258,24 @@ class JarvisLocalAgent(NexusComponent):
             "filepath": str(filepath)
         }
     
+    async def _handle_visual_navigation(self, action: str, params: Dict) -> Dict:
+        """Run visual navigation locally and return evidence to the bridge."""
+        if not HAS_PYAUTOGUI:
+            return {"success": False, "status": "unavailable", "message": "PyAutoGUI not available"}
+        try:
+            if self._visual_navigator is None:
+                from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
+
+                self._visual_navigator = VisualNavigationAdapter(pyautogui_module=pyautogui)
+            action_aliases = {"visual_recipe": "run_visual_recipe"}
+            return await asyncio.to_thread(
+                self._visual_navigator.execute,
+                {"action": action_aliases.get(action, action), "params": params},
+            )
+        except Exception as exc:
+            logger.exception("Visual navigation task failed")
+            return {"success": False, "status": "error", "message": str(exc)}
+
     async def _handle_open_url(self, params: Dict) -> Dict:
         """Handle opening URL in browser."""
         url = params.get("url", "")
@@ -289,7 +336,7 @@ class JarvisLocalAgent(NexusComponent):
                                 "type": "task_result",
                                 "task_id": task_id,
                                 "success": result.get("success", False),
-                                "result": result.get("result"),
+                                "result": result.get("result", result),
                                 "error": result.get("error"),
                                 "timestamp": datetime.now().isoformat()
                             }

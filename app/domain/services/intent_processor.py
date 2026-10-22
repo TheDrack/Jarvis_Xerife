@@ -65,6 +65,16 @@ class IntentProcessor(NexusComponent):
             logger.info("🔍 [PROCESSOR] Não é hardware. Delegando para LLM.")
             return self._process_with_llm(raw_text)
         
+        visual_actions = {
+            "observe_screen", "watch_screen", "run_visual_recipe",
+            "capture_visual_template", "save_visual_template",
+        }
+        if target_id in visual_actions:
+            adapter = nexus.resolve("visual_navigation_adapter")
+            if not adapter or isinstance(adapter, CloudMock):
+                return {"success": False, "status": "unavailable", "message": "Navegação visual indisponível neste dispositivo."}
+            return adapter.execute({"action": target_id, "params": getattr(intent_obj, "parameters", {})})
+
         # 3. RESOLUÇÃO DE COMANDO TÉCNICO (fluxo original)
         logger.info(f"🎯 [PROCESSOR] Buscando executor para: '{target_id}'")
         executor = nexus.resolve(target_id)

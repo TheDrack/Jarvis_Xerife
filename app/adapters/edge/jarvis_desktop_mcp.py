@@ -1,0 +1,330 @@
+# -*- coding: utf-8 -*-
+"""Local MCP server exposing the interactive Windows desktop to an MCP host.
+
+Run from the repository root with:
+    python -m app.adapters.edge.jarvis_desktop_mcp
+
+The server uses stdio so screenshots and input events stay on this machine.
+"""
+from __future__ import annotations
+
+import base64
+import json
+import logging
+import os
+import sys
+from pathlib import Path
+from typing import Any
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(_REPO_ROOT))
+
+from mcp.server.fastmcp import FastMCP, Image
+from mcp.types import TextContent
+
+from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
+from app.adapters.edge.background_window_input import click_window_background
+from app.adapters.edge.jarvis_agent_status import tracked_action
+
+logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+_HTTP_TRANSPORT = os.environ.get("JARVIS_DESKTOP_TRANSPORT", "stdio").strip().lower()
+_HTTP_PORT = int(os.environ.get("JARVIS_DESKTOP_HTTP_PORT", "8765"))
+
+mcp = FastMCP(
+    "Jarvis Desktop",
+    host="127.0.0.1",
+    port=_HTTP_PORT,
+    instructions=(
+        "Control the user's interactive Windows desktop. Always observe before acting. "
+        "Prefer accessibility elements or image templates over raw coordinates. Perform one "
+        "action at a time and inspect the returned screenshot before continuing. Never claim "
+        "success unless the action result and post-action screen confirm it."
+    ),
+)
+if _HTTP_TRANSPORT == "streamable-http":
+    # Tailscale Serve is the only remote ingress; keep the MCP app loopback-only.
+    # The reverse proxy supplies the tailnet hostname, so derive a narrow host
+    # allowlist from the authenticated local Tailscale status instead of disabling
+    # DNS-rebinding protection.
+    from mcp.server.transport_security import TransportSecuritySettings
+
+    _allowed_hosts = [
+        host.strip().lower()
+        for host in os.environ.get("JARVIS_DESKTOP_ALLOWED_HOSTS", "").split(",")
+        if host.strip()
+    ]
+    _allowed_origins = [
+        origin.strip().lower()
+        for origin in os.environ.get("JARVIS_DESKTOP_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    ]
+    if not _allowed_hosts:
+        raise RuntimeError(
+            "JARVIS_DESKTOP_ALLOWED_HOSTS precisa conter o DNS privado do Tailscale."
+        )
+    mcp.settings.transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=_allowed_hosts,
+        allowed_origins=_allowed_origins,
+    )
+navigator = VisualNavigationAdapter()
+
+
+def _content(result: dict[str, Any], *, include_frames: bool = True) -> list[Any]:
+    """Return concise status text plus actual MCP image blocks for the model to inspect."""
+    metadata = {
+        key: value
+        for key, value in result.items()
+        if key not in {"screenshot_data_url", "frames", "image_base64"}
+    }
+    blocks: list[Any] = [
+        TextContent(type="text", text=json.dumps(metadata, ensure_ascii=False, default=str))
+    ]
+    screenshot_path = result.get("screenshot_path")
+    if screenshot_path and Path(screenshot_path).is_file():
+        blocks.append(Image(path=screenshot_path))
+    if include_frames:
+        for frame in result.get("frames", []):
+            value = str(frame.get("image", ""))
+            if value.startswith("data:image/") and "," in value:
+                raw = base64.b64decode(value.split(",", 1)[1], validate=True)
+                blocks.append(Image(data=raw, format="jpeg"))
+    return blocks
+
+
+def _observe_after_action(result: dict[str, Any]) -> dict[str, Any]:
+    """Attach a fresh screen to successful actions, or keep the failure screenshot."""
+    if result.get("screenshot_path"):
+        return result
+    observation = navigator.observe_screen()
+    return {**observation, **result}
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Observando tela")
+def observe_screen() -> list[Any]:
+    """Capture the current desktop; return status and the screen as an MCP image."""
+    return _content(navigator.observe_screen())
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Observando mudanças na tela")
+def watch_screen(duration_seconds: float = 3, fps: float = 1) -> list[Any]:
+    """Return a short, finite sequence of recent screen images (up to 6 seconds, 2 FPS)."""
+    return _content(navigator.watch_screen(duration_seconds, fps))
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Executando receita visual")
+def run_visual_recipe(steps: list[dict[str, Any]]) -> list[Any]:
+    """Click unique saved image templates, verifying a distinct postcondition after each click.
+
+    If a target is missing or ambiguous, stop and return the current screenshot to the model.
+    Keep recipes short; each step requires template_id and verify_template_id.
+    """
+    result = navigator.run_recipe(steps)
+    return _content(_observe_after_action(result))
+
+
+@mcp.tool()
+@tracked_action("Capturando template visual")
+def capture_visual_template(
+    template_id: str,
+    user_confirmed: bool,
+    display_name: str = "",
+    timeout_seconds: float = 60,
+) -> dict[str, Any]:
+    """Open Windows Snipping Tool and save the user's selected control as a reusable template.
+
+    Ask the user first and call only after they explicitly agree. user_confirmed must be true.
+    """
+    if not user_confirmed:
+        return {
+            "success": False,
+            "status": "confirmation_required",
+            "message": "Peça autorização explícita ao usuário antes de abrir o recorte.",
+        }
+    return navigator.capture_template_from_clipboard(template_id, display_name, timeout_seconds)
+
+
+@mcp.tool()
+@tracked_action("Listando templates visuais")
+def list_visual_templates() -> dict[str, Any]:
+    """List saved template identifiers and display names."""
+    return {"templates": navigator._read_catalog()}
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Acionando controle acessível")
+def click_accessibility(
+    target_name: str,
+    window_title_contains: str = "",
+    control_type: str = "",
+    expected_name_after: str = "",
+    timeout_seconds: float = 2.0,
+) -> list[Any]:
+    """Click a unique visible UI Automation control by exact accessible name.
+
+    Optionally verify that expected_name_after becomes visible. Ambiguous targets are never clicked.
+    """
+    return _content(navigator.click_accessibility(
+        target_name, window_title_contains, control_type, expected_name_after, timeout_seconds
+    ))
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Preenchendo campo acessível")
+def set_accessibility_value(
+    target_name: str,
+    value: str,
+    window_title_contains: str = "",
+    control_type: str = "Edit",
+    expected_value: str = "",
+) -> list[Any]:
+    """Set and verify a uniquely identified accessible text field without global keyboard input."""
+    return _content(navigator.set_accessibility_value(
+        target_name, value, window_title_contains, control_type, expected_value
+    ))
+
+
+@mcp.tool()
+@tracked_action("Clique em segundo plano")
+def click_window_background_at(
+    window_title_contains: str,
+    x: int,
+    y: int,
+) -> dict[str, Any]:
+    """Post a click to a unique visible Windows window without moving the user's cursor.
+
+    x/y are screen coordinates from the current desktop screenshot. The API maps them
+    to the target window's client area. Some apps ignore background messages; success
+    only confirms messages were queued, so observe and verify the target state.
+    """
+    return click_window_background(window_title_contains, x, y, coordinates_are_screen=True)
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Clique físico autorizado")
+def click_at(
+    x: int,
+    y: int,
+    target_description: str,
+    user_confirmed: bool,
+) -> list[Any]:
+    """One-off coordinate fallback; use only after observing and with explicit user approval."""
+    if not user_confirmed:
+        return [{
+            "success": False,
+            "status": "confirmation_required",
+            "message": "Peça autorização explícita para o clique por coordenadas.",
+        }]
+    screenshot = navigator._capture()
+    if x < 0 or y < 0 or x >= screenshot.width or y >= screenshot.height:
+        return _content({
+            "success": False,
+            "status": "coordinates_out_of_bounds",
+            "target_description": target_description,
+            **navigator._save_observation(screenshot),
+        })
+    navigator._gui().click(x, y, button="left")
+    return _content(_observe_after_action({
+        "success": True,
+        "status": "clicked",
+        "target_description": target_description,
+        "x": x,
+        "y": y,
+    }))
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Digitando texto")
+def type_text(text: str) -> list[Any]:
+    """Type user-provided text into the currently focused window and return a fresh screenshot."""
+    if len(text) > 10000:
+        return [{"success": False, "status": "input_too_long", "message": "Limite: 10.000 caracteres."}]
+    navigator._gui().write(text, interval=0.01)
+    return _content(_observe_after_action({"success": True, "status": "typed", "characters": len(text)}))
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Rolando a janela")
+def scroll(amount: int) -> list[Any]:
+    """Scroll the active window a small bounded amount and return a fresh screenshot."""
+    if amount == 0 or abs(amount) > 20:
+        return [{"success": False, "status": "invalid_scroll", "message": "Use um valor entre -20 e 20, diferente de zero."}]
+    navigator._gui().scroll(amount)
+    return _content(_observe_after_action({"success": True, "status": "scrolled", "amount": amount}))
+
+
+_ALLOWED_KEYS = {
+    "enter", "tab", "esc", "escape", "space", "backspace", "delete",
+    "home", "end", "pageup", "pagedown", "up", "down", "left", "right",
+    "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
+}
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Pressionando tecla")
+def press_key(key: str) -> list[Any]:
+    """Press one navigation key from the safe list and return a fresh screenshot."""
+    normalized = key.strip().lower()
+    if normalized not in _ALLOWED_KEYS:
+        return [{
+            "success": False,
+            "status": "unsupported_key",
+            "allowed_keys": sorted(_ALLOWED_KEYS),
+        }]
+    navigator._gui().press(normalized)
+    return _content(_observe_after_action({"success": True, "status": "key_pressed", "key": normalized}))
+
+
+@mcp.tool()
+@tracked_action("Lendo árvore de acessibilidade")
+def read_accessibility_tree(window_title_contains: str = "", max_elements: int = 120) -> dict[str, Any]:
+    """Read visible Windows UI Automation elements before resorting to pixel coordinates.
+
+    Requires optional pywinauto. Returns names, roles, automation IDs and screen rectangles.
+    """
+    try:
+        from pywinauto import Desktop
+    except ImportError:
+        return {
+            "success": False,
+            "status": "dependency_missing",
+            "message": "Instale pywinauto para leitura da árvore UI Automation.",
+        }
+
+    needle = window_title_contains.casefold().strip()
+    limit = min(max(int(max_elements), 1), 300)
+    windows = []
+    for window in Desktop(backend="uia").windows():
+        try:
+            title = window.window_text()
+            if not window.is_visible() or (needle and needle not in title.casefold()):
+                continue
+            elements = []
+            for control in window.descendants()[:limit]:
+                try:
+                    info = control.element_info
+                    rect = control.rectangle()
+                    elements.append({
+                        "name": info.name,
+                        "control_type": info.control_type,
+                        "automation_id": info.automation_id,
+                        "enabled": bool(info.enabled),
+                        "rectangle": [rect.left, rect.top, rect.right, rect.bottom],
+                    })
+                except Exception:
+                    continue
+            windows.append({"title": title, "elements": elements})
+        except Exception:
+            continue
+    return {"success": True, "windows": windows}
+
+
+if __name__ == "__main__":
+    if _HTTP_TRANSPORT not in {"stdio", "streamable-http"}:
+        raise SystemExit("JARVIS_DESKTOP_TRANSPORT deve ser stdio ou streamable-http.")
+    mcp.run(transport=_HTTP_TRANSPORT)

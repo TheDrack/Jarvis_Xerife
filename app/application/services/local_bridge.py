@@ -147,9 +147,10 @@ class LocalBridgeManager(NexusComponent):
             logger.info(f"Task sent to {device_id}: {task.get('action')}")
             
             # Wait for result (with timeout)
+            timeout = 125.0 if task.get("action") == "capture_visual_template" else 30.0
             result = await asyncio.wait_for(
                 self._wait_for_result(device_id, task_id),
-                timeout=30.0
+                timeout=timeout
             )
             
             return result
