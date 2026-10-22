@@ -7,6 +7,7 @@ from .memory_provider import MemoryProvider
 from .system_controller import SystemController
 from .tactical_command_port import TacticalCommandPort
 from .voice_provider import VoiceProvider
+from .visual_navigation import VisualNavigationPort
 from .web_provider import WebProvider
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "HistoryProvider",
     "MemoryProvider",
     "TacticalCommandPort",
+    "VisualNavigationPort",
 ]

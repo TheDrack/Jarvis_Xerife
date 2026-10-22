@@ -185,10 +185,18 @@ class AssistantService(NexusComponent):
         try:
             adapter = self._get_history_adapter()
             if adapter and hasattr(adapter, "save_interaction"):
+                safe_data = dict(response.data or {})
+                visual_result = safe_data.get("result")
+                if isinstance(visual_result, dict):
+                    visual_result = {
+                        key: value for key, value in visual_result.items()
+                        if key not in {"screenshot_data_url", "frames", "image_base64"}
+                    }
+                    safe_data["result"] = visual_result
                 adapter.save_interaction(
                     user_input=user_input,
                     command_type=response.data.get("command_type", "unknown") if response.data else "unknown",
-                    parameters=response.data or {},
+                    parameters=safe_data,
                     success=response.success,
                     response_text=response.message,
                     channel=channel,
@@ -311,9 +319,15 @@ class AssistantService(NexusComponent):
             result = intent_processor.execute({"intent": intent})
 
             # 5. Constrói a resposta unificada
+            result_ok = result.get("success", True) if isinstance(result, dict) else True
+            result_message = (
+                result.get("message", "Comando executado com sucesso.")
+                if isinstance(result, dict) else str(result) if result else "Comando executado com sucesso."
+            )
             response = Response(
-                success=True,
-                message=str(result) if result else "Comando executado com sucesso.",
+                success=bool(result_ok),
+                message=str(result_message),
+                error=(result.get("error") if isinstance(result, dict) else None),
                 data={
                     "intent": str(intent),
                     "result": result,
@@ -420,6 +434,21 @@ class AssistantService(NexusComponent):
                 if self._web:
                     self._web.search_on_page(query)
                 return Response(success=True, message=f"Searched: {query}", data={"command_type": "search_on_page"})
+            elif cmd_type in {
+                CommandType.OBSERVE_SCREEN,
+                CommandType.WATCH_SCREEN,
+                CommandType.RUN_VISUAL_RECIPE,
+                CommandType.CAPTURE_VISUAL_TEMPLATE,
+                CommandType.SAVE_VISUAL_TEMPLATE,
+            }:
+                visual = nexus.resolve("visual_navigation_adapter")
+                result = visual.execute({"action": cmd_type.value, "params": params})
+                return Response(
+                    success=bool(result.get("success")),
+                    message=result.get("message", "Navegação visual concluída."),
+                    error=result.get("error"),
+                    data={"command_type": cmd_type.value, "result": result},
+                )
             elif cmd_type == CommandType.UNKNOWN:
                 interpreter = self._interpreter
                 if hasattr(interpreter, "generate_conversational_response"):

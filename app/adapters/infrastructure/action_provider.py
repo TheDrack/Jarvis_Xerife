@@ -37,7 +37,9 @@ class ActionProvider(NexusComponent):
         action = context["action"]
         params = context.get("params", {})
 
-        return self.dispatch_action(action, params)
+        from app.adapters.edge.jarvis_agent_status import tracked_action
+        tracked = tracked_action(f"A??o Jarvis: {getattr(action, 'value', action)}")(self.dispatch_action)
+        return tracked(action, params)
 
     def dispatch_action(self, action: CommandType, params: Dict[str, Any]) -> Dict[str, Any]:
         """Encaminha para o método específico de hardware/OS."""

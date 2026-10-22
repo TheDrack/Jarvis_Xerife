@@ -18,7 +18,7 @@ class TestAgentService(NexusComponent):
         functions = AgentService.get_function_declarations()
 
         assert isinstance(functions, list)
-        assert len(functions) == 6  # type_text, press_key, open_browser, open_url, search_on_page, report_issue
+        assert len(functions) == 11
 
         # Check that all expected functions are present
         function_names = [f["name"] for f in functions]
@@ -27,6 +27,11 @@ class TestAgentService(NexusComponent):
         assert "open_browser" in function_names
         assert "open_url" in function_names
         assert "search_on_page" in function_names
+        assert "observe_screen" in function_names
+        assert "watch_screen" in function_names
+        assert "run_visual_recipe" in function_names
+        assert "capture_visual_template" in function_names
+        assert "save_visual_template" in function_names
         assert "report_issue" in function_names
 
     def test_type_text_function_declaration(self):
@@ -97,6 +102,11 @@ class TestAgentService(NexusComponent):
         assert AgentService.map_function_to_command_type("open_browser") == CommandType.OPEN_BROWSER
         assert AgentService.map_function_to_command_type("open_url") == CommandType.OPEN_URL
         assert AgentService.map_function_to_command_type("search_on_page") == CommandType.SEARCH_ON_PAGE
+        assert AgentService.map_function_to_command_type("observe_screen") == CommandType.OBSERVE_SCREEN
+        assert AgentService.map_function_to_command_type("watch_screen") == CommandType.WATCH_SCREEN
+        assert AgentService.map_function_to_command_type("run_visual_recipe") == CommandType.RUN_VISUAL_RECIPE
+        assert AgentService.map_function_to_command_type("capture_visual_template") == CommandType.CAPTURE_VISUAL_TEMPLATE
+        assert AgentService.map_function_to_command_type("save_visual_template") == CommandType.SAVE_VISUAL_TEMPLATE
         assert AgentService.map_function_to_command_type("report_issue") == CommandType.REPORT_ISSUE
 
     def test_map_unknown_function(self):

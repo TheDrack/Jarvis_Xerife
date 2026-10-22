@@ -82,6 +82,32 @@ def build_parameters(command_type: CommandType, function_args: dict) -> dict:
     elif command_type == CommandType.SEARCH_ON_PAGE:
         return {"search_text": function_args.get("search_text", "")}
 
+    elif command_type == CommandType.OBSERVE_SCREEN:
+        return {}
+
+    elif command_type == CommandType.WATCH_SCREEN:
+        return {
+            "duration_seconds": function_args.get("duration_seconds", 4),
+            "fps": function_args.get("fps", 1),
+        }
+
+    elif command_type == CommandType.RUN_VISUAL_RECIPE:
+        return {"steps": function_args.get("steps", [])}
+
+    elif command_type == CommandType.CAPTURE_VISUAL_TEMPLATE:
+        return {
+            "template_id": function_args.get("template_id", ""),
+            "display_name": function_args.get("display_name", ""),
+            "timeout_seconds": function_args.get("timeout_seconds", 60),
+        }
+
+    elif command_type == CommandType.SAVE_VISUAL_TEMPLATE:
+        return {
+            "template_id": function_args.get("template_id", ""),
+            "image_base64": function_args.get("image_base64", ""),
+            "display_name": function_args.get("display_name", ""),
+        }
+
     elif command_type == CommandType.REPORT_ISSUE:
         return {
             "issue_description": function_args.get("issue_description", ""),

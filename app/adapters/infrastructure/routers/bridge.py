@@ -7,6 +7,7 @@ All components are resolved through the Nexus DI container.
 """
 
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
@@ -90,6 +91,12 @@ def create_bridge_router() -> APIRouter:
                 status_code=404,
                 detail=f"Device {device_id} is not connected",
             )
-        return await bridge_manager.send_task(device_id, task)
+        api_key = os.getenv("API_KEY_LOCAL")
+        if not api_key:
+            raise HTTPException(
+                status_code=503,
+                detail="API_KEY_LOCAL não configurada no servidor.",
+            )
+        return await bridge_manager.send_task(device_id, task, api_key=api_key)
 
     return router
