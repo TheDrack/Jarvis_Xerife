@@ -149,6 +149,9 @@ jobs:
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report.json > "$RUNNER_TEMP/pytest_log.txt" 2>&1
           PYTEST_EXIT=$?
           set -e
+          echo "::group::Resumo do pytest (1ª execução, exit=$PYTEST_EXIT)"
+          tail -n 40 "$RUNNER_TEMP/pytest_log.txt" || true
+          echo "::endgroup::"
 
           PRODUCTION_LOG_ARG=""
           if [[ -n "${{ github.event.inputs.error_log }}" ]]; then
@@ -161,7 +164,9 @@ jobs:
             WORKFLOW_LOG_ARG="--workflow-log failed_workflow_logs.txt"
           fi
 
-          uv run python scripts/jarvis_healer.py --report report.json --log "$RUNNER_TEMP/pytest_log.txt" $PRODUCTION_LOG_ARG $WORKFLOW_LOG_ARG
+          # Falha do healer não é falha de teste: a verificação final abaixo decide
+          uv run python scripts/jarvis_healer.py --report report.json --log "$RUNNER_TEMP/pytest_log.txt" $PRODUCTION_LOG_ARG $WORKFLOW_LOG_ARG \
+            || echo "::warning::healer terminou sem corrigir (exit $?)"
 
           set +e
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file=report_final.json > final_log.txt 2>&1
