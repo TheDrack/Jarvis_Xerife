@@ -1,10 +1,7 @@
-"""Shared multi-agent contracts for the Jarvis Harness.
-
-The package is runtime-agnostic: each agent keeps its own model/context while
-using the same task and capability contracts.
-"""
+"""Shared multi-agent contracts for the Jarvis Harness."""
 from .contracts import AgentProfile, TaskSpec, TaskAssignment, TaskStatus
 from .scheduler import CostBenefitScheduler, NoEligibleAgentError
+from .transport import AgentConnector, AgentMessage
 
 __all__ = [
     "AgentProfile",
@@ -13,4 +10,6 @@ __all__ = [
     "TaskStatus",
     "CostBenefitScheduler",
     "NoEligibleAgentError",
+    "AgentConnector",
+    "AgentMessage",
 ]
