@@ -24,14 +24,15 @@ RDC diretamente ao bridge JSONL e Aperture diretamente ao upstream Jarvis são r
 
 ## Inicialização e diagnóstico
 
-Na raiz do repositório, abra PowerShell:
+Para verificar a instalação existente, use os comandos oficiais do Tailscale, confira o estado do servidor MCP e teste o gateway Aperture. **Atenção:** os exemplos antigos deste documento referenciavam `scripts/jarvis_magic.ps1`, `scripts/start-jarvis-boot.ps1` e `scripts/start_jarvis_tailscale.ps1`, mas esses caminhos não existem no branch `main` verificado durante esta revisão. Não trate esses comandos como executáveis até que o entrypoint canônico do Magic Executor seja restaurado.
+
+Para a integração Secure MCP Tunnel, o configurador autônomo incluído nesta PR é executável:
 
 ```powershell
-.\scripts\jarvis_magic.ps1 -Action doctor
-.\scripts\jarvis_magic.ps1 -Action status
+.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action status
 ```
 
-O repositório inclui `scripts/jarvis_magic.ps1`, `scripts/start-jarvis-boot.ps1` e `scripts/start_jarvis_tailscale.ps1` para instalação, diagnóstico e inicialização. A configuração do boot deve garantir que o Tailscale conecta, que o servidor MCP e Tailscale Serve estão disponíveis e que o conector do Aperture consegue alcançar o upstream.
+O boot completo deve garantir que o Tailscale conecta, que o servidor MCP e Tailscale Serve estão disponíveis e que o conector do Aperture alcança o upstream. O configurador de túnel não altera nem substitui esses componentes.
 
 A existência de uma tarefa agendada ou de um processo ativo não prova que toda a cadeia funciona após reinicialização. Validar a rota P0 após um boot real, verificando cada camada e fazendo uma chamada MCP não destrutiva. A autenticação do RDC iniciada como `SYSTEM` pode não compartilhar o perfil/sessão autenticada do usuário; isso não deve ser confundido com o caminho principal via Aperture.
 
