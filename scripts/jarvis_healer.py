@@ -100,7 +100,7 @@ def extract_failed_files_from_report(
 
     failure_context = ""
     if failures:
-        failure_context = "=== PYTEST JSON FAILURES ===\\n" + "\\n".join(failures) + "\\n"
+        failure_context = "=== PYTEST JSON FAILURES ===\n" + "\n".join(failures) + "\n"
     return sorted(found_files), failure_context
 
 
