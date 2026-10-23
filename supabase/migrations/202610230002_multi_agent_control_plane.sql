@@ -161,7 +161,7 @@ declare
     v_finished integer;
 begin
     if p_status not in ('completed', 'failed', 'blocked', 'cancelled',
-                        'recovery_pending', 'approval_required', 'verifying') then
+                        'recovery_pending', 'approval_required') then
         raise exception 'unsupported terminal/intermediate status';
     end if;
 
