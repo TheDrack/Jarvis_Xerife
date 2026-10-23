@@ -29,27 +29,30 @@ The existing preferred operational route remains RDC → Aperture → Tailscale 
 
 ## Dynamic assignment policy
 
-The app.multiagent.contracts module defines runtime-neutral AgentProfile, TaskSpec, TaskAssignment, and lifecycle statuses. CostBenefitScheduler is the deterministic baseline: it filters by availability, capacity, required tools, and budget, then ranks by expected task value times measured success probability divided by estimated cost, coordination cost, and a configurable latency penalty.
+The `app.multiagent.contracts` module defines runtime-neutral `AgentProfile`, `TaskSpec`, `TaskAssignment`, and lifecycle statuses. `CostBenefitScheduler` is the deterministic baseline: it filters by availability, capacity, required tools, and budget, then ranks by expected task value times measured success probability divided by estimated cost, coordination cost, and a configurable latency penalty.
 
-The leader may assign work to itself or any eligible peer. The assigned role is task-scoped (task_type), not a permanent worker identity. The baseline score is a heuristic, not a calibrated probability; telemetry must improve it over time. Deadline and risk policies should be enforced as constraints by the orchestration layer before dispatch.
+The leader may assign work to itself or any eligible peer. The assigned role is task-scoped (`task_type`), not a permanent worker identity. The baseline score is a heuristic, not a calibrated probability; telemetry must improve it over time. Deadline and risk policies should be enforced as constraints by the orchestration layer before dispatch.
 
 ## Agent communication
 
-app.multiagent.transport defines a versioned, JSON-safe envelope and a transport protocol. Concrete MCP, HTTP, or queue adapters must implement it. A message contains message/task identities, sender/recipient, kind, payload, correlation ID, and protocol version.
+`app.multiagent.transport` defines a versioned, JSON-safe envelope and connector protocol. `SupabaseQueueConnector` is the first durable connector: it stores messages in Supabase, claims them through a transactional RPC using `FOR UPDATE SKIP LOCKED`, and leases claims to a recipient agent. Consumers must acknowledge after safely handling a message.
 
-Message kinds are intentionally bounded: request, ack, progress, result, error, cancel, and proposal. Do not use free-form shared chat as the source of truth. Store substantial artifacts by reference and persist task state separately from messages.
+Delivery is **at-least-once**, not exactly-once. A crashed consumer may receive a message again after its lease expires, so handlers and external side effects must be idempotent. The current connector performs one claim when `timeout_seconds=0`; positive timeouts poll at a bounded interval. Do not use free-form shared chat as the source of truth. Store substantial artifacts by reference and persist task state separately from messages.
 
-## Supabase control-plane migration
+Message kinds are bounded: `request`, `ack`, `progress`, `result`, `error`, `cancel`, and `proposal`. A message is a request, not an authorization grant.
 
-supabase/migrations/202610230002_multi_agent_control_plane.sql adds agent profiles, tasks, attempts, and append-only events, with RLS enabled and direct anon/authenticated access revoked. The claim RPC is intended for trusted server-side callers only.
+## Supabase migrations
 
-**The migration is versioned but must not be assumed applied to the live project.** Review the SQL, apply it to a staging project first, verify grants and concurrent claims, then apply it to the intended Supabase project using the approved deployment process. Never put a service_role key in agent prompts, desktop clients, or repository files.
+- `202610230002_multi_agent_control_plane.sql`: agent profiles, tasks, attempts, events, RLS, and task claim/completion RPCs.
+- `202610230003_multi_agent_message_queue.sql`: durable message table, leased claim RPC, acknowledgement RPC, and least-privilege grants.
+
+**Neither migration should be assumed applied to the live project.** Review the SQL and apply it to a staging project first; verify grants, concurrent claims, lease expiry/redelivery, acknowledgement ownership, and behavior under concurrent consumers. Only then apply to the intended Supabase project through the approved deployment process. Never put a `service_role` key in agent prompts, desktop clients, or repository files. The connector requires a trusted server-side client.
 
 ## Failure and concurrency invariants
 
 - Every task has a stable ID; every retry has a new attempt ID.
-- Claims are leases, not permanent ownership. Expired work must be reconciled before reassignment.
-- Use a monotonic fencing token to reject stale workers after reassignment.
+- Message claims are leases, not permanent ownership. Expired messages may be delivered again.
+- Task fencing tokens reject stale workers after reassignment; queue message leases do not replace task-level fencing.
 - Use idempotency keys for external side effects; a durable queue does not guarantee exactly-once effects.
 - One writer per shared file/branch; use isolated worktrees/branches for parallel engineering.
 - A successful tool response is not proof of task completion; acceptance criteria and evidence must be verified.
@@ -58,4 +61,6 @@ supabase/migrations/202610230002_multi_agent_control_plane.sql adds agent profil
 
 ## Implementation status
 
-This branch adds the first runtime-neutral contracts, a deterministic cost-benefit assignment baseline, a thin leader dispatch boundary, a transport interface, focused unit tests, and the initial Supabase schema. It does **not** yet provide a production MCP/HTTP queue adapter, an LLM-driven task decomposer, a persistent leader/worker process, a heartbeat worker, lease renewal/reaping, or end-to-end deployment integration. Those should be implemented in small stages against the existing Harness APIs, not as a competing second runtime.
+Implemented: shared contracts, deterministic cost-benefit scheduling, thin leader dispatch, the transport protocol, the Supabase task/control-plane adapter, a durable Supabase message queue adapter with leased claims and acknowledgements, focused unit tests, and initial schema migrations.
+
+Still required before production: run focused tests against the exact branch, validate both migrations against a staging Supabase/Postgres instance, test real concurrent claims and lease expiry, add agent heartbeat/health reconciliation and lease renewal, integrate task decomposition with the existing Harness, and run an end-to-end test with two real Harness runtimes. No production migration or deployment is performed by this change.
