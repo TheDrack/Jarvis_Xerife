@@ -4,6 +4,7 @@ from .scheduler import CostBenefitScheduler, NoEligibleAgentError
 from .transport import AgentConnector, AgentMessage
 from .leader import AgentLeader, DispatchResult
 from .supabase_store import SupabaseAgentStore
+from .supabase_queue import SupabaseQueueConnector
 
 __all__ = [
     "AgentProfile",
@@ -17,4 +18,5 @@ __all__ = [
     "AgentLeader",
     "DispatchResult",
     "SupabaseAgentStore",
+    "SupabaseQueueConnector",
 ]
