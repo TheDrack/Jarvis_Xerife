@@ -57,7 +57,7 @@ Execute na máquina que hospeda o Jarvis:
 4. Faça um handshake MCP `initialize`, `tools/list` e uma chamada não destrutiva como `observe_screen` no endpoint local.
 5. No ChatGPT, selecione o app criado e repita uma chamada de leitura. Somente esta última etapa valida a rota completa através do produto OpenAI.
 
-O endpoint local pode responder HTTP 406 a um GET simples e ainda aceitar MCP Streamable HTTP por POST; não use um GET de navegador como prova de falha ou sucesso. Uma mensagem de descoberta OAuth também deve ser investigada separadamente: não desative autenticação nem invente metadados para eliminá-la.
+O endpoint local pode responder HTTP 406 a um GET simples e ainda aceitar MCP Streamable HTTP por POST; não use um GET de navegador como prova de falha ou sucesso. Para um servidor sem OAuth, HTTP 404 em `/.well-known/oauth-protected-resource/mcp` e `/.well-known/oauth-protected-resource` é esperado; o cliente pode registrar um aviso opcional de descoberta mesmo com `/readyz = ready`. No host validado, ambos retornaram 404, enquanto MCP `initialize`, `tools/list` e `observe_screen` passaram. Não desative autenticação nem invente metadados para eliminar esse aviso. Investigue somente se `/readyz` deixar de responder `ready` ou se a descoberta/chamada no app ChatGPT falhar.
 
 ## Magic Executor e automação futura
 
