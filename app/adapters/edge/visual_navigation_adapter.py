@@ -17,6 +17,7 @@ from typing import Any, Dict, Iterable, Optional
 
 from app.application.ports.visual_navigation import VisualNavigationPort
 from app.adapters.edge.background_window_input import click_window_background
+from app.adapters.edge.jarvis_agent_status import agent_activity, tracked_action
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,44 @@ _TEMPLATE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$")
 _MAX_STEPS = 20
 _MAX_WATCH_SECONDS = 6
 _MAX_WATCH_FPS = 2
+
+
+_GUI_ACTIVITY = {
+    "click": "Clique",
+    "doubleClick": "Clique duplo",
+    "rightClick": "Clique direito",
+    "moveTo": "Movendo o cursor",
+    "dragTo": "Arrastando",
+    "write": "Digitando texto",
+    "typewrite": "Digitando texto",
+    "press": "Pressionando tecla",
+    "hotkey": "Atalho de teclado",
+    "keyDown": "Pressionando tecla",
+    "keyUp": "Soltando tecla",
+    "scroll": "Rolando a janela",
+    "screenshot": "Observando tela",
+    "locateOnScreen": "Procurando na tela",
+    "locateAllOnScreen": "Procurando na tela",
+}
+
+
+class _ActivityGUI:
+    """Proxy do pyautogui: toda ação de mouse, teclado ou captura aparece na caixa de status."""
+
+    def __init__(self, gui: Any) -> None:
+        self._gui = gui
+
+    def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._gui, name)
+        label = _GUI_ACTIVITY.get(name)
+        if label is None or not callable(attr):
+            return attr
+
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
+            with agent_activity(label):
+                return attr(*args, **kwargs)
+
+        return wrapped
 
 
 class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
@@ -36,6 +75,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
         screenshot_dir: Optional[str | Path] = None,
     ) -> None:
         self._pyautogui = pyautogui_module
+        self._tracked_gui = None
         local_app_data = Path(os.getenv("LOCALAPPDATA", Path.home() / ".local" / "share"))
         self.template_dir = Path(
             template_dir or os.getenv("JARVIS_TEMPLATE_DIR", local_app_data / "Jarvis_Xerife" / "templates")
@@ -45,6 +85,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
         )
         self.catalog_path = self.template_dir / "catalog.json"
 
+    @tracked_action("Executando receita visual")
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         context = context or {}
         action = context.get("action", "run_visual_recipe")
@@ -83,7 +124,9 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
             import pyautogui
             self._pyautogui = pyautogui
         self._pyautogui.FAILSAFE = True
-        return self._pyautogui
+        if self._tracked_gui is None or self._tracked_gui._gui is not self._pyautogui:
+            self._tracked_gui = _ActivityGUI(self._pyautogui)
+        return self._tracked_gui
 
     def _template_path(self, template_id: str) -> Path:
         if not _TEMPLATE_ID.fullmatch(str(template_id)):
@@ -110,10 +153,12 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
         image.save(path, format="JPEG", quality=82)
         return {"screenshot_path": str(path), "screenshot_data_url": self._encode_image(image)}
 
+    @tracked_action("Observando tela")
     def observe_screen(self) -> Dict[str, Any]:
         observation = self._save_observation(self._capture())
         return {"success": True, "status": "observed", "message": "Tela capturada.", **observation}
 
+    @tracked_action("Observando mudanças na tela")
     def watch_screen(self, duration_seconds: float = 4, fps: float = 1) -> Dict[str, Any]:
         """Retorna poucos quadros recentes para acompanhar uma mudança transitória."""
         duration = min(max(float(duration_seconds), 1), _MAX_WATCH_SECONDS)
@@ -470,6 +515,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
             time.sleep(0.4)
         return {"success": False, "status": "capture_timeout", "message": "Nenhum recorte recebido; tente novamente e confirme a captura do botão."}
 
+    @tracked_action("Acionando controle acessível")
     def click_accessibility(
         self,
         target_name: str,
@@ -576,6 +622,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
                 "message": "Controle invocado sem mouse físico." if not expected else "Invocação sem mouse físico e pós-condição semântica verificada.",
                 **self._failure_observation()}
 
+    @tracked_action("Preenchendo campo acessível")
     def set_accessibility_value(
         self, target_name: str, value: str, window_title_contains: str = "",
         control_type: str = "Edit", expected_value: str = "",
