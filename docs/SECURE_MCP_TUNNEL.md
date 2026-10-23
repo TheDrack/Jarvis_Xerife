@@ -35,7 +35,7 @@ Na raiz do repositório, execute:
 .\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action status
 ```
 
-O configurador cria o perfil `jarvis-direct-chatgpt`, grava a referência à chave de runtime de forma protegida por DPAPI e registra a tarefa `Jarvis-OpenAI-Secure-MCP-Tunnel` para iniciar no logon interativo. O túnel é executado no contexto do usuário que configurou a chave; não copie o segredo para a conta SYSTEM nem execute o perfil DPAPI por outra conta.
+O configurador cria o perfil `jarvis-direct-chatgpt`, grava a referência à chave de runtime de forma protegida por DPAPI e registra a tarefa `Jarvis-OpenAI-Secure-MCP-Tunnel` para iniciar no logon interativo. A tarefa tem política de reinício para até cinco falhas, com intervalo de um minuto, e execução sem limite de tempo. O túnel é executado no contexto do usuário que configurou a chave; não copie o segredo para a conta SYSTEM nem execute o perfil DPAPI por outra conta.
 
 Ações disponíveis:
 - `configure`: solicita o `tunnel_id` e a runtime key, valida o MCP local, cria o perfil e registra/inicia a tarefa.
