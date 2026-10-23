@@ -224,7 +224,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
         """
         try:
             with Session(self.engine) as session:
-                statement = select(Interaction).order_by(Interaction.timestamp.desc()).limit(limit)
+                statement = select(Interaction).order_by(Interaction.timestamp.desc(), Interaction.id.desc()).limit(limit)
                 results = session.exec(statement).all()
 
                 history = []
@@ -263,7 +263,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
                 statement = (
                     select(Interaction)
                     .where(Interaction.success == True)  # noqa: E712
-                    .order_by(Interaction.timestamp.desc())
+                    .order_by(Interaction.timestamp.desc(), Interaction.id.desc())
                     .limit(limit)
                 )
                 results = session.exec(statement).all()
@@ -372,7 +372,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
                 statement = (
                     select(Interaction)
                     .where(Interaction.status == "pending")
-                    .order_by(Interaction.timestamp.asc())
+                    .order_by(Interaction.timestamp.asc(), Interaction.id.asc())
                     .limit(1)
                 )
                 interaction = session.exec(statement).first()
