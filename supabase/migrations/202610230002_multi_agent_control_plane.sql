@@ -196,6 +196,21 @@ begin
         return false;
     end if;
 
+    update public.jarvis_agent_attempts
+       set status = p_status,
+           finished_at = now(),
+           error_summary = nullif(p_result ->> 'error', ''),
+           evidence = coalesce(p_result -> 'evidence', '[]'::jsonb)
+     where attempt_id = p_attempt_id
+       and task_id = p_task_id
+       and agent_id = p_agent_id;
+
+    insert into public.jarvis_agent_events (
+        task_id, attempt_id, agent_id, event_type, payload
+    ) values (
+        p_task_id, p_attempt_id, p_agent_id, 'task.' || p_status, coalesce(p_result, '{}'::jsonb)
+    );
+
     update public.jarvis_agents
        set active_tasks = greatest(active_tasks - 1, 0),
            status = case
