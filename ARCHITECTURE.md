@@ -47,6 +47,9 @@ graph LR
     class requirements support
     app["<b>app</b><br/><hr/>📄 container.py: Container<br/>📄 bootstrap_edge.py: main"]
     class app support
+    app_multiagent["<b>multiagent</b><br/><hr/>📄 leader.py: from, class, AgentLeader<br/>📄 supabase_store.py: SupabaseAgentStore, register_agent<br/>📄 transport.py: AgentMessage, create, to_dict<br/>📄 contracts.py: TaskStatus, AgentProfile<br/>📄 scheduler.py: from, NoEligibleAgentError, CostBenefitScheduler"]
+    class app_multiagent support
+    app --> app_multiagent
     app_static["<b>static</b>"]
     class app_static support
     app --> app_static
