@@ -27,7 +27,7 @@ def test_leader_and_workers_use_same_contract_and_role_is_task_scoped():
         AgentProfile(
             agent_id="worker",
             available_tools=("repo.read", "pytest", "browser"),
-            estimated_cost=0.01,
+            estimated_cost=0.03,
             success_rates={"verification": 0.8},
         ),
     ]
