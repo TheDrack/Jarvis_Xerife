@@ -102,7 +102,7 @@ jobs:
       # ajuste este `if` ou adicione um step de criação de tag antes.
       - name: 🏷️ Create Release (on tag)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/Jarvis_Installer.exe
           draft: false
