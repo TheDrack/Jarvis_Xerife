@@ -164,7 +164,7 @@ $$;
 -- Completion is tied to the current task owner and attempt; stale workers
 -- cannot complete a task after a new attempt has been assigned.
 create or replace function public.finish_jarvis_agent_task(
-    p_task_id uuid,
+    p_task_id text,
     p_agent_id text,
     p_attempt_id uuid,
     p_status text,
@@ -254,8 +254,8 @@ revoke all on public.jarvis_agent_attempts from anon, authenticated;
 revoke all on public.jarvis_agent_events from anon, authenticated;
 revoke all on function public.claim_jarvis_agent_task(text, text, integer) from public, anon, authenticated;
 revoke all on function public.finish_jarvis_agent_task(text, text, uuid, text, jsonb) from public, anon, authenticated;
-grant execute on function public.claim_jarvis_agent_task(uuid, text, integer) to service_role;
-grant execute on function public.finish_jarvis_agent_task(uuid, text, uuid, text, jsonb) to service_role;
+grant execute on function public.claim_jarvis_agent_task(text, text, integer) to service_role;
+grant execute on function public.finish_jarvis_agent_task(text, text, uuid, text, jsonb) to service_role;
 grant select, insert, update on public.jarvis_agents to service_role;
 grant select, insert, update on public.jarvis_agent_tasks to service_role;
 grant select, insert, update on public.jarvis_agent_attempts to service_role;
