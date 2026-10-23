@@ -170,6 +170,12 @@ graph LR
     skills_jarvis-visual-navigation["<b>jarvis-visual-navigation</b>"]
     class skills_jarvis-visual-navigation support
     skills --> skills_jarvis-visual-navigation
+    skills_jarvis-multi-agent-coordination["<b>jarvis-multi-agent-coordination</b>"]
+    class skills_jarvis-multi-agent-coordination support
+    skills --> skills_jarvis-multi-agent-coordination
     docs["<b>docs</b>"]
     class docs support
+    docs_architecture["<b>architecture</b>"]
+    class docs_architecture support
+    docs --> docs_architecture
 ```
