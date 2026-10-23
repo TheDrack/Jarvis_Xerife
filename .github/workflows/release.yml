@@ -20,7 +20,7 @@ jobs:
           token: ${{ github.token }}
 
       - name: 📦 Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
 
       - name: 📦 Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: Jarvis_Installer
           path: dist/Jarvis_Installer.exe
