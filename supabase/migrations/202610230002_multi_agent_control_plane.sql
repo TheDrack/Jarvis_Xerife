@@ -21,8 +21,8 @@ create table if not exists public.jarvis_agents (
 );
 
 create table if not exists public.jarvis_agent_tasks (
-    task_id uuid primary key,
-    parent_task_id uuid references public.jarvis_agent_tasks(task_id),
+    task_id text primary key,
+    parent_task_id text references public.jarvis_agent_tasks(task_id),
     objective text not null,
     task_type text not null default 'general',
     required_tools text[] not null default '{}',
@@ -57,7 +57,7 @@ create index if not exists jarvis_agent_tasks_owner_idx
 
 create table if not exists public.jarvis_agent_attempts (
     attempt_id uuid primary key,
-    task_id uuid not null references public.jarvis_agent_tasks(task_id),
+    task_id text not null references public.jarvis_agent_tasks(task_id),
     agent_id text not null references public.jarvis_agents(agent_id),
     assigned_role text not null,
     status text not null default 'claimed'
@@ -75,7 +75,7 @@ create table if not exists public.jarvis_agent_attempts (
 
 create table if not exists public.jarvis_agent_events (
     event_id bigint generated always as identity primary key,
-    task_id uuid references public.jarvis_agent_tasks(task_id),
+    task_id text references public.jarvis_agent_tasks(task_id),
     attempt_id uuid references public.jarvis_agent_attempts(attempt_id),
     agent_id text,
     event_type text not null,
@@ -89,7 +89,7 @@ create index if not exists jarvis_agent_events_task_idx
 -- The row lock serializes claims for the same agent and prevents the
 -- concurrency counter from being oversubscribed by simultaneous requests.
 create or replace function public.claim_jarvis_agent_task(
-    p_task_id uuid,
+    p_task_id text,
     p_agent_id text,
     p_lease_seconds integer default 90
 )
@@ -219,8 +219,8 @@ revoke all on public.jarvis_agents from anon, authenticated;
 revoke all on public.jarvis_agent_tasks from anon, authenticated;
 revoke all on public.jarvis_agent_attempts from anon, authenticated;
 revoke all on public.jarvis_agent_events from anon, authenticated;
-revoke all on function public.claim_jarvis_agent_task(uuid, text, integer) from public, anon, authenticated;
-revoke all on function public.finish_jarvis_agent_task(uuid, text, uuid, text, jsonb) from public, anon, authenticated;
+revoke all on function public.claim_jarvis_agent_task(text, text, integer) from public, anon, authenticated;
+revoke all on function public.finish_jarvis_agent_task(text, text, uuid, text, jsonb) from public, anon, authenticated;
 grant execute on function public.claim_jarvis_agent_task(uuid, text, integer) to service_role;
 grant execute on function public.finish_jarvis_agent_task(uuid, text, uuid, text, jsonb) to service_role;
 grant select, insert, update on public.jarvis_agents to service_role;
