@@ -6,7 +6,7 @@
 
 O JARVIS já tem autocorreção de código e logs por job, mas não há protocolo comum de checkpoint, restauração e verificação para ações de agentes em múltiplos ambientes. O healer grava a correção no arquivo antes de validar o comportamento; validação sintática não garante que a mudança seja segura.
 
-Esta primeira entrega acrescenta uma primitiva local conservadora e um esquema versionado para futuro histórico central. Ela não habilita rollback cloud nem altera o banco Supabase automaticamente.
+Esta entrega acrescenta uma primitiva local conservadora, integra checkpoints ao healer e faz o workflow restaurar tentativas malsucedidas quando os arquivos ainda correspondem ao estado selado. Também versiona o esquema para o futuro histórico central. Ela não habilita rollback cloud nem altera o banco Supabase automaticamente.
 
 ## Matriz de achados
 
@@ -50,8 +50,8 @@ Não tornar nenhum projeto dependência obrigatória antes de comparar licença,
 
 ## Plano por fases
 
-- **Fase 1 — Local (esta PR):** snapshots, detecção de conflito, journal hash-chained, testes, migration SQL versionada e documentação.
-- **Fase 2 — Healer:** checkpoint antes da escrita, restauração condicional e teste completo; remoção de arquivo novo requer aprovação.
+- **Fase 1 — Local (esta PR):** snapshots, detecção de conflito, journal hash-chained, integração com o healer/CI, testes, migration SQL versionada, remoção de credencial do exemplo e documentação.
+- **Fase 2 — Healer:** validar em CI o fluxo completo de falha → restauração → resultado de testes; expandir para operações adicionais só após esses testes.
 - **Fase 3 — Supabase:** autenticação server-side de privilégio mínimo, sincronização idempotente, fila offline e testes RLS. Não aplicar migration em produção sem validar destino e backup.
 - **Fase 4 — Render:** verificar dashboard, deploys, health check, banco usado e rollback; separar rollback de código e schema.
 - **Fase 5 — Ferramentas:** adaptadores para filesystem, Git, browser, APIs, deploys e Postgres; efeitos irreversíveis protegidos por aprovação.
