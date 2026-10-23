@@ -90,7 +90,10 @@ class TestOverwatchDaemon:
     def test_get_pending_tasks_from_context(self, daemon, tmp_path):
         """Should parse pending_tasks from a real context.json."""
         ctx_file = tmp_path / "context.json"
-        ctx_file.write_text('{"pending_tasks": ["reunião às 15h", "enviar relatório"]}')
+        ctx_file.write_text(
+            '{"pending_tasks": ["reunião às 15h", "enviar relatório"]}',
+            encoding="utf-8",
+        )
 
         import app.adapters.infrastructure.overwatch_adapter as mod
         original = mod._CONTEXT_FILE
