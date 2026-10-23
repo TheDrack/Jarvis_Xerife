@@ -78,12 +78,21 @@ class AgentStatusTests(unittest.TestCase):
             self.assertFalse(status._wait_for_overlay_visible(stale, timeout=0.0))
 
     def test_begin_action_waits_for_overlay_ack_on_windows(self):
-        with patch.object(status.os, "name", "nt"), patch.object(status, "_wait_for_overlay_visible") as wait:
+        # Simulate the Windows branch without changing os.name during file I/O:
+        # patching os.name globally makes pathlib choose WindowsPath on Linux and
+        # causes the status lock to import the unavailable msvcrt module.
+        payload = {
+            "pid": 123,
+            "updated_at": 10.5,
+            "action_id": "action-1",
+            "action": "windows action",
+            "phase": "working",
+        }
+        with patch.object(status, "_write_status", return_value=payload), \
+             patch.object(status.os, "name", "nt"), \
+             patch.object(status, "_wait_for_overlay_visible") as wait:
             status.begin_action("windows action")
-        wait.assert_called_once()
-        payload = wait.call_args.args[0]
-        self.assertEqual(payload["action"], "windows action")
-        self.assertEqual(payload["phase"], "working")
+        wait.assert_called_once_with(payload)
 
     def test_non_windows_begin_action_does_not_wait_for_overlay(self):
         payload = {"phase": "working", "action": "portable action", "updated_at": 1.0, "pid": 123}
