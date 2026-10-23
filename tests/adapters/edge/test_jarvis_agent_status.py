@@ -56,6 +56,44 @@ class AgentStatusTests(unittest.TestCase):
         self.assertEqual(saved["phase"], "attention")
         self.assertEqual(saved["message"], "expected test error")
 
+    def test_overlay_ack_is_action_specific(self):
+        payload = {"pid": 123, "updated_at": 10.5, "action_id": "action-1", "action": "open browser", "phase": "working"}
+        status._publish_overlay_ready(payload)
+        ready = json.loads((self.root / "agent_overlay_ready.json").read_text(encoding="utf-8"))
+        self.assertEqual(ready["pid"], payload["pid"])
+        self.assertEqual(ready["action_id"], payload["action_id"])
+        self.assertEqual(ready["action"], payload["action"])
+        self.assertTrue(ready["visible"])
+
+    def test_overlay_ack_ignores_non_working_status(self):
+        status._publish_overlay_ready({"phase": "success", "pid": 123, "updated_at": 10.5, "action": "done"})
+        self.assertFalse((self.root / "agent_overlay_ready.json").exists())
+
+    def test_wait_for_overlay_visible_matches_exact_action(self):
+        payload = {"phase": "working", "pid": 123, "updated_at": 10.5, "action_id": "action-1", "action": "open browser"}
+        status._publish_overlay_ready(payload)
+        with patch.object(status.os, "name", "nt"):
+            self.assertTrue(status._wait_for_overlay_visible(payload, timeout=0.1))
+            stale = dict(payload, action_id="action-2")
+            self.assertFalse(status._wait_for_overlay_visible(stale, timeout=0.0))
+
+    def test_begin_action_waits_for_overlay_ack_on_windows(self):
+        with patch.object(status.os, "name", "nt"), patch.object(status, "_wait_for_overlay_visible") as wait:
+            status.begin_action("windows action")
+        wait.assert_called_once()
+        payload = wait.call_args.args[0]
+        self.assertEqual(payload["action"], "windows action")
+        self.assertEqual(payload["phase"], "working")
+
+    def test_non_windows_begin_action_does_not_wait_for_overlay(self):
+        payload = {"phase": "working", "action": "portable action", "updated_at": 1.0, "pid": 123}
+        with patch.object(status.os, "name", "posix"), \
+             patch.object(status, "_write_status", return_value=payload), \
+             patch.object(status, "ensure_overlay_started", return_value=True), \
+             patch.object(status, "_wait_for_overlay_visible") as wait:
+            status.begin_action("portable action")
+        wait.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

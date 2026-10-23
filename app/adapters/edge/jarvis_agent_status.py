@@ -19,6 +19,7 @@ import functools
 import asyncio
 import contextvars
 import inspect
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -87,7 +88,7 @@ def _replace_status(payload: dict[str, Any]) -> None:
                     pass
 
 
-def _write_status(phase: str, action: str, message: str = "") -> None:
+def _write_status(phase: str, action: str, message: str = "") -> dict[str, Any]:
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
     payload = {
         "phase": phase,
@@ -95,14 +96,67 @@ def _write_status(phase: str, action: str, message: str = "") -> None:
         "message": str(message)[:180],
         "updated_at": time.time(),
         "pid": os.getpid(),
+        "action_id": uuid.uuid4().hex,
     }
     _replace_status(payload)
+    return payload
+
+
+def _wait_for_overlay_visible(payload: dict[str, Any], timeout: float = 2.0) -> bool:
+    """Wait briefly for this action's overlay acknowledgement; never wait on non-Windows."""
+    if os.name != "nt":
+        return False
+    expected = (payload.get("pid"), payload.get("action_id"), payload.get("action"))
+    deadline = time.monotonic() + max(0.0, timeout)
+    ready_file = STATUS_DIR / "agent_overlay_ready.json"
+    while time.monotonic() < deadline:
+        try:
+            ready = json.loads(ready_file.read_text(encoding="utf-8"))
+            actual = (ready.get("pid"), ready.get("action_id"), ready.get("action"))
+            if actual == expected and ready.get("visible") is True:
+                return True
+        except (OSError, ValueError, TypeError):
+            pass
+        time.sleep(0.025)
+    return False
+
+
+def _publish_overlay_ready(data: dict[str, Any]) -> None:
+    """Acknowledge the exact action only after the overlay window is viewable."""
+    if data.get("phase") != "working":
+        return
+    STATUS_DIR.mkdir(parents=True, exist_ok=True)
+    ready = {
+        "pid": data.get("pid"),
+        "action_id": data.get("action_id"),
+        "action": data.get("action"),
+        "visible": True,
+    }
+    ready_file = STATUS_DIR / "agent_overlay_ready.json"
+    try:
+        existing = json.loads(ready_file.read_text(encoding="utf-8"))
+        if (existing.get("pid"), existing.get("action_id"), existing.get("action")) == (
+            ready.get("pid"), ready.get("action_id"), ready.get("action")
+        ) and existing.get("visible") is True:
+            return
+    except (OSError, ValueError, TypeError):
+        pass
+    tmp = STATUS_DIR / f"agent_overlay_ready.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        tmp.write_text(json.dumps(ready, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, ready_file)
+    finally:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def begin_action(action: str) -> None:
-    """Publish activity and start the optional overlay without blocking MCP."""
-    _write_status("working", action)
-    ensure_overlay_started()
+    """Publish activity and wait briefly for visible overlay presence on Windows."""
+    payload = _write_status("working", action)
+    if ensure_overlay_started() and os.name == "nt":
+        _wait_for_overlay_visible(payload)
 
 
 def set_agent_cursor_target(x: int, y: int, event: str = "target") -> None:
@@ -322,6 +376,8 @@ def run_overlay() -> int:
                 apply_no_activate()
             else:
                 apply_no_activate()
+            if root.winfo_viewable():
+                _publish_overlay_ready(data)
         else:
             if root.winfo_viewable():
                 root.withdraw()
