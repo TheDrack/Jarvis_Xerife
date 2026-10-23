@@ -28,7 +28,7 @@ class RecoveryStore:
     def __init__(self, root: str | Path, storage_dir: str | Path | None = None) -> None:
         self.root = Path(root).resolve()
         configured = storage_dir or os.environ.get("JARVIS_RECOVERY_DIR")
-        self.storage_dir = Path(configured).expanduser().resolve() if configured else self.root / ".jarvis-recovery"
+        self.storage_dir = Path(configured).expanduser().resolve() if configured else self.root.parent / f".{self.root.name}-recovery"
         self.objects_dir = self.storage_dir / "objects"
         self.checkpoints_dir = self.storage_dir / "checkpoints"
         self.journal_path = self.storage_dir / "events.jsonl"
