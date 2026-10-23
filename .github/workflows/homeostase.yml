@@ -217,9 +217,8 @@ jobs:
             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
               PUSH_TARGET="${{ github.head_ref }}"
               git push origin HEAD:"$PUSH_TARGET" || true
-              if [[ "${{ steps.healing_process.outputs.status }}" == "success" ]]; then
-                gh pr merge ${{ github.event.pull_request.number }} --auto --merge || true
-              fi
+              # A autocura não faz merge de PR automaticamente. Testes verdes
+              # permitem propor a correção, não substituem a aprovação do mantenedor.
             elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
               HEAL_BRANCH="jarvis/heal-${{ github.run_id }}"
               git checkout -b "$HEAL_BRANCH"
