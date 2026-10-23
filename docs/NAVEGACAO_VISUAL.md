@@ -119,6 +119,17 @@ Procedimento no RDM:
 
 O passo `click_at` exige `user_confirmed: true`; prefira a receita por template. Não coloque credenciais em arquivos de requisição temporários. A skill portátil está em `skills/jarvis-visual-navigation/SKILL.md` e contém os nomes de ferramentas, exemplos e recuperação.
 
+## Rota remota principal: RDC → Aperture → Tailscale → Jarvis
+
+**Prioridade P0.** Ao ligar o PC, o Tailscale deve conectar automaticamente à tailnet. Agentes compatíveis com MCP e autorizados usam o gateway do Aperture: `https://aperture.tail350144.ts.net/v1/mcp`. O conector `jarvis` do Aperture encaminha as chamadas ao upstream privado `https://multimetal.tail350144.ts.net/mcp`, publicado pelo Tailscale Serve para o servidor local `127.0.0.1:8765`.
+
+O Aperture centraliza grants e exposição de ferramentas; as ACLs/identidade do Tailscale limitam o alcance de rede. “Qualquer agente” significa qualquer agente compatível e autorizado, não acesso público irrestrito.
+
+RDC diretamente ao bridge JSONL e Aperture diretamente ao upstream Jarvis são alternativas para situações específicas, por exemplo diagnóstico local ou quando a rota principal não pode ser usada. Não são a metodologia padrão. A sessão visual do Windows ainda precisa estar acessível para ferramentas que controlam a interface gráfica.
+
+Detalhes, boot, segurança e critérios de aceitação: `docs/ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md`.
+
+
 ## Acesso remoto privado com Tailscale
 
 O servidor MCP oferece também Streamable HTTP para clientes em outros dispositivos do mesmo tailnet. O script `scripts/start_jarvis_tailscale.ps1` inicia o servidor em `127.0.0.1:8765`, deriva uma allowlist Host/Origin do DNS privado da máquina e configura **Tailscale Serve** em HTTPS. O backend permanece preso ao loopback; não usa Funnel nem publica a porta local. A autorização de rede fica sob a identidade dos dispositivos e as ACLs do tailnet.

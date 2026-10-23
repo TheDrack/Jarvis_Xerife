@@ -29,6 +29,64 @@ _OVERLAY_PROCESS: subprocess.Popen[Any] | None = None
 _ACTION_DEPTH = contextvars.ContextVar("jarvis_action_depth", default=0)
 
 
+def _status_file_lock():
+    """Serialize status-file updates across threads and separate Jarvis processes."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def _locked():
+        STATUS_DIR.mkdir(parents=True, exist_ok=True)
+        handle = open(STATUS_DIR / "agent_activity.write.lock", "a+b")
+        try:
+            if os.name == "nt":
+                import msvcrt
+                handle.seek(0, os.SEEK_END)
+                if handle.tell() == 0:
+                    handle.write(b"0")
+                    handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                if os.name == "nt":
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            handle.close()
+    return _locked()
+
+
+def _replace_status(payload: dict[str, Any]) -> None:
+    """Atomically publish status using a unique temp file while holding a process lock."""
+    with _LOCK:
+        with _status_file_lock():
+            tmp = STATUS_DIR / f"agent_activity.{os.getpid()}.{threading.get_ident()}.tmp"
+            try:
+                tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+                last_error = None
+                for attempt in range(30):
+                    try:
+                        os.replace(tmp, STATUS_FILE)
+                        last_error = None
+                        break
+                    except PermissionError as exc:
+                        last_error = exc
+                        time.sleep(0.02)
+                if last_error is not None:
+                    raise last_error
+            finally:
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
+
 def _write_status(phase: str, action: str, message: str = "") -> None:
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -38,10 +96,7 @@ def _write_status(phase: str, action: str, message: str = "") -> None:
         "updated_at": time.time(),
         "pid": os.getpid(),
     }
-    tmp = STATUS_FILE.with_suffix(".tmp")
-    with _LOCK:
-        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(STATUS_FILE)
+    _replace_status(payload)
 
 
 def begin_action(action: str) -> None:
@@ -57,10 +112,7 @@ def set_agent_cursor_target(x: int, y: int, event: str = "target") -> None:
         return
     data.update({"cursor_target": [int(x), int(y)], "cursor_event": str(event)[:24], "updated_at": time.time()})
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = STATUS_FILE.with_suffix(".tmp")
-    with _LOCK:
-        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(STATUS_FILE)
+    _replace_status(data)
 
 
 def end_action(action: str, success: bool, message: str = "") -> None:
@@ -363,3 +415,5 @@ def tracked_action(action: str):
 
 if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "--overlay":
     raise SystemExit(run_overlay())
+
+
