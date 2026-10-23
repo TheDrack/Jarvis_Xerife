@@ -126,6 +126,7 @@ begin
            updated_at = now()
      where t.task_id = p_task_id
        and t.status = 'ready'
+       and (t.assigned_agent_id is null or t.assigned_agent_id = p_agent_id)
        and v_agent.available_tools @> to_jsonb(t.required_tools)
     returning t.* into v_task;
 
