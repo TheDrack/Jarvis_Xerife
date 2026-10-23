@@ -178,10 +178,21 @@ as $$
 declare
     v_finished integer;
     v_attempt_updated integer;
+    v_agent public.jarvis_agents%rowtype;
 begin
     if p_status not in ('completed', 'failed', 'blocked', 'cancelled',
                         'recovery_pending', 'approval_required') then
         raise exception 'unsupported terminal/intermediate status';
+    end if;
+
+    -- Keep lock ordering consistent with claim_jarvis_agent_task (agent first,
+    -- then task) to avoid deadlocks between claim and completion.
+    select * into v_agent
+      from public.jarvis_agents
+     where agent_id = p_agent_id
+     for update;
+    if not found then
+        return false;
     end if;
 
     update public.jarvis_agent_tasks
