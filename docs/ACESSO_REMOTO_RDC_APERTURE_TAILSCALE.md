@@ -85,13 +85,12 @@ O comportamento esperado é:
 5. O gateway MCP do Aperture publica as ferramentas autorizadas para os agentes.
 6. Quando uma ferramenta depende da interface gráfica, a sessão Windows interativa precisa estar disponível.
 
-Scripts relacionados:
+Scripts e estado do repositório:
 
-- `scripts/jarvis_magic.ps1` — instalação, status, diagnóstico e gerenciamento.
-- `scripts/start-jarvis-boot.ps1` — supervisor de boot instalado em `C:\ProgramData\Jarvis_Xerife`.
-- `scripts/start_jarvis_tailscale.ps1` — inicialização do servidor MCP e Tailscale Serve.
+- `scripts/setup_chatgpt_jarvis_tunnel.ps1` — configurador específico do Secure MCP Tunnel, incluído nesta PR.
+- Os caminhos `scripts/jarvis_magic.ps1`, `scripts/start-jarvis-boot.ps1` e `scripts/start_jarvis_tailscale.ps1` citados por versões anteriores da documentação não foram encontrados no branch `main` durante esta verificação. Não os execute nem considere o Magic Executor integrado até que seu entrypoint canônico seja restaurado e testado.
 
-Use `.scriptsjarvis_magic.ps1 -Action doctor` e `.scriptsjarvis_magic.ps1 -Action status` para verificar a configuração. Não declare o boot validado apenas porque a tarefa existe: o critério completo exige testar após reinicialização real e verificar Tailscale, servidor local, Serve, conector Aperture e uma chamada MCP. A autenticação do RDC como tarefa `SYSTEM` pode não compartilhar o perfil interativo; não é pré-requisito da rota P0 se o gateway já está disponível ao agente.
+Para o túnel, use `scripts/setup_chatgpt_jarvis_tunnel.ps1 -Action status`. Não declare o boot da rota P0 validado apenas porque uma tarefa existe: o critério completo exige testar após reinicialização real e verificar Tailscale, servidor local, Serve, conector Aperture e uma chamada MCP. A autenticação do RDC como tarefa `SYSTEM` pode não compartilhar o perfil interativo; não é pré-requisito da rota P0 se o gateway já está disponível ao agente.
 
 ## Segurança e controle de acesso
 
