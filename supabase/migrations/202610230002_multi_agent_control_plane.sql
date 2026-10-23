@@ -86,8 +86,8 @@ create table if not exists public.jarvis_agent_events (
 create index if not exists jarvis_agent_events_task_idx
     on public.jarvis_agent_events (task_id, event_id);
 
--- Claim is atomic. The fencing token increments every time a lease is claimed
--- or reclaimed, allowing receivers to reject stale commands from old owners.
+-- The row lock serializes claims for the same agent and prevents the
+-- concurrency counter from being oversubscribed by simultaneous requests.
 create or replace function public.claim_jarvis_agent_task(
     p_task_id uuid,
     p_agent_id text,
@@ -98,12 +98,25 @@ language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+    v_agent public.jarvis_agents%rowtype;
+    v_task public.jarvis_agent_tasks%rowtype;
 begin
     if p_lease_seconds < 10 or p_lease_seconds > 3600 then
         raise exception 'lease duration must be between 10 and 3600 seconds';
     end if;
 
-    return query
+    select * into v_agent
+      from public.jarvis_agents
+     where agent_id = p_agent_id
+     for update;
+
+    if not found
+       or v_agent.status not in ('available', 'busy')
+       or v_agent.active_tasks >= v_agent.concurrency_limit then
+        return;
+    end if;
+
     update public.jarvis_agent_tasks t
        set status = 'claimed',
            assigned_agent_id = p_agent_id,
@@ -111,17 +124,73 @@ begin
            lease_expires_at = now() + make_interval(secs => p_lease_seconds),
            fencing_token = t.fencing_token + 1,
            updated_at = now()
-      from public.jarvis_agents a
      where t.task_id = p_task_id
-       and a.agent_id = p_agent_id
-       and a.status = 'available'
-       and a.active_tasks < a.concurrency_limit
-       and a.available_tools @> to_jsonb(t.required_tools)
-       and (
-            t.status = 'ready'
-            or (t.status = 'claimed' and t.lease_expires_at < now())
-       )
-    returning t.*;
+       and t.status = 'ready'
+       and v_agent.available_tools @> to_jsonb(t.required_tools)
+    returning t.* into v_task;
+
+    if not found then
+        return;
+    end if;
+
+    update public.jarvis_agents
+       set active_tasks = active_tasks + 1,
+           status = case when active_tasks + 1 >= concurrency_limit then 'busy' else status end,
+           updated_at = now()
+     where agent_id = p_agent_id;
+
+    return next v_task;
+end;
+$$;
+
+-- Completion is tied to the current task owner and attempt; stale workers
+-- cannot complete a task after a new attempt has been assigned.
+create or replace function public.finish_jarvis_agent_task(
+    p_task_id uuid,
+    p_agent_id text,
+    p_attempt_id uuid,
+    p_status text,
+    p_result jsonb default '{}'::jsonb
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+    v_finished integer;
+begin
+    if p_status not in ('completed', 'failed', 'blocked', 'cancelled',
+                        'recovery_pending', 'approval_required', 'verifying') then
+        raise exception 'unsupported terminal/intermediate status';
+    end if;
+
+    update public.jarvis_agent_tasks
+       set status = p_status,
+           result = p_result,
+           lease_expires_at = null,
+           updated_at = now()
+     where task_id = p_task_id
+       and assigned_agent_id = p_agent_id
+       and attempt_id = p_attempt_id
+       and status in ('claimed', 'in_progress', 'verifying');
+
+    get diagnostics v_finished = row_count;
+    if v_finished = 0 then
+        return false;
+    end if;
+
+    update public.jarvis_agents
+       set active_tasks = greatest(active_tasks - 1, 0),
+           status = case
+               when status in ('offline', 'degraded') then status
+               when greatest(active_tasks - 1, 0) < concurrency_limit then 'available'
+               else 'busy'
+           end,
+           updated_at = now()
+     where agent_id = p_agent_id;
+
+    return true;
 end;
 $$;
 
@@ -151,7 +220,9 @@ revoke all on public.jarvis_agent_tasks from anon, authenticated;
 revoke all on public.jarvis_agent_attempts from anon, authenticated;
 revoke all on public.jarvis_agent_events from anon, authenticated;
 revoke all on function public.claim_jarvis_agent_task(uuid, text, integer) from public, anon, authenticated;
+revoke all on function public.finish_jarvis_agent_task(uuid, text, uuid, text, jsonb) from public, anon, authenticated;
 grant execute on function public.claim_jarvis_agent_task(uuid, text, integer) to service_role;
+grant execute on function public.finish_jarvis_agent_task(uuid, text, uuid, text, jsonb) to service_role;
 grant select, insert, update on public.jarvis_agents to service_role;
 grant select, insert, update on public.jarvis_agent_tasks to service_role;
 grant select, insert, update on public.jarvis_agent_attempts to service_role;
