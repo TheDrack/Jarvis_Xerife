@@ -177,6 +177,7 @@ set search_path = public, pg_temp
 as $$
 declare
     v_finished integer;
+    v_attempt_updated integer;
 begin
     if p_status not in ('completed', 'failed', 'blocked', 'cancelled',
                         'recovery_pending', 'approval_required') then
@@ -206,6 +207,11 @@ begin
      where attempt_id = p_attempt_id
        and task_id = p_task_id
        and agent_id = p_agent_id;
+
+    get diagnostics v_attempt_updated = row_count;
+    if v_attempt_updated = 0 then
+        raise exception 'attempt not found for current task owner';
+    end if;
 
     insert into public.jarvis_agent_events (
         task_id, attempt_id, agent_id, event_type, payload
