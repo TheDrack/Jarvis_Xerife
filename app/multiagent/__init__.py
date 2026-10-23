@@ -2,6 +2,7 @@
 from .contracts import AgentProfile, TaskSpec, TaskAssignment, TaskStatus
 from .scheduler import CostBenefitScheduler, NoEligibleAgentError
 from .transport import AgentConnector, AgentMessage
+from .leader import AgentLeader, DispatchResult
 
 __all__ = [
     "AgentProfile",
@@ -12,4 +13,6 @@ __all__ = [
     "NoEligibleAgentError",
     "AgentConnector",
     "AgentMessage",
+    "AgentLeader",
+    "DispatchResult",
 ]
