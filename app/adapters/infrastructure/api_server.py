@@ -14,6 +14,7 @@ from slowapi.util import get_remote_address
 
 from app.adapters.infrastructure import api_models
 from app.adapters.infrastructure.api_models import Token, User
+from app.adapters.infrastructure.routers.agent_tasks import create_agent_tasks_router
 from app.adapters.infrastructure.routers.assistant import create_assistant_router
 from app.adapters.infrastructure.routers.bridge import create_bridge_router
 from app.adapters.infrastructure.routers.dev_agent import create_dev_agent_router
@@ -192,6 +193,7 @@ def create_api_server(
         return HTMLResponse(content=html_content)
 
     app.include_router(create_assistant_router(assistant_service, db_adapter, get_current_user, limiter))
+    app.include_router(create_agent_tasks_router(db_adapter, get_current_user))
     app.include_router(create_health_router(db_adapter, get_current_user))
     app.include_router(create_extensions_router(extension_manager, get_current_user))
     if device_service:
