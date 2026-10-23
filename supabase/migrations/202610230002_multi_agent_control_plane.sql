@@ -139,6 +139,22 @@ begin
            updated_at = now()
      where agent_id = p_agent_id;
 
+    insert into public.jarvis_agent_attempts (
+        attempt_id, task_id, agent_id, assigned_role, status, estimated_cost
+    ) values (
+        v_task.attempt_id, v_task.task_id, p_agent_id,
+        initcap(replace(v_task.task_type, '_', ' ')), 'claimed',
+        v_agent.estimated_cost + v_agent.coordination_cost
+    );
+
+    insert into public.jarvis_agent_events (
+        task_id, attempt_id, agent_id, event_type, payload
+    ) values (
+        v_task.task_id, v_task.attempt_id, p_agent_id, 'task.claimed',
+        jsonb_build_object('fencing_token', v_task.fencing_token,
+                           'lease_expires_at', v_task.lease_expires_at)
+    );
+
     return next v_task;
 end;
 $$;
