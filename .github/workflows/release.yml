@@ -15,12 +15,12 @@ jobs:
 
     steps:
       - name: 🛰️ Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           token: ${{ github.token }}
 
       - name: 📦 Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
@@ -91,7 +91,7 @@ jobs:
         shell: pwsh
 
       - name: 📦 Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Jarvis_Installer
           path: dist/Jarvis_Installer.exe

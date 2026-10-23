@@ -31,13 +31,13 @@ jobs:
     
     steps:
       - name: 📥 Checkout do repositório
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🐍 Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -54,7 +54,7 @@ jobs:
 
       - name: 📊 Upload do relatório
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nexus-di-migration-report-${{ github.run_id }}
           path: |
@@ -64,7 +64,7 @@ jobs:
 
       - name: 📦 Upload do backup (se criado)
         if: github.event.inputs.create_backup == 'true' && github.event.inputs.dry_run == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nexus-di-backup-${{ github.run_id }}
           path: .backups/nexus_di_migration/*.py
