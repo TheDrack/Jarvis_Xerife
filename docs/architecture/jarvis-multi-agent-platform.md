@@ -58,4 +58,4 @@ supabase/migrations/202610230002_multi_agent_control_plane.sql adds agent profil
 
 ## Implementation status
 
-This branch adds the first runtime-neutral contracts, a deterministic cost-benefit assignment baseline, a transport interface, focused unit tests, and the initial Supabase schema. It does **not** yet provide a production MCP/HTTP queue adapter, an LLM-driven task decomposer, a running leader service, a heartbeat worker, lease renewal/reaping, or end-to-end deployment integration. Those should be implemented in small stages against the existing Harness APIs, not as a competing second runtime.
+This branch adds the first runtime-neutral contracts, a deterministic cost-benefit assignment baseline, a thin leader dispatch boundary, a transport interface, focused unit tests, and the initial Supabase schema. It does **not** yet provide a production MCP/HTTP queue adapter, an LLM-driven task decomposer, a persistent leader/worker process, a heartbeat worker, lease renewal/reaping, or end-to-end deployment integration. Those should be implemented in small stages against the existing Harness APIs, not as a competing second runtime.
