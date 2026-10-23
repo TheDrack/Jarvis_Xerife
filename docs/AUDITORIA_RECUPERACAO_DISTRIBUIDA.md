@@ -6,13 +6,13 @@
 
 O JARVIS já tem autocorreção de código e logs por job, mas não há protocolo comum de checkpoint, restauração e verificação para ações de agentes em múltiplos ambientes. O healer grava a correção no arquivo antes de validar o comportamento; validação sintática não garante que a mudança seja segura.
 
-Esta entrega acrescenta uma primitiva local conservadora, integra checkpoints ao healer e faz o workflow restaurar tentativas malsucedidas quando os arquivos ainda correspondem ao estado selado. Também versiona o esquema para o futuro histórico central. Ela não habilita rollback cloud nem altera o banco Supabase automaticamente.
+Esta entrega acrescenta uma primitiva local conservadora, integra checkpoints ao healer, faz o workflow restaurar tentativas malsucedidas quando os arquivos ainda correspondem ao estado selado e remove o auto-merge de PRs de autocura. Também versiona o esquema para o futuro histórico central. Ela não habilita rollback cloud nem altera o banco Supabase automaticamente.
 
 ## Matriz de achados
 
 | Área | Evidência | Lacuna / risco | Ação | Prioridade |
 |---|---|---|---|---|
-| CI self-healing | .github/workflows/homeostase.yml roda pytest, chama scripts/jarvis_healer.py, roda pytest novamente e pode enviar alterações para branch/PR | Não existe checkpoint por arquivo; healer modifica antes da validação comportamental | Checkpoint antes da escrita, teste, restauração condicional e verificação final | P0 |
+| CI self-healing | .github/workflows/homeostase.yml roda pytest, chama scripts/jarvis_healer.py e roda pytest novamente | Antes desta PR não havia checkpoint por arquivo; o workflow também podia acionar auto-merge de PR | Checkpoint antes da escrita, restauração condicional e aprovação humana antes de merge | P0 |
 | Healer | scripts/jarvis_healer.py usa write_text para aplicar resposta do modelo e compile() como validação sintática | Correção sintaticamente válida pode piorar comportamento; escrita pode ser interrompida | Escrita atômica, snapshot e testes antes de declarar cura | P0 |
 | Agente | JarvisDevAgent mantém data/dev_agent_jobs.jsonl; EvolutionOrchestrator gera propostas e usa gatekeeper | Log por job não desfaz efeitos colaterais de ferramentas | Propagar run_id/operation_id e usar adaptadores de recuperação | P0 |
 | Sandbox | docs/VERIFICACAO_ENTREGAS.md relata DockerSandbox sem consumidor/testes e sandbox de evolução local | Isolamento de execução arbitrária não é garantido | Testar falhas e conectar sandbox depois de verificar seu comportamento | P1 |
