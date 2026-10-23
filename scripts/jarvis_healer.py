@@ -8,8 +8,11 @@ import os
 import re
 import sys
 import argparse
+import tempfile
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+
+from app.core.recovery_store import RecoveryStore
 
 # Configuração de Logging
 logging.basicConfig(
@@ -385,6 +388,13 @@ def heal():
     
     total_success = 0
     total_fail = 0
+    recovery_store = None
+    if not args.dry_run:
+        try:
+            recovery_store = RecoveryStore(REPO_ROOT)
+        except Exception as exc:
+            logger.error("[Healer] Recovery store indisponível; nenhuma escrita será feita: %s", exc)
+            return 1
     
     for file_path in target_files:
         if not file_path.exists():
@@ -399,14 +409,53 @@ def heal():
         fixed = call_groq_healer(original, error_context, is_production_file=is_prod)
         
         if fixed and fixed != original:
+            checkpoint_id = None
             try:
                 compile(fixed, str(file_path), "exec")
                 if not args.dry_run:
-                    file_path.write_text(fixed, encoding="utf-8")
+                    relative_path = file_path.resolve().relative_to(REPO_ROOT.resolve())
+                    checkpoint = recovery_store.checkpoint(
+                        [relative_path],
+                        reason="self-healing code mutation",
+                        run_id=os.getenv("GITHUB_RUN_ID") or os.getenv("JARVIS_RUN_ID"),
+                    )
+                    checkpoint_id = checkpoint["checkpoint_id"]
+                    temporary_path = None
+                    try:
+                        with tempfile.NamedTemporaryFile(
+                            mode="w", encoding="utf-8", dir=str(file_path.parent),
+                            prefix=f".{file_path.name}.", suffix=".healing", delete=False
+                        ) as handle:
+                            temporary_path = Path(handle.name)
+                            handle.write(fixed)
+                            handle.flush()
+                            os.fsync(handle.fileno())
+                        os.replace(temporary_path, file_path)
+                        recovery_store.seal(checkpoint_id)
+                    except Exception:
+                        if temporary_path is not None:
+                            temporary_path.unlink(missing_ok=True)
+                        # Only undo our own write if the file still contains the exact
+                        # generated result; never overwrite a concurrent external edit.
+                        try:
+                            if file_path.is_file() and file_path.read_text(encoding="utf-8") == fixed:
+                                with tempfile.NamedTemporaryFile(
+                                    mode="w", encoding="utf-8", dir=str(file_path.parent),
+                                    prefix=f".{file_path.name}.", suffix=".recovery", delete=False
+                                ) as handle:
+                                    rollback_path = Path(handle.name)
+                                    handle.write(original)
+                                    handle.flush()
+                                    os.fsync(handle.fileno())
+                                os.replace(rollback_path, file_path)
+                        except Exception:
+                            logger.exception("[Healer] Falha ao restaurar após erro ao selar checkpoint")
+                        raise
+                    print(f"RECOVERY_CHECKPOINT_ID={checkpoint_id}", flush=True)
                 logger.info(f"✅ {file_path.name}: correção aplicada")
                 total_success += 1
-            except SyntaxError as e:
-                logger.error(f"❌ {file_path.name}: correção rejeitada (SyntaxError: {e})")
+            except Exception as e:
+                logger.error(f"❌ {file_path.name}: correção rejeitada ou protegida ({type(e).__name__}: {e})")
                 total_fail += 1
         else:
             logger.warning(f"⚠️ {file_path.name}: nenhuma correção gerada")

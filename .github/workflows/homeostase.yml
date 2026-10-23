@@ -165,8 +165,13 @@ jobs:
           fi
 
           # Falha do healer não é falha de teste: a verificação final abaixo decide
-          uv run python scripts/jarvis_healer.py --report "$RUNNER_TEMP/report.json" --log "$RUNNER_TEMP/pytest_log.txt" $PRODUCTION_LOG_ARG $WORKFLOW_LOG_ARG \
-            || echo "::warning::healer terminou sem corrigir (exit $?)"
+          set +e
+          uv run python scripts/jarvis_healer.py --report "$RUNNER_TEMP/report.json" --log "$RUNNER_TEMP/pytest_log.txt" $PRODUCTION_LOG_ARG $WORKFLOW_LOG_ARG 2>&1 | tee "$RUNNER_TEMP/healer.log"
+          HEALER_EXIT=${PIPESTATUS[0]}
+          set -e
+          if [[ $HEALER_EXIT -ne 0 ]]; then
+            echo "::warning::healer terminou sem corrigir (exit $HEALER_EXIT)"
+          fi
 
           set +e
           uv run pytest $PYTEST_IGNORES --json-report --json-report-file="$RUNNER_TEMP/report_final.json" > "$RUNNER_TEMP/final_log.txt" 2>&1
@@ -178,6 +183,13 @@ jobs:
           echo "::endgroup::"
           echo "pytest_exit_final=$FINAL_EXIT"
 
+          # Se a suíte continuar falhando, reverta apenas os arquivos cujo estado
+          # ainda corresponde à tentativa de cura; conflitos não são sobrescritos.
+          if [[ $FINAL_EXIT -ne 0 && -f "$RUNNER_TEMP/healer.log" ]]; then
+            uv run python scripts/jarvis_recovery_cli.py --restore-from-log "$RUNNER_TEMP/healer.log" \
+              || echo "::warning::recuperação automática incompleta; intervenção necessária"
+          fi
+
           # Sucesso = código de saída do pytest após a auto-cura (sem heurística por grep)
           if [[ $FINAL_EXIT -eq 0 ]]; then
              echo "status=success" >> $GITHUB_OUTPUT
@@ -186,7 +198,7 @@ jobs:
           fi
 
       - name: 🛠️ Commit & Push (Sincronização de Correção)
-        if: steps.gatekeeper.outputs.authorized == 'true'
+        if: steps.gatekeeper.outputs.authorized == 'true' && steps.healing_process.outputs.status == 'success'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
         run: |
@@ -205,9 +217,8 @@ jobs:
             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
               PUSH_TARGET="${{ github.head_ref }}"
               git push origin HEAD:"$PUSH_TARGET" || true
-              if [[ "${{ steps.healing_process.outputs.status }}" == "success" ]]; then
-                gh pr merge ${{ github.event.pull_request.number }} --auto --merge || true
-              fi
+              # A autocura não faz merge de PR automaticamente. Testes verdes
+              # permitem propor a correção, não substituem a aprovação do mantenedor.
             elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
               HEAL_BRANCH="jarvis/heal-${{ github.run_id }}"
               git checkout -b "$HEAL_BRANCH"
