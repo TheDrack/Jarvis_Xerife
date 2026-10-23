@@ -55,6 +55,55 @@ def extract_files_from_log(log_content: str) -> List[Path]:
     return list(set(found_files))
 
 
+def extract_failed_files_from_report(
+    report_path: Path, repo_root: Path = REPO_ROOT
+) -> tuple[List[Path], str]:
+    """Extrai arquivos dos testes falhos do pytest-json-report com contenção ao repositório.
+
+    O nodeid tem formato relativo, por exemplo:
+    tests/example/test_sample.py::TestClass::test_case
+    """
+    try:
+        report = json.loads(Path(report_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError) as exc:
+        logger.debug("[Healer] Não foi possível ler pytest JSON report: %s", exc)
+        return [], ""
+
+    root = Path(repo_root).resolve()
+    found_files = set()
+    failures = []
+    for test in report.get("tests", []):
+        if not isinstance(test, dict) or test.get("outcome") not in {"failed", "error"}:
+            continue
+
+        nodeid = test.get("nodeid", "")
+        if not isinstance(nodeid, str) or not nodeid:
+            continue
+
+        # Contexto útil para o modelo, sem depender de traceback no log textual.
+        detail = test.get("call", {}) or test.get("setup", {}) or test.get("teardown", {})
+        crash = detail.get("crash", {}) if isinstance(detail, dict) else {}
+        message = crash.get("message", "") if isinstance(crash, dict) else ""
+        failures.append(f"{nodeid}: {str(message)[:1200]}")
+
+        relative_file = nodeid.split("::", 1)[0]
+        if not relative_file.endswith(".py"):
+            continue
+        candidate = (root / relative_file).resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            logger.warning("[Healer] Ignorando caminho fora do repositório no report: %s", nodeid)
+            continue
+        if candidate.is_file() and ".venv" not in candidate.parts:
+            found_files.add(candidate)
+
+    failure_context = ""
+    if failures:
+        failure_context = "=== PYTEST JSON FAILURES ===\\n" + "\\n".join(failures) + "\\n"
+    return sorted(found_files), failure_context
+
+
 def is_production_file(file_path: Path) -> bool:
     """Verifica se o arquivo pertence à lógica de produção."""
     path_str = str(file_path).lower()
@@ -297,6 +346,29 @@ def heal():
         logger.info(f"🔍 [Healer] Log do workflow CI recebido ({len(workflow_log_content)} chars).")
         error_context += f"=== WORKFLOW CI LOG ===\n{workflow_log_content}\n"
     
+    # O relatório estruturado é a fonte de fallback quando o log não contém
+    # traceback Python (por exemplo, falhas de assert do pytest).
+    report_path = Path(args.report)
+    report_files, report_context = extract_failed_files_from_report(report_path)
+    target_files.update(report_files)
+    if report_context:
+        error_context += report_context
+
+    # Mantém apenas arquivos existentes dentro do repositório. Logs podem conter
+    # caminhos absolutos de dependências ou caminhos manipulados.
+    repo_root = REPO_ROOT.resolve()
+    safe_targets = set()
+    for candidate in target_files:
+        try:
+            resolved = Path(candidate).resolve()
+            resolved.relative_to(repo_root)
+        except (OSError, ValueError):
+            logger.warning("[Healer] Ignorando arquivo fora do repositório: %s", candidate)
+            continue
+        if resolved.is_file() and ".venv" not in resolved.parts:
+            safe_targets.add(resolved)
+    target_files = safe_targets
+
     if not target_files:
         # Nenhum arquivo com erro: só é sucesso se o relatório existir e não tiver falhas.
         try:
