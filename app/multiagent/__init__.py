@@ -6,6 +6,9 @@ from .leader import AgentLeader, DispatchResult
 from .supabase_store import SupabaseAgentStore
 from .supabase_queue import SupabaseQueueConnector
 from .worker import AgentWorker
+from .freellmapi_client import FreeLLMAPIClient, FreeLLMAPIError
+from .freellmapi_handler import FreeLLMAgentHandler
+from .priority_queue_mini_agent import PriorityQueueMiniAgent
 
 __all__ = [
     "AgentProfile",
@@ -21,4 +24,8 @@ __all__ = [
     "SupabaseAgentStore",
     "SupabaseQueueConnector",
     "AgentWorker",
+    "FreeLLMAPIClient",
+    "FreeLLMAPIError",
+    "FreeLLMAgentHandler",
+    "PriorityQueueMiniAgent",
 ]
