@@ -14,6 +14,7 @@ create table if not exists public.jarvis_agents (
     concurrency_limit integer not null default 1 check (concurrency_limit > 0),
     estimated_cost numeric(14, 6) not null default 0 check (estimated_cost >= 0),
     coordination_cost numeric(14, 6) not null default 0 check (coordination_cost >= 0),
+    estimated_latency_seconds numeric(14, 3) not null default 0 check (estimated_latency_seconds >= 0),
     success_rates jsonb not null default '{}'::jsonb
         check (jsonb_typeof(success_rates) = 'object'),
     last_seen_at timestamptz,
