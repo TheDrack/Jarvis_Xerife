@@ -413,6 +413,35 @@ def tracked_action(action: str):
     return decorate
 
 
+def agent_activity(action: str):
+    """Context manager: mostra a atividade do agente durante um bloco (mouse, teclado ou captura).
+
+    Usa o mesmo contador de profundidade de tracked_action: dentro de uma ação já rastreada,
+    não cria um segundo ciclo de vida. Falhas são marcadas como atenção e propagadas.
+    """
+    import contextlib
+
+    @contextlib.contextmanager
+    def _scope():
+        depth = _ACTION_DEPTH.get()
+        token = _ACTION_DEPTH.set(depth + 1)
+        outermost = depth == 0
+        if outermost:
+            begin_action(action)
+        success, message = True, ""
+        try:
+            yield
+        except Exception as exc:
+            success, message = False, str(exc)
+            raise
+        finally:
+            if outermost:
+                end_action(action, success, message)
+            _ACTION_DEPTH.reset(token)
+
+    return _scope()
+
+
 if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "--overlay":
     raise SystemExit(run_overlay())
 
