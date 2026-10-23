@@ -38,6 +38,7 @@ class SupabaseAgentStore:
             "concurrency_limit": profile.concurrency_limit,
             "estimated_cost": profile.estimated_cost,
             "coordination_cost": profile.coordination_cost,
+            "estimated_latency_seconds": profile.estimated_latency_seconds,
             "success_rates": dict(profile.success_rates),
             "last_seen_at": "now()",
             "updated_at": "now()",
