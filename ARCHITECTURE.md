@@ -9,6 +9,11 @@ graph LR
     classDef support fill:#2d333b,stroke:#6c757d,color:#aaa;
     static["<b>static</b>"]
     class static support
+    supabase["<b>supabase</b>"]
+    class supabase support
+    supabase_migrations["<b>migrations</b>"]
+    class supabase_migrations support
+    supabase --> supabase_migrations
     _backups["<b>.backups</b>"]
     class _backups support
     _backups_cleanup["<b>cleanup</b>"]
@@ -102,7 +107,7 @@ graph LR
     app_ports["<b>ports</b><br/><hr/>📄 voice_port.py: VoicePort, stt, tts<br/>📄 secrets_provider.py: SecretsProvider, get_secret"]
     class app_ports port
     app --> app_ports
-    app_core["<b>core</b><br/><hr/>📄 llm_config.py: LLMConfig, use_llm_command_interpretation, use_llm_capability_detection<br/>📄 encryption.py: get_hardware_id, derive_key_from_hardware, encrypt_value<br/>📄 nexuscomponent.py: NexusComponent<br/>📄 nexus.py: JarvisNexus<br/>📄 nexus_discovery.py: finders<br/>📄 config.py: Settings, decrypt_api_key, decrypt_database_url<br/>📄 nexus_exceptions.py: ImportTimeoutError, InstantiateTimeoutError, instantiation"]
+    app_core["<b>core</b><br/><hr/>📄 llm_config.py: LLMConfig, use_llm_command_interpretation, use_llm_capability_detection<br/>📄 encryption.py: get_hardware_id, derive_key_from_hardware, encrypt_value<br/>📄 nexuscomponent.py: NexusComponent<br/>📄 nexus.py: JarvisNexus<br/>📄 nexus_discovery.py: finders<br/>📄 config.py: Settings, decrypt_api_key, decrypt_database_url<br/>📄 recovery_store.py: RecoveryError<br/>📄 nexus_exceptions.py: ImportTimeoutError, InstantiateTimeoutError, instantiation"]
     class app_core core
     app --> app_core
     app_core_meta["<b>meta</b><br/><hr/>📄 compile_lock.py: acquire_compile_lock<br/>📄 decision_engine.py: class, DecisionEngine<br/>📄 exploration_controller.py: ExplorationController, execute<br/>📄 jrvs_compiler.py: SchemaVersionError, JRVSCompiler<br/>📄 policy_store.py: PolicyStore, get_policies_by_module"]
