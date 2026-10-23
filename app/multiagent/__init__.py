@@ -3,6 +3,7 @@ from .contracts import AgentProfile, TaskSpec, TaskAssignment, TaskStatus
 from .scheduler import CostBenefitScheduler, NoEligibleAgentError
 from .transport import AgentConnector, AgentMessage
 from .leader import AgentLeader, DispatchResult
+from .supabase_store import SupabaseAgentStore
 
 __all__ = [
     "AgentProfile",
@@ -15,4 +16,5 @@ __all__ = [
     "AgentMessage",
     "AgentLeader",
     "DispatchResult",
+    "SupabaseAgentStore",
 ]
