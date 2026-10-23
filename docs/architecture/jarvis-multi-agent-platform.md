@@ -33,13 +33,15 @@ The `app.multiagent.contracts` module defines runtime-neutral `AgentProfile`, `T
 
 The leader may assign work to itself or any eligible peer. The assigned role is task-scoped (`task_type`), not a permanent worker identity. The baseline score is a heuristic, not a calibrated probability; telemetry must improve it over time. Deadline and risk policies should be enforced as constraints by the orchestration layer before dispatch.
 
-## Agent communication
+## Agent communication and worker
 
-`app.multiagent.transport` defines a versioned, JSON-safe envelope and connector protocol. `SupabaseQueueConnector` is the first durable connector: it stores messages in Supabase, claims them through a transactional RPC using `FOR UPDATE SKIP LOCKED`, and leases claims to a recipient agent. Consumers must acknowledge after safely handling a message.
+`app.multiagent.transport` defines a versioned, JSON-safe envelope and connector protocol. `SupabaseQueueConnector` is the first durable connector: it stores messages in Supabase, claims them through a transactional RPC using `FOR UPDATE SKIP LOCKED`, and leases claims to a recipient agent.
 
-Delivery is **at-least-once**, not exactly-once. A crashed consumer may receive a message again after its lease expires, so handlers and external side effects must be idempotent. The current connector performs one claim when `timeout_seconds=0`; positive timeouts poll at a bounded interval. Do not use free-form shared chat as the source of truth. Store substantial artifacts by reference and persist task state separately from messages.
+`AgentWorker.process_once()` receives one message, invokes an injected handler, publishes a correlated `result` for successful `request` messages, then acknowledges the original message. If the handler or result publication raises, it deliberately leaves the message unacknowledged so it can be redelivered after lease expiry. A failed acknowledgement raises an error; the worker does not silently report success.
 
-Message kinds are bounded: `request`, `ack`, `progress`, `result`, `error`, `cancel`, and `proposal`. A message is a request, not an authorization grant.
+Delivery is **at-least-once**, not exactly-once. A crash after publishing a result but before acknowledging the request may cause a duplicate result, so consumers should deduplicate by correlation ID and keep handlers/external side effects idempotent. This worker is a processing primitive, not yet a managed long-running service: process supervision, heartbeat, graceful shutdown, and lease renewal are still required.
+
+Message kinds are bounded: `request`, `ack`, `progress`, `result`, `error`, `cancel`, and `proposal`. A message is a request, not an authorization grant. Do not use free-form shared chat as the source of truth; store substantial artifacts by reference and persist task state separately from messages.
 
 ## Supabase migrations
 
@@ -61,6 +63,6 @@ Message kinds are bounded: `request`, `ack`, `progress`, `result`, `error`, `can
 
 ## Implementation status
 
-Implemented: shared contracts, deterministic cost-benefit scheduling, thin leader dispatch, the transport protocol, the Supabase task/control-plane adapter, a durable Supabase message queue adapter with leased claims and acknowledgements, focused unit tests, and initial schema migrations.
+Implemented: shared contracts, deterministic cost-benefit scheduling, thin leader dispatch, the transport protocol, the Supabase task/control-plane adapter, a durable Supabase message queue with leased claims and acknowledgements, a one-message worker primitive, focused unit tests, and initial schema migrations.
 
 Still required before production: run focused tests against the exact branch, validate both migrations against a staging Supabase/Postgres instance, test real concurrent claims and lease expiry, add agent heartbeat/health reconciliation and lease renewal, integrate task decomposition with the existing Harness, and run an end-to-end test with two real Harness runtimes. No production migration or deployment is performed by this change.
