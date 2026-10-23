@@ -25,6 +25,7 @@ Usage (embedded in main.py):
 """
 
 import collections
+import json
 import logging
 import os
 import threading
@@ -443,9 +444,17 @@ class OverwatchDaemon(NexusComponent):
         tasks: List[str] = []
         try:
             if _CONTEXT_FILE.exists():
-                ctx: Dict[str, Any] = document_store.read(_CONTEXT_FILE)
+                # Plain JSON context files are used by tests and lightweight
+                # integrations; .jrvs continues through the encrypted store.
+                if _CONTEXT_FILE.suffix.lower() == ".json":
+                    ctx: Dict[str, Any] = json.loads(
+                        _CONTEXT_FILE.read_text(encoding="utf-8")
+                    )
+                else:
+                    ctx = document_store.read(_CONTEXT_FILE)
                 raw = ctx.get("pending_tasks", [])
-                tasks = [str(t) for t in raw[:limit]]
+                if isinstance(raw, list):
+                    tasks = [str(t) for t in raw[:max(0, limit)]]
         except Exception:
             pass
         return tasks

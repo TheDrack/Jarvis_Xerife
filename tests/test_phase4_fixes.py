@@ -119,13 +119,19 @@ class TestExecuteOrderAfterInit:
 
 class TestFrozenCapsExecuteSelf:
     def test_no_frozen_execute_without_self(self):
-        import subprocess
-        result = subprocess.run(
-            ["grep", "-r", "def execute(context=None):", ".frozen/"],
-            capture_output=True, text=True
-        )
-        assert result.stdout.strip() == "", (
-            f"Found execute without self in .frozen/:\n{result.stdout}"
+        # Keep the source guard portable across Windows and POSIX runners.
+        frozen_dir = Path(".frozen")
+        offenders = []
+        if frozen_dir.exists():
+            for source in frozen_dir.rglob("*.py"):
+                try:
+                    content = source.read_text(encoding="utf-8")
+                except (OSError, UnicodeError):
+                    continue
+                if "def execute(context=None):" in content:
+                    offenders.append(str(source))
+        assert offenders == [], (
+            "Found execute without self in .frozen/:\n" + "\n".join(offenders)
         )
 
 

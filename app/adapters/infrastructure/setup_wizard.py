@@ -185,27 +185,26 @@ def get_api_key_with_clipboard() -> Optional[str]:
 
 
 def validate_database_connection(database_url: str) -> bool:
-    """Validate database connection"""
+    """Validate a database connection and release its pooled resources."""
     print_info(f"\nTestando conexão com o banco de dados...")
-    
+    engine = None
     try:
-        # Create engine with connection timeout
         engine = create_engine(
             database_url,
             connect_args={"connect_timeout": 10} if "postgresql" in database_url else {},
-            echo=False
+            echo=False,
         )
-        
-        # Try to connect and execute a simple query
         with Session(engine) as session:
             session.exec(text("SELECT 1"))
-        
         print_success("Conexão com o banco de dados estabelecida com sucesso!")
         return True
-        
     except Exception as e:
         print_error(f"Erro ao conectar ao banco de dados: {e}")
         return False
+    finally:
+        # SQLite keeps a pooled file handle open unless the engine is disposed.
+        if engine is not None:
+            engine.dispose()
 
 
 def get_database_url() -> str:
