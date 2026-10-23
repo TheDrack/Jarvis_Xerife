@@ -66,6 +66,14 @@ Usar como alternativa técnica quando o cliente/agente pode acessar o Aperture, 
 
 Para desenvolvimento no próprio PC, um cliente MCP local pode iniciar `app/adapters/edge/jarvis_desktop_mcp.py` por stdio. Esse caminho é local e não deve ser confundido com a rota remota principal.
 
+## Rota adicional para produtos OpenAI: Secure MCP Tunnel
+
+O Secure MCP Tunnel é uma rota complementar para produtos OpenAI compatíveis, como ChatGPT, Codex e Responses API. O cliente `tunnel-client` inicia conexões HTTPS de saída e encaminha chamadas ao MCP local sem expor sua porta à internet pública.
+
+**Esta rota não substitui P0 e não é um túnel universal para todos os provedores de IA.** Agentes de outros provedores devem usar uma rota MCP compatível e autorizada, como o gateway Aperture + Tailscale. Não compartilhe o túnel pessoal do desenvolvedor com outros usuários: cada usuário/ambiente deve provisionar seu próprio `tunnel_id` e runtime key com permissões adequadas.
+
+No Windows, o setup assistido está documentado em [SECURE_MCP_TUNNEL.md](SECURE_MCP_TUNNEL.md) e pode ser executado por `scripts/setup_chatgpt_jarvis_tunnel.ps1`. O script configura o cliente local e a tarefa agendada; o usuário ainda precisa criar/selecionar o túnel na Platform e registrar o app no workspace ChatGPT. Só declare sucesso após uma chamada de ferramenta no app registrado.
+
 ## Inicialização no boot
 
 O comportamento esperado é:
@@ -113,3 +121,4 @@ A rota P0 está operacional quando todos os itens abaixo forem verificados:
 - [Navegação visual](NAVEGACAO_VISUAL.md)
 - [Instalação Windows](INSTALACAO_WINDOWS.md)
 - [Guia do agente](AGENT_GUIDE.md)
+- [Secure MCP Tunnel: instalação por usuário](SECURE_MCP_TUNNEL.md)
