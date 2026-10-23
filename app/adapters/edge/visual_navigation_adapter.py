@@ -527,6 +527,11 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
                     "message": "Há mais de um controle correspondente; nenhum clique foi executado."}
 
         title, control, rect = candidates[0]
+        try:
+            from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target
+            set_agent_cursor_target((rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2, "target")
+        except Exception as exc:
+            logger.debug("Indicador visual indisponível: %s", exc)
         # Prefer UI Automation InvokePattern: it activates the control without moving
         # the user's global mouse cursor or injecting a physical click.
         invocation = self._invoke_with_timeout(control)

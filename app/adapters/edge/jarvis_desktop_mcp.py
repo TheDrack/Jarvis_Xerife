@@ -24,10 +24,18 @@ from mcp.types import TextContent
 
 from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
 from app.adapters.edge.background_window_input import click_window_background
-from app.adapters.edge.jarvis_agent_status import tracked_action
+from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _show_agent_target(x: int, y: int) -> None:
+    """Mostra o cursor fantasma no ponto de clique (somente visual; não move o mouse)."""
+    try:
+        set_agent_cursor_target(int(x), int(y), "target")
+    except Exception as exc:
+        logger.debug("Indicador visual indisponível: %s", exc)
 
 _HTTP_TRANSPORT = os.environ.get("JARVIS_DESKTOP_TRANSPORT", "stdio").strip().lower()
 _HTTP_PORT = int(os.environ.get("JARVIS_DESKTOP_HTTP_PORT", "8765"))
@@ -202,6 +210,7 @@ def click_window_background_at(
     to the target window's client area. Some apps ignore background messages; success
     only confirms messages were queued, so observe and verify the target state.
     """
+    _show_agent_target(x, y)
     return click_window_background(window_title_contains, x, y, coordinates_are_screen=True)
 
 
@@ -228,6 +237,7 @@ def click_at(
             "target_description": target_description,
             **navigator._save_observation(screenshot),
         })
+    _show_agent_target(x, y)
     navigator._gui().click(x, y, button="left")
     return _content(_observe_after_action({
         "success": True,
