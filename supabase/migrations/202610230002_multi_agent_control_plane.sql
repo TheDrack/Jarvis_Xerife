@@ -62,7 +62,7 @@ create table if not exists public.jarvis_agent_attempts (
     assigned_role text not null,
     status text not null default 'claimed'
         check (status in (
-            'claimed', 'in_progress', 'verifying', 'completed', 'failed',
+            'claimed', 'in_progress', 'verifying', 'completed', 'failed', 'blocked',
             'cancelled', 'recovery_pending', 'approval_required'
         )),
     estimated_cost numeric(14, 6) not null default 0,
