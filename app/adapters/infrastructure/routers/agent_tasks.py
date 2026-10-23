@@ -1,9 +1,13 @@
 """Authenticated API for shared multi-agent task scheduling."""
 from __future__ import annotations
 
+import os
+from functools import lru_cache
 from typing import Any, Literal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import create_engine
 
 from app.application.services.agent_task_queue_service import (
     AgentTaskQueueService, TaskQueueUnavailable,
@@ -68,10 +72,32 @@ class RoutineRequest(BaseModel):
 def create_agent_tasks_router(db_adapter, get_current_user) -> APIRouter:
     router = APIRouter(prefix="/v1", tags=["agent-task-queue"])
 
+    @lru_cache(maxsize=1)
+    def queue_engine():
+        # Prefer an explicit shared PostgreSQL URL. The general history adapter
+        # may use local SQLite, which is not a shared multi-agent queue.
+        database_url = os.getenv("JARVIS_TASK_QUEUE_DATABASE_URL") or os.getenv("DATABASE_URL")
+        if database_url:
+            if database_url.startswith("postgres://"):
+                database_url = "postgresql://" + database_url[len("postgres://"):]
+            return create_engine(database_url, pool_pre_ping=True, pool_recycle=300)
+        engine = getattr(db_adapter, "engine", None) if db_adapter else None
+        if engine is not None and engine.dialect.name == "postgresql":
+            return engine
+        return None
+
     def service() -> AgentTaskQueueService:
-        if not db_adapter or not getattr(db_adapter, "engine", None):
-            raise HTTPException(status_code=503, detail="Database adapter unavailable")
-        return AgentTaskQueueService(db_adapter.engine)
+        engine = queue_engine()
+        if engine is None:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Shared task queue requires JARVIS_TASK_QUEUE_DATABASE_URL or "
+                    "DATABASE_URL pointing to the PostgreSQL database with the Jarvis "
+                    "multi-agent migrations applied."
+                ),
+            )
+        return AgentTaskQueueService(engine)
 
     def translate_error(exc: Exception) -> HTTPException:
         if isinstance(exc, TaskQueueUnavailable):
