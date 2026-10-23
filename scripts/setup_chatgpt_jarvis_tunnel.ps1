@@ -45,9 +45,13 @@ function Test-JarvisLocal {
 }
 function Invoke-TunnelDoctor {
     Set-RuntimeKey
-    # An ephemeral port avoids colliding with a healthy tunnel-client already on 8767.
-    & $Client doctor --profile $ProfileName --profile-dir $ProfileDir --health-listen-addr '127.0.0.1:0' --explain
-    if ($LASTEXITCODE -ne 0) { throw "tunnel-client doctor falhou (exit=$LASTEXITCODE)." }
+    try {
+        # An ephemeral port avoids colliding with a healthy tunnel-client already on 8767.
+        & $Client doctor --profile $ProfileName --profile-dir $ProfileDir --health-listen-addr '127.0.0.1:0' --explain
+        if ($LASTEXITCODE -ne 0) { throw "tunnel-client doctor falhou (exit=$LASTEXITCODE)." }
+    } finally {
+        Remove-Item Env:CONTROL_PLANE_API_KEY -ErrorAction SilentlyContinue
+    }
 }
 switch ($Action) {
     'configure' {
