@@ -1,10 +1,19 @@
 import json
+import subprocess
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-# Capture the checked-in snapshot during collection, before legacy tests mutate this file.
-_CONTEXT_SNAPSHOT = json.loads((ROOT / "data/context.json").read_text(encoding="utf-8"))
+# Read the committed baseline from Git, not the mutable working file: legacy tests and
+# self-healing hooks may rewrite data/context.json during the test session.
+_CONTEXT_SNAPSHOT = json.loads(subprocess.run(
+    ["git", "show", "HEAD:data/context.json"],
+    cwd=ROOT,
+    check=True,
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+).stdout)
 
 
 def test_curiosity_intake_is_registered_and_exposed_through_mcp():
