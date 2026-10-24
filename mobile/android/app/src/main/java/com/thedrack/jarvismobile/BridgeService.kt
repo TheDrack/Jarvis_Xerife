@@ -130,6 +130,12 @@ class BridgeService : Service() {
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                     socket = null
+                    if (response?.code == 403 || response?.code == 401) {
+                        updateNotification("Sessão recusada/expirada; reabra o app para entrar novamente")
+                        stopping = true
+                        stopSelf()
+                        return
+                    }
                     updateNotification("Conexão perdida; tentando reconectar")
                     if (!stopping) scheduleReconnect()
                 }
