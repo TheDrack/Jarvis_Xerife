@@ -1,0 +1,96 @@
+# Jarvis Mobile — arquitetura e plano de entrega
+
+## Objetivo
+
+Evoluir o HUD web para um cliente Android nativo que mantenha uma presença útil do Jarvis no telefone mesmo quando a interface não estiver aberta. O aplicativo é um cliente do mesmo núcleo Jarvis, não um segundo agente nem uma nova fonte de memória.
+
+## Estado verificado antes da implementação
+
+- O repositório já possui um HUD web/PWA em `app/static/index.html`.
+- Há APIs autenticadas para login OAuth2 (`POST /token`) e cadastro/heartbeat de dispositivos (`/v1/devices/*`).
+- Há navegação Android por ADB documentada em `docs/ANDROID_AUTONOMOUS_NAVIGATION.md`; ela cobre controle de UI, não presença pessoal contínua.
+- O endpoint `/v1/local-bridge` aceita WebSocket sem validar a identidade do cliente. O endpoint `/ws/{user_id}` também confia no identificador da URL. Nenhum deles deve ser usado como canal de eventos pessoais do aplicativo antes de corrigir a autenticação e a autorização.
+- O monitor Windows de retorno de atividade está em uma PR separada (#582) e atualmente tenta falar pelo áudio padrão do PC. Esta proposta não altera nem mistura essa PR.
+
+## Arquitetura alvo
+
+```text
+Windows watcher ── evento autenticado ──┐
+HUD web ────────────────────────────────┼── Jarvis Core / event router
+Android Jarvis Mobile ◄── FCM push ─────┘             │
+                                                      └── memória, agentes e ferramentas
+```
+
+O núcleo continua responsável por raciocínio, ferramentas, rotinas e memória. O aplicativo móvel fornece canais de interação, voz local, notificações e contexto do dispositivo, sempre com permissões explícitas.
+
+## Decisões técnicas
+
+1. **Cliente Android nativo (Kotlin + Jetpack Compose).** Não depender de uma WebView aberta para receber eventos ou reproduzir voz.
+2. **Push para acordar a atenção, não para transportar memória sensível.** Usar Firebase Cloud Messaging (FCM) para notificações/eventos breves quando o processo estiver suspenso. Buscar detalhes por uma API autenticada. Não incluir tokens, localização precisa ou conteúdo privado no payload de push.
+3. **Conexão em tempo real apenas quando permitida.** WebSocket autenticado pode servir enquanto o processo está ativo e conectado, mas não é garantia de presença permanente.
+4. **Trabalho adiado com WorkManager.** Sincronizações recuperáveis e não urgentes usam trabalho agendado, em vez de loops permanentes.
+5. **Foreground service apenas para uma sessão contínua perceptível pelo usuário.** Exibir notificação persistente e permitir que a pessoa pare a sessão. Não manter microfone sempre ligado como comportamento padrão.
+6. **Identidade e autorização de dispositivo.** Reutilizar a autenticação OAuth2 existente como ponto de entrada, mas introduzir credenciais/sessões de dispositivo revogáveis para a conexão móvel. Não colocar senha, JWT de longa duração ou segredo de servidor no APK.
+7. **Canal de eventos dedicado.** Corrigir ou contornar explicitamente os WebSockets sem autenticação. Validar a identidade do usuário e a associação do dispositivo em cada conexão e ação; validar payloads e aplicar limites.
+8. **Rotas de contingência.** O HUD e Telegram permanecem disponíveis; a falha do aplicativo não pode bloquear o núcleo Jarvis nem as rotas atuais.
+9. **Contexto com proveniência.** Diferenciar fatos observados de inferências; registrar apenas os sinais autorizados, com controles de revogação e retenção.
+
+## Entregas incrementais
+
+### Fase 0 — segurança e contratos (obrigatória antes de conectar o app)
+
+- Definir o contrato de eventos: identificador, tipo permitido, origem, timestamp, idempotency key e política de expiração.
+- Adicionar testes de autenticação/autorização para WebSocket e rotas de evento; garantir rejeição de token ausente/inválido e de usuário/dispositivo incompatível.
+- Definir registro, revogação e rotação de credencial de dispositivo sem armazenar segredos em logs.
+- Criar testes de contrato para eventos duplicados, payload inválido, replay e desconexão.
+
+### Fase 1 — aplicativo mínimo
+
+- Projeto Android nativo, estado de conexão visível e teste de síntese de voz `pt-BR`.
+- Login pelo fluxo existente sem persistir senha.
+- Armazenamento protegido de credenciais curtas/revogáveis, logout e revogação.
+- Build automatizado de APK de debug e testes de lógica.
+
+### Fase 2 — presença e notificações
+
+- Registro do telefone como dispositivo Jarvis.
+- FCM com token de instalação registrado por endpoint autenticado; atualização e revogação do token.
+- Notificações de eventos enquanto o HUD estiver fechado.
+- Confirmação de recebimento e deduplicação; recuperação após ficar offline.
+
+### Fase 3 — saudação PC → telefone
+
+- O watcher do Windows publica um evento de retorno por um cliente autorizado, sem embutir credenciais no script.
+- O núcleo valida a origem, associa o evento ao usuário e entrega uma notificação ao telefone.
+- O Android decide se fala por TTS, considerando preferências de silêncio, volume, estado do aparelho e janela de cooldown.
+- Se o telefone estiver offline, registrar estado de entrega e manter a contingência configurada; não afirmar que a fala foi reproduzida sem confirmação do cliente.
+
+### Fase 4 — contexto e capacidades adicionais
+
+- Presença, rede/localização opcional, voz interativa e automação Android por APIs apropriadas.
+- Permissões granulares, indicação visível de captura, controles de pausa e exclusão.
+- Avaliar ARTEMIS como ferramenta de automação/teste Android, não como substituto do aplicativo de presença.
+
+## Limites do Android
+
+A aplicação não pode garantir execução ininterrupta nem inicializar arbitrariamente microfone/serviços quando o sistema restringe o background. FCM, notificações, WorkManager e foreground service têm papéis diferentes. A implementação deve obedecer às regras vigentes do Android e às otimizações de bateria do fabricante; “sempre presente” significa recuperação robusta e canais disponíveis, não execução irrestrita.
+
+## Critérios de aceitação
+
+- Nenhum WebSocket pessoal aceita conexão sem autenticação e autorização verificadas.
+- O cliente pode registrar-se, autenticar-se, desconectar-se e revogar a própria sessão.
+- Um evento PC de retorno produz no máximo uma saudação por janela de cooldown; eventos repetidos não duplicam a fala.
+- Notificações funcionam com o app em foreground e background; os resultados são testados separadamente para tela bloqueada, rede indisponível, processo encerrado e reinicialização.
+- Nenhum teste válido é removido ou enfraquecido para obter CI verde.
+- HUD, Telegram, rotinas e navegação Android existentes continuam funcionando.
+- Produção e credenciais Firebase só são configuradas depois de revisar o fluxo em ambiente de teste; nenhum segredo entra no repositório.
+
+## Fontes técnicas
+
+- Android: restrições para iniciar foreground services em background — https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start
+- Android: visão geral de foreground services — https://developer.android.com/develop/background-work/services/fgs
+- Firebase: receber mensagens em apps Android — https://firebase.google.com/docs/cloud-messaging/android/receive-messages
+
+## Estado desta proposta
+
+Este documento define a arquitetura e as etapas; não significa que o aplicativo nativo, FCM, o canal autenticado ou a saudação PC→telefone já estejam implementados. A primeira mudança de código deve fechar a lacuna de autenticação e adicionar testes antes de conectar o cliente móvel.
