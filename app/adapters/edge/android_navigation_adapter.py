@@ -1,7 +1,8 @@
-"""Navegação via Android usando ADB sobre uma rede privada autorizada.
+"""Navegação via Android usando ADB em transporte privado autorizado.
 
-O transporte MCP permanece no servidor Jarvis existente. Este adaptador controla
-um dispositivo Android selecionado explicitamente por serial/IP Tailscale.
+O transporte/conector MCP é independente deste adaptador. O alvo deve estar
+selecionado explicitamente e já autorizado para ADB; não se presume Tailscale
+nem qualquer software específico de conectividade.
 """
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ class AndroidNavigationAdapter:
 
     def _run(self, *args: str, timeout: int | None = None) -> subprocess.CompletedProcess[str]:
         if not self.device_address:
-            raise ValueError("Defina JARVIS_ANDROID_DEVICE com o serial ADB ou IP Tailscale autorizado.")
+            raise ValueError("Defina JARVIS_ANDROID_DEVICE com o serial/endereço ADB do dispositivo autorizado.")
         return subprocess.run(
             [self.adb_path, "-s", self.device_address, *args],
             capture_output=True, text=True, timeout=timeout or self.timeout_seconds, check=False,
@@ -32,12 +33,17 @@ class AndroidNavigationAdapter:
         """Capture a tela atual como PNG codificado em base64."""
         if not self.device_address:
             return {"success": False, "status": "device_not_configured"}
-        proc = subprocess.run(
-            [self.adb_path, "-s", self.device_address, "exec-out", "screencap", "-p"],
-            capture_output=True, timeout=self.timeout_seconds, check=False,
-        )
+        try:
+            proc = subprocess.run(
+                [self.adb_path, "-s", self.device_address, "exec-out", "screencap", "-p"],
+                capture_output=True, timeout=self.timeout_seconds, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return {"success": False, "status": "transport_error", "error": str(exc)}
         if proc.returncode:
             return {"success": False, "status": "adb_error", "error": proc.stderr.decode("utf-8", "replace")[:1000]}
+        if not proc.stdout:
+            return {"success": False, "status": "empty_screenshot"}
         return {"success": True, "status": "observed", "device_id": self.device_address,
                 "image_base64": base64.b64encode(proc.stdout).decode("ascii"), "image_format": "png"}
 
@@ -62,8 +68,8 @@ class AndroidNavigationAdapter:
     def type_text(self, text: str) -> dict[str, Any]:
         if len(text) > 2000:
             return {"success": False, "status": "input_too_long"}
-        # Android input text reserves spaces and shell metacharacters; escape for input command.
-        escaped = text.replace("%", "%25").replace(" ", "%s").replace("&", "\\&").replace(";", "\\;").replace("|", "\\|").replace("<", "\\<").replace(">", "\\>")
+        # Android input text reserves spaces and percent escapes.
+        escaped = text.replace("%", "%25").replace(" ", "%s")
         return self._action("shell", "input", "text", escaped)
 
     def _action(self, *args: str) -> dict[str, Any]:
