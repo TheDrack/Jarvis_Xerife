@@ -68,8 +68,10 @@ class AndroidNavigationAdapter:
     def type_text(self, text: str) -> dict[str, Any]:
         if len(text) > 2000:
             return {"success": False, "status": "input_too_long"}
-        # Android input text reserves spaces and percent escapes.
+        # Escape remote-shell metacharacters as well as Android's text escapes.
         escaped = text.replace("%", "%25").replace(" ", "%s")
+        shell_metacharacters = set('\\"\'$`;&|<>()[ ]{}*!?~#')
+        escaped = "".join(("\\\\" + char) if char in shell_metacharacters else char for char in escaped)
         return self._action("shell", "input", "text", escaped)
 
     def _action(self, *args: str) -> dict[str, Any]:
