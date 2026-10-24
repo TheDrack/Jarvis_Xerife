@@ -46,6 +46,11 @@ class TokenVault(context: Context) {
 
     fun clear() {
         prefs.edit().clear().commit()
+        try {
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
+        } catch (_: Exception) {
+            // The encrypted preference has already been removed; key cleanup is best-effort.
+        }
     }
 
     private fun getOrCreateKey(): SecretKey {
