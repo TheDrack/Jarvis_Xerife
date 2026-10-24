@@ -100,7 +100,8 @@ def test_recipe_taps_by_resource_id_and_verifies_text():
         "action": "tap",
         "verify": {"text": "Oi"},
     }]
-    out = adapter(conn).run_recipe("abc", steps)
+    # resource-id "send" é sensível: exige confirmação explícita.
+    out = adapter(conn).run_recipe("abc", steps, user_confirmed=True)
     assert out == {"status": "completed", "device_id": "abc", "completed_steps": 1}
     assert conn.actions == [("tap", 200, 230)]
 
@@ -112,7 +113,7 @@ def test_recipe_postcondition_failure_stops_and_reports_step():
         {"target": {"text": "Enviar"}, "action": "tap", "verify": {"text": "Tela inexistente"}},
         {"action": "key", "value": 4},
     ]
-    out = adapter(conn).run_recipe("abc", steps)
+    out = adapter(conn).run_recipe("abc", steps, user_confirmed=True)
     assert out["status"] == "postcondition_failed"
     assert out["step"] == 1 and out["completed_steps"] == 1
     assert ("key", 4) not in conn.actions
@@ -143,3 +144,22 @@ def test_execute_dispatches_observe_and_unknown():
     a = adapter(FakeConn())
     assert a.execute({"action": "observe", "device_id": "abc"})["status"] == "observed"
     assert a.execute({"action": "wat"})["status"] == "invalid_recipe"
+
+
+def test_sensitive_recipe_blocked_before_any_step_runs():
+    conn = FakeConn()
+    steps = [
+        {"action": "launch", "value": "com.app"},
+        {"target": {"text": "Pagar"}, "action": "tap"},
+    ]
+    out = adapter(conn).run_recipe("abc", steps)
+    assert out["status"] == "confirmation_required"
+    assert out["step"] == 1
+    assert conn.actions == []  # nem o lançamento do app ocorreu
+
+
+def test_explicit_sensitive_flag_requires_confirmation():
+    conn = FakeConn()
+    out = adapter(conn).run_recipe("abc", [{"action": "key", "value": 4, "sensitive": True}])
+    assert out["status"] == "confirmation_required"
+    assert conn.actions == []

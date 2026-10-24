@@ -25,6 +25,8 @@ from mcp.types import TextContent
 from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
+from app.adapters.edge.android_navigation_adapter import AndroidNavigationAdapter
+from app.adapters.edge.mobile_mcp_tools import register_mobile_tools
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -78,6 +80,8 @@ if _HTTP_TRANSPORT == "streamable-http":
         allowed_origins=_allowed_origins,
     )
 navigator = VisualNavigationAdapter()
+# Grupo `mobile_*` (Android via ADB) no mesmo servidor MCP; sem túnel ou canal próprios.
+register_mobile_tools(mcp, AndroidNavigationAdapter())
 
 
 def _content(result: dict[str, Any], *, include_frames: bool = True) -> list[Any]:

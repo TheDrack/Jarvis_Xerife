@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 _MAX_STEPS = 20
 _ACTIONS = {"tap", "type", "key", "launch", "stop", "swipe"}
+# Termos que indicam ação com efeito externo (enviar, pagar, apagar...). Comparação sem caixa.
+SENSITIVE_TERMS = (
+    "enviar", "send", "pagar", "pay", "comprar", "buy", "transferir", "transfer",
+    "excluir", "apagar", "delete", "remove", "publicar", "publish", "confirmar", "confirm",
+    "sair", "logout", "sign out",
+)
 Factory = Callable[[str], AdbConnection]
 _BOUNDS = re.compile(r"^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$")
 
@@ -118,7 +124,9 @@ class AndroidNavigationAdapter(NexusComponent):
             return {"status": "ambiguous", "device_id": serial, "count": len(matches)}
         return {"status": "found", "device_id": serial, "element": matches[0]}
 
-    def run_recipe(self, serial: str, steps: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def run_recipe(
+        self, serial: str, steps: List[Dict[str, Any]], *, user_confirmed: bool = False
+    ) -> Dict[str, Any]:
         """Executa passos em ordem. Para no primeiro passo que não se confirma.
 
         Passo: {target: {resource_id|text}, action, value?, verify?: {text|resource_id}}.
@@ -133,11 +141,23 @@ class AndroidNavigationAdapter(NexusComponent):
         except AdbError as exc:
             return {"status": "unavailable", "message": str(exc)}
 
-        completed = 0
         for index, step in enumerate(steps):
             err = _validate_step(step)
             if err:
-                return {"status": "invalid_recipe", "step": index, "message": err, "completed_steps": completed}
+                return {"status": "invalid_recipe", "step": index, "message": err, "completed_steps": 0}
+        # Confirmação é checada antes de qualquer passo: nenhuma ação parcial sem autorização.
+        if not user_confirmed:
+            for index, step in enumerate(steps):
+                if is_sensitive(step):
+                    return {
+                        "status": "confirmation_required",
+                        "step": index,
+                        "message": "Passo com efeito externo; peça autorização explícita ao usuário.",
+                        "completed_steps": 0,
+                    }
+
+        completed = 0
+        for index, step in enumerate(steps):
             outcome = self._run_step(serial, conn, step)
             if outcome["status"] != "completed":
                 outcome.update({"step": index, "completed_steps": completed})
@@ -173,6 +193,17 @@ class AndroidNavigationAdapter(NexusComponent):
             if seen["status"] != "found":
                 return {"status": "postcondition_failed", "device_id": serial}
         return {"status": "completed"}
+
+
+def is_sensitive(step: Dict[str, Any]) -> bool:
+    """Passo é sensível se marcado explicitamente ou se alvo/valor citam ação com efeito externo."""
+    if step.get("sensitive") is True:
+        return True
+    target = step.get("target") or {}
+    haystack = " ".join(
+        str(part) for part in (target.get("text", ""), target.get("resource_id", ""), step.get("value", ""))
+    ).lower()
+    return any(term in haystack for term in SENSITIVE_TERMS)
 
 
 def _validate_step(step: Any) -> Optional[str]:
