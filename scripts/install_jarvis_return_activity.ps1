@@ -7,8 +7,13 @@ New-Item -ItemType Directory -Path $runtime,$startup,$config -Force | Out-Null
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 $acl = Get-Acl -LiteralPath $config
 $acl.SetAccessRuleProtection($true, $false)
-$rule = New-Object Security.AccessControl.FileSystemAccessRule(
-    $identity, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'
+$inheritance = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+$rule = New-Object -TypeName System.Security.AccessControl.FileSystemAccessRule -ArgumentList @(
+    $identity,
+    [System.Security.AccessControl.FileSystemRights]::FullControl,
+    $inheritance,
+    [System.Security.AccessControl.PropagationFlags]::None,
+    [System.Security.AccessControl.AccessControlType]::Allow
 )
 $acl.SetAccessRule($rule)
 Set-Acl -LiteralPath $config -AclObject $acl
