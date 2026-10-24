@@ -215,7 +215,7 @@ python -c "from app.adapters.infrastructure.docker_sandbox import DockerSandbox;
 | Fase | Status | Descrição |
 |------|--------|-----------|
 | Phase 1 | ✅ Completo | Arquitetura Hexagonal + Nexus DI |
-| Phase 2 | ✅ Completo | Auto-Evolução + Self-Healing |
+| Phase 2 | ⏸️ Pausado | Autoevolução fail-closed por padrão; recuperação e curiosidade em validação |
 | Phase 3 | ✅ Completo | JarvisDevAgent + AdapterRegistry |
 | Phase 4 | 🟡 Em Progresso | Soldier Mesh (Edge Computing) |
 
