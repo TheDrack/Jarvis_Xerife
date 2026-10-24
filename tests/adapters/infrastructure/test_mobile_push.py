@@ -325,6 +325,14 @@ def test_return_activity_dispatch_requires_dedicated_machine_key(monkeypatch):
     assert missing.status_code == 401
     assert invalid.status_code == 401
 
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", "short")
+    short_key = client.post(
+        "/v1/mobile/push/return-activity",
+        json={},
+        headers={"X-Jarvis-Return-Activity-Key": "short"},
+    )
+    assert short_key.status_code == 401
+
 
 def test_return_activity_uses_fcm_when_mobile_websocket_is_offline(monkeypatch):
     client, database, sender, _auth = _setup(monkeypatch)

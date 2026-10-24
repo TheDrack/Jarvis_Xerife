@@ -105,14 +105,14 @@ O primeiro incremento foi implementado nesta branch:
 
 ### Limitações ainda abertas
 
-- O endpoint legado `/token` continua usando o prazo OAuth2 padrão de 30 minutos. O aplicativo nativo passa a usar os endpoints de sessão móvel renovável descritos no incremento 2; para produção, ainda é necessário configurar a chave administrativa e aplicar a migration.
+- O endpoint legado `/token` continua usando o prazo OAuth2 padrão de 30 minutos. O aplicativo nativo usa os endpoints de sessão móvel renovável do incremento 2; as migrations já estão aplicadas, mas o backend precisa ser implantado e a chave administrativa confirmada no Render.
 - FCM não está configurado; isso exige um projeto Firebase e configuração de servidor que não devem ser inventados. Sem FCM, o canal depende de o serviço em primeiro plano continuar permitido pelo Android.
 - O Android impõe limite de seis horas por janela de 24 horas a serviços foreground do tipo `dataSync` em apps que miram API 35. O serviço encerra no callback de timeout; não tenta contornar a regra.
-- A saudação PC→telefone ainda não está ponta a ponta: o watcher Windows não publica evento autenticado ao núcleo e não há push FCM. Não foi instalado APK no telefone nem alterada a produção.
+- A saudação PC→telefone ainda não está ponta a ponta: o código do watcher foi conectado ao endpoint autenticado na PR #587, mas ela ainda não foi mesclada/implantada e a cópia instalada no Windows ainda precisa ser atualizada. FCM não está configurado; não foi validado em telefone físico.
 
 ## Estado desta proposta
 
-A base nativa e a sessão móvel renovável/revogável estão implementadas em código, mas ainda dependem da migration e da chave administrativa no ambiente de servidor. O canal de eventos ainda não é uma solução conclusiva de presença persistente. Não marcar a integração PC→telefone como concluída até configurar FCM, ligar o watcher ao fluxo autenticado e testar em dispositivo Android real.
+A base nativa e a sessão móvel renovável/revogável estão implementadas; as migrations já estão aplicadas no Supabase. O login ainda depende do deploy do backend e da chave administrativa no ambiente de servidor. O canal de eventos ainda não é uma solução conclusiva de presença persistente. Não marcar a integração PC→telefone como concluída até configurar FCM, configurar a chave do watcher e testar em dispositivo Android real.
 ## Incremento 2 — sessão móvel renovável e revogável
 
 - Adiciona `POST /v1/mobile/session/login`, `POST /v1/mobile/session/refresh` e `POST /v1/mobile/session/revoke`.
@@ -121,20 +121,20 @@ A base nativa e a sessão móvel renovável/revogável estão implementadas em c
 - O token de acesso inclui identidade, família da sessão e ID do dispositivo; o WebSocket exige que o `device_id` solicitado corresponda ao dispositivo do token.
 - Android cifra access + refresh token com Android Keystore. Ao receber rejeição de sessão, tenta renovação antes de interromper a presença; logout tenta revogar no servidor e sempre limpa o material local.
 - A migration `20261024200302_mobile_device_sessions.sql` ativa RLS, não concede acesso às roles públicas/autenticadas e limita tabela/função ao `service_role`.
-- O backend requer `SUPABASE_SERVICE_ROLE_KEY` no ambiente de servidor. Não foi configurada nenhuma chave, aplicada migration em produção ou feito deploy nesta etapa.
+- O backend requer `SUPABASE_SERVICE_ROLE_KEY` no ambiente de servidor; o valor não foi lido nem alterado nesta etapa. As migrations móveis já estão aplicadas no Supabase, mas o backend do Render ainda não foi atualizado.
 - Testes locais específicos: `test_mobile_sessions.py` e `test_mobile_bridge_auth.py`.
 
 ### Próximos bloqueios
 
-1. Configurar `SUPABASE_SERVICE_ROLE_KEY` no ambiente de servidor usando o gerenciador de segredos, sem expor o valor.
-2. Aplicar a migration somente após revisão e confirmar tabela/função e RLS no projeto correto.
+1. Confirmar se `SUPABASE_SERVICE_ROLE_KEY` está configurada no Render; se faltar, adicioná-la pelo gerenciador de segredos sem expor o valor.
+2. As migrations móveis já estão aplicadas; não reaplicá-las. Confirmar tabelas e RLS antes de futuras alterações.
 3. Configurar FCM com um projeto e credenciais reais.
-4. Integrar o watcher de retorno do Windows ao fluxo autenticado e validar PC → núcleo → Android.
-5. Compilar APK, instalar e validar em telefone real, incluindo tela bloqueada, rede interrompida, expiração, replay e logout.
+4. A PR #587 integra o watcher; após CI verde, revisão e merge, configurar a chave dedicada e validar PC → núcleo → Android.
+5. Validar em telefone real, incluindo tela bloqueada, rede interrompida, expiração, replay e logout.
 
 ### Atenção ao histórico de migrations do projeto remoto
 
-Na inspeção somente leitura do projeto Supabase `saibtpdehhprttqlgqdt`, as quatro migrations existentes aparecem com versões remotas `20261024142633`, `20261024142635`, `20261024142637` e `20261024142639`, enquanto os prefixos dos arquivos no repositório são `202610230001` a `202610230004`. Antes de aplicar a nova migration, reconciliar esse histórico e a ordem com a ferramenta de migração escolhida; não executar um `db push` às cegas. Nenhuma alteração foi aplicada ao banco durante esta etapa.
+Na inspeção somente leitura do projeto Supabase `saibtpdehhprttqlgqdt`, as quatro migrations existentes aparecem com versões remotas `20261024142633`, `20261024142635`, `20261024142637` e `20261024142639`, enquanto os prefixos dos arquivos no repositório são `202610230001` a `202610230004`. Depois dessa inspeção, as duas migrations móveis foram aplicadas pelo conector sob as versões remotas `20261024213541` e `20261024213552`. Os prefixos dos arquivos locais ainda diferem das versões remotas; não executar `db push` às cegas nem reaplicar essas migrations. Reconciliar o histórico antes de qualquer migração futura.
 
 ## Incremento 3 — FCM e entrega de voz quando o WebSocket está offline
 
@@ -143,9 +143,9 @@ Na inspeção somente leitura do projeto Supabase `saibtpdehhprttqlgqdt`, as qua
 - O Android pede permissão de notificações ao ativar presença. Mensagens FCM de prioridade alta geram notificação visível; quando a presença está ativada, as notificações estão permitidas e o Android aceita iniciar o serviço, o app busca o evento autenticado e fala via TTS `pt-BR`. Se o sistema rebaixar a prioridade ou negar a inicialização em segundo plano, permanece a notificação sem tentar contornar a restrição.
 - O Firebase é opcional no build: o APK compila sem credenciais, mas FCM fica inativo. Injetar no build Android `JARVIS_FCM_API_KEY`, `JARVIS_FCM_APP_ID`, `JARVIS_FCM_PROJECT_ID` e `JARVIS_FCM_SENDER_ID`; estes são identificadores de configuração do cliente, não a chave privada de serviço.
 - No servidor, configurar `FIREBASE_PROJECT_ID` e `FIREBASE_SERVICE_ACCOUNT_JSON` como segredos. A conta de serviço precisa da permissão de envio FCM. Alternativamente, pode-se configurar `GOOGLE_APPLICATION_CREDENTIALS` para um arquivo protegido e `FIREBASE_PROJECT_ID`.
-- A migration `20261024202104_mobile_push_delivery.sql` cria registros de dispositivos e eventos privados com RLS e acesso apenas a `service_role`.
-- A validação local específica da segunda etapa foi: `test_mobile_push.py`, `test_mobile_sessions.py` e `test_mobile_bridge_auth.py` — **23 passed**; compilação Python e `git diff --check` também passaram. Build Android e CI completos aguardam a nova PR.
-- Ainda é obrigatório configurar um projeto Firebase real, aplicar migrations após reconciliar o histórico Supabase, implantar as variáveis secretas no ambiente correto e validar em telefone físico.
+- A migration local `20261024202104_mobile_push_delivery.sql` cria registros de dispositivos e eventos privados com RLS e acesso apenas a `service_role`; a migration correspondente já está aplicada no Supabase sob a versão remota `20261024213552`.
+- A validação local específica da segunda etapa foi: `test_mobile_push.py`, `test_mobile_sessions.py` e `test_mobile_bridge_auth.py` — **23 passed**; depois, a suíte completa passou com **1504 passed, 4 skipped**. O CI da PR #587 está em execução.
+- Ainda é obrigatório configurar um projeto Firebase real, confirmar os segredos de servidor, implantar o backend depois da revisão/merge e validar em telefone físico.
 
 ## Diagnóstico de login após o merge — 2026-10-24
 
@@ -154,7 +154,7 @@ A verificação real do serviço de produção após os merges encontrou dois bl
 1. O serviço Render ainda estava servindo um commit anterior aos merges do cliente móvel. A verificação HTTP confirmou /health = 200, mas /v1/mobile/session/login = 404 e as rotas de push não estavam no OpenAPI. A notificação de canal indisponível no Android era o estado do serviço WebSocket, não prova de que o fallback FCM estivesse ativo.
 2. O projeto Supabase contém a tabela histórica public.user (singular), sem registros de conta, enquanto o adaptador de autenticação consultava public.users (plural). O adaptador foi ajustado para compatibilidade com os dois nomes, consulta somente pelo cliente administrativo e grava contas somente com privilégios de servidor.
 
-A correção de autenticação deve passar por CI e revisão antes de ser mesclada. Em seguida, o backend precisa ser implantado; as migrations de sessões móveis e entrega push precisam ser aplicadas na ordem (20261024200302_mobile_device_sessions.sql, depois 20261024202104_mobile_push_delivery.sql) após reconciliar o histórico remoto. O Render deve ter SUPABASE_SERVICE_ROLE_KEY; essa chave não pode ser colocada no APK nem em código. Ainda não foi criada conta nem alterado o banco de produção.
+A correção de autenticação foi mesclada na main. As migrations de sessões móveis e entrega push já foram aplicadas ao projeto Supabase saibtpdehhprttqlgqdt na ordem registrada no histórico remoto (versões 20261024213541 e 20261024213552); as tabelas existem e ainda não têm registros móveis. O backend do Render continua num commit anterior e não expõe as rotas móveis. Antes de validar o login, confirmar/configurar SUPABASE_SERVICE_ROLE_KEY no Render; essa chave não pode ser colocada no APK nem em código. Nenhuma conta móvel foi criada nesta etapa.
 
 
 ## Incremento 4 — saudação autenticada do Windows ao telefone
