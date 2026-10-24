@@ -93,7 +93,12 @@ def create_bridge_router() -> APIRouter:
     ) -> Dict[str, Any]:
         """List all currently connected soldier devices and their capabilities."""
         bridge_manager = nexus.resolve("soldier_bridge")
-        soldiers = bridge_manager.get_connected_soldiers()
+        principal = str(_principal.get("user_id") or _principal.get("sub"))
+        soldiers = [
+            soldier for soldier in bridge_manager.get_connected_soldiers()
+            if not str(soldier.get("device_id", "")).startswith("mobile:")
+            or str(soldier.get("device_id", "")).startswith("mobile:" + principal + ":")
+        ]
         return {"connected_devices": soldiers, "count": len(soldiers)}
 
     @router.post("/v1/local-bridge/send-task")
@@ -103,6 +108,9 @@ def create_bridge_router() -> APIRouter:
         _principal: Dict[str, Any] = Depends(require_authenticated_principal),
     ) -> Any:
         """Send a task to a connected soldier device using the configured server key."""
+        principal = str(_principal.get("user_id") or _principal.get("sub"))
+        if device_id.startswith("mobile:") and not device_id.startswith("mobile:" + principal + ":"):
+            raise HTTPException(status_code=403, detail="Device belongs to another user")
         bridge_manager = nexus.resolve("soldier_bridge")
         if not bridge_manager.is_device_connected(device_id):
             raise HTTPException(status_code=404, detail=f"Device {device_id} is not connected")
