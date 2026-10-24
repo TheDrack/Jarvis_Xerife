@@ -47,6 +47,32 @@ graph LR
     _backups_nexus_20260310_160218_app_application --> _backups_nexus_20260310_160218_app_application_services
     capabilities["<b>capabilities</b><br/><hr/>📄 classification.py: from, CapabilityStatus, class"]
     class capabilities support
+    mobile["<b>mobile</b>"]
+    class mobile support
+    mobile_android["<b>android</b>"]
+    class mobile_android support
+    mobile --> mobile_android
+    mobile_android_app["<b>app</b>"]
+    class mobile_android_app support
+    mobile_android --> mobile_android_app
+    mobile_android_app_src["<b>src</b>"]
+    class mobile_android_app_src support
+    mobile_android_app --> mobile_android_app_src
+    mobile_android_app_src_main["<b>main</b>"]
+    class mobile_android_app_src_main support
+    mobile_android_app_src --> mobile_android_app_src_main
+    mobile_android_app_src_main_java["<b>java</b>"]
+    class mobile_android_app_src_main_java support
+    mobile_android_app_src_main --> mobile_android_app_src_main_java
+    mobile_android_app_src_main_java_com["<b>com</b>"]
+    class mobile_android_app_src_main_java_com support
+    mobile_android_app_src_main_java --> mobile_android_app_src_main_java_com
+    mobile_android_app_src_main_java_com_thedrack["<b>thedrack</b>"]
+    class mobile_android_app_src_main_java_com_thedrack support
+    mobile_android_app_src_main_java_com --> mobile_android_app_src_main_java_com_thedrack
+    mobile_android_app_src_main_java_com_thedrack_jarvismobile["<b>jarvismobile</b>"]
+    class mobile_android_app_src_main_java_com_thedrack_jarvismobile support
+    mobile_android_app_src_main_java_com_thedrack --> mobile_android_app_src_main_java_com_thedrack_jarvismobile
     skills["<b>skills</b>"]
     class skills support
     skills_jarvis-android-navigation["<b>jarvis-android-navigation</b>"]
@@ -121,7 +147,7 @@ graph LR
     app_adapters_infrastructure_secrets["<b>secrets</b><br/><hr/>📄 env_secrets_provider.py: EnvSecretsProvider, execute, get_secret"]
     class app_adapters_infrastructure_secrets adapter
     app_adapters_infrastructure --> app_adapters_infrastructure_secrets
-    app_adapters_infrastructure_routers["<b>routers</b><br/><hr/>📄 utility.py: create_utility_router, get_api_key_guides, analyze_missing_resources<br/>📄 devices.py: create_devices_router, register_device<br/>📄 agent_tasks.py: AgentHeartbeatRequest, EnqueueTaskRequest, ClaimTaskRequest<br/>📄 health.py: create_health_router, health_check, health_detail<br/>📄 extensions.py: create_extensions_router, install_package, get_package_status<br/>📄 dev_agent.py: create_dev_agent_router, run_dev_agent, list_dev_agent_jobs<br/>📄 evolution.py: create_evolution_router, get_evolution_status<br/>📄 assistant.py: create_assistant_router<br/>📄 thoughts.py: create_thoughts_router, create_thought_log<br/>📄 github.py: create_github_router, github_worker_operation, auto_heal_ci_failure<br/>📄 missions.py: create_missions_router, execute_mission, control_browser<br/>📄 bridge.py: create_bridge_router, local_bridge_websocket, list_connected_devices"]
+    app_adapters_infrastructure_routers["<b>routers</b><br/><hr/>📄 utility.py: create_utility_router, get_api_key_guides, analyze_missing_resources<br/>📄 devices.py: create_devices_router, register_device<br/>📄 agent_tasks.py: AgentHeartbeatRequest, EnqueueTaskRequest, ClaimTaskRequest<br/>📄 health.py: create_health_router, health_check, health_detail<br/>📄 extensions.py: create_extensions_router, install_package, get_package_status<br/>📄 dev_agent.py: create_dev_agent_router, run_dev_agent, list_dev_agent_jobs<br/>📄 evolution.py: create_evolution_router, get_evolution_status<br/>📄 assistant.py: create_assistant_router<br/>📄 thoughts.py: create_thoughts_router, create_thought_log<br/>📄 github.py: create_github_router, github_worker_operation, auto_heal_ci_failure<br/>📄 missions.py: create_missions_router, execute_mission, control_browser<br/>📄 bridge.py: create_bridge_router, require_authenticated_principal, local_bridge_websocket"]
     class app_adapters_infrastructure_routers adapter
     app_adapters_infrastructure --> app_adapters_infrastructure_routers
     app_adapters_api["<b>api</b><br/><hr/>📄 voice_endpoint.py: voice_stream"]
