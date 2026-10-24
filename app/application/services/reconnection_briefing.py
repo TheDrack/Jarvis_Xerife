@@ -73,7 +73,7 @@ class ReconnectionBriefing(NexusComponent):
         if not isinstance(value, list):
             return []
         result: List[Dict[str, str]] = []
-        for raw in value[:limit]:
+        for raw in value:
             if not isinstance(raw, dict):
                 continue
             title = cls._clean(raw.get("title") or raw.get("name"), 240)
@@ -81,6 +81,8 @@ class ReconnectionBriefing(NexusComponent):
             url = cls._clean(raw.get("url") or raw.get("html_url"), 1000)
             if title:
                 result.append({"title": title, "status": status, **({"url": url} if url else {})})
+                if len(result) >= limit:
+                    break
         return result
 
     @staticmethod
