@@ -1,52 +1,62 @@
-# Navegação autônoma Android (módulo aditivo)
+# Navegação via Android — capacidade aditiva
 
-## Escopo
+## Princípio arquitetural
 
-Esta integração acrescenta uma ponte opcional Jarvis → Google ARTEMIS para executar tarefas de interface em Android. Não modifica o adaptador de navegação visual desktop, o contrato `VisualNavigationPort`, o MacroDroid, nem o registro atual de dispositivos.
+Jarvis expõe capacidades por interfaces e ferramentas; o software de conexão é escolha do usuário. Tailscale, Aperture e Remote Desktop Commander (RDC) são exemplos de rotas possíveis, não dependências obrigatórias. O requisito é uma conexão compatível e autorizada entre o agente, o servidor MCP/conector e o dispositivo-alvo.
 
-## Arquitetura
+Separar sempre:
+- **Capacidade:** observação e interação com a UI Android.
+- **Conector/protocolo:** MCP e adaptadores que expõem operações ao agente.
+- **Transporte:** rede, túnel, relay ou software escolhido pelo usuário.
 
-- `app/application/ports/android_navigation.py`: contrato isolado da nova capacidade.
-- `app/adapters/edge/artemis_android_navigation_adapter.py`: adaptador opcional para `artemis-client`.
-- `tests/adapters/test_artemis_android_navigation_adapter.py`: testes com cliente falso, sem telefone, ADB, rede ou credenciais.
-- O despacho atual do líder/registro de dispositivos ainda não é alterado. Esta primeira etapa deixa o adaptador explicitamente invocável, evitando acoplamento ou roteamento automático prematuro.
+Não documentar um produto específico como pré-requisito universal. A conexão selecionada deve ser verificada em tempo de execução.
 
-## Configuração
+## Escopo e preservação
 
-1. Inicie um servidor ARTEMIS em uma máquina confiável que tenha ADB e o dispositivo Android autorizado conectado.
-2. Configure `JARVIS_ARTEMIS_SERVER_URL` no processo que instancia o adaptador.
-3. Instale `artemis-client` apenas no ambiente dedicado da integração, conforme as instruções oficiais do [ARTEMIS](https://github.com/google/artemis).
-4. Passe o serial Android registrado explicitamente como `device_id`. O adaptador não escolhe um telefone automaticamente.
-5. Use o perfil `pro` para tarefas que exigem planejamento/verificação; `flash` é para ações rotineiras e simples. A verificação real do resultado continua obrigatória.
+- `app/application/ports/android_navigation.py`: contrato isolado para a capacidade Android.
+- `app/adapters/edge/android_navigation_adapter.py`: adaptador de baixo nível ADB para dispositivo selecionado explicitamente.
+- O transporte MCP existente deve ser reutilizado. A funcionalidade precisa ser exposta como ferramenta/handler aditivo no servidor MCP; não criar um segundo conector MCP sem necessidade.
+- Não substituir nem alterar o comportamento da navegação desktop, `VisualNavigationPort`, os adaptadores Android já existentes, MacroDroid ou o registro de dispositivos.
+- Um adaptador isolado não significa que as ferramentas MCP já estejam registradas. Confirme a descoberta de ferramentas antes de declarar integração concluída.
 
-## Exemplo
+## Seleção de dispositivo e conexão
 
-```python
-import os
-from app.adapters.edge.artemis_android_navigation_adapter import ArtemisAndroidNavigationAdapter
+O agente deve selecionar um dispositivo Android identificado e autorizado explicitamente pelo cadastro confiável do Jarvis ou por configuração de implantação. Não aceite um endereço arbitrário vindo apenas da instrução do usuário como prova de identidade.
 
-android_nav = ArtemisAndroidNavigationAdapter(
-    server_url=os.environ["JARVIS_ARTEMIS_SERVER_URL"]
-)
-result = android_nav.run_task(
-    instruction="Abra Configurações e confirme que a tela Configurações está visível.",
-    device_id="SERIAL_ANDROID_REGISTRADO",
-    profile="pro",
-)
-if not result["success"]:
-    raise RuntimeError(f"Navegação Android falhou: {result}")
-```
+A implementação ADB atual usa:
+- `JARVIS_ANDROID_DEVICE`: serial/endereço ADB do dispositivo autorizado.
+- `JARVIS_ADB_PATH`: caminho opcional para o executável ADB; o padrão é `adb` no PATH.
 
-## Segurança e limitações
+Essas variáveis configuram o adaptador de baixo nível; elas não registram ferramentas MCP nem alteram automaticamente o destino das ferramentas desktop. O transporte de rede é independente: ADB só funcionará se o dispositivo estiver alcançável, emparelhado/autorizado e com o modo de depuração necessário já habilitado. Uma VPN ou túnel, por si só, não habilita ADB.
 
-- Não inclua credenciais em instruções ou logs.
-- A URL do servidor deve permanecer em rede privada/autorizada; não exponha o endpoint publicamente sem autenticação e controles de acesso.
-- Não execute tarefas destrutivas sem autorização específica.
-- A etapa atual não sincroniza automaticamente o cadastro Jarvis com a lista de dispositivos ADB. Essa ligação precisa de uma mudança de integração separada, depois de definir uma fonte de identidade confiável e testar a seleção do dispositivo.
-- Os testes unitários usam doubles e não comprovam conectividade real com telefone nem compatibilidade ponta a ponta; isso exige ambiente ARTEMIS/ADB conectado.
+Não exponha ADB à internet pública. Não habilite depuração, instale software nem altere configurações do telefone sem autorização explícita.
 
-## Referências
+## Ciclo de navegação
 
-- [Google ARTEMIS](https://github.com/google/artemis)
-- [README e SDK](https://github.com/google/artemis/blob/main/README.md)
-- [MCP Server ARTEMIS](https://github.com/google/artemis/tree/main/mcp_server)
+1. Descubra no MCP as ferramentas realmente disponíveis e leia os respectivos esquemas.
+2. Resolva o alvo explicitamente: desktop ou Android.
+3. Observe a tela atual.
+4. Identifique o controle-alvo; prefira APIs de acessibilidade quando disponíveis e use coordenadas/imagem como fallback.
+5. Execute uma ação compatível com o esquema da ferramenta.
+6. Observe novamente e verifique o resultado. Retorno de sucesso da chamada não prova que a UI atingiu o estado desejado.
+7. Se falhar, inspecione o erro e o estado atual antes de tentar de novo.
+
+Permita observação, navegação e cliques comuns necessários para cumprir o pedido. Peça autorização antes de fechar aplicações, excluir dados, efetuar compras, enviar comunicações ou alterar segurança/privacidade sem autorização clara para a ação específica.
+
+## Instalação e integração
+
+O caminho de instalação depende do sistema operacional, do conector e do transporte escolhidos pelo usuário. Primeiro inspecione o ambiente e a documentação de instalação vigente; não imponha Tailscale, Aperture ou RDC.
+
+1. Verifique se o servidor Jarvis MCP está instalado e saudável.
+2. Escolha ou reutilize um conector MCP e uma rota de transporte compatível, segura e autorizada.
+3. Configure o acesso ao alvo sem expor portas ou credenciais.
+4. Emparelhe/autorize o dispositivo Android para o método de controle escolhido, quando necessário.
+5. Registre/exponha as novas ferramentas Android de forma aditiva no servidor MCP existente.
+6. Teste separadamente: saúde do servidor, handshake MCP, descoberta das ferramentas, conectividade do transporte, acessibilidade do alvo e uma chamada real segura.
+7. Execute testes unitários e CI; confirme que as ferramentas desktop continuam inalteradas.
+
+## Estado e limites desta etapa
+
+O adaptador ADB é um componente de baixo nível, não um agente de planejamento semântico. Até que a integração aditiva com o servidor MCP seja implementada e verificada, não alegar que o seletor desktop/Android funciona nem que o ChatGPT já consegue controlar o telefone.
+
+Testes com subprocesses simulados verificam construção de comandos e tratamento de erros, mas não provam conectividade real nem compatibilidade ponta a ponta. O teste real exige dispositivo autorizado e ferramenta MCP descoberta pelo agente.
