@@ -47,7 +47,8 @@
     "task_runner": "app.application.services.task_runner.TaskRunner",
     "browser_manager": "app.adapters.infrastructure.browser_manager.BrowserManager",
     "playwright_worker": "app.adapters.infrastructure.playwright_worker.PlaywrightWorker",
-    "persistent_shell_adapter": "app.adapters.infrastructure.persistent_shell_adapter.PersistentShellAdapter",    "audit_logger": "app.adapters.infrastructure.audit_logger.AuditLogger",
+    "persistent_shell_adapter": "app.adapters.infrastructure.persistent_shell_adapter.PersistentShellAdapter",
+    "audit_logger": "app.adapters.infrastructure.audit_logger.AuditLogger",
     "reward_adapter": "app.adapters.infrastructure.reward_adapter.RewardAdapter",
     "reward_logger": "app.adapters.infrastructure.reward_logger.RewardLogger",
     "adapter_registry": "app.adapters.infrastructure.adapter_registry.AdapterRegistry",
@@ -85,17 +86,19 @@
     "vocal_orchestrator": "app.domain.services.vocal_orchestrator.VocalOrchestrator",
     "automation_adapter": "app.adapters.edge.automation_adapter.AutomationAdapter",
     "field_vision": "app.adapters.edge.field_vision.FieldVision",
-    "curiosity_engine": "app.application.services.curiosity_engine.CuriosityEngine"
+    "curiosity_engine": "app.application.services.curiosity_engine.CuriosityEngine",
+    "curiosity_intake": "app.application.services.curiosity_intake.CuriosityIntake"
   },
   "metadata": {
     "version": "2026.03",
-    "last_updated": "2026-03-20T20:00:00Z",
+    "last_updated": "2026-10-24T00:00:00Z",
     "total_components": 92,
     "core_components": 15,
     "memory_components": 5,
     "adapter_components": 42,
     "service_components": 25,
     "edge_components": 10,
-    "macrodroid_integration": true,    "ci_cd_friendly": true
+    "macrodroid_integration": true,
+    "ci_cd_friendly": true
   }
 }
