@@ -10,16 +10,17 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/** Stores the short-lived API access token encrypted by an Android Keystore key. */
+/** Encrypts short-lived access and rotating refresh tokens using Android Keystore. */
 class TokenVault(context: Context) {
     private val prefs = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
     private val alias = "jarvis_mobile_token_key"
 
-    fun save(token: String) {
-        require(token.isNotBlank()) { "Token must not be blank" }
+    fun save(accessToken: String, refreshToken: String? = null) {
+        require(accessToken.isNotBlank()) { "Access token must not be blank" }
+        val payload = accessToken + if (refreshToken.isNullOrBlank()) "" else "\n" + refreshToken
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
-        val ciphertext = cipher.doFinal(token.toByteArray(Charsets.UTF_8))
+        val ciphertext = cipher.doFinal(payload.toByteArray(Charsets.UTF_8))
         val iv = Base64.encodeToString(cipher.iv, Base64.NO_WRAP)
         val body = Base64.encodeToString(ciphertext, Base64.NO_WRAP)
         check(prefs.edit().putString("iv", iv).putString("body", body).commit()) {
@@ -27,7 +28,13 @@ class TokenVault(context: Context) {
         }
     }
 
-    fun read(): String? {
+    fun read(): String? = readPayload()?.substringBefore('\n')?.takeIf { it.isNotBlank() }
+
+    fun readRefreshToken(): String? = readPayload()?.let {
+        it.substringAfter('\n', "").takeIf { refresh -> refresh.isNotBlank() }
+    }
+
+    private fun readPayload(): String? {
         val iv = prefs.getString("iv", null) ?: return null
         val body = prefs.getString("body", null) ?: return null
         return try {
@@ -45,11 +52,11 @@ class TokenVault(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().clear().commit()
+        prefs.edit().remove("iv").remove("body").commit()
         try {
             KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
         } catch (_: Exception) {
-            // The encrypted preference has already been removed; key cleanup is best-effort.
+            // Encrypted credentials are already removed; key cleanup is best-effort.
         }
     }
 
