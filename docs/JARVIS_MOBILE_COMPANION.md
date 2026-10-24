@@ -91,6 +91,25 @@ A aplicação não pode garantir execução ininterrupta nem inicializar arbitra
 - Android: visão geral de foreground services — https://developer.android.com/develop/background-work/services/fgs
 - Firebase: receber mensagens em apps Android — https://firebase.google.com/docs/cloud-messaging/android/receive-messages
 
+## Implementação em andamento — 2026-10-24
+
+O primeiro incremento foi implementado nesta branch:
+
+- Projeto Android nativo isolado em `mobile/android`, Kotlin + Jetpack Compose.
+- Login OAuth2 por HTTPS, senha não persistida e token cifrado com AES-GCM usando chave do Android Keystore.
+- TTS local em português e serviço de conexão WebSocket opcional, iniciado pelo usuário com notificação persistente.
+- O serviço aceita apenas a ação de fala, limita o texto a 1.000 caracteres e retorna o resultado da tarefa.
+- Conexões WebSocket com `device_type=mobile` agora exigem JWT Bearer válido; o identificador é namespaceado com a identidade autenticada.
+- Os endpoints HTTP de listagem e despacho do bridge também exigem JWT. Testes locais específicos: 6 passaram.
+- CI Android configurado para compilar o APK de debug. A primeira execução revelou que `setup-android@v3` tenta instalar o pacote SDK removido `tools`; foi corrigida para `setup-android@v4` com `platform-tools` explícito. A compilação após essa correção ainda precisa terminar.
+
+### Limitações ainda abertas
+
+- O token OAuth2 padrão expira em 30 minutos. O serviço WebSocket não é uma presença confiável de longo prazo até existir uma sessão de dispositivo renovável e revogável.
+- FCM não está configurado; isso exige um projeto Firebase e configuração de servidor que não devem ser inventados. Sem FCM, o canal depende de o serviço em primeiro plano continuar permitido pelo Android.
+- O Android impõe limite de seis horas por janela de 24 horas a serviços foreground do tipo `dataSync` em apps que miram API 35. O serviço encerra no callback de timeout; não tenta contornar a regra.
+- A saudação PC→telefone ainda não está ponta a ponta: o watcher Windows não publica evento autenticado ao núcleo e não há push FCM. Não foi instalado APK no telefone nem alterada a produção.
+
 ## Estado desta proposta
 
-Este documento define a arquitetura e as etapas; não significa que o aplicativo nativo, FCM, o canal autenticado ou a saudação PC→telefone já estejam implementados. A primeira mudança de código deve fechar a lacuna de autenticação e adicionar testes antes de conectar o cliente móvel.
+A base nativa e a primeira camada de autenticação estão implementadas, mas o canal de eventos ainda não é uma solução conclusiva de presença persistente. Não marcar a integração PC→telefone como concluída até resolver a sessão de dispositivo renovável/revogável, a configuração FCM e os testes em dispositivo Android real.
