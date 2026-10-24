@@ -58,6 +58,9 @@ graph LR
     skills_jarvis-multi-agent-coordination["<b>jarvis-multi-agent-coordination</b>"]
     class skills_jarvis-multi-agent-coordination support
     skills --> skills_jarvis-multi-agent-coordination
+    skills_jarvis-context-memory["<b>jarvis-context-memory</b>"]
+    class skills_jarvis-context-memory support
+    skills --> skills_jarvis-context-memory
     static["<b>static</b>"]
     class static support
     backups["<b>backups</b>"]
