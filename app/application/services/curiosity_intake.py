@@ -7,13 +7,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from app.core.nexus import NexusComponent
+
 
 _DEFAULT_STORE = Path("data/curiosity/inbox.jsonl")
 _MAX_TEXT = 4000
 _SOURCE_TYPES = {"research", "news", "paper", "conversation", "idea", "error", "tool", "metric", "other"}
 
 
-class CuriosityIntake:
+class CuriosityIntake(NexusComponent):
     """Nexus component that records evidence-aware discovery cards.
 
     This component is deliberately observational: it never executes source
@@ -22,6 +24,7 @@ class CuriosityIntake:
     """
 
     def __init__(self, storage_path: Optional[str] = None) -> None:
+        super().__init__()
         self.storage_path = Path(storage_path) if storage_path else _DEFAULT_STORE
 
     def configure(self, config: Dict[str, Any]) -> None:
