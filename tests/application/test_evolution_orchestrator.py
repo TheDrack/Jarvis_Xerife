@@ -333,3 +333,13 @@ class TestEvolutionOrchestratorFullCycle:
 
         assert result["success"] is True
         mock_cap_manager.get_executable_capabilities.assert_called_once()
+
+
+
+def test_orchestrator_does_not_run_cycle_without_explicit_opt_in(orchestrator, monkeypatch):
+    monkeypatch.delenv("EVOLUTION_ENABLED", raising=False)
+    with patch.object(orchestrator, "_run_cycle") as run_cycle:
+        result = orchestrator.execute({"error_snippet": "must stay paused"})
+    assert result["success"] is False
+    assert result["reason"] == "evolution_paused"
+    run_cycle.assert_not_called()
