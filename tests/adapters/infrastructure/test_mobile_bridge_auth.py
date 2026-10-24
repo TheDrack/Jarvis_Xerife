@@ -162,3 +162,20 @@ def test_bridge_task_dispatch_rejects_another_users_mobile_device(monkeypatch):
 
     assert response.status_code == 403
     assert manager.sent_tasks == []
+
+
+def test_mobile_task_dispatch_never_receives_desktop_bridge_secret(monkeypatch):
+    manager = FakeBridgeManager()
+    client = _client(monkeypatch, manager)
+    monkeypatch.setenv("API_KEY_LOCAL", "server-side-test-key")
+
+    response = client.post(
+        "/v1/local-bridge/send-task?device_id=mobile%3Auser-123%3Aphone-1",
+        json={"action": "speak", "parameters": {"text": "Jarvis pronto"}},
+        headers={"Authorization": "Bearer valid"},
+    )
+
+    assert response.status_code == 200
+    assert manager.sent_tasks == [
+        ("mobile:user-123:phone-1", {"action": "speak", "parameters": {"text": "Jarvis pronto"}}, None)
+    ]
