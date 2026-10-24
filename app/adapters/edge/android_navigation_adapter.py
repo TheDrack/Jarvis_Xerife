@@ -70,8 +70,8 @@ class AndroidNavigationAdapter:
             return {"success": False, "status": "input_too_long"}
         # Escape remote-shell metacharacters as well as Android's text escapes.
         escaped = text.replace("%", "%25").replace(" ", "%s")
-        shell_metacharacters = set('\\"\'$`;&|<>()[ ]{}*!?~#')
-        escaped = "".join(("\\\\" + char) if char in shell_metacharacters else char for char in escaped)
+        shell_metacharacters = {chr(code) for code in (92, 34, 39, 36, 96, 59, 38, 124, 60, 62, 40, 41, 91, 93, 123, 125, 42, 33, 63, 126, 35)}
+        escaped = "".join((chr(92) + char) if char in shell_metacharacters else char for char in escaped)
         return self._action("shell", "input", "text", escaped)
 
     def _action(self, *args: str) -> dict[str, Any]:
