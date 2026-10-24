@@ -53,6 +53,19 @@ class TestVisionAdapter:
         result = adapter._analyze_with_gemini(b"fake", "descricao")
         assert result is None
 
+    def test_capture_screenshot_skips_headless_linux(self, adapter, monkeypatch):
+        """Cloud Linux without a display should not probe GUI libraries."""
+        import sys
+
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.delenv("DISPLAY", raising=False)
+        monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+
+        with patch("builtins.__import__", side_effect=AssertionError("unexpected GUI import")) as importer:
+            assert adapter._capture_screenshot() is None
+
+        importer.assert_not_called()
+
     def test_capture_screenshot_fallback_on_no_mss(self, adapter):
         """If mss and PIL are unavailable, _capture_screenshot returns None gracefully."""
         with patch.dict("sys.modules", {"mss": None, "PIL": None, "PIL.ImageGrab": None}):
