@@ -113,6 +113,7 @@ def test_evolve_all_pending_unknown_cap_id_fails():
     resolved (CAP-999 does not exist in data/capabilities.jrvs).
     """
     env = os.environ.copy()
+    env["EVOLUTION_ENABLED"] = "true"
     env.pop('ISSUE_BODY', None)  # Ensure no cap-id can be inferred from the environment
     # Keep subprocess text output deterministic on Windows CI with emoji output.
     env['PYTHONIOENCODING'] = 'utf-8'
