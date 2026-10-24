@@ -2,7 +2,7 @@ from app.core.nexus import NexusComponent
 # -*- coding: utf-8 -*-
 """Tests for SQLite History Adapter"""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -67,7 +67,9 @@ class TestSQLiteHistoryAdapter(NexusComponent):
 
     def test_get_recent_history(self, adapter):
         """Test getting recent command history"""
-        # Add multiple interactions
+        # Use explicit monotonic timestamps so this test verifies ordering,
+        # not timing differences between inserts on the CI runner.
+        base_timestamp = datetime(2024, 1, 1, 12, 0, 0)
         for i in range(5):
             adapter.save_interaction(
                 user_input=f"command {i}",
@@ -75,6 +77,7 @@ class TestSQLiteHistoryAdapter(NexusComponent):
                 parameters={"index": i},
                 success=True,
                 response_text=f"Response {i}",
+                timestamp=base_timestamp + timedelta(seconds=i),
             )
 
         # Get recent history (default limit)
