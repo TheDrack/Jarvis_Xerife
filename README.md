@@ -224,6 +224,7 @@ python -c "from app.adapters.infrastructure.docker_sandbox import DockerSandbox;
 ## 📚 Documentação
 
 - → Veja [docs/ARQUIVO_MAP.md](docs/ARQUIVO_MAP.md) para lista completa de arquivos
+- → Veja [docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md](docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md) para o protocolo de inicialização e consolidação de memória das IAs.
 - → Veja [docs/STATUS.md](docs/STATUS.md) para status detalhado
 - → Veja [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para arquitetura completa
 - → Veja [docs/NEXUS.md](docs/NEXUS.md) para documentação do Nexus DI
