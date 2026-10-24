@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -71,7 +72,7 @@ class CuriosityIntake(NexusComponent):
             "source_uri": source_uri or None,
             "source_title": title or None,
             "observation": observation,
-            "evidence_level": str(ctx.get("evidence_level", "unverified")),
+            "evidence_level": self._evidence_level(ctx.get("evidence_level", "unverified")),
             "user_benefit": self._text(ctx.get("user_benefit"), 1000) or None,
             "jarvis_benefit": self._text(ctx.get("jarvis_benefit"), 1000) or None,
             "connections": self._string_list(ctx.get("connections")),
@@ -83,7 +84,7 @@ class CuriosityIntake(NexusComponent):
             ],
             "experiment": self._text(ctx.get("experiment"), 1000) or None,
             "risks": self._string_list(ctx.get("risks")),
-            "priority": ctx.get("priority", {"impact": "unknown", "effort": "unknown", "confidence": "low"}),
+            "priority": self._priority(ctx.get("priority")),
             "status": "captured",
             "next_action": self._text(ctx.get("next_action"), 500) or "Investigate sources, relevance, existing implementations, and a measurable low-risk test.",
         }
@@ -111,7 +112,31 @@ class CuriosityIntake(NexusComponent):
     def _text(value: Any, limit: int) -> str:
         if not isinstance(value, str):
             return ""
-        return value.strip()[:limit]
+        text = value.strip()[:limit]
+        # Best-effort redaction of common credential formats before persistence.
+        patterns = (
+            (r"(?i)\b(?:ghp|github_pat|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{10,}\b", "[REDACTED_TOKEN]"),
+            (r"(?i)\bsk-[A-Za-z0-9_-]{16,}\b", "[REDACTED_API_KEY]"),
+            (r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}", "Bearer [REDACTED_TOKEN]"),
+            (r"(?i)\b(api[_-]?key|access[_-]?token|secret|password)\s*[:=]\s*[^\s,;]+", r"\1=[REDACTED]"),
+        )
+        for pattern, replacement in patterns:
+            text = re.sub(pattern, replacement, text)
+        return text
+
+    @staticmethod
+    def _evidence_level(value: Any) -> str:
+        allowed = {"unverified", "reported", "documented", "replicated", "validated"}
+        normalized = str(value).strip().lower()
+        return normalized if normalized in allowed else "unverified"
+
+    @staticmethod
+    def _priority(value: Any) -> Dict[str, str]:
+        default = {"impact": "unknown", "effort": "unknown", "confidence": "low"}
+        if not isinstance(value, dict):
+            return default
+        allowed = ("impact", "effort", "confidence", "urgency")
+        return {key: str(value.get(key, default.get(key, "unknown")))[:40] for key in allowed}
 
     @classmethod
     def _string_list(cls, value: Any) -> list[str]:
