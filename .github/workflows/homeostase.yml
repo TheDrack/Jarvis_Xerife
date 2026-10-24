@@ -89,7 +89,7 @@ jobs:
         if: steps.gatekeeper.outputs.authorized == 'true'
         run: |
           uv venv --clear --python 3.11
-          uv pip install -r requirements/core.txt pytest 'pytest-asyncio>=0.23.0' pytest-json-report pytest-cov anyio autopep8 requests pillow opencv-python-headless
+          uv pip install -r requirements/core.txt pytest 'pytest-asyncio>=0.23.0' pytest-json-report pytest-cov anyio autopep8 requests pillow opencv-python-headless 'mcp>=1.26,<2'
 
       - name: 🔍 Buscar Logs do Workflow com Falha
         if: steps.gatekeeper.outputs.authorized == 'true' && github.event_name == 'workflow_run'
