@@ -21,11 +21,13 @@
 | Remote Windows / visual automation | Observe UI, navigate apps and perform authorized desktop workflows | Remote Desktop Commander / Jarvis visual-navigation skill, when exposed. Prefer accessibility/DOM, then image templates, then coordinates. Ask before closing or deleting items. |
 | MCP / agent communication | Discover and invoke tools exposed through configured MCP connectors; exchange structured task messages where supported | Use the live MCP tool list and connector documentation. A message is not an authorization grant. |
 | Shared task queue | Enqueue, claim, finish and recover priority-scheduled tasks using PostgreSQL leases | Jarvis task-queue API/service and migrations `202610230002`–`202610230004`; only use against the configured shared PostgreSQL database. |
-| Self-healing / recovery history | Record recovery runs, checkpoints and append-only recovery events | Jarvis recovery subsystem and migration `202610230001_recovery_history.sql`; preserve evidence and verify rollback before claiming recovery. |\n| Context & memory lifecycle | Bootstrap, reconcile, compact, deduplicate, and persist useful context across compatible agent runtimes | [Context & Memory Protocol](CONTEXT_MEMORY_PROTOCOL.md) and [jarvis-context-memory skill](../../skills/jarvis-context-memory/SKILL.md); provider-native memory is optional and must not be falsely claimed. |
+| Self-healing / recovery history | Record recovery runs, checkpoints and append-only recovery events | Jarvis recovery subsystem and migration `202610230001_recovery_history.sql`; preserve evidence and verify rollback before claiming recovery. |
+| Context & memory lifecycle | Bootstrap, reconcile, compact, deduplicate, and persist useful context across compatible agent runtimes | [Context & Memory Protocol](CONTEXT_MEMORY_PROTOCOL.md) and [jarvis-context-memory skill](../../skills/jarvis-context-memory/SKILL.md); provider-native memory is optional and must not be falsely claimed. |
 
 ## Relevant runbooks
 
-- [Context & Memory Protocol](CONTEXT_MEMORY_PROTOCOL.md)\n- [Multi-agent platform and task protocol](../architecture/jarvis-multi-agent-platform.md)
+- [Context & Memory Protocol](CONTEXT_MEMORY_PROTOCOL.md)
+- [Multi-agent platform and task protocol](../architecture/jarvis-multi-agent-platform.md)
 - [Remote access: RDC → Aperture → Tailscale → Jarvis](../ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md)
 - [Visual navigation](../NAVEGACAO_VISUAL.md)
 - [Usage guide](../GUIA_DE_USO.md)
