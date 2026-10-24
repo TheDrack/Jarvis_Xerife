@@ -170,7 +170,9 @@ class MainActivity : ComponentActivity() {
         executor.execute {
             try {
                 if (!refreshToken.isNullOrBlank()) MobilePushClient.revokePushNow(applicationContext)
-                if (!refreshToken.isNullOrBlank() && !deviceId.isNullOrBlank() && baseUrl.startsWith("https://")) {
+                // Push revocation may refresh/rotate the session; revoke with the latest token.
+                val currentRefreshToken = vault.readRefreshToken() ?: refreshToken
+                if (!currentRefreshToken.isNullOrBlank() && !deviceId.isNullOrBlank() && baseUrl.startsWith("https://")) {
                     val connection = (URL(baseUrl.trimEnd('/') + "/v1/mobile/session/revoke")
                         .openConnection() as HttpURLConnection)
                     try {
@@ -180,7 +182,7 @@ class MainActivity : ComponentActivity() {
                         connection.doOutput = true
                         connection.setRequestProperty("Content-Type", "application/json")
                         val body = JSONObject()
-                            .put("refresh_token", refreshToken)
+                            .put("refresh_token", currentRefreshToken)
                             .put("device_id", deviceId)
                             .toString()
                         connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
