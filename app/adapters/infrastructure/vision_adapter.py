@@ -10,6 +10,7 @@ Implements :class:`app.core.nexuscomponent.NexusComponent`.
 
 import logging
 import os
+import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -104,6 +105,18 @@ class VisionAdapter(NexusComponent):
 
     def _capture_screenshot(self) -> Optional[bytes]:
         """Take a silent screenshot using Pillow / mss (if available)."""
+        # Cloud Linux services are normally headless; do not probe GUI libraries
+        # or emit dependency warnings when no display server exists.
+        if (
+            sys.platform.startswith("linux")
+            and not os.environ.get("DISPLAY")
+            and not os.environ.get("WAYLAND_DISPLAY")
+        ):
+            logger.debug(
+                "📸 [VisionAdapter] Captura ignorada: ambiente Linux sem servidor gráfico."
+            )
+            return None
+
         # Try mss (fastest, no dependencies besides itself)
         try:
             import mss
