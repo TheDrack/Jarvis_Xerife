@@ -60,3 +60,18 @@ def test_key_allowlist_and_text_length(monkeypatch):
     assert adapter.press_key("POWER")["status"] == "unsupported_key"
     assert adapter.type_text("x" * 2001)["status"] == "input_too_long"
     assert calls == []
+
+
+
+def test_type_text_escapes_shell_metacharacters(monkeypatch):
+    calls = []
+    monkeypatch.setattr(subprocess, "run", lambda args, **kwargs: (calls.append(args) or completed(args)))
+    adapter = AndroidNavigationAdapter(device_address="phone-1")
+    result = adapter.type_text("hello world;$(id)%")
+    assert result["success"] is True
+    sent = calls[0][-1]
+    assert "%s" in sent
+    assert "\\;" in sent
+    assert "\\$" in sent
+    assert "\\(" in sent
+    assert "%25" in sent
