@@ -16,8 +16,13 @@ def test_curiosity_intake_is_registered_and_exposed_through_mcp():
     mcp_source = (ROOT / "app/adapters/edge/jarvis_desktop_mcp.py").read_text(encoding="utf-8")
     assert "def curiosity_capture(" in mcp_source
     assert "def curiosity_list_recent(" in mcp_source
+    assert "def reconnection_briefing(" in mcp_source
     assert "curiosity_capture" in mcp_source
     assert "curiosity_list_recent" in mcp_source
+    assert "reconnection_briefing" in mcp_source
+    assert registry["components"]["reconnection_briefing"] == (
+        "app.application.services.reconnection_briefing.ReconnectionBriefing"
+    )
 
 
 def test_repository_default_context_is_paused_and_health_is_unknown():
