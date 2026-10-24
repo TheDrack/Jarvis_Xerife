@@ -88,14 +88,20 @@ def create_bridge_router() -> APIRouter:
             bridge_manager.disconnect(canonical_device_id)
 
     @router.get("/v1/local-bridge/devices")
-    async def list_connected_devices(\n        _principal: Dict[str, Any] = Depends(require_authenticated_principal),\n    ) -> Dict[str, Any]:
+    async def list_connected_devices(
+        _principal: Dict[str, Any] = Depends(require_authenticated_principal),
+    ) -> Dict[str, Any]:
         """List all currently connected soldier devices and their capabilities."""
         bridge_manager = nexus.resolve("soldier_bridge")
         soldiers = bridge_manager.get_connected_soldiers()
         return {"connected_devices": soldiers, "count": len(soldiers)}
 
     @router.post("/v1/local-bridge/send-task")
-    async def send_task_to_local_device(\n        device_id: str,\n        task: Dict[str, Any],\n        _principal: Dict[str, Any] = Depends(require_authenticated_principal),\n    ) -> Any:
+    async def send_task_to_local_device(
+        device_id: str,
+        task: Dict[str, Any],
+        _principal: Dict[str, Any] = Depends(require_authenticated_principal),
+    ) -> Any:
         """Send a task to a connected soldier device using the configured server key."""
         bridge_manager = nexus.resolve("soldier_bridge")
         if not bridge_manager.is_device_connected(device_id):
