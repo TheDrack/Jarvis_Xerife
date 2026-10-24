@@ -3,6 +3,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# Capture the checked-in snapshot during collection, before legacy tests mutate this file.
+_CONTEXT_SNAPSHOT = json.loads((ROOT / "data/context.json").read_text(encoding="utf-8"))
 
 
 def test_curiosity_intake_is_registered_and_exposed_through_mcp():
@@ -19,8 +21,7 @@ def test_curiosity_intake_is_registered_and_exposed_through_mcp():
 
 
 def test_repository_default_context_is_paused_and_health_is_unknown():
-    context = json.loads((ROOT / "data/context.json").read_text(encoding="utf-8"))
-    assert context["evolution_state"] == "paused"
-    assert context["system_health"]["status"] == "unknown"
-    assert context["system_health"]["cpu_percent"] is None
-    assert context["system_health"]["ram_percent"] is None
+    assert _CONTEXT_SNAPSHOT["evolution_state"] == "paused"
+    assert _CONTEXT_SNAPSHOT["system_health"]["status"] == "unknown"
+    assert _CONTEXT_SNAPSHOT["system_health"]["cpu_percent"] is None
+    assert _CONTEXT_SNAPSHOT["system_health"]["ram_percent"] is None
