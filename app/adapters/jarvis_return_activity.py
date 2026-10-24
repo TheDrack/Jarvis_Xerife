@@ -71,6 +71,7 @@ def _acquire_single_instance() -> object:
         return None
     return handle
 
+
 def main() -> int:
     if sys.platform != "win32":
         print("Jarvis return-activity watcher requires Windows.", file=sys.stderr)
