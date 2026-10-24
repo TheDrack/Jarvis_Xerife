@@ -46,7 +46,7 @@ def test_observe_screen_returns_base64_png(monkeypatch):
 
 def test_observe_screen_handles_transport_error(monkeypatch):
     def fail(*args, **kwargs):
-        raise subprocess.TimeoutExpired(args=args, timeout=1)
+        raise subprocess.TimeoutExpired(cmd=args, timeout=1)
     monkeypatch.setattr(subprocess, "run", fail)
     result = AndroidNavigationAdapter(device_address="phone-1").observe_screen()
     assert result["success"] is False
