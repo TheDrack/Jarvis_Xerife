@@ -50,7 +50,7 @@ def test_catalog_links_to_the_portable_skill_and_protocol():
 
 def test_status_envelope_defaults_to_not_persisted():
     protocol = _read("docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md")
-    match = re.search(r"```json\s*(\{.*?\})\s*```", protocol, re.DOTALL)
+    match = re.search(r"```json\s*(.*?)\s*```", protocol, re.DOTALL)
     assert match, "protocol must publish a machine-readable status envelope"
     envelope = json.loads(match.group(1))
     assert envelope["protocol"] == "JCMP/1.0"
