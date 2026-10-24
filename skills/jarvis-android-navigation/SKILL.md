@@ -20,7 +20,7 @@ Use esta skill quando o alvo solicitado for um telefone/tablet Android. Ela desc
 2. Identifique o alvo explicitamente como Android, sem redirecionar chamadas desktop silenciosamente.
 3. Resolva o dispositivo por identidade/cadastro autorizado ou configuração explícita confiável. Nunca selecione outro dispositivo automaticamente.
 4. Confirme que o transporte está alcançando o alvo e que o método de controle está autorizado. IP acessível não significa que ADB está emparelhado.
-5. Se as ferramentas Android não estiverem na lista MCP, relate esse bloqueio. Um arquivo adaptador ou variável de ambiente, isoladamente, não significa que a ferramenta esteja exposta.
+5. As ferramentas Android esperadas são `android_observe_screen`, `android_tap`, `android_swipe`, `android_press_key` e `android_type_text`; confirme que aparecem na lista MCP do servidor conectado. Se não estiverem, relate esse bloqueio. Um arquivo adaptador ou variável de ambiente, isoladamente, não prova que a ferramenta esteja exposta.
 
 ## Observe → aja → verifique
 
