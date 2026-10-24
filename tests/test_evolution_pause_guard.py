@@ -17,4 +17,5 @@ def test_evolution_batch_script_requires_explicit_opt_in():
         timeout=30,
     )
     assert result.returncode == 2
-    assert "Autoevolução pausada" in result.stdout
+    output = (result.stdout or "") + (result.stderr or "")
+    assert "Autoevolução pausada" in output
