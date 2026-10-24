@@ -82,7 +82,7 @@ class TestAuthAdapterSupabaseFallback:
             {"id": "uuid-123", "email": "new@example.com", "full_name": "New User"}
         ]
         with patch(
-            "app.adapters.infrastructure.supabase_client.get_supabase_client",
+            "app.adapters.infrastructure.supabase_client.get_supabase_admin_client",
             return_value=mock_client,
         ):
             result = adapter.create_user("new@example.com", "pass123", "New User")
@@ -103,7 +103,7 @@ class TestAuthAdapterSupabaseFallback:
             }
         ]
         with patch(
-            "app.adapters.infrastructure.supabase_client.get_supabase_client",
+            "app.adapters.infrastructure.supabase_client.get_supabase_admin_client",
             return_value=mock_client,
         ):
             user = adapter.authenticate_user("su@example.com", "supapass")

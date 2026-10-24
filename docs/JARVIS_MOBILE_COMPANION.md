@@ -146,3 +146,12 @@ Na inspeção somente leitura do projeto Supabase `saibtpdehhprttqlgqdt`, as qua
 - A migration `20261024202104_mobile_push_delivery.sql` cria registros de dispositivos e eventos privados com RLS e acesso apenas a `service_role`.
 - A validação local específica da segunda etapa foi: `test_mobile_push.py`, `test_mobile_sessions.py` e `test_mobile_bridge_auth.py` — **23 passed**; compilação Python e `git diff --check` também passaram. Build Android e CI completos aguardam a nova PR.
 - Ainda é obrigatório configurar um projeto Firebase real, aplicar migrations após reconciliar o histórico Supabase, implantar as variáveis secretas no ambiente correto e validar em telefone físico.
+
+## Diagnóstico de login após o merge — 2026-10-24
+
+A verificação real do serviço de produção após os merges encontrou dois bloqueios independentes:
+
+1. O serviço Render ainda estava servindo um commit anterior aos merges do cliente móvel. A verificação HTTP confirmou /health = 200, mas /v1/mobile/session/login = 404 e as rotas de push não estavam no OpenAPI. A notificação de canal indisponível no Android era o estado do serviço WebSocket, não prova de que o fallback FCM estivesse ativo.
+2. O projeto Supabase contém a tabela histórica public.user (singular), sem registros de conta, enquanto o adaptador de autenticação consultava public.users (plural). O adaptador foi ajustado para compatibilidade com os dois nomes, consulta somente pelo cliente administrativo e grava contas somente com privilégios de servidor.
+
+A correção de autenticação deve passar por CI e revisão antes de ser mesclada. Em seguida, o backend precisa ser implantado; as migrations de sessões móveis e entrega push precisam ser aplicadas na ordem (20261024200302_mobile_device_sessions.sql, depois 20261024202104_mobile_push_delivery.sql) após reconciliar o histórico remoto. O Render deve ter SUPABASE_SERVICE_ROLE_KEY; essa chave não pode ser colocada no APK nem em código. Ainda não foi criada conta nem alterado o banco de produção.

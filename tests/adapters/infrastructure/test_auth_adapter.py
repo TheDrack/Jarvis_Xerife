@@ -156,3 +156,86 @@ class TestUserAuthentication(NexusComponent):
         assert user is not None
         assert "password" not in user
         assert "hashed_password" not in user
+
+
+class _FakeSupabaseResponse:
+    def __init__(self, data):
+        self.data = data
+
+
+class _FakeSupabaseQuery:
+    def __init__(self, client, table_name):
+        self.client = client
+        self.table_name = table_name
+        self.column = None
+        self.value = None
+
+    def select(self, _columns):
+        return self
+
+    def eq(self, column, value):
+        self.column = column
+        self.value = value
+        return self
+
+    def limit(self, _limit):
+        return self
+
+    def execute(self):
+        if self.table_name != "user":
+            raise RuntimeError("legacy plural table is not present")
+        record = self.client.record
+        if record and record.get(self.column) == self.value:
+            return _FakeSupabaseResponse([record])
+        return _FakeSupabaseResponse([])
+
+
+class _FakeSupabaseClient:
+    def __init__(self, record):
+        self.record = record
+
+    def table(self, table_name):
+        return _FakeSupabaseQuery(self, table_name)
+
+
+def test_authenticate_legacy_singular_user_table(auth_adapter, monkeypatch):
+    from app.adapters.infrastructure import supabase_client
+
+    record = {
+        "id": 7,
+        "username": "owner@example.com",
+        "email": "owner@example.com",
+        "hashed_password": auth_adapter.get_password_hash("correct-horse-battery"),
+        "full_name": "Jarvis Owner",
+        "disabled": False,
+    }
+    fake_client = _FakeSupabaseClient(record)
+    monkeypatch.setattr(supabase_client, "get_supabase_admin_client", lambda: fake_client)
+    monkeypatch.setattr(supabase_client, "get_supabase_client", lambda: None)
+
+    user = auth_adapter.authenticate_user("owner@example.com", "correct-horse-battery")
+
+    assert user == {
+        "username": "owner@example.com",
+        "email": "owner@example.com",
+        "full_name": "Jarvis Owner",
+        "user_id": "7",
+    }
+
+
+def test_authenticate_legacy_user_table_rejects_wrong_password(auth_adapter, monkeypatch):
+    from app.adapters.infrastructure import supabase_client
+
+    record = {
+        "id": 7,
+        "username": "owner@example.com",
+        "email": "owner@example.com",
+        "hashed_password": auth_adapter.get_password_hash("correct-horse-battery"),
+        "full_name": "Jarvis Owner",
+        "disabled": False,
+    }
+    fake_client = _FakeSupabaseClient(record)
+    monkeypatch.setattr(supabase_client, "get_supabase_admin_client", lambda: fake_client)
+    monkeypatch.setattr(supabase_client, "get_supabase_client", lambda: None)
+
+    assert auth_adapter.authenticate_user("owner@example.com", "wrong-password") is None
