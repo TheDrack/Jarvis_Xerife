@@ -14,6 +14,13 @@ from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
 
+_TELEGRAM_TOKEN_RE = re.compile(r"/bot\d{5,}:[A-Za-z0-9_-]+")
+
+
+def _safe_telegram_error(value: Any) -> str:
+    """Remove bot-token-shaped strings before errors reach logs or chat."""
+    return _TELEGRAM_TOKEN_RE.sub("/bot[REDACTED]", str(value))
+
 _RENDER_WAKE_TIMEOUT = 30  # seconds to wait for Render to wake up
 
 
@@ -60,7 +67,7 @@ class TelegramAdapter(NexusComponent):
             payload = {"chat_id": target, "text": str(text), "parse_mode": "Markdown"}
             return self.http.request("POST", "/sendMessage", json=payload)
         except Exception as e:
-            logger.error(f"❌ [TELEGRAM] Erro ao enviar mensagem: {e}")
+            logger.error("❌ [TELEGRAM] Erro ao enviar mensagem: %s", _safe_telegram_error(e))
             return None
 
     def send_document(self, file_path: str, caption: str = "", chat_id: Any = None) -> Any:
@@ -77,7 +84,7 @@ class TelegramAdapter(NexusComponent):
                     files={"document": f},
                 )
         except Exception as e:
-            logger.error(f"💥 [TELEGRAM] Erro no upload de documento: {e}")
+            logger.error("💥 [TELEGRAM] Erro no upload de documento: %s", _safe_telegram_error(e))
             return None
 
     def get_updates(self, offset: int = 0, timeout: int = 10) -> list:
@@ -90,7 +97,7 @@ class TelegramAdapter(NexusComponent):
             if response.status_code == 200:
                 return response.json().get("result", [])
         except Exception as e:
-            logger.debug(f"Fetch updates fail: {e}")
+            logger.debug("Fetch updates failed: %s", _safe_telegram_error(e))
         return []
 
     def set_webhook(self, url: str, secret_token: Optional[str] = None) -> bool:
@@ -111,10 +118,10 @@ class TelegramAdapter(NexusComponent):
             if ok:
                 logger.info(f"✅ [TELEGRAM] Webhook registrado em {url}")
             else:
-                logger.error(f"❌ [TELEGRAM] setWebhook recusado: {response.text}")
+                logger.error("❌ [TELEGRAM] setWebhook recusado (HTTP %s)", response.status_code)
             return ok
         except Exception as e:
-            logger.error(f"❌ [TELEGRAM] Erro ao registrar webhook: {e}")
+            logger.error("❌ [TELEGRAM] Erro ao registrar webhook: %s", _safe_telegram_error(e))
             return False
 
     def delete_webhook(self) -> bool:
@@ -125,7 +132,7 @@ class TelegramAdapter(NexusComponent):
             response = self.http.request("POST", "/deleteWebhook")
             return bool(response.json().get("ok", False))
         except Exception as e:
-            logger.error(f"❌ [TELEGRAM] Erro ao remover webhook: {e}")
+            logger.error("❌ [TELEGRAM] Erro ao remover webhook: %s", _safe_telegram_error(e))
             return False
 
     # ------------------------------------------------------------------
@@ -155,7 +162,7 @@ class TelegramAdapter(NexusComponent):
                     return None
 
         if callback:
-            logger.info(f"📩 [TELEGRAM] Mensagem recebida de {chat_id}: {text}")
+            logger.info("📩 [TELEGRAM] Mensagem recebida de %s", chat_id)
             try:
                 response = callback(text, chat_id)
                 if response:
@@ -168,9 +175,9 @@ class TelegramAdapter(NexusComponent):
                     self.send_message(clean_text, chat_id=chat_id)
                 return response
             except Exception as e:
-                logger.error(f"💥 [TELEGRAM] Erro no callback: {e}")
-                self.send_message(f"⚠️ Erro ao processar comando: {str(e)}", chat_id=chat_id)
-                return str(e)
+                logger.error("💥 [TELEGRAM] Erro no callback: %s", _safe_telegram_error(e))
+                self.send_message("⚠️ Erro ao processar comando. Consulte os logs do servidor.", chat_id=chat_id)
+                return "Erro interno ao processar comando"
         return None
 
     # ------------------------------------------------------------------
@@ -209,7 +216,7 @@ class TelegramAdapter(NexusComponent):
                         self.handle_update(u, callback=callback)
                 time.sleep(interval)
             except Exception as e:
-                logger.error(f"⚠️ [TELEGRAM] Erro no loop de polling: {e}")
+                logger.error("⚠️ [TELEGRAM] Erro no loop de polling: %s", _safe_telegram_error(e))
                 time.sleep(5)
 
     # ------------------------------------------------------------------
@@ -252,7 +259,7 @@ class TelegramAdapter(NexusComponent):
             if isinstance(file_path, str) and os.path.exists(file_path):
                 self.send_document(file_path, caption="📦 *Nexus DNA Backup*")
         except Exception as e:
-            logger.error(f"💥 [TELEGRAM] execute error: {e}")
+            logger.error("💥 [TELEGRAM] execute error: %s", _safe_telegram_error(e))
         return context
 
     def _action_upload_backup(self, context: dict) -> dict:
