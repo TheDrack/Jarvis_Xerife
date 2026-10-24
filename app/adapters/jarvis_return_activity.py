@@ -46,8 +46,8 @@ def get_idle_seconds() -> float:
 
 
 def speak_welcome() -> None:
-    """Speak through the Windows speech engine without requiring audio hardware on this PC."""
-    command = r'''$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; try { $v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq 'pt-BR' } | Select-Object -First 1; if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; $s.Speak('Você voltou. Estou ativo e pronto para continuar.'); } finally { $s.Dispose() }'''
+    """Speak through the Windows speech engine using the default audio output."""
+    command = r'''$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; try { $v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq 'pt-BR' } | Select-Object -First 1; if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; $s.Speak('VocÃª voltou. Estou ativo e pronto para continuar.'); } finally { $s.Dispose() }'''
     subprocess.run(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", command],
         check=False,
@@ -58,10 +58,26 @@ def speak_welcome() -> None:
     )
 
 
+def _acquire_single_instance() -> object:
+    """Keep one watcher per interactive user session."""
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.wintypes.BOOL, ctypes.wintypes.LPCWSTR]
+    kernel32.CreateMutexW.restype = ctypes.wintypes.HANDLE
+    ctypes.set_last_error(0)
+    handle = kernel32.CreateMutexW(None, True, "Local\\JarvisReturnActivityWatcher")
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    if ctypes.get_last_error() == 183:
+        return None
+    return handle
+
 def main() -> int:
     if sys.platform != "win32":
         print("Jarvis return-activity watcher requires Windows.", file=sys.stderr)
         return 2
+    mutex = _acquire_single_instance()
+    if mutex is None:
+        return 0
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=LOG_FILE, level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s", encoding="utf-8")
