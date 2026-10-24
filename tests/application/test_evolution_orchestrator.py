@@ -8,7 +8,9 @@ from app.application.services.evolution_orchestrator import EvolutionOrchestrato
 
 
 @pytest.fixture
-def orchestrator():
+def orchestrator(monkeypatch):
+    # Unit tests explicitly opt in; production/default runtime remains paused.
+    monkeypatch.setenv("EVOLUTION_ENABLED", "true")
     return EvolutionOrchestrator()
 
 
