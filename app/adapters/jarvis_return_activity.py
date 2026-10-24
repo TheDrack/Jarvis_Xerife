@@ -13,9 +13,9 @@ import os
 import subprocess
 import sys
 import time
-from pathlib import Path
 import http.client
 import ssl
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from app.application.return_activity_service import ReturnActivityDetector
@@ -53,7 +53,7 @@ def _send_welcome_to_mobile() -> bool:
     base_url = os.getenv("JARVIS_API_BASE_URL", "https://jarvis-api-c47i.onrender.com").strip().rstrip("/")
     key = os.getenv("JARVIS_RETURN_ACTIVITY_KEY", "").strip()
     if not key:
-        key_path = LOG_DIR.parent / "config" / "return_activity.key"
+        key_path = LOG_DIR.parent / "config" / "return_activity" / "return_activity.key"
         try:
             key = key_path.read_text(encoding="utf-8").strip()
         except OSError:

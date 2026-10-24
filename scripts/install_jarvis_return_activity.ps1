@@ -2,8 +2,16 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $runtime = Join-Path $env:LOCALAPPDATA 'Jarvis_Xerife\runtime'
 $startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
-$config = Join-Path $env:LOCALAPPDATA 'Jarvis_Xerife\config'
+$config = Join-Path $env:LOCALAPPDATA 'Jarvis_Xerife\config\return_activity'
 New-Item -ItemType Directory -Path $runtime,$startup,$config -Force | Out-Null
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+$acl = Get-Acl -LiteralPath $config
+$acl.SetAccessRuleProtection($true, $false)
+$rule = New-Object Security.AccessControl.FileSystemAccessRule(
+    $identity, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'
+)
+$acl.SetAccessRule($rule)
+Set-Acl -LiteralPath $config -AclObject $acl
 $sourceRoot = Join-Path $repo 'app'
 $targetRoot = Join-Path $runtime 'app'
 New-Item -ItemType Directory -Path (Join-Path $targetRoot 'application'),(Join-Path $targetRoot 'adapters') -Force | Out-Null

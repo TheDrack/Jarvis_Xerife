@@ -163,7 +163,7 @@ A correção de autenticação deve passar por CI e revisão antes de ser mescla
 - O endpoint usa uma credencial dedicada JARVIS_RETURN_ACTIVITY_KEY, comparada em tempo constante; não reutiliza nem envia API_KEY_LOCAL ao telefone.
 - A rota aceita apenas a saudação fixa, sem texto, usuário ou ID de dispositivo arbitrário no corpo. Ela falha de forma fechada se não houver telefone ativo ou se houver mais de um telefone registrado.
 - Se o telefone estiver conectado ao WebSocket autenticado, a saudação segue por esse canal. Se estiver desconectado, o backend tenta FCM. Não envia a mesma saudação pelos dois caminhos quando a confirmação WebSocket falha, para evitar fala duplicada.
-- O watcher lê a chave de JARVIS_RETURN_ACTIVITY_KEY no ambiente do usuário ou de %LOCALAPPDATA%\\Jarvis_Xerife\\config\\return_activity.key. O instalador cria a pasta de configuração sem criar nem exibir segredo.
+- O watcher lê a chave de JARVIS_RETURN_ACTIVITY_KEY no ambiente do usuário ou de %LOCALAPPDATA%\\Jarvis_Xerife\\config\\return_activity\\return_activity.key. O instalador cria a pasta de configuração sem criar nem exibir segredo.
 - Para habilitar: configurar o mesmo segredo aleatório em JARVIS_RETURN_ACTIVITY_KEY no serviço Render e no Windows (variável do usuário ou arquivo protegido). Configurar também as credenciais FCM do servidor e do build Android para que a rota funcione quando o WebSocket estiver offline.
 - Se FCM não estiver configurado, a fala por WebSocket ainda pode funcionar quando o telefone estiver conectado; o fallback offline retorna erro explícito e não afirma entrega.
 - Testes adicionados cobrem credencial ausente/incorreta, escolha de transporte FCM, falha fechada com mais de um telefone e requisição do watcher sem registrar o segredo.
