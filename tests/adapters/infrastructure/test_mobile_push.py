@@ -310,3 +310,92 @@ def test_fcm_token_reassignment_revokes_previous_active_owner(monkeypatch):
         "updated_at": active[0]["updated_at"],
         "revoked_at": None,
     }]
+
+
+def test_return_activity_dispatch_requires_dedicated_machine_key(monkeypatch):
+    client, _database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", "test-machine-key-that-is-at-least-32-characters-long")
+
+    missing = client.post("/v1/mobile/push/return-activity", json={})
+    invalid = client.post(
+        "/v1/mobile/push/return-activity",
+        json={},
+        headers={"X-Jarvis-Return-Activity-Key": "wrong-key"},
+    )
+    assert missing.status_code == 401
+    assert invalid.status_code == 401
+
+
+def test_return_activity_uses_fcm_when_mobile_websocket_is_offline(monkeypatch):
+    client, database, sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", "test-machine-key-that-is-at-least-32-characters-long")
+
+    response = client.post(
+        "/v1/mobile/push/return-activity",
+        json={},
+        headers={"X-Jarvis-Return-Activity-Key": "test-machine-key-that-is-at-least-32-characters-long"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["transport"] == "fcm"
+    assert response.json()["status"] == "queued"
+    assert len(sender.sent) == 1
+    event = database.tables[mobile_push.PUSH_EVENT_TABLE][0]
+    assert event["payload"]["parameters"]["text"] == "Você voltou ao computador. Estou ativo e pronto para continuar."
+
+
+def test_return_activity_fails_closed_if_multiple_phones_are_registered(monkeypatch):
+    client, database, sender, _auth = _setup(monkeypatch)
+    database.tables[mobile_push.PUSH_DEVICE_TABLE].append({
+        "user_id": "user-99",
+        "device_id": "phone-2",
+        "fcm_token": "g" * 64,
+        "revoked_at": None,
+    })
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", "test-machine-key-that-is-at-least-32-characters-long")
+
+    response = client.post(
+        "/v1/mobile/push/return-activity",
+        json={},
+        headers={"X-Jarvis-Return-Activity-Key": "test-machine-key-that-is-at-least-32-characters-long"},
+    )
+
+    assert response.status_code == 409
+    assert sender.sent == []
+    assert database.tables[mobile_push.PUSH_EVENT_TABLE] == []
+
+
+def test_return_activity_prefers_websocket_when_phone_is_connected(monkeypatch):
+    client, database, sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", "test-machine-key-that-is-at-least-32-characters-long")
+    calls = []
+
+    class ConnectedBridge:
+        def is_device_connected(self, device_id):
+            return device_id == "mobile:user-42:phone-1"
+
+        async def send_task(self, device_id, task, api_key=None):
+            calls.append((device_id, task, api_key))
+            return {"success": True, "result": "speech_completed"}
+
+    auth = FakeAuth()
+    manager = ConnectedBridge()
+    monkeypatch.setattr(
+        nexus,
+        "resolve",
+        lambda name: auth if name == "auth_adapter" else manager,
+    )
+
+    response = client.post(
+        "/v1/mobile/push/return-activity",
+        json={},
+        headers={"X-Jarvis-Return-Activity-Key": "test-machine-key-that-is-at-least-32-characters-long"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "delivered", "transport": "websocket"}
+    assert calls[0][0] == "mobile:user-42:phone-1"
+    assert calls[0][1]["action"] == "speak"
+    assert calls[0][2] is None
+    assert sender.sent == []
+    assert database.tables[mobile_push.PUSH_EVENT_TABLE] == []

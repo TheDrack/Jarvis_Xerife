@@ -155,3 +155,15 @@ A verificação real do serviço de produção após os merges encontrou dois bl
 2. O projeto Supabase contém a tabela histórica public.user (singular), sem registros de conta, enquanto o adaptador de autenticação consultava public.users (plural). O adaptador foi ajustado para compatibilidade com os dois nomes, consulta somente pelo cliente administrativo e grava contas somente com privilégios de servidor.
 
 A correção de autenticação deve passar por CI e revisão antes de ser mesclada. Em seguida, o backend precisa ser implantado; as migrations de sessões móveis e entrega push precisam ser aplicadas na ordem (20261024200302_mobile_device_sessions.sql, depois 20261024202104_mobile_push_delivery.sql) após reconciliar o histórico remoto. O Render deve ter SUPABASE_SERVICE_ROLE_KEY; essa chave não pode ser colocada no APK nem em código. Ainda não foi criada conta nem alterado o banco de produção.
+
+
+## Incremento 4 — saudação autenticada do Windows ao telefone
+
+- O watcher de retorno do Windows tenta o endpoint HTTPS POST /v1/mobile/push/return-activity antes de usar a saída de áudio local.
+- O endpoint usa uma credencial dedicada JARVIS_RETURN_ACTIVITY_KEY, comparada em tempo constante; não reutiliza nem envia API_KEY_LOCAL ao telefone.
+- A rota aceita apenas a saudação fixa, sem texto, usuário ou ID de dispositivo arbitrário no corpo. Ela falha de forma fechada se não houver telefone ativo ou se houver mais de um telefone registrado.
+- Se o telefone estiver conectado ao WebSocket autenticado, a saudação segue por esse canal. Se estiver desconectado, o backend tenta FCM. Não envia a mesma saudação pelos dois caminhos quando a confirmação WebSocket falha, para evitar fala duplicada.
+- O watcher lê a chave de JARVIS_RETURN_ACTIVITY_KEY no ambiente do usuário ou de %LOCALAPPDATA%\\Jarvis_Xerife\\config\\return_activity.key. O instalador cria a pasta de configuração sem criar nem exibir segredo.
+- Para habilitar: configurar o mesmo segredo aleatório em JARVIS_RETURN_ACTIVITY_KEY no serviço Render e no Windows (variável do usuário ou arquivo protegido). Configurar também as credenciais FCM do servidor e do build Android para que a rota funcione quando o WebSocket estiver offline.
+- Se FCM não estiver configurado, a fala por WebSocket ainda pode funcionar quando o telefone estiver conectado; o fallback offline retorna erro explícito e não afirma entrega.
+- Testes adicionados cobrem credencial ausente/incorreta, escolha de transporte FCM, falha fechada com mais de um telefone e requisição do watcher sem registrar o segredo.

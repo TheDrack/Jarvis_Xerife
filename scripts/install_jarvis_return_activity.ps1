@@ -2,7 +2,8 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $runtime = Join-Path $env:LOCALAPPDATA 'Jarvis_Xerife\runtime'
 $startup = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
-New-Item -ItemType Directory -Path $runtime,$startup -Force | Out-Null
+$config = Join-Path $env:LOCALAPPDATA 'Jarvis_Xerife\config'
+New-Item -ItemType Directory -Path $runtime,$startup,$config -Force | Out-Null
 $sourceRoot = Join-Path $repo 'app'
 $targetRoot = Join-Path $runtime 'app'
 New-Item -ItemType Directory -Path (Join-Path $targetRoot 'application'),(Join-Path $targetRoot 'adapters') -Force | Out-Null

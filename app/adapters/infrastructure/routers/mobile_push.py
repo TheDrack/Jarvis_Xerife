@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """Authenticated FCM registration and short-lived mobile event delivery."""
 
+import hmac
 import logging
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from app.adapters.infrastructure.firebase_push import (
@@ -113,6 +116,58 @@ def dispatch_mobile_speak(user_id: str, device_id: str, text: str) -> dict[str, 
 
 def create_mobile_push_router() -> APIRouter:
     router = APIRouter(tags=["mobile-push"])
+
+    @router.post("/v1/mobile/push/return-activity")
+    async def dispatch_return_activity(
+        return_key: str | None = Header(default=None, alias="X-Jarvis-Return-Activity-Key"),
+    ) -> dict[str, Any]:
+        expected = os.getenv("JARVIS_RETURN_ACTIVITY_KEY", "").strip()
+        supplied = (return_key or "").strip()
+        if len(expected) < 32 or not supplied or not hmac.compare_digest(expected, supplied):
+            raise HTTPException(status_code=401, detail="Invalid return-activity credential")
+
+        try:
+            client = _admin_client()
+            response = client.table(PUSH_DEVICE_TABLE).select("user_id,device_id").is_(
+                "revoked_at", "null"
+            ).limit(2).execute()
+            devices = response.data or []
+        except MobilePushStorageUnavailable:
+            raise HTTPException(status_code=503, detail="Mobile push storage is not configured") from None
+        except Exception as exc:
+            logger.error("Could not resolve return-activity target (%s)", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Could not resolve mobile target") from None
+
+        if not devices:
+            raise HTTPException(status_code=404, detail="No active mobile device is registered")
+        if len(devices) != 1:
+            raise HTTPException(status_code=409, detail="More than one active mobile device is registered")
+
+        target = devices[0]
+        user_id, device_id = str(target["user_id"]), str(target["device_id"])
+        message = "Você voltou ao computador. Estou ativo e pronto para continuar."
+        manager = nexus.resolve("soldier_bridge")
+        canonical_id = f"mobile:{user_id}:{device_id}"
+        if manager.is_device_connected(canonical_id):
+            result = await manager.send_task(
+                canonical_id, {"action": "speak", "parameters": {"text": message}}, api_key=None
+            )
+            if not isinstance(result, dict) or not result.get("success", False):
+                raise HTTPException(status_code=502, detail="Mobile speech was not confirmed")
+            return {"status": "delivered", "transport": "websocket"}
+
+        try:
+            result = await run_in_threadpool(dispatch_mobile_speak, user_id, device_id, message)
+            return {**result, "transport": "fcm"}
+        except FirebasePushNotConfigured:
+            raise HTTPException(status_code=503, detail="Firebase push delivery is not configured") from None
+        except MobilePushDeviceNotRegistered:
+            raise HTTPException(status_code=404, detail="No active push registration for mobile device") from None
+        except (FirebasePushDeliveryError, MobilePushStorageUnavailable):
+            raise HTTPException(status_code=502, detail="Mobile push delivery failed") from None
+        except Exception as exc:
+            logger.error("Return-activity dispatch failed (%s)", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Return-activity dispatch failed") from None
 
     @router.post("/v1/mobile/push/register", status_code=204)
     async def register_push_device(

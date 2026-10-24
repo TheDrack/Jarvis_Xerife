@@ -14,6 +14,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+import http.client
+import ssl
+from urllib.parse import urlsplit
 
 from app.application.return_activity_service import ReturnActivityDetector
 
@@ -45,8 +48,60 @@ def get_idle_seconds() -> float:
     return elapsed_ms / 1000.0
 
 
+def _send_welcome_to_mobile() -> bool:
+    """Ask Jarvis API to deliver the fixed greeting to the registered phone."""
+    base_url = os.getenv("JARVIS_API_BASE_URL", "https://jarvis-api-c47i.onrender.com").strip().rstrip("/")
+    key = os.getenv("JARVIS_RETURN_ACTIVITY_KEY", "").strip()
+    if not key:
+        key_path = LOG_DIR.parent / "config" / "return_activity.key"
+        try:
+            key = key_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return False
+    if not key or not base_url.startswith("https://"):
+        return False
+    parsed = urlsplit(base_url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        logging.warning("Mobile greeting endpoint must use HTTPS.")
+        return False
+    connection = None
+    try:
+        connection = http.client.HTTPSConnection(
+            parsed.hostname,
+            parsed.port or 443,
+            timeout=10,
+            context=ssl.create_default_context(),
+        )
+        path = (parsed.path.rstrip("/") + "/v1/mobile/push/return-activity") or "/v1/mobile/push/return-activity"
+        connection.request(
+            "POST",
+            path,
+            body=b"{}",
+            headers={
+                "X-Jarvis-Return-Activity-Key": key,
+                "Content-Type": "application/json",
+            },
+        )
+        response = connection.getresponse()
+        status_code = response.status
+        response.read()
+    except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
+        logging.warning("Mobile greeting request failed (%s)", type(exc).__name__)
+        return False
+    finally:
+        if connection is not None:
+            connection.close()
+    if 200 <= status_code < 300:
+        logging.info("Return greeting dispatched to phone.")
+        return True
+    logging.warning("Mobile greeting delivery rejected (HTTP %s).", status_code)
+    return False
+
+
 def speak_welcome() -> None:
-    """Speak through the Windows speech engine using the default audio output."""
+    """Deliver the greeting to the phone when configured; otherwise use PC audio."""
+    if _send_welcome_to_mobile():
+        return
     command = r'''$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; try { $v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq 'pt-BR' } | Select-Object -First 1; if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; $s.Speak('Voce voltou. Estou ativo e pronto para continuar.'); } finally { $s.Dispose() }'''
     subprocess.run(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", command],
