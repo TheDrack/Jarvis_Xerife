@@ -9,7 +9,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Header, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.core.nexus import nexus
 
@@ -19,6 +19,22 @@ logger = logging.getLogger(__name__)
 def create_bridge_router() -> APIRouter:
     """Create the soldier-bridge router."""
     router = APIRouter()
+
+    async def require_authenticated_principal(
+        authorization: Optional[str] = Header(default=None),
+    ) -> Dict[str, Any]:
+        """Validate bearer tokens for HTTP bridge management and task dispatch."""
+        scheme, _, token = (authorization or "").partition(" ")
+        if scheme.lower() != "bearer" or not token.strip():
+            raise HTTPException(status_code=401, detail="Bearer token required")
+        try:
+            auth_adapter = nexus.resolve("auth_adapter")
+            claims = auth_adapter.verify_token(token.strip())
+        except Exception:
+            claims = None
+        if not isinstance(claims, dict) or not (claims.get("user_id") or claims.get("sub")):
+            raise HTTPException(status_code=401, detail="Invalid authentication token")
+        return claims
 
     @router.websocket("/v1/local-bridge")
     async def local_bridge_websocket(
@@ -72,14 +88,14 @@ def create_bridge_router() -> APIRouter:
             bridge_manager.disconnect(canonical_device_id)
 
     @router.get("/v1/local-bridge/devices")
-    async def list_connected_devices() -> Dict[str, Any]:
+    async def list_connected_devices(\n        _principal: Dict[str, Any] = Depends(require_authenticated_principal),\n    ) -> Dict[str, Any]:
         """List all currently connected soldier devices and their capabilities."""
         bridge_manager = nexus.resolve("soldier_bridge")
         soldiers = bridge_manager.get_connected_soldiers()
         return {"connected_devices": soldiers, "count": len(soldiers)}
 
     @router.post("/v1/local-bridge/send-task")
-    async def send_task_to_local_device(device_id: str, task: Dict[str, Any]) -> Any:
+    async def send_task_to_local_device(\n        device_id: str,\n        task: Dict[str, Any],\n        _principal: Dict[str, Any] = Depends(require_authenticated_principal),\n    ) -> Any:
         """Send a task to a connected soldier device using the configured server key."""
         bridge_manager = nexus.resolve("soldier_bridge")
         if not bridge_manager.is_device_connected(device_id):
