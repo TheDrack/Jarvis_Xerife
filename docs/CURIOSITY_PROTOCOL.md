@@ -88,3 +88,16 @@ Uma oportunidade só deve avançar quando responde de forma específica:
 - Qual é o custo/risco de não fazer, fazer ou esperar?
 
 O objetivo é aprendizado cumulativo com baixo ruído, não gerar o máximo de tarefas possível.
+
+
+## Saudação de reencontro
+
+Quando o usuário voltar após uma ausência, o agente deve produzir uma saudação curta com um resumo útil, em vez de apenas dizer que está online. Use a ferramenta MCP `reconnection_briefing` para reunir:
+
+- descobertas/ideias recentes capturadas no inbox, mantendo o nível de evidência e o estado real;
+- mudanças verificadas desde a última interação;
+- PRs relevantes, com estado atual e link;
+- resultados de testes/CI, incluindo falhas e itens pendentes;
+- próximo passo concreto, sem despejar detalhes de baixo valor.
+
+O agente precisa consultar a fonte viva antes de informar status de PR ou workflow e passar os dados verificados para a ferramenta. Se não conseguiu verificar, deve dizer isso explicitamente; nunca inventar uma PR, inferir que foi mesclada, nem chamar uma ideia de implementação concluída. O resumo não deve atrasar tarefas urgentes nem repetir notificações já entregues.
