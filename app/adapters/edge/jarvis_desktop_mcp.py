@@ -146,6 +146,31 @@ def curiosity_list_recent(limit: int = 20) -> dict[str, Any]:
         return {"success": False, "error": str(exc)}
 
 
+@mcp.tool()
+def reconnection_briefing(
+    verified_updates: list[dict[str, Any]] | None = None,
+    pull_requests: list[dict[str, Any]] | None = None,
+    limit: int = 5,
+) -> dict[str, Any]:
+    """Build a returning-user greeting from recent curiosity cards and live-verified updates.
+
+    Before supplying pull_requests or verified_updates, check current repository/workflow
+    state. Never label an idea as implemented or a PR as green without evidence.
+    """
+    try:
+        briefing = nexus.resolve("reconnection_briefing")
+        if briefing is None or not hasattr(briefing, "execute"):
+            return {"success": False, "error": "reconnection_briefing unavailable"}
+        return briefing.execute({
+            "verified_updates": verified_updates or [],
+            "pull_requests": pull_requests or [],
+            "limit": limit,
+        })
+    except Exception as exc:
+        logger.exception("Reconnection briefing failed")
+        return {"success": False, "error": str(exc)}
+
+
 def _content(result: dict[str, Any], *, include_frames: bool = True) -> list[Any]:
     """Return concise status text plus actual MCP image blocks for the model to inspect."""
     metadata = {
