@@ -87,7 +87,8 @@
     "automation_adapter": "app.adapters.edge.automation_adapter.AutomationAdapter",
     "field_vision": "app.adapters.edge.field_vision.FieldVision",
     "curiosity_engine": "app.application.services.curiosity_engine.CuriosityEngine",
-    "curiosity_intake": "app.application.services.curiosity_intake.CuriosityIntake"
+    "curiosity_intake": "app.application.services.curiosity_intake.CuriosityIntake",
+    "reconnection_briefing": "app.application.services.reconnection_briefing.ReconnectionBriefing"
   },
   "metadata": {
     "version": "2026.03",
