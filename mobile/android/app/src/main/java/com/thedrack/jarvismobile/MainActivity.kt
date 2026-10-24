@@ -50,7 +50,7 @@ class MainActivity : ComponentActivity() {
                     JarvisMobileScreen(
                         initialBaseUrl = getSharedPreferences("jarvis_session", MODE_PRIVATE)
                             .getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL) ?: BuildConfig.DEFAULT_API_BASE_URL,
-                        isLoggedInInitially = vault.read() != null,
+                        isLoggedInInitially = vault.read() != null && vault.readRefreshToken() != null,
                         speechReady = speechReady.value,
                         presenceInitiallyActive = BridgeService.isRunning,
                         onLogin = ::login,
