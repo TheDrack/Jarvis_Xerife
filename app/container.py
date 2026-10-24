@@ -163,11 +163,14 @@ class MainService:
 
         try:
             logger.info("[Main] Inicializando Nexus DI...")
-            evolution_orchestrator = self.nexus.resolve("evolution_orchestrator")
-            if evolution_orchestrator and not getattr(
-                evolution_orchestrator, "__is_cloud_mock__", False
-            ):
-                asyncio.create_task(self._evolution_heartbeat(evolution_orchestrator))
+            if os.environ.get("EVOLUTION_ENABLED", "").strip().lower() == "true":
+                evolution_orchestrator = self.nexus.resolve("evolution_orchestrator")
+                if evolution_orchestrator and not getattr(
+                    evolution_orchestrator, "__is_cloud_mock__", False
+                ):
+                    asyncio.create_task(self._evolution_heartbeat(evolution_orchestrator))
+            else:
+                logger.info("[Main] Autoevolução pausada (EVOLUTION_ENABLED não é true); heartbeat não iniciado.")
 
             logger.info("[Main] Sistema Operacional. Aguardando eventos.")
 

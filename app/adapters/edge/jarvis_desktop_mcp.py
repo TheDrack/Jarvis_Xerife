@@ -25,6 +25,7 @@ from mcp.types import TextContent
 from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
+from app.core.nexus import nexus
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,7 +58,11 @@ mcp = FastMCP(
         "and mark stale/conflicting claims. At meaningful milestones and handoff, consolidate "
         "useful memory and confirm persistence; if no writable backend exists, mark the update "
         "NOT PERSISTED. Never claim provider-native memory changed without confirmation and never "
-        "store secrets. Always observe before acting, prefer accessibility elements or image "
+        "store secrets. When research, news, ideas, errors, or new tools reveal a possible improvement, "
+        "use curiosity_capture and review curiosity_list_recent; captured ideas are not authorization to mutate. "
+        "When reconnecting after an absence, use reconnection_briefing for recent discoveries, verified changes, "
+        "pull requests, and test status. Check live sources before supplying PR/workflow states and distinguish "
+        "ideas from implemented/tested work. Always observe before acting, prefer accessibility elements or image "
         "templates over raw coordinates, perform one action at a time, and verify the post-action "
         "state. Preserve existing behavior, test changes, and never claim success without evidence."
     ),
@@ -89,6 +94,87 @@ if _HTTP_TRANSPORT == "streamable-http":
         allowed_origins=_allowed_origins,
     )
 navigator = VisualNavigationAdapter()
+
+
+@mcp.tool()
+def curiosity_capture(
+    source_title: str,
+    observation: str,
+    source_type: str = "other",
+    source_uri: str = "",
+    evidence_level: str = "unverified",
+    user_benefit: str = "",
+    jarvis_benefit: str = "",
+    connections: list[str] | None = None,
+    open_questions: list[str] | None = None,
+    experiment: str = "",
+    risks: list[str] | None = None,
+) -> dict[str, Any]:
+    """Record a research/news/idea/error discovery as a deduplicated curiosity card.
+
+    This records an observation only. It does not execute code, modify files, or
+    enable auto-evolution. Provide source evidence and concrete user/Jarvis benefit
+    where known; unsupported claims should remain unverified.
+    """
+    try:
+        intake = nexus.resolve("curiosity_intake")
+        if intake is None or not hasattr(intake, "execute"):
+            return {"success": False, "error": "curiosity_intake unavailable"}
+        return intake.execute({
+            "action": "capture",
+            "source_title": source_title,
+            "observation": observation,
+            "source_type": source_type,
+            "source_uri": source_uri,
+            "evidence_level": evidence_level,
+            "user_benefit": user_benefit,
+            "jarvis_benefit": jarvis_benefit,
+            "connections": connections or [],
+            "open_questions": open_questions or [],
+            "experiment": experiment,
+            "risks": risks or [],
+        })
+    except Exception as exc:
+        logger.exception("Curiosity capture failed")
+        return {"success": False, "error": str(exc)}
+
+
+@mcp.tool()
+def curiosity_list_recent(limit: int = 20) -> dict[str, Any]:
+    """List recent curiosity cards so agents can deduplicate research and follow up."""
+    try:
+        intake = nexus.resolve("curiosity_intake")
+        if intake is None or not hasattr(intake, "execute"):
+            return {"success": False, "error": "curiosity_intake unavailable"}
+        return intake.execute({"action": "list_recent", "limit": limit})
+    except Exception as exc:
+        logger.exception("Curiosity list failed")
+        return {"success": False, "error": str(exc)}
+
+
+@mcp.tool()
+def reconnection_briefing(
+    verified_updates: list[dict[str, Any]] | None = None,
+    pull_requests: list[dict[str, Any]] | None = None,
+    limit: int = 5,
+) -> dict[str, Any]:
+    """Build a returning-user greeting from recent curiosity cards and live-verified updates.
+
+    Before supplying pull_requests or verified_updates, check current repository/workflow
+    state. Never label an idea as implemented or a PR as green without evidence.
+    """
+    try:
+        briefing = nexus.resolve("reconnection_briefing")
+        if briefing is None or not hasattr(briefing, "execute"):
+            return {"success": False, "error": "reconnection_briefing unavailable"}
+        return briefing.execute({
+            "verified_updates": verified_updates or [],
+            "pull_requests": pull_requests or [],
+            "limit": limit,
+        })
+    except Exception as exc:
+        logger.exception("Reconnection briefing failed")
+        return {"success": False, "error": str(exc)}
 
 
 def _content(result: dict[str, Any], *, include_frames: bool = True) -> list[Any]:

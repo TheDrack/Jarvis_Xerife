@@ -215,7 +215,7 @@ python -c "from app.adapters.infrastructure.docker_sandbox import DockerSandbox;
 | Fase | Status | Descrição |
 |------|--------|-----------|
 | Phase 1 | ✅ Completo | Arquitetura Hexagonal + Nexus DI |
-| Phase 2 | ✅ Completo | Auto-Evolução + Self-Healing |
+| Phase 2 | ⏸️ Pausado | Autoevolução fail-closed por padrão; recuperação e curiosidade em validação |
 | Phase 3 | ✅ Completo | JarvisDevAgent + AdapterRegistry |
 | Phase 4 | 🟡 Em Progresso | Soldier Mesh (Edge Computing) |
 
@@ -228,6 +228,9 @@ python -c "from app.adapters.infrastructure.docker_sandbox import DockerSandbox;
 - → Veja [docs/STATUS.md](docs/STATUS.md) para status detalhado
 - → Veja [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para arquitetura completa
 - → Veja [docs/NEXUS.md](docs/NEXUS.md) para documentação do Nexus DI
+- → Veja [docs/CURIOSITY_PROTOCOL.md](docs/CURIOSITY_PROTOCOL.md) para transformar descobertas em oportunidades verificáveis.
+- → A saudação de reencontro usa `reconnection_briefing` para resumir descobertas, PRs e testes com status verificado.
+- → Veja [docs/AUTOEVOLUTION_RECOVERY.md](docs/AUTOEVOLUTION_RECOVERY.md) para recuperação controlada e critérios para reativar a autoevolução.
 
 ---
 

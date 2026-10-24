@@ -415,6 +415,7 @@ Antes de ler ou alterar qualquer coisa, o agente deve preferir:
 - regras de arquitetura: `data/architecture_rules.yml`
 - jobs do agente: `data/dev_agent_jobs.jsonl`
 - propostas de evolução: `data/evolution_proposals/`
+- caixa de entrada de curiosidade: `data/curiosity/inbox.jsonl` (descobertas com origem, incerteza, benefício, perguntas e próximo passo)
 - snapshots: `data/jrvs-snapshots/`
 - logs: `data/logs/`
 
@@ -435,14 +436,16 @@ Se o agente precisar aprofundar, a ordem sugerida é:
 5. `docs/PIPELINE_RUNNER.md`
 6. `SECURITY_GUARDRAILS.md`
 7. `padrão_estrutural.md`
-8. `CONTRIBUTING.md`
-9. `CHANGELOG.md`
+8. `docs/CURIOSITY_PROTOCOL.md` — obrigatório para pesquisar ideias, notícias, ferramentas e erros
+9. `docs/AUTOEVOLUTION_RECOVERY.md` — obrigatório antes de alterar o ciclo de evolução
+10. `CONTRIBUTING.md`
+11. `CHANGELOG.md`
 
 ---
 
 ## 9) Resumo de uma linha para o agente
 
-Este repo é um sistema Python autônomo/documentado/resolvido-pelo-Nexus.
+Este repo é um sistema Python autônomo/documentado/resolvido-pelo-Nexus. A autoevolução deve permanecer pausada sem `EVOLUTION_ENABLED=true`; descobertas são registradas por `curiosity_intake` e nunca autorizam mutação automática.
 O agente deve resolver antes de criar, checar existência antes de declarar
 gap, tratar CloudMock como indisponibilidade real, e não publicar nada pelo
 código.

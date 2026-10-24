@@ -4,10 +4,13 @@
   "recent_errors": [],
   "user_last_interaction": null,
   "system_health": {
-    "cpu_percent": 99.0,
-    "ram_percent": 10.0,
-    "status": "critical"
+    "cpu_percent": null,
+    "ram_percent": null,
+    "status": "unknown",
+    "source": null,
+    "observed_at": null
   },
-  "evolution_state": "idle",
-  "trend": "stable"
+  "evolution_state": "paused",
+  "trend": "unknown",
+  "state_note": "Baseline reset: previous health values had no timestamp/source; collect fresh telemetry before assessing system health."
 }

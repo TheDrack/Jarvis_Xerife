@@ -187,6 +187,11 @@ def main() -> None:
         print()
         sys.exit(0)
 
+    import os
+    if os.environ.get("EVOLUTION_ENABLED", "").strip().lower() != "true":
+        print("⏸️ Autoevolução pausada: defina EVOLUTION_ENABLED=true explicitamente para mutações.")
+        sys.exit(2)
+
     successes = 0
     failures = 0
     failed_caps: List[str] = []

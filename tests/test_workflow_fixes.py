@@ -113,6 +113,7 @@ def test_evolve_all_pending_unknown_cap_id_fails():
     resolved (CAP-999 does not exist in data/capabilities.jrvs).
     """
     env = os.environ.copy()
+    env["EVOLUTION_ENABLED"] = "true"
     env.pop('ISSUE_BODY', None)  # Ensure no cap-id can be inferred from the environment
     # Keep subprocess text output deterministic on Windows CI with emoji output.
     env['PYTHONIOENCODING'] = 'utf-8'
@@ -154,7 +155,7 @@ def test_auto_evolution_service():
     assert is_not_auto is False, "is_auto_evolution_pr() should not match regular PRs"
 
 
-def test_auto_evolution_evolve_uses_evolution_orchestrator():
+def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch):
     """A mutação de capabilities deve passar pelo EvolutionOrchestrator (via Nexus).
 
     O antigo ``scripts/evolution_mutator.py`` foi removido do projeto; a ação
@@ -164,6 +165,7 @@ def test_auto_evolution_evolve_uses_evolution_orchestrator():
 
     import app.application.services.auto_evolutionV2 as mod
 
+    monkeypatch.setenv("EVOLUTION_ENABLED", "true")
     service = mod.AutoEvolutionServiceV2(capabilities_path=str(PROJECT_ROOT / 'data' / 'capabilities.json'))
     mission = service.find_next_mission()
     assert mission is not None, "O inventário precisa ter ao menos uma cap pendente"
@@ -222,12 +224,13 @@ def test_auto_evolution_resolved_path_keeps_configured_jrvs(tmp_path):
     assert service._resolved_path() == jrvs_path
 
 
-def test_auto_evolution_evolve_reports_missing_orchestrator():
+def test_auto_evolution_evolve_reports_missing_orchestrator(monkeypatch):
     """Sem orchestrator no Nexus, a evolução deve falhar de forma explícita."""
     from unittest.mock import patch
 
     import app.application.services.auto_evolutionV2 as mod
 
+    monkeypatch.setenv("EVOLUTION_ENABLED", "true")
     service = mod.AutoEvolutionServiceV2(capabilities_path=str(PROJECT_ROOT / 'data' / 'capabilities.json'))
 
     with patch.object(mod, "nexus") as mock_nexus:
@@ -266,3 +269,34 @@ def test_services_package_importable_without_sqlmodel():
         f"stderr: {result.stderr}\nstdout: {result.stdout}"
     )
 
+
+
+
+def test_auto_evolution_is_paused_without_explicit_opt_in(monkeypatch):
+    """Mutation is fail-closed by default while status/discovery remain available."""
+    from unittest.mock import patch
+    import app.application.services.auto_evolutionV2 as mod
+
+    monkeypatch.delenv("EVOLUTION_ENABLED", raising=False)
+    service = mod.AutoEvolutionServiceV2(
+        capabilities_path=str(PROJECT_ROOT / "data" / "capabilities.json")
+    )
+
+    with patch.object(mod, "nexus") as mock_nexus:
+        result = service.execute({"action": "evolve_next"})
+    assert result["success"] is False
+    assert result["reason"] == "evolution_paused"
+    mock_nexus.resolve.assert_not_called()
+
+
+def test_auto_evolution_status_is_available_while_paused(monkeypatch):
+    import app.application.services.auto_evolutionV2 as mod
+
+    monkeypatch.delenv("EVOLUTION_ENABLED", raising=False)
+    service = mod.AutoEvolutionServiceV2(
+        capabilities_path=str(PROJECT_ROOT / "data" / "capabilities.json")
+    )
+    result = service.execute({"action": "status"})
+
+    assert result["success"] is True
+    assert result["metrics"]["total_missions"] > 0
