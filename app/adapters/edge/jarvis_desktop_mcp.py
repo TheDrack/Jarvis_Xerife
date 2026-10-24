@@ -25,6 +25,7 @@ from mcp.types import TextContent
 from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
+from app.core.nexus import nexus
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -50,7 +51,12 @@ mcp = FastMCP(
         "android_* tools target the explicitly configured authorized Android device. Never "
         "silently redirect one target to the other. The user chooses the connection software "
         "and transport; Tailscale, Aperture, and RDC are examples, not requirements. MCP is "
-        "the tool interface, not a mandated network route. Always observe before acting, prefer "
+        "the tool interface, not a mandated network route. When research, news, ideas, errors, "
+        "or new tools reveal a possible improvement, use curiosity_capture to record the source, evidence "
+        "level, user/Jarvis benefit, open questions, risks, and a measurable next experiment. Review "
+        "curiosity_list_recent to avoid duplicate investigations. Curiosity records are proposals only "
+        "and never authorize code mutation; autoevolution remains paused unless explicitly enabled. "
+        "Always observe before acting, prefer "
         "accessibility elements or image templates over raw coordinates, perform one action at "
         "a time, and verify the post-action state. Never claim success without evidence."
     ),
@@ -82,6 +88,62 @@ if _HTTP_TRANSPORT == "streamable-http":
         allowed_origins=_allowed_origins,
     )
 navigator = VisualNavigationAdapter()
+
+
+@mcp.tool()
+def curiosity_capture(
+    source_title: str,
+    observation: str,
+    source_type: str = "other",
+    source_uri: str = "",
+    evidence_level: str = "unverified",
+    user_benefit: str = "",
+    jarvis_benefit: str = "",
+    connections: list[str] | None = None,
+    open_questions: list[str] | None = None,
+    experiment: str = "",
+    risks: list[str] | None = None,
+) -> dict[str, Any]:
+    """Record a research/news/idea/error discovery as a deduplicated curiosity card.
+
+    This records an observation only. It does not execute code, modify files, or
+    enable auto-evolution. Provide source evidence and concrete user/Jarvis benefit
+    where known; unsupported claims should remain unverified.
+    """
+    try:
+        intake = nexus.resolve("curiosity_intake")
+        if intake is None or not hasattr(intake, "execute"):
+            return {"success": False, "error": "curiosity_intake unavailable"}
+        return intake.execute({
+            "action": "capture",
+            "source_title": source_title,
+            "observation": observation,
+            "source_type": source_type,
+            "source_uri": source_uri,
+            "evidence_level": evidence_level,
+            "user_benefit": user_benefit,
+            "jarvis_benefit": jarvis_benefit,
+            "connections": connections or [],
+            "open_questions": open_questions or [],
+            "experiment": experiment,
+            "risks": risks or [],
+        })
+    except Exception as exc:
+        logger.exception("Curiosity capture failed")
+        return {"success": False, "error": str(exc)}
+
+
+@mcp.tool()
+def curiosity_list_recent(limit: int = 20) -> dict[str, Any]:
+    """List recent curiosity cards so agents can deduplicate research and follow up."""
+    try:
+        intake = nexus.resolve("curiosity_intake")
+        if intake is None or not hasattr(intake, "execute"):
+            return {"success": False, "error": "curiosity_intake unavailable"}
+        return intake.execute({"action": "list_recent", "limit": limit})
+    except Exception as exc:
+        logger.exception("Curiosity list failed")
+        return {"success": False, "error": str(exc)}
 
 
 def _content(result: dict[str, Any], *, include_frames: bool = True) -> list[Any]:
