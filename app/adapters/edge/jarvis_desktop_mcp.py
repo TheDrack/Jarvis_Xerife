@@ -50,9 +50,16 @@ mcp = FastMCP(
         "android_* tools target the explicitly configured authorized Android device. Never "
         "silently redirect one target to the other. The user chooses the connection software "
         "and transport; Tailscale, Aperture, and RDC are examples, not requirements. MCP is "
-        "the tool interface, not a mandated network route. Always observe before acting, prefer "
-        "accessibility elements or image templates over raw coordinates, perform one action at "
-        "a time, and verify the post-action state. Never claim success without evidence."
+        "the tool interface, not a mandated network route. At session/task start, discover live "
+        "tools and read AGENTS.md, docs/skills-connectors/CATALOG.md, and "
+        "docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md when repository files are available. "
+        "Load relevant persisted Jarvis memory and task state, reconcile against live evidence, "
+        "and mark stale/conflicting claims. At meaningful milestones and handoff, consolidate "
+        "useful memory and confirm persistence; if no writable backend exists, mark the update "
+        "NOT PERSISTED. Never claim provider-native memory changed without confirmation and never "
+        "store secrets. Always observe before acting, prefer accessibility elements or image "
+        "templates over raw coordinates, perform one action at a time, and verify the post-action "
+        "state. Preserve existing behavior, test changes, and never claim success without evidence."
     ),
 )
 if _HTTP_TRANSPORT == "streamable-http":
