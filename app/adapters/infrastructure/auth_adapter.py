@@ -63,26 +63,45 @@ class AuthAdapter(SecurityProvider):
     # ------------------------------------------------------------------
 
     def get_user_by_email(self, email: str) -> Optional[dict]:
-        """Fetch a user record from the Supabase ``users`` table by e-mail.
+        """Look up a custom Jarvis user using the server-only client when available.
 
-        Args:
-            email: The user's e-mail address.
-
-        Returns:
-            User dict or ``None`` if not found / Supabase unavailable.
+        Existing deployments contain the legacy singular public.user table;
+        newer code also encountered public.users. Support both schemas while
+        keeping password hashes behind the server's service-role client.
         """
         try:
-            from app.adapters.infrastructure.supabase_client import get_supabase_client
+            from app.adapters.infrastructure.supabase_client import get_supabase_admin_client
 
-            client = get_supabase_client()
+            # Password hashes must only be read with server-side privileges.
+            # Never fall back to the public/publishable Supabase client.
+            client = get_supabase_admin_client()
             if client is None:
                 return None
-            response = client.table("users").select("*").eq("email", email).limit(1).execute()
-            rows = response.data
-            if rows:
-                return rows[0]
+
+            for table_name in ("user", "users"):
+                for column_name in ("email", "username"):
+                    try:
+                        response = (
+                            client.table(table_name)
+                            .select("*")
+                            .eq(column_name, email)
+                            .limit(1)
+                            .execute()
+                        )
+                        rows = response.data or []
+                        if rows:
+                            return rows[0]
+                    except Exception as exc:
+                        # Historical schemas may not contain a table/column.
+                        # Do not log account identifiers or credential data.
+                        logger.debug(
+                            "[AuthAdapter] User lookup skipped for %s.%s (%s)",
+                            table_name,
+                            column_name,
+                            type(exc).__name__,
+                        )
         except Exception as exc:
-            logger.error("[AuthAdapter] Erro ao buscar usuário no Supabase: %s", exc)
+            logger.error("[AuthAdapter] User lookup failed (%s)", type(exc).__name__)
         return None
 
     def get_user_by_username(self, username: str) -> Optional[dict]:
@@ -95,37 +114,33 @@ class AuthAdapter(SecurityProvider):
         password: str,
         full_name: Optional[str] = None,
     ) -> Optional[dict]:
-        """Create a new user in the Supabase ``users`` table.
-
-        Args:
-            email: User's e-mail address.
-            password: Plain-text password (will be hashed before storage).
-            full_name: Optional display name.
-
-        Returns:
-            Created user dict or ``None`` on failure.
-        """
+        """Create a user using server-only database privileges."""
         try:
-            from app.adapters.infrastructure.supabase_client import get_supabase_client
+            from app.adapters.infrastructure.supabase_client import get_supabase_admin_client
 
-            client = get_supabase_client()
+            client = get_supabase_admin_client()
             if client is None:
-                logger.warning("[AuthAdapter] Supabase indisponível; não é possível criar usuário.")
+                logger.warning(
+                    "[AuthAdapter] Admin database client unavailable; user creation refused."
+                )
                 return None
-            hashed = self.get_password_hash(password)
+            normalized_email = email.strip().lower()
+            if not normalized_email or not password:
+                return None
             payload = {
-                "email": email,
-                "hashed_password": hashed,
+                "username": normalized_email,
+                "email": normalized_email,
+                "hashed_password": self.get_password_hash(password),
                 "full_name": full_name or "",
                 "disabled": False,
             }
-            response = client.table("users").insert(payload).execute()
-            rows = response.data
+            response = client.table("user").insert(payload).execute()
+            rows = response.data or []
             if rows:
-                logger.info("[AuthAdapter] Usuário criado: %s", email)
+                logger.info("[AuthAdapter] User created successfully.")
                 return rows[0]
         except Exception as exc:
-            logger.error("[AuthAdapter] Erro ao criar usuário no Supabase: %s", exc)
+            logger.error("[AuthAdapter] User creation failed (%s)", type(exc).__name__)
         return None
 
     # ------------------------------------------------------------------
@@ -228,9 +243,10 @@ class AuthAdapter(SecurityProvider):
             if not stored_hash or not self.verify_password(password, stored_hash):
                 logger.warning("Authentication failed: invalid password for user '%s'", username)
                 return None
+            canonical_username = user.get("email") or user.get("username") or username
             return {
-                "username": user.get("email", username),
-                "email": user.get("email"),
+                "username": canonical_username,
+                "email": user.get("email") or user.get("username"),
                 "full_name": user.get("full_name"),
                 "user_id": str(user.get("id", "")),
             }

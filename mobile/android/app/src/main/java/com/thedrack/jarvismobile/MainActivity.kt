@@ -113,7 +113,12 @@ class MainActivity : ComponentActivity() {
                 val stream = if (code in 200..299) connection.inputStream else connection.errorStream
                 val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
                 if (code !in 200..299) {
-                    "Login recusado pelo servidor (HTTP " + code + ")."
+                    when (code) {
+                        401 -> "Credenciais inválidas. Confira o e-mail/usuário e a senha."
+                        404 -> "A API publicada ainda não contém o login móvel (HTTP 404). O servidor precisa ser atualizado."
+                        503 -> "O servidor está sem o armazenamento seguro de sessões configurado (HTTP 503)."
+                        else -> "Login recusado pelo servidor (HTTP " + code + ")."
+                    }
                 } else {
                     val payload = JSONObject(response)
                     val token = payload.optString("access_token")
