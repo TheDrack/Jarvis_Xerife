@@ -227,6 +227,8 @@ python -c "from app.adapters.infrastructure.docker_sandbox import DockerSandbox;
 - → Veja [docs/STATUS.md](docs/STATUS.md) para status detalhado
 - → Veja [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para arquitetura completa
 - → Veja [docs/NEXUS.md](docs/NEXUS.md) para documentação do Nexus DI
+- → Veja [docs/CURIOSITY_PROTOCOL.md](docs/CURIOSITY_PROTOCOL.md) para transformar descobertas em oportunidades verificáveis.
+- → Veja [docs/AUTOEVOLUTION_RECOVERY.md](docs/AUTOEVOLUTION_RECOVERY.md) para recuperação controlada e critérios para reativar a autoevolução.
 
 ---
 
