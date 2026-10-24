@@ -56,3 +56,17 @@ def test_capture_rejects_unknown_actions(tmp_path):
 
     assert result["success"] is False
     assert not (tmp_path / "inbox.jsonl").exists()
+
+
+
+def test_capture_redacts_common_secrets_and_normalizes_evidence(tmp_path):
+    intake = CuriosityIntake(storage_path=str(tmp_path / "inbox.jsonl"))
+    result = intake.execute({
+        "source_title": "Credential exposure",
+        "observation": "A leaked key was ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456 and password=hunter2",
+        "evidence_level": "certainly_true",
+    })
+    record = result["record"]
+    assert "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456" not in record["observation"]
+    assert "hunter2" not in record["observation"]
+    assert record["evidence_level"] == "unverified"
