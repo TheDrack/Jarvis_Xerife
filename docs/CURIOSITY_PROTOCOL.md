@@ -55,6 +55,19 @@ Não inventar campos factuais que a fonte não suporta. Usar null, lista vazia o
 8. **Integrar:** se justificado, abrir uma tarefa/PR aditiva com testes, documentação e plano de rollback.
 9. **Aprender:** consolidar o que foi confirmado na memória compartilhada; preservar fonte e incertezas.
 
+## Integração disponível
+
+O Nexus registra o componente `curiosity_intake`. Agentes podem capturar uma descoberta com `nexus.resolve("curiosity_intake").execute({...})`. No servidor MCP Jarvis, as ferramentas `curiosity_capture` e `curiosity_list_recent` expõem captura e consulta para clientes conectados.
+
+Após uma pesquisa, notícia, ideia ou erro relevante, o agente deve:
+1. consultar registros recentes para evitar duplicação;
+2. registrar fonte, observação e nível de evidência;
+3. preencher benefício para o usuário/Jarvis e perguntas abertas quando conhecidos;
+4. deixar status como captured até haver investigação real;
+5. nunca alegar que houve validação, implementação ou persistência externa além do resultado confirmado pela ferramenta.
+
+Essa integração disponibiliza a capacidade aos clientes MCP; ela não intercepta automaticamente cada pesquisa feita fora do Jarvis. Os conectores de pesquisa/notícias e os fluxos de erro devem chamar a captura explicitamente para cobertura sistemática.
+
 ## Relação com autoevolução
 
 - Curiosidade não concede permissão para alterar arquivos, executar código descoberto, instalar dependências, publicar, mudar credenciais ou alterar produção.
