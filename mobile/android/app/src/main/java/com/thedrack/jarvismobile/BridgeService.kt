@@ -227,7 +227,7 @@ class BridgeService : Service() {
     }
 
     @Suppress("DEPRECATION")
-    override fun onTimeout(startId: Int) {
+    override fun onTimeout(startId: Int, fgsType: Int) {
         // Android 15+ caps dataSync foreground-service runtime. Stop cleanly
         // instead of repeatedly attempting a forbidden background restart.
         stopping = true
