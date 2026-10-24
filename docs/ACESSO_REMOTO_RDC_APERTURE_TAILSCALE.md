@@ -66,6 +66,14 @@ Usar como alternativa técnica quando o cliente/agente pode acessar o Aperture, 
 
 Para desenvolvimento no próprio PC, um cliente MCP local pode iniciar `app/adapters/edge/jarvis_desktop_mcp.py` por stdio. Esse caminho é local e não deve ser confundido com a rota remota principal.
 
+## Rota adicional para produtos OpenAI: Secure MCP Tunnel
+
+O Secure MCP Tunnel é uma rota complementar para produtos OpenAI compatíveis, como ChatGPT, Codex e Responses API. O cliente `tunnel-client` inicia conexões HTTPS de saída e encaminha chamadas ao MCP local sem expor sua porta à internet pública.
+
+**Esta rota não substitui P0 e não é um túnel universal para todos os provedores de IA.** Agentes de outros provedores devem usar uma rota MCP compatível e autorizada, como o gateway Aperture + Tailscale. Não compartilhe o túnel pessoal do desenvolvedor com outros usuários: cada usuário/ambiente deve provisionar seu próprio `tunnel_id` e runtime key com permissões adequadas.
+
+No Windows, o setup assistido está documentado em [SECURE_MCP_TUNNEL.md](SECURE_MCP_TUNNEL.md) e pode ser executado por `scripts/setup_chatgpt_jarvis_tunnel.ps1`. O script configura o cliente local e a tarefa agendada; o usuário ainda precisa criar/selecionar o túnel na Platform e registrar o app no workspace ChatGPT. Só declare sucesso após uma chamada de ferramenta no app registrado.
+
 ## Inicialização no boot
 
 O comportamento esperado é:
@@ -77,13 +85,12 @@ O comportamento esperado é:
 5. O gateway MCP do Aperture publica as ferramentas autorizadas para os agentes.
 6. Quando uma ferramenta depende da interface gráfica, a sessão Windows interativa precisa estar disponível.
 
-Scripts relacionados:
+Scripts e estado do repositório:
 
-- `scripts/jarvis_magic.ps1` — instalação, status, diagnóstico e gerenciamento.
-- `scripts/start-jarvis-boot.ps1` — supervisor de boot instalado em `C:\ProgramData\Jarvis_Xerife`.
-- `scripts/start_jarvis_tailscale.ps1` — inicialização do servidor MCP e Tailscale Serve.
+- `scripts/setup_chatgpt_jarvis_tunnel.ps1` — configurador específico do Secure MCP Tunnel, incluído nesta PR.
+- Os caminhos `scripts/jarvis_magic.ps1`, `scripts/start-jarvis-boot.ps1` e `scripts/start_jarvis_tailscale.ps1` citados por versões anteriores da documentação não foram encontrados no branch `main` durante esta verificação. Não os execute nem considere o Magic Executor integrado até que seu entrypoint canônico seja restaurado e testado.
 
-Use `.scriptsjarvis_magic.ps1 -Action doctor` e `.scriptsjarvis_magic.ps1 -Action status` para verificar a configuração. Não declare o boot validado apenas porque a tarefa existe: o critério completo exige testar após reinicialização real e verificar Tailscale, servidor local, Serve, conector Aperture e uma chamada MCP. A autenticação do RDC como tarefa `SYSTEM` pode não compartilhar o perfil interativo; não é pré-requisito da rota P0 se o gateway já está disponível ao agente.
+Para o túnel, use `scripts/setup_chatgpt_jarvis_tunnel.ps1 -Action status`. Não declare o boot da rota P0 validado apenas porque uma tarefa existe: o critério completo exige testar após reinicialização real e verificar Tailscale, servidor local, Serve, conector Aperture e uma chamada MCP. A autenticação do RDC como tarefa `SYSTEM` pode não compartilhar o perfil interativo; não é pré-requisito da rota P0 se o gateway já está disponível ao agente.
 
 ## Segurança e controle de acesso
 
@@ -113,3 +120,4 @@ A rota P0 está operacional quando todos os itens abaixo forem verificados:
 - [Navegação visual](NAVEGACAO_VISUAL.md)
 - [Instalação Windows](INSTALACAO_WINDOWS.md)
 - [Guia do agente](AGENT_GUIDE.md)
+- [Secure MCP Tunnel: instalação por usuário](SECURE_MCP_TUNNEL.md)

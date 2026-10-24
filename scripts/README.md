@@ -8,6 +8,23 @@ The scripts are part of Jarvis's self-healing and proactive architecture, enabli
 
 ## Scripts
 
+
+### setup_chatgpt_jarvis_tunnel.ps1
+
+Windows setup and recovery helper for OpenAI Secure MCP Tunnel. It configures the official `tunnel-client` to forward requests to the private Jarvis MCP server at `127.0.0.1:8765/mcp`.
+
+**Usage (PowerShell, as the user who owns the tunnel):**
+
+```powershell
+.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action configure
+.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action status
+```
+
+The script prompts for the user's own `tunnel_id` and runtime key, stores the key using Windows DPAPI, runs the official client diagnostics, and creates a per-user logon task with up to five retries at one-minute intervals. Supported actions: `configure`, `run`, `start`, `status`, `stop`, and `uninstall`.
+
+**Important:** this script does not create the OpenAI-hosted tunnel or register the custom MCP app in ChatGPT. The user must have the appropriate Platform permissions, associate the tunnel with the target ChatGPT workspace, then add it through ChatGPT Plugins → Add custom MCP server → Connection: Tunnel. Verify the app with a safe tool call before declaring end-to-end success. See [../docs/SECURE_MCP_TUNNEL.md](../docs/SECURE_MCP_TUNNEL.md).
+
+
 ### overwatch_daemon.py
 
 Background daemon that implements the **JARVIS Proactive Core** (`[PROACTIVE_CORE]`).
