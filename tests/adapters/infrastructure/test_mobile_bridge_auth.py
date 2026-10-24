@@ -147,3 +147,18 @@ def test_bridge_device_listing_requires_authentication(monkeypatch):
     response = client.get("/v1/local-bridge/devices")
 
     assert response.status_code == 401
+
+
+def test_bridge_task_dispatch_rejects_another_users_mobile_device(monkeypatch):
+    manager = FakeBridgeManager()
+    client = _client(monkeypatch, manager)
+    monkeypatch.setenv("API_KEY_LOCAL", "server-side-test-key")
+
+    response = client.post(
+        "/v1/local-bridge/send-task?device_id=mobile%3Aother-user%3Aphone-1",
+        json={"action": "speak", "parameters": {"text": "hello"}},
+        headers={"Authorization": "Bearer valid"},
+    )
+
+    assert response.status_code == 403
+    assert manager.sent_tasks == []
