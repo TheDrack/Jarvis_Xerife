@@ -1,6 +1,8 @@
 package com.thedrack.jarvismobile
 
 import android.os.Bundle
+import android.content.Intent
+import android.os.Build
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -47,11 +49,15 @@ class MainActivity : ComponentActivity() {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     JarvisMobileScreen(
-                        initialBaseUrl = BuildConfig.DEFAULT_API_BASE_URL,
+                        initialBaseUrl = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+                            .getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL) ?: BuildConfig.DEFAULT_API_BASE_URL,
                         isLoggedInInitially = vault.read() != null,
                         speechReady = speechReady.value,
+                        presenceInitiallyActive = BridgeService.isRunning,
                         onLogin = ::login,
-                        onLogout = { vault.clear() },
+                        onLogout = { vault.clear(); stopPresence() },
+                        onStartPresence = ::startPresence,
+                        onStopPresence = ::stopPresence,
                         onSpeak = { speak("Jarvis Mobile ativo. Canal de voz local funcionando.") }
                     )
                 }
@@ -85,6 +91,8 @@ class MainActivity : ComponentActivity() {
                     if (token.isBlank()) "Resposta de login sem token válido."
                     else {
                         vault.save(token)
+                        getSharedPreferences("jarvis_session", MODE_PRIVATE).edit()
+                            .putString("api_base_url", normalized).apply()
                         null
                     }
                 }
@@ -95,6 +103,20 @@ class MainActivity : ComponentActivity() {
             }
             runOnUiThread { result(outcome) }
         }
+    }
+
+    private fun startPresence() {
+        val accessToken = vault.read() ?: return
+        val baseUrl = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+            .getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL) ?: BuildConfig.DEFAULT_API_BASE_URL
+        val intent = Intent(this, BridgeService::class.java)
+            .putExtra(BridgeService.EXTRA_BASE_URL, baseUrl)
+            .putExtra(BridgeService.EXTRA_TOKEN, accessToken)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+    }
+
+    private fun stopPresence() {
+        stopService(Intent(this, BridgeService::class.java))
     }
 
     private fun speak(text: String) {
@@ -114,14 +136,18 @@ private fun JarvisMobileScreen(
     initialBaseUrl: String,
     isLoggedInInitially: Boolean,
     speechReady: Boolean,
+    presenceInitiallyActive: Boolean,
     onLogin: (String, String, String, (String?) -> Unit) -> Unit,
     onLogout: () -> Unit,
+    onStartPresence: () -> Unit,
+    onStopPresence: () -> Unit,
     onSpeak: () -> Unit
 ) {
     var baseUrl by remember { mutableStateOf(initialBaseUrl) }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var loggedIn by remember { mutableStateOf(isLoggedInInitially) }
+    var presenceActive by remember { mutableStateOf(presenceInitiallyActive) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("Sessão local; integração de eventos ainda não ativada.") }
 
@@ -170,7 +196,17 @@ private fun JarvisMobileScreen(
         } else {
             Text("Sessão autenticada neste dispositivo.", modifier = Modifier.padding(top = 12.dp))
             Button(
-                onClick = { onLogout(); loggedIn = false; message = "Sessão encerrada." },
+                onClick = { onStartPresence(); presenceActive = true; message = "Presença solicitada; verifique a notificação persistente." },
+                enabled = !presenceActive,
+                modifier = Modifier.padding(top = 12.dp)
+            ) { Text("Ativar presença em segundo plano") }
+            Button(
+                onClick = { onStopPresence(); presenceActive = false; message = "Presença interrompida." },
+                enabled = presenceActive,
+                modifier = Modifier.padding(top = 8.dp)
+            ) { Text("Parar presença") }
+            Button(
+                onClick = { onStopPresence(); onLogout(); presenceActive = false; loggedIn = false; message = "Sessão encerrada." },
                 modifier = Modifier.padding(top = 8.dp)
             ) { Text("Sair") }
         }
