@@ -268,3 +268,34 @@ def test_services_package_importable_without_sqlmodel():
         f"stderr: {result.stderr}\nstdout: {result.stdout}"
     )
 
+
+
+
+def test_auto_evolution_is_paused_without_explicit_opt_in(monkeypatch):
+    """Mutation is fail-closed by default while status/discovery remain available."""
+    from unittest.mock import patch
+    import app.application.services.auto_evolutionV2 as mod
+
+    monkeypatch.delenv("EVOLUTION_ENABLED", raising=False)
+    service = mod.AutoEvolutionServiceV2(
+        capabilities_path=str(PROJECT_ROOT / "data" / "capabilities.json")
+    )
+
+    with patch.object(mod, "nexus") as mock_nexus:
+        result = service.execute({"action": "evolve_next"})
+    assert result["success"] is False
+    assert result["reason"] == "evolution_paused"
+    mock_nexus.resolve.assert_not_called()
+
+
+def test_auto_evolution_status_is_available_while_paused(monkeypatch):
+    import app.application.services.auto_evolutionV2 as mod
+
+    monkeypatch.delenv("EVOLUTION_ENABLED", raising=False)
+    service = mod.AutoEvolutionServiceV2(
+        capabilities_path=str(PROJECT_ROOT / "data" / "capabilities.json")
+    )
+    result = service.execute({"action": "status"})
+
+    assert result["success"] is True
+    assert result["metrics"]["total_missions"] > 0
