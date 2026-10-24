@@ -45,10 +45,14 @@ mcp = FastMCP(
     host="127.0.0.1",
     port=_HTTP_PORT,
     instructions=(
-        "Control the user's interactive Windows desktop. Always observe before acting. "
-        "Prefer accessibility elements or image templates over raw coordinates. Perform one "
-        "action at a time and inspect the returned screenshot before continuing. Never claim "
-        "success unless the action result and post-action screen confirm it."
+        "Jarvis exposes desktop tools and explicit Android navigation tools on this MCP server. "
+        "The target is determined by the selected tool: desktop tools remain desktop-only; "
+        "android_* tools target the explicitly configured authorized Android device. Never "
+        "silently redirect one target to the other. The user chooses the connection software "
+        "and transport; Tailscale, Aperture, and RDC are examples, not requirements. MCP is "
+        "the tool interface, not a mandated network route. Always observe before acting, prefer "
+        "accessibility elements or image templates over raw coordinates, perform one action at "
+        "a time, and verify the post-action state. Never claim success without evidence."
     ),
 )
 if _HTTP_TRANSPORT == "streamable-http":
