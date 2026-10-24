@@ -114,9 +114,14 @@ def create_bridge_router() -> APIRouter:
         bridge_manager = nexus.resolve("soldier_bridge")
         if not bridge_manager.is_device_connected(device_id):
             raise HTTPException(status_code=404, detail=f"Device {device_id} is not connected")
-        api_key = os.getenv("API_KEY_LOCAL")
-        if not api_key:
-            raise HTTPException(status_code=503, detail="API_KEY_LOCAL não configurada no servidor.")
+        # Mobile speech/notification clients do not execute local desktop commands
+        # and must never receive the server's local-bridge secret.
+        if device_id.startswith("mobile:"):
+            api_key = None
+        else:
+            api_key = os.getenv("API_KEY_LOCAL")
+            if not api_key:
+                raise HTTPException(status_code=503, detail="API_KEY_LOCAL não configurada no servidor.")
         return await bridge_manager.send_task(device_id, task, api_key=api_key)
 
     return router
