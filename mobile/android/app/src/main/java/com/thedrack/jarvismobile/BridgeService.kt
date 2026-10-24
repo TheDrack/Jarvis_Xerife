@@ -172,7 +172,7 @@ class BridgeService : Service() {
 
     private fun scheduleReconnect() {
         if (stopping) return
-        val delay = min(60_000L, 1_000L shl min(retryCount, 6))
+        val delay = min(60_000L, 1_000L * (1L shl min(retryCount, 6)))
         retryCount += 1
         handler.removeCallbacks(reconnectRunnable)
         handler.postDelayed(reconnectRunnable, delay)
