@@ -1,16 +1,15 @@
 # -*- coding: utf-8 -*-
 """Bridge router: /v1/local-bridge/* WebSocket and REST endpoints.
 
-Uses :class:`~app.adapters.infrastructure.soldier_bridge.SoldierBridgeManager`
-which supports multiple simultaneous connections and capability registration.
-All components are resolved through the Nexus DI container.
+Mobile clients must authenticate with a valid Jarvis bearer token. Their bridge
+IDs are namespaced by the authenticated principal to prevent cross-user ID
+collisions. Existing non-mobile bridge clients retain their current contract.
 """
-
 import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Header, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.core.nexus import nexus
 
@@ -18,13 +17,24 @@ logger = logging.getLogger(__name__)
 
 
 def create_bridge_router() -> APIRouter:
-    """
-    Create the soldier-bridge router for GUI/edge delegation to connected devices.
-
-    Returns:
-        Configured APIRouter
-    """
+    """Create the soldier-bridge router."""
     router = APIRouter()
+
+    async def require_authenticated_principal(
+        authorization: Optional[str] = Header(default=None),
+    ) -> Dict[str, Any]:
+        """Validate bearer tokens for HTTP bridge management and task dispatch."""
+        scheme, _, token = (authorization or "").partition(" ")
+        if scheme.lower() != "bearer" or not token.strip():
+            raise HTTPException(status_code=401, detail="Bearer token required")
+        try:
+            auth_adapter = nexus.resolve("auth_adapter")
+            claims = auth_adapter.verify_token(token.strip())
+        except Exception:
+            claims = None
+        if not isinstance(claims, dict) or not (claims.get("user_id") or claims.get("sub")):
+            raise HTTPException(status_code=401, detail="Invalid authentication token")
+        return claims
 
     @router.websocket("/v1/local-bridge")
     async def local_bridge_websocket(
@@ -33,70 +43,85 @@ def create_bridge_router() -> APIRouter:
         device_type: str = "desktop",
         capabilities: Optional[str] = None,
     ):
-        """
-        WebSocket endpoint for connecting a soldier device to JARVIS.
-
-        Enables JARVIS (in the cloud) to delegate GUI tasks (PyAutoGUI) or
-        mobile-specific tasks (camera, sensors, vibration) to connected devices.
-        Supports 3+ simultaneous connections.
-
-        Query Parameters:
-            device_id:    Unique identifier for the device (default: "default")
-            device_type:  Type of device – desktop, mobile, tablet, rpi, iot, …
-            capabilities: Comma-separated capability tags, e.g. "pyautogui,camera"
-
-        Usage:
-            Desktop: ws://jarvis-host/v1/local-bridge?device_id=my_pc&device_type=desktop
-            Mobile:  ws://jarvis-host/v1/local-bridge?device_id=my_phone&device_type=mobile&capabilities=camera
-        """
+        """Connect an edge device. Mobile clients must provide Authorization: Bearer <JWT>."""
         bridge_manager = nexus.resolve("soldier_bridge")
-        caps: List[str] = [c.strip() for c in capabilities.split(",")] if capabilities else []
+        canonical_device_id = device_id
+        if device_type.lower() == "mobile":
+            authorization = websocket.headers.get("authorization", "")
+            scheme, _, token = authorization.partition(" ")
+            if scheme.lower() != "bearer" or not token.strip():
+                await websocket.close(code=4401, reason="Authentication required")
+                return
+            if not device_id or device_id == "default" or len(device_id) > 128:
+                await websocket.close(code=4400, reason="A valid mobile device_id is required")
+                return
+            if any(ord(char) < 32 for char in device_id):
+                await websocket.close(code=4400, reason="Invalid mobile device_id")
+                return
+            try:
+                auth_adapter = nexus.resolve("auth_adapter")
+                claims = auth_adapter.verify_token(token.strip())
+            except Exception:
+                claims = None
+            principal = None
+            if isinstance(claims, dict):
+                principal = claims.get("user_id") or claims.get("sub")
+            if not isinstance(principal, (str, int)) or not str(principal).strip():
+                await websocket.close(code=4401, reason="Invalid authentication token")
+                return
+            canonical_device_id = "mobile:" + str(principal) + ":" + device_id
+
+        caps: List[str] = [c.strip() for c in capabilities.split(",") if c.strip()] if capabilities else []
         try:
-            await bridge_manager.connect(websocket, device_id, device_type, caps)
+            await bridge_manager.connect(websocket, canonical_device_id, device_type, caps)
             while True:
                 try:
                     data = await websocket.receive_json()
-                    await bridge_manager.handle_message(device_id, data)
+                    await bridge_manager.handle_message(canonical_device_id, data)
                 except WebSocketDisconnect:
-                    logger.info(f"Device disconnected: {device_id}")
+                    logger.info("Device disconnected: %s", canonical_device_id)
                     break
-                except Exception as e:
-                    logger.error(f"Error handling message from {device_id}: {e}")
-                    await websocket.send_json({"type": "error", "error": str(e)})
+                except Exception:
+                    logger.exception("Error handling bridge message from %s", canonical_device_id)
+                    await websocket.send_json({"type": "error", "error": "Message handling failed"})
         finally:
-            bridge_manager.disconnect(device_id)
+            bridge_manager.disconnect(canonical_device_id)
 
     @router.get("/v1/local-bridge/devices")
-    async def list_connected_devices() -> Dict[str, Any]:
+    async def list_connected_devices(
+        _principal: Dict[str, Any] = Depends(require_authenticated_principal),
+    ) -> Dict[str, Any]:
         """List all currently connected soldier devices and their capabilities."""
         bridge_manager = nexus.resolve("soldier_bridge")
-        soldiers = bridge_manager.get_connected_soldiers()
+        principal = str(_principal.get("user_id") or _principal.get("sub"))
+        soldiers = [
+            soldier for soldier in bridge_manager.get_connected_soldiers()
+            if not str(soldier.get("device_id", "")).startswith("mobile:")
+            or str(soldier.get("device_id", "")).startswith("mobile:" + principal + ":")
+        ]
         return {"connected_devices": soldiers, "count": len(soldiers)}
 
     @router.post("/v1/local-bridge/send-task")
-    async def send_task_to_local_device(device_id: str, task: Dict[str, Any]) -> Any:
-        """
-        Send a task to a connected soldier device.
-
-        Args:
-            device_id: Target device ID
-            task:      Task definition with 'action' and 'parameters'
-
-        Returns:
-            Task result from the device
-        """
+    async def send_task_to_local_device(
+        device_id: str,
+        task: Dict[str, Any],
+        _principal: Dict[str, Any] = Depends(require_authenticated_principal),
+    ) -> Any:
+        """Send a task to a connected soldier device using the configured server key."""
+        principal = str(_principal.get("user_id") or _principal.get("sub"))
+        if device_id.startswith("mobile:") and not device_id.startswith("mobile:" + principal + ":"):
+            raise HTTPException(status_code=403, detail="Device belongs to another user")
         bridge_manager = nexus.resolve("soldier_bridge")
         if not bridge_manager.is_device_connected(device_id):
-            raise HTTPException(
-                status_code=404,
-                detail=f"Device {device_id} is not connected",
-            )
-        api_key = os.getenv("API_KEY_LOCAL")
-        if not api_key:
-            raise HTTPException(
-                status_code=503,
-                detail="API_KEY_LOCAL não configurada no servidor.",
-            )
+            raise HTTPException(status_code=404, detail=f"Device {device_id} is not connected")
+        # Mobile speech/notification clients do not execute local desktop commands
+        # and must never receive the server's local-bridge secret.
+        if device_id.startswith("mobile:"):
+            api_key = None
+        else:
+            api_key = os.getenv("API_KEY_LOCAL")
+            if not api_key:
+                raise HTTPException(status_code=503, detail="API_KEY_LOCAL não configurada no servidor.")
         return await bridge_manager.send_task(device_id, task, api_key=api_key)
 
     return router
