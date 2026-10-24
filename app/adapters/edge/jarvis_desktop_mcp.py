@@ -334,6 +334,55 @@ def read_accessibility_tree(window_title_contains: str = "", max_elements: int =
     return {"success": True, "windows": windows}
 
 
+# Android navigation tools are registered additively on the same MCP server.
+# Existing desktop tool implementations and their default behavior remain unchanged.
+def _android_navigation_adapter():
+    from app.adapters.edge.android_navigation_adapter import AndroidNavigationAdapter
+    return AndroidNavigationAdapter()
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Observando tela Android")
+def android_observe_screen() -> list[Any]:
+    """Observe the explicitly configured Android device; return status and a PNG image."""
+    result = _android_navigation_adapter().observe_screen()
+    if not result.get("success"):
+        return _content(result)
+    metadata = {key: value for key, value in result.items() if key != "image_base64"}
+    return [
+        TextContent(type="text", text=json.dumps(metadata, ensure_ascii=False, default=str)),
+        Image(data=base64.b64decode(result["image_base64"], validate=True), format="png"),
+    ]
+
+
+@mcp.tool()
+@tracked_action("Tocando na tela Android")
+def android_tap(x: int, y: int) -> dict[str, Any]:
+    """Tap Android screen coordinates. Observe the screen before and after acting."""
+    return _android_navigation_adapter().tap(x, y)
+
+
+@mcp.tool()
+@tracked_action("Deslizando na tela Android")
+def android_swipe(x1: int, y1: int, x2: int, y2: int, duration_ms: int = 350) -> dict[str, Any]:
+    """Swipe on the configured Android device; coordinates must come from a fresh observation."""
+    return _android_navigation_adapter().swipe(x1, y1, x2, y2, duration_ms)
+
+
+@mcp.tool()
+@tracked_action("Pressionando tecla Android")
+def android_press_key(keycode: str) -> dict[str, Any]:
+    """Press an allowlisted Android navigation key (for example HOME, BACK, or ENTER)."""
+    return _android_navigation_adapter().press_key(keycode)
+
+
+@mcp.tool()
+@tracked_action("Digitando texto no Android")
+def android_type_text(text: str) -> dict[str, Any]:
+    """Type text into the currently focused Android field; maximum 2000 characters."""
+    return _android_navigation_adapter().type_text(text)
+
+
 if __name__ == "__main__":
     if _HTTP_TRANSPORT not in {"stdio", "streamable-http"}:
         raise SystemExit("JARVIS_DESKTOP_TRANSPORT deve ser stdio ou streamable-http.")
