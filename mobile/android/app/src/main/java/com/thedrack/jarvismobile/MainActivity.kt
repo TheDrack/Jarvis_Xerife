@@ -1,11 +1,15 @@
 package com.thedrack.jarvismobile
 
-import android.os.Bundle
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
 import android.os.Build
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,8 +27,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.google.firebase.messaging.FirebaseMessaging
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -40,6 +47,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         vault = TokenVault(this)
+        if (FirebaseBootstrap.initialize(this) && vault.readRefreshToken() != null) {
+            registerFcmToken()
+        }
         speech = TextToSpeech(this) { status ->
             speechReady.value = status == TextToSpeech.SUCCESS
             if (status == TextToSpeech.SUCCESS) speech?.language = Locale("pt", "BR")
@@ -62,6 +72,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        handlePushIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePushIntent(intent)
+    }
+
+    private fun handlePushIntent(source: Intent?) {
+        val eventId = source?.getStringExtra(PushSpeechService.EXTRA_EVENT_ID) ?: return
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        if (!prefs.getBoolean("presence_enabled", false) || vault.readRefreshToken().isNullOrBlank()) return
+        val speechIntent = Intent(this, PushSpeechService::class.java)
+            .putExtra(PushSpeechService.EXTRA_EVENT_ID, eventId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(speechIntent) else startService(speechIntent)
     }
 
     private fun login(baseUrl: String, username: String, password: String, result: (String?) -> Unit) {
@@ -105,7 +131,25 @@ class MainActivity : ComponentActivity() {
             } finally {
                 connection?.disconnect()
             }
-            runOnUiThread { result(outcome) }
+            runOnUiThread {
+                result(outcome)
+                if (outcome == null) registerFcmToken()
+            }
+        }
+    }
+
+    private fun registerFcmToken() {
+        if (!FirebaseBootstrap.initialize(applicationContext)) return
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    task.result?.takeIf { it.isNotBlank() }?.let { token ->
+                        MobilePushClient.registerCurrentDevice(applicationContext, token)
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // FCM remains optional until the Firebase project configuration is injected at build time.
         }
     }
 
@@ -125,6 +169,7 @@ class MainActivity : ComponentActivity() {
         stopPresence()
         executor.execute {
             try {
+                if (!refreshToken.isNullOrBlank()) MobilePushClient.revokePushNow(applicationContext)
                 if (!refreshToken.isNullOrBlank() && !deviceId.isNullOrBlank() && baseUrl.startsWith("https://")) {
                     val connection = (URL(baseUrl.trimEnd('/') + "/v1/mobile/session/revoke")
                         .openConnection() as HttpURLConnection)
@@ -154,8 +199,11 @@ class MainActivity : ComponentActivity() {
 
     private fun startPresence() {
         val accessToken = vault.read() ?: return
-        val baseUrl = getSharedPreferences("jarvis_session", MODE_PRIVATE)
-            .getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL) ?: BuildConfig.DEFAULT_API_BASE_URL
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        prefs.edit().putBoolean("presence_enabled", true).apply()
+        registerFcmToken()
+        val baseUrl = prefs.getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL)
+            ?: BuildConfig.DEFAULT_API_BASE_URL
         val intent = Intent(this, BridgeService::class.java)
             .putExtra(BridgeService.EXTRA_BASE_URL, baseUrl)
             .putExtra(BridgeService.EXTRA_TOKEN, accessToken)
@@ -163,7 +211,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun stopPresence() {
+        getSharedPreferences("jarvis_session", MODE_PRIVATE).edit()
+            .putBoolean("presence_enabled", false).apply()
         stopService(Intent(this, BridgeService::class.java))
+        stopService(Intent(this, PushSpeechService::class.java))
     }
 
     private fun speak(text: String) {
@@ -196,7 +247,20 @@ private fun JarvisMobileScreen(
     var loggedIn by remember { mutableStateOf(isLoggedInInitially) }
     var presenceActive by remember { mutableStateOf(presenceInitiallyActive) }
     var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("Sessão local; integração de eventos ainda não ativada.") }
+    var message by remember { mutableStateOf("Entre e ative a presença para receber eventos do Jarvis.") }
+    val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            onStartPresence()
+            presenceActive = true
+            message = "Presença ativada; o Jarvis pode enviar avisos e voz em segundo plano."
+        } else {
+            presenceActive = false
+            message = "A permissão de notificações é necessária para a presença em segundo plano."
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -243,7 +307,18 @@ private fun JarvisMobileScreen(
         } else {
             Text("Sessão autenticada neste dispositivo.", modifier = Modifier.padding(top = 12.dp))
             Button(
-                onClick = { onStartPresence(); presenceActive = true; message = "Presença solicitada; verifique a notificação persistente." },
+                onClick = {
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        onStartPresence()
+                        presenceActive = true
+                        message = "Presença ativada; verifique a notificação persistente."
+                    }
+                },
                 enabled = !presenceActive,
                 modifier = Modifier.padding(top = 12.dp)
             ) { Text("Ativar presença em segundo plano") }

@@ -25,6 +25,7 @@ from app.adapters.infrastructure.routers.github import create_github_router
 from app.adapters.infrastructure.routers.health import create_health_router
 from app.adapters.infrastructure.routers.missions import create_missions_router
 from app.adapters.infrastructure.routers.mobile_sessions import create_mobile_sessions_router
+from app.adapters.infrastructure.routers.mobile_push import create_mobile_push_router
 from app.adapters.infrastructure.routers.thoughts import create_thoughts_router
 from app.adapters.infrastructure.routers.utility import create_utility_router
 from app.application.services import AssistantService, ExtensionManager
@@ -205,6 +206,7 @@ def create_api_server(
     app.include_router(create_evolution_router(db_adapter, get_current_user))
     app.include_router(create_bridge_router())
     app.include_router(create_mobile_sessions_router())
+    app.include_router(create_mobile_push_router())
     app.include_router(create_utility_router(db_adapter, get_current_user))
     app.include_router(create_dev_agent_router())
 

@@ -158,14 +158,35 @@ def create_mobile_sessions_router() -> APIRouter:
     @router.post("/v1/mobile/session/revoke", status_code=204)
     async def revoke_mobile_session(request: MobileRevokeRequest) -> None:
         device_id = _validate_device_id(request.device_id)
+        token_hash = _token_hash(request.refresh_token)
         try:
-            _admin_client().rpc(
+            client = _admin_client()
+            user_id = None
+            try:
+                rows = client.table(SESSION_TABLE).select("user_id").eq(
+                    "token_hash", token_hash
+                ).eq("device_id", device_id).limit(1).execute().data or []
+                if rows:
+                    user_id = rows[0].get("user_id")
+            except Exception:
+                # Revocation must remain possible even if the optional push table is not installed yet.
+                user_id = None
+
+            client.rpc(
                 "revoke_jarvis_mobile_session",
                 {
-                    "p_token_hash": _token_hash(request.refresh_token),
+                    "p_token_hash": token_hash,
                     "p_device_id": device_id,
                 },
             ).execute()
+
+            if user_id:
+                try:
+                    client.table("jarvis_mobile_push_devices").update(
+                        {"revoked_at": datetime.now(timezone.utc).isoformat()}
+                    ).eq("user_id", str(user_id)).eq("device_id", device_id).execute()
+                except Exception:
+                    logger.info("Push registration revocation skipped; push schema may not be installed")
         except HTTPException:
             raise
         except Exception as exc:

@@ -51,8 +51,39 @@ class TokenVault(context: Context) {
         }
     }
 
+    fun savePushToken(token: String) {
+        require(token.isNotBlank()) { "FCM token must not be blank" }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+        val encrypted = cipher.doFinal(token.toByteArray(Charsets.UTF_8))
+        check(
+            prefs.edit()
+                .putString("push_iv", Base64.encodeToString(cipher.iv, Base64.NO_WRAP))
+                .putString("push_body", Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .commit()
+        ) { "Could not persist encrypted FCM token" }
+    }
+
+    fun readPushToken(): String? {
+        val iv = prefs.getString("push_iv", null) ?: return null
+        val body = prefs.getString("push_body", null) ?: return null
+        return try {
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                getOrCreateKey(),
+                GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP))
+            )
+            String(cipher.doFinal(Base64.decode(body, Base64.NO_WRAP)), Charsets.UTF_8)
+                .takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            prefs.edit().remove("push_iv").remove("push_body").commit()
+            null
+        }
+    }
+
     fun clear() {
-        prefs.edit().remove("iv").remove("body").commit()
+        prefs.edit().remove("iv").remove("body").remove("push_iv").remove("push_body").commit()
         try {
             KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
         } catch (_: Exception) {

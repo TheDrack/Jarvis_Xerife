@@ -135,3 +135,14 @@ A base nativa e a sessão móvel renovável/revogável estão implementadas em c
 ### Atenção ao histórico de migrations do projeto remoto
 
 Na inspeção somente leitura do projeto Supabase `saibtpdehhprttqlgqdt`, as quatro migrations existentes aparecem com versões remotas `20261024142633`, `20261024142635`, `20261024142637` e `20261024142639`, enquanto os prefixos dos arquivos no repositório são `202610230001` a `202610230004`. Antes de aplicar a nova migration, reconciliar esse histórico e a ordem com a ferramenta de migração escolhida; não executar um `db push` às cegas. Nenhuma alteração foi aplicada ao banco durante esta etapa.
+
+## Incremento 3 — FCM e entrega de voz quando o WebSocket está offline
+
+- O backend registra o token FCM por usuário/dispositivo, cria eventos de fala com expiração de cinco minutos e envia apenas o `event_id` pelo FCM. O texto fica no banco privado e só é recuperado pela API autenticada; tokens e texto privado não são incluídos no payload push.
+- Se o telefone estiver desconectado do WebSocket, `/v1/local-bridge/send-task` pode enfileirar apenas tarefas `speak` para um dispositivo móvel com registro FCM ativo. Com o dispositivo conectado, o bridge atual continua sendo preferido.
+- O Android pede permissão de notificações ao ativar presença. Mensagens FCM de prioridade alta geram notificação visível; quando a presença está ativada, as notificações estão permitidas e o Android aceita iniciar o serviço, o app busca o evento autenticado e fala via TTS `pt-BR`. Se o sistema rebaixar a prioridade ou negar a inicialização em segundo plano, permanece a notificação sem tentar contornar a restrição.
+- O Firebase é opcional no build: o APK compila sem credenciais, mas FCM fica inativo. Injetar no build Android `JARVIS_FCM_API_KEY`, `JARVIS_FCM_APP_ID`, `JARVIS_FCM_PROJECT_ID` e `JARVIS_FCM_SENDER_ID`; estes são identificadores de configuração do cliente, não a chave privada de serviço.
+- No servidor, configurar `FIREBASE_PROJECT_ID` e `FIREBASE_SERVICE_ACCOUNT_JSON` como segredos. A conta de serviço precisa da permissão de envio FCM. Alternativamente, pode-se configurar `GOOGLE_APPLICATION_CREDENTIALS` para um arquivo protegido e `FIREBASE_PROJECT_ID`.
+- A migration `20261024202104_mobile_push_delivery.sql` cria registros de dispositivos e eventos privados com RLS e acesso apenas a `service_role`.
+- A validação local específica da segunda etapa foi: `test_mobile_push.py`, `test_mobile_sessions.py` e `test_mobile_bridge_auth.py` — **23 passed**; compilação Python e `git diff --check` também passaram. Build Android e CI completos aguardam a nova PR.
+- Ainda é obrigatório configurar um projeto Firebase real, aplicar migrations após reconciliar o histórico Supabase, implantar as variáveis secretas no ambiente correto e validar em telefone físico.
