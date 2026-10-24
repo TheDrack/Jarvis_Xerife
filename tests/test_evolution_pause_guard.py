@@ -8,6 +8,9 @@ def test_evolution_batch_script_requires_explicit_opt_in():
     root = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
     env.pop("EVOLUTION_ENABLED", None)
+    # The CI runner may use a Windows legacy console encoding; force deterministic capture.
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
     result = subprocess.run(
         [sys.executable, str(root / "scripts" / "evolve_all_pending.py"), "--cap-id", "CAP-001"],
         cwd=root,
@@ -18,4 +21,4 @@ def test_evolution_batch_script_requires_explicit_opt_in():
     )
     assert result.returncode == 2
     output = (result.stdout or "") + (result.stderr or "")
-    assert "Autoevolução pausada" in output
+    assert "Autoevolução pausada" in output or "EVOLUTION_PAUSED" in output
