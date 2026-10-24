@@ -15,7 +15,7 @@ Não documentar um produto específico como pré-requisito universal. A conexão
 
 - `app/application/ports/android_navigation.py`: contrato isolado para a capacidade Android.
 - `app/adapters/edge/android_navigation_adapter.py`: adaptador de baixo nível ADB para dispositivo selecionado explicitamente.
-- O transporte MCP existente deve ser reutilizado. A funcionalidade precisa ser exposta como ferramenta/handler aditivo no servidor MCP; não criar um segundo conector MCP sem necessidade.
+- As ferramentas `android_observe_screen`, `android_tap`, `android_swipe`, `android_press_key` e `android_type_text` são registradas de forma aditiva na mesma instância MCP (`app/adapters/edge/jarvis_desktop_mcp.py`). O conector MCP e o transporte existente são reutilizados; não é criado um segundo conector.
 - Não substituir nem alterar o comportamento da navegação desktop, `VisualNavigationPort`, os adaptadores Android já existentes, MacroDroid ou o registro de dispositivos.
 - Um adaptador isolado não significa que as ferramentas MCP já estejam registradas. Confirme a descoberta de ferramentas antes de declarar integração concluída.
 
@@ -57,6 +57,6 @@ O caminho de instalação depende do sistema operacional, do conector e do trans
 
 ## Estado e limites desta etapa
 
-O adaptador ADB é um componente de baixo nível, não um agente de planejamento semântico. Até que a integração aditiva com o servidor MCP seja implementada e verificada, não alegar que o seletor desktop/Android funciona nem que o ChatGPT já consegue controlar o telefone.
+O adaptador ADB é um componente de baixo nível, não um agente de planejamento semântico. As ferramentas Android foram adicionadas ao registro MCP, mas ainda precisam de CI verde, descoberta real pelo cliente e validação com dispositivo autorizado antes de alegar controle ponta a ponta. O seletor não redireciona as ferramentas desktop; as novas ferramentas Android são explícitas.
 
 Testes com subprocesses simulados verificam construção de comandos e tratamento de erros, mas não provam conectividade real nem compatibilidade ponta a ponta. O teste real exige dispositivo autorizado e ferramenta MCP descoberta pelo agente.
