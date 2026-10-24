@@ -1,11 +1,15 @@
 package com.thedrack.jarvismobile
 
-import android.os.Bundle
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
 import android.os.Build
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,12 +27,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.google.firebase.messaging.FirebaseMessaging
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -41,6 +47,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         vault = TokenVault(this)
+        if (FirebaseBootstrap.initialize(this) && vault.readRefreshToken() != null) {
+            registerFcmToken()
+        }
         speech = TextToSpeech(this) { status ->
             speechReady.value = status == TextToSpeech.SUCCESS
             if (status == TextToSpeech.SUCCESS) speech?.language = Locale("pt", "BR")
@@ -51,11 +60,11 @@ class MainActivity : ComponentActivity() {
                     JarvisMobileScreen(
                         initialBaseUrl = getSharedPreferences("jarvis_session", MODE_PRIVATE)
                             .getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL) ?: BuildConfig.DEFAULT_API_BASE_URL,
-                        isLoggedInInitially = vault.read() != null,
+                        isLoggedInInitially = vault.read() != null && vault.readRefreshToken() != null,
                         speechReady = speechReady.value,
                         presenceInitiallyActive = BridgeService.isRunning,
                         onLogin = ::login,
-                        onLogout = { vault.clear(); stopPresence() },
+                        onLogout = ::logout,
                         onStartPresence = ::startPresence,
                         onStopPresence = ::stopPresence,
                         onSpeak = { speak("Jarvis Mobile ativo. Canal de voz local funcionando.") }
@@ -63,6 +72,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        handlePushIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handlePushIntent(intent)
+    }
+
+    private fun handlePushIntent(source: Intent?) {
+        val eventId = source?.getStringExtra(PushSpeechService.EXTRA_EVENT_ID) ?: return
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        if (!prefs.getBoolean("presence_enabled", false) || vault.readRefreshToken().isNullOrBlank()) return
+        val speechIntent = Intent(this, PushSpeechService::class.java)
+            .putExtra(PushSpeechService.EXTRA_EVENT_ID, eventId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(speechIntent) else startService(speechIntent)
     }
 
     private fun login(baseUrl: String, username: String, password: String, result: (String?) -> Unit) {
@@ -71,15 +96,18 @@ class MainActivity : ComponentActivity() {
             val outcome = try {
                 val normalized = baseUrl.trim().trimEnd('/')
                 require(normalized.startsWith("https://")) { "Use uma URL HTTPS." }
-                connection = (URL(normalized + "/token").openConnection() as HttpURLConnection).apply {
+                connection = (URL(normalized + "/v1/mobile/session/login").openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 10000
                     readTimeout = 10000
                     doOutput = true
-                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                    setRequestProperty("Content-Type", "application/json")
                 }
-                val body = "username=" + URLEncoder.encode(username, "UTF-8") +
-                    "&password=" + URLEncoder.encode(password, "UTF-8")
+                val body = JSONObject()
+                    .put("username", username)
+                    .put("password", password)
+                    .put("device_id", getOrCreateDeviceId())
+                    .toString()
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                 val code = connection.responseCode
                 val stream = if (code in 200..299) connection.inputStream else connection.errorStream
@@ -87,10 +115,12 @@ class MainActivity : ComponentActivity() {
                 if (code !in 200..299) {
                     "Login recusado pelo servidor (HTTP " + code + ")."
                 } else {
-                    val token = JSONObject(response).optString("access_token")
-                    if (token.isBlank()) "Resposta de login sem token válido."
+                    val payload = JSONObject(response)
+                    val token = payload.optString("access_token")
+                    val refreshToken = payload.optString("refresh_token")
+                    if (token.isBlank() || refreshToken.isBlank()) "Resposta de sessão móvel incompleta."
                     else {
-                        vault.save(token)
+                        vault.save(token, refreshToken)
                         getSharedPreferences("jarvis_session", MODE_PRIVATE).edit()
                             .putString("api_base_url", normalized).apply()
                         null
@@ -101,14 +131,81 @@ class MainActivity : ComponentActivity() {
             } finally {
                 connection?.disconnect()
             }
-            runOnUiThread { result(outcome) }
+            runOnUiThread {
+                result(outcome)
+                if (outcome == null) registerFcmToken()
+            }
+        }
+    }
+
+    private fun registerFcmToken() {
+        if (!FirebaseBootstrap.initialize(applicationContext)) return
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    task.result?.takeIf { it.isNotBlank() }?.let { token ->
+                        MobilePushClient.registerCurrentDevice(applicationContext, token)
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // FCM remains optional until the Firebase project configuration is injected at build time.
+        }
+    }
+
+    private fun getOrCreateDeviceId(): String {
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        return prefs.getString("bridge_device_id", null) ?: java.util.UUID.randomUUID().toString().also {
+            prefs.edit().putString("bridge_device_id", it).apply()
+        }
+    }
+
+    private fun logout() {
+        val refreshToken = vault.readRefreshToken()
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        val deviceId = prefs.getString("bridge_device_id", null)
+        val baseUrl = prefs.getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL)
+            ?: BuildConfig.DEFAULT_API_BASE_URL
+        stopPresence()
+        executor.execute {
+            try {
+                if (!refreshToken.isNullOrBlank()) MobilePushClient.revokePushNow(applicationContext)
+                // Push revocation may refresh/rotate the session; revoke with the latest token.
+                val currentRefreshToken = vault.readRefreshToken() ?: refreshToken
+                if (!currentRefreshToken.isNullOrBlank() && !deviceId.isNullOrBlank() && baseUrl.startsWith("https://")) {
+                    val connection = (URL(baseUrl.trimEnd('/') + "/v1/mobile/session/revoke")
+                        .openConnection() as HttpURLConnection)
+                    try {
+                        connection.requestMethod = "POST"
+                        connection.connectTimeout = 5000
+                        connection.readTimeout = 5000
+                        connection.doOutput = true
+                        connection.setRequestProperty("Content-Type", "application/json")
+                        val body = JSONObject()
+                            .put("refresh_token", currentRefreshToken)
+                            .put("device_id", deviceId)
+                            .toString()
+                        connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                        connection.responseCode
+                    } finally {
+                        connection.disconnect()
+                    }
+                }
+            } catch (_: Exception) {
+                // Local logout must still complete when the phone is offline.
+            } finally {
+                vault.clear()
+            }
         }
     }
 
     private fun startPresence() {
         val accessToken = vault.read() ?: return
-        val baseUrl = getSharedPreferences("jarvis_session", MODE_PRIVATE)
-            .getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL) ?: BuildConfig.DEFAULT_API_BASE_URL
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        prefs.edit().putBoolean("presence_enabled", true).apply()
+        registerFcmToken()
+        val baseUrl = prefs.getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL)
+            ?: BuildConfig.DEFAULT_API_BASE_URL
         val intent = Intent(this, BridgeService::class.java)
             .putExtra(BridgeService.EXTRA_BASE_URL, baseUrl)
             .putExtra(BridgeService.EXTRA_TOKEN, accessToken)
@@ -116,7 +213,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun stopPresence() {
+        getSharedPreferences("jarvis_session", MODE_PRIVATE).edit()
+            .putBoolean("presence_enabled", false).apply()
         stopService(Intent(this, BridgeService::class.java))
+        stopService(Intent(this, PushSpeechService::class.java))
     }
 
     private fun speak(text: String) {
@@ -149,7 +249,20 @@ private fun JarvisMobileScreen(
     var loggedIn by remember { mutableStateOf(isLoggedInInitially) }
     var presenceActive by remember { mutableStateOf(presenceInitiallyActive) }
     var busy by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("Sessão local; integração de eventos ainda não ativada.") }
+    var message by remember { mutableStateOf("Entre e ative a presença para receber eventos do Jarvis.") }
+    val context = LocalContext.current
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            onStartPresence()
+            presenceActive = true
+            message = "Presença ativada; o Jarvis pode enviar avisos e voz em segundo plano."
+        } else {
+            presenceActive = false
+            message = "A permissão de notificações é necessária para a presença em segundo plano."
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -196,7 +309,18 @@ private fun JarvisMobileScreen(
         } else {
             Text("Sessão autenticada neste dispositivo.", modifier = Modifier.padding(top = 12.dp))
             Button(
-                onClick = { onStartPresence(); presenceActive = true; message = "Presença solicitada; verifique a notificação persistente." },
+                onClick = {
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        onStartPresence()
+                        presenceActive = true
+                        message = "Presença ativada; verifique a notificação persistente."
+                    }
+                },
                 enabled = !presenceActive,
                 modifier = Modifier.padding(top = 12.dp)
             ) { Text("Ativar presença em segundo plano") }

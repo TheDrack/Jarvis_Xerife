@@ -39,3 +39,4 @@ networkx>=3.0
 # Telemetria e Chamadas API (Substitui o SDK do Render)
 httpx>=0.25.0
 requests>=2.31.0
+google-auth>=2.40.0

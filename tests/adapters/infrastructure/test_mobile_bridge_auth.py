@@ -37,7 +37,7 @@ class FakeBridgeManager:
 class FakeAuthAdapter:
     def verify_token(self, token):
         if token == "valid":
-            return {"sub": "felipe", "user_id": "user-123"}
+            return {"sub": "felipe", "user_id": "user-123", "device_id": "phone-1"}
         return None
 
 
@@ -179,3 +179,19 @@ def test_mobile_task_dispatch_never_receives_desktop_bridge_secret(monkeypatch):
     assert manager.sent_tasks == [
         ("mobile:user-123:phone-1", {"action": "speak", "parameters": {"text": "Jarvis pronto"}}, None)
     ]
+
+
+def test_mobile_websocket_rejects_token_bound_to_another_device(monkeypatch):
+    manager = FakeBridgeManager()
+    client = _client(monkeypatch, manager)
+
+    try:
+        with client.websocket_connect(
+            "/v1/local-bridge?device_id=phone-2&device_type=mobile",
+            headers={"Authorization": "Bearer valid"},
+        ):
+            raise AssertionError("A token bound to another device unexpectedly connected")
+    except WebSocketDisconnect:
+        pass
+
+    assert manager.connected == []

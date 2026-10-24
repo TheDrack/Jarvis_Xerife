@@ -10,7 +10,14 @@ import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.concurrency import run_in_threadpool
 
+from app.adapters.infrastructure.firebase_push import FirebasePushDeliveryError, FirebasePushNotConfigured
+from app.adapters.infrastructure.routers.mobile_push import (
+    MobilePushDeviceNotRegistered,
+    MobilePushStorageUnavailable,
+    dispatch_mobile_speak,
+)
 from app.core.nexus import nexus
 
 logger = logging.getLogger(__name__)
@@ -69,6 +76,9 @@ def create_bridge_router() -> APIRouter:
             if not isinstance(principal, (str, int)) or not str(principal).strip():
                 await websocket.close(code=4401, reason="Invalid authentication token")
                 return
+            if claims.get("device_id") != device_id:
+                await websocket.close(code=4403, reason="Token is not bound to this mobile device")
+                return
             canonical_device_id = "mobile:" + str(principal) + ":" + device_id
 
         caps: List[str] = [c.strip() for c in capabilities.split(",") if c.strip()] if capabilities else []
@@ -113,6 +123,30 @@ def create_bridge_router() -> APIRouter:
             raise HTTPException(status_code=403, detail="Device belongs to another user")
         bridge_manager = nexus.resolve("soldier_bridge")
         if not bridge_manager.is_device_connected(device_id):
+            if device_id.startswith("mobile:"):
+                mobile_prefix = "mobile:" + principal + ":"
+                mobile_device_id = device_id[len(mobile_prefix):]
+                if not mobile_device_id:
+                    raise HTTPException(status_code=422, detail="Invalid mobile device ID")
+                if task.get("action") != "speak":
+                    raise HTTPException(status_code=422, detail="Offline mobile delivery supports speak tasks only")
+                parameters = task.get("parameters")
+                text = parameters.get("text") if isinstance(parameters, dict) else None
+                try:
+                    return await run_in_threadpool(
+                        dispatch_mobile_speak, principal, mobile_device_id, text
+                    )
+                except ValueError as exc:
+                    raise HTTPException(status_code=422, detail=str(exc)) from None
+                except MobilePushDeviceNotRegistered:
+                    raise HTTPException(status_code=404, detail="Mobile device has no active push registration") from None
+                except (FirebasePushNotConfigured, MobilePushStorageUnavailable):
+                    raise HTTPException(status_code=503, detail="Mobile push delivery is not configured") from None
+                except FirebasePushDeliveryError:
+                    raise HTTPException(status_code=502, detail="Mobile push delivery failed") from None
+                except Exception as exc:
+                    logger.error("Mobile push dispatch failed (%s)", type(exc).__name__)
+                    raise HTTPException(status_code=503, detail="Mobile push dispatch failed") from None
             raise HTTPException(status_code=404, detail=f"Device {device_id} is not connected")
         # Mobile speech/notification clients do not execute local desktop commands
         # and must never receive the server's local-bridge secret.

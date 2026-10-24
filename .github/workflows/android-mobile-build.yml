@@ -33,4 +33,16 @@ jobs:
           gradle-version: "8.13"
       - name: Assemble debug APK
         working-directory: mobile/android
+        env:
+          JARVIS_FCM_API_KEY: ${{ secrets.JARVIS_FCM_API_KEY }}
+          JARVIS_FCM_APP_ID: ${{ secrets.JARVIS_FCM_APP_ID }}
+          JARVIS_FCM_PROJECT_ID: ${{ secrets.JARVIS_FCM_PROJECT_ID }}
+          JARVIS_FCM_SENDER_ID: ${{ secrets.JARVIS_FCM_SENDER_ID }}
         run: gradle --no-daemon :app:assembleDebug
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-mobile-debug-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
