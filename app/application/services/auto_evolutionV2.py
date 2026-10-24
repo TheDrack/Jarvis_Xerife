@@ -3,6 +3,7 @@ from app.utils.document_store import document_store
 from pathlib import Path
 from typing import List, Dict, Optional
 import logging
+import os
 logger = logging.getLogger(__name__)
 
 class AutoEvolutionServiceV2(NexusComponent):
@@ -38,6 +39,15 @@ class AutoEvolutionServiceV2(NexusComponent):
                 return {"success": True, "action": action, "mission": mission}
 
             if action in ("evolve_next", "evolve_cap"):
+                # Fail closed: status/discovery remain available while mutation is paused.
+                if os.environ.get("EVOLUTION_ENABLED", "").strip().lower() != "true":
+                    return {
+                        "success": False,
+                        "action": action,
+                        "reason": "evolution_paused",
+                        "error": "Autoevolução pausada: defina EVOLUTION_ENABLED=true explicitamente após concluir a revisão de segurança.",
+                    }
+
                 cap_id = context.get("cap_id")
                 if not cap_id:
                     mission = self.find_next_mission()
