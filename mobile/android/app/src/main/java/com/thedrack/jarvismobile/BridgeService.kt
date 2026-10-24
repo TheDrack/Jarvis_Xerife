@@ -129,7 +129,11 @@ class BridgeService : Service() {
 
                 override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                     socket = null
-                    if (!stopping) scheduleReconnect()
+                    if (!stopping) {
+                        val closeReason = reason.take(60).ifBlank { "sem detalhe" }
+                        updateNotification("Canal do Jarvis encerrado ($code: $closeReason); reconectando")
+                        scheduleReconnect()
+                    }
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
