@@ -59,11 +59,13 @@ def test_mobile_websocket_rejects_missing_bearer_token(monkeypatch):
     manager = FakeBridgeManager()
     client = _client(monkeypatch, manager)
 
-    with client.websocket_connect(
-        "/v1/local-bridge?device_id=phone-1&device_type=mobile"
-    ) as websocket:
-        # A server-side close before accept is surfaced as an exception at connect.
-        websocket.receive_json()
+    try:
+        with client.websocket_connect(
+            "/v1/local-bridge?device_id=phone-1&device_type=mobile"
+        ):
+            raise AssertionError("Unauthenticated mobile connection unexpectedly opened")
+    except WebSocketDisconnect:
+        pass
 
     assert manager.connected == []
 
