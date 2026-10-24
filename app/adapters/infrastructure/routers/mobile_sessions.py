@@ -159,10 +159,12 @@ def create_mobile_sessions_router() -> APIRouter:
     async def revoke_mobile_session(request: MobileRevokeRequest) -> None:
         device_id = _validate_device_id(request.device_id)
         try:
-            _admin_client().table(SESSION_TABLE).update(
-                {"revoked_at": datetime.now(timezone.utc).isoformat()}
-            ).eq("token_hash", _token_hash(request.refresh_token)).eq(
-                "device_id", device_id
+            _admin_client().rpc(
+                "revoke_jarvis_mobile_session",
+                {
+                    "p_token_hash": _token_hash(request.refresh_token),
+                    "p_device_id": device_id,
+                },
             ).execute()
         except HTTPException:
             raise

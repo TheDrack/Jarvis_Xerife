@@ -99,3 +99,46 @@ revoke all on function public.rotate_jarvis_mobile_session(text, text, text, tim
     from public, anon, authenticated;
 grant execute on function public.rotate_jarvis_mobile_session(text, text, text, timestamptz)
     to service_role;
+
+
+-- Revoke the entire session family, not just the presented token. This also
+-- handles logout racing with an in-flight refresh-token rotation.
+create or replace function public.revoke_jarvis_mobile_session(
+    p_token_hash text,
+    p_device_id text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public
+as $$
+declare
+    v_family_id uuid;
+begin
+    if length(p_token_hash) <> 64
+       or length(p_device_id) not between 1 and 128 then
+        return false;
+    end if;
+
+    select s.family_id into v_family_id
+      from public.jarvis_mobile_device_sessions as s
+     where s.token_hash = p_token_hash
+       and s.device_id = p_device_id
+     for update;
+
+    if not found then
+        return false;
+    end if;
+
+    update public.jarvis_mobile_device_sessions
+       set revoked_at = coalesce(revoked_at, now())
+     where family_id = v_family_id;
+
+    return true;
+end;
+$$;
+
+revoke all on function public.revoke_jarvis_mobile_session(text, text)
+    from public, anon, authenticated;
+grant execute on function public.revoke_jarvis_mobile_session(text, text)
+    to service_role;

@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from hashlib import sha256
 from uuid import UUID
 
@@ -52,6 +51,8 @@ class FakeRpc:
 
     def execute(self):
         self.client.rpc_calls.append((self.name, self.params))
+        if self.name == "revoke_jarvis_mobile_session":
+            return FakeResponse(True)
         if self.client.rpc_data is None:
             return FakeResponse([])
         return FakeResponse([self.client.rpc_data])
@@ -75,7 +76,7 @@ class FakeSupabase:
         return FakeQuery(self, name)
 
     def rpc(self, name, params):
-        assert name == "rotate_jarvis_mobile_session"
+        assert name in {"rotate_jarvis_mobile_session", "revoke_jarvis_mobile_session"}
         return FakeRpc(self, name, params)
 
 
@@ -215,9 +216,9 @@ def test_revoke_hashes_token_and_scopes_to_device(monkeypatch):
     )
 
     assert response.status_code == 204
-    payload, filters = database.updated[0]
-    assert filters == {
-        "token_hash": sha256(token.encode()).hexdigest(),
-        "device_id": "android-1",
+    rpc_name, args = database.rpc_calls[0]
+    assert rpc_name == "revoke_jarvis_mobile_session"
+    assert args == {
+        "p_token_hash": sha256(token.encode()).hexdigest(),
+        "p_device_id": "android-1",
     }
-    assert datetime.fromisoformat(payload["revoked_at"].replace("Z", "+00:00")).tzinfo
