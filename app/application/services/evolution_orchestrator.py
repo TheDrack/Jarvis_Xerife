@@ -69,6 +69,10 @@ class EvolutionOrchestrator(NexusComponent):
                 dependências) injetado no prompt do LLM.
         """
         ctx = context or {}
+        if os.environ.get("EVOLUTION_ENABLED", "").strip().lower() != "true":
+            logger.info("[EvolutionOrchestrator] Autoevolução pausada; ciclo ignorado.")
+            return {"success": False, "reason": "evolution_paused", "cycles": self._cycle_count}
+
         error_snippet = ctx.get("error_snippet", "")
         mission_id = ctx.get("mission_id", f"evo-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}")
 
