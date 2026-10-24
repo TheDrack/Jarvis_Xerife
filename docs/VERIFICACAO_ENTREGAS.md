@@ -145,3 +145,19 @@ python -c "import json,pathlib;c=json.loads(pathlib.Path('data/capabilities.json
 # Arquivos acima de 300 linhas
 wc -l $(find app -name "*.py" -not -path "*__pycache__*") | awk '$1>300' | wc -l             # 35
 ```
+
+
+## 8. Revisão de recuperação e curiosidade (2026-10-24)
+
+Esta seção complementa a auditoria anterior; não apaga os achados históricos.
+
+| Item | Estado após a proposta | Limite de validação |
+|------|------------------------|---------------------|
+| Estado versionado de contexto | 🟨 Baseline pausada; telemetria sem origem/data foi alterada para unknown | Não representa leitura do computador/serviço em produção |
+| Entrada principal de autoevolução | 🟨 Gate explícito EVOLUTION_ENABLED na camada de serviço e no EvolutionOrchestrator | Exige CI e teste em runtime; variáveis remotas não foram inspecionadas |
+| Heartbeat do MainService | 🟨 Não agenda ciclo de evolução quando EVOLUTION_ENABLED não é true | Ainda precisa validar boot real com a variável ausente |
+| Script batch de autoevolução | 🟨 Bloqueia mutação sem opt-in; dry-run continua disponível | Execução local/CI ainda precisa ser confirmada |
+| CuriosityIntake | 🟨 Captura cartões com origem, evidência, benefício, perguntas, risco e deduplicação | Integração MCP não intercepta automaticamente pesquisa feita fora do Jarvis |
+| Qualidade funcional de capabilities | ❌ Não resolvida por esta PR | Inventário antigo não foi apagado nem redefinido; precisa ser reclassificado com testes comportamentais |
+
+A autoevolução deve continuar pausada até o CI e a inspeção de runtime confirmarem os gates. A curiosidade pode capturar e investigar ideias sem reativar mutações.
