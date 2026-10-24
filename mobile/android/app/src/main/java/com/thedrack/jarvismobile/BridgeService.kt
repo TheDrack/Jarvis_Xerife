@@ -146,12 +146,14 @@ class BridgeService : Service() {
                         }
                         return
                     }
-                    updateNotification("Conexão perdida; tentando reconectar")
+                    val detail = response?.code?.let { "Resposta HTTP $it" } ?: "sem resposta HTTP"
+                    updateNotification("Canal do Jarvis indisponível ($detail); tentando reconectar")
                     if (!stopping) scheduleReconnect()
                 }
             })
         } catch (_: Exception) {
             socket = null
+            updateNotification("Não foi possível iniciar o canal do Jarvis; nova tentativa agendada")
             if (!stopping) scheduleReconnect()
         }
     }
