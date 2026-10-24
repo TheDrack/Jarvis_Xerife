@@ -47,7 +47,7 @@ def get_idle_seconds() -> float:
 
 def speak_welcome() -> None:
     """Speak through the Windows speech engine using the default audio output."""
-    command = r'''$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; try { $v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq 'pt-BR' } | Select-Object -First 1; if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; $s.Speak('VocÃª voltou. Estou ativo e pronto para continuar.'); } finally { $s.Dispose() }'''
+    command = r'''$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.Speech; $s = New-Object System.Speech.Synthesis.SpeechSynthesizer; try { $v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq 'pt-BR' } | Select-Object -First 1; if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; $s.Speak('Voce voltou. Estou ativo e pronto para continuar.'); } finally { $s.Dispose() }'''
     subprocess.run(
         ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", command],
         check=False,
