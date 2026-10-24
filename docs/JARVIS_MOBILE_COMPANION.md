@@ -131,3 +131,7 @@ A base nativa e a sessão móvel renovável/revogável estão implementadas em c
 3. Configurar FCM com um projeto e credenciais reais.
 4. Integrar o watcher de retorno do Windows ao fluxo autenticado e validar PC → núcleo → Android.
 5. Compilar APK, instalar e validar em telefone real, incluindo tela bloqueada, rede interrompida, expiração, replay e logout.
+
+### Atenção ao histórico de migrations do projeto remoto
+
+Na inspeção somente leitura do projeto Supabase `saibtpdehhprttqlgqdt`, as quatro migrations existentes aparecem com versões remotas `20261024142633`, `20261024142635`, `20261024142637` e `20261024142639`, enquanto os prefixos dos arquivos no repositório são `202610230001` a `202610230004`. Antes de aplicar a nova migration, reconciliar esse histórico e a ordem com a ferramenta de migração escolhida; não executar um `db push` às cegas. Nenhuma alteração foi aplicada ao banco durante esta etapa.
