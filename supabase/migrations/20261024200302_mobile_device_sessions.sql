@@ -2,6 +2,8 @@
 -- The application server must use SUPABASE_SERVICE_ROLE_KEY for this table.
 -- No browser/client role receives direct access.
 
+grant usage on schema public to service_role;
+
 create table if not exists public.jarvis_mobile_device_sessions (
     token_hash text primary key check (length(token_hash) = 64),
     family_id uuid not null,
