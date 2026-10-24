@@ -20,6 +20,8 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.min
@@ -39,6 +41,7 @@ class BridgeService : Service() {
         .build()
     @Volatile private var socket: WebSocket? = null
     private var tts: TextToSpeech? = null
+    private lateinit var tokenVault: TokenVault
     private var ttsReady = false
     private var apiBaseUrl = ""
     private var token = ""
@@ -51,6 +54,7 @@ class BridgeService : Service() {
     override fun onCreate() {
         super.onCreate()
         isRunning = true
+        tokenVault = TokenVault(applicationContext)
         createNotificationChannel()
     }
 
@@ -131,9 +135,15 @@ class BridgeService : Service() {
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                     socket = null
                     if (response?.code == 403 || response?.code == 401) {
-                        updateNotification("Sessão recusada/expirada; reabra o app para entrar novamente")
-                        stopping = true
-                        stopSelf()
+                        updateNotification("Sessão expirou; tentando renovação segura")
+                        if (refreshSession()) {
+                            retryCount = 0
+                            scheduleReconnect()
+                        } else {
+                            updateNotification("Sessão expirada/revogada; reabra o app para entrar novamente")
+                            stopping = true
+                            stopSelf()
+                        }
                         return
                     }
                     updateNotification("Conexão perdida; tentando reconectar")
@@ -174,6 +184,43 @@ class BridgeService : Service() {
             .put("success", success)
             .put("result", result)
         socket?.send(payload.toString())
+    }
+
+    /** Rotate the refresh token after an expired access token; never log credentials. */
+    private fun refreshSession(): Boolean {
+        val refreshToken = tokenVault.readRefreshToken() ?: return false
+        if (!apiBaseUrl.startsWith("https://") || deviceId.isBlank()) return false
+        var connection: HttpURLConnection? = null
+        return try {
+            connection = (URL(apiBaseUrl.trimEnd('/') + "/v1/mobile/session/refresh")
+                .openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 10000
+                readTimeout = 10000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json")
+            }
+            val body = JSONObject()
+                .put("refresh_token", refreshToken)
+                .put("device_id", deviceId)
+                .toString()
+            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val code = connection.responseCode
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            if (code !in 200..299) return false
+            val payload = JSONObject(response)
+            val access = payload.optString("access_token")
+            val replacement = payload.optString("refresh_token")
+            if (access.isBlank() || replacement.isBlank()) return false
+            tokenVault.save(access, replacement)
+            token = access
+            true
+        } catch (_: Exception) {
+            false
+        } finally {
+            connection?.disconnect()
+        }
     }
 
     private fun scheduleReconnect() {

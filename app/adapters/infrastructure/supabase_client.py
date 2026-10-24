@@ -65,3 +65,39 @@ def get_supabase_client() -> Optional["Client"]:  # type: ignore[type-arg]
 def is_supabase_available() -> bool:
     """Return ``True`` if the Supabase client is reachable."""
     return get_supabase_client() is not None
+
+
+
+_admin_client: Optional["Client"] = None  # type: ignore[type-arg]
+
+
+def get_supabase_admin_client() -> Optional["Client"]:  # type: ignore[type-arg]
+    """Return a server-only Supabase client requiring the service-role secret.
+
+    Session-management tables are deliberately inaccessible to anon/authenticated
+    roles. Never fall back to SUPABASE_KEY here because it may be a publishable
+    or anon key and must not be treated as an administrative credential.
+    """
+    global _admin_client
+
+    if _admin_client is not None:
+        return _admin_client
+    if not _SUPABASE_AVAILABLE:
+        return None
+
+    import os
+    from app.core.config import settings
+
+    url = settings.supabase_url
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if not url or not key:
+        logger.debug("[Supabase] Admin client unavailable; service-role secret is not configured.")
+        return None
+
+    try:
+        _admin_client = create_client(url, key)
+        logger.info("[Supabase] Server-only admin client initialized.")
+        return _admin_client
+    except Exception as exc:
+        logger.error("[Supabase] Failed to initialize server-only admin client: %s", exc)
+        return None

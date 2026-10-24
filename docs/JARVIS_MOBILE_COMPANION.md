@@ -105,11 +105,29 @@ O primeiro incremento foi implementado nesta branch:
 
 ### Limitações ainda abertas
 
-- O token OAuth2 padrão expira em 30 minutos. O serviço WebSocket não é uma presença confiável de longo prazo até existir uma sessão de dispositivo renovável e revogável.
+- O endpoint legado `/token` continua usando o prazo OAuth2 padrão de 30 minutos. O aplicativo nativo passa a usar os endpoints de sessão móvel renovável descritos no incremento 2; para produção, ainda é necessário configurar a chave administrativa e aplicar a migration.
 - FCM não está configurado; isso exige um projeto Firebase e configuração de servidor que não devem ser inventados. Sem FCM, o canal depende de o serviço em primeiro plano continuar permitido pelo Android.
 - O Android impõe limite de seis horas por janela de 24 horas a serviços foreground do tipo `dataSync` em apps que miram API 35. O serviço encerra no callback de timeout; não tenta contornar a regra.
 - A saudação PC→telefone ainda não está ponta a ponta: o watcher Windows não publica evento autenticado ao núcleo e não há push FCM. Não foi instalado APK no telefone nem alterada a produção.
 
 ## Estado desta proposta
 
-A base nativa e a primeira camada de autenticação estão implementadas, mas o canal de eventos ainda não é uma solução conclusiva de presença persistente. Não marcar a integração PC→telefone como concluída até resolver a sessão de dispositivo renovável/revogável, a configuração FCM e os testes em dispositivo Android real.
+A base nativa e a sessão móvel renovável/revogável estão implementadas em código, mas ainda dependem da migration e da chave administrativa no ambiente de servidor. O canal de eventos ainda não é uma solução conclusiva de presença persistente. Não marcar a integração PC→telefone como concluída até configurar FCM, ligar o watcher ao fluxo autenticado e testar em dispositivo Android real.
+## Incremento 2 — sessão móvel renovável e revogável
+
+- Adiciona `POST /v1/mobile/session/login`, `POST /v1/mobile/session/refresh` e `POST /v1/mobile/session/revoke`.
+- Access tokens móveis duram 15 minutos; refresh tokens opacos duram até 30 dias e são rotacionados a cada renovação.
+- O banco guarda apenas SHA-256 do refresh token, nunca o token bruto. A função SQL de rotação usa bloqueio de linha, invalida o token anterior e revoga a família em caso de replay ou expiração.
+- O token de acesso inclui identidade, família da sessão e ID do dispositivo; o WebSocket exige que o `device_id` solicitado corresponda ao dispositivo do token.
+- Android cifra access + refresh token com Android Keystore. Ao receber rejeição de sessão, tenta renovação antes de interromper a presença; logout tenta revogar no servidor e sempre limpa o material local.
+- A migration `20261024200302_mobile_device_sessions.sql` ativa RLS, não concede acesso às roles públicas/autenticadas e limita tabela/função ao `service_role`.
+- O backend requer `SUPABASE_SERVICE_ROLE_KEY` no ambiente de servidor. Não foi configurada nenhuma chave, aplicada migration em produção ou feito deploy nesta etapa.
+- Testes locais específicos: `test_mobile_sessions.py` e `test_mobile_bridge_auth.py`.
+
+### Próximos bloqueios
+
+1. Configurar `SUPABASE_SERVICE_ROLE_KEY` no ambiente de servidor usando o gerenciador de segredos, sem expor o valor.
+2. Aplicar a migration somente após revisão e confirmar tabela/função e RLS no projeto correto.
+3. Configurar FCM com um projeto e credenciais reais.
+4. Integrar o watcher de retorno do Windows ao fluxo autenticado e validar PC → núcleo → Android.
+5. Compilar APK, instalar e validar em telefone real, incluindo tela bloqueada, rede interrompida, expiração, replay e logout.

@@ -69,6 +69,9 @@ def create_bridge_router() -> APIRouter:
             if not isinstance(principal, (str, int)) or not str(principal).strip():
                 await websocket.close(code=4401, reason="Invalid authentication token")
                 return
+            if claims.get("device_id") != device_id:
+                await websocket.close(code=4403, reason="Token is not bound to this mobile device")
+                return
             canonical_device_id = "mobile:" + str(principal) + ":" + device_id
 
         caps: List[str] = [c.strip() for c in capabilities.split(",") if c.strip()] if capabilities else []

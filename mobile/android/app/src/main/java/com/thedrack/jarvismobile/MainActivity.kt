@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -51,11 +50,11 @@ class MainActivity : ComponentActivity() {
                     JarvisMobileScreen(
                         initialBaseUrl = getSharedPreferences("jarvis_session", MODE_PRIVATE)
                             .getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL) ?: BuildConfig.DEFAULT_API_BASE_URL,
-                        isLoggedInInitially = vault.read() != null,
+                        isLoggedInInitially = vault.read() != null && vault.readRefreshToken() != null,
                         speechReady = speechReady.value,
                         presenceInitiallyActive = BridgeService.isRunning,
                         onLogin = ::login,
-                        onLogout = { vault.clear(); stopPresence() },
+                        onLogout = ::logout,
                         onStartPresence = ::startPresence,
                         onStopPresence = ::stopPresence,
                         onSpeak = { speak("Jarvis Mobile ativo. Canal de voz local funcionando.") }
@@ -71,15 +70,18 @@ class MainActivity : ComponentActivity() {
             val outcome = try {
                 val normalized = baseUrl.trim().trimEnd('/')
                 require(normalized.startsWith("https://")) { "Use uma URL HTTPS." }
-                connection = (URL(normalized + "/token").openConnection() as HttpURLConnection).apply {
+                connection = (URL(normalized + "/v1/mobile/session/login").openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 10000
                     readTimeout = 10000
                     doOutput = true
-                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                    setRequestProperty("Content-Type", "application/json")
                 }
-                val body = "username=" + URLEncoder.encode(username, "UTF-8") +
-                    "&password=" + URLEncoder.encode(password, "UTF-8")
+                val body = JSONObject()
+                    .put("username", username)
+                    .put("password", password)
+                    .put("device_id", getOrCreateDeviceId())
+                    .toString()
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                 val code = connection.responseCode
                 val stream = if (code in 200..299) connection.inputStream else connection.errorStream
@@ -87,10 +89,12 @@ class MainActivity : ComponentActivity() {
                 if (code !in 200..299) {
                     "Login recusado pelo servidor (HTTP " + code + ")."
                 } else {
-                    val token = JSONObject(response).optString("access_token")
-                    if (token.isBlank()) "Resposta de login sem token válido."
+                    val payload = JSONObject(response)
+                    val token = payload.optString("access_token")
+                    val refreshToken = payload.optString("refresh_token")
+                    if (token.isBlank() || refreshToken.isBlank()) "Resposta de sessão móvel incompleta."
                     else {
-                        vault.save(token)
+                        vault.save(token, refreshToken)
                         getSharedPreferences("jarvis_session", MODE_PRIVATE).edit()
                             .putString("api_base_url", normalized).apply()
                         null
@@ -102,6 +106,49 @@ class MainActivity : ComponentActivity() {
                 connection?.disconnect()
             }
             runOnUiThread { result(outcome) }
+        }
+    }
+
+    private fun getOrCreateDeviceId(): String {
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        return prefs.getString("bridge_device_id", null) ?: java.util.UUID.randomUUID().toString().also {
+            prefs.edit().putString("bridge_device_id", it).apply()
+        }
+    }
+
+    private fun logout() {
+        val refreshToken = vault.readRefreshToken()
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        val deviceId = prefs.getString("bridge_device_id", null)
+        val baseUrl = prefs.getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL)
+            ?: BuildConfig.DEFAULT_API_BASE_URL
+        stopPresence()
+        executor.execute {
+            try {
+                if (!refreshToken.isNullOrBlank() && !deviceId.isNullOrBlank() && baseUrl.startsWith("https://")) {
+                    val connection = (URL(baseUrl.trimEnd('/') + "/v1/mobile/session/revoke")
+                        .openConnection() as HttpURLConnection)
+                    try {
+                        connection.requestMethod = "POST"
+                        connection.connectTimeout = 5000
+                        connection.readTimeout = 5000
+                        connection.doOutput = true
+                        connection.setRequestProperty("Content-Type", "application/json")
+                        val body = JSONObject()
+                            .put("refresh_token", refreshToken)
+                            .put("device_id", deviceId)
+                            .toString()
+                        connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                        connection.responseCode
+                    } finally {
+                        connection.disconnect()
+                    }
+                }
+            } catch (_: Exception) {
+                // Local logout must still complete when the phone is offline.
+            } finally {
+                vault.clear()
+            }
         }
     }
 
