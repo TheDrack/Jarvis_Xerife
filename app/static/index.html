@@ -920,43 +920,43 @@
         // Convert display-oriented Markdown into a concise, natural spoken version.
         // Keep the original response untouched for the HUD; only the audio uses this text.
         function prepareSpeechText(text) {
-            let spoken = String(text ?? '').replace(/\\r\\n?/g, '\\n').trim();
+            let spoken = String(text ?? '').replace(/\r\n?/g, '\n').trim();
             if (!spoken) return '';
 
             // Code and tables are useful visually but are poor material for speech.
-            spoken = spoken.replace(/```[\\s\\S]*?```/g,
+            spoken = spoken.replace(/```[\s\S]*?```/g,
                 'A resposta inclui um bloco de código. Consulte o código no HUD.');
-            spoken = spoken.replace(/(?:^\\s*\\|.*\\|\\s*(?:\\n|$)){2,}/gm,
+            spoken = spoken.replace(/(?:^\s*\|.*\|\s*(?:\n|$)){2,}/gm,
                 'A resposta inclui uma tabela. Consulte os detalhes no HUD.');
 
             // Markdown links/images: speak the label, never the raw URL.
-            spoken = spoken.replace(/!\\[([^\\]]*)\\]\\([^)]*\\)/g, '$1');
-            spoken = spoken.replace(/\\[([^\\]]+)\\]\\((?:https?:\\/\\/)?[^)]*\\)/g, '$1');
-            spoken = spoken.replace(/https?:\\/\\/\\S+/g, ' ');
+            spoken = spoken.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1');
+            spoken = spoken.replace(/\[([^\]]+)\]\((?:https?:\/\/)?[^)]*\)/g, '$1');
+            spoken = spoken.replace(/https?:\/\/\S+/g, ' ');
             // Inline code: preserve the words, not the formatting delimiters.
             spoken = spoken.replace(/`([^`]+)`/g, '$1');
 
             // Remove common Markdown structure and presentation markers.
-            spoken = spoken.replace(/^\\s{0,3}#{1,6}\\s+/gm, '');
-            spoken = spoken.replace(/^\\s*(?:[-*+]\\s+|\\d+[.)]\\s+)/gm, '');
-            spoken = spoken.replace(/\\*\\*(.*?)\\*\\*/gs, '$1');
+            spoken = spoken.replace(/^\s{0,3}#{1,6}\s+/gm, '');
+            spoken = spoken.replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+)/gm, '');
+            spoken = spoken.replace(/\*\*(.*?)\*\*/gs, '$1');
             spoken = spoken.replace(/__(.*?)__/gs, '$1');
-            spoken = spoken.replace(/(?<!\\*)\\*(?!\\*)(.*?)\\*(?!\\*)/gs, '$1');
+            spoken = spoken.replace(/(?<!\*)\*(?!\*)(.*?)\*(?!\*)/gs, '$1');
             spoken = spoken.replace(/~~(.*?)~~/gs, '$1');
             spoken = spoken.replace(/[|*_~#`]/g, ' ');
             spoken = spoken
-                .replace(/\\bAPI(s)?\\b/g, 'á pê í')
-                .replace(/\\bURL(s)?\\b/g, 'endereço eletrônico')
-                .replace(/\\bHTTP(s)?\\b/g, 'agá tê tê pê')
+                .replace(/\bAPI(s)?\b/g, 'á pê í')
+                .replace(/\bURL(s)?\b/g, 'endereço eletrônico')
+                .replace(/\bHTTP(s)?\b/g, 'agá tê tê pê')
                 .replace(/≤/g, ' menor ou igual a ')
                 .replace(/≥/g, ' maior ou igual a ')
                 .replace(/≈/g, ' aproximadamente ')
                 .replace(/→/g, ' para ')
                 .replace(/×/g, ' vezes ')
                 .replace(/&/g, ' e ')
-                .replace(/\\s+([,.;:!?])/g, '$1')
+                .replace(/\s+([,.;:!?])/g, '$1')
                 .replace(/([,.;:!?]){2,}/g, '$1')
-                .replace(/\\s{2,}/g, ' ')
+                .replace(/\s{2,}/g, ' ')
                 .trim();
 
             return spoken;
