@@ -16,7 +16,7 @@ android {
         applicationId = "com.thedrack.jarvismobile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
+        versionCode = System.getenv("ANDROID_VERSION_CODE")?.toIntOrNull() ?: 2
         versionName = "0.2.0"
         buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://jarvis-api-c47i.onrender.com\"")
         buildConfigField("String", "FCM_API_KEY", "\"${buildConfigString("JARVIS_FCM_API_KEY")}\"")
@@ -30,6 +30,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    signingConfigs {
+        create("release") {
+            System.getenv("ANDROID_KEYSTORE_PATH")?.let { path ->
+                storeFile = file(path)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
 }
 
 dependencies {

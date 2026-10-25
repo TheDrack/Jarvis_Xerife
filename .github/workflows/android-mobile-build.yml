@@ -12,7 +12,7 @@ on:
       - ".github/workflows/android-mobile-build.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   assemble:
@@ -46,3 +46,37 @@ jobs:
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+      - name: Assemble release APK
+        if: github.event_name == 'push'
+        working-directory: mobile/android
+        env:
+          JARVIS_FCM_API_KEY: ${{ secrets.JARVIS_FCM_API_KEY }}
+          JARVIS_FCM_APP_ID: ${{ secrets.JARVIS_FCM_APP_ID }}
+          JARVIS_FCM_PROJECT_ID: ${{ secrets.JARVIS_FCM_PROJECT_ID }}
+          JARVIS_FCM_SENDER_ID: ${{ secrets.JARVIS_FCM_SENDER_ID }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+          fi
+          gradle --no-daemon :app:assembleRelease
+      - name: Publish release APK
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "Chave de release ausente; APK não publicado."
+            exit 0
+          fi
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk jarvis-mobile.apk
+          gh release create "mobile-build-${{ github.run_number }}" jarvis-mobile.apk \
+            --title "Jarvis Mobile (build ${{ github.run_number }})" \
+            --notes "APK gerado a partir de ${{ github.sha }}." \
+            --latest
