@@ -119,3 +119,15 @@ def test_google_login_refuses_without_admin_storage(monkeypatch):
     monkeypatch.setattr(google_identity, "get_supabase_admin_client", lambda: None)
     response = test_client.post("/v1/mobile/session/google", json={"id_token": "valid-id-token-long-enough", "device_id": "android-1"})
     assert response.status_code == 503
+
+
+
+def test_google_login_rejects_mapping_to_deleted_jarvis_account(monkeypatch):
+    db = Database()
+    db.identities.append({"provider": "google", "provider_subject": "google-sub-1", "user_id": "deleted-user",
+                          "email": "person@example.com", "full_name": "Old User"})
+    db.rows = {"user": [], "users": []}
+    test_client, db, _ = client(monkeypatch, db)
+    response = test_client.post("/v1/mobile/session/google", json={"id_token": "valid-id-token-long-enough", "device_id": "android-1"})
+    assert response.status_code == 403
+    assert db.sessions == []
