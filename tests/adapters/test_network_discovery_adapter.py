@@ -1,4 +1,4 @@
-﻿import ipaddress
+import ipaddress
 import unittest
 from unittest.mock import patch, Mock
 

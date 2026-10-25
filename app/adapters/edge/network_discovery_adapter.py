@@ -1,4 +1,4 @@
-﻿"""Read-only local network discovery with explicit private-network scope."""
+"""Read-only local network discovery with explicit private-network scope."""
 from __future__ import annotations
 
 import ipaddress
