@@ -2,7 +2,7 @@
 
 O briefing de inicializacao continua sendo executado pelo atalho existente `Jarvis - Briefing de Inicializacao.lnk`. Este monitor e complementar: depois de cinco minutos sem teclado/mouse, fala uma saudacao apenas quando a entrada volta. O limiar pode ser ajustado com `JARVIS_RETURN_IDLE_SECONDS` (minimo 30 s).
 
-O monitor usa a API Win32 `GetLastInputInfo`, que observa a sessao interativa que o executa. Por isso, deve iniciar no logon do usuario, nao como servico `SYSTEM`; sessoes remotas separadas tem contadores proprios. A voz usa `System.Speech`, seleciona `pt-BR` quando disponivel e reproduz pelo dispositivo de audio padrao do Windows. Em PCs sem saida de audio, a reproducao precisa ser roteada para o telefone em uma etapa de integracao separada. Falhas sao registradas em `%LOCALAPPDATA%\Jarvis_Xerife\logs\return_activity.log`.
+O monitor usa a API Win32 `GetLastInputInfo`, que observa a sessao interativa que o executa. Por isso, deve iniciar no logon do usuario, nao como servico `SYSTEM`; sessoes remotas separadas tem contadores proprios. A voz tenta primeiro o endpoint HTTPS de retorno do Jarvis quando `JARVIS_RETURN_ACTIVITY_KEY` esta configurada no ambiente do usuario ou no arquivo `%LOCALAPPDATA%\Jarvis_Xerife\config\return_activity\return_activity.key`. O segredo e dedicado a esta acao e nunca e registrado em logs. Sem a configuracao, o monitor conserva a fala local via `System.Speech`, selecionando `pt-BR` quando disponivel. Falhas sao registradas em `%LOCALAPPDATA%\Jarvis_Xerife\logs\return_activity.log`.
 
 ## Instalar no usuario atual
 
