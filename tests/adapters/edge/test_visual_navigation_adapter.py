@@ -171,7 +171,9 @@ def test_compact_accessibility_snapshot_caps_element_count():
 
 
 def test_postcondition_must_transition_from_baseline_count():
+    from app.adapters.edge.visual_navigation_adapter import _postcondition_transitioned
+
     # An already-visible success label must not prove that a new click worked.
-    assert 1 > 0
-    assert not (1 > 1)
-    assert 2 > 1
+    assert _postcondition_transitioned(0, 1) is True
+    assert _postcondition_transitioned(1, 1) is False
+    assert _postcondition_transitioned(1, 2) is True

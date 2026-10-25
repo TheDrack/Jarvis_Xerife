@@ -27,6 +27,11 @@ _MAX_WATCH_SECONDS = 6
 _MAX_WATCH_FPS = 2
 
 
+def _postcondition_transitioned(baseline_count: int, observed_count: int) -> bool:
+    """A visible label only confirms an action when its matching count increases."""
+    return observed_count > baseline_count
+
+
 _GUI_ACTIVITY = {
     "click": "Clique",
     "doubleClick": "Clique duplo",
@@ -627,7 +632,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
                     last_count = count_expected()
                     # Require a new matching accessible element, not merely a
                     # label that was already visible before the click.
-                    if last_count > baseline_count:
+                    if _postcondition_transitioned(baseline_count, last_count):
                         found_transition = True
                         break
                 except Exception:
