@@ -41,7 +41,10 @@ class Query:
             else:
                 raise AssertionError(self.table)
             return Response([self.payload])
-        rows = self.db.rows.get(self.table, [])
+        if self.table == google_identity.IDENTITY_TABLE:
+            rows = self.db.identities
+        else:
+            rows = self.db.rows.get(self.table, [])
         for key, value in self.filters.items():
             rows = [row for row in rows if row.get(key) == value]
         return Response(rows[:2])
