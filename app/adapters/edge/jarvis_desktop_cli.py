@@ -40,6 +40,59 @@ def _with_screenshot(navigator: VisualNavigationAdapter, result: dict[str, Any])
     return {**observation, **result}
 
 
+def _with_screenshot_on_uncertain(
+    navigator: VisualNavigationAdapter, result: dict[str, Any]
+) -> dict[str, Any]:
+    """Skip image capture when a semantic postcondition already proves the result."""
+    if result.get("success") and result.get("status") in {
+        "postcondition_verified", "value_verified", "completed", "semantic_ui_snapshot"
+    }:
+        return result
+    return _with_screenshot(navigator, result)
+
+
+def _compact_accessibility_snapshot(windows: list[dict[str, Any]], max_elements: int = 80, max_chars: int = 12000) -> dict[str, Any]:
+    """Build a bounded, text-first UI summary; element IDs are display-only per snapshot."""
+    max_elements = min(max(int(max_elements), 1), 200)
+    max_chars = min(max(int(max_chars), 1000), 24000)
+    compact_windows = []
+    remaining = max_elements
+    chars_used = 0
+    for window_index, window in enumerate(windows, start=1):
+        title = str(window.get("title", "")).strip()
+        compact_elements = []
+        for element in window.get("elements", []):
+            if remaining <= 0:
+                break
+            name = str(element.get("name", "")).strip()
+            role = str(element.get("control_type", "")).strip()
+            automation_id = str(element.get("automation_id", "")).strip()
+            if not (name or automation_id):
+                continue
+            item = {"id": f"w{window_index}-e{max_elements - remaining + 1}",
+                    "role": role or "Unknown", "name": name[:240],
+                    "enabled": bool(element.get("enabled", False))}
+            if automation_id:
+                item["automation_id"] = automation_id[:120]
+            size = len(json.dumps(item, ensure_ascii=False))
+            if chars_used + size > max_chars:
+                break
+            compact_elements.append(item)
+            chars_used += size
+            remaining -= 1
+        if compact_elements:
+            compact_windows.append({"title": title[:240], "elements": compact_elements})
+        if remaining <= 0 or chars_used >= max_chars:
+            break
+    return {"success": True, "status": "semantic_ui_snapshot",
+            "id_scope": "display_only_this_snapshot",
+            "instruction": "IDs are display-only. Act by unique accessible name/role and verify the resulting state.",
+            "window_count": len(compact_windows),
+            "element_count": sum(len(w["elements"]) for w in compact_windows),
+            "windows": compact_windows,
+            "truncated": remaining <= 0 or chars_used >= max_chars}
+
+
 def _watch(navigator: VisualNavigationAdapter, request: dict[str, Any]) -> dict[str, Any]:
     from PIL import Image, ImageDraw
 
@@ -104,7 +157,7 @@ def _run_untracked(
     if action == "list_templates":
         return {"success": True, "status": "listed", "templates": navigator._read_catalog()}
     if action == "click_accessibility":
-        return _with_screenshot(navigator, navigator.click_accessibility(
+        return _with_screenshot_on_uncertain(navigator, navigator.click_accessibility(
             str(request.get("target_name", "")),
             str(request.get("window_title_contains", "")),
             str(request.get("control_type", "")),
@@ -112,14 +165,14 @@ def _run_untracked(
             request.get("timeout_seconds", 2.0),
         ))
     if action == "set_accessibility_value":
-        return _with_screenshot(navigator, navigator.set_accessibility_value(
+        return _with_screenshot_on_uncertain(navigator, navigator.set_accessibility_value(
             str(request.get("target_name", "")),
             str(request.get("value", "")),
             str(request.get("window_title_contains", "")),
             str(request.get("control_type", "Edit")),
             str(request.get("expected_value", "")),
         ))
-    if action == "read_accessibility_tree":
+    if action in {"read_accessibility_tree", "describe_state"}:
         try:
             from pywinauto import Desktop
         except ImportError:
@@ -152,10 +205,12 @@ def _run_untracked(
                 windows.append({"title": title, "elements": elements})
             except Exception:
                 continue
+        if action == "describe_state":
+            return _compact_accessibility_snapshot(windows, request.get("max_elements", 80), request.get("max_chars", 12000))
         return {"success": True, "status": "accessibility_tree", "windows": windows}
     if action == "run_recipe":
         steps = request.get("steps", [])
-        return _with_screenshot(navigator, navigator.run_recipe(steps))
+        return _with_screenshot_on_uncertain(navigator, navigator.run_recipe(steps))
     if action == "capture_template":
         if request.get("user_confirmed") is not True:
             return {
@@ -210,7 +265,7 @@ def _run_untracked(
         "success": False,
         "status": "invalid_action",
         "allowed_actions": [
-            "observe", "watch", "list_templates", "read_accessibility_tree",
+            "observe", "watch", "list_templates", "read_accessibility_tree", "describe_state",
             "run_recipe", "capture_template", "click_at", "type_text", "press_key", "scroll",
         ],
     }

@@ -140,3 +140,65 @@ def test_template_recipe_does_not_use_physical_mouse_without_explicit_opt_in(tmp
     assert result["success"] is False
     assert result["status"] == "background_input_unavailable"
     assert gui.clicks == []
+
+
+def test_compact_accessibility_snapshot_is_bounded_and_omits_geometry():
+    from app.adapters.edge.jarvis_desktop_cli import _compact_accessibility_snapshot
+
+    snapshot = _compact_accessibility_snapshot([{"title": "Settings", "elements": [
+        {"name": "Save", "control_type": "Button", "automation_id": "save", "enabled": True, "rectangle": [1, 2, 3, 4]},
+        {"name": "", "control_type": "Pane", "automation_id": "", "enabled": True},
+        {"name": "Cancel", "control_type": "Button", "automation_id": "", "enabled": False, "rectangle": [5, 6, 7, 8]},
+    ]}])
+    assert snapshot["status"] == "semantic_ui_snapshot"
+    assert snapshot["element_count"] == 2
+    assert snapshot["windows"][0]["elements"][0]["name"] == "Save"
+    assert "rectangle" not in snapshot["windows"][0]["elements"][0]
+    assert snapshot["windows"][0]["elements"][1]["enabled"] is False
+    assert snapshot["id_scope"] == "display_only_this_snapshot"
+
+
+def test_compact_accessibility_snapshot_caps_element_count():
+    from app.adapters.edge.jarvis_desktop_cli import _compact_accessibility_snapshot
+
+    windows = [{"title": "App", "elements": [
+        {"name": f"Button {i}", "control_type": "Button", "enabled": True} for i in range(20)
+    ]}]
+    snapshot = _compact_accessibility_snapshot(windows, max_elements=3)
+    assert snapshot["element_count"] == 3
+    assert snapshot["truncated"] is True
+
+
+
+def test_postcondition_must_transition_from_baseline_count():
+    from app.adapters.edge.visual_navigation_adapter import _postcondition_transitioned
+
+    # An already-visible success label must not prove that a new click worked.
+    assert _postcondition_transitioned(0, 1) is True
+    assert _postcondition_transitioned(1, 1) is False
+    assert _postcondition_transitioned(1, 2) is True
+
+
+def test_cli_skips_screenshot_after_semantic_success():
+    from app.adapters.edge.jarvis_desktop_cli import _with_screenshot_on_uncertain
+
+    class Navigator:
+        def observe_screen(self):
+            raise AssertionError("semantic success must not capture a screenshot")
+
+    result = {"success": True, "status": "postcondition_verified"}
+    assert _with_screenshot_on_uncertain(Navigator(), result) is result
+
+
+def test_cli_keeps_screenshot_fallback_when_semantic_result_is_uncertain():
+    from app.adapters.edge.jarvis_desktop_cli import _with_screenshot_on_uncertain
+
+    class Navigator:
+        def observe_screen(self):
+            return {"success": True, "status": "observed", "screenshot_path": "captured.jpg"}
+
+    result = _with_screenshot_on_uncertain(
+        Navigator(), {"success": False, "status": "postcondition_failed"}
+    )
+    assert result["screenshot_path"] == "captured.jpg"
+    assert result["status"] == "postcondition_failed"

@@ -27,6 +27,11 @@ _MAX_WATCH_SECONDS = 6
 _MAX_WATCH_FPS = 2
 
 
+def _postcondition_transitioned(baseline_count: int, observed_count: int) -> bool:
+    """A visible label only confirms an action when its matching count increases."""
+    return observed_count > baseline_count
+
+
 _GUI_ACTIVITY = {
     "click": "Clique",
     "doubleClick": "Clique duplo",
@@ -578,6 +583,36 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
             set_agent_cursor_target((rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2, "target")
         except Exception as exc:
             logger.debug("Indicador visual indisponível: %s", exc)
+        expected = str(expected_name_after or "").strip()
+
+        def count_expected() -> int:
+            count = 0
+            for current_window in Desktop(backend="uia").windows():
+                try:
+                    if not current_window.is_visible() or current_window.window_text() != title:
+                        continue
+                    for item in current_window.descendants():
+                        try:
+                            info = item.element_info
+                            if item.is_visible() and str(info.name or "").strip().casefold() == expected.casefold():
+                                count += 1
+                        except Exception:
+                            continue
+                except Exception:
+                    continue
+            return count
+
+        # Snapshot before invoking. A matching label that already existed is not
+        # evidence that this action caused the expected transition.
+        baseline_count = 0
+        if expected:
+            try:
+                baseline_count = count_expected()
+            except Exception:
+                return {"success": False, "status": "postcondition_unobservable",
+                        "target_name": target_name, "expected_name_after": expected,
+                        "message": "Não foi possível ler o estado semântico antes da ação; clique não executado."}
+
         # Prefer UI Automation InvokePattern: it activates the control without moving
         # the user's global mouse cursor or injecting a physical click.
         invocation = self._invoke_with_timeout(control)
@@ -588,34 +623,29 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
                     "detail": invocation.get("error", ""), **self._failure_observation()}
         input_mode = "uia_invoke_non_physical"
 
-        expected = str(expected_name_after or "").strip()
         if expected:
             deadline = time.monotonic() + min(max(float(timeout_seconds), 0.2), 5.0)
-            found_postcondition = False
+            found_transition = False
+            last_count = baseline_count
             while time.monotonic() < deadline:
                 try:
-                    for window in Desktop(backend="uia").windows():
-                        if not window.is_visible() or window.window_text() != title:
-                            continue
-                        for item in window.descendants():
-                            try:
-                                info = item.element_info
-                                if item.is_visible() and str(info.name or "").strip().casefold() == expected.casefold():
-                                    found_postcondition = True
-                                    break
-                            except Exception:
-                                continue
-                        if found_postcondition:
-                            break
+                    last_count = count_expected()
+                    # Require a new matching accessible element, not merely a
+                    # label that was already visible before the click.
+                    if _postcondition_transitioned(baseline_count, last_count):
+                        found_transition = True
+                        break
                 except Exception:
                     pass
-                if found_postcondition:
-                    break
                 time.sleep(0.15)
-            if not found_postcondition:
-                return {"success": False, "status": "postcondition_failed", "target_name": target_name,
-                        "expected_name_after": expected, "window_title": title,
-                        "message": "Clique enviado, mas o elemento semântico esperado não apareceu.",
+            if not found_transition:
+                status = "postcondition_preexisting" if baseline_count else "postcondition_failed"
+                return {"success": False, "status": status, "action_sent": True,
+                        "target_name": target_name, "expected_name_after": expected,
+                        "baseline_match_count": baseline_count, "after_match_count": last_count,
+                        "window_title": title,
+                        "message": ("A condição esperada já existia antes da ação; não é possível atribuir a ela o clique."
+                                    if baseline_count else "Clique enviado, mas a condição semântica não surgiu."),
                         **self._failure_observation()}
 
         return {"success": True, "status": "postcondition_verified" if expected else "invoked_unverified",

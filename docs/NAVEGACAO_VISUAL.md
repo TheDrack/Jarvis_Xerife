@@ -145,3 +145,10 @@ O script recusa iniciar se a porta 8765 estiver ocupada ou se detectar outra con
 Acesso por Tailscale Serve funciona para clientes HTTP MCP cuja máquina cliente também está no tailnet e tem permissão pelas ACLs. O Remote Desktop Commander hospedado não ganha acesso ao tailnet nem passa a montar servidores MCP arbitrários; para ele, continue usando a ponte de processos JSONL. Para um cliente local, prefira stdio. Funnel não é habilitado: ele exporia o endpoint ao público e exigiria uma camada adicional de autenticação.
 
 O MCP Python usa proteção Host/Origin com valores derivados do DNS Tailscale; não desligue essa proteção para contornar erro 421. O transporte de rede é Streamable HTTP, enquanto stdio continua sendo o padrão local.
+
+
+## Estado semântico compacto (sem screenshot por clique)
+
+A ação `describe_state` retorna uma visão textual limitada da árvore UI Automation (janela, nome acessível, papel, estado habilitado e AutomationId quando existe). Isso reduz o payload enviado ao agente quando a interface expõe controles acessíveis. Use `read_accessibility_tree` para diagnóstico detalhado e `click_accessibility` ou receitas semânticas para agir; depois confirme a pós-condição. Os IDs `wN-eN` são apenas rótulos de leitura daquela resposta, **não** referências executáveis nem estáveis entre observações.
+
+Esse caminho não captura imagem por padrão. Recorra à captura visual apenas quando a árvore não representar o conteúdo relevante (por exemplo, canvas, imagem ou controle customizado), quando o estado semântico for insuficiente ou quando a verificação falhar. A camada compacta limita elementos e caracteres, não inclui coordenadas e não muda os requisitos de confirmação nem os limites de segurança das ações existentes.
