@@ -77,3 +77,35 @@ async def test_admin_recovery_fails_if_admin_row_missing(monkeypatch):
             x_jarvis_reset_token="test-reset-token",
         )
     assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_admin_recovery_logs_connection_metadata_without_exception_message(monkeypatch, caplog):
+    import logging
+    import socket
+
+    monkeypatch.setenv("JARVIS_ADMIN_RESET_TOKEN", "unit-test-reset-value")
+
+    class BrokenClient:
+        def table(self, name):
+            raise RuntimeError("do-not-log-this-message") from socket.gaierror(-2, "dns failure detail")
+
+    monkeypatch.setattr(admin_recovery, "get_supabase_admin_client", lambda: BrokenClient())
+    monkeypatch.setattr(admin_recovery.settings, "supabase_url", "https://project.example.supabase.co")
+
+    endpoint = admin_recovery.create_admin_recovery_router().routes[0].endpoint
+    with caplog.at_level(logging.ERROR, logger=admin_recovery.__name__):
+        with pytest.raises(HTTPException) as exc:
+            await endpoint(
+                admin_recovery.AdminPasswordResetRequest(new_password="unit-test-password-long-enough-123"),
+                x_jarvis_reset_token="unit-test-reset-value",
+            )
+
+    assert exc.value.status_code == 503
+    assert "RuntimeError -> gaierror" in caplog.text
+    assert "project.example.supabase.co" in caplog.text
+    assert "dns_errno=-2" in caplog.text
+    assert "do-not-log-this-message" not in caplog.text
+    assert "dns failure detail" not in caplog.text
+    assert "unit-test-reset-value" not in caplog.text
+    assert "unit-test-password-long-enough-123" not in caplog.text

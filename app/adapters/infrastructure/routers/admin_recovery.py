@@ -2,7 +2,9 @@
 import hmac
 import logging
 import os
+import socket
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import HTMLResponse
@@ -10,12 +12,40 @@ from pydantic import BaseModel, Field
 
 from app.adapters.infrastructure.supabase_client import get_supabase_admin_client
 from app.adapters.infrastructure.auth_adapter import AuthAdapter
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class AdminPasswordResetRequest(BaseModel):
     new_password: str = Field(min_length=20, max_length=72)
+
+
+def _connection_diagnostics(exc: BaseException) -> dict[str, object]:
+    """Return safe connection metadata without exception messages or credentials."""
+    chain: list[BaseException] = []
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen and len(chain) < 8:
+        seen.add(id(current))
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+
+    url = settings.supabase_url or ""
+    try:
+        hostname = urlsplit(url).hostname
+    except ValueError:
+        hostname = None
+
+    dns_errors = [
+        item.errno for item in chain
+        if isinstance(item, socket.gaierror) and item.errno is not None
+    ]
+    return {
+        "exception_chain": " -> ".join(type(item).__name__ for item in chain),
+        "supabase_host": hostname or "unavailable",
+        "dns_errno": dns_errors[0] if dns_errors else None,
+    }
 
 
 def create_admin_recovery_router() -> APIRouter:
@@ -47,7 +77,13 @@ def create_admin_recovery_router() -> APIRouter:
         except HTTPException:
             raise
         except Exception as exc:
-            logger.error("Administrator recovery failed (%s)", type(exc).__name__)
+            diagnostics = _connection_diagnostics(exc)
+            logger.error(
+                "Administrator recovery failed; exception_chain=%s supabase_host=%s dns_errno=%s",
+                diagnostics["exception_chain"],
+                diagnostics["supabase_host"],
+                diagnostics["dns_errno"],
+            )
             raise HTTPException(status_code=503, detail="Recovery failed") from None
 
     @router.get("/recover", response_class=HTMLResponse, include_in_schema=False)
