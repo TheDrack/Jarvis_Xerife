@@ -1,6 +1,7 @@
-name: Android Mobile Build
+﻿name: Android Mobile Build
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "mobile/android/**"
@@ -49,7 +50,7 @@ jobs:
           retention-days: 7
       - name: Check release signing configuration
         id: release-signing
-        if: github.event_name == 'push'
+        if: contains(fromJSON('["push","workflow_dispatch"]'), github.event_name)
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -72,7 +73,7 @@ jobs:
             echo "::warning::Release signing secrets are incomplete; skipping signed release. The debug APK artifact remains available."
           fi
       - name: Assemble release APK
-        if: github.event_name == 'push' && steps.release-signing.outputs.configured == 'true'
+        if: contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && steps.release-signing.outputs.configured == 'true'
         working-directory: mobile/android
         env:
           JARVIS_FCM_API_KEY: ${{ secrets.JARVIS_FCM_API_KEY }}
@@ -87,7 +88,7 @@ jobs:
           ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: gradle --no-daemon :app:assembleRelease
       - name: Publish release APK
-        if: github.event_name == 'push' && steps.release-signing.outputs.configured == 'true'
+        if: contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && steps.release-signing.outputs.configured == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -96,3 +97,4 @@ jobs:
             --title "Jarvis Mobile (build ${{ github.run_number }})" \
             --notes "APK gerado a partir de ${{ github.sha }}." \
             --latest
+
