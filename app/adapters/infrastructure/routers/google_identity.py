@@ -108,14 +108,9 @@ def create_google_identity_router() -> APIRouter:
             raise HTTPException(status_code=503, detail="Google identity mapping is ambiguous")
         if matches:
             identity = matches[0]
-            account = {
-                "id": str(identity["user_id"]),
-                "email": identity["email"],
-                "username": identity["email"],
-                "full_name": identity.get("full_name") or google["full_name"],
-                "disabled": identity.get("disabled", False),
-            }
-            # Re-check the source account so a disabled/deleted account cannot use a stale link.
+            account = None
+            # The mapping is not sufficient by itself: the source Jarvis account
+            # must still exist, and its current disabled flag must be respected.
             for table in ("user", "users"):
                 try:
                     rows = client.table(table).select("*").eq("id", str(identity["user_id"])).limit(1).execute().data or []
@@ -124,6 +119,8 @@ def create_google_identity_router() -> APIRouter:
                         break
                 except Exception:
                     continue
+            if account is None:
+                raise HTTPException(status_code=403, detail="Linked Jarvis account no longer exists")
         else:
             account = _existing_account(client, google["email"])
             if account is None:
