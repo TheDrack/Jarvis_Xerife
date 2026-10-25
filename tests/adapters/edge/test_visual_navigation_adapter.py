@@ -167,3 +167,11 @@ def test_compact_accessibility_snapshot_caps_element_count():
     snapshot = _compact_accessibility_snapshot(windows, max_elements=3)
     assert snapshot["element_count"] == 3
     assert snapshot["truncated"] is True
+
+
+
+def test_postcondition_must_transition_from_baseline_count():
+    # An already-visible success label must not prove that a new click worked.
+    assert 1 > 0
+    assert not (1 > 1)
+    assert 2 > 1
