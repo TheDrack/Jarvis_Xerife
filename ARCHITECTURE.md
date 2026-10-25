@@ -58,6 +58,21 @@ graph LR
     mobile_android_app_src["<b>src</b>"]
     class mobile_android_app_src support
     mobile_android_app --> mobile_android_app_src
+    mobile_android_app_src_test["<b>test</b>"]
+    class mobile_android_app_src_test support
+    mobile_android_app_src --> mobile_android_app_src_test
+    mobile_android_app_src_test_java["<b>java</b>"]
+    class mobile_android_app_src_test_java support
+    mobile_android_app_src_test --> mobile_android_app_src_test_java
+    mobile_android_app_src_test_java_com["<b>com</b>"]
+    class mobile_android_app_src_test_java_com support
+    mobile_android_app_src_test_java --> mobile_android_app_src_test_java_com
+    mobile_android_app_src_test_java_com_thedrack["<b>thedrack</b>"]
+    class mobile_android_app_src_test_java_com_thedrack support
+    mobile_android_app_src_test_java_com --> mobile_android_app_src_test_java_com_thedrack
+    mobile_android_app_src_test_java_com_thedrack_jarvismobile["<b>jarvismobile</b>"]
+    class mobile_android_app_src_test_java_com_thedrack_jarvismobile support
+    mobile_android_app_src_test_java_com_thedrack --> mobile_android_app_src_test_java_com_thedrack_jarvismobile
     mobile_android_app_src_main["<b>main</b>"]
     class mobile_android_app_src_main support
     mobile_android_app_src --> mobile_android_app_src_main
