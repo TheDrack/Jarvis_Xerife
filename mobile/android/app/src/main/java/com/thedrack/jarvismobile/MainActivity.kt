@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.os.Build
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -36,6 +37,9 @@ import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -48,11 +52,29 @@ class MainActivity : ComponentActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private val speechReady = mutableStateOf(false)
     private lateinit var voice: VoiceInput
+    private lateinit var googleSignInLauncher: ActivityResultLauncher<Intent>
+    private var pendingGoogleResult: ((String?) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         vault = TokenVault(this)
         voice = VoiceInput(this)
+        googleSignInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val callback = pendingGoogleResult
+            pendingGoogleResult = null
+            if (result.resultCode != RESULT_OK) {
+                callback?.invoke("Login Google cancelado.")
+            } else {
+                try {
+                    val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                    val idToken = task.getResult(ApiException::class.java).idToken
+                    if (idToken.isNullOrBlank()) callback?.invoke("O Google não retornou ID token. Confira o OAuth Web Client ID.")
+                    else exchangeGoogleToken(idToken, callback)
+                } catch (error: Exception) {
+                    callback?.invoke("Falha no login Google: " + (error.message ?: error.javaClass.simpleName))
+                }
+            }
+        }
         if (FirebaseBootstrap.initialize(this) && vault.readRefreshToken() != null) {
             registerFcmToken()
         }
@@ -71,6 +93,7 @@ class MainActivity : ComponentActivity() {
                         presenceInitiallyActive = BridgeService.isRunning,
                         voice = voice,
                         onLogin = ::login,
+                        onGoogleSignIn = ::startGoogleSignIn,
                         onLogout = ::logout,
                         onStartPresence = ::startPresence,
                         onStopPresence = ::stopPresence,
@@ -148,6 +171,76 @@ class MainActivity : ComponentActivity() {
             }
             runOnUiThread {
                 result(outcome)
+                if (outcome == null) registerFcmToken()
+            }
+        }
+    }
+
+    private fun startGoogleSignIn(result: (String?) -> Unit) {
+        val clientId = BuildConfig.GOOGLE_WEB_CLIENT_ID
+        if (clientId.isBlank()) {
+            result("Login Google ainda não configurado: defina GOOGLE_WEB_CLIENT_ID no build Android.")
+            return
+        }
+        val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestIdToken(clientId)
+            .build()
+        pendingGoogleResult = result
+        googleSignInLauncher.launch(GoogleSignIn.getClient(this, options).signInIntent)
+    }
+
+    private fun exchangeGoogleToken(idToken: String, result: ((String?) -> Unit)?) {
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        val baseUrl = prefs.getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL)
+            ?: BuildConfig.DEFAULT_API_BASE_URL
+        executor.execute {
+            var connection: HttpURLConnection? = null
+            val outcome = try {
+                val normalized = baseUrl.trim().trimEnd('/')
+                require(normalized.startsWith("https://")) { "Use uma URL HTTPS." }
+                connection = (URL(normalized + "/v1/mobile/session/google").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                }
+                val body = JSONObject()
+                    .put("id_token", idToken)
+                    .put("device_id", getOrCreateDeviceId())
+                    .toString()
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                val code = connection.responseCode
+                val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+                if (code !in 200..299) {
+                    val detail = try { JSONObject(response).optString("detail") } catch (_: Exception) { "" }
+                    when (code) {
+                        401 -> "Token Google inválido ou expirado."
+                        403 -> detail.ifBlank { "Esta conta Google ainda não está vinculada a uma conta Jarvis existente." }
+                        404 -> "A API publicada ainda não contém o login Google (HTTP 404)."
+                        503 -> detail.ifBlank { "Login Google não configurado no servidor (HTTP 503)." }
+                        else -> detail.ifBlank { "Login Google recusado pelo servidor (HTTP $code)." }
+                    }
+                } else {
+                    val payload = JSONObject(response)
+                    val token = payload.optString("access_token")
+                    val refreshToken = payload.optString("refresh_token")
+                    if (token.isBlank() || refreshToken.isBlank()) "Resposta de sessão móvel incompleta."
+                    else {
+                        vault.save(token, refreshToken)
+                        prefs.edit().putString("api_base_url", normalized).apply()
+                        null
+                    }
+                }
+            } catch (error: Exception) {
+                "Falha de conexão/login Google: " + (error.message ?: error.javaClass.simpleName)
+            } finally {
+                connection?.disconnect()
+            }
+            runOnUiThread {
+                result?.invoke(outcome)
                 if (outcome == null) registerFcmToken()
             }
         }
@@ -274,6 +367,7 @@ private fun JarvisMobileScreen(
     presenceInitiallyActive: Boolean,
     voice: VoiceInput,
     onLogin: (String, String, String, (String?) -> Unit) -> Unit,
+    onGoogleSignIn: ((String?) -> Unit) -> Unit,
     onLogout: () -> Unit,
     onStartPresence: () -> Unit,
     onStopPresence: () -> Unit,
@@ -432,6 +526,26 @@ private fun JarvisMobileScreen(
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
                         visualTransformation = PasswordVisualTransformation()
                     )
+                    Button(
+                        onClick = {
+                            busy = true
+                            message = "Abrindo login Google…"
+                            onGoogleSignIn { error ->
+                                busy = false
+                                loggedIn = error == null
+                                message = error ?: "Autenticado com Google. Token protegido pelo Android Keystore."
+                            }
+                        },
+                        enabled = !busy && BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank(),
+                        modifier = Modifier.padding(top = 12.dp)
+                    ) { Text("Continuar com Google") }
+                    if (BuildConfig.GOOGLE_WEB_CLIENT_ID.isBlank()) {
+                        Text(
+                            "Login Google aguardando configuração do OAuth Web Client ID no build.",
+                            modifier = Modifier.padding(top = 6.dp),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     Button(
                         onClick = {
                             busy = true
