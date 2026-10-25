@@ -1,13 +1,11 @@
-"""One-time, explicitly enabled administrator password recovery endpoint.
-
-The endpoint is unavailable unless JARVIS_ADMIN_RESET_TOKEN is configured.
-Use a high-entropy token, perform one reset, then remove the variable from Render.
-"""
+"""One-time, explicitly enabled administrator recovery endpoint."""
 import hmac
 import logging
 import os
+from pathlib import Path
 
 from fastapi import APIRouter, Header, HTTPException
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from app.adapters.infrastructure.supabase_client import get_supabase_admin_client
@@ -49,7 +47,17 @@ def create_admin_recovery_router() -> APIRouter:
         except HTTPException:
             raise
         except Exception as exc:
-            logger.error("Administrator password reset failed (%s)", type(exc).__name__)
-            raise HTTPException(status_code=503, detail="Password reset failed") from None
+            logger.error("Administrator recovery failed (%s)", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Recovery failed") from None
+
+    @router.get("/recover", response_class=HTMLResponse, include_in_schema=False)
+    async def recovery_page() -> HTMLResponse:
+        page = Path(__file__).resolve().parents[3] / "static" / "admin-recovery.html"
+        if not page.is_file():
+            raise HTTPException(status_code=503, detail="Recovery interface unavailable")
+        return HTMLResponse(
+            content=page.read_text(encoding="utf-8"),
+            headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+        )
 
     return router
