@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """Local MCP server exposing the interactive Windows desktop to an MCP host.
 
 Run from the repository root with:
@@ -32,11 +32,11 @@ logger = logging.getLogger(__name__)
 
 
 def _show_agent_target(x: int, y: int) -> None:
-    """Mostra o cursor fantasma no ponto de clique (somente visual; nÃ£o move o mouse)."""
+    """Mostra o cursor fantasma no ponto de clique (somente visual; nÃƒÂ£o move o mouse)."""
     try:
         set_agent_cursor_target(int(x), int(y), "target")
     except Exception as exc:
-        logger.debug("Indicador visual indisponÃ­vel: %s", exc)
+        logger.debug("Indicador visual indisponÃƒÂ­vel: %s", exc)
 
 _HTTP_TRANSPORT = os.environ.get("JARVIS_DESKTOP_TRANSPORT", "stdio").strip().lower()
 _HTTP_PORT = int(os.environ.get("JARVIS_DESKTOP_HTTP_PORT", "8765"))
@@ -215,7 +215,7 @@ def observe_screen() -> list[Any]:
 
 
 @mcp.tool(structured_output=False)
-@tracked_action("Observando mudanÃ§as na tela")
+@tracked_action("Observando mudanÃƒÂ§as na tela")
 def watch_screen(duration_seconds: float = 3, fps: float = 1) -> list[Any]:
     """Return a short, finite sequence of recent screen images (up to 6 seconds, 2 FPS)."""
     return _content(navigator.watch_screen(duration_seconds, fps))
@@ -249,7 +249,7 @@ def capture_visual_template(
         return {
             "success": False,
             "status": "confirmation_required",
-            "message": "PeÃ§a autorizaÃ§Ã£o explÃ­cita ao usuÃ¡rio antes de abrir o recorte.",
+            "message": "PeÃƒÂ§a autorizaÃƒÂ§ÃƒÂ£o explÃƒÂ­cita ao usuÃƒÂ¡rio antes de abrir o recorte.",
         }
     return navigator.capture_template_from_clipboard(template_id, display_name, timeout_seconds)
 
@@ -262,7 +262,7 @@ def list_visual_templates() -> dict[str, Any]:
 
 
 @mcp.tool(structured_output=False)
-@tracked_action("Acionando controle acessÃ­vel")
+@tracked_action("Acionando controle acessÃƒÂ­vel")
 def click_accessibility(
     target_name: str,
     window_title_contains: str = "",
@@ -280,7 +280,7 @@ def click_accessibility(
 
 
 @mcp.tool(structured_output=False)
-@tracked_action("Preenchendo campo acessÃ­vel")
+@tracked_action("Preenchendo campo acessÃƒÂ­vel")
 def set_accessibility_value(
     target_name: str,
     value: str,
@@ -312,7 +312,7 @@ def click_window_background_at(
 
 
 @mcp.tool(structured_output=False)
-@tracked_action("Clique fÃ­sico autorizado")
+@tracked_action("Clique fÃƒÂ­sico autorizado")
 def click_at(
     x: int,
     y: int,
@@ -324,7 +324,7 @@ def click_at(
         return [{
             "success": False,
             "status": "confirmation_required",
-            "message": "PeÃ§a autorizaÃ§Ã£o explÃ­cita para o clique por coordenadas.",
+            "message": "PeÃƒÂ§a autorizaÃƒÂ§ÃƒÂ£o explÃƒÂ­cita para o clique por coordenadas.",
         }]
     screenshot = navigator._capture()
     if x < 0 or y < 0 or x >= screenshot.width or y >= screenshot.height:
@@ -388,7 +388,7 @@ def press_key(key: str) -> list[Any]:
 
 
 @mcp.tool()
-@tracked_action("Lendo Ã¡rvore de acessibilidade")
+@tracked_action("Lendo ÃƒÂ¡rvore de acessibilidade")
 def read_accessibility_tree(window_title_contains: str = "", max_elements: int = 120) -> dict[str, Any]:
     """Read visible Windows UI Automation elements before resorting to pixel coordinates.
 
@@ -400,7 +400,7 @@ def read_accessibility_tree(window_title_contains: str = "", max_elements: int =
         return {
             "success": False,
             "status": "dependency_missing",
-            "message": "Instale pywinauto para leitura da Ã¡rvore UI Automation.",
+            "message": "Instale pywinauto para leitura da ÃƒÂ¡rvore UI Automation.",
         }
 
     needle = window_title_contains.casefold().strip()
@@ -457,6 +457,19 @@ def network_inspect_device(ip_address: str) -> dict[str, Any]:
 
 # Android navigation tools are registered additively on the same MCP server.
 # Existing desktop tool implementations and their default behavior remain unchanged.
+@mcp.tool()
+def android_connect(pairing_address: str, pairing_code: str, device_address: str) -> dict[str, Any]:
+    """Pair and connect Android Wireless debugging using the pairing endpoint/code and separate connect endpoint shown by Android Settings. Stores only the selected endpoint, never the pairing code."""
+    from app.adapters.edge.android_connection_adapter import pair_and_connect
+    return pair_and_connect(pairing_address, pairing_code, device_address)
+
+
+@mcp.tool()
+def android_device_status() -> dict[str, Any]:
+    """Report ADB device states and the currently selected Android target."""
+    from app.adapters.edge.android_connection_adapter import device_status
+    return device_status()
+
 def _android_navigation_adapter():
     from app.adapters.edge.android_navigation_adapter import AndroidNavigationAdapter
     return AndroidNavigationAdapter()
@@ -508,4 +521,5 @@ if __name__ == "__main__":
     if _HTTP_TRANSPORT not in {"stdio", "streamable-http"}:
         raise SystemExit("JARVIS_DESKTOP_TRANSPORT deve ser stdio ou streamable-http.")
     mcp.run(transport=_HTTP_TRANSPORT)
+
 

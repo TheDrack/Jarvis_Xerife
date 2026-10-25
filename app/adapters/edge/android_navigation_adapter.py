@@ -1,8 +1,8 @@
-"""Navegação via Android usando ADB em transporte privado autorizado.
+"""NavegaÃ§Ã£o via Android usando ADB em transporte privado autorizado.
 
-O transporte/conector MCP é independente deste adaptador. O alvo deve estar
-selecionado explicitamente e já autorizado para ADB; não se presume Tailscale
-nem qualquer software específico de conectividade.
+O transporte/conector MCP Ã© independente deste adaptador. O alvo deve estar
+selecionado explicitamente e jÃ¡ autorizado para ADB; nÃ£o se presume Tailscale
+nem qualquer software especÃ­fico de conectividade.
 """
 from __future__ import annotations
 
@@ -13,17 +13,21 @@ from typing import Any
 
 
 class AndroidNavigationAdapter:
-    """Operações ADB mínimas para observar e operar a UI Android."""
+    """OperaÃ§Ãµes ADB mÃ­nimas para observar e operar a UI Android."""
 
     def __init__(self, device_address: str | None = None, adb_path: str | None = None,
                  timeout_seconds: int = 15) -> None:
-        self.device_address = (device_address or os.getenv("JARVIS_ANDROID_DEVICE", "")).strip()
+        if device_address is not None:
+            self.device_address = device_address.strip()
+        else:
+            from app.adapters.edge.android_connection_adapter import selected_device
+            self.device_address = selected_device()
         self.adb_path = adb_path or os.getenv("JARVIS_ADB_PATH", "adb")
         self.timeout_seconds = max(1, min(int(timeout_seconds), 60))
 
     def _run(self, *args: str, timeout: int | None = None) -> subprocess.CompletedProcess[str]:
         if not self.device_address:
-            raise ValueError("Defina JARVIS_ANDROID_DEVICE com o serial/endereço ADB do dispositivo autorizado.")
+            raise ValueError("Defina JARVIS_ANDROID_DEVICE com o serial/endereÃ§o ADB do dispositivo autorizado.")
         return subprocess.run(
             [self.adb_path, "-s", self.device_address, *args],
             capture_output=True, text=True, timeout=timeout or self.timeout_seconds, check=False,
@@ -85,3 +89,4 @@ class AndroidNavigationAdapter:
             return {"success": False, "status": "adb_error", "error": proc.stderr[:1000]}
         return {"success": True, "status": "action_sent", "device_id": self.device_address,
                 "command": list(args)}
+
