@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#07111f">
+<title>Jarvis · Recuperar acesso</title>
+<style>
+:root{color-scheme:dark;--cyan:#53e7ff;--green:#70ffb0;--bg:#07111f;--panel:#0d1c2d;--muted:#a6bacb;--red:#ff7f91}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:20px;background:radial-gradient(ellipse at top,#12304a 0,var(--bg) 62%);font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#eaf7ff}
+main{width:min(100%,460px);border:1px solid #24516a;border-radius:18px;background:rgba(13,28,45,.96);padding:clamp(22px,6vw,34px);box-shadow:0 20px 80px #0008}
+.brand{color:var(--cyan);letter-spacing:.22em;font-size:.82rem;font-weight:700}
+h1{font-size:1.65rem;margin:.6rem 0}
+p{color:var(--muted);line-height:1.55;font-size:.95rem}
+label{display:block;margin:18px 0 7px;font-size:.9rem;color:#d9f3ff}
+input{display:block;width:100%;padding:13px 12px;border:1px solid #2e6079;border-radius:9px;background:#06101b;color:#fff;font:inherit;min-height:48px}
+input:focus{outline:2px solid var(--cyan);outline-offset:1px}
+button{width:100%;min-height:48px;margin-top:22px;border:0;border-radius:9px;background:linear-gradient(100deg,var(--cyan),#8dffc8);color:#06101b;font-weight:800;font-size:1rem}
+button:disabled{opacity:.55}
+.note{font-size:.82rem;border-left:3px solid #426a81;padding-left:12px}
+#result{display:none;margin-top:18px;padding:12px;border-radius:8px;line-height:1.45;overflow-wrap:anywhere}
+#result.ok{display:block;border:1px solid #2b9166;color:var(--green);background:#08261d}
+#result.error{display:block;border:1px solid #a94c5d;color:var(--red);background:#2a111a}
+a{color:var(--cyan)}
+</style>
+</head>
+<body>
+<main>
+<div class="brand">J.A.R.V.I.S. · ACESSO SEGURO</div>
+<h1>Recuperar acesso</h1>
+<p>Defina uma nova senha administrativa. Você precisará do token temporário configurado no serviço Jarvis-api do Render.</p>
+<form id="recovery" autocomplete="off">
+<label for="token">Token de recuperação do Render</label>
+<input id="token" name="token" type="password" autocomplete="off" required spellcheck="false">
+<label for="password">Nova senha (20–72 caracteres)</label>
+<input id="password" name="password" type="password" minlength="20" maxlength="72" autocomplete="new-password" required>
+<label for="confirm">Repita a nova senha</label>
+<input id="confirm" name="confirm" type="password" minlength="20" maxlength="72" autocomplete="new-password" required>
+<button id="submit" type="submit">Redefinir senha</button>
+</form>
+<div id="result" role="status" aria-live="polite"></div>
+<p class="note">O token e a senha são enviados apenas nesta requisição HTTPS. Não os reutilize nem os compartilhe. Após confirmar o login, remova <code>JARVIS_ADMIN_RESET_TOKEN</code> do Render.</p>
+<p><a href="/">Voltar ao Jarvis</a></p>
+</main>
+<script>
+const form=document.getElementById('recovery');
+const result=document.getElementById('result');
+const button=document.getElementById('submit');
+form.addEventListener('submit',async event=>{
+ event.preventDefault();
+ result.className='';result.style.display='none';
+ const token=document.getElementById('token').value;
+ const password=document.getElementById('password').value;
+ const confirm=document.getElementById('confirm').value;
+ if(password.length<20||password.length>72){show('A senha precisa ter entre 20 e 72 caracteres.',false);return}
+ if(password!==confirm){show('As senhas não coincidem.',false);return}
+ button.disabled=true;button.textContent='Processando…';
+ try{
+  const response=await fetch('/internal/admin/password-reset',{method:'POST',headers:{'Content-Type':'application/json','X-Jarvis-Reset-Token':token},body:JSON.stringify({new_password:password}),cache:'no-store',credentials:'same-origin'});
+  if(response.status===204){
+   show('Senha atualizada pela API. Agora tente entrar no Jarvis. Se o login funcionar, remova JARVIS_ADMIN_RESET_TOKEN do Render.',true);
+   form.reset();
+  }else if(response.status===404){
+   show('Token inválido ou conta administrativa não encontrada. Confirme o token e a configuração do banco no Render.',false);
+  }else if(response.status===503){
+   show('A API não conseguiu acessar o banco administrativo. Verifique as credenciais Supabase e os logs do serviço.',false);
+  }else{
+   show('A redefinição falhou (HTTP '+response.status+'). Consulte os logs da API antes de tentar novamente.',false);
+  }
+ }catch(error){show('Não foi possível conectar à API do Jarvis. Verifique a conexão e tente novamente.',false)}
+ finally{button.disabled=false;button.textContent='Redefinir senha'}
+});
+function show(message,ok){result.textContent=message;result.className=ok?'ok':'error';result.style.display='block'}
+</script>
+</body>
+</html>
