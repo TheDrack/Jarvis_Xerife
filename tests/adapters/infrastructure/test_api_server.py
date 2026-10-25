@@ -73,6 +73,11 @@ class TestAPIServer(NexusComponent):
         assert "passwordToggle" in response.text
         # Verify voice synthesis
         assert "speechSynthesis" in response.text
+        # HUD keeps rich Markdown for display but sanitizes a separate TTS-only version.
+        assert "function prepareSpeechText(text)" in response.text
+        assert "const speechText = prepareSpeechText(text)" in response.text
+        assert "A resposta inclui uma tabela. Consulte os detalhes no HUD." in response.text
+        assert "A resposta inclui um bloco de código. Consulte o código no HUD." in response.text
         # Verify reactor loading animation
         assert "reactor" in response.text
         # Verify wake word support - should include WAKE_WORDS array and fetchWakeWord function
