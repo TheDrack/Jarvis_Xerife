@@ -32,11 +32,11 @@ logger = logging.getLogger(__name__)
 
 
 def _show_agent_target(x: int, y: int) -> None:
-    """Mostra o cursor fantasma no ponto de clique (somente visual; não move o mouse)."""
+    """Mostra o cursor fantasma no ponto de clique (somente visual; nÃ£o move o mouse)."""
     try:
         set_agent_cursor_target(int(x), int(y), "target")
     except Exception as exc:
-        logger.debug("Indicador visual indisponível: %s", exc)
+        logger.debug("Indicador visual indisponÃ­vel: %s", exc)
 
 _HTTP_TRANSPORT = os.environ.get("JARVIS_DESKTOP_TRANSPORT", "stdio").strip().lower()
 _HTTP_PORT = int(os.environ.get("JARVIS_DESKTOP_HTTP_PORT", "8765"))
@@ -215,7 +215,7 @@ def observe_screen() -> list[Any]:
 
 
 @mcp.tool(structured_output=False)
-@tracked_action("Observando mudanças na tela")
+@tracked_action("Observando mudanÃ§as na tela")
 def watch_screen(duration_seconds: float = 3, fps: float = 1) -> list[Any]:
     """Return a short, finite sequence of recent screen images (up to 6 seconds, 2 FPS)."""
     return _content(navigator.watch_screen(duration_seconds, fps))
@@ -249,7 +249,7 @@ def capture_visual_template(
         return {
             "success": False,
             "status": "confirmation_required",
-            "message": "Peça autorização explícita ao usuário antes de abrir o recorte.",
+            "message": "PeÃ§a autorizaÃ§Ã£o explÃ­cita ao usuÃ¡rio antes de abrir o recorte.",
         }
     return navigator.capture_template_from_clipboard(template_id, display_name, timeout_seconds)
 
@@ -262,7 +262,7 @@ def list_visual_templates() -> dict[str, Any]:
 
 
 @mcp.tool(structured_output=False)
-@tracked_action("Acionando controle acessível")
+@tracked_action("Acionando controle acessÃ­vel")
 def click_accessibility(
     target_name: str,
     window_title_contains: str = "",
@@ -280,7 +280,7 @@ def click_accessibility(
 
 
 @mcp.tool(structured_output=False)
-@tracked_action("Preenchendo campo acessível")
+@tracked_action("Preenchendo campo acessÃ­vel")
 def set_accessibility_value(
     target_name: str,
     value: str,
@@ -312,7 +312,7 @@ def click_window_background_at(
 
 
 @mcp.tool(structured_output=False)
-@tracked_action("Clique físico autorizado")
+@tracked_action("Clique fÃ­sico autorizado")
 def click_at(
     x: int,
     y: int,
@@ -324,7 +324,7 @@ def click_at(
         return [{
             "success": False,
             "status": "confirmation_required",
-            "message": "Peça autorização explícita para o clique por coordenadas.",
+            "message": "PeÃ§a autorizaÃ§Ã£o explÃ­cita para o clique por coordenadas.",
         }]
     screenshot = navigator._capture()
     if x < 0 or y < 0 or x >= screenshot.width or y >= screenshot.height:
@@ -388,7 +388,7 @@ def press_key(key: str) -> list[Any]:
 
 
 @mcp.tool()
-@tracked_action("Lendo árvore de acessibilidade")
+@tracked_action("Lendo Ã¡rvore de acessibilidade")
 def read_accessibility_tree(window_title_contains: str = "", max_elements: int = 120) -> dict[str, Any]:
     """Read visible Windows UI Automation elements before resorting to pixel coordinates.
 
@@ -400,7 +400,7 @@ def read_accessibility_tree(window_title_contains: str = "", max_elements: int =
         return {
             "success": False,
             "status": "dependency_missing",
-            "message": "Instale pywinauto para leitura da árvore UI Automation.",
+            "message": "Instale pywinauto para leitura da Ã¡rvore UI Automation.",
         }
 
     needle = window_title_contains.casefold().strip()
@@ -430,6 +430,30 @@ def read_accessibility_tree(window_title_contains: str = "", max_elements: int =
             continue
     return {"success": True, "windows": windows}
 
+
+# Read-only local network discovery tools; they never send active probes.
+@mcp.tool()
+def network_interfaces() -> dict[str, Any]:
+    """List local IPv4 interfaces and candidate private subnets; no packets are sent."""
+    from app.adapters.edge.network_discovery_adapter import network_interfaces as _interfaces
+    return _interfaces()
+
+
+@mcp.tool()
+def network_discover_devices(cidr: str) -> dict[str, Any]:
+    """Read the local ARP cache for an explicitly supplied private IPv4 /24 or smaller. No probes are sent."""
+    from app.adapters.edge.network_discovery_adapter import discover_devices
+    try:
+        return discover_devices(cidr)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
+
+
+@mcp.tool()
+def network_inspect_device(ip_address: str) -> dict[str, Any]:
+    """Resolve reverse DNS for one RFC1918 private IPv4 address; does not scan ports or connect to it."""
+    from app.adapters.edge.network_discovery_adapter import inspect_private_address
+    return inspect_private_address(ip_address)
 
 # Android navigation tools are registered additively on the same MCP server.
 # Existing desktop tool implementations and their default behavior remain unchanged.
@@ -484,3 +508,4 @@ if __name__ == "__main__":
     if _HTTP_TRANSPORT not in {"stdio", "streamable-http"}:
         raise SystemExit("JARVIS_DESKTOP_TRANSPORT deve ser stdio ou streamable-http.")
     mcp.run(transport=_HTTP_TRANSPORT)
+
