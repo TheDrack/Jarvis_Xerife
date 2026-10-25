@@ -8,7 +8,7 @@ import java.net.URL
 data class MobilePushEvent(val eventId: String, val text: String)
 
 object MobilePushClient {
-    private data class HttpResult(val code: Int, val body: String)
+    internal data class HttpResult(val code: Int, val body: String)
 
     fun registerCurrentDevice(context: Context, fcmToken: String) {
         if (fcmToken.isBlank()) return
@@ -60,6 +60,17 @@ object MobilePushClient {
         path: String,
         method: String,
         body: String?
+    ): HttpResult? = authenticatedRequest(context, path, method, body)?.takeIf { it.code in 200..299 }
+
+    /**
+     * Chamada autenticada que devolve o status HTTP mesmo em erro (o chat mostra a mensagem do servidor).
+     * Renova a sessão uma vez em 401.
+     */
+    internal fun authenticatedRequest(
+        context: Context,
+        path: String,
+        method: String,
+        body: String?
     ): HttpResult? {
         val vault = TokenVault(context)
         var accessToken = vault.read() ?: refreshSession(context) ?: return null
@@ -68,8 +79,12 @@ object MobilePushClient {
             accessToken = refreshSession(context) ?: return null
             result = perform(context, path, method, body, accessToken) ?: return null
         }
-        return result.takeIf { it.code in 200..299 }
+        return result
     }
+
+    /** GET sem autenticação (ex.: /v1/status). */
+    internal fun publicGet(context: Context, path: String): HttpResult? =
+        perform(context, path, "GET", null, null)
 
     private fun refreshSession(context: Context): String? {
         val vault = TokenVault(context)

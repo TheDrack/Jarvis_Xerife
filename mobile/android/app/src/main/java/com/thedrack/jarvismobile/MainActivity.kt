@@ -11,6 +11,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,10 +47,12 @@ class MainActivity : ComponentActivity() {
     private var speech: TextToSpeech? = null
     private val executor = Executors.newSingleThreadExecutor()
     private val speechReady = mutableStateOf(false)
+    private lateinit var voice: VoiceInput
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         vault = TokenVault(this)
+        voice = VoiceInput(this)
         if (FirebaseBootstrap.initialize(this) && vault.readRefreshToken() != null) {
             registerFcmToken()
         }
@@ -63,11 +69,15 @@ class MainActivity : ComponentActivity() {
                         isLoggedInInitially = vault.read() != null && vault.readRefreshToken() != null,
                         speechReady = speechReady.value,
                         presenceInitiallyActive = BridgeService.isRunning,
+                        voice = voice,
                         onLogin = ::login,
                         onLogout = ::logout,
                         onStartPresence = ::startPresence,
                         onStopPresence = ::stopPresence,
-                        onSpeak = { speak("Jarvis Mobile ativo. Canal de voz local funcionando.") }
+                        onSpeak = { speak("Jarvis Mobile ativo. Canal de voz local funcionando.") },
+                        onSendChat = ::sendChat,
+                        onFetchStatus = ::fetchStatus,
+                        onSpeakReply = ::speak
                     )
                 }
             }
@@ -228,9 +238,29 @@ class MainActivity : ComponentActivity() {
         speech?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "jarvis-mobile-local-tts")
     }
 
+    /** Envia texto ao núcleo em segundo plano e devolve a resposta na thread de UI. */
+    private fun sendChat(text: String, onReply: (ChatReply) -> Unit) {
+        executor.execute {
+            val reply = try {
+                JarvisApi.sendMessage(applicationContext, text)
+            } catch (error: IllegalArgumentException) {
+                ChatReply(false, "", error.message)
+            }
+            runOnUiThread { onReply(reply) }
+        }
+    }
+
+    private fun fetchStatus(onStatus: (JarvisStatus?) -> Unit) {
+        executor.execute {
+            val status = JarvisApi.fetchStatus(applicationContext)
+            runOnUiThread { onStatus(status) }
+        }
+    }
+
     override fun onDestroy() {
         speech?.stop()
         speech?.shutdown()
+        voice.release()
         executor.shutdownNow()
         super.onDestroy()
     }
@@ -242,11 +272,15 @@ private fun JarvisMobileScreen(
     isLoggedInInitially: Boolean,
     speechReady: Boolean,
     presenceInitiallyActive: Boolean,
+    voice: VoiceInput,
     onLogin: (String, String, String, (String?) -> Unit) -> Unit,
     onLogout: () -> Unit,
     onStartPresence: () -> Unit,
     onStopPresence: () -> Unit,
-    onSpeak: () -> Unit
+    onSpeak: () -> Unit,
+    onSendChat: (String, (ChatReply) -> Unit) -> Unit,
+    onFetchStatus: ((JarvisStatus?) -> Unit) -> Unit,
+    onSpeakReply: (String) -> Unit
 ) {
     var baseUrl by remember { mutableStateOf(initialBaseUrl) }
     var username by remember { mutableStateOf("") }
@@ -255,7 +289,40 @@ private fun JarvisMobileScreen(
     var presenceActive by remember { mutableStateOf(presenceInitiallyActive) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("Entre e ative a presença para receber eventos do Jarvis.") }
+    var tab by remember { mutableStateOf(0) } // 0 = Presença, 1 = Conversa
+    var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
+    var nextId by remember { mutableStateOf(1L) }
+    var draft by remember { mutableStateOf("") }
+    var chatBusy by remember { mutableStateOf(false) }
+    var listening by remember { mutableStateOf(false) }
+    var chatNotice by remember { mutableStateOf<String?>(null) }
+    var status by remember { mutableStateOf<JarvisStatus?>(null) }
     val context = LocalContext.current
+
+    fun newId(): Long {
+        val id = nextId
+        nextId = id + 1
+        return id
+    }
+
+    LaunchedEffect(loggedIn) {
+        if (loggedIn) onFetchStatus { status = it }
+    }
+
+    val startListening: () -> Unit = {
+        listening = true
+        chatNotice = null
+        voice.listen(
+            onPartialText = { draft = it },
+            onFinalText = { draft = it; listening = false },
+            onFailure = { listening = false; chatNotice = it }
+        )
+    }
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startListening() else chatNotice = "Sem permissão de microfone; use o teclado."
+    }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -269,76 +336,156 @@ private fun JarvisMobileScreen(
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("J.A.R.V.I.S.", style = MaterialTheme.typography.headlineLarge)
-        Text("Companheiro Android", modifier = Modifier.padding(top = 8.dp))
-        Text(
-            if (speechReady) "Voz local disponível" else "Inicializando mecanismo de voz…",
-            modifier = Modifier.padding(top = 12.dp)
-        )
-        Button(onClick = onSpeak, enabled = speechReady, modifier = Modifier.padding(top = 12.dp)) {
-            Text("Testar voz")
-        }
-        if (!loggedIn) {
-            OutlinedTextField(
-                baseUrl, { baseUrl = it }, label = { Text("API HTTPS") },
-                modifier = Modifier.fillMaxWidth().padding(top = 12.dp), singleLine = true
-            )
-            OutlinedTextField(
-                username, { username = it }, label = { Text("Usuário") },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true
-            )
-            OutlinedTextField(
-                password, { password = it }, label = { Text("Senha (não será salva)") },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
-                visualTransformation = PasswordVisualTransformation()
-            )
-            Button(
-                onClick = {
-                    busy = true
-                    message = "Autenticando…"
-                    onLogin(baseUrl, username, password) { error ->
-                        busy = false
-                        password = ""
-                        loggedIn = error == null
-                        message = error ?: "Autenticado. Token protegido pelo Android Keystore."
-                    }
-                },
-                enabled = !busy && username.isNotBlank() && password.isNotBlank(),
-                modifier = Modifier.padding(top = 12.dp)
-            ) { Text(if (busy) "Conectando…" else "Entrar no Jarvis") }
+    fun onMicPressed() {
+        if (listening) {
+            voice.stop()
+            listening = false
+        } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            startListening()
         } else {
-            Text("Sessão autenticada neste dispositivo.", modifier = Modifier.padding(top = 12.dp))
-            Button(
-                onClick = {
-                    if (Build.VERSION.SDK_INT >= 33 &&
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                        PackageManager.PERMISSION_GRANTED
-                    ) {
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    } else {
-                        onStartPresence()
-                        presenceActive = true
-                        message = "Presença ativada; verifique a notificação persistente."
-                    }
-                },
-                enabled = !presenceActive,
-                modifier = Modifier.padding(top = 12.dp)
-            ) { Text("Ativar presença em segundo plano") }
-            Button(
-                onClick = { onStopPresence(); presenceActive = false; message = "Presença interrompida." },
-                enabled = presenceActive,
-                modifier = Modifier.padding(top = 8.dp)
-            ) { Text("Parar presença") }
-            Button(
-                onClick = { onStopPresence(); onLogout(); presenceActive = false; loggedIn = false; message = "Sessão encerrada." },
-                modifier = Modifier.padding(top = 8.dp)
-            ) { Text("Sair") }
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
-        Text(message, modifier = Modifier.padding(top = 16.dp), style = MaterialTheme.typography.bodySmall)
+    }
+
+    fun sendDraft() {
+        val text = draft.trim()
+        if (text.isEmpty() || chatBusy) return
+        messages = messages + ChatMessage(newId(), fromUser = true, text = text)
+        draft = ""
+        chatBusy = true
+        chatNotice = null
+        onSendChat(text) { reply ->
+            chatBusy = false
+            if (reply.success) {
+                messages = messages + ChatMessage(newId(), fromUser = false, text = reply.text)
+                onSpeakReply(reply.text)
+            } else {
+                messages = messages + ChatMessage(
+                    newId(),
+                    fromUser = false,
+                    text = reply.error ?: "Falha ao falar com o Jarvis.",
+                    isError = true
+                )
+            }
+        }
+    }
+
+    val statusLine = when {
+        status != null -> {
+            val s = status!!
+            "Jarvis ${s.appName} ${s.version} · " + if (s.isActive) "ativo" else "inativo"
+        }
+        loggedIn -> "Consultando o Jarvis…"
+        else -> "Entre para conversar."
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        Text("J.A.R.V.I.S.", style = MaterialTheme.typography.headlineLarge)
+        Text("Companheiro Android", modifier = Modifier.padding(top = 4.dp))
+        if (loggedIn) {
+            Row(modifier = Modifier.padding(top = 12.dp)) {
+                Button(onClick = { tab = 0 }, enabled = tab != 0) { Text("Presença") }
+                Button(onClick = { tab = 1 }, enabled = tab != 1, modifier = Modifier.padding(start = 8.dp)) {
+                    Text("Conversa")
+                }
+            }
+        }
+        if (loggedIn && tab == 1) {
+            ChatPanel(
+                modifier = Modifier.fillMaxWidth().weight(1f).padding(top = 12.dp),
+                messages = messages,
+                draft = draft,
+                busy = chatBusy,
+                listening = listening,
+                voiceAvailable = voice.available,
+                statusLine = statusLine,
+                notice = chatNotice,
+                onDraftChange = { draft = it },
+                onSend = ::sendDraft,
+                onMic = ::onMicPressed
+            )
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    if (speechReady) "Voz local disponível" else "Inicializando mecanismo de voz…",
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+                Button(onClick = onSpeak, enabled = speechReady, modifier = Modifier.padding(top = 12.dp)) {
+                    Text("Testar voz")
+                }
+                if (!loggedIn) {
+                    OutlinedTextField(
+                        baseUrl, { baseUrl = it }, label = { Text("API HTTPS") },
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp), singleLine = true
+                    )
+                    OutlinedTextField(
+                        username, { username = it }, label = { Text("Usuário") },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true
+                    )
+                    OutlinedTextField(
+                        password, { password = it }, label = { Text("Senha (não será salva)") },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp), singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                    Button(
+                        onClick = {
+                            busy = true
+                            message = "Autenticando…"
+                            onLogin(baseUrl, username, password) { error ->
+                                busy = false
+                                password = ""
+                                loggedIn = error == null
+                                message = error ?: "Autenticado. Token protegido pelo Android Keystore."
+                            }
+                        },
+                        enabled = !busy && username.isNotBlank() && password.isNotBlank(),
+                        modifier = Modifier.padding(top = 12.dp)
+                    ) { Text(if (busy) "Conectando…" else "Entrar no Jarvis") }
+                } else {
+                    Text("Sessão autenticada neste dispositivo.", modifier = Modifier.padding(top = 12.dp))
+                    Button(
+                        onClick = {
+                            if (Build.VERSION.SDK_INT >= 33 &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                                PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                onStartPresence()
+                                presenceActive = true
+                                message = "Presença ativada; verifique a notificação persistente."
+                            }
+                        },
+                        enabled = !presenceActive,
+                        modifier = Modifier.padding(top = 12.dp)
+                    ) { Text("Ativar presença em segundo plano") }
+                    Button(
+                        onClick = { onStopPresence(); presenceActive = false; message = "Presença interrompida." },
+                        enabled = presenceActive,
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text("Parar presença") }
+                    Button(
+                        onClick = {
+                            onStopPresence()
+                            onLogout()
+                            presenceActive = false
+                            loggedIn = false
+                            messages = emptyList()
+                            draft = ""
+                            status = null
+                            tab = 0
+                            message = "Sessão encerrada."
+                        },
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text("Sair") }
+                }
+                Text(message, modifier = Modifier.padding(top = 16.dp), style = MaterialTheme.typography.bodySmall)
+            }
+        }
     }
 }
