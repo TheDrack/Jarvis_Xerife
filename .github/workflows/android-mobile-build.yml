@@ -38,7 +38,7 @@ jobs:
           JARVIS_FCM_APP_ID: ${{ secrets.JARVIS_FCM_APP_ID }}
           JARVIS_FCM_PROJECT_ID: ${{ secrets.JARVIS_FCM_PROJECT_ID }}
           JARVIS_FCM_SENDER_ID: ${{ secrets.JARVIS_FCM_SENDER_ID }}
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
