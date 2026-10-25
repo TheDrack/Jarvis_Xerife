@@ -40,6 +40,17 @@ def _with_screenshot(navigator: VisualNavigationAdapter, result: dict[str, Any])
     return {**observation, **result}
 
 
+def _with_screenshot_on_uncertain(
+    navigator: VisualNavigationAdapter, result: dict[str, Any]
+) -> dict[str, Any]:
+    """Skip image capture when a semantic postcondition already proves the result."""
+    if result.get("success") and result.get("status") in {
+        "postcondition_verified", "value_verified", "completed", "semantic_ui_snapshot"
+    }:
+        return result
+    return _with_screenshot(navigator, result)
+
+
 def _compact_accessibility_snapshot(windows: list[dict[str, Any]], max_elements: int = 80, max_chars: int = 12000) -> dict[str, Any]:
     """Build a bounded, text-first UI summary; element IDs are display-only per snapshot."""
     max_elements = min(max(int(max_elements), 1), 200)
@@ -146,7 +157,7 @@ def _run_untracked(
     if action == "list_templates":
         return {"success": True, "status": "listed", "templates": navigator._read_catalog()}
     if action == "click_accessibility":
-        return _with_screenshot(navigator, navigator.click_accessibility(
+        return _with_screenshot_on_uncertain(navigator, navigator.click_accessibility(
             str(request.get("target_name", "")),
             str(request.get("window_title_contains", "")),
             str(request.get("control_type", "")),
@@ -154,7 +165,7 @@ def _run_untracked(
             request.get("timeout_seconds", 2.0),
         ))
     if action == "set_accessibility_value":
-        return _with_screenshot(navigator, navigator.set_accessibility_value(
+        return _with_screenshot_on_uncertain(navigator, navigator.set_accessibility_value(
             str(request.get("target_name", "")),
             str(request.get("value", "")),
             str(request.get("window_title_contains", "")),
@@ -199,7 +210,7 @@ def _run_untracked(
         return {"success": True, "status": "accessibility_tree", "windows": windows}
     if action == "run_recipe":
         steps = request.get("steps", [])
-        return _with_screenshot(navigator, navigator.run_recipe(steps))
+        return _with_screenshot_on_uncertain(navigator, navigator.run_recipe(steps))
     if action == "capture_template":
         if request.get("user_confirmed") is not True:
             return {
