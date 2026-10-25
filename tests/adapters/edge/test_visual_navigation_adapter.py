@@ -177,3 +177,28 @@ def test_postcondition_must_transition_from_baseline_count():
     assert _postcondition_transitioned(0, 1) is True
     assert _postcondition_transitioned(1, 1) is False
     assert _postcondition_transitioned(1, 2) is True
+
+
+def test_cli_skips_screenshot_after_semantic_success():
+    from app.adapters.edge.jarvis_desktop_cli import _with_screenshot_on_uncertain
+
+    class Navigator:
+        def observe_screen(self):
+            raise AssertionError("semantic success must not capture a screenshot")
+
+    result = {"success": True, "status": "postcondition_verified"}
+    assert _with_screenshot_on_uncertain(Navigator(), result) is result
+
+
+def test_cli_keeps_screenshot_fallback_when_semantic_result_is_uncertain():
+    from app.adapters.edge.jarvis_desktop_cli import _with_screenshot_on_uncertain
+
+    class Navigator:
+        def observe_screen(self):
+            return {"success": True, "status": "observed", "screenshot_path": "captured.jpg"}
+
+    result = _with_screenshot_on_uncertain(
+        Navigator(), {"success": False, "status": "postcondition_failed"}
+    )
+    assert result["screenshot_path"] == "captured.jpg"
+    assert result["status"] == "postcondition_failed"
