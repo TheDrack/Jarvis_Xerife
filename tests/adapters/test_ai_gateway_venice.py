@@ -69,3 +69,20 @@ async def test_generate_completion_uses_venice_openai_compatible_client():
         model="venice-uncensored-1-2",
         messages=[{"role": "user", "content": "Hello"}],
     )
+
+
+@pytest.mark.anyio
+async def test_groq_rate_limit_falls_back_to_venice_when_gemini_is_unavailable():
+    gateway = make_gateway()
+    gateway.groq_client = Mock()
+    gateway.groq_client.chat.completions.create.side_effect = Exception("HTTP 429 rate limit")
+    gateway.venice_client = Mock()
+    completion = Mock()
+    gateway.venice_client.chat.completions.create.return_value = completion
+
+    result = await gateway.generate_completion(
+        [{"role": "user", "content": "Hello"}]
+    )
+
+    assert result["provider"] == "venice"
+    assert result["fallback_from"] == "groq"
