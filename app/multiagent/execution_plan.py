@@ -6,6 +6,7 @@ handlers and a policy callback; every step is authorized immediately before disp
 from __future__ import annotations
 
 import json
+import math
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
@@ -229,8 +230,8 @@ class DeclarativePlanInterpreter:
         max_elapsed_seconds: float = 30.0,
         event_sink: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> None:
-        if max_elapsed_seconds <= 0:
-            raise ValueError("max_elapsed_seconds must be positive")
+        if not math.isfinite(max_elapsed_seconds) or max_elapsed_seconds <= 0:
+            raise ValueError("max_elapsed_seconds must be finite and positive")
         self._executors = dict(executors)
         self._policy = policy
         self._max_steps = max_steps
@@ -307,7 +308,7 @@ class DeclarativePlanInterpreter:
                 # A connector can fail after an external effect. Do not blindly retry.
                 outcome = StepOutcome(step_id, tool, "unknown", error=type(exc).__name__, duration_ms=duration)
                 if not self._record({"event": "step_finished", "execution_id": execution_id,
-                                     **outcome.to_dict()}):
+                                     "step_id": step_id, "tool": tool, "status": outcome.status, "error": outcome.error, "duration_ms": duration}):
                     outcome = StepOutcome(step_id, tool, "unknown", error="journal_unavailable",
                                           duration_ms=duration)
                 outcomes.append(outcome)
