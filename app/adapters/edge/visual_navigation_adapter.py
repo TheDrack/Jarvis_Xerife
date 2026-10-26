@@ -283,6 +283,32 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
                 "target_name": name, "control_type": role, "window_title": title,
                 "rectangle": [rect.left, rect.top, rect.right, rect.bottom]}
 
+    @staticmethod
+    def _count_accessible_name(expected_name: str) -> int:
+        """Count visible UIA elements with an exact accessible name."""
+        from pywinauto import Desktop
+
+        expected = str(expected_name or "").strip().casefold()
+        if not expected:
+            return 0
+        count = 0
+        for window in Desktop(backend="uia").windows():
+            try:
+                if not window.is_visible():
+                    continue
+                for item in window.descendants():
+                    try:
+                        if (
+                            item.is_visible()
+                            and str(item.element_info.name or "").strip().casefold() == expected
+                        ):
+                            count += 1
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+        return count
+
     def run_recipe(self, steps: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
         steps = list(steps or [])
         if not steps:
@@ -347,6 +373,25 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
 
             if step.get("action", "click") != "click":
                 return {"success": False, "status": "invalid_recipe", "step": index, "message": "Somente ação click é aceita."}
+            # Snapshot the semantic postcondition before sending input. A label that
+            # already exists must not count as proof that this click caused a transition.
+            baseline_count = None
+            if expected_name:
+                try:
+                    baseline_count = self._count_accessible_name(expected_name)
+                except Exception as exc:
+                    if not verify_id:
+                        return {
+                            "success": False,
+                            "status": "postcondition_unobservable",
+                            "step": index,
+                            "message": "Não foi possível observar a pós-condição antes da ação; clique não executado.",
+                            "detail": str(exc),
+                            "completed_steps": completed,
+                            **self._save_observation(self._capture()),
+                        }
+                    logger.debug("UIA baseline unavailable; using visual postcondition: %s", exc)
+
             center = self._gui().center(match)
             # Publish the detected target so the click-through Jarvis reticle glides there.
             # This is visual feedback only; the actual input path remains separate.
@@ -389,21 +434,18 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
             deadline = time.monotonic() + min(max(float(step.get("verify_timeout_seconds", 2)), 0.2), 5)
             verified = False
             while time.monotonic() < deadline:
-                if expected_name:
+                if expected_name and baseline_count is not None:
                     try:
-                        from pywinauto import Desktop
-                        verified = any(
-                            item.is_visible()
-                            and str(item.element_info.name or "").strip().casefold() == expected_name.casefold()
-                            for window in Desktop(backend="uia").windows() if window.is_visible()
-                            for item in window.descendants()
-                        )
+                        observed_count = self._count_accessible_name(expected_name)
+                        verified = _postcondition_transitioned(baseline_count, observed_count)
                     except Exception:
                         verified = False
-                else:
+                elif verify_id:
                     after = self._capture()
                     verify_state, _ = self._find_unique(after, verify_id, confidence)
                     verified = verify_state == "found"
+                else:
+                    verified = False
                 if verified:
                     break
                 time.sleep(0.2)
@@ -418,32 +460,35 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
                 action_strategy = "background_then_physical_fallback"
                 fallback_deadline = time.monotonic() + min(max(float(step.get("verify_timeout_seconds", 2)), 0.2), 5)
                 while time.monotonic() < fallback_deadline:
-                    if expected_name:
+                    if expected_name and baseline_count is not None:
                         try:
-                            from pywinauto import Desktop
-                            verified = any(
-                                item.is_visible()
-                                and str(item.element_info.name or "").strip().casefold() == expected_name.casefold()
-                                for window in Desktop(backend="uia").windows() if window.is_visible()
-                                for item in window.descendants()
-                            )
+                            observed_count = self._count_accessible_name(expected_name)
+                            verified = _postcondition_transitioned(baseline_count, observed_count)
                         except Exception:
                             verified = False
-                    else:
+                    elif verify_id:
                         after = self._capture()
                         verify_state, _ = self._find_unique(after, verify_id, confidence)
                         verified = verify_state == "found"
+                    else:
+                        verified = False
                     if verified:
                         break
                     time.sleep(0.2)
 
             if not verified:
+                preexisting = baseline_count is not None and baseline_count > 0
                 return {
                     "success": False,
-                    "status": "postcondition_failed",
+                    "status": "postcondition_preexisting" if preexisting else "postcondition_failed",
                     "step": index,
                     "physical_fallback_used": physical_fallback_used,
-                    "message": f"A pós-condição '{expected_name or verify_id}' não apareceu mesmo após a estratégia de entrada. Receita interrompida.",
+                    "baseline_match_count": baseline_count,
+                    "message": (
+                        f"A pós-condição '{expected_name}' já existia antes da ação e não surgiu uma nova ocorrência."
+                        if preexisting and expected_name
+                        else f"A pós-condição '{expected_name or verify_id}' não foi confirmada após a ação."
+                    ) + " Receita interrompida.",
                     "completed_steps": completed,
                     **self._save_observation(self._capture()),
                 }
