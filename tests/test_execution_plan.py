@@ -139,3 +139,10 @@ def test_plan_rejects_python_values_that_json_would_coerce():
     candidate = make_plan(make_step("read", args={1: "not a JSON object key"}))
     with pytest.raises(PlanValidationError, match="keys must be strings"):
         validate_plan(candidate)
+
+
+def test_cyclic_python_input_is_rejected_cleanly():
+    cyclic = []
+    cyclic.append(cyclic)
+    with pytest.raises(PlanValidationError):
+        validate_plan(make_plan(make_step("read", args={"loop": cyclic})))
