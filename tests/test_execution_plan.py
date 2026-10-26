@@ -23,7 +23,7 @@ def test_references_use_only_projected_payload():
     )
     result = interpreter.execute(make_plan(
         make_step("find", output_fields=["id"]),
-        make_step("update", args={"item_id": {"$ref": "find.id"}}, depends_on=["find"]),
+        make_step("update", tool="update", args={"item_id": {"$ref": "find.id"}}, depends_on=["find"]),
     ))
     assert result.status == "completed"
     assert calls == [{"item_id": "item-7"}]
@@ -102,7 +102,7 @@ def test_bad_reference_blocks_downstream_step():
     )
     result = interpreter.execute(make_plan(
         make_step("read"),
-        make_step("write", "update", {"id": {"$ref": "missing.id"}}, depends_on=["read"]),
+        make_step("write", "update", {"id": {"$ref": "read.missing"}}, depends_on=["read"]),
     ))
     assert result.status == "blocked"
     assert calls == []
