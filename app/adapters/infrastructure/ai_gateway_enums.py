@@ -10,6 +10,7 @@ class LLMProvider(str, Enum):
     """Available LLM providers"""
     GROQ = "groq"
     GEMINI = "gemini"
+    VENICE = "venice"
 
 
 class GroqGear(str, Enum):
