@@ -317,7 +317,7 @@ class DeclarativePlanInterpreter:
             duration = int((time.monotonic() - started) * 1000)
             outcome = StepOutcome(step_id, tool, "completed", projected, duration_ms=duration)
             if not self._record({"event": "step_finished", "execution_id": execution_id,
-                                 **outcome.to_dict()}):
+                                 "step_id": step_id, "tool": tool, "status": outcome.status, "error": outcome.error, "duration_ms": duration}):
                 # The connector may have changed external state, but durable completion
                 # could not be recorded. Never report success or retry blindly.
                 outcome = StepOutcome(step_id, tool, "unknown", error="journal_unavailable",
