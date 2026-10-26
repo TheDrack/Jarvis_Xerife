@@ -40,6 +40,60 @@ def test_leader_and_workers_use_same_contract_and_role_is_task_scoped():
     assert payload["required_tools"] == ["repo.read", "pytest"]
     assert payload["acceptance_criteria"] == ["Report exact command and result"]
     assert payload["leader_id"] == "leader"
+    assert payload["required_model_provider"] is None
+
+
+@pytest.mark.parametrize("task_type", ["red_team", "Red Team", "red-team", "blue_team", "BLUE TEAM"])
+def test_red_blue_tasks_are_routed_only_to_venice_agents(task_type):
+    task = TaskSpec(
+        task_id="security-task",
+        objective="Perform an authorized security review",
+        task_type=task_type,
+    )
+    agents = [
+        AgentProfile("corporate-model", estimated_cost=0.001, model_provider="openai"),
+        AgentProfile("groq-agent", estimated_cost=0.001, model_provider="groq"),
+        AgentProfile("venice-agent", estimated_cost=0.5, model_provider="Venice"),
+    ]
+
+    assignment = CostBenefitScheduler().choose(task, agents, leader_id="leader")
+
+    assert assignment.assigned_agent_id == "venice-agent"
+    assert assignment.required_model_provider == "venice"
+    assert assignment.to_dict()["required_model_provider"] == "venice"
+
+
+@pytest.mark.parametrize("task_type", ["red_team", "blue_team"])
+def test_red_blue_tasks_fail_closed_when_no_venice_agent_is_available(task_type):
+    task = TaskSpec(
+        task_id="security-task",
+        objective="Perform an authorized security review",
+        task_type=task_type,
+    )
+    agents = [
+        AgentProfile("groq-agent", model_provider="groq"),
+        AgentProfile("offline-venice", status="offline", model_provider="venice"),
+    ]
+
+    with pytest.raises(NoEligibleAgentError, match="require an available Venice-configured agent"):
+        CostBenefitScheduler().choose(task, agents, leader_id="leader")
+
+
+def test_non_security_tasks_keep_normal_provider_selection():
+    task = TaskSpec(
+        task_id="general-task",
+        objective="Summarize documentation",
+        task_type="research",
+    )
+    agents = [
+        AgentProfile("groq-agent", estimated_cost=0.2, model_provider="groq"),
+        AgentProfile("venice-agent", estimated_cost=0.4, model_provider="venice"),
+    ]
+
+    assignment = CostBenefitScheduler().choose(task, agents, leader_id="leader")
+
+    assert assignment.assigned_agent_id == "groq-agent"
+    assert assignment.required_model_provider is None
 
 
 def test_scheduler_filters_unavailable_capacity_tools_and_budget():
