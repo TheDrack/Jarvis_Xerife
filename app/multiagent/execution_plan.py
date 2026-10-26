@@ -226,11 +226,27 @@ class DeclarativePlanInterpreter:
         *,
         max_steps: int = MAX_PLAN_STEPS,
         max_plan_bytes: int = MAX_PLAN_BYTES,
+        max_elapsed_seconds: float = 30.0,
+        event_sink: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> None:
+        if max_elapsed_seconds <= 0:
+            raise ValueError("max_elapsed_seconds must be positive")
         self._executors = dict(executors)
         self._policy = policy
         self._max_steps = max_steps
         self._max_plan_bytes = max_plan_bytes
+        self._max_elapsed_seconds = max_elapsed_seconds
+        self._event_sink = event_sink
+
+    def _record(self, event: Mapping[str, Any]) -> bool:
+        """Append an execution event; fail closed if the configured journal is unavailable."""
+        if self._event_sink is None:
+            return True
+        try:
+            self._event_sink(dict(event))
+        except Exception:
+            return False
+        return True
 
     def execute(self, plan: Mapping[str, Any]) -> PlanOutcome:
         normalized = validate_plan(
@@ -238,8 +254,20 @@ class DeclarativePlanInterpreter:
         )
         outcomes: list[StepOutcome] = []
         results: dict[str, Any] = {}
+        execution_started = time.monotonic()
+        execution_id = normalized["execution_id"]
+        if not self._record({"event": "execution_started", "execution_id": execution_id,
+                             "step_count": len(normalized["steps"])}):
+            return PlanOutcome(execution_id, "blocked", (
+                StepOutcome("", "", "blocked", error="journal_unavailable"),
+            ))
         for step in normalized["steps"]:
             step_id, tool = step["step_id"], step["tool"]
+            if time.monotonic() - execution_started >= self._max_elapsed_seconds:
+                outcomes.append(StepOutcome(step_id, tool, "blocked", error="execution_budget_exhausted"))
+                self._record({"event": "execution_budget_exhausted", "execution_id": execution_id,
+                              "step_id": step_id})
+                return PlanOutcome(execution_id, "blocked", tuple(outcomes))
             if tool not in self._executors:
                 outcomes.append(StepOutcome(step_id, tool, "blocked", error="tool_not_allowlisted"))
                 return PlanOutcome(normalized["execution_id"], "blocked", tuple(outcomes))
@@ -265,6 +293,11 @@ class DeclarativePlanInterpreter:
                 outcomes.append(StepOutcome(step_id, tool, "blocked", error="policy_denied"))
                 return PlanOutcome(normalized["execution_id"], "blocked", tuple(outcomes))
 
+            if not self._record({"event": "step_started", "execution_id": execution_id,
+                                 "step_id": step_id, "tool": tool, "argument_keys": sorted(args)}):
+                outcomes.append(StepOutcome(step_id, tool, "blocked", error="journal_unavailable"))
+                return PlanOutcome(execution_id, "blocked", tuple(outcomes))
+
             started = time.monotonic()
             try:
                 raw_result = self._executors[tool](args)
@@ -272,10 +305,30 @@ class DeclarativePlanInterpreter:
             except Exception as exc:
                 duration = int((time.monotonic() - started) * 1000)
                 # A connector can fail after an external effect. Do not blindly retry.
-                outcomes.append(StepOutcome(step_id, tool, "unknown", error=type(exc).__name__, duration_ms=duration))
-                return PlanOutcome(normalized["execution_id"], "unknown", tuple(outcomes))
+                outcome = StepOutcome(step_id, tool, "unknown", error=type(exc).__name__, duration_ms=duration)
+                if not self._record({"event": "step_finished", "execution_id": execution_id,
+                                     **outcome.to_dict()}):
+                    outcome = StepOutcome(step_id, tool, "unknown", error="journal_unavailable",
+                                          duration_ms=duration)
+                outcomes.append(outcome)
+                return PlanOutcome(execution_id, "unknown", tuple(outcomes))
 
-            outcomes.append(StepOutcome(step_id, tool, "completed", projected,
-                                        duration_ms=int((time.monotonic() - started) * 1000)))
+            duration = int((time.monotonic() - started) * 1000)
+            outcome = StepOutcome(step_id, tool, "completed", projected, duration_ms=duration)
+            if not self._record({"event": "step_finished", "execution_id": execution_id,
+                                 **outcome.to_dict()}):
+                # The connector may have changed external state, but durable completion
+                # could not be recorded. Never report success or retry blindly.
+                outcome = StepOutcome(step_id, tool, "unknown", error="journal_unavailable",
+                                      duration_ms=duration)
+                outcomes.append(outcome)
+                return PlanOutcome(execution_id, "unknown", tuple(outcomes))
+            outcomes.append(outcome)
             results[step_id] = projected
-        return PlanOutcome(normalized["execution_id"], "completed", tuple(outcomes))
+        if not self._record({"event": "execution_finished", "execution_id": execution_id,
+                             "status": "completed"}):
+            return PlanOutcome(execution_id, "unknown", tuple(outcomes[:-1]) + (
+                StepOutcome(outcomes[-1].step_id, outcomes[-1].tool, "unknown",
+                            error="journal_unavailable", duration_ms=outcomes[-1].duration_ms),
+            ))
+        return PlanOutcome(execution_id, "completed", tuple(outcomes))
