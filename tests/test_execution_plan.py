@@ -148,18 +148,28 @@ def test_cyclic_python_input_is_rejected_cleanly():
         validate_plan(make_plan(make_step("read", args={"loop": cyclic})))
 
 
-def test_execution_budget_stops_before_dispatching_next_step():
+def test_execution_budget_stops_before_dispatching_next_step(monkeypatch):
+    import app.multiagent.execution_plan as execution_plan
+
+    ticks = iter([0.0, 0.0, 0.0, 0.001, 1.0])
+    monkeypatch.setattr(execution_plan.time, "monotonic", lambda: next(ticks))
     calls = []
     interpreter = DeclarativePlanInterpreter(
         {"lookup": lambda args: calls.append(args) or {"ok": True}},
         allow_all,
-        max_elapsed_seconds=0.000001,
+        max_elapsed_seconds=0.5,
     )
-    result = interpreter.execute(make_plan(make_step("first")))
-    # The budget is checked between steps, not as a hard preemptive timeout.
+    result = interpreter.execute(make_plan(make_step("first"), make_step("second")))
     assert result.status == "blocked"
+    assert [step.status for step in result.steps] == ["completed", "blocked"]
     assert result.steps[-1].error == "execution_budget_exhausted"
+    assert calls == [{}]
 
+
+@pytest.mark.parametrize("invalid_budget", [0, -1, float("nan"), float("inf"), -float("inf")])
+def test_elapsed_budget_must_be_finite_and_positive(invalid_budget):
+    with pytest.raises(ValueError, match="finite and positive"):
+        DeclarativePlanInterpreter({}, allow_all, max_elapsed_seconds=invalid_budget)
 
 def test_journal_failure_before_dispatch_fails_closed():
     calls = []
@@ -195,3 +205,35 @@ def test_journal_failure_after_side_effect_returns_unknown_without_retry():
     assert result.status == "unknown"
     assert result.steps[0].error == "journal_unavailable"
     assert len(calls) == 1
+
+
+def test_journal_failure_on_step_started_prevents_dispatch():
+    calls = []
+
+    def journal(event):
+        if event["event"] == "step_started":
+            raise OSError("journal unavailable")
+
+    interpreter = DeclarativePlanInterpreter(
+        {"mutate": lambda args: calls.append(args)},
+        allow_all,
+        event_sink=journal,
+    )
+    result = interpreter.execute(make_plan(make_step("write", "mutate")))
+    assert result.status == "blocked"
+    assert result.steps[0].error == "journal_unavailable"
+    assert calls == []
+
+
+def test_lifecycle_events_never_include_raw_args_or_result_payloads():
+    events = []
+    secret = "do-not-log-this-secret"
+    interpreter = DeclarativePlanInterpreter(
+        {"lookup": lambda args: {"token": secret, "ok": True}},
+        allow_all,
+        event_sink=events.append,
+    )
+    result = interpreter.execute(make_plan(make_step("read", args={"token": secret})))
+    assert result.status == "completed"
+    assert all("args" not in event and "result" not in event for event in events)
+    assert secret not in repr(events)
