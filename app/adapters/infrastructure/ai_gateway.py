@@ -58,16 +58,17 @@ class AIGateway(NexusComponent):
         self,
         groq_api_key: Optional[str] = None,
         gemini_api_key: Optional[str] = None,
-        venice_api_key: Optional[str] = None,
         groq_high_gear_model: Optional[str] = None,
         groq_low_gear_model: Optional[str] = None,
         gemini_model: Optional[str] = None,
-        venice_model: Optional[str] = None,
         default_provider: LLMProvider = LLMProvider.GROQ,
         enable_auto_repair: bool = True,
         github_adapter: Optional[Any] = None,
         # Backward compatibility parameters
         groq_model: Optional[str] = None,
+        # Optional Venice parameters are appended to preserve positional compatibility.
+        venice_api_key: Optional[str] = None,
+        venice_model: Optional[str] = None,
     ):
         """
         Initialize AI Gateway with multiple provider support and Gears system.
@@ -80,7 +81,7 @@ class AIGateway(NexusComponent):
             groq_low_gear_model: Low Gear model name (defaults to DEFAULT_LOW_GEAR_MODEL or GROQ_LOW_GEAR_MODEL env var)
             gemini_model: Gemini model name (defaults to DEFAULT_GEMINI_MODEL or GEMINI_MODEL env var)
             venice_model: Venice model name (defaults to DEFAULT_VENICE_MODEL or VENICE_MODEL env var)
-            default_provider: Default provider for routing (GROQ or GEMINI)
+            default_provider: Default provider for routing (GROQ by default; Venice can be forced explicitly)
             enable_auto_repair: Enable auto-repair on critical errors
             github_adapter: Optional GitHubAdapter instance for auto-repair
             groq_model: (Deprecated) Use groq_high_gear_model instead. For backward compatibility.
