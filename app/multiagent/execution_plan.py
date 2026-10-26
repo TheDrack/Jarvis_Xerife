@@ -105,6 +105,11 @@ def validate_plan(plan: Mapping[str, Any], *, max_steps: int = MAX_PLAN_STEPS,
         # may be referenced. It does not support loops, recursion, or dynamic branches.
         if any(dep not in seen for dep in depends_on):
             raise PlanValidationError(f"step {step_id} may depend only on earlier steps")
+        referenced_steps = _collect_refs(args)
+        if not referenced_steps.issubset(set(depends_on)):
+            raise PlanValidationError(
+                f"step {step_id} must declare every referenced step in depends_on"
+            )
         output_fields = step.get("output_fields")
         if output_fields is not None and (
             not isinstance(output_fields, list)
@@ -121,6 +126,21 @@ def validate_plan(plan: Mapping[str, Any], *, max_steps: int = MAX_PLAN_STEPS,
         })
         seen.add(step_id)
     return {"version": PLAN_VERSION, "execution_id": execution_id, "steps": normalized}
+
+
+def _collect_refs(value: Any) -> set[str]:
+    """Return step IDs named by explicit references, without interpreting text."""
+    found: set[str] = set()
+    if isinstance(value, Mapping):
+        if set(value) == {"$ref"} and isinstance(value["$ref"], str):
+            found.add(value["$ref"].split(".", 1)[0])
+        else:
+            for item in value.values():
+                found.update(_collect_refs(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(_collect_refs(item))
+    return found
 
 
 def _resolve_refs(value: Any, results: Mapping[str, Any]) -> Any:
@@ -209,7 +229,12 @@ class DeclarativePlanInterpreter:
                 outcomes.append(StepOutcome(step_id, tool, "blocked", error=str(exc)))
                 return PlanOutcome(normalized["execution_id"], "blocked", tuple(outcomes))
 
-            decision = self._policy(tool, args)
+            try:
+                decision = self._policy(tool, args)
+            except Exception:
+                # A policy subsystem failure must fail closed, before dispatch.
+                outcomes.append(StepOutcome(step_id, tool, "blocked", error="policy_unavailable"))
+                return PlanOutcome(normalized["execution_id"], "blocked", tuple(outcomes))
             if decision == "approval_required":
                 outcomes.append(StepOutcome(step_id, tool, "approval_required"))
                 return PlanOutcome(normalized["execution_id"], "approval_required", tuple(outcomes))
