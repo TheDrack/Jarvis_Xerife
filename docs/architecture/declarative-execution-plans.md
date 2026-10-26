@@ -23,7 +23,7 @@ A value such as `{"$ref":"lookup.item_id"}` explicitly references a field from a
 
 ## Deliberate limitations
 
-This is a deterministic, in-process interpreter with a synchronous injected executor. It does not yet provide a durable execution journal, cross-process replay protection, pause/resume after approval, operation-level idempotency, connector timeout enforcement, or conditional branching. Do not use it for production mutations until those controls are integrated with the real policy gateway and durable state store.
+This is a deterministic, in-process interpreter with a synchronous injected executor. Optional event-sink hooks can record lifecycle events; they are only durable if the host supplies an append-only durable sink. The interpreter fails closed if journaling fails before dispatch and reports `unknown` if it cannot record a result after a possible side effect. Event records omit raw arguments. The elapsed-time budget is checked between steps and cannot preempt a currently running synchronous connector. Cross-process replay protection, pause/resume after approval, operation-level idempotency, hard connector timeouts, and conditional branching are still absent. Do not use it for production mutations until those controls are integrated with the real policy gateway and durable state store.
 
 Desktop actions must continue to use the existing verified visual-navigation adapter, which handles ambiguity, postconditions, and observations.
 
@@ -31,5 +31,5 @@ Desktop actions must continue to use the existing verified visual-navigation ada
 
 1. Unit-test plan validation and deterministic execution using fake connectors.
 2. Integrate a small, read-only connector allowlist and benchmark against direct tool calls.
-3. Add durable journaling, explicit approval resume, idempotency/reconciliation, and time/call budgets.
+3. Connect the event sink to a durable journal, then add replay protection, explicit approval resume, idempotency/reconciliation, and hard connector-call/time budgets.
 4. Only then consider mutating connectors and desktop recipe composition.
