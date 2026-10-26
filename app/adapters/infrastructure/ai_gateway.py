@@ -52,14 +52,17 @@ class AIGateway(NexusComponent):
     
     # Gemini Cannon Shot (External Fallback)
     DEFAULT_GEMINI_MODEL = "gemini-1.5-pro"  # Changed from gemini-flash-latest
+    DEFAULT_VENICE_MODEL = "venice-uncensored-1-2"
     
     def __init__(
         self,
         groq_api_key: Optional[str] = None,
         gemini_api_key: Optional[str] = None,
+        venice_api_key: Optional[str] = None,
         groq_high_gear_model: Optional[str] = None,
         groq_low_gear_model: Optional[str] = None,
         gemini_model: Optional[str] = None,
+        venice_model: Optional[str] = None,
         default_provider: LLMProvider = LLMProvider.GROQ,
         enable_auto_repair: bool = True,
         github_adapter: Optional[Any] = None,
@@ -72,9 +75,11 @@ class AIGateway(NexusComponent):
         Args:
             groq_api_key: Groq API key (defaults to GROQ_API_KEY env var)
             gemini_api_key: Gemini API key (defaults to GOOGLE_API_KEY or GEMINI_API_KEY env var)
+            venice_api_key: Venice API key (defaults to VENICE_API_KEY env var)
             groq_high_gear_model: High Gear model name (defaults to DEFAULT_HIGH_GEAR_MODEL or GROQ_MODEL env var)
             groq_low_gear_model: Low Gear model name (defaults to DEFAULT_LOW_GEAR_MODEL or GROQ_LOW_GEAR_MODEL env var)
             gemini_model: Gemini model name (defaults to DEFAULT_GEMINI_MODEL or GEMINI_MODEL env var)
+            venice_model: Venice model name (defaults to DEFAULT_VENICE_MODEL or VENICE_MODEL env var)
             default_provider: Default provider for routing (GROQ or GEMINI)
             enable_auto_repair: Enable auto-repair on critical errors
             github_adapter: Optional GitHubAdapter instance for auto-repair
@@ -103,6 +108,11 @@ class AIGateway(NexusComponent):
             or os.getenv("GEMINI_MODEL")
             or self.DEFAULT_GEMINI_MODEL
         )
+        self.venice_model = (
+            venice_model
+            or os.getenv("VENICE_MODEL")
+            or self.DEFAULT_VENICE_MODEL
+        )
         
         self.default_provider = default_provider
         self.enable_auto_repair = enable_auto_repair
@@ -114,6 +124,7 @@ class AIGateway(NexusComponent):
         # Get API keys from parameters or environment
         self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY")
         self.gemini_api_key = gemini_api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        self.venice_api_key = venice_api_key or os.getenv("VENICE_API_KEY")
         
         # Initialize tokenizer for token counting (use cached tokenizer)
         self.tokenizer = _get_tokenizer()
@@ -121,9 +132,11 @@ class AIGateway(NexusComponent):
         # Initialize providers
         self.groq_client = None
         self.gemini_client = None
+        self.venice_client = None
         
         self._initialize_groq()
         self._initialize_gemini()
+        self._initialize_venice()
         
         logger.info(
             f"AI Gateway initialized with Gears System:\n"
@@ -133,6 +146,7 @@ class AIGateway(NexusComponent):
             f"  - Default provider: {self.default_provider.value}\n"
             f"  - Groq available: {self.groq_client is not None}\n"
             f"  - Gemini available: {self.gemini_client is not None}\n"
+            f"  - Venice available: {self.venice_client is not None}\n"
             f"  - Auto-repair: {self.enable_auto_repair}"
         )
     
@@ -192,6 +206,21 @@ class AIGateway(NexusComponent):
         except Exception as e:
             logger.error(f"Failed to initialize Gemini client: {e}")
     
+    def _initialize_venice(self) -> None:
+        """Initialize the OpenAI-compatible Venice client when configured."""
+        if not self.venice_api_key:
+            logger.warning("Venice API key not provided. Venice provider will be unavailable.")
+            return
+        try:
+            from openai import OpenAI
+            self.venice_client = OpenAI(
+                api_key=self.venice_api_key,
+                base_url=os.getenv("VENICE_BASE_URL", "https://api.venice.ai/api/v1"),
+            )
+            logger.info("Venice client initialized successfully (%s)", self.venice_model)
+        except Exception as e:
+            logger.error("Failed to initialize Venice client: %s", e)
+
     def count_tokens(self, text: str) -> int:
         """
         Count tokens in the given text.
@@ -228,6 +257,8 @@ class AIGateway(NexusComponent):
                 return LLMProvider.GROQ
             elif force_provider == LLMProvider.GEMINI and self.gemini_client:
                 return LLMProvider.GEMINI
+            elif force_provider == LLMProvider.VENICE and self.venice_client:
+                return LLMProvider.VENICE
             logger.warning(f"Forced provider {force_provider} not available, using auto-selection")
         
         # Multimodal always goes to Gemini (Groq doesn't support it yet)
@@ -235,9 +266,11 @@ class AIGateway(NexusComponent):
             if self.gemini_client:
                 logger.info("Multimodal request detected, routing to Gemini")
                 return LLMProvider.GEMINI
-            else:
-                logger.error("Multimodal requested but Gemini not available")
-                raise ValueError("Multimodal analysis requires Gemini, but it's not available")
+            if self.venice_client:
+                logger.info("Multimodal request detected, routing to Venice")
+                return LLMProvider.VENICE
+            logger.error("Multimodal requested but no multimodal provider is available")
+            raise ValueError("Multimodal analysis requires Gemini or Venice, but neither is available")
         
         # Count tokens in payload
         token_count = self.count_tokens(payload)
@@ -251,6 +284,9 @@ class AIGateway(NexusComponent):
                     "escalating to Gemini"
                 )
                 return LLMProvider.GEMINI
+            elif self.venice_client:
+                logger.info("Large payload detected; routing to Venice")
+                return LLMProvider.VENICE
             else:
                 logger.warning(
                     f"Payload exceeds threshold but Gemini not available, using Groq"
@@ -265,6 +301,9 @@ class AIGateway(NexusComponent):
         if self.gemini_client:
             logger.debug("Groq not available, falling back to Gemini")
             return LLMProvider.GEMINI
+        if self.venice_client:
+            logger.debug("Groq and Gemini not available, falling back to Venice")
+            return LLMProvider.VENICE
         
         raise ValueError("No LLM providers available")
     
@@ -300,8 +339,10 @@ class AIGateway(NexusComponent):
         try:
             if provider == LLMProvider.GROQ:
                 return await self._generate_with_groq(messages, functions)
-            else:
+            elif provider == LLMProvider.GEMINI:
                 return await self._generate_with_gemini(messages, functions)
+            else:
+                return await self._generate_with_venice(messages, functions)
         except Exception as e:
             error_traceback = traceback.format_exc()
             
@@ -550,6 +591,36 @@ class AIGateway(NexusComponent):
             "model": self.gemini_model,
         }
     
+    async def _generate_with_venice(
+        self,
+        messages: List[Dict[str, str]],
+        functions: Optional[List[Any]] = None,
+    ) -> Dict[str, Any]:
+        """Generate a completion through Venice's OpenAI-compatible API."""
+        if not self.venice_client:
+            raise ValueError("Venice client not initialized")
+
+        request_params: Dict[str, Any] = {
+            "model": self.venice_model,
+            "messages": messages,
+        }
+        if functions:
+            tools = self._convert_functions_to_groq_tools(functions)
+            if tools:
+                request_params["tools"] = tools
+                request_params["tool_choice"] = "auto"
+
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: self.venice_client.chat.completions.create(**request_params),
+        )
+        return {
+            "provider": LLMProvider.VENICE.value,
+            "response": response,
+            "model": self.venice_model,
+        }
+
     def _convert_functions_to_groq_tools(self, functions: List[Any]) -> List[Dict[str, Any]]:
         """
         Convert Gemini function declarations to Groq's tool format.
@@ -675,6 +746,20 @@ class AIGateway(NexusComponent):
                 logger.info("Gemini rate limit reached, falling back to Groq")
                 response = await self._generate_with_groq(messages, functions)
                 response["fallback_from"] = LLMProvider.GEMINI.value
+                return response
+            if self.venice_client:
+                response = await self._generate_with_venice(messages, functions)
+                response["fallback_from"] = LLMProvider.GEMINI.value
+                return response
+        elif failed_provider == LLMProvider.VENICE:
+            if self.groq_client:
+                response = await self._generate_with_groq(messages, functions)
+            elif self.gemini_client:
+                response = await self._generate_with_gemini(messages, functions)
+            else:
+                response = None
+            if response is not None:
+                response["fallback_from"] = LLMProvider.VENICE.value
                 return response
         
         # No fallback available
