@@ -37,6 +37,7 @@ class AgentTaskQueueService:
         agent_id: str,
         runtime_version: str = "unknown",
         environment: str = "unknown",
+        model_provider: str = "unknown",
         available_tools: list[str] | None = None,
         status: str = "available",
         concurrency_limit: int = 1,
@@ -52,17 +53,18 @@ class AgentTaskQueueService:
         with self.engine.begin() as conn:
             row = conn.execute(text("""
                 insert into public.jarvis_agents (
-                    agent_id, runtime_version, environment, available_tools, status,
+                    agent_id, runtime_version, environment, model_provider, available_tools, status,
                     concurrency_limit, estimated_cost, coordination_cost,
                     estimated_latency_seconds, last_seen_at, updated_at
                 ) values (
-                    :agent_id, :runtime_version, :environment, cast(:available_tools as jsonb),
+                    :agent_id, :runtime_version, :environment, :model_provider, cast(:available_tools as jsonb),
                     :status, :concurrency_limit, :estimated_cost, :coordination_cost,
                     :estimated_latency_seconds, now(), now()
                 )
                 on conflict (agent_id) do update set
                     runtime_version = excluded.runtime_version,
                     environment = excluded.environment,
+                    model_provider = excluded.model_provider,
                     available_tools = excluded.available_tools,
                     status = case
                         when public.jarvis_agents.status = 'busy' and excluded.status = 'available'
@@ -77,6 +79,7 @@ class AgentTaskQueueService:
                 "agent_id": agent_id,
                 "runtime_version": runtime_version,
                 "environment": environment,
+                "model_provider": (model_provider or "unknown").strip().lower(),
                 "available_tools": self._json(available_tools or []),
                 "status": status,
                 "concurrency_limit": concurrency_limit,

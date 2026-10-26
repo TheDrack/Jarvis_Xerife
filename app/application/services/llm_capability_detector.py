@@ -374,7 +374,7 @@ Be conservative - only mark as "complete" if you see clear, working implementati
         provider = result.get("provider")
         response = result.get("response")
         
-        if provider == "groq":
+        if provider in ("groq", "venice"):
             if hasattr(response, "choices") and response.choices:
                 choice = response.choices[0]
                 if hasattr(choice, "message") and hasattr(choice.message, "content"):
@@ -476,6 +476,8 @@ Be conservative - only mark as "complete" if you see clear, working implementati
             return LLMProvider.GROQ
         if provider_setting == "gemini":
             return LLMProvider.GEMINI
+        if provider_setting == "venice":
+            return LLMProvider.VENICE
         return None
 
 

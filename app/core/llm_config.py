@@ -106,7 +106,7 @@ class LLMConfig:
             valid = False
 
         # Check provider values
-        valid_providers = ["groq", "gemini", "auto"]
+        valid_providers = ["groq", "gemini", "venice", "auto"]
         if cls.command_llm_provider() not in valid_providers:
             logger.warning(
                 f"Invalid COMMAND_LLM_PROVIDER: {cls.command_llm_provider()}. "

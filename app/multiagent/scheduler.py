@@ -11,13 +11,20 @@ class NoEligibleAgentError(RuntimeError):
     """Raised when no registered agent can safely accept a task."""
 
 
+_VENICE_REQUIRED_TASK_TYPES = frozenset({"red_team", "blue_team"})
+
+
+def _normalize_task_type(task_type: str) -> str:
+    return task_type.strip().lower().replace("-", "_").replace(" ", "_")
+
+
 @dataclass(frozen=True)
 class CostBenefitScheduler:
-    """Choose the lowest-cost eligible agent with the best expected utility.
+    """Choose the best eligible agent while enforcing role-specific providers.
 
-    This is a deterministic baseline, not an LLM role classifier. The leader
-    decomposes the objective into TaskSpec objects and labels each task_type.
-    Scores improve as real per-task-type success and cost telemetry is recorded.
+    The leader labels task_type before dispatch. Red/Blue Team tasks require an
+    agent whose runtime advertises Venice as its configured model provider;
+    these tasks never fall back to another provider or another role candidate.
     """
 
     latency_cost_per_second: float = 0.001
@@ -36,16 +43,22 @@ class CostBenefitScheduler:
         *,
         leader_id: str,
     ) -> TaskAssignment:
-        """Assign a task to any eligible agent, including the leader itself."""
+        """Assign to the best eligible agent, including the leader itself."""
         if not leader_id.strip():
             raise ValueError("leader_id must not be empty")
 
+        normalized_type = _normalize_task_type(task.task_type)
+        required_provider = (
+            "venice" if normalized_type in _VENICE_REQUIRED_TASK_TYPES else None
+        )
         candidates: list[tuple[float, str, AgentProfile, float, float]] = []
         required = set(task.required_tools)
         for agent in agents:
             if agent.status != "available" or agent.active_tasks >= agent.concurrency_limit:
                 continue
             if not required.issubset(set(agent.available_tools)):
+                continue
+            if required_provider and agent.model_provider.strip().lower() != required_provider:
                 continue
 
             estimated_cost = agent.estimated_cost + agent.coordination_cost
@@ -59,18 +72,19 @@ class CostBenefitScheduler:
                 estimated_cost
                 + agent.estimated_latency_seconds * self.latency_cost_per_second
             )
-            # A small epsilon keeps zero-cost tasks scoreable without pretending
-            # that a score is a calibrated probability.
             score = task.expected_value * success_probability / (effective_cost + 1e-9)
             candidates.append((score, agent.agent_id, agent, estimated_cost, success_probability))
 
         if not candidates:
+            provider_note = (
+                " Red/Blue Team tasks require an available Venice-configured agent."
+                if required_provider else ""
+            )
             raise NoEligibleAgentError(
                 f"No available agent satisfies task {task.task_id!r}; "
-                "check status, concurrency, tools, and budget."
+                f"check status, concurrency, tools, budget, and model provider.{provider_note}"
             )
 
-        # Highest utility first; stable ID tie-break makes tests and replay deterministic.
         score, _, selected, estimated_cost, success_probability = sorted(
             candidates, key=lambda row: (-row[0], row[1])
         )[0]
@@ -89,4 +103,5 @@ class CostBenefitScheduler:
             estimated_success_probability=success_probability,
             score=score,
             parent_task_id=task.parent_task_id,
+            required_model_provider=required_provider,
         )

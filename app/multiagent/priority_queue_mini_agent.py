@@ -85,6 +85,7 @@ class PriorityQueueMiniAgent:
                 "agent_id": self.agent_id,
                 "runtime_version": "jarvis-freellmapi-mini/1",
                 "environment": "local",
+                "model_provider": os.getenv("FREELLMAPI_PROVIDER", "unknown").strip().lower(),
                 "available_tools": ["text_reasoning"],
                 "status": "available",
                 "concurrency_limit": 1,
