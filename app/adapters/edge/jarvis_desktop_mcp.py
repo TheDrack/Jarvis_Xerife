@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """Local MCP server exposing the interactive Windows desktop to an MCP host.
 
 Run from the repository root with:
