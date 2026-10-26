@@ -386,12 +386,13 @@ class AIGateway(NexusComponent):
                             if self.gemini_client:
                                 logger.warning("🚀 Firing Cannon Shot (Tiro de Canhão): Gemini")
                                 return await self._handle_rate_limit_fallback(provider, messages, functions)
-                            else:
-                                # No Gemini available, raise proper error
-                                raise ValueError(
-                                    f"Rate limit reached on {provider.value} (both High and Low Gear) "
-                                    "and no fallback provider available"
-                                ) from low_gear_error
+                            if self.venice_client:
+                                logger.warning("Venice fallback after both Groq gears hit rate limits")
+                                return await self._handle_rate_limit_fallback(provider, messages, functions)
+                            raise ValueError(
+                                f"Rate limit reached on {provider.value} (both High and Low Gear) "
+                                "and no fallback provider available"
+                            ) from low_gear_error
                         else:
                             # Different error in Low Gear, re-raise
                             raise
