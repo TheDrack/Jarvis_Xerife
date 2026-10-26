@@ -54,6 +54,7 @@ async def test_generate_completion_uses_venice_openai_compatible_client():
     gateway = make_gateway()
     gateway.venice_client = Mock()
     completion = Mock()
+    completion.choices = [Mock()]
     completion.choices[0].message.content = "Venice response"
     gateway.venice_client.chat.completions.create.return_value = completion
 
