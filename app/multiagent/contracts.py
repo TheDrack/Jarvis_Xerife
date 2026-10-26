@@ -24,6 +24,7 @@ class TaskStatus(str, Enum):
 class AgentProfile:
     """Current advertised runtime capabilities and measured performance.
 
+    model_provider identifies the provider actually configured for this agent.
     Tool availability is descriptive, not an authorization grant. The receiving
     runtime must still authorize each tool invocation independently.
     """
@@ -38,6 +39,7 @@ class AgentProfile:
     success_rates: Mapping[str, float] = field(default_factory=dict)
     estimated_latency_seconds: float = 0.0
     environment: str = "unknown"
+    model_provider: str = "unknown"
 
     def __post_init__(self) -> None:
         if not self.agent_id.strip():
@@ -50,6 +52,8 @@ class AgentProfile:
             raise ValueError("latency must be non-negative")
         if any(not 0.0 <= float(rate) <= 1.0 for rate in self.success_rates.values()):
             raise ValueError("success rates must be between 0 and 1")
+        if not isinstance(self.model_provider, str) or not self.model_provider.strip():
+            raise ValueError("model_provider must be a non-empty string")
 
 
 @dataclass(frozen=True)
@@ -103,6 +107,7 @@ class TaskAssignment:
     score: float
     status: TaskStatus = TaskStatus.CLAIMED
     parent_task_id: str | None = None
+    required_model_provider: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable envelope for MCP, HTTP, or a task queue."""
@@ -122,4 +127,5 @@ class TaskAssignment:
             "score": self.score,
             "status": self.status.value,
             "parent_task_id": self.parent_task_id,
+            "required_model_provider": self.required_model_provider,
         }
