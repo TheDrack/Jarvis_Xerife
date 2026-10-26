@@ -1,4 +1,4 @@
-﻿import subprocess
+import subprocess
 from app.adapters.edge import android_connection_adapter as connection
 
 
