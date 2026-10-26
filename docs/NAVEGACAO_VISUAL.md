@@ -41,7 +41,7 @@ A receita aceita até 20 passos, mas mantenha cada chamada curta. Cada passo pre
 
 ## Observação e acompanhamento
 
-`watch_screen` retorna uma sequência finita de quadros capturados por alguns segundos, não um fluxo contínuo de vídeo. No caminho antigo da API/LLM, a captura é devolvida ao cliente e não entra automaticamente numa segunda inferência. No novo caminho MCP, `observe_screen`, `run_visual_recipe` e as ações retornam blocos MCP de imagem diretamente ao modelo; ele pode inspecionar a tela, escolher a próxima ferramenta e repetir o ciclo observe/act/verify. O host MCP recebe as imagens para incluí-las no contexto da chamada.
+`watch_screen` retorna uma sequência finita de quadros capturados por alguns segundos, não um fluxo contínuo de vídeo. No caminho MCP, `observe_screen` retorna a imagem para inspeção. `run_visual_recipe` verifica cada etapa internamente e, quando termina com `status=completed`, retorna apenas o resultado estruturado — sem anexar uma captura final redundante. Em falhas ou resultados incertos, a captura continua sendo devolvida como evidência para recuperação. Ações pontuais sem verificação própria continuam retornando observação para que o agente possa inspecionar o estado.
 
 ## Agente local e ponte
 
