@@ -111,3 +111,24 @@ def test_oversized_plan_rejected():
     oversized = make_plan(make_step("a", args={"text": "x" * 500}))
     with pytest.raises(PlanValidationError):
         validate_plan(oversized, max_plan_bytes=100)
+
+
+def test_reference_requires_explicit_dependency():
+    candidate = make_plan(
+        make_step("read"),
+        make_step("write", "update", {"id": {"$ref": "read.id"}}),
+    )
+    with pytest.raises(PlanValidationError, match="depends_on"):
+        validate_plan(candidate)
+
+
+def test_policy_error_fails_closed_before_tool_call():
+    calls = []
+    interpreter = DeclarativePlanInterpreter(
+        {"mutate": lambda args: calls.append(args)},
+        lambda _tool, _args: (_ for _ in ()).throw(RuntimeError("policy unavailable")),
+    )
+    result = interpreter.execute(make_plan(make_step("write", "mutate")))
+    assert result.status == "blocked"
+    assert result.steps[0].error == "policy_unavailable"
+    assert calls == []
