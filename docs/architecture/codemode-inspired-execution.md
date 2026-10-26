@@ -72,10 +72,10 @@ Do not infer success from token reduction alone. A change is accepted only if ef
 
 ## Rollout stages
 
-1. Harden existing batch operations and remove redundant successful-result payloads. **Implemented in this increment; CI validation pending.**
-2. Add a pure, schema-validated plan contract and deterministic interpreter with fake connectors and adversarial tests.
-3. Add a policy gateway, durable execution journal, idempotency/reconciliation rules, and approval pause/resume.
-4. Integrate the plan interpreter with a small allowlisted MCP subset; benchmark against direct calls.
-5. Add desktop recipe composition only after replay and uncertain-action recovery are covered by tests.
+1. Harden existing batch operations and remove redundant successful-result payloads. **Merged in PR #606.**
+2. Add a pure, schema-validated plan contract and deterministic interpreter with fake connectors and adversarial tests. **Implemented in the current branch; CI validation pending.**
+3. Add a durable execution journal, idempotency/reconciliation rules, bounded runtime budgets, and approval pause/resume.
+4. Integrate the plan interpreter with a small read-only allowlisted connector subset; benchmark against direct calls.
+5. Consider mutating connectors and desktop recipe composition only after replay and uncertain-action recovery are covered by tests.
 
 No generic arbitrary-code executor is introduced by this increment.

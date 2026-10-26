@@ -9,6 +9,7 @@ from .worker import AgentWorker
 from .freellmapi_client import FreeLLMAPIClient, FreeLLMAPIError
 from .freellmapi_handler import FreeLLMAgentHandler
 from .priority_queue_mini_agent import PriorityQueueMiniAgent
+from .execution_plan import DeclarativePlanInterpreter, PlanOutcome, PlanValidationError, StepOutcome, validate_plan
 
 __all__ = [
     "AgentProfile",
@@ -28,4 +29,9 @@ __all__ = [
     "FreeLLMAPIError",
     "FreeLLMAgentHandler",
     "PriorityQueueMiniAgent",
+    "DeclarativePlanInterpreter",
+    "PlanOutcome",
+    "PlanValidationError",
+    "StepOutcome",
+    "validate_plan",
 ]
