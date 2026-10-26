@@ -179,6 +179,67 @@ def test_postcondition_must_transition_from_baseline_count():
     assert _postcondition_transitioned(1, 2) is True
 
 
+def test_template_recipe_rejects_preexisting_semantic_postcondition(tmp_path, monkeypatch):
+    gui = FakePyAutoGUI(Image.new("RGB", (160, 90), (30, 80, 150)))
+    adapter = VisualNavigationAdapter(
+        pyautogui_module=gui,
+        template_dir=tmp_path / "templates",
+        screenshot_dir=tmp_path / "captures",
+    )
+
+    class Box:
+        x, y = 40, 20
+
+    counts = iter([1, 1, 1, 1])
+    monkeypatch.setattr(adapter, "_find_unique", lambda image, template_id, confidence: ("found", object()))
+    monkeypatch.setattr(adapter._gui(), "center", lambda match: Box())
+    monkeypatch.setattr(adapter, "_invoke_accessible_at", lambda x, y: {"success": True, "status": "invoked"})
+    monkeypatch.setattr(adapter, "_count_accessible_name", lambda name: next(counts, 1))
+
+    result = adapter.run_recipe([{
+        "template_id": "save_button",
+        "verify_template_id": "saved_state",
+        "expected_name_after": "Salvo",
+        "wait_ms": 0,
+        "verify_timeout_seconds": 0.2,
+    }])
+
+    assert result["success"] is False
+    assert result["status"] == "postcondition_preexisting"
+    assert result["baseline_match_count"] == 1
+    assert result["completed_steps"] == []
+
+
+def test_template_recipe_accepts_new_semantic_postcondition(tmp_path, monkeypatch):
+    gui = FakePyAutoGUI(Image.new("RGB", (160, 90), (30, 80, 150)))
+    adapter = VisualNavigationAdapter(
+        pyautogui_module=gui,
+        template_dir=tmp_path / "templates",
+        screenshot_dir=tmp_path / "captures",
+    )
+
+    class Box:
+        x, y = 40, 20
+
+    counts = iter([0, 1])
+    monkeypatch.setattr(adapter, "_find_unique", lambda image, template_id, confidence: ("found", object()))
+    monkeypatch.setattr(adapter._gui(), "center", lambda match: Box())
+    monkeypatch.setattr(adapter, "_invoke_accessible_at", lambda x, y: {"success": True, "status": "invoked"})
+    monkeypatch.setattr(adapter, "_count_accessible_name", lambda name: next(counts, 1))
+
+    result = adapter.run_recipe([{
+        "template_id": "save_button",
+        "verify_template_id": "saved_state",
+        "expected_name_after": "Salvo",
+        "wait_ms": 0,
+        "verify_timeout_seconds": 0.2,
+    }])
+
+    assert result["success"] is True
+    assert result["status"] == "completed"
+    assert result["completed_steps"][0]["verified_by"] == "Salvo"
+
+
 def test_cli_skips_screenshot_after_semantic_success():
     from app.adapters.edge.jarvis_desktop_cli import _with_screenshot_on_uncertain
 
