@@ -32,6 +32,7 @@ class SupabaseAgentStore:
             "agent_id": profile.agent_id,
             "runtime_version": runtime_version,
             "environment": environment or profile.environment,
+            "model_provider": profile.model_provider.lower(),
             "available_tools": list(profile.available_tools),
             "status": profile.status,
             "active_tasks": profile.active_tasks,
@@ -70,6 +71,7 @@ class SupabaseAgentStore:
                     success_rates=record.get("success_rates") or {},
                     estimated_latency_seconds=float(record.get("estimated_latency_seconds") or 0),
                     environment=record.get("environment", "unknown"),
+                    model_provider=record.get("model_provider", "unknown"),
                 )
             )
         return profiles
