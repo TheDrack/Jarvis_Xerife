@@ -204,7 +204,9 @@ class TaskRunner(NexusComponent):
         return {"success": outcome.status == "completed", **outcome.to_dict()}
 
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Any:
-        """Execute a list of Nexus tasks from context (legacy API)."""
+        """Dispatch declarative plans or preserve the legacy Nexus tasks API."""
+        if context and "plan" in context:
+            return self.execute_plan(context)
         if not context or "tasks" not in context:
             logger.error("TaskRunner: Nenhuma tarefa recebida.")
             return {"success": False, "error": "No tasks provided"}
