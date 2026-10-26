@@ -199,9 +199,13 @@ def _content(result: dict[str, Any], *, include_frames: bool = True) -> list[Any
     return blocks
 
 
-def _observe_after_action(result: dict[str, Any]) -> dict[str, Any]:
-    """Attach a fresh screen to successful actions, or keep the failure screenshot."""
+def _observe_after_action(
+    result: dict[str, Any], *, include_success_screenshot: bool = True
+) -> dict[str, Any]:
+    """Attach a screen when useful; verified batch actions avoid redundant image payloads."""
     if result.get("screenshot_path"):
+        return result
+    if result.get("success") and not include_success_screenshot:
         return result
     observation = navigator.observe_screen()
     return {**observation, **result}
@@ -230,7 +234,11 @@ def run_visual_recipe(steps: list[dict[str, Any]]) -> list[Any]:
     Keep recipes short; each step requires template_id and verify_template_id.
     """
     result = navigator.run_recipe(steps)
-    return _content(_observe_after_action(result))
+    # A completed recipe already verified each postcondition. Avoid sending a
+    # redundant final screenshot; uncertain/failed recipes still include evidence.
+    return _content(_observe_after_action(
+        result, include_success_screenshot=result.get("status") != "completed"
+    ))
 
 
 @mcp.tool()
