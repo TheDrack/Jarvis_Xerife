@@ -55,11 +55,33 @@ class PlanOutcome:
         }
 
 
+def _assert_json_value(value: Any, path: str = "value") -> None:
+    """Reject Python-only values that JSON encoding would silently coerce."""
+    if value is None or isinstance(value, (str, bool, int)):
+        return
+    if isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            raise PlanValidationError(f"{path} must be finite")
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _assert_json_value(item, f"{path}[{index}]")
+        return
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise PlanValidationError(f"{path} object keys must be strings")
+            _assert_json_value(item, f"{path}.{key}")
+        return
+    raise PlanValidationError(f"{path} contains a non-JSON value")
+
+
 def validate_plan(plan: Mapping[str, Any], *, max_steps: int = MAX_PLAN_STEPS,
                   max_plan_bytes: int = MAX_PLAN_BYTES) -> dict[str, Any]:
     """Validate a JSON-compatible, strictly shaped plan before any side effect."""
     if not isinstance(plan, Mapping):
         raise PlanValidationError("plan must be an object")
+    _assert_json_value(plan, "plan")
     try:
         encoded = json.dumps(plan, allow_nan=False, separators=(",", ":")).encode("utf-8")
     except (TypeError, ValueError) as exc:
@@ -170,6 +192,7 @@ _MISSING = object()
 
 def _project_result(result: Any, fields: list[str] | None) -> Any:
     """Keep downstream context small; full artifacts should be referenced by URI."""
+    _assert_json_value(result, "tool result")
     try:
         json.dumps(result, allow_nan=False)
     except (TypeError, ValueError) as exc:
