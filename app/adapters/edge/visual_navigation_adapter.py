@@ -284,17 +284,19 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
                 "rectangle": [rect.left, rect.top, rect.right, rect.bottom]}
 
     @staticmethod
-    def _count_accessible_name(expected_name: str) -> int:
-        """Count visible UIA elements with an exact accessible name."""
+    def _count_accessible_name(expected_name: str, window_title_contains: str = "") -> int:
+        """Count visible UIA elements with an exact name, optionally scoped to windows."""
         from pywinauto import Desktop
 
         expected = str(expected_name or "").strip().casefold()
+        title_filter = str(window_title_contains or "").strip().casefold()
         if not expected:
             return 0
         count = 0
         for window in Desktop(backend="uia").windows():
             try:
-                if not window.is_visible():
+                title = window.window_text()
+                if not window.is_visible() or (title_filter and title_filter not in title.casefold()):
                     continue
                 for item in window.descendants():
                     try:
@@ -378,7 +380,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
             baseline_count = None
             if expected_name:
                 try:
-                    baseline_count = self._count_accessible_name(expected_name)
+                    baseline_count = self._count_accessible_name(expected_name, str(step.get("window_title_contains", "")))
                 except Exception as exc:
                     if not verify_id:
                         return {
@@ -436,7 +438,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
             while time.monotonic() < deadline:
                 if expected_name and baseline_count is not None:
                     try:
-                        observed_count = self._count_accessible_name(expected_name)
+                        observed_count = self._count_accessible_name(expected_name, str(step.get("window_title_contains", "")))
                         verified = _postcondition_transitioned(baseline_count, observed_count)
                     except Exception:
                         verified = False
