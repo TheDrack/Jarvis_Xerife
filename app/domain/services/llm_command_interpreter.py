@@ -201,7 +201,7 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
         provider = result.get("provider")
         response = result.get("response")
         
-        if provider == "groq":
+        if provider in ("groq", "venice"):
             if hasattr(response, "choices") and response.choices:
                 choice = response.choices[0]
                 if hasattr(choice, "message") and hasattr(choice.message, "content"):
@@ -299,6 +299,8 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
             return LLMProvider.GROQ
         if provider_setting == "gemini":
             return LLMProvider.GEMINI
+        if provider_setting == "venice":
+            return LLMProvider.VENICE
         return None
 
     def is_exit_command(self, raw_input: str) -> bool:
