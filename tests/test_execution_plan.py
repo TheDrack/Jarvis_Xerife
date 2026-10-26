@@ -38,8 +38,9 @@ def test_references_use_only_projected_payload():
 ])
 def test_invalid_plan_rejected_before_dispatch(bad_plan):
     calls = []
+    interpreter = DeclarativePlanInterpreter({"lookup": lambda args: calls.append(args)}, allow_all)
     with pytest.raises(PlanValidationError):
-        validate_plan(bad_plan)
+        interpreter.execute(bad_plan)
     assert calls == []
 
 
