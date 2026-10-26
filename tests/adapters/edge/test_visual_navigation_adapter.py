@@ -194,7 +194,7 @@ def test_template_recipe_rejects_preexisting_semantic_postcondition(tmp_path, mo
     monkeypatch.setattr(adapter, "_find_unique", lambda image, template_id, confidence: ("found", object()))
     monkeypatch.setattr(adapter._gui(), "center", lambda match: Box())
     monkeypatch.setattr(adapter, "_invoke_accessible_at", lambda x, y: {"success": True, "status": "invoked"})
-    monkeypatch.setattr(adapter, "_count_accessible_name", lambda name: next(counts, 1))
+    monkeypatch.setattr(adapter, "_count_accessible_name", lambda name, window_title_contains="": next(counts, 1))
 
     result = adapter.run_recipe([{
         "template_id": "save_button",
