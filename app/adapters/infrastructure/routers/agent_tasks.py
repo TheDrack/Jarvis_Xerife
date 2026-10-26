@@ -18,6 +18,7 @@ class AgentHeartbeatRequest(BaseModel):
     agent_id: str = Field(min_length=1, max_length=200)
     runtime_version: str = "unknown"
     environment: str = "unknown"
+    model_provider: str = "unknown"
     available_tools: list[str] = Field(default_factory=list)
     status: str = "available"
     concurrency_limit: int = Field(default=1, ge=1, le=64)
