@@ -81,11 +81,11 @@ def validate_plan(plan: Mapping[str, Any], *, max_steps: int = MAX_PLAN_STEPS,
     """Validate a JSON-compatible, strictly shaped plan before any side effect."""
     if not isinstance(plan, Mapping):
         raise PlanValidationError("plan must be an object")
-    _assert_json_value(plan, "plan")
     try:
         encoded = json.dumps(plan, allow_nan=False, separators=(",", ":")).encode("utf-8")
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, RecursionError) as exc:
         raise PlanValidationError("plan must contain only finite JSON values") from exc
+    _assert_json_value(plan, "plan")
     if len(encoded) > max_plan_bytes:
         raise PlanValidationError("plan exceeds maximum serialized size")
     if set(plan) != {"version", "execution_id", "steps"}:
