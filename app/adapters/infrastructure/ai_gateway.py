@@ -365,8 +365,8 @@ class AIGateway(NexusComponent):
                 )
                 
                 # Try to fallback to Gemini if available
-                if provider == LLMProvider.GROQ and self.gemini_client:
-                    logger.warning("Tentando fallback para Gemini devido a modelo descomissionado")
+                if provider == LLMProvider.GROQ and (self.gemini_client or self.venice_client):
+                    logger.warning("Tentando fallback após modelo Groq descomissionado")
                     return await self._handle_rate_limit_fallback(provider, messages, functions)
                 raise ValueError(error_msg) from e
             
@@ -739,6 +739,11 @@ class AIGateway(NexusComponent):
             if self.gemini_client:
                 logger.info("Groq rate limit reached, falling back to Gemini")
                 response = await self._generate_with_gemini(messages, functions)
+                response["fallback_from"] = LLMProvider.GROQ.value
+                return response
+            if self.venice_client:
+                logger.info("Groq rate limit reached, falling back to Venice")
+                response = await self._generate_with_venice(messages, functions)
                 response["fallback_from"] = LLMProvider.GROQ.value
                 return response
         elif failed_provider == LLMProvider.GEMINI:
