@@ -60,3 +60,16 @@ O processo hospedeiro deve repetir o ciclo com backoff, shutdown limpo e heartbe
 O gateway FreeLLMAPI continua em loopback no PC. Não execute este worker no Render esperando que ele consiga acessar `127.0.0.1:3001` do computador local.
 
 Para autenticação do worker, prefira configurar `JARVIS_TASK_QUEUE_USERNAME` e `JARVIS_TASK_QUEUE_PASSWORD` por um gerenciador seguro de segredos: o worker obtém o JWT no endpoint `/token` e renova após HTTP 401. Alternativamente, `JARVIS_TASK_QUEUE_API_TOKEN` pode ser usado enquanto válido, mas um token JWT expira e precisa ser rotacionado externamente.
+
+
+## Venice Uncensored 1.2 (roteador principal e miniagentes)
+
+O Venice é um provedor opcional do `AIGateway`; a configuração padrão continua sendo Groq. Gemini permanece como primeira opção para contexto longo quando disponível, e Venice é usado quando explicitamente selecionado, como fallback de disponibilidade, ou quando o roteador precisa de inferência multimodal e Gemini não está configurado.
+
+- `VENICE_API_KEY`: chave da API Venice (não versionar).
+- `VENICE_MODEL=venice-uncensored-1-2`
+- `VENICE_BASE_URL=https://api.venice.ai/api/v1`
+
+O SDK OpenAI é usado apenas como cliente compatível com a API Venice. Para usar o Venice no worker FreeLLMAPI, configure também `FREELLMAPI_BASE_URL=https://api.venice.ai/api/v1`, `FREELLMAPI_API_KEY` com o valor da chave Venice e `FREELLMAPI_MODEL=venice-uncensored-1-2`. A configuração do miniagente é independente da do roteador principal. A ausência da chave Venice não desativa nem altera Groq/Gemini.
+
+Referência oficial: https://docs.venice.ai/api-reference/api-spec
