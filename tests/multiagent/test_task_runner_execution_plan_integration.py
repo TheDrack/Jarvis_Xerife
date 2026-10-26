@@ -58,7 +58,7 @@ def build_runner(monkeypatch, *, authorizer=None, capability=None, sink=None):
 def test_task_runner_executes_plan_through_nexus_capability(monkeypatch):
     events = []
     runner, capability = build_runner(monkeypatch, sink=events.append)
-    result = runner.execute_plan({"plan": plan(args={"query": "safe"}), "user": "test-user"})
+    result = runner.execute({"plan": plan(args={"query": "safe"}), "user": "test-user"})
     assert result["success"] is True
     assert result["status"] == "completed"
     assert capability.calls == [{"query": "safe"}]
