@@ -223,7 +223,7 @@ Be specific and actionable. This will guide automated agents in making changes.
         provider = result.get("provider")
         response = result.get("response")
         
-        if provider == "groq":
+        if provider in ("groq", "venice"):
             if hasattr(response, "choices") and response.choices:
                 choice = response.choices[0]
                 if hasattr(choice, "message") and hasattr(choice.message, "content"):
