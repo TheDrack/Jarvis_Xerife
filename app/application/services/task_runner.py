@@ -177,26 +177,26 @@ class TaskRunner(NexusComponent):
             except Exception:
                 return "deny"
 
-        class LiveNexusExecutors(dict):
-            def __contains__(self, tool):
-                return isinstance(tool, str) and authorizer.is_allowed(tool)
+        def make_dispatch(tool):
+            def dispatch(args):
+                capability = nexus.resolve(tool)
+                if not capability or getattr(capability, "__is_cloud_mock__", False):
+                    raise RuntimeError("capability_unavailable")
+                execute = getattr(capability, "execute", None)
+                if not callable(execute):
+                    raise RuntimeError("capability_not_executable")
+                return execute(dict(args))
+            return dispatch
 
-            def __getitem__(self, tool):
-                if not authorizer.is_allowed(tool):
-                    raise KeyError(tool)
-
-                def dispatch(args):
-                    capability = nexus.resolve(tool)
-                    if not capability or getattr(capability, "__is_cloud_mock__", False):
-                        raise RuntimeError("capability_unavailable")
-                    execute = getattr(capability, "execute", None)
-                    if not callable(execute):
-                        raise RuntimeError("capability_not_executable")
-                    return execute(dict(args))
-                return dispatch
+        # Snapshot only the host-configured allowlist; plans cannot add tools.
+        executors = {
+            name: make_dispatch(name)
+            for name in getattr(authorizer, "_allowlist", set())
+            if isinstance(name, str) and name
+        }
 
         interpreter = DeclarativePlanInterpreter(
-            LiveNexusExecutors(),
+            executors,
             policy,
             event_sink=self._plan_event_sink,
         )
