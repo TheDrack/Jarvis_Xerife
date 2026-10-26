@@ -61,15 +61,20 @@ O gateway FreeLLMAPI continua em loopback no PC. Não execute este worker no Ren
 
 Para autenticação do worker, prefira configurar `JARVIS_TASK_QUEUE_USERNAME` e `JARVIS_TASK_QUEUE_PASSWORD` por um gerenciador seguro de segredos: o worker obtém o JWT no endpoint `/token` e renova após HTTP 401. Alternativamente, `JARVIS_TASK_QUEUE_API_TOKEN` pode ser usado enquanto válido, mas um token JWT expira e precisa ser rotacionado externamente.
 
+## Venice Uncensored 1.2
 
-## Venice Uncensored 1.2 (roteador principal e miniagentes)
-
-O Venice é um provedor opcional do `AIGateway`; a configuração padrão continua sendo Groq. Gemini permanece como primeira opção para contexto longo quando disponível, e Venice é usado quando explicitamente selecionado, como fallback de disponibilidade, ou quando o roteador precisa de inferência multimodal e Gemini não está configurado.
+O Venice é um provedor opcional do `AIGateway`; a configuração padrão continua sendo Groq. Para o roteador principal:
 
 - `VENICE_API_KEY`: chave da API Venice (não versionar).
 - `VENICE_MODEL=venice-uncensored-1-2`
 - `VENICE_BASE_URL=https://api.venice.ai/api/v1`
 
-O SDK OpenAI é usado apenas como cliente compatível com a API Venice. Para usar o Venice no worker FreeLLMAPI, configure também `FREELLMAPI_BASE_URL=https://api.venice.ai/api/v1`, `FREELLMAPI_API_KEY` com o valor da chave Venice e `FREELLMAPI_MODEL=venice-uncensored-1-2`. A configuração do miniagente é independente da do roteador principal. A ausência da chave Venice não desativa nem altera Groq/Gemini.
+Para usar Venice diretamente no worker FreeLLMAPI, configure `FREELLMAPI_BASE_URL=https://api.venice.ai/api/v1`, `FREELLMAPI_API_KEY` com o valor da chave Venice e `FREELLMAPI_MODEL=venice-uncensored-1-2`. Essa configuração é independente da chave do roteador principal.
 
-Referência oficial: https://docs.venice.ai/api-reference/api-spec
+## Delegação por papel de segurança
+
+A liderança continua decidindo dinamicamente qual agente recebe cada tarefa. Não existem agentes permanentemente fixos como Red Team ou Blue Team. Para tarefas com `task_type` igual a `red_team` ou `blue_team` (aceita variação de maiúsculas, espaços e hífens), o scheduler só considera perfis cujo `model_provider` anunciado seja `venice`.
+
+O envelope de atribuição inclui `required_model_provider: "venice"`. Se nenhum agente Venice estiver disponível, elegível em capacidade, ferramentas e orçamento, a atribuição falha explicitamente com `NoEligibleAgentError`; não há fallback para Groq, Gemini ou outro provedor. Para todos os demais tipos de tarefa, a seleção de agente/provedor permanece como antes.
+
+O valor `model_provider` do perfil deve refletir o provedor realmente configurado no runtime do agente, e não apenas uma preferência declarada pelo líder. O runtime que executa o agente é responsável por impedir fallback interno para outro provedor durante a tarefa protegida.
