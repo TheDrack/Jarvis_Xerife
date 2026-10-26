@@ -58,16 +58,19 @@ def test_supabase_store_maps_shared_agent_and_task_contracts():
         estimated_cost=0.03,
         estimated_latency_seconds=2.5,
         environment="windows",
+        model_provider="venice",
     )
 
     registered = store.register_agent(profile, runtime_version="2.0.0")
     assert registered["agent_id"] == "agent-local"
     assert registered["estimated_latency_seconds"] == 2.5
+    assert registered["model_provider"] == "venice"
 
     loaded = store.list_agents()
     assert loaded[0].agent_id == "agent-local"
     assert loaded[0].available_tools == ("repo.read", "pytest")
     assert loaded[0].estimated_latency_seconds == 2.5
+    assert loaded[0].model_provider == "venice"
 
     task = TaskSpec(
         task_id="task-9",
