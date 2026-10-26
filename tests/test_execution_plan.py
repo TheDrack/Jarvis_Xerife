@@ -146,3 +146,52 @@ def test_cyclic_python_input_is_rejected_cleanly():
     cyclic.append(cyclic)
     with pytest.raises(PlanValidationError):
         validate_plan(make_plan(make_step("read", args={"loop": cyclic})))
+
+
+def test_execution_budget_stops_before_dispatching_next_step():
+    calls = []
+    interpreter = DeclarativePlanInterpreter(
+        {"lookup": lambda args: calls.append(args) or {"ok": True}},
+        allow_all,
+        max_elapsed_seconds=0.000001,
+    )
+    result = interpreter.execute(make_plan(make_step("first")))
+    # The budget is checked between steps, not as a hard preemptive timeout.
+    assert result.status == "blocked"
+    assert result.steps[-1].error == "execution_budget_exhausted"
+
+
+def test_journal_failure_before_dispatch_fails_closed():
+    calls = []
+    def broken_journal(_event):
+        raise OSError("storage unavailable")
+
+    interpreter = DeclarativePlanInterpreter(
+        {"mutate": lambda args: calls.append(args)},
+        allow_all,
+        event_sink=broken_journal,
+    )
+    result = interpreter.execute(make_plan(make_step("write", "mutate")))
+    assert result.status == "blocked"
+    assert result.steps[0].error == "journal_unavailable"
+    assert calls == []
+
+
+def test_journal_failure_after_side_effect_returns_unknown_without_retry():
+    calls = []
+    events = []
+
+    def journal(event):
+        events.append(event)
+        if event["event"] == "step_finished":
+            raise OSError("durable write failed")
+
+    interpreter = DeclarativePlanInterpreter(
+        {"mutate": lambda args: calls.append(args) or {"ok": True}},
+        allow_all,
+        event_sink=journal,
+    )
+    result = interpreter.execute(make_plan(make_step("write", "mutate")))
+    assert result.status == "unknown"
+    assert result.steps[0].error == "journal_unavailable"
+    assert len(calls) == 1
