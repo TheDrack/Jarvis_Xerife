@@ -132,3 +132,9 @@ def test_policy_error_fails_closed_before_tool_call():
     assert result.status == "blocked"
     assert result.steps[0].error == "policy_unavailable"
     assert calls == []
+
+
+def test_plan_rejects_python_values_that_json_would_coerce():
+    candidate = make_plan(make_step("read", args={1: "not a JSON object key"}))
+    with pytest.raises(PlanValidationError, match="keys must be strings"):
+        validate_plan(candidate)
