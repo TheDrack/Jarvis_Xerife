@@ -464,7 +464,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
                 while time.monotonic() < fallback_deadline:
                     if expected_name and baseline_count is not None:
                         try:
-                            observed_count = self._count_accessible_name(expected_name)
+                            observed_count = self._count_accessible_name(expected_name, str(step.get("window_title_contains", "")))
                             verified = _postcondition_transitioned(baseline_count, observed_count)
                         except Exception:
                             verified = False
