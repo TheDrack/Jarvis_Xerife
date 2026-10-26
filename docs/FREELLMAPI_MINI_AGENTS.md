@@ -17,6 +17,7 @@ Instale e configure FreeLLMAPI separadamente conforme sua documentação oficial
 - `FREELLMAPI_BASE_URL=http://127.0.0.1:3001/v1`
 - `FREELLMAPI_API_KEY=<chave unificada local>`
 - `FREELLMAPI_MODEL=auto`
+- `FREELLMAPI_PROVIDER=unknown` (use `venice` only when this worker calls Venice directly)
 - `FREELLMAPI_TIMEOUT_SECONDS=45`
 
 Não coloque chaves em código, commits, payloads de tarefas ou logs. Sem `FREELLMAPI_API_KEY`, o cliente permanece desativado e falha explicitamente.
@@ -77,4 +78,4 @@ A liderança continua decidindo dinamicamente qual agente recebe cada tarefa. N�
 
 O envelope de atribuição inclui `required_model_provider: "venice"`. Se nenhum agente Venice estiver disponível, elegível em capacidade, ferramentas e orçamento, a atribuição falha explicitamente com `NoEligibleAgentError`; não há fallback para Groq, Gemini ou outro provedor. Para todos os demais tipos de tarefa, a seleção de agente/provedor permanece como antes.
 
-O valor `model_provider` do perfil deve refletir o provedor realmente configurado no runtime do agente, e não apenas uma preferência declarada pelo líder. O runtime que executa o agente é responsável por impedir fallback interno para outro provedor durante a tarefa protegida.
+O valor `model_provider` do perfil/heartbeat deve refletir o provedor realmente configurado no runtime do agente, e não apenas uma preferência declarada pelo líder. Para o worker FreeLLMAPI apontado diretamente à API Venice, configure `FREELLMAPI_PROVIDER=venice`; mantenha `unknown` se o endpoint usar um roteador que não garante Venice. O schema de fila armazena esse campo e as funções SQL de claim recusam Red/Blue Team para agentes não-Venice, inclusive em tentativas de claim direto. O runtime que executa o agente também deve impedir fallback interno para outro provedor durante a tarefa protegida.
