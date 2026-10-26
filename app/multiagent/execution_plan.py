@@ -192,19 +192,19 @@ _MISSING = object()
 
 def _project_result(result: Any, fields: list[str] | None) -> Any:
     """Keep downstream context small; full artifacts should be referenced by URI."""
-    _assert_json_value(result, "tool result")
-    try:
-        json.dumps(result, allow_nan=False)
-    except (TypeError, ValueError) as exc:
-        raise PlanValidationError("tool result is not JSON serializable") from exc
     if fields is not None:
         if not isinstance(result, Mapping):
             raise PlanValidationError("output_fields requires an object result")
         missing = [field for field in fields if field not in result]
         if missing:
             raise PlanValidationError("tool result is missing requested output fields")
+        # Project first so discarded artifacts are never serialized into model context.
         result = {field: result[field] for field in fields}
-    encoded = json.dumps(result, allow_nan=False, separators=(",", ":")).encode("utf-8")
+    _assert_json_value(result, "tool result")
+    try:
+        encoded = json.dumps(result, allow_nan=False, separators=(",", ":")).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise PlanValidationError("tool result is not JSON serializable") from exc
     if len(encoded) > MAX_RESULT_BYTES:
         raise PlanValidationError("tool result exceeds maximum projected size")
     return result
