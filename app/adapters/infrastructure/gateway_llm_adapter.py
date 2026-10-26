@@ -357,7 +357,7 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         provider = result.get("provider")
         response = result.get("response")
         
-        if provider == LLMProvider.GROQ.value:
+        if provider in (LLMProvider.GROQ.value, LLMProvider.VENICE.value):
             # Groq returns OpenAI-compatible format
             if hasattr(response, "choices") and response.choices:
                 choice = response.choices[0]
