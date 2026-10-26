@@ -131,6 +131,7 @@ begin
     select t.task_id into v_task_id
       from public.jarvis_agent_tasks t
      where t.status = 'ready'
+       and (t.assigned_agent_id is null or t.assigned_agent_id = p_agent_id)
        and (t.parent_task_id is null or exists (
             select 1 from public.jarvis_agent_tasks parent
              where parent.task_id = t.parent_task_id and parent.status = 'completed'
