@@ -167,12 +167,18 @@ class TaskRunner(NexusComponent):
         # Each executor resolves the capability again at dispatch time so stale
         # instances are not captured during plan construction.
         def policy(tool, args):
+            # Plans are untrusted input. They must never self-assert trusted
+            # approval or remote authorization by setting payload booleans.
+            payload = dict(args)
+            payload.pop("human_confirmed", None)
+            payload.pop("remote_authorized", None)
             try:
-                authorizer.authorize(user, tool, dict(args))
-                return "allow"
-            except PermissionError as exc:
-                if "exige confirmação humana" in str(exc):
+                sensitive = getattr(authorizer, "_sensitive", set())
+                if tool in sensitive:
                     return "approval_required"
+                authorizer.authorize(user, tool, payload)
+                return "allow"
+            except PermissionError:
                 return "deny"
             except Exception:
                 return "deny"
