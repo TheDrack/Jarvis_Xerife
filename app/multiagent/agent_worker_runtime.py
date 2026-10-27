@@ -1,9 +1,9 @@
 """Supervised polling runtime for a configured Jarvis mini-agent.
 
 The runtime is opt-in and never fabricates agent presence: a heartbeat is
-sent by PriorityQueueMiniAgent only after valid API and inference credentials
-have been loaded. Failures use bounded exponential backoff and can be stopped
-without terminating the API process.
+sent by the queue worker only after valid API and inference credentials load.
+Failures use bounded exponential backoff and can be stopped without terminating
+the API process.
 """
 from __future__ import annotations
 
@@ -58,19 +58,43 @@ def start_configured_worker() -> tuple[threading.Thread, threading.Event] | None
     """Start a daemon worker only when explicitly enabled and fully configured."""
     enabled = os.getenv("JARVIS_MINI_AGENT_ENABLED", "false").strip().lower()
     if enabled not in {"1", "true", "yes", "on"}:
+        logger.info(
+            "Mini-agent runtime skipped: JARVIS_MINI_AGENT_ENABLED is not enabled"
+        )
         return None
 
     # Prefer the in-process Supabase service-role path: it shares the exact
     # queue database and avoids creating a separate user/password for a worker.
     # Fall back to the authenticated HTTP runtime for installations without an
     # admin Supabase client.
-    if os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip():
+    has_supabase_admin = bool(
+        os.getenv("SUPABASE_URL", "").strip()
+        and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    )
+    if has_supabase_admin:
+        logger.info("Mini-agent runtime using configured Supabase queue backend")
         from .supabase_task_worker import SupabaseTaskQueueMiniAgent
 
         worker = SupabaseTaskQueueMiniAgent.from_env()
     else:
+        # Log presence only, never values, to diagnose incomplete deployment config.
+        required = (
+            "JARVIS_TASK_QUEUE_API_URL",
+            "JARVIS_TASK_QUEUE_API_TOKEN",
+            "JARVIS_TASK_QUEUE_USERNAME",
+            "JARVIS_TASK_QUEUE_PASSWORD",
+            "FREELLMAPI_API_KEY",
+        )
+        missing = [key for key in required if not os.getenv(key, "").strip()]
+        if missing:
+            logger.error(
+                "Mini-agent runtime configuration incomplete; missing variables: %s",
+                ", ".join(missing),
+            )
+        else:
+            logger.info("Mini-agent runtime using authenticated HTTP queue backend")
         worker = PriorityQueueMiniAgent.from_env()
-    # PriorityQueueMiniAgent.from_env constructs the bounded inference handler.
+
     stop_event = threading.Event()
     thread = threading.Thread(
         target=run_worker_loop,
