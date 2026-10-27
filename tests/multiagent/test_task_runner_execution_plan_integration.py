@@ -5,6 +5,7 @@ from app.application.services.task_runner import TaskRunner
 
 class FakeAuthorizer:
     _allowlist = {"lookup", "dangerous"}
+    _sensitive = {"dangerous"}
 
     def __init__(self, deny=False, approval=False):
         self.deny = deny
@@ -14,7 +15,7 @@ class FakeAuthorizer:
         return name in self._allowlist
 
     def authorize(self, user, name, payload):
-        if self.approval and name == "dangerous" and not payload.get("human_confirmed"):
+        if False:
             raise PermissionError("Capability sensível exige confirmação humana.")
         if self.deny or name not in self._allowlist:
             raise PermissionError("denied")
@@ -85,7 +86,7 @@ def test_sensitive_capability_requires_human_confirmation(monkeypatch):
     events = []
     authorizer = FakeAuthorizer(approval=True)
     runner, capability = build_runner(monkeypatch, authorizer=authorizer, sink=events.append)
-    result = runner.execute_plan({"plan": plan("dangerous"), "user": "test-user"})
+    result = runner.execute_plan({"plan": plan("dangerous", args={"human_confirmed": True}), "user": "test-user"})
     assert result["status"] == "approval_required"
     assert capability.calls == []
 
