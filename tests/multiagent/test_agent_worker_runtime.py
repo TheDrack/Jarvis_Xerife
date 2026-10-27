@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from threading import Event
 
 import pytest
@@ -67,12 +68,15 @@ def test_runtime_rejects_invalid_timing(idle, minimum, maximum):
         )
 
 
-def test_runtime_is_disabled_by_default(monkeypatch):
+def test_runtime_is_disabled_by_default(monkeypatch, caplog):
+    caplog.set_level(logging.INFO, logger="app.multiagent.agent_worker_runtime")
     monkeypatch.delenv("JARVIS_MINI_AGENT_ENABLED", raising=False)
     assert start_configured_worker() is None
+    assert "JARVIS_MINI_AGENT_ENABLED is not enabled" in caplog.text
 
 
-def test_runtime_opt_in_fails_closed_without_required_credentials(monkeypatch):
+def test_runtime_opt_in_fails_closed_without_required_credentials(monkeypatch, caplog):
+    caplog.set_level(logging.INFO, logger="app.multiagent.agent_worker_runtime")
     monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
     monkeypatch.delenv("SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
@@ -83,6 +87,8 @@ def test_runtime_opt_in_fails_closed_without_required_credentials(monkeypatch):
         monkeypatch.delenv(key, raising=False)
     with pytest.raises(RuntimeError, match="JARVIS_TASK_QUEUE_API_URL"):
         start_configured_worker()
+    assert "Mini-agent runtime configuration incomplete" in caplog.text
+    assert "JARVIS_TASK_QUEUE_API_TOKEN" in caplog.text
 
 
 def test_runtime_starts_configured_worker_and_can_be_stopped(monkeypatch):
