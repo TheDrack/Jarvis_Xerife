@@ -24,36 +24,22 @@ RDC diretamente ao bridge JSONL e Aperture diretamente ao upstream Jarvis são r
 
 ## Inicialização e diagnóstico
 
-Para verificar a instalação existente, use os comandos oficiais do Tailscale, confira o estado do servidor MCP e teste o gateway Aperture. **Atenção:** os exemplos antigos deste documento referenciavam `scripts/jarvis_magic.ps1`, `scripts/start-jarvis-boot.ps1` e `scripts/start_jarvis_tailscale.ps1`, mas esses caminhos não existem no branch `main` verificado durante esta revisão. Não trate esses comandos como executáveis até que o entrypoint canônico do Magic Executor seja restaurado.
-
-Para a integração Secure MCP Tunnel, o configurador autônomo incluído nesta PR é executável:
+Na raiz do repositório, abra PowerShell:
 
 ```powershell
-.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action status
+.\scripts\jarvis_magic.ps1 -Action doctor
+.\scripts\jarvis_magic.ps1 -Action status
 ```
 
-O boot completo deve garantir que o Tailscale conecta, que o servidor MCP e Tailscale Serve estão disponíveis e que o conector do Aperture alcança o upstream. O configurador de túnel não altera nem substitui esses componentes.
+O repositório inclui `scripts/jarvis_magic.ps1`, `scripts/start-jarvis-boot.ps1` e `scripts/start-jarvis-mcp-interactive.ps1` para instalação e inicialização separadas. Para preparar a conexão direta ChatGPT → Jarvis por meio do Secure MCP Tunnel oficial, consulte `docs/ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md` e use `scripts/setup_chatgpt_jarvis_tunnel.ps1 -Action configure` somente depois de provisionar o tunnel ID e a runtime API key na organização OpenAI. A tarefa SYSTEM mantém o bridge RDC; a tarefa `Jarvis-Desktop-MCP-Interactive` inicia o MCP de desktop no logon do usuário, porque captura de tela e automação visual não funcionam corretamente a partir da Session 0 isolada do Windows. Tailscale Serve continua publicando o endpoint privado para o MCP em `127.0.0.1:8765`.
+
+Para instalar ou sincronizar as duas tarefas, execute PowerShell como Administrador na raiz do repositório:
+
+```powershell
+.\scripts\jarvis_magic.ps1 -Action install -IncludeRdc
+```
 
 A existência de uma tarefa agendada ou de um processo ativo não prova que toda a cadeia funciona após reinicialização. Validar a rota P0 após um boot real, verificando cada camada e fazendo uma chamada MCP não destrutiva. A autenticação do RDC iniciada como `SYSTEM` pode não compartilhar o perfil/sessão autenticada do usuário; isso não deve ser confundido com o caminho principal via Aperture.
-
-## Secure MCP Tunnel para produtos OpenAI
-
-O Secure MCP Tunnel é uma rota adicional para produtos OpenAI compatíveis, não um substituto da rota principal Aperture + Tailscale. Ele permite que ChatGPT, Codex e outras superfícies OpenAI compatíveis alcancem o MCP privado sem publicar a porta local. Não é um túnel universal para todos os provedores de IA; outros agentes devem usar uma rota MCP que suportem e para a qual estejam autorizados.
-
-Cada usuário deve criar/selecionar seu próprio túnel e usar sua própria runtime key com permissão `Tunnels Read + Use`. Não compartilhe `tunnel_id`, chaves ou perfis com segredos entre usuários. A criação do túnel e a associação ao workspace ChatGPT são vinculadas à conta/organização e às permissões do usuário.
-
-Depois de instalar o cliente oficial `tunnel-client`, configure a conexão local com:
-
-```powershell
-.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action configure
-.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action status
-```
-
-O script solicita o `tunnel_id` e a runtime key em entrada segura, armazena o segredo com DPAPI no perfil do usuário e registra uma tarefa agendada no logon interativo. O script não cria o túnel hospedado nem registra o app no ChatGPT: o usuário precisa concluir essas etapas na página Platform Tunnels e em ChatGPT → Plugins → + → Add custom MCP server → Connection: Tunnel.
-
-Antes de diagnosticar com `tunnel-client doctor`, se o cliente já estiver ativo e ocupando a porta de health configurada, passe `--health-listen-addr 127.0.0.1:0` para usar uma porta temporária sem interromper o túnel. Aceite como pontos de verificação separados: MCP local inicializado, `/readyz` retornando `ready`, cliente conectado/polling, ferramentas descobertas no ChatGPT e uma chamada de ferramenta ponta a ponta.
-
-O guia completo está em [SECURE_MCP_TUNNEL.md](SECURE_MCP_TUNNEL.md).
 
 ## Rede e segurança
 
@@ -66,12 +52,12 @@ O guia completo está em [SECURE_MCP_TUNNEL.md](SECURE_MCP_TUNNEL.md).
 
 ## Logs úteis
 
-- Jarvis MCP: `%LOCALAPPDATA%\Jarvis_Xerife\logs\desktop-mcp.stdout.log` e `desktop-mcp.stderr.log` (os caminhos podem variar se o processo for iniciado como `SYSTEM`).
-- Supervisor: `%LOCALAPPDATA%\Jarvis_Xerife\logs\rdc-boot.log`.
+- Jarvis MCP (sessão interativa): `%LOCALAPPDATA%\Jarvis_Xerife\logs\jarvis-mcp.stdout.log` e `jarvis-mcp.stderr.log`.
+- Supervisor RDC (SYSTEM): `C:\ProgramData\Jarvis_Xerife\logs\supervisor.log`.
+- Supervisor MCP interativo: `%LOCALAPPDATA%\Jarvis_Xerife\logs\jarvis-mcp-supervisor.log`.
 - Tailscale: `tailscale status` e `tailscale serve status`.
 - Porta local: `Get-NetTCPConnection -State Listen -LocalPort 8765`.
 - Tarefa: `Get-ScheduledTask -TaskName Jarvis-RDC-Boot-Connect`.
-- Secure MCP Tunnel: `%LOCALAPPDATA%\Jarvis_Xerife\logs\openai-tunnel-client.log` (sanitizar antes de compartilhar).
 
 ## Critérios de aceitação
 
@@ -82,6 +68,5 @@ O guia completo está em [SECURE_MCP_TUNNEL.md](SECURE_MCP_TUNNEL.md).
 - [ ] O agente autorizado conecta ao gateway `/v1/mcp` do Aperture.
 - [ ] Uma chamada de observação/listagem termina sem erro.
 - [ ] A disponibilidade da sessão gráfica foi testada separadamente, quando necessário.
-- [ ] Se Secure MCP Tunnel for usado, `/readyz` retorna `ready` e uma chamada do app registrado no ChatGPT passa ponta a ponta.
 
-Não marque todos os critérios como concluídos sem evidência de uma reinicialização real e chamada MCP não destrutiva ponta a ponta.
+Não marque todos os critérios como concluídos sem evidência de uma reinicialização real e chamada MCP ponta a ponta.

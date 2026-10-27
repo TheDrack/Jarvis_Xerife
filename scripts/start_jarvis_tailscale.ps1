@@ -36,6 +36,16 @@ if ($status.BackendState -ne "Running" -or [string]::IsNullOrWhiteSpace($hostNam
 }
 $hostName = $hostName.TrimEnd(".").ToLowerInvariant()
 
+# Share a named mutex with the interactive supervisor to prevent concurrent port binds.
+$startupMutex = [System.Threading.Mutex]::new($false, 'Global\JarvisDesktopMcpStartup')
+$hasStartupLock = $false
+try { $hasStartupLock = $startupMutex.WaitOne(20000) }
+catch [System.Threading.AbandonedMutexException] { $hasStartupLock = $true }
+if (-not $hasStartupLock) {
+    $startupMutex.Dispose()
+    throw "Outro inicializador está ocupando o lock do MCP; tente novamente."
+}
+
 $server = $null
 $existingListener = Get-NetTCPConnection -State Listen -LocalAddress "127.0.0.1" -LocalPort $port -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($existingListener) {
@@ -95,8 +105,14 @@ for ($attempt = 0; $attempt -lt 40; $attempt++) {
 }
 if (-not $ready) {
     if ($server) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
+    $startupMutex.ReleaseMutex()
+    $startupMutex.Dispose()
     throw "O endpoint MCP não abriu em 127.0.0.1:$port. Consulte: $stderr"
 }
+
+# The listener is established; release the startup lock before configuring Serve.
+$startupMutex.ReleaseMutex()
+$startupMutex.Dispose()
 
 # Existing matching Serve routes are already healthy configuration; do not reapply
 # them on every logon (Tailscale may return exit code 1 for an unchanged route).
