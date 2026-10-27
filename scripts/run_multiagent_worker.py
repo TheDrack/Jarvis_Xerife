@@ -1,4 +1,4 @@
-﻿"""Run one supervised Jarvis multi-agent worker against the shared Supabase queue.
+"""Run one supervised Jarvis multi-agent worker against the shared Supabase queue.
 
 Required environment: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 JARVIS_AGENT_ID, FREELLMAPI_API_KEY. This worker performs text-only inference;
