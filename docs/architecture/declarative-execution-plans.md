@@ -1,44 +1,36 @@
 # Declarative execution plans
 
-## Scope
+The interpreter in `app/multiagent/execution_plan.py` accepts a versioned JSON plan with an explicit ordered list of steps. It does not convert natural-language text into executable steps. The assistant/orchestration layer must return a structured `result.plan` before the orchestrator dispatches it.
 
-The interpreter composes existing Jarvis connectors through a bounded, declarative plan. It is not an arbitrary-code sandbox, a new agent role, a policy authority, or a durable workflow engine.
+## Runtime flow
 
-## Plan shape
+1. The orchestrator normalizes the assistant's domain `Response` or legacy dictionary response.
+2. An explicit structured plan is passed to `TaskRunner.execute({"plan": plan, "user": authenticated_user_id})`.
+3. `TaskRunner` validates the plan, resolves only capabilities in the host-configured authorizer allowlist, checks policy before each dispatch, and records lifecycle events.
+4. Result projections are bounded and explicit references can only point to declared earlier steps.
+5. Legacy `tasks` payloads remain supported during migration.
 
-A plan uses version `1`, a stable `execution_id`, and a non-empty ordered list of steps. Each step has a unique `step_id`, a registered `tool`, JSON object `args`, optional earlier-step `depends_on`, and optional `output_fields` projection.
+The `authenticated_user_id` must come from trusted request middleware/session context. A caller-controlled `user` field is ignored. If no authenticated identity is present, the plan uses `anonymous` and will normally be denied by the capability authorizer.
 
-A value such as `{"$ref":"lookup.item_id"}` explicitly references a field from an earlier step. Every referenced step must be declared in `depends_on`. References are data references only; strings are never evaluated as expressions. This version supports no loops or dynamic branches.
+## Durable journal
 
-## Runtime guarantees
+The Supabase migration `202610260002_execution_plan_events.sql` creates an append-only event table with RLS enabled. The follow-up migration `202610270002_execution_plan_events_append_only_grants.sql` limits the `service_role` to SELECT and INSERT and grants no table privileges to `anon` or `authenticated`.
 
-- Validate the entire plan before connector dispatch.
-- Reject unknown fields, duplicate IDs, invalid dependency order, unsupported versions, oversized plans, and non-JSON values.
-- Enforce a host-configured executor allowlist. A plan cannot register a tool or provide executable code.
-- Call the injected policy gate immediately before each step. `allow` is the only decision that dispatches; `approval_required`, denial, or policy failure stops the plan.
-- Stop on the first failure. No automatic retries are performed.
-- A connector exception after dispatch yields `unknown`, because an external operation may have happened before the error. Reconcile state before proposing another execution.
-- Project results to requested fields and enforce a maximum serialized result size before exposing them to downstream steps.
-- Return per-step status and duration for evidence and telemetry.
+Configure these server-side environment variables on the runtime service:
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-## Deliberate limitations
+Never expose the service-role key to clients, mobile apps, logs, or browser code. The service-role client is deliberately separate from the normal publishable/anon client. If it is missing or the journal insert fails, plan execution fails closed.
 
-This is a deterministic, in-process interpreter with a synchronous injected executor. Optional event-sink hooks can record lifecycle events; they are only durable if the host supplies an append-only durable sink. The interpreter fails closed if journaling fails before dispatch and reports `unknown` if it cannot record a result after a possible side effect. Lifecycle events omit raw argument values and tool result payloads; they include only operational metadata. The elapsed-time budget is checked between steps and cannot preempt a currently running synchronous connector. Cross-process replay protection, pause/resume after approval, operation-level idempotency, hard connector timeouts, and conditional branching are still absent. Do not use it for production mutations until those controls are integrated with the real policy gateway and durable state store.
+The journal stores only allowlisted event metadata; raw arguments, user prompts, tool results, and credentials must not be added to it. Database retention and access monitoring should be configured according to the deployment's privacy policy.
 
-Desktop actions must continue to use the existing verified visual-navigation adapter, which handles ambiguity, postconditions, and observations.
+## Approval boundary
 
-## Rollout
+Plan arguments cannot self-assert `human_confirmed` or `remote_authorized`. Sensitive capabilities remain `approval_required` until a trusted approval/resume protocol binds approval to the authenticated principal, exact plan digest, capability, and expiration. Do not resume a side-effecting step automatically after an unknown outcome.
 
-1. Unit-test plan validation and deterministic execution using fake connectors.
-2. Integrate a small, read-only connector allowlist and benchmark against direct tool calls.
-3. Connect the event sink to a durable journal, then add replay protection, explicit approval resume, idempotency/reconciliation, and hard connector-call/time budgets.
-4. Only then consider mutating connectors and desktop recipe composition.
+## Operational constraints
 
-
-## TaskRunner / Nexus integration
-
-`TaskRunner.execute_plan({"plan": ..., "user": ...})` now provides the runtime seam for declarative plans. It snapshots the host-configured `CapabilityAuthorizer` allowlist, resolves each capability through the real Nexus registry immediately before dispatch, and calls that capability's existing `execute(context)` entry point. Plans cannot supply Python callables or add capabilities to the allowlist.
-
-The existing authorizer is invoked per step. A sensitive-capability confirmation failure becomes `approval_required`; other authorization failures stop before dispatch. The host must inject `plan_event_sink` into `TaskRunner`. If it is absent, execution is rejected. The sink must be backed by durable append-only storage in production; the integration layer cannot infer durability from a callback.
-
-This is an explicit API seam, not proof that every natural-language assistant request is automatically converted into a plan. Existing legacy task execution remains unchanged. Before enabling plans in production, wire the host's durable journal and caller identity into TaskRunner construction, then exercise the complete request-to-plan-to-Nexus path in deployment-level tests.
+- The execution budget is checked between steps; it is not a preemptive timeout for a blocking connector.
+- An exception after dispatch is an unknown outcome, not a safe-to-retry failure.
+- A journal failure after a connector call may mean the external side effect occurred without a durable completion record.
+- The production migration must be applied and verified before enabling declarative plans on a deployment.
