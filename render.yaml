@@ -68,9 +68,9 @@ services:
       - key: USE_LLM
         value: true
 
-      # Supervised text-only mini-agent. Keep disabled until all secrets are set.
+      # Supervised text-only mini-agent; fails closed if Supabase/model credentials are missing.
       - key: JARVIS_MINI_AGENT_ENABLED
-        value: false
+        value: true
       - key: JARVIS_TASK_QUEUE_API_URL
         value: https://jarvis-api-c47i.onrender.com
       - key: JARVIS_TASK_QUEUE_API_TOKEN

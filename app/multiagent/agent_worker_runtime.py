@@ -60,8 +60,16 @@ def start_configured_worker() -> tuple[threading.Thread, threading.Event] | None
     if enabled not in {"1", "true", "yes", "on"}:
         return None
 
-    # Importing the worker only after opt-in keeps normal API startup cheap.
-    worker = PriorityQueueMiniAgent.from_env()
+    # Prefer the in-process Supabase service-role path: it shares the exact
+    # queue database and avoids creating a separate user/password for a worker.
+    # Fall back to the authenticated HTTP runtime for installations without an
+    # admin Supabase client.
+    if os.getenv("SUPABASE_URL", "").strip() and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip():
+        from .supabase_task_worker import SupabaseTaskQueueMiniAgent
+
+        worker = SupabaseTaskQueueMiniAgent.from_env()
+    else:
+        worker = PriorityQueueMiniAgent.from_env()
     # PriorityQueueMiniAgent.from_env constructs the bounded inference handler.
     stop_event = threading.Event()
     thread = threading.Thread(

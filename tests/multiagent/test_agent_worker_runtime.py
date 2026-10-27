@@ -74,6 +74,8 @@ def test_runtime_is_disabled_by_default(monkeypatch):
 
 def test_runtime_opt_in_fails_closed_without_required_credentials(monkeypatch):
     monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
     for key in (
         "JARVIS_TASK_QUEUE_API_URL", "JARVIS_TASK_QUEUE_API_TOKEN",
         "JARVIS_TASK_QUEUE_USERNAME", "JARVIS_TASK_QUEUE_PASSWORD", "FREELLMAPI_API_KEY",
@@ -91,6 +93,8 @@ def test_runtime_starts_configured_worker_and_can_be_stopped(monkeypatch):
             return None
 
     monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
     monkeypatch.setattr(
         "app.multiagent.agent_worker_runtime.PriorityQueueMiniAgent.from_env",
         lambda: IdleWorker(),
@@ -99,6 +103,29 @@ def test_runtime_starts_configured_worker_and_can_be_stopped(monkeypatch):
     assert runtime is not None
     thread, stop = runtime
     assert thread.name == "JarvisAgentWorker-test-mini-agent"
+    stop.set()
+    thread.join(timeout=1)
+    assert not thread.is_alive()
+
+
+def test_runtime_prefers_supabase_native_worker_when_admin_credentials_exist(monkeypatch):
+    class IdleWorker:
+        agent_id = "supabase-mini-agent"
+
+        def run_once(self):
+            return None
+
+    monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-service-role")
+    monkeypatch.setattr(
+        "app.multiagent.supabase_task_worker.SupabaseTaskQueueMiniAgent.from_env",
+        lambda: IdleWorker(),
+    )
+    runtime = start_configured_worker()
+    assert runtime is not None
+    thread, stop = runtime
+    assert thread.name == "JarvisAgentWorker-supabase-mini-agent"
     stop.set()
     thread.join(timeout=1)
     assert not thread.is_alive()
