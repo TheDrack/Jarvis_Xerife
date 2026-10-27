@@ -70,8 +70,6 @@ _ALLOWED_MISSING: Dict[str, str] = {
     "report.json": "artefato de runtime citado nos exemplos de CLI",
     "pytest_log.txt": "artefato de runtime citado nos exemplos de CLI",
     "failed_workflow_logs.txt": "artefato de runtime citado nos exemplos de CLI",
-    # Documentados explicitamente como removidos/migrados (histórico).
-    "scripts/evolution_mutator.py": "removido do repositório; documentado como tal",
 }
 
 
