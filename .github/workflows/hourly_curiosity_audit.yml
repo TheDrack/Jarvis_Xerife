@@ -33,7 +33,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest pytest-cov
+          # pytest-asyncio registra o marcador 'asyncio' exigido por pytest.ini (--strict-markers);
+          # Pillow e opencv (cv2) são usados por tests/adapters/edge. Só o necessário para headless.
+          pip install pytest 'pytest-asyncio>=0.23.0' pytest-cov pytest-mock anyio Pillow opencv-python-headless
 
       - name: Run full test suite
         id: tests
