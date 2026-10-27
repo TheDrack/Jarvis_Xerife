@@ -22,6 +22,7 @@ from app.adapters.infrastructure.routers.devices import create_devices_router
 from app.adapters.infrastructure.routers.evolution import create_evolution_router
 from app.adapters.infrastructure.routers.extensions import create_extensions_router
 from app.adapters.infrastructure.routers.github import create_github_router
+from app.adapters.infrastructure.routers.github_webhook import create_github_webhook_router
 from app.adapters.infrastructure.routers.health import create_health_router
 from app.adapters.infrastructure.routers.missions import create_missions_router
 from app.adapters.infrastructure.routers.mobile_sessions import create_mobile_sessions_router
@@ -205,6 +206,7 @@ def create_api_server(
     app.include_router(create_missions_router(get_current_user))
     app.include_router(create_thoughts_router(db_adapter, get_current_user))
     app.include_router(create_github_router(db_adapter, get_current_user))
+    app.include_router(create_github_webhook_router())
     app.include_router(create_evolution_router(db_adapter, get_current_user))
     app.include_router(create_bridge_router())
     app.include_router(create_mobile_sessions_router())
