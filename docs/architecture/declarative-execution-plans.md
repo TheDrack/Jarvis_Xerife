@@ -33,3 +33,12 @@ Desktop actions must continue to use the existing verified visual-navigation ada
 2. Integrate a small, read-only connector allowlist and benchmark against direct tool calls.
 3. Connect the event sink to a durable journal, then add replay protection, explicit approval resume, idempotency/reconciliation, and hard connector-call/time budgets.
 4. Only then consider mutating connectors and desktop recipe composition.
+
+
+## TaskRunner / Nexus integration
+
+`TaskRunner.execute_plan({"plan": ..., "user": ...})` now provides the runtime seam for declarative plans. It snapshots the host-configured `CapabilityAuthorizer` allowlist, resolves each capability through the real Nexus registry immediately before dispatch, and calls that capability's existing `execute(context)` entry point. Plans cannot supply Python callables or add capabilities to the allowlist.
+
+The existing authorizer is invoked per step. A sensitive-capability confirmation failure becomes `approval_required`; other authorization failures stop before dispatch. The host must inject `plan_event_sink` into `TaskRunner`. If it is absent, execution is rejected. The sink must be backed by durable append-only storage in production; the integration layer cannot infer durability from a callback.
+
+This is an explicit API seam, not proof that every natural-language assistant request is automatically converted into a plan. Existing legacy task execution remains unchanged. Before enabling plans in production, wire the host's durable journal and caller identity into TaskRunner construction, then exercise the complete request-to-plan-to-Nexus path in deployment-level tests.

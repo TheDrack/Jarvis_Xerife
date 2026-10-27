@@ -26,6 +26,7 @@ class TaskRunner(NexusComponent):
         use_venv: bool = False,
         sandbox_mode: bool = False,
         budget_cap_usd: Optional[float] = None,
+        plan_event_sink=None,
     ):
         super().__init__()
         self.cache_dir: Path = Path(cache_dir) if cache_dir else Path(tempfile.gettempdir()) / "task_runner_cache"
@@ -33,6 +34,8 @@ class TaskRunner(NexusComponent):
         self.use_venv = use_venv
         self.sandbox_mode = sandbox_mode
         self.budget_cap_usd = budget_cap_usd
+        # Declarative plans fail closed unless the host injects a durable journal.
+        self._plan_event_sink = plan_event_sink
         self.total_cost_usd: float = 0.0
         self._mission_costs: Dict[str, float] = {}
 
@@ -139,8 +142,71 @@ class TaskRunner(NexusComponent):
     # Legacy Nexus-style execution (kept for backward compatibility)
     # ------------------------------------------------------------------
 
+    def execute_plan(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Execute a declarative plan through the live Nexus capability registry.
+
+        A durable append-only event sink must be injected by the host. This method
+        intentionally refuses to run plans without one; an in-memory logger is not
+        an adequate execution journal for side-effecting tools.
+        """
+        from app.multiagent.execution_plan import DeclarativePlanInterpreter
+
+        context = context or {}
+        plan = context.get("plan")
+        user = context.get("user", "anonymous")
+        if not isinstance(plan, dict):
+            return {"success": False, "status": "blocked", "error": "plan_required"}
+        if self._plan_event_sink is None:
+            return {"success": False, "status": "blocked", "error": "durable_plan_journal_not_configured"}
+
+        authorizer = nexus.resolve("capability_authorizer")
+        if not authorizer or getattr(authorizer, "__is_cloud_mock__", False):
+            return {"success": False, "status": "blocked", "error": "capability_authorizer_unavailable"}
+
+        # Only capabilities the existing authorizer explicitly allows are exposed.
+        # Each executor resolves the capability again at dispatch time so stale
+        # instances are not captured during plan construction.
+        def policy(tool, args):
+            try:
+                authorizer.authorize(user, tool, dict(args))
+                return "allow"
+            except PermissionError as exc:
+                if "exige confirmação humana" in str(exc):
+                    return "approval_required"
+                return "deny"
+            except Exception:
+                return "deny"
+
+        def make_dispatch(tool):
+            def dispatch(args):
+                capability = nexus.resolve(tool)
+                if not capability or getattr(capability, "__is_cloud_mock__", False):
+                    raise RuntimeError("capability_unavailable")
+                execute = getattr(capability, "execute", None)
+                if not callable(execute):
+                    raise RuntimeError("capability_not_executable")
+                return execute(dict(args))
+            return dispatch
+
+        # Snapshot only the host-configured allowlist; plans cannot add tools.
+        executors = {
+            name: make_dispatch(name)
+            for name in getattr(authorizer, "_allowlist", set())
+            if isinstance(name, str) and name
+        }
+
+        interpreter = DeclarativePlanInterpreter(
+            executors,
+            policy,
+            event_sink=self._plan_event_sink,
+        )
+        outcome = interpreter.execute(plan)
+        return {"success": outcome.status == "completed", **outcome.to_dict()}
+
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Any:
-        """Execute a list of Nexus tasks from context (legacy API)."""
+        """Dispatch declarative plans or preserve the legacy Nexus tasks API."""
+        if context and "plan" in context:
+            return self.execute_plan(context)
         if not context or "tasks" not in context:
             logger.error("TaskRunner: Nenhuma tarefa recebida.")
             return {"success": False, "error": "No tasks provided"}
