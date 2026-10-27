@@ -15,8 +15,6 @@ class FakeAuthorizer:
         return name in self._allowlist
 
     def authorize(self, user, name, payload):
-        if False:
-            raise PermissionError("Capability sensível exige confirmação humana.")
         if self.deny or name not in self._allowlist:
             raise PermissionError("denied")
         return True
