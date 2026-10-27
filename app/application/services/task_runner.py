@@ -34,7 +34,18 @@ class TaskRunner(NexusComponent):
         self.use_venv = use_venv
         self.sandbox_mode = sandbox_mode
         self.budget_cap_usd = budget_cap_usd
-        # Declarative plans fail closed unless the host injects a durable journal.
+        # Prefer an explicitly injected sink; otherwise use the durable Supabase
+        # journal only when the trusted server-side service-role client is configured.
+        if plan_event_sink is None:
+            try:
+                from app.adapters.infrastructure.supabase_client import get_supabase_admin_client
+                from app.adapters.infrastructure.supabase_plan_journal import SupabasePlanEventJournal
+
+                admin_client = get_supabase_admin_client()
+                if admin_client is not None:
+                    plan_event_sink = SupabasePlanEventJournal(admin_client).append
+            except Exception as exc:
+                logger.warning("Durable plan journal unavailable; declarative plans remain blocked: %s", type(exc).__name__)
         self._plan_event_sink = plan_event_sink
         self.total_cost_usd: float = 0.0
         self._mission_costs: Dict[str, float] = {}
