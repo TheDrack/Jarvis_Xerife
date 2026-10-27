@@ -253,6 +253,15 @@ class DeclarativePlanInterpreter:
         normalized = validate_plan(
             plan, max_steps=self._max_steps, max_plan_bytes=self._max_plan_bytes
         )
+        # Preflight the allowlist for every step before any dispatch, so a plan that
+        # names an unregistered tool later in the sequence cannot run earlier side
+        # effects and then stop. Only the offending step is reported.
+        for step in normalized["steps"]:
+            if step["tool"] not in self._executors:
+                return PlanOutcome(normalized["execution_id"], "blocked", (
+                    StepOutcome(step["step_id"], step["tool"], "blocked",
+                                error="tool_not_allowlisted"),
+                ))
         outcomes: list[StepOutcome] = []
         results: dict[str, Any] = {}
         execution_started = time.monotonic()
