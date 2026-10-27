@@ -67,6 +67,33 @@ services:
 
       - key: USE_LLM
         value: true
+
+      # Supervised text-only mini-agent. Keep disabled until all secrets are set.
+      - key: JARVIS_MINI_AGENT_ENABLED
+        value: false
+      - key: JARVIS_TASK_QUEUE_API_URL
+        value: https://jarvis-api-c47i.onrender.com
+      - key: JARVIS_TASK_QUEUE_API_TOKEN
+        sync: false
+      - key: JARVIS_TASK_QUEUE_USERNAME
+        sync: false
+      - key: JARVIS_TASK_QUEUE_PASSWORD
+        sync: false
+      - key: JARVIS_AGENT_ID
+        value: mini-freellmapi-1
+      - key: JARVIS_TASK_QUEUE_LEASE_SECONDS
+        value: 90
+      - key: FREELLMAPI_API_KEY
+        sync: false
+      - key: FREELLMAPI_BASE_URL
+        sync: false
+      - key: FREELLMAPI_MODEL
+        value: auto
+      - key: FREELLMAPI_TIMEOUT_SECONDS
+        value: 45
+      - key: FREELLMAPI_PROVIDER
+        value: unknown
+
       - key: API_HOST
         value: 0.0.0.0
 
