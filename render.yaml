@@ -20,8 +20,8 @@ services:
       uv pip install --system -r requirements/prod-cloud.txt
       uv pip install google-generativeai groq tiktoken
     
-    # Comando de início
-    startCommand: python serve.py
+    # The production Render service uses the cloud entrypoint that owns API + worker lifecycle.
+    startCommand: python main.py
 
     branch: main
     healthCheckPath: /health
@@ -31,13 +31,13 @@ services:
       - key: RENDER
         value: true
       - key: TELEGRAM_TOKEN
-        sync: false 
+        sync: false
       - key: TELEGRAM_CHAT_ID
-        sync: false 
+        sync: false
 
-      # --- CONFIGURAÇÕES DO GITHUB (CORREÇÃO DO ERRO) ---
+      # --- CONFIGURAÇÕES DO GITHUB ---
       - key: GITHUB_PAT
-        sync: false # Gere um Personal Access Token no GitHub e insira no Dashboard
+        sync: false
 
       # --- CONFIGURAÇÕES DE AMBIENTE ---
       - key: PORT
@@ -68,7 +68,7 @@ services:
       - key: USE_LLM
         value: true
 
-      # Supervised text-only mini-agent; fails closed if Supabase/model credentials are missing.
+      # Supervised text-only mini-agent; credentials are set in the Render dashboard.
       - key: JARVIS_MINI_AGENT_ENABLED
         value: true
       - key: JARVIS_TASK_QUEUE_API_URL
