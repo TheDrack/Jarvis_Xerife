@@ -145,7 +145,17 @@ def main() -> None:
     
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
-        # Aguarda o servidor estar pronto antes de configurar o webhook
+
+    # Optional supervised task consumer. Disabled by default and started only
+    # when its API and inference credentials are explicitly configured.
+    worker_runtime = None
+    try:
+        from app.multiagent.agent_worker_runtime import start_configured_worker
+        worker_runtime = start_configured_worker()
+    except Exception as exc:
+        logger.error("Mini-agent runtime was enabled but could not start: %s", exc)
+
+    # Aguarda o servidor estar pronto antes de configurar o webhook
     if _wait_for_server_ready(host, port, timeout=10.0):
         logger.info("🔗 Servidor pronto. Configurando Telegram Webhook...")
         setup_telegram_webhook()
@@ -162,6 +172,11 @@ def main() -> None:
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
+    finally:
+        if worker_runtime is not None:
+            worker_thread, worker_stop = worker_runtime
+            worker_stop.set()
+            worker_thread.join(timeout=5)
 
 
 if __name__ == "__main__":

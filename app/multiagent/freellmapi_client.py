@@ -45,18 +45,35 @@ class FreeLLMAPIClient:
     def from_env(cls) -> "FreeLLMAPIClient":
         """Build a client from explicit environment configuration."""
         api_key = os.getenv("FREELLMAPI_API_KEY", "").strip()
+        base_url = os.getenv("FREELLMAPI_BASE_URL", "").strip()
+        model = os.getenv("FREELLMAPI_MODEL", "").strip()
+        if not api_key:
+            # Prefer Groq to preserve Venice capacity for explicitly routed
+            # Red/Blue tasks. Respect an explicit non-auto model override.
+            api_key = os.getenv("GROQ_API_KEY", "").strip()
+            if api_key:
+                base_url = base_url or "https://api.groq.com/openai/v1"
+                model = model if model and model.lower() != "auto" else os.getenv(
+                    "GROQ_MODEL", "llama-3.3-70b-versatile"
+                )
+            else:
+                api_key = os.getenv("VENICE_API_KEY", "").strip()
+                if api_key:
+                    base_url = base_url or "https://api.venice.ai/api/v1"
+                    model = model if model and model.lower() != "auto" else "venice-uncensored-1-2"
         if not api_key:
             raise FreeLLMAPIError(
-                "FREELLMAPI_API_KEY is not configured; mini-agent inference remains disabled."
+                "Configure FREELLMAPI_API_KEY, GROQ_API_KEY, or VENICE_API_KEY; "
+                "mini-agent inference remains disabled."
             )
         try:
             timeout = float(os.getenv("FREELLMAPI_TIMEOUT_SECONDS", "45"))
         except ValueError as exc:
             raise FreeLLMAPIError("FREELLMAPI_TIMEOUT_SECONDS must be numeric.") from exc
         return cls(
-            base_url=os.getenv("FREELLMAPI_BASE_URL", "http://127.0.0.1:3001/v1"),
+            base_url=base_url or "http://127.0.0.1:3001/v1",
             api_key=api_key,
-            model=os.getenv("FREELLMAPI_MODEL", "auto"),
+            model=model or "auto",
             timeout_seconds=timeout,
         )
 

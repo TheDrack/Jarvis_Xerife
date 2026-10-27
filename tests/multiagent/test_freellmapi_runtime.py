@@ -78,7 +78,9 @@ def test_chat_maps_http_error_without_leaking_response_body():
 
 def test_from_env_requires_explicit_api_key(monkeypatch):
     monkeypatch.delenv("FREELLMAPI_API_KEY", raising=False)
-    with pytest.raises(FreeLLMAPIError, match="FREELLMAPI_API_KEY"):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("VENICE_API_KEY", raising=False)
+    with pytest.raises(FreeLLMAPIError, match="FREELLMAPI_API_KEY|GROQ_API_KEY|VENICE_API_KEY"):
         FreeLLMAPIClient.from_env()
 
 
@@ -135,3 +137,31 @@ def test_handler_rejects_missing_objective_without_calling_model():
     assert FreeLLMAgentHandler(FakeClient())(message) == {
         "success": False, "error": "missing_objective"
     }
+
+
+def test_from_env_uses_groq_when_explicit_gateway_key_is_absent(monkeypatch):
+    monkeypatch.delenv("FREELLMAPI_API_KEY", raising=False)
+    monkeypatch.delenv("FREELLMAPI_BASE_URL", raising=False)
+    monkeypatch.delenv("FREELLMAPI_MODEL", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "groq-test-key")
+    monkeypatch.delenv("VENICE_API_KEY", raising=False)
+
+    client = FreeLLMAPIClient.from_env()
+
+    assert client.api_key == "groq-test-key"
+    assert client.base_url == "https://api.groq.com/openai/v1"
+    assert client.model == "llama-3.3-70b-versatile"
+
+
+def test_from_env_uses_venice_only_when_no_groq_key_is_configured(monkeypatch):
+    monkeypatch.delenv("FREELLMAPI_API_KEY", raising=False)
+    monkeypatch.delenv("FREELLMAPI_BASE_URL", raising=False)
+    monkeypatch.delenv("FREELLMAPI_MODEL", raising=False)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setenv("VENICE_API_KEY", "venice-test-key")
+
+    client = FreeLLMAPIClient.from_env()
+
+    assert client.api_key == "venice-test-key"
+    assert client.base_url == "https://api.venice.ai/api/v1"
+    assert client.model == "venice-uncensored-1-2"
