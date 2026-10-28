@@ -153,7 +153,7 @@ class SupabaseTaskQueueMiniAgent:
         self, task_id: str, attempt_id: str, stop_event: threading.Event
     ) -> None:
         """Renew the lease while inference runs; never revive an expired/stale claim."""
-        interval = max(1.0, self.lease_seconds / 3)
+        interval = self._lease_renewal_interval()
         while not stop_event.wait(interval):
             try:
                 response = self.client.rpc(
@@ -181,6 +181,10 @@ class SupabaseTaskQueueMiniAgent:
                     self.agent_id,
                     exc_info=True,
                 )
+
+    def _lease_renewal_interval(self) -> float:
+        """Renew at one-third of the lease, with a one-second minimum."""
+        return max(1.0, self.lease_seconds / 3)
 
     def _release_after_failure(self, task_id: str, attempt_id: str, exc: Exception) -> None:
         """Return the claimed task to the queue without waiting for the lease."""
