@@ -264,3 +264,7 @@ MIT License — veja [LICENSE](LICENSE) para detalhes.
 ## Guia de uso e modos de opera??o
 
 Consulte [docs/GUIA_DE_USO.md](docs/GUIA_DE_USO.md) para os modos de opera??o e [docs/NAVEGACAO_VISUAL.md](docs/NAVEGACAO_VISUAL.md) para navega??o do desktop.
+
+## Pós-instalação e primeiro uso obrigatório
+
+Antes de considerar uma instalação operacional, toda IA que usar Jarvis deve executar a **Verificação Inicial de Vôo (VIV)**: [procedimento de pós-instalação](docs/POS_INSTALACAO.md). O protocolo também está referenciado nas instruções de agentes e no [prompt inicial portátil](docs/skills-connectors/STARTUP_PROMPT.md), para runtimes que não carregam arquivos do repositório automaticamente.
