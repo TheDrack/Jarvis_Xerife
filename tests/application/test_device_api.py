@@ -11,6 +11,7 @@ from sqlmodel import create_engine, SQLModel
 from app.adapters.infrastructure.api_server import create_api_server
 from app.application.services import AssistantService
 from app.application.services.device_service import DeviceService
+from app.core.config import settings
 
 
 @pytest.fixture(autouse=True)
@@ -18,6 +19,7 @@ def set_admin_credentials(monkeypatch):
     """Set env-var admin credentials so authentication works without Supabase."""
     monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
     monkeypatch.setenv("JARVIS_ADMIN_EMAIL", "admin@jarvis.local")
+    monkeypatch.setattr(settings, "secret_key", "test-only-signing-secret-not-for-production-32")
 
 
 @pytest.fixture
