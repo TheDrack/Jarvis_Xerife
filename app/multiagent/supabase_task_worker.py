@@ -38,7 +38,7 @@ class SupabaseTaskQueueMiniAgent:
         self.model_provider = model_provider.strip().lower() or "unknown"
 
     @classmethod
-    def from_env(cls) -> "SupabaseTaskQueueMiniAgent":
+    def from_env(cls, agent_id: str | None = None) -> "SupabaseTaskQueueMiniAgent":
         from app.adapters.infrastructure.supabase_client import get_supabase_admin_client
 
         client = get_supabase_admin_client()
@@ -59,7 +59,7 @@ class SupabaseTaskQueueMiniAgent:
                 provider = "unknown"
         return cls(
             client=client,
-            agent_id=os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1").strip(),
+            agent_id=(agent_id or os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1")).strip(),
             handler=FreeLLMAgentHandler(llm_client),
             lease_seconds=int(os.getenv("JARVIS_TASK_QUEUE_LEASE_SECONDS", "90")),
             model_provider=provider,

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from threading import Event
 
 import pytest
 
+from app.multiagent import agent_worker_runtime
 from app.multiagent.agent_worker_runtime import run_worker_loop, start_configured_worker
 
 
@@ -103,7 +106,7 @@ def test_runtime_starts_configured_worker_and_can_be_stopped(monkeypatch):
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
     monkeypatch.setattr(
         "app.multiagent.agent_worker_runtime.PriorityQueueMiniAgent.from_env",
-        lambda: IdleWorker(),
+        lambda agent_id=None: IdleWorker(),
     )
     runtime = start_configured_worker()
     assert runtime is not None
@@ -126,7 +129,7 @@ def test_runtime_prefers_supabase_native_worker_when_admin_credentials_exist(mon
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "test-service-role")
     monkeypatch.setattr(
         "app.multiagent.supabase_task_worker.SupabaseTaskQueueMiniAgent.from_env",
-        lambda: IdleWorker(),
+        lambda agent_id=None: IdleWorker(),
     )
     runtime = start_configured_worker()
     assert runtime is not None
@@ -135,3 +138,99 @@ def test_runtime_prefers_supabase_native_worker_when_admin_credentials_exist(mon
     stop.set()
     thread.join(timeout=1)
     assert not thread.is_alive()
+
+
+def test_agent_ids_derive_distinct_slots_from_the_base_identity():
+    assert agent_worker_runtime._agent_ids("mini-freellmapi-1", 1) == ["mini-freellmapi-1"]
+    assert agent_worker_runtime._agent_ids("mini-freellmapi-1", 3) == [
+        "mini-freellmapi-1",
+        "mini-freellmapi-2",
+        "mini-freellmapi-3",
+    ]
+    assert agent_worker_runtime._agent_ids("solo", 2) == ["solo-1", "solo-2"]
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("0", 1), ("abc", 1), ("99", agent_worker_runtime.MAX_WORKER_SLOTS)])
+def test_worker_slots_are_clamped_to_a_safe_range(monkeypatch, raw, expected):
+    monkeypatch.setenv("JARVIS_MINI_AGENT_WORKERS", raw)
+    assert agent_worker_runtime._configured_worker_count() == expected
+
+
+def test_runtime_starts_one_worker_per_configured_slot(monkeypatch):
+    class IdleWorker:
+        def __init__(self, agent_id):
+            self.agent_id = agent_id
+
+        def run_once(self):
+            return None
+
+    monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.setenv("JARVIS_MINI_AGENT_WORKERS", "3")
+    monkeypatch.setenv("JARVIS_AGENT_ID", "mini-freellmapi-1")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.setattr(
+        "app.multiagent.agent_worker_runtime.PriorityQueueMiniAgent.from_env",
+        lambda agent_id=None: IdleWorker(agent_id),
+    )
+
+    runtime = start_configured_worker()
+    assert runtime is not None
+    group, stop = runtime
+    assert len(group.threads) == 3
+    assert sorted(thread.name for thread in group.threads) == [
+        "JarvisAgentWorker-mini-freellmapi-1",
+        "JarvisAgentWorker-mini-freellmapi-2",
+        "JarvisAgentWorker-mini-freellmapi-3",
+    ]
+    stop.set()
+    group.join(timeout=2)
+    assert not group.is_alive()
+
+
+def test_configured_workers_poll_simultaneously(monkeypatch):
+    """Workers must be inside their loops at the same time, not staggered."""
+    parties = 3
+    barrier = threading.Barrier(parties, timeout=5)
+    started = []
+    lock = threading.Lock()
+
+    class SynchronizingWorker:
+        def __init__(self, agent_id):
+            self.agent_id = agent_id
+            self.waited = False
+
+        def run_once(self):
+            if self.waited:
+                return None
+            self.waited = True
+            barrier.wait()  # only releases once every worker has reached it
+            with lock:
+                started.append(self.agent_id)
+            return {"task_id": f"task-{self.agent_id}", "status": "completed"}
+
+    monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.setenv("JARVIS_MINI_AGENT_WORKERS", str(parties))
+    monkeypatch.setenv("JARVIS_AGENT_ID", "mini-freellmapi-1")
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.setattr(
+        "app.multiagent.agent_worker_runtime.PriorityQueueMiniAgent.from_env",
+        lambda agent_id=None: SynchronizingWorker(agent_id),
+    )
+
+    runtime = start_configured_worker()
+    assert runtime is not None
+    group, stop = runtime
+    deadline = time.monotonic() + 5
+    while len(started) < parties and time.monotonic() < deadline:
+        time.sleep(0.01)
+    stop.set()
+    group.join(timeout=5)
+
+    assert sorted(started) == [
+        "mini-freellmapi-1",
+        "mini-freellmapi-2",
+        "mini-freellmapi-3",
+    ], "every configured worker must run its loop at the same time"
+    assert not group.is_alive()

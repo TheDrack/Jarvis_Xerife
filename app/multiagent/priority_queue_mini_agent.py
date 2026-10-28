@@ -48,12 +48,12 @@ class PriorityQueueMiniAgent:
         self._client = client
 
     @classmethod
-    def from_env(cls) -> "PriorityQueueMiniAgent":
+    def from_env(cls, agent_id: str | None = None) -> "PriorityQueueMiniAgent":
         api_token = os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
         api_base_url = os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
         username = os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip() or None
         password = os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "") or None
-        agent_id = os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1").strip()
+        agent_id = (agent_id or os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1")).strip()
         if not api_base_url or not (api_token or (username and password)):
             raise RuntimeError(
                 "Set JARVIS_TASK_QUEUE_API_URL and either JARVIS_TASK_QUEUE_API_TOKEN "

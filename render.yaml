@@ -49,7 +49,7 @@ services:
       - key: LANGUAGE
         value: pt-BR
       - key: WAKE_WORD
-        value: jarvis
+        value: xerife
 
       # Database URL
       - key: DATABASE_URL
@@ -71,6 +71,11 @@ services:
       # Supervised text-only mini-agent; credentials are set in the Render dashboard.
       - key: JARVIS_MINI_AGENT_ENABLED
         value: true
+      # Preferred queue backend: the worker uses the shared Supabase admin client.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
       - key: JARVIS_TASK_QUEUE_API_URL
         value: https://jarvis-api-c47i.onrender.com
       - key: JARVIS_TASK_QUEUE_API_TOKEN
@@ -81,6 +86,9 @@ services:
         sync: false
       - key: JARVIS_AGENT_ID
         value: mini-freellmapi-1
+      # Concurrent slots; identities derive as mini-freellmapi-1..N.
+      - key: JARVIS_MINI_AGENT_WORKERS
+        value: 3
       - key: JARVIS_TASK_QUEUE_LEASE_SECONDS
         value: 90
       - key: FREELLMAPI_API_KEY
