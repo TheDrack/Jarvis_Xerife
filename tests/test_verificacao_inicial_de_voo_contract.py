@@ -46,3 +46,8 @@ def test_viv_requires_regression_tests_and_protects_production():
     assert "autorização explícita" in viv
     assert "rate limits" in viv
     assert "evidência" in viv
+
+def test_viv_does_not_assume_repository_instructions_auto_load_everywhere():
+    startup = _read("docs/skills-connectors/STARTUP_PROMPT.md").casefold()
+    assert "do not assume" in startup or "não assume" in startup
+    assert "docs/POS_INSTALACAO.md" in startup
