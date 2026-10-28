@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import Mock, MagicMock
 from sqlmodel import create_engine, SQLModel
 
-from app.adapters.infrastructure.api_server import create_api_server
+from app.adapters.infrastructure.api_server import create_api_server, auth_adapter as api_auth_adapter
 from app.application.services import AssistantService
 from app.application.services.device_service import DeviceService
 from app.core.config import settings
@@ -20,6 +20,7 @@ def set_admin_credentials(monkeypatch):
     monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
     monkeypatch.setenv("JARVIS_ADMIN_EMAIL", "admin@jarvis.local")
     monkeypatch.setattr(settings, "secret_key", "test-only-signing-secret-not-for-production-32")
+    monkeypatch.setattr(api_auth_adapter, "secret_key", "test-only-signing-secret-not-for-production-32")
 
 
 @pytest.fixture
