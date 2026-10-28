@@ -216,6 +216,14 @@ graph LR
     app_utils["<b>utils</b><br/><hr/>📄 jrvs_codec.py: JrvsDecodeError, encode, decode<br/>📄 document_store.py: DocumentStore, read, write<br/>📄 helpers.py: setup_logging, ensure_directory, sanitize_filename"]
     class app_utils support
     app --> app_utils
+    Jarvis_Xerife["<b>Jarvis_Xerife</b>"]
+    class Jarvis_Xerife support
+    Jarvis_Xerife_capabilities["<b>capabilities</b>"]
+    class Jarvis_Xerife_capabilities support
+    Jarvis_Xerife --> Jarvis_Xerife_capabilities
+    Jarvis_Xerife_capabilities_Vigilance["<b>Vigilance</b>"]
+    class Jarvis_Xerife_capabilities_Vigilance support
+    Jarvis_Xerife_capabilities --> Jarvis_Xerife_capabilities_Vigilance
     docs["<b>docs</b>"]
     class docs support
     docs_architecture["<b>architecture</b>"]
@@ -232,6 +240,23 @@ graph LR
     supabase__temp["<b>.temp</b>"]
     class supabase__temp support
     supabase --> supabase__temp
+    _agents["<b>.agents</b>"]
+    class _agents support
+    _agents_skills["<b>skills</b>"]
+    class _agents_skills support
+    _agents --> _agents_skills
+    _agents_skills_jarvis-android-navigation["<b>jarvis-android-navigation</b>"]
+    class _agents_skills_jarvis-android-navigation support
+    _agents_skills --> _agents_skills_jarvis-android-navigation
+    _agents_skills_jarvis-visual-navigation["<b>jarvis-visual-navigation</b>"]
+    class _agents_skills_jarvis-visual-navigation support
+    _agents_skills --> _agents_skills_jarvis-visual-navigation
+    _agents_skills_jarvis-multi-agent-coordination["<b>jarvis-multi-agent-coordination</b>"]
+    class _agents_skills_jarvis-multi-agent-coordination support
+    _agents_skills --> _agents_skills_jarvis-multi-agent-coordination
+    _agents_skills_jarvis-context-memory["<b>jarvis-context-memory</b>"]
+    class _agents_skills_jarvis-context-memory support
+    _agents_skills --> _agents_skills_jarvis-context-memory
     data["<b>data</b>"]
     class data support
     data_jrvs["<b>jrvs</b>"]
