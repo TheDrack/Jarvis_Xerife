@@ -158,7 +158,7 @@ def get_api_key_with_clipboard() -> Optional[str]:
                     # Google API keys typically start with "AIza"
                     if current_clipboard.startswith("AIza") or len(current_clipboard) > MIN_API_KEY_LENGTH:
                         print_success(f"\n✓ Chave API capturada automaticamente!")
-                        print_info(f"Chave: {current_clipboard[:10]}...{current_clipboard[-5:]}")
+                        print_info("Chave capturada (valor oculto por segurança).")
                         
                         confirm = input(f"\n{Colors.OKBLUE}Esta é a chave correta? (s/n): {Colors.ENDC}").lower()
                         if confirm in ['s', 'sim', 'y', 'yes', '']:
@@ -199,7 +199,8 @@ def validate_database_connection(database_url: str) -> bool:
         print_success("Conexão com o banco de dados estabelecida com sucesso!")
         return True
     except Exception as e:
-        print_error(f"Erro ao conectar ao banco de dados: {e}")
+        logger.warning("Falha ao validar conexão com o banco de dados (%s).", type(e).__name__)
+        print_error("Falha ao conectar ao banco de dados. Verifique a URL e as credenciais; detalhes sensíveis foram omitidos.")
         return False
     finally:
         # SQLite keeps a pooled file handle open unless the engine is disposed.
@@ -303,10 +304,18 @@ def save_env_file(
         ]
     
     try:
+        # Create/update the secret file with owner-only permissions where supported.
+        # chmod after opening also tightens permissions on pre-existing files.
         with open(env_path, 'w', encoding='utf-8') as f:
             f.writelines(env_content)
-        
-        print_success(f"Configurações salvas em {env_path}")
+        try:
+            os.chmod(env_path, 0o600)
+        except OSError:
+            # Windows ACLs do not map cleanly to POSIX mode bits; rely on the
+            # user's profile ACL there and never fail setup solely on chmod.
+            logger.debug("Could not apply POSIX permissions to .env on this platform.")
+
+        print_success("Configurações salvas no arquivo .env.")
         print_warning("⚠ IMPORTANTE: Este arquivo .env está criptografado para este computador!")
         print_warning("⚠ Se movido para outro PC, será necessário executar o setup novamente.")
         return True
