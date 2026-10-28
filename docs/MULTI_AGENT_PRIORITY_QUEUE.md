@@ -12,6 +12,7 @@ Rotinas liberam demandas no banco; agentes elegíveis reivindicam a tarefa pende
 - `jarvis_agent_attempts` / `jarvis_agent_events`: tentativas e trilha de auditoria.
 - `claim_next_jarvis_agent_task`: reivindicação atômica com ordenação por prioridade, antiguidade e ID; usa `FOR UPDATE SKIP LOCKED`.
 - `recover_expired_jarvis_agent_tasks`: recupera leases vencidos e encerra tarefas que esgotaram as tentativas.
+- `release_jarvis_agent_task`: devolve a tarefa ao `ready` assim que o worker atual falha, sem esperar o lease; encerra em `failed` quando as tentativas acabam e recusa tentativas obsoletas ou de outro agente.
 
 ## API autenticada
 

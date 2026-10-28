@@ -25,7 +25,7 @@ slots. All slots share a single shutdown signal, and each still advertises only
 
 ## Supervision behavior
 
-The runtime heartbeats and claims at most one task per iteration. An empty queue uses an interruptible idle wait. Failures use bounded exponential backoff (1–30 seconds by default), and shutdown signals stop the loop. A task is marked completed only after the model returns a successful result and the Supabase finish RPC accepts the current attempt ID. A worker error never fabricates a heartbeat or completion.
+The runtime heartbeats and claims at most one task per iteration. An empty queue uses an interruptible idle wait. Failures use bounded exponential backoff (1–30 seconds by default), and shutdown signals stop the loop. A task is marked completed only after the model returns a successful result and the Supabase finish RPC accepts the current attempt ID. A worker error never fabricates a heartbeat or completion. When an attempt fails before finishing, the worker calls `release_jarvis_agent_task` (`supabase/migrations/20261028090000_release_failed_task_attempt.sql`) so the task returns to the queue immediately instead of waiting out its lease; the lease remains the fallback when the release itself cannot be recorded, and a task that exhausted `max_attempts` becomes `failed` rather than `ready`.
 
 ## Local verification
 

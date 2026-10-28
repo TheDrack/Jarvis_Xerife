@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from app.multiagent.supabase_task_worker import SupabaseTaskQueueMiniAgent
 
 
@@ -34,6 +36,8 @@ class FakeSupabase:
         if name == "claim_next_jarvis_agent_task":
             return FakeQuery(SimpleNamespace(data=[self.task] if self.task else []))
         if name == "finish_jarvis_agent_task":
+            return FakeQuery(SimpleNamespace(data=True))
+        if name == "release_jarvis_agent_task":
             return FakeQuery(SimpleNamespace(data=True))
         return FakeQuery(SimpleNamespace(data=None))
 
@@ -119,3 +123,79 @@ def test_supabase_worker_rejects_stale_completion():
         assert "stale" in str(exc)
     else:
         raise AssertionError("stale completion must be rejected")
+
+
+def failing_task():
+    return {
+        "task_id": "text-task-3",
+        "attempt_id": "00000000-0000-0000-0000-000000000003",
+        "objective": "Summarize text",
+        "task_type": "general",
+        "leader_id": "jarvis",
+    }
+
+
+def test_supabase_worker_releases_a_task_when_inference_raises():
+    class DroppingHandler:
+        def __call__(self, message):
+            raise RuntimeError("provider dropped the connection")
+
+    client = FakeSupabase(failing_task())
+    worker = SupabaseTaskQueueMiniAgent(
+        client=client, agent_id="mini-test", handler=DroppingHandler()
+    )
+
+    with pytest.raises(RuntimeError, match="provider dropped"):
+        worker.run_once()
+
+    names = [name for name, _ in client.rpc_calls]
+    assert "release_jarvis_agent_task" in names, "a failed attempt must be released at once"
+    assert "finish_jarvis_agent_task" not in names, "a crash must not fabricate a completion"
+    release = dict(client.rpc_calls)["release_jarvis_agent_task"]
+    assert release["p_task_id"] == "text-task-3"
+    assert release["p_attempt_id"] == "00000000-0000-0000-0000-000000000003"
+    assert release["p_agent_id"] == "mini-test"
+    assert "provider dropped" in release["p_reason"]
+
+
+def test_supabase_worker_still_raises_when_the_queue_refuses_release():
+    class RefusingSupabase(FakeSupabase):
+        def rpc(self, name, params):
+            if name == "release_jarvis_agent_task":
+                self.rpc_calls.append((name, params))
+                return FakeQuery(SimpleNamespace(data=False))
+            return super().rpc(name, params)
+
+    class DroppingHandler:
+        def __call__(self, message):
+            raise RuntimeError("boom")
+
+    client = RefusingSupabase(failing_task())
+    worker = SupabaseTaskQueueMiniAgent(
+        client=client, agent_id="mini-test", handler=DroppingHandler()
+    )
+
+    with pytest.raises(RuntimeError, match="boom"):
+        worker.run_once()
+
+    assert any(name == "release_jarvis_agent_task" for name, _ in client.rpc_calls)
+
+
+def test_supabase_worker_keeps_the_original_error_when_release_itself_fails():
+    class ExplodingSupabase(FakeSupabase):
+        def rpc(self, name, params):
+            if name == "release_jarvis_agent_task":
+                raise ConnectionError("supabase unreachable")
+            return super().rpc(name, params)
+
+    class DroppingHandler:
+        def __call__(self, message):
+            raise RuntimeError("original failure")
+
+    worker = SupabaseTaskQueueMiniAgent(
+        client=ExplodingSupabase(failing_task()), agent_id="mini-test",
+        handler=DroppingHandler(),
+    )
+
+    with pytest.raises(RuntimeError, match="original failure"):
+        worker.run_once()

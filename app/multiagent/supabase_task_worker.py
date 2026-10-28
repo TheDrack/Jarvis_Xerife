@@ -1,6 +1,7 @@
 """Supabase-native task consumer for the bounded text-only mini-agent."""
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Any
@@ -8,6 +9,8 @@ from typing import Any
 from .freellmapi_client import FreeLLMAPIClient
 from .freellmapi_handler import FreeLLMAgentHandler
 from .transport import AgentMessage
+
+logger = logging.getLogger(__name__)
 
 
 class SupabaseTaskQueueMiniAgent:
@@ -112,7 +115,13 @@ class SupabaseTaskQueueMiniAgent:
                 "model": task.get("model"),
             },
         )
-        result = dict(self.handler(message))
+        try:
+            result = dict(self.handler(message))
+        except Exception as exc:  # noqa: BLE001 - release the claim, then surface it
+            # Hand the task back at once instead of holding it until the lease
+            # expires; the lease stays as the fallback when release cannot land.
+            self._release_after_failure(task_id, attempt_id, exc)
+            raise
         status = "completed" if result.get("success") else "failed"
         finished = self.client.rpc(
             "finish_jarvis_agent_task",
@@ -127,3 +136,28 @@ class SupabaseTaskQueueMiniAgent:
         if not bool(getattr(finished, "data", False)):
             raise RuntimeError("Supabase rejected task completion because the attempt is stale.")
         return {"task_id": task_id, "status": status, "result": result}
+
+    def _release_after_failure(self, task_id: str, attempt_id: str, exc: Exception) -> None:
+        """Return the claimed task to the queue without waiting for the lease."""
+        reason = " ".join(f"{type(exc).__name__}: {exc}".split())[:500]
+        try:
+            released = self.client.rpc(
+                "release_jarvis_agent_task",
+                {
+                    "p_task_id": task_id,
+                    "p_agent_id": self.agent_id,
+                    "p_attempt_id": attempt_id,
+                    "p_reason": reason,
+                },
+            ).execute()
+        except Exception:  # noqa: BLE001 - the lease is the safety net
+            logger.exception(
+                "Could not release task %s after a worker error; the lease will recover it",
+                task_id,
+            )
+            return
+        if not bool(getattr(released, "data", False)):
+            logger.warning(
+                "Supabase refused to release task %s; the lease will recover it",
+                task_id,
+            )
