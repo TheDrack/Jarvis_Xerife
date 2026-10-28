@@ -19,28 +19,19 @@ Exemplo:
 ```python
 from app.adapters.edge.navigation_gps import NavigationGraph
 
-with NavigationGraph("navigation-gps.sqlite3") as_unused:
-    pass
-```
-
-A classe não implementa context manager; feche a conexão explicitamente:
-
-```python
-from app.adapters.edge.navigation_gps import NavigationGraph
-
 graph = NavigationGraph("navigation-gps.sqlite3")
-graph.upsert_node("app.home", label="Página inicial")
-graph.upsert_node("app.settings", label="Configurações")
-graph.record_transition(
-    "app.home", "app.settings",
-    action="open_settings",
-    backend="uia",
-    latency_seconds=0.18,
-    success=True,  # somente após validar o estado de destino
-    metadata={"target_name": "Settings", "postcondition": "settings panel visible"},
-)
-route = graph.plan("app.home", "app.settings")
 try:
+    graph.upsert_node("app.home", label="Página inicial")
+    graph.upsert_node("app.settings", label="Configurações")
+    graph.record_transition(
+        "app.home", "app.settings",
+        action="open_settings",
+        backend="uia",
+        latency_seconds=0.18,
+        success=True,  # somente após validar o estado de destino
+        metadata={"target_name": "Settings", "postcondition": "settings panel visible"},
+    )
+    route = graph.plan("app.home", "app.settings")
     print(route)
 finally:
     graph.close()
