@@ -50,4 +50,5 @@ def test_viv_requires_regression_tests_and_protects_production():
 def test_viv_does_not_assume_repository_instructions_auto_load_everywhere():
     startup = _read("docs/skills-connectors/STARTUP_PROMPT.md").casefold()
     assert "do not assume" in startup or "não assume" in startup
+    # Paths are case-insensitive here because the contract is about the target file, not its display casing.
     assert "docs/pos_instalacao.md" in startup
