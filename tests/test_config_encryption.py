@@ -22,7 +22,7 @@ class TestConfigDecryption(NexusComponent):
     def test_config_loads_encrypted_api_key(self, tmp_path):
         """Test that Settings correctly decrypts GEMINI_API_KEY"""
         # Create a temporary .env file with encrypted API key
-        api_key = "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
+        api_key = "TEST_ONLY_NOT_A_REAL_GOOGLE_API_KEY"
         encrypted_api_key = encrypt_value(api_key)
         
         env_file = tmp_path / ".env"
@@ -57,7 +57,7 @@ class TestConfigDecryption(NexusComponent):
     def test_config_loads_plain_text_values(self, tmp_path):
         """Test that Settings still works with plain text (unencrypted) values"""
         # Create a temporary .env file with plain text values
-        api_key = "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
+        api_key = "TEST_ONLY_NOT_A_REAL_GOOGLE_API_KEY"
         database_url = "sqlite:///jarvis.db"
         
         env_file = tmp_path / ".env"
@@ -75,7 +75,7 @@ DATABASE_URL={database_url}
     def test_config_fails_with_wrong_hardware_encrypted_value(self, tmp_path):
         """Test that Settings raises error when encrypted value can't be decrypted"""
         # Create encrypted value with current hardware
-        api_key = "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
+        api_key = "TEST_ONLY_NOT_A_REAL_GOOGLE_API_KEY"
         encrypted_api_key = encrypt_value(api_key)
         
         env_file = tmp_path / ".env"
