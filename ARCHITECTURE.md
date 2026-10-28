@@ -229,6 +229,9 @@ graph LR
     supabase_migrations["<b>migrations</b>"]
     class supabase_migrations support
     supabase --> supabase_migrations
+    supabase__temp["<b>.temp</b>"]
+    class supabase__temp support
+    supabase --> supabase__temp
     data["<b>data</b>"]
     class data support
     data_jrvs["<b>jrvs</b>"]
