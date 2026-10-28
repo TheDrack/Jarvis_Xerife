@@ -10,7 +10,7 @@ DASHBOARD = ROOT / "app" / "static" / "network-devices.html"
 
 def test_hud_links_to_network_device_dashboard():
     html = HUD.read_text(encoding="utf-8")
-    assert 'href="/static/network-devices.html"' in html
+    assert 'href="/network-devices"' in html
     assert "Abrir painel de dispositivos da rede" in html
 
 
