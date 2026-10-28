@@ -133,6 +133,9 @@ DATABASE_URL=sqlite:///jarvis.db
         
         env_file = tmp_path / ".env"
         assert env_file.exists()
+        if os.name != "nt":
+            import stat
+            assert stat.S_IMODE(env_file.stat().st_mode) == 0o600
         
         content = env_file.read_text()
         assert f"USER_ID={user_id}" in content
@@ -183,6 +186,17 @@ DATABASE_URL=sqlite:///jarvis.db
         database_url = "invalid://connection/string"
         result = validate_database_connection(database_url)
         assert result is False
+
+    @patch(
+        "app.adapters.infrastructure.setup_wizard.create_engine",
+        side_effect=RuntimeError("postgresql://admin:DO_NOT_LEAK@secret-host/db"),
+    )
+    def test_database_errors_do_not_print_credentials(self, mock_engine, capsys):
+        result = validate_database_connection("postgresql://admin:DO_NOT_LEAK@secret-host/db")
+        assert result is False
+        output = capsys.readouterr().out
+        assert "DO_NOT_LEAK" not in output
+        assert "secret-host" not in output
     
     @patch('app.adapters.infrastructure.setup_wizard.webbrowser.open')
     @patch('app.adapters.infrastructure.setup_wizard.input')
