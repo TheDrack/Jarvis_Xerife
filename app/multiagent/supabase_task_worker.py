@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,9 +17,9 @@ logger = logging.getLogger(__name__)
 class SupabaseTaskQueueMiniAgent:
     """Claim and finish tasks through service-role Supabase RPCs.
 
-    This worker advertises only ``text_reasoning``. PostgreSQL capability
-    containment prevents it from claiming tasks that require repository, shell,
-    browser, or production-diagnostic tools.
+    PostgreSQL capability containment prevents this worker from claiming tasks
+    that require repository, shell, browser, or production-diagnostic tools.
+    A lease-renewal thread fences long-running inference from lease expiry.
     """
 
     def __init__(
@@ -115,27 +116,71 @@ class SupabaseTaskQueueMiniAgent:
                 "model": task.get("model"),
             },
         )
+
+        renew_stop = threading.Event()
+        renew_thread = threading.Thread(
+            target=self._renew_lease_loop,
+            args=(task_id, attempt_id, renew_stop),
+            name=f"JarvisLeaseRenewal-{self.agent_id}",
+            daemon=True,
+        )
+        renew_thread.start()
         try:
-            result = dict(self.handler(message))
-        except Exception as exc:  # noqa: BLE001 - release the claim, then surface it
-            # Hand the task back at once instead of holding it until the lease
-            # expires; the lease stays as the fallback when release cannot land.
-            self._release_after_failure(task_id, attempt_id, exc)
-            raise
-        status = "completed" if result.get("success") else "failed"
-        finished = self.client.rpc(
-            "finish_jarvis_agent_task",
-            {
-                "p_task_id": task_id,
-                "p_agent_id": self.agent_id,
-                "p_attempt_id": attempt_id,
-                "p_status": status,
-                "p_result": result,
-            },
-        ).execute()
-        if not bool(getattr(finished, "data", False)):
-            raise RuntimeError("Supabase rejected task completion because the attempt is stale.")
-        return {"task_id": task_id, "status": status, "result": result}
+            try:
+                result = dict(self.handler(message))
+            except Exception as exc:  # noqa: BLE001 - release claim, then surface it
+                self._release_after_failure(task_id, attempt_id, exc)
+                raise
+            status = "completed" if result.get("success") else "failed"
+            finished = self.client.rpc(
+                "finish_jarvis_agent_task",
+                {
+                    "p_task_id": task_id,
+                    "p_agent_id": self.agent_id,
+                    "p_attempt_id": attempt_id,
+                    "p_status": status,
+                    "p_result": result,
+                },
+            ).execute()
+            if not bool(getattr(finished, "data", False)):
+                raise RuntimeError("Supabase rejected task completion because the attempt is stale.")
+            return {"task_id": task_id, "status": status, "result": result}
+        finally:
+            renew_stop.set()
+            renew_thread.join(timeout=1.0)
+
+    def _renew_lease_loop(
+        self, task_id: str, attempt_id: str, stop_event: threading.Event
+    ) -> None:
+        """Renew the lease while inference runs; never revive an expired/stale claim."""
+        interval = max(1.0, self.lease_seconds / 3)
+        while not stop_event.wait(interval):
+            try:
+                response = self.client.rpc(
+                    "renew_jarvis_agent_task_lease",
+                    {
+                        "p_task_id": task_id,
+                        "p_agent_id": self.agent_id,
+                        "p_attempt_id": attempt_id,
+                        "p_lease_seconds": self.lease_seconds,
+                    },
+                ).execute()
+                if not bool(getattr(response, "data", False)):
+                    logger.error(
+                        "Lease renewal rejected; task ownership may have changed "
+                        "(task_id=%s, agent_id=%s)",
+                        task_id,
+                        self.agent_id,
+                    )
+                    return
+            except Exception:  # noqa: BLE001 - transient errors must not crash inference
+                logger.warning(
+                    "Lease renewal failed; retrying before the current lease expires "
+                    "(task_id=%s, agent_id=%s)",
+                    task_id,
+                    self.agent_id,
+                    exc_info=True,
+                )
 
     def _release_after_failure(self, task_id: str, attempt_id: str, exc: Exception) -> None:
         """Return the claimed task to the queue without waiting for the lease."""
