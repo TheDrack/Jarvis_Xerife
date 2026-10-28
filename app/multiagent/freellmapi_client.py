@@ -5,10 +5,21 @@ replace ChatGPT/Claude as high-capability agents and does not execute tools.
 """
 from __future__ import annotations
 
+import logging
 import os
+import time
 from typing import Any, Mapping, Sequence
 
 import httpx
+
+logger = logging.getLogger(__name__)
+
+# A transient transport failure (connection reset, server disconnect) is worth one
+# immediate retry: otherwise the claimed task waits for its lease to expire before
+# another agent can recover it. Timeouts are deliberately not retried because a
+# second full timeout would outlive the queue lease.
+TRANSPORT_RETRY_ATTEMPTS = 2
+TRANSPORT_RETRY_DELAY_SECONDS = 0.5
 
 
 class FreeLLMAPIError(RuntimeError):
@@ -108,12 +119,7 @@ class FreeLLMAPIClient:
         owned_client = self._client is None
         client = self._client or httpx.Client(timeout=self.timeout_seconds)
         try:
-            response = client.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=request_body,
-                timeout=self.timeout_seconds,
-            )
+            response = self._post_completion(client, headers, request_body)
             if response.is_error:
                 raise FreeLLMAPIError(
                     f"FreeLLMAPI returned HTTP {response.status_code}."
@@ -143,6 +149,38 @@ class FreeLLMAPIClient:
         finally:
             if owned_client:
                 client.close()
+
+    def _post_completion(
+        self,
+        client: httpx.Client,
+        headers: Mapping[str, str],
+        request_body: Mapping[str, Any],
+    ) -> httpx.Response:
+        """POST the completion, retrying only transient transport failures."""
+        last_error: httpx.TransportError | None = None
+        for attempt in range(1, TRANSPORT_RETRY_ATTEMPTS + 1):
+            try:
+                return client.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=dict(headers),
+                    json=dict(request_body),
+                    timeout=self.timeout_seconds,
+                )
+            except httpx.TimeoutException:
+                raise
+            except httpx.TransportError as exc:
+                last_error = exc
+                if attempt >= TRANSPORT_RETRY_ATTEMPTS:
+                    break
+                delay = TRANSPORT_RETRY_DELAY_SECONDS * attempt
+                logger.warning(
+                    "FreeLLMAPI transport error (%s); retrying in %.1fs",
+                    type(exc).__name__,
+                    delay,
+                )
+                time.sleep(delay)
+        assert last_error is not None
+        raise last_error
 
 
 def _parse_nonnegative_int(value: str | None) -> int:

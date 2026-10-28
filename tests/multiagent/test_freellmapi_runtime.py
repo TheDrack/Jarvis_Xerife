@@ -165,3 +165,47 @@ def test_from_env_uses_venice_only_when_no_groq_key_is_configured(monkeypatch):
     assert client.api_key == "venice-test-key"
     assert client.base_url == "https://api.venice.ai/api/v1"
     assert client.model == "venice-uncensored-1-2"
+
+
+def test_chat_retries_a_transient_transport_error(monkeypatch):
+    monkeypatch.setattr(
+        "app.multiagent.freellmapi_client.TRANSPORT_RETRY_DELAY_SECONDS", 0
+    )
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        if len(calls) == 1:
+            raise httpx.RemoteProtocolError("Server disconnected")
+        return httpx.Response(
+            200, json={"model": "m", "choices": [{"message": {"content": "OK"}}]}
+        )
+
+    client, owned = client_for(respond)
+    try:
+        result = client.chat([{"role": "user", "content": "hello"}])
+    finally:
+        owned.close()
+
+    assert result["content"] == "OK"
+    assert len(calls) == 2, "a dropped connection must be retried once"
+
+
+def test_chat_does_not_retry_a_timeout_that_would_outlive_the_lease(monkeypatch):
+    monkeypatch.setattr(
+        "app.multiagent.freellmapi_client.TRANSPORT_RETRY_DELAY_SECONDS", 0
+    )
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        raise httpx.ReadTimeout("slow provider")
+
+    client, owned = client_for(respond)
+    try:
+        with pytest.raises(FreeLLMAPIError, match="timed out"):
+            client.chat([{"role": "user", "content": "hello"}])
+    finally:
+        owned.close()
+
+    assert len(calls) == 1, "a timeout must not be retried inside the same lease"
