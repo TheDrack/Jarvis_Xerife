@@ -20,15 +20,15 @@ Use this skill when the user asks to inspect or operate a Windows desktop throug
 2. If the client exposes only Remote Desktop Commander (RDM), use the persistent JSONL bridge below. RDM relays file/process operations; it does not add Jarvis MCP tools to its own server.
 3. In another local MCP client, register Jarvis's stdio server from `app/adapters/edge/jarvis_desktop_mcp.py`. The navigation engine and template library are the same.
 
-Windows paths for this installation:
-- Repo: `C:\Users\USER\.copilot\repos\Jarvis_Xerife`
-- Python: `C:\Users\USER\.copilot\repos\Jarvis_Xerife\.venv\Scripts\python.exe`
-- CLI: `C:\Users\USER\.copilot\repos\Jarvis_Xerife\app\adapters\edge\jarvis_desktop_cli.py`
+Windows paths are relative to the clone, never fixed to one machine:
+- Repo: the directory that contains `app/` (use `JARVIS_REPO_ROOT` when set).
+- Python: `<repo>\.venv\Scripts\python.exe`
+- CLI: `<repo>\app\adapters\edge\jarvis_desktop_cli.py`
 
 ## RDM observe / act / verify loop
 
-1. Reuse an active Jarvis bridge PID from RDM `list_sessions` when available. Otherwise start it once with RDM `start_process`:
-   `& 'C:\Users\USER\.copilot\repos\Jarvis_Xerife\.venv\Scripts\python.exe' 'C:\Users\USER\.copilot\repos\Jarvis_Xerife\app\adapters\edge\jarvis_desktop_cli.py' --serve`
+1. Reuse an active Jarvis bridge PID from RDM `list_sessions` when available. Otherwise start it once with RDM `start_process`, with the shell already positioned at the clone (or `JARVIS_REPO_ROOT` exported):
+   `& "$env:JARVIS_REPO_ROOT\.venv\Scripts\python.exe" "$env:JARVIS_REPO_ROOT\app\adapters\edge\jarvis_desktop_cli.py" --serve`
    Keep the returned PID for this device. The `>>>` prompt means it is ready.
 2. Send one JSON object per call using RDM `interact_with_process`, with `wait_for_prompt: true`. Example: `{"request_id":"observe-1","action":"observe"}`. The bridge echoes `request_id` so responses can be matched.
 3. Read the JSON response. For an action, open `screenshot_path` with RDM `read_file`. For `watch`, open `contact_sheet_path` first; read individual `frame_paths` only when a detail in the contact sheet needs inspection. Do not infer what is on-screen from paths or process output alone.

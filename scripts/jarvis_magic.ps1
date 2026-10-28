@@ -7,10 +7,13 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'jarvis-machine.ps1')
+$InstallDir = Get-JarvisInstallDir
+$UserHome = Get-JarvisUserHome
 $TaskName = 'Jarvis-RDC-Boot-Connect'
 $InteractiveTaskName = 'Jarvis-Desktop-MCP-Interactive'
-$BootScript = 'C:\ProgramData\Jarvis_Xerife\start-jarvis-boot.ps1'
-$InteractiveBootScript = 'C:\ProgramData\Jarvis_Xerife\start-jarvis-mcp-interactive.ps1'
+$BootScript = Join-Path $InstallDir 'start-jarvis-boot.ps1'
+$InteractiveBootScript = Join-Path $InstallDir 'start-jarvis-mcp-interactive.ps1'
 $Tailscale = @("$env:ProgramFiles\Tailscale\tailscale.exe", "$env:ProgramFiles\Tailscale IPN\tailscale.exe") | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 function Need-Admin {
     $p = [Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()
@@ -45,7 +48,8 @@ switch ($Action) {
             } else { Write-Warning "Tarefa $name não instalada." }
         }
         Get-NetTCPConnection -State Listen -LocalPort 8765 -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, OwningProcess | Format-Table -AutoSize
-        if (Test-Path 'C:\ProgramData\Jarvis_Xerife\logs\supervisor.log') { Get-Content 'C:\ProgramData\Jarvis_Xerife\logs\supervisor.log' -Tail 8 }
+        $supervisorLog = Join-Path $InstallDir 'logs\supervisor.log'
+        if (Test-Path -LiteralPath $supervisorLog) { Get-Content -LiteralPath $supervisorLog -Tail 8 }
     }
     'doctor' {
         $checks = [ordered]@{}
@@ -81,8 +85,10 @@ switch ($Action) {
         if (-not (Test-Path (Join-Path $RepoRoot '.venv\Scripts\python.exe'))) { throw 'Venv do projeto ausente. Siga docs/INSTALACAO_WINDOWS.md.' }
         $sourceBoot = Join-Path $PSScriptRoot 'start-jarvis-boot.ps1'
         $sourceInteractive = Join-Path $PSScriptRoot 'start-jarvis-mcp-interactive.ps1'
+        $sourceMachine = Join-Path $PSScriptRoot 'jarvis-machine.ps1'
         if (-not (Test-Path -LiteralPath $sourceBoot)) { throw "Script fonte de boot não encontrado: $sourceBoot" }
         if (-not (Test-Path -LiteralPath $sourceInteractive)) { throw "Script fonte interativo não encontrado: $sourceInteractive" }
+        if (-not (Test-Path -LiteralPath $sourceMachine)) { throw "Resolver de caminhos não encontrado: $sourceMachine" }
         $up = & $Tailscale up --unattended=true 2>&1
         if ($LASTEXITCODE -ne 0) { throw "Falha ao ativar Tailscale unattended: $up" }
         Log 'Tailscale configurado para executar sem login.'
@@ -93,6 +99,14 @@ switch ($Action) {
         New-Item -ItemType Directory -Path (Split-Path -Parent $BootScript) -Force | Out-Null
         Copy-Item -LiteralPath $sourceBoot -Destination $BootScript -Force
         Copy-Item -LiteralPath $sourceInteractive -Destination $InteractiveBootScript -Force
+        Copy-Item -LiteralPath $sourceMachine -Destination (Join-Path $InstallDir 'jarvis-machine.ps1') -Force
+        $machineConfig = Save-JarvisMachinePaths -Paths ([ordered]@{
+            userHome = $UserHome
+            repoRoot = $RepoRoot
+            installDir = $InstallDir
+            nodeRoot = Get-JarvisNodeRoot
+        }) -Directory $InstallDir
+        Log "Caminhos desta máquina gravados em $machineConfig"
         Log "Supervisor SYSTEM sincronizado: $sourceBoot -> $BootScript"
         Log "Supervisor interativo sincronizado: $sourceInteractive -> $InteractiveBootScript"
         $existingSystemTask = Check-Task
