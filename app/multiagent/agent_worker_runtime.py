@@ -50,7 +50,13 @@ def run_worker_loop(
             if on_error is not None:
                 on_error(exc)
             else:
-                logger.exception("Agent worker iteration failed; retrying with backoff")
+                logger.exception(
+                    "Agent worker iteration failed; retrying with backoff "
+                    "(worker_id=%s, exception_type=%s, backoff_seconds=%.1f)",
+                    getattr(worker, "agent_id", "unknown"),
+                    type(exc).__name__,
+                    backoff,
+                )
             stop_event.wait(backoff)
             backoff = min(max_error_backoff_seconds, backoff * 2)
 
