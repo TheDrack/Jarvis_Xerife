@@ -69,13 +69,13 @@ python -m venv --system-site-packages .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements\edge.txt
 ```
 
-Registre o subprocesso em `%USERPROFILE%/.codex/config.toml`, ajustando o caminho do clone se necessário:
+Registre o subprocesso em `%USERPROFILE%/.codex/config.toml`. Troque `<RAIZ_DO_REPO>` pelo caminho absoluto do seu clone (o mesmo valor de `JARVIS_REPO_ROOT` quando definido):
 
 ```toml
 [mcp_servers.jarvis_desktop]
-command = "C:/Users/USER/.copilot/repos/Jarvis_Xerife/.venv/Scripts/python.exe"
-args = ["C:/Users/USER/.copilot/repos/Jarvis_Xerife/app/adapters/edge/jarvis_desktop_mcp.py"]
-cwd = "C:/Users/USER/.copilot/repos/Jarvis_Xerife"
+command = "<RAIZ_DO_REPO>/.venv/Scripts/python.exe"
+args = ["<RAIZ_DO_REPO>/app/adapters/edge/jarvis_desktop_mcp.py"]
+cwd = "<RAIZ_DO_REPO>"
 ```
 
 Depois que o Codex carregar a configuração, o modelo terá acesso a ferramentas locais que enxergam e controlam o desktop. Uma conexão MCP recém-configurada não aparece retroativamente no inventário de ferramentas de uma conversa já aberta; reabra/atualize o Codex para carregar o servidor.

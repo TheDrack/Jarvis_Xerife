@@ -53,11 +53,24 @@ A existência de uma tarefa agendada ou de um processo ativo não prova que toda
 ## Logs úteis
 
 - Jarvis MCP (sessão interativa): `%LOCALAPPDATA%\Jarvis_Xerife\logs\jarvis-mcp.stdout.log` e `jarvis-mcp.stderr.log`.
-- Supervisor RDC (SYSTEM): `C:\ProgramData\Jarvis_Xerife\logs\supervisor.log`.
+- Supervisor RDC (SYSTEM): `%ProgramData%\Jarvis_Xerife\logs\supervisor.log`.
 - Supervisor MCP interativo: `%LOCALAPPDATA%\Jarvis_Xerife\logs\jarvis-mcp-supervisor.log`.
 - Tailscale: `tailscale status` e `tailscale serve status`.
 - Porta local: `Get-NetTCPConnection -State Listen -LocalPort 8765`.
 - Tarefa: `Get-ScheduledTask -TaskName Jarvis-RDC-Boot-Connect`.
+
+## Caminhos configuráveis
+
+Os supervisores não carregam caminhos fixos desta máquina. A resolução (em `scripts/jarvis-machine.ps1`) usa, nesta ordem: variável de ambiente, `machine.paths.json` ao lado do script instalado e detecção automática.
+
+| Variável | Padrão |
+|---|---|
+| `JARVIS_USER_HOME` | perfil do usuário interativo |
+| `JARVIS_REPO_ROOT` | clone encontrado subindo a partir do script |
+| `JARVIS_INSTALL_DIR` | `%ProgramData%\Jarvis_Xerife` |
+| `JARVIS_NODE_ROOT` | `%ProgramFiles%\nodejs` |
+
+`jarvis_magic.ps1 -Action install` grava `machine.paths.json` com os valores resolvidos nesta máquina, para que a tarefa SYSTEM funcione antes de qualquer logon. Trocar a variável de ambiente sobrescreve o arquivo sem editar script.
 
 ## Critérios de aceitação
 

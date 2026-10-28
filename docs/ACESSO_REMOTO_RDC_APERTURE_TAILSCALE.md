@@ -86,8 +86,8 @@ O comportamento esperado é:
 Scripts relacionados:
 
 - `scripts/jarvis_magic.ps1` — instalação, status, diagnóstico e gerenciamento.
-- `scripts/start-jarvis-boot.ps1` — supervisor SYSTEM do RDC, instalado em `C:\ProgramData\Jarvis_Xerife`.
-- `scripts/start-jarvis-mcp-interactive.ps1` — supervisor do MCP visual na sessão interativa, instalado em `C:\ProgramData\Jarvis_Xerife`.
+- `scripts/start-jarvis-boot.ps1` — supervisor SYSTEM do RDC, instalado em `%ProgramData%\Jarvis_Xerife` (ou `JARVIS_INSTALL_DIR`).
+- `scripts/start-jarvis-mcp-interactive.ps1` — supervisor do MCP visual na sessão interativa, instalado em `%ProgramData%\Jarvis_Xerife`.
 - `scripts/start_jarvis_tailscale.ps1` — inicialização do servidor MCP e Tailscale Serve.
 
 Use `.\scripts\jarvis_magic.ps1 -Action doctor` e `.\scripts\jarvis_magic.ps1 -Action status` para verificar a configuração. Não declare o boot validado apenas porque a tarefa existe: o critério completo exige testar após reinicialização real e verificar Tailscale, servidor local, Serve, conector Aperture e uma chamada MCP. A autenticação do RDC como tarefa `SYSTEM` pode não compartilhar o perfil interativo; não é pré-requisito da rota P0 se o gateway já está disponível ao agente.
@@ -106,7 +106,7 @@ Use `.\scripts\jarvis_magic.ps1 -Action doctor` e `.\scripts\jarvis_magic.ps1 -A
 
 **Objetivo:** permitir que um app MCP personalizado do ChatGPT chame o Jarvis sem usar o gateway Aperture e sem expor a porta local à internet.
 
-O `tunnel-client` oficial já está instalado em `C:\Users\USER\AppData\Local\Programs\tunnel-client\tunnel-client.exe`. O helper `scripts/setup_chatgpt_jarvis_tunnel.ps1` foi criado e passou na validação sintática. Ele não cria credenciais automaticamente e não inicia o túnel até receber os valores de uma organização OpenAI autorizada.
+O `tunnel-client` oficial já está instalado em `%LOCALAPPDATA%\Programs\tunnel-client\tunnel-client.exe` (nesta máquina). O helper `scripts/setup_chatgpt_jarvis_tunnel.ps1` foi criado e passou na validação sintática. Ele não cria credenciais automaticamente e não inicia o túnel até receber os valores de uma organização OpenAI autorizada.
 
 Pré-requisitos externos:
 
