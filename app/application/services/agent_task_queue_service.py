@@ -173,6 +173,29 @@ class AgentTaskQueueService:
             }).scalar_one()
         return bool(value)
 
+    def release(
+        self,
+        task_id: str,
+        agent_id: str,
+        attempt_id: str,
+        reason: str = "worker error",
+    ) -> bool:
+        """Return a failed attempt to the queue without waiting for its lease."""
+        self._ensure_postgres()
+        if not task_id.strip() or not agent_id.strip() or not attempt_id.strip():
+            raise ValueError("task_id, agent_id and attempt_id must not be empty")
+        normalized_reason = (reason or "").strip()[:500] or "worker error"
+        with self.engine.begin() as conn:
+            value = conn.execute(text("""
+                select public.release_jarvis_agent_task(
+                    :task_id, :agent_id, cast(:attempt_id as uuid), :reason
+                )
+            """), {
+                "task_id": task_id, "agent_id": agent_id,
+                "attempt_id": attempt_id, "reason": normalized_reason,
+            }).scalar_one()
+        return bool(value)
+
     def create_routine(
         self,
         routine_key: str,

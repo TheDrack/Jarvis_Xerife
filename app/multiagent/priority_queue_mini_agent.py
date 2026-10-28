@@ -1,6 +1,7 @@
 """HTTP worker that pulls the shared priority queue and runs FreeLLMAPI mini-agents."""
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -9,6 +10,8 @@ import httpx
 from .freellmapi_client import FreeLLMAPIClient
 from .freellmapi_handler import FreeLLMAgentHandler
 from .transport import AgentMessage
+
+logger = logging.getLogger(__name__)
 
 
 class PriorityQueueMiniAgent:
@@ -118,7 +121,13 @@ class PriorityQueueMiniAgent:
                     "model": task.get("model"),
                 },
             )
-            result = dict(self.handler(message))
+            try:
+                result = dict(self.handler(message))
+            except Exception as exc:  # noqa: BLE001 - release the claim, then surface it
+                # Hand the task back at once instead of holding it until the lease
+                # expires; the lease stays as the fallback when release cannot land.
+                self._release_after_failure(client, headers, task_id, attempt_id, exc)
+                raise
             if not result.get("success"):
                 self._post(client, f"/v1/agent-tasks/{task_id}/finish", headers, {
                     "agent_id": self.agent_id,
@@ -138,6 +147,30 @@ class PriorityQueueMiniAgent:
         finally:
             if owned_client:
                 client.close()
+
+    def _release_after_failure(
+        self,
+        client: httpx.Client,
+        headers: dict[str, str],
+        task_id: str,
+        attempt_id: str,
+        exc: Exception,
+    ) -> None:
+        """Return the claimed task to the queue without waiting for the lease."""
+        reason = " ".join(f"{type(exc).__name__}: {exc}".split())[:500]
+        try:
+            self._post(
+                client,
+                f"/v1/agent-tasks/{task_id}/release",
+                headers,
+                {"agent_id": self.agent_id, "attempt_id": attempt_id, "reason": reason},
+            )
+        except Exception:  # noqa: BLE001 - the lease is the safety net
+            logger.warning(
+                "Could not release task %s through the API; its lease will recover it",
+                task_id,
+                exc_info=True,
+            )
 
     def _login(self, client: httpx.Client, headers: dict[str, str]) -> None:
         """Obtain or refresh the short-lived Jarvis JWT without logging credentials."""

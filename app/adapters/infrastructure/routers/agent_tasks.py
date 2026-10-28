@@ -57,6 +57,12 @@ class FinishTaskRequest(BaseModel):
     result: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReleaseTaskRequest(BaseModel):
+    agent_id: str = Field(min_length=1, max_length=200)
+    attempt_id: str
+    reason: str = Field(default="worker error", max_length=500)
+
+
 class TriggerRoutineRequest(BaseModel):
     run_key: str = Field(min_length=1, max_length=250)
 
@@ -138,6 +144,20 @@ def create_agent_tasks_router(db_adapter, get_current_user) -> APIRouter:
             if not accepted:
                 raise HTTPException(status_code=409, detail="Task ownership or attempt is stale")
             return {"accepted": True, "task_id": task_id, "status": request.status}
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise translate_error(exc) from exc
+
+    @router.post("/agent-tasks/{task_id}/release")
+    async def release(task_id: str, request: ReleaseTaskRequest, _user=Depends(get_current_user)):
+        try:
+            released = service().release(
+                task_id, request.agent_id, request.attempt_id, request.reason
+            )
+            if not released:
+                raise HTTPException(status_code=409, detail="Task ownership or attempt is stale")
+            return {"released": True, "task_id": task_id}
         except HTTPException:
             raise
         except Exception as exc:

@@ -20,6 +20,7 @@ Rotinas liberam demandas no banco; agentes elegíveis reivindicam a tarefa pende
 - `POST /v1/agent-tasks`
 - `POST /v1/agent-tasks/claim-next`
 - `POST /v1/agent-tasks/{task_id}/finish`
+- `POST /v1/agent-tasks/{task_id}/release` (devolve a tentativa falha à fila sem esperar o lease; 409 quando a tentativa não é mais do agente)
 - `POST /v1/routines` (cria/atualiza definição; não executa agendador por si só)
 
 Todas as rotas usam a dependência de autenticação existente. A fila requer PostgreSQL; SQLite retorna HTTP 503 em vez de fingir que a fila compartilhada está disponível.

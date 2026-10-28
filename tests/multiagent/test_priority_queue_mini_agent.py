@@ -84,10 +84,12 @@ def test_priority_worker_returns_none_when_queue_empty():
         client.close()
 
 
-def test_priority_worker_does_not_finish_task_when_inference_raises():
-    paths = []
+def test_priority_worker_releases_task_when_inference_raises():
+    calls = []
+
     def transport(request):
-        paths.append(request.url.path)
+        body = __import__("json").loads(request.content)
+        calls.append((request.url.path, body))
         if request.url.path.endswith("/heartbeat"):
             return httpx.Response(200, json={})
         if request.url.path.endswith("/claim-next"):
@@ -95,7 +97,9 @@ def test_priority_worker_does_not_finish_task_when_inference_raises():
                 "task_id": "task-23", "attempt_id": "00000000-0000-0000-0000-000000000023",
                 "objective": "Do bounded analysis",
             }})
-        raise AssertionError("must leave task leased for timeout recovery")
+        if request.url.path.endswith("/release"):
+            return httpx.Response(200, json={"released": True})
+        raise AssertionError(f"unexpected call {request.url.path}")
 
     client = httpx.Client(transport=httpx.MockTransport(transport))
     worker = PriorityQueueMiniAgent(
@@ -108,7 +112,44 @@ def test_priority_worker_does_not_finish_task_when_inference_raises():
             worker.run_once()
     finally:
         client.close()
-    assert not any(path.endswith("/finish") for path in paths)
+
+    paths = [path for path, _ in calls]
+    assert "/v1/agent-tasks/task-23/release" in paths, "the HTTP worker must release at once"
+    assert not any(path.endswith("/finish") for path in paths), "no fabricated completion"
+    release = next(body for path, body in calls if path.endswith("/release"))
+    assert release["agent_id"] == "mini-1"
+    assert release["attempt_id"] == "00000000-0000-0000-0000-000000000023"
+    assert "model unavailable" in release["reason"]
+
+
+def test_priority_worker_keeps_original_error_when_release_endpoint_fails():
+    paths = []
+
+    def transport(request):
+        paths.append(request.url.path)
+        if request.url.path.endswith("/heartbeat"):
+            return httpx.Response(200, json={})
+        if request.url.path.endswith("/claim-next"):
+            return httpx.Response(200, json={"task": {
+                "task_id": "task-24", "attempt_id": "00000000-0000-0000-0000-000000000024",
+                "objective": "Do bounded analysis",
+            }})
+        if request.url.path.endswith("/release"):
+            return httpx.Response(503, json={"detail": "queue unavailable"})
+        raise AssertionError(f"unexpected call {request.url.path}")
+
+    client = httpx.Client(transport=httpx.MockTransport(transport))
+    worker = PriorityQueueMiniAgent(
+        api_base_url="https://jarvis.example", api_token="token",
+        agent_id="mini-1", handler=FakeHandler(error=RuntimeError("model unavailable")),
+        client=client,
+    )
+    try:
+        with pytest.raises(RuntimeError, match="model unavailable"):
+            worker.run_once()
+    finally:
+        client.close()
+    assert any(path.endswith("/release") for path in paths)
 
 
 

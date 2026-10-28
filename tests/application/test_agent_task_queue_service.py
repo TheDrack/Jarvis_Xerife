@@ -40,6 +40,51 @@ def test_empty_agent_id_is_rejected_before_database_call():
 
 
 
+def test_release_rejects_empty_identifiers_before_database_call():
+    engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+    service = AgentTaskQueueService(engine)
+    service.engine.begin = MagicMock(side_effect=AssertionError("DB must not be called"))
+    with pytest.raises(ValueError, match="attempt_id"):
+        service.release("task-1", "mini-1", "  ")
+
+
+def test_release_calls_the_queue_rpc_with_attempt_scope():
+    engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+    service = AgentTaskQueueService(engine)
+    connection = MagicMock()
+    connection.execute.return_value.scalar_one.return_value = True
+    transaction = MagicMock()
+    transaction.__enter__.return_value = connection
+    engine.begin = MagicMock(return_value=transaction)
+
+    released = service.release(
+        "task-1", "mini-1", "00000000-0000-0000-0000-000000000001", "provider dropped"
+    )
+
+    statement = str(connection.execute.call_args.args[0])
+    params = connection.execute.call_args.args[1]
+    assert released is True
+    assert "release_jarvis_agent_task" in statement
+    assert params == {
+        "task_id": "task-1",
+        "agent_id": "mini-1",
+        "attempt_id": "00000000-0000-0000-0000-000000000001",
+        "reason": "provider dropped",
+    }
+
+
+def test_release_reports_a_refused_attempt_as_false():
+    engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+    service = AgentTaskQueueService(engine)
+    connection = MagicMock()
+    connection.execute.return_value.scalar_one.return_value = False
+    transaction = MagicMock()
+    transaction.__enter__.return_value = connection
+    engine.begin = MagicMock(return_value=transaction)
+
+    assert service.release("task-1", "mini-1", "00000000-0000-0000-0000-000000000001") is False
+
+
 def test_heartbeat_persists_model_provider_and_refreshes_presence():
     engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
     service = AgentTaskQueueService(engine)
