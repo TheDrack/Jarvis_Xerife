@@ -82,3 +82,7 @@ The table describes integration families in the repository/installation; it does
 - Never put Supabase service-role keys, Render secrets, tokens, or tunnel keys into prompts, docs, commits, task ledgers, or client-side code.
 - Do not retry an action with unknown external outcome without reconciling state first.
 - Do not describe planned, stubbed, or code-only behavior as operationally verified.
+
+## Mandatory first-use verification: VIV
+
+The catalog bootstrap is only the discovery stage. Every agent must also execute the [Verificação Inicial de Vôo (VIV)](../POS_INSTALACAO.md) on first use of an installation and after material environment/connector changes. Inventory and safely test live tools/capabilities, record evidence and explicit states, research each material failure, implement fixes with regression tests, rerun focused and full tests, and report unresolved/unavailable items. Never infer access from catalog presence, never disable valid tests, and do not mutate production without explicit authorization.

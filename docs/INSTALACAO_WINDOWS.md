@@ -83,3 +83,7 @@ Os supervisores não carregam caminhos fixos desta máquina. A resolução (em `
 - [ ] A disponibilidade da sessão gráfica foi testada separadamente, quando necessário.
 
 Não marque todos os critérios como concluídos sem evidência de uma reinicialização real e chamada MCP ponta a ponta.
+
+## Pós-instalação obrigatória — Verificação Inicial de Vôo (VIV)
+
+Depois da instalação/configuração inicial, antes de considerar o Jarvis operacional, execute a [Verificação Inicial de Vôo](POS_INSTALACAO.md). O procedimento exige leitura do repositório e da arquitetura, inventário das ferramentas/conectores/skills/capacidades e permissões, teste seguro de cada item acessível, registro de falhas e pesquisa de soluções por falha. Correções devem ser isoladas, cobertas por testes de regressão e validadas pela suíte completa; nunca desabilite testes válidos. Não faça mutações em produção, deploys, migrações ou alterações de grants/credenciais sem autorização explícita. Só declare aprovação com evidência, incluindo a rota MCP ponta a ponta quando aplicável.

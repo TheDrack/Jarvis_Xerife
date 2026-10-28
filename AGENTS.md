@@ -23,3 +23,7 @@ At the beginning of every new task/session, before planning or acting:
 - Do not expose secrets in prompts, logs, commits, or outputs.
 - Ask before destructive actions, credential changes, permission expansion, or production changes when the host policy requires it.
 - For a repository task, follow this file plus any more-specific instructions in the target directory.
+
+## Verificação Inicial de Vôo (obrigatória)
+
+Antes de iniciar tarefas operacionais em uma instalação Jarvis, execute a [Verificação Inicial de Vôo (VIV)](docs/POS_INSTALACAO.md). Leia o repositório e a arquitetura, descubra as ferramentas/conectores realmente expostos, reconcilie-os com o catálogo e inventário, confira permissões e teste cada capacidade acessível de forma segura. Registre explicitamente o que falhou, está indisponível, não foi testado ou está bloqueado por autorização. Para cada falha material, pesquise fontes confiáveis, aplique a correção em branch isolada, adicione testes de regressão e execute a suíte exigida. Nunca enfraqueça/desabilite testes válidos. Não altere produção, grants, credenciais, migrações ou deploys sem autorização explícita. Se o harness não carregar instruções automaticamente, use `docs/skills-connectors/STARTUP_PROMPT.md`; não presuma que todo provedor lê arquivos do repositório.
