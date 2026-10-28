@@ -2,6 +2,8 @@
 
 The API and queue are not an agent by themselves. A real worker must have API credentials and an inference provider configured before it can claim tasks.
 
+End-to-end setup — migrations, environment groups, running several slots, enqueueing work, failure semantics and troubleshooting — is in [MULTI_AGENT_USAGE.md](MULTI_AGENT_USAGE.md).
+
 ## Enable the bounded FreeLLMAPI worker
 
 The preferred production path uses the existing server-only Supabase admin client and calls the queue's atomic claim/finish RPCs directly. Configure these variables in the environment that runs `serve.py`:

@@ -224,6 +224,7 @@ python -c "from app.adapters.infrastructure.docker_sandbox import DockerSandbox;
 ## 📚 Documentação
 
 - → Veja [docs/ARQUIVO_MAP.md](docs/ARQUIVO_MAP.md) para lista completa de arquivos
+- → Veja [docs/MULTI_AGENT_USAGE.md](docs/MULTI_AGENT_USAGE.md) para o guia de uso dos multiagentes (fila, workers, concorrência e falhas)
 - → Veja [docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md](docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md) para o protocolo de inicialização e consolidação de memória das IAs.
 - → Veja [docs/STATUS.md](docs/STATUS.md) para status detalhado
 - → Veja [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para arquitetura completa

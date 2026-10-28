@@ -4,6 +4,8 @@
 
 Rotinas liberam demandas no banco; agentes elegíveis reivindicam a tarefa pendente de maior prioridade disponível. Não existe mapeamento fixo de função por IA.
 
+Para configurar e operar o conjunto (migrações, variáveis, concorrência, release e diagnóstico), use o [guia de uso dos multiagentes](MULTI_AGENT_USAGE.md).
+
 ## Componentes
 
 - `jarvis_routine_definitions`: agenda declarativa, prioridade padrão e template da tarefa.
