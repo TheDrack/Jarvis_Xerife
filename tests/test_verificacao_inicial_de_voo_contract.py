@@ -50,4 +50,4 @@ def test_viv_requires_regression_tests_and_protects_production():
 def test_viv_does_not_assume_repository_instructions_auto_load_everywhere():
     startup = _read("docs/skills-connectors/STARTUP_PROMPT.md").casefold()
     assert "do not assume" in startup or "não assume" in startup
-    assert "docs/POS_INSTALACAO.md" in startup
+    assert "docs/pos_instalacao.md" in startup
