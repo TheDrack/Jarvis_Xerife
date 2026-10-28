@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     groq_model: str = "llama-3.3-70b-versatile"
 
     # Security Settings
-    secret_key: str = "your-secret-key-change-this-in-production-minimum-32-characters"
+    secret_key: str = ""  # Must be supplied through SECRET_KEY; never use a built-in signing key.
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 

@@ -24,6 +24,7 @@ class TestSettings(NexusComponent):
         assert test_settings.version == "1.0.0"
         assert test_settings.language == "pt-BR"
         assert test_settings.wake_word == "xerife"
+        assert test_settings.secret_key == ""
 
     def test_paths_creation(self):
         """Test that paths are created correctly"""

@@ -178,6 +178,19 @@ class AuthAdapter(SecurityProvider):
         """
         return bcrypt.hashpw(_prepare_secret(password), bcrypt.gensalt()).decode("utf-8")
 
+    def _require_signing_key(self) -> None:
+        """Fail closed unless a deployment-specific JWT secret is configured."""
+        key = self.secret_key
+        if (
+            not isinstance(key, str)
+            or len(key) < 32
+            or key.startswith("your-secret-key")
+            or key.lower() in {"changeme", "change-me", "secret", "development"}
+        ):
+            raise RuntimeError(
+                "SECRET_KEY is missing or insecure; configure a random secret of at least 32 characters."
+            )
+
     def create_access_token(self, data: dict, expires_delta: Optional[int] = None) -> str:
         """
         Create a JWT access token
@@ -189,6 +202,7 @@ class AuthAdapter(SecurityProvider):
         Returns:
             The encoded JWT token
         """
+        self._require_signing_key()
         to_encode = data.copy()
         
         if expires_delta:
@@ -211,6 +225,7 @@ class AuthAdapter(SecurityProvider):
             The decoded token data if valid, None otherwise
         """
         try:
+            self._require_signing_key()
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             return payload
         except JWTError as e:

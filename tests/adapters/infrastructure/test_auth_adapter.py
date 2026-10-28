@@ -10,9 +10,17 @@ from app.core.config import settings
 
 
 @pytest.fixture
-def auth_adapter():
-    """Create an AuthAdapter instance for testing"""
+def auth_adapter(monkeypatch):
+    """Create an AuthAdapter with an explicit test-only signing secret."""
+    monkeypatch.setattr(settings, "secret_key", "test-only-signing-secret-not-for-production-32")
     return AuthAdapter()
+
+
+def test_jwt_signing_fails_closed_without_configured_secret(monkeypatch):
+    monkeypatch.setattr(settings, "secret_key", "")
+    adapter = AuthAdapter()
+    with pytest.raises(RuntimeError, match="SECRET_KEY is missing or insecure"):
+        adapter.create_access_token({"sub": "test"})
 
 
 class TestPasswordHashing(NexusComponent):

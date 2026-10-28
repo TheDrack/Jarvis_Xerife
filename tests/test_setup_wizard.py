@@ -133,6 +133,9 @@ DATABASE_URL=sqlite:///jarvis.db
         
         env_file = tmp_path / ".env"
         assert env_file.exists()
+        if os.name != "nt":
+            import stat
+            assert stat.S_IMODE(env_file.stat().st_mode) == 0o600
         
         content = env_file.read_text()
         assert f"USER_ID={user_id}" in content
@@ -183,10 +186,21 @@ DATABASE_URL=sqlite:///jarvis.db
         database_url = "invalid://connection/string"
         result = validate_database_connection(database_url)
         assert result is False
+
+    @patch(
+        "app.adapters.infrastructure.setup_wizard.create_engine",
+        side_effect=RuntimeError("postgresql://admin:DO_NOT_LEAK@secret-host/db"),
+    )
+    def test_database_errors_do_not_print_credentials(self, mock_engine, capsys):
+        result = validate_database_connection("postgresql://admin:DO_NOT_LEAK@secret-host/db")
+        assert result is False
+        output = capsys.readouterr().out
+        assert "DO_NOT_LEAK" not in output
+        assert "secret-host" not in output
     
     @patch('app.adapters.infrastructure.setup_wizard.webbrowser.open')
     @patch('app.adapters.infrastructure.setup_wizard.input')
-    def test_get_api_key_with_clipboard_auto_capture(self, mock_input, mock_browser):
+    def test_get_api_key_with_clipboard_auto_capture(self, mock_input, mock_browser, capsys):
         """Test API key capture with automatic clipboard detection"""
         # Mock the pyperclip module that gets imported inside the function
         mock_pyperclip = Mock()
@@ -194,7 +208,7 @@ DATABASE_URL=sqlite:///jarvis.db
         # 1. First call: initial clipboard check to verify pyperclip is available (returns "")
         # 2. Second call: initial state before user copies API key (returns "")
         # 3. Third call: after user copies API key to clipboard (returns the actual key)
-        mock_pyperclip.paste.side_effect = ["", "", "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"]
+        mock_pyperclip.paste.side_effect = ["", "", "TEST_ONLY_NOT_A_REAL_GOOGLE_API_KEY"]
         
         with patch.dict('sys.modules', {'pyperclip': mock_pyperclip}):
             mock_input.side_effect = ["", "s"]  # Press enter to open browser, then confirm
@@ -202,8 +216,11 @@ DATABASE_URL=sqlite:///jarvis.db
             from app.adapters.infrastructure.setup_wizard import get_api_key_with_clipboard
             result = get_api_key_with_clipboard()
             
-            assert result == "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
+            assert result == "TEST_ONLY_NOT_A_REAL_GOOGLE_API_KEY"
             assert mock_browser.called
+        captured = capsys.readouterr()
+        assert "TEST_ONLY_NOT_A_REAL_GOOGLE_API_KEY" not in captured.out
+        assert "Chave capturada (valor oculto por segurança)." in captured.out
 
 
 if __name__ == "__main__":

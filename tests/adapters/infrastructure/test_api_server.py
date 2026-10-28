@@ -8,8 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.adapters.infrastructure import create_api_server
+from app.adapters.infrastructure.api_server import auth_adapter as api_auth_adapter
 from app.application.services import AssistantService
 from app.domain.models import Response
+from app.core.config import settings
 
 
 class TestAPIServer(NexusComponent):
@@ -35,6 +37,8 @@ class TestAPIServer(NexusComponent):
         """Set env-var admin credentials so authentication tests work without Supabase."""
         monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
         monkeypatch.setenv("JARVIS_ADMIN_EMAIL", "admin@jarvis.local")
+        monkeypatch.setattr(settings, "secret_key", "test-only-signing-secret-not-for-production-32")
+        monkeypatch.setattr(api_auth_adapter, "secret_key", "test-only-signing-secret-not-for-production-32")
 
     @pytest.fixture
     def client(self, mock_assistant_service):
@@ -450,6 +454,8 @@ class TestJarvisDispatchEndpoint(NexusComponent):
         """Set env-var admin credentials so authentication tests work without Supabase."""
         monkeypatch.setenv("JARVIS_ADMIN_PASSWORD", "admin123")
         monkeypatch.setenv("JARVIS_ADMIN_EMAIL", "admin@jarvis.local")
+        monkeypatch.setattr(settings, "secret_key", "test-only-signing-secret-not-for-production-32")
+        monkeypatch.setattr(api_auth_adapter, "secret_key", "test-only-signing-secret-not-for-production-32")
 
     @pytest.fixture
     def client(self, mock_assistant_service, mock_github_worker):
