@@ -7,3 +7,7 @@ Paste this into the system/project instructions for an agent runtime that does n
 ## Important limitation
 
 Repository instruction files only load automatically in clients that support those files and have the repository/workspace open. A general ChatGPT or Claude conversation that has no repository context cannot read this catalog by itself. For a true cross-provider guarantee, each client must be configured with this startup instruction and a connected Jarvis MCP/catalog endpoint; verify that setup with a new-session acceptance test. Jarvis shared memory is the portable source of truth; provider-native memory is only an optional mirror when the provider exposes an authorized write interface.
+
+## Required addition: Verificação Inicial de Vôo (VIV)
+
+At the beginning of first use of Jarvis (and after material changes to tools/connectors/configuration), execute `docs/POS_INSTALACAO.md` end to end. Read the repository and architecture; inventory live tools, connectors, skills, capabilities and permissions; safely test each accessible item; record evidence and mark failures, unavailable/untested capabilities, and authorization blockers separately. Research a reliable solution for every material failure, apply fixes in an isolated branch, add regression tests, run focused and full required tests, and retest the original capability. Do not disable valid tests or change production, deploys, migrations, grants/ACLs, or credentials without explicit authorization. Do not claim completion while any discovered item lacks a status.
