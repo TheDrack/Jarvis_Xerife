@@ -28,7 +28,7 @@ class TestEncryptionIntegration(NexusComponent):
         # Step 1: Setup wizard saves encrypted values
         assistant_name = "Jarvis"
         user_id = "user_123"
-        api_key = "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
+        api_key = "TEST_ONLY_NOT_A_REAL_GOOGLE_API_KEY"
         database_url = "postgresql://postgres:password@db.example.com:5432/postgres"
         
         # Create .env.example
@@ -76,7 +76,7 @@ DATABASE_URL=sqlite:///jarvis.db
         from unittest.mock import patch
         
         # Step 1: Create encrypted .env on "machine 1"
-        api_key = "AIzaSyB38zXj77_eNGKb2nB5NfrQKl1s7XwIpIc"
+        api_key = "TEST_ONLY_NOT_A_REAL_GOOGLE_API_KEY"
         database_url = "postgresql://postgres:password@db.example.com:5432/postgres"
         
         env_example = tmp_path / ".env.example"
