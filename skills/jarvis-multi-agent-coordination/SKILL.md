@@ -1,4 +1,9 @@
-﻿# Jarvis Multi-Agent Coordination
+---
+name: jarvis-multi-agent-coordination
+description: Reusable operating protocol for collaboration between independent harnesses (for example, Jarvis, ChatGPT, and Claude) through a shared repository and task artifacts - roles, task contracts, a shared ledger, handoffs, parallel-work controls, and evidence.
+---
+
+# Jarvis Multi-Agent Coordination
 
 Reusable operating protocol for collaboration between independent harnesses (for example, Jarvis, ChatGPT, and Claude) through a shared repository and task artifacts.
 

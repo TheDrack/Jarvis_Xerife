@@ -108,6 +108,10 @@ jarvis_test.db
 report.json
 .pytest_report/
 
+# Harness install points (generated locally, machine-specific paths)
+.agents/
+.claude/skills/
+
 # Autonomous instruction files (created by auto-fixer)
 autonomous_instruction.json
 

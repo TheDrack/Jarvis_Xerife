@@ -1,0 +1,32 @@
+diff --git a/main.py b/main.py
+index fc94f200..158e2ccd 100644
+--- a/main.py
++++ b/main.py
+@@ -137,11 +137,26 @@ def start_cloud_service():
+     t.start()
+ 
+     # 3. Execução do Servidor Uvicorn
++    # Start the supervised queue consumer from Render's actual entrypoint (python main.py).
++    worker_runtime = None
++    try:
++        from app.multiagent.agent_worker_runtime import start_configured_worker
++        worker_runtime = start_configured_worker()
++    except Exception as exc:
++        # Missing worker credentials must not prevent the API health endpoint from starting.
++        logger.error("Mini-agent runtime could not start; API remains available: %s", exc)
++
+     host = os.getenv("API_HOST", "0.0.0.0")
+     port = int(os.getenv("PORT", 10000))
+ 
+     logger.info(f"🚀 [SERVER] Uvicorn subindo em {host}:{port}")
+-    uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
++    try:
++        uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
++    finally:
++        if worker_runtime is not None:
++            worker_thread, worker_stop = worker_runtime
++            worker_stop.set()
++            worker_thread.join(timeout=5)
+ 
+ if __name__ == "__main__":
+     if is_running_on_cloud():

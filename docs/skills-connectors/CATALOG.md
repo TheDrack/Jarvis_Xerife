@@ -65,6 +65,7 @@ The table describes integration families in the repository/installation; it does
 ## Relevant runbooks
 
 - [Context & Memory Protocol](CONTEXT_MEMORY_PROTOCOL.md)
+- [Freebuff Desktop harness install](FREEBUFF_HARNESS.md)
 - [Multi-agent platform and task protocol](../architecture/jarvis-multi-agent-platform.md)
 - [Remote access: RDC → Aperture → Tailscale → Jarvis](../ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md)
 - [Visual navigation](../NAVEGACAO_VISUAL.md)
