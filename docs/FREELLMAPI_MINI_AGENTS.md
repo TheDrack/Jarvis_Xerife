@@ -40,6 +40,8 @@ FreeLLMAPI agrega camadas gratuitas, mas quotas, modelos, limites de requisiçã
 
 ## Worker conectado à fila de prioridades
 
+Configuração completa, execução de vários slots e diagnóstico: [MULTI_AGENT_USAGE.md](MULTI_AGENT_USAGE.md).
+
 Configure o worker local com as variáveis listadas acima e com um token autorizado para a API Jarvis:
 
 - `JARVIS_TASK_QUEUE_API_URL=https://<host-jarvis>`
@@ -56,7 +58,7 @@ worker = PriorityQueueMiniAgent.from_env()
 outcome = worker.run_once()  # None quando não há tarefa elegível
 ```
 
-O processo hospedeiro deve repetir o ciclo com backoff, shutdown limpo e heartbeat. O worker anuncia somente `text_reasoning`, reivindica a maior prioridade elegível pela API compartilhada e envia o resultado ligado ao `attempt_id`. Se a inferência falhar, não marca a tarefa como concluída; a lease expira para permitir recuperação/reexecução.
+O processo hospedeiro deve repetir o ciclo com backoff, shutdown limpo e heartbeat. O worker anuncia somente `text_reasoning`, reivindica a maior prioridade elegível pela API compartilhada e envia o resultado ligado ao `attempt_id`. Se a inferência falhar, não marca a tarefa como concluída: a tentativa é liberada na hora (RPC `release_jarvis_agent_task` no backend nativo ou `POST /v1/agent-tasks/{task_id}/release` no HTTP) e volta a `ready` com `attempts` incrementado; o lease de 90 s é apenas a rede de segurança quando o release não pode ser registrado. Ao esgotar `max_attempts`, a tarefa termina em `failed`. Passo a passo em [MULTI_AGENT_USAGE.md](MULTI_AGENT_USAGE.md).
 
 O gateway FreeLLMAPI continua em loopback no PC. Não execute este worker no Render esperando que ele consiga acessar `127.0.0.1:3001` do computador local.
 
