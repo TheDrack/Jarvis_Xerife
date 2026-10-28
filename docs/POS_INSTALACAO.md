@@ -22,7 +22,7 @@ Em sessões subsequentes sem mudanças, o agente pode reutilizar evidências rec
 
 ### 1. Ler o contexto e o repositório
 
-1. Ler as instruções do harness disponíveis (\`AGENTS.md\`, \`CLAUDE.md\`, \`.github/copilot-instructions.md\` ou equivalente).
+1. Ler as instruções do harness disponíveis (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` ou equivalente).
 2. Ler o [catálogo de capacidades, skills e conectores](skills-connectors/CATALOG.md), o [inventário de capacidades](skills-connectors/CAPABILITY_INVENTORY.md), o [protocolo de contexto e memória](skills-connectors/CONTEXT_MEMORY_PROTOCOL.md) e este procedimento.
 3. Inspecionar README, mapa de arquivos, arquitetura, documentação de pós-instalação, configuração, testes, workflows/CI e skills relevantes.
 4. Identificar o estado do repositório (branch, commit, alterações existentes, PRs/workflows relevantes) antes de modificar arquivos. Preservar alterações de terceiros.
@@ -94,15 +94,15 @@ Registrar fontes, alternativas, solução escolhida, justificativa, riscos, plan
 
 | Estado | Significado |
 |---|---|
-| \`INVENTARIADO\` | Identificado na documentação/código ou registro vivo. |
-| \`DISPONÍVEL\` | Observado no runtime atual, mas pode não estar autorizado. |
-| \`AUTORIZADO\` | Escopo necessário confirmado para a operação pretendida. |
-| \`APROVADO\` | Teste definido executado e passou, com evidência. |
-| \`PONTA_A_PONTA\` | Fluxo completo entre os componentes foi verificado. |
-| \`FALHOU\` | Teste executado e falhou, com evidência registrada. |
-| \`INDISPONÍVEL NESTE RUNTIME\` | Ferramenta/conector não está exposto ou alcançável neste ambiente. |
-| \`NÃO TESTADO\` | Não foi executado, com motivo e risco registrado. |
-| \`BLOQUEADO POR AUTORIZAÇÃO\` | Teste/ação requer aprovação ainda não concedida. |
+| `INVENTARIADO` | Identificado na documentação/código ou registro vivo. |
+| `DISPONÍVEL` | Observado no runtime atual, mas pode não estar autorizado. |
+| `AUTORIZADO` | Escopo necessário confirmado para a operação pretendida. |
+| `APROVADO` | Teste definido executado e passou, com evidência. |
+| `PONTA_A_PONTA` | Fluxo completo entre os componentes foi verificado. |
+| `FALHOU` | Teste executado e falhou, com evidência registrada. |
+| `INDISPONÍVEL NESTE RUNTIME` | Ferramenta/conector não está exposto ou alcançável neste ambiente. |
+| `NÃO TESTADO` | Não foi executado, com motivo e risco registrado. |
+| `BLOQUEADO POR AUTORIZAÇÃO` | Teste/ação requer aprovação ainda não concedida. |
 
 ## Relatório obrigatório de saída
 
@@ -122,4 +122,4 @@ Se o inventário for grande, dividir em lotes por família de capacidades e mant
 
 ## Instruções por harness
 
-Os arquivos de instrução na raiz e em \`.github/\` devem apontar para este procedimento. Nem todo provedor lê automaticamente arquivos do repositório. Se o harness não carregar instruções do projeto, o agente ou operador deve fornecer [STARTUP_PROMPT.md](skills-connectors/STARTUP_PROMPT.md) no início da sessão e confirmar que o repositório/catalogo estão acessíveis. Não afirmar que a VIV foi executada apenas porque o documento foi criado.
+Os arquivos de instrução na raiz e em `.github/` devem apontar para este procedimento. Nem todo provedor lê automaticamente arquivos do repositório. Se o harness não carregar instruções do projeto, o agente ou operador deve fornecer [STARTUP_PROMPT.md](skills-connectors/STARTUP_PROMPT.md) no início da sessão e confirmar que o repositório/catalogo estão acessíveis. Não afirmar que a VIV foi executada apenas porque o documento foi criado.
