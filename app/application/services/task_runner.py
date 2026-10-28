@@ -13,6 +13,31 @@ from app.domain.models.mission import Mission, MissionResult
 
 logger = logging.getLogger(__name__)
 
+# Declarative plans use stable, user-facing tool names while reusing the
+# existing visual-navigation adapter and its own safety/postcondition checks.
+_NAVIGATION_PLAN_ACTIONS = {
+    "observe_screen": "observe_screen",
+    "run_visual_recipe": "run_visual_recipe",
+    "click_accessibility": "click_accessibility",
+    "read_accessibility_tree": "read_accessibility_tree",
+    "list_visual_templates": "list_visual_templates",
+}
+
+
+def _navigation_plan_args(tool: str, args: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize planner arguments to the existing adapter's action/params contract."""
+    action = _NAVIGATION_PLAN_ACTIONS[tool]
+    if not isinstance(args, dict):
+        raise ValueError("navigation arguments must be an object")
+    if tool == "observe_screen" or tool == "list_visual_templates":
+        if args:
+            raise ValueError(f"{tool} does not accept arguments")
+    if tool == "run_visual_recipe":
+        steps = args.get("steps")
+        if not isinstance(steps, list) or not steps:
+            raise ValueError("run_visual_recipe requires a non-empty steps list")
+    return {"action": action, "params": dict(args)}
+
 
 class TaskRunner(NexusComponent):
     """
@@ -177,17 +202,35 @@ class TaskRunner(NexusComponent):
         # Only capabilities the existing authorizer explicitly allows are exposed.
         # Each executor resolves the capability again at dispatch time so stale
         # instances are not captured during plan construction.
+        allowlist = {
+            name for name in getattr(authorizer, "_allowlist", set())
+            if isinstance(name, str) and name
+        }
+        navigation_aliases = (
+            set(_NAVIGATION_PLAN_ACTIONS)
+            if "visual_navigation_adapter" in allowlist else set()
+        )
+
+        def canonical_tool(tool):
+            return "visual_navigation_adapter" if tool in navigation_aliases else tool
+
         def policy(tool, args):
             # Plans are untrusted input. They must never self-assert trusted
             # approval or remote authorization by setting payload booleans.
+            canonical = canonical_tool(tool)
             payload = dict(args)
             payload.pop("human_confirmed", None)
             payload.pop("remote_authorized", None)
+            if tool in navigation_aliases:
+                try:
+                    payload = _navigation_plan_args(tool, payload)
+                except (TypeError, ValueError):
+                    return "deny"
             try:
                 sensitive = getattr(authorizer, "_sensitive", set())
-                if tool in sensitive:
+                if canonical in sensitive:
                     return "approval_required"
-                authorizer.authorize(user, tool, payload)
+                authorizer.authorize(user, canonical, payload)
                 return "allow"
             except PermissionError:
                 return "deny"
@@ -196,21 +239,21 @@ class TaskRunner(NexusComponent):
 
         def make_dispatch(tool):
             def dispatch(args):
-                capability = nexus.resolve(tool)
+                canonical = canonical_tool(tool)
+                capability = nexus.resolve(canonical)
                 if not capability or getattr(capability, "__is_cloud_mock__", False):
                     raise RuntimeError("capability_unavailable")
                 execute = getattr(capability, "execute", None)
                 if not callable(execute):
                     raise RuntimeError("capability_not_executable")
-                return execute(dict(args))
+                payload = _navigation_plan_args(tool, dict(args)) if tool in navigation_aliases else dict(args)
+                return execute(payload)
             return dispatch
 
-        # Snapshot only the host-configured allowlist; plans cannot add tools.
-        executors = {
-            name: make_dispatch(name)
-            for name in getattr(authorizer, "_allowlist", set())
-            if isinstance(name, str) and name
-        }
+        # Snapshot only host-configured capabilities; navigation aliases become
+        # available only when the real navigation adapter is explicitly allowlisted.
+        executors = {name: make_dispatch(name) for name in allowlist}
+        executors.update({name: make_dispatch(name) for name in navigation_aliases})
 
         interpreter = DeclarativePlanInterpreter(
             executors,
