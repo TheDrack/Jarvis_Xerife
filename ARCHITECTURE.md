@@ -244,6 +244,9 @@ graph LR
     skills_jarvis-visual-navigation["<b>jarvis-visual-navigation</b>"]
     class skills_jarvis-visual-navigation support
     skills --> skills_jarvis-visual-navigation
+    skills_jarvis-viv["<b>jarvis-viv</b>"]
+    class skills_jarvis-viv support
+    skills --> skills_jarvis-viv
     skills_jarvis-context-memory["<b>jarvis-context-memory</b>"]
     class skills_jarvis-context-memory support
     skills --> skills_jarvis-context-memory
