@@ -1,4 +1,5 @@
 from hashlib import sha256
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import FastAPI
@@ -222,3 +223,18 @@ def test_revoke_hashes_token_and_scopes_to_device(monkeypatch):
         "p_token_hash": sha256(token.encode()).hexdigest(),
         "p_device_id": "android-1",
     }
+
+
+
+def test_refresh_rotation_migration_qualifies_family_id_output_column():
+    migration = (
+        Path(__file__).resolve().parents[3]
+        / "supabase"
+        / "migrations"
+        / "20261029170000_fix_mobile_session_rotation_ambiguity.sql"
+    )
+    sql = migration.read_text(encoding="utf-8")
+
+    assert "update public.jarvis_mobile_device_sessions as s" in sql
+    assert "where s.family_id = v_session.family_id;" in sql
+    assert "where family_id = v_session.family_id;" not in sql
