@@ -197,6 +197,9 @@ def create_mobile_push_router() -> APIRouter:
             devices = _resolve_agent_mobile_devices(_admin_client(), nexus.resolve("soldier_bridge"))
         except MobilePushStorageUnavailable:
             raise HTTPException(status_code=503, detail="Mobile push storage is not configured") from None
+        except Exception as exc:
+            logger.error("Could not list agent mobile devices (%s)", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Could not list mobile devices") from None
         return {"devices": devices, "count": len(devices)}
 
     @router.post("/v1/mobile/push/notify")
@@ -219,6 +222,9 @@ def create_mobile_push_router() -> APIRouter:
             devices = _resolve_agent_mobile_devices(client, manager)
         except MobilePushStorageUnavailable:
             raise HTTPException(status_code=503, detail="Mobile push storage is not configured") from None
+        except Exception as exc:
+            logger.error("Could not resolve agent mobile target (%s)", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Could not resolve mobile target") from None
 
         if request.device_id:
             devices = [d for d in devices if d["device_id"] == request.device_id]
@@ -259,6 +265,9 @@ def create_mobile_push_router() -> APIRouter:
             raise HTTPException(status_code=404, detail="Mobile device has no active push registration") from None
         except (FirebasePushDeliveryError, MobilePushStorageUnavailable):
             raise HTTPException(status_code=502, detail="Mobile push delivery failed") from None
+        except Exception as exc:
+            logger.error("Unexpected agent mobile notification failure (%s)", type(exc).__name__)
+            raise HTTPException(status_code=502, detail="Mobile notification delivery failed") from None
 
     @router.get("/v1/mobile/push/agent/events/{event_id}")
     async def get_agent_mobile_event_status(
