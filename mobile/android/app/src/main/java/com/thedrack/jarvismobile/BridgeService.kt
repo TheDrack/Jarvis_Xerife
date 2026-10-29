@@ -198,41 +198,13 @@ class BridgeService : Service() {
         socket?.send(payload.toString())
     }
 
-    /** Rotate the refresh token after an expired access token; never log credentials. */
+    /** Share the process-wide refresh coordinator to avoid concurrent token rotation. */
     private fun refreshSession(): Boolean {
-        val refreshToken = tokenVault.readRefreshToken() ?: return false
         if (!apiBaseUrl.startsWith("https://") || deviceId.isBlank()) return false
-        var connection: HttpURLConnection? = null
-        return try {
-            connection = (URL(apiBaseUrl.trimEnd('/') + "/v1/mobile/session/refresh")
-                .openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = 10000
-                readTimeout = 10000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json")
-            }
-            val body = JSONObject()
-                .put("refresh_token", refreshToken)
-                .put("device_id", deviceId)
-                .toString()
-            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val response = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) return false
-            val payload = JSONObject(response)
-            val access = payload.optString("access_token")
-            val replacement = payload.optString("refresh_token")
-            if (access.isBlank() || replacement.isBlank()) return false
-            tokenVault.save(access, replacement)
-            token = access
-            true
-        } catch (_: Exception) {
-            false
-        } finally {
-            connection?.disconnect()
-        }
+        val refreshedAccessToken = MobilePushClient.refreshAccessToken(applicationContext, token)
+            ?: return false
+        token = refreshedAccessToken
+        return true
     }
 
     private fun scheduleReconnect() {
