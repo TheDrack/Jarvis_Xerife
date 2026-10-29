@@ -519,3 +519,52 @@ def test_agent_notification_uses_websocket_and_waits_for_task_ack(monkeypatch):
     )]
     assert database.tables[mobile_push.PUSH_EVENT_TABLE] == []
     assert sender.sent == []
+
+
+
+def test_agent_event_status_reports_acknowledged_without_exposing_payload(monkeypatch):
+    client, database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+    event_id = "d2a6f6d2-5312-4b58-9c3a-90a1f8e27e25"
+    database.tables[mobile_push.PUSH_EVENT_TABLE].append({
+        "event_id": event_id,
+        "user_id": "user-42",
+        "device_id": "phone-1",
+        "event_type": "notification",
+        "payload": {},
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat(),
+        "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    response = client.get(
+        f"/v1/mobile/push/agent/events/{event_id}",
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "acknowledged"
+    assert "payload" not in response.json()
+
+
+def test_agent_event_status_reports_expired_unacknowledged_event(monkeypatch):
+    client, database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+    event_id = "a5f3a8a8-1ed9-4a2b-a84a-cb3df5bb0e31"
+    database.tables[mobile_push.PUSH_EVENT_TABLE].append({
+        "event_id": event_id,
+        "user_id": "user-42",
+        "device_id": "phone-1",
+        "event_type": "notification",
+        "payload": {"action": "notification", "parameters": {"text": "private"}},
+        "expires_at": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(),
+        "acknowledged_at": None,
+    })
+
+    response = client.get(
+        f"/v1/mobile/push/agent/events/{event_id}",
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "expired"
+    assert "payload" not in response.json()
