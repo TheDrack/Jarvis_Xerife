@@ -251,7 +251,7 @@ def test_follow_up_migration_revokes_unneeded_server_privileges():
     from pathlib import Path
     root = Path(__file__).resolve().parents[3]
     migration = (
-        root / "supabase" / "migrations" / "20261029110600_environment_observations_least_privilege.sql"
+        root / "supabase" / "migrations" / "20261029112400_environment_observations_least_privilege.sql"
     ).read_text(encoding="utf-8").lower()
     assert "revoke all on table public.jarvis_environment_observations" in migration
     assert "from public, anon, authenticated, service_role" in migration

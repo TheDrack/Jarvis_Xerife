@@ -24,7 +24,7 @@ Set JARVIS_OBSERVATION_TOKEN to a valid Jarvis OAuth bearer token in the desktop
 ## Deployment sequence
 
 1. Keep the baseline migration named `20261029110505_environment_observations.sql` aligned with the Supabase history, which currently records version `20261029110505` as applied.
-2. Apply `supabase/migrations/20261029110600_environment_observations_least_privilege.sql` through the controlled migration process before merge. The live table currently grants extra privileges to `service_role`; this migration limits it to SELECT and INSERT.
+2. Apply `supabase/migrations/20261029112400_environment_observations_least_privilege.sql` through the controlled migration process before merge. The live table currently grants extra privileges to `service_role`; this migration limits it to SELECT and INSERT.
 3. For a fresh database, apply the baseline schema first, then the least-privilege migration.
 4. Confirm the Render service has the server-only `SUPABASE_SERVICE_ROLE_KEY` and Supabase URL configured; never print the secret.
 5. After merge, deploy the commit and test one authenticated desktop and mobile observation, including readback/freshness.
