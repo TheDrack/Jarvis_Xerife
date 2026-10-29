@@ -121,6 +121,9 @@ class BridgeService : Service() {
                     retryCount = 0
                     updateNotification("Conectado ao Jarvis")
                     webSocket.send(JSONObject().put("type", "status").put("status", "ready").toString())
+                    publishEnvironmentObservations()
+                    handler.removeCallbacks(observationRunnable)
+                    handler.postDelayed(observationRunnable, OBSERVATION_INTERVAL_MS)
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -241,6 +244,25 @@ class BridgeService : Service() {
         if (!stopping) connect()
     }
 
+    private val observationRunnable = object : Runnable {
+        override fun run() {
+            if (stopping) return
+            publishEnvironmentObservations()
+            handler.postDelayed(this, OBSERVATION_INTERVAL_MS)
+        }
+    }
+
+    private fun publishEnvironmentObservations() {
+        if (deviceId.isBlank() || token.isBlank()) return
+        Thread {
+            try {
+                EnvironmentObservationPublisher.publish(applicationContext, deviceId, true)
+            } catch (error: Exception) {
+                android.util.Log.w("JarvisMobile", "Environment observation publish failed: " + error.javaClass.simpleName)
+            }
+        }.start()
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -299,6 +321,7 @@ class BridgeService : Service() {
         const val EXTRA_TOKEN = "access_token"
         private const val CHANNEL_ID = "jarvis_presence"
         private const val NOTIFICATION_ID = 5821
+        private const val OBSERVATION_INTERVAL_MS = 60_000L
         @Volatile var isRunning: Boolean = false
             private set
     }

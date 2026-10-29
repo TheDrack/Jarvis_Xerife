@@ -35,6 +35,11 @@ from typing import Dict, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.adapters.edge.jarvis_agent_status import tracked_action
+from app.adapters.edge.environment_observation_publisher import (
+    build_desktop_observations,
+    configured_observation_target,
+    publish_observation,
+)
 
 # Check for required dependencies
 try:
@@ -114,6 +119,8 @@ class JarvisLocalAgent(NexusComponent):
         self._visual_navigator = None
         self.device_id = device_id
         self.api_key = api_key
+        self.observation_token = os.getenv("JARVIS_OBSERVATION_TOKEN", "").strip()
+        self.observation_api_base_url = configured_observation_target(jarvis_url)
         self.connected = False
         self.screenshots_dir = Path("jarvis_screenshots")
         self.screenshots_dir.mkdir(exist_ok=True)
@@ -368,26 +375,55 @@ class JarvisLocalAgent(NexusComponent):
             logger.error(f"Connection error: {e}", exc_info=True)
             self.connected = False
     
-    async def run_with_reconnect(self, reconnect_delay: int = 5):
-        """
-        Run the agent with automatic reconnection on disconnect.
-        
-        Args:
-            reconnect_delay: Seconds to wait before reconnecting
-        """
+    async def _publish_environment_observations(self) -> None:
+        """Publish passive local facts while an optional bearer token is configured."""
         while True:
             try:
-                await self.connect()
-            except KeyboardInterrupt:
-                logger.info("Shutdown requested by user")
-                break
-            except Exception as e:
-                logger.error(f"Unexpected error: {e}")
-            
-            if not self.connected:
-                logger.info(f"Reconnecting in {reconnect_delay} seconds...")
-                await asyncio.sleep(reconnect_delay)
+                observations = await asyncio.to_thread(
+                    build_desktop_observations, self.device_id
+                )
+                for observation in observations:
+                    await asyncio.to_thread(
+                        publish_observation,
+                        self.observation_api_base_url,
+                        self.observation_token,
+                        observation,
+                    )
+                logger.debug("Published desktop environment observations")
+            except Exception as exc:
+                # Do not log payloads, URLs, response bodies, or bearer tokens.
+                logger.warning(
+                    "Desktop environment observation publish failed (%s)",
+                    type(exc).__name__,
+                )
+            await asyncio.sleep(60)
 
+    async def run_with_reconnect(self, reconnect_delay: int = 5):
+        """Reconnect the bridge and run the opt-in observation publisher."""
+        publisher_task = None
+        if self.observation_token:
+            publisher_task = asyncio.create_task(self._publish_environment_observations())
+        else:
+            logger.info(
+                "Environment publishing disabled; set JARVIS_OBSERVATION_TOKEN locally to enable it"
+            )
+        try:
+            while True:
+                try:
+                    await self.connect()
+                except KeyboardInterrupt:
+                    logger.info("Shutdown requested by user")
+                    break
+                except Exception as e:
+                    logger.error("Unexpected connection error: %s", type(e).__name__)
+
+                if not self.connected:
+                    logger.info("Reconnecting in %s seconds...", reconnect_delay)
+                    await asyncio.sleep(reconnect_delay)
+        finally:
+            if publisher_task is not None:
+                publisher_task.cancel()
+                await asyncio.gather(publisher_task, return_exceptions=True)
 
 def print_banner():
     """Print startup banner."""

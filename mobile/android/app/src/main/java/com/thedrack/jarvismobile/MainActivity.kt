@@ -159,6 +159,7 @@ class MainActivity : ComponentActivity() {
                     if (token.isBlank() || refreshToken.isBlank()) "Resposta de sessão móvel incompleta."
                     else {
                         vault.save(token, refreshToken)
+                        EnvironmentObservationPublisher.publish(applicationContext, getOrCreateDeviceId(), BridgeService.isRunning)
                         getSharedPreferences("jarvis_session", MODE_PRIVATE).edit()
                             .putString("api_base_url", normalized).apply()
                         null
