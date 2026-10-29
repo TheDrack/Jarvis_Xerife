@@ -13,7 +13,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$baseUrl = ($env:JARVIS_API_BASE_URL ?? "https://jarvis-api-c47i.onrender.com").TrimEnd("/")
+$baseUrl = $env:JARVIS_API_BASE_URL
+if ([string]::IsNullOrWhiteSpace($baseUrl)) { $baseUrl = "https://jarvis-api-c47i.onrender.com" }
+$baseUrl = $baseUrl.TrimEnd("/")
 $key = $env:JARVIS_MOBILE_NOTIFY_KEY
 if ([string]::IsNullOrWhiteSpace($key)) {
     $keyPath = Join-Path $env:LOCALAPPDATA "Jarvis_Xerife\config\mobile_notify\mobile_notify.key"
