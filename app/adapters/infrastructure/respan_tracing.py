@@ -1,4 +1,4 @@
-﻿"""Optional Respan tracing initialization for direct Python LLM SDK calls.
+"""Optional Respan tracing initialization for direct Python LLM SDK calls.
 
 The open-source respan-gateway has its own tracing plugin; see docs/RESPAN_SETUP.md.
 """

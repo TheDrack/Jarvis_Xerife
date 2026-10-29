@@ -1,4 +1,4 @@
-﻿from unittest.mock import Mock
+from unittest.mock import Mock
 
 from app.adapters.infrastructure import respan_tracing
 
