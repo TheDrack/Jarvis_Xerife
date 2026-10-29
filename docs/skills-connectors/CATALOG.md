@@ -12,6 +12,13 @@
 6. Refresh discovery after connector/configuration changes or a failed/missing tool. Do not assume another provider has the same tools.
 7. Report capabilities as **implemented**, **available in this runtime**, **authorized**, **tested**, and **production-verified** separately. Never promote one state into another without evidence.
 
+## Active inventory and action gate
+
+- If Jarvis MCP is connected, call `jarvis_agent_bootstrap` before other Jarvis operations. It returns the versioned repository baseline, the context/memory contract, status semantics, and required preflight steps.
+- Reconcile that baseline with the calling host's live registry. The Jarvis server cannot see private host tools or grants; missing runtime evidence must be reported as unavailable/untested, not inferred.
+- Before a consequential tool call, verify the relevant schema, target, prerequisites, authorization, side effects, success signal, and rollback. After failure or a domain/provider change, refresh discovery before retrying.
+- This is an operational contract, not a claim that every external harness enforces it automatically. Configure each provider's startup instructions and verify with a fresh-session acceptance test.
+
 ## Portable Jarvis skills
 
 | Skill | Use it for | Canonical entry point |
