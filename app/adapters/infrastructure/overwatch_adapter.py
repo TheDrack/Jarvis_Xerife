@@ -25,6 +25,7 @@ Usage (embedded in main.py):
 """
 
 import collections
+import hashlib
 import json
 import logging
 import os
@@ -460,10 +461,36 @@ class OverwatchDaemon(NexusComponent):
         return tasks
 
     def _notify(self, message: str) -> None:
+        """Send a proactive event through the intelligent mobile policy when configured.
+
+        The legacy channels remain as a fallback only when mobile delivery is not
+        configured or fails. A deliberate policy deferral is respected so fallback
+        voice does not bypass presence/quiet-state decisions.
         """
-        Send *message* through whatever notification channel is available
-        (Telegram, voice, etc.).  Fails silently if none is available.
-        """
+        mobile_user = os.getenv("JARVIS_MOBILE_USER_ID", "").strip()
+        mobile_device = os.getenv("JARVIS_MOBILE_DEVICE_ID", "").strip()
+        if mobile_user and mobile_device:
+            try:
+                from app.application.services.user_communication_service import CommunicationPriority
+                notifier = nexus.resolve("notification_service")
+                if notifier is not None and hasattr(notifier, "communicate_user"):
+                    lowered = message.casefold()
+                    priority = (
+                        CommunicationPriority.CRITICAL
+                        if any(term in lowered for term in (
+                            "intruso", "n?o autorizado", "nao autorizado", "arp-spoof",
+                            "ataque", "attack", "security breach",
+                        ))
+                        else CommunicationPriority.NORMAL
+                    )
+                    event_key = "overwatch:" + hashlib.sha256(message.encode("utf-8")).hexdigest()
+                    outcome = notifier.communicate_user(event_key, message, priority)
+                    status = outcome.get("status") if isinstance(outcome, dict) else None
+                    if status in {"sent", "deferred", "deduplicated", "rate_limited", "rejected"}:
+                        return
+                    logger.warning("[PROACTIVE_CORE] Mobile communication unavailable; using legacy fallback.")
+            except Exception as exc:
+                logger.debug("[PROACTIVE_CORE] Intelligent communication failed (%s)", type(exc).__name__)
         for adapter_id in ("telegram_adapter", "voice_provider"):
             try:
                 adapter = nexus.resolve(adapter_id)
