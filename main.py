@@ -11,6 +11,11 @@ import uvicorn
 import threading
 import logging
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
+from app.adapters.infrastructure.respan_tracing import initialize_respan_tracing
+initialize_respan_tracing()
 from fastapi import FastAPI
 
 # Imports de configuração e núcleo

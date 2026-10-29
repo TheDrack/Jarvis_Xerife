@@ -374,7 +374,7 @@ Be conservative - only mark as "complete" if you see clear, working implementati
         provider = result.get("provider")
         response = result.get("response")
         
-        if provider in ("groq", "venice"):
+        if provider in ("groq", "venice", "respan"):
             if hasattr(response, "choices") and response.choices:
                 choice = response.choices[0]
                 if hasattr(choice, "message") and hasattr(choice.message, "content"):

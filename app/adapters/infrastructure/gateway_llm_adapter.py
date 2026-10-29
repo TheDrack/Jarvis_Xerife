@@ -357,8 +357,12 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         provider = result.get("provider")
         response = result.get("response")
         
-        if provider in (LLMProvider.GROQ.value, LLMProvider.VENICE.value):
-            # Groq returns OpenAI-compatible format
+        if provider in (
+            LLMProvider.GROQ.value,
+            LLMProvider.VENICE.value,
+            LLMProvider.RESPAN.value,
+        ):
+            # Groq, Venice and the Respan Gateway return OpenAI-compatible format
             if hasattr(response, "choices") and response.choices:
                 choice = response.choices[0]
                 if hasattr(choice, "message") and hasattr(choice.message, "content"):

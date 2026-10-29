@@ -14,6 +14,9 @@ openai>=1.0.0
 instructor>=1.3.0
 json-repair>=0.25.0
 tiktoken>=0.5.0
+# Open-source LLM gateway in-process (opt-in via RESPAN_GATEWAY_ENABLED).
+# Requires Python 3.10+; uses the provider keys above, no Respan account needed.
+respan-gateway==0.3.0
 
 # API Server (FastAPI + Uvicorn)
 fastapi>=0.104.0
@@ -41,3 +44,6 @@ networkx>=3.0
 httpx>=0.25.0
 requests>=2.31.0
 google-auth>=2.40.0
+
+# Respan SDK tracing for direct Python LLM SDK calls (optional without RESPAN_API_KEY).
+respan-ai==4.2.4

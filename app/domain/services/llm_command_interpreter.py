@@ -201,7 +201,7 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
         provider = result.get("provider")
         response = result.get("response")
         
-        if provider in ("groq", "venice"):
+        if provider in ("groq", "venice", "respan"):
             if hasattr(response, "choices") and response.choices:
                 choice = response.choices[0]
                 if hasattr(choice, "message") and hasattr(choice.message, "content"):

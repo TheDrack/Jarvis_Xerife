@@ -6,6 +6,8 @@ This gateway implements a "Gears" (Marchas) system:
 - High Gear (Marcha Alta): Llama-4-Scout/Llama-3.3-70b as default (fast, cost-effective)
 - Low Gear (Marcha Baixa): Qwen-3-32B or Llama-8B for internal Groq rate limit fallback
 - Cannon Shot (Tiro de Canhão): Gemini-1.5-Pro as external fallback when Groq entirely fails
+- Respan Gateway (opt-in): open-source gateway opened in-process, routing by model
+  name over the same provider keys, with retries/fallbacks in its own routes
 - Auto-Repair: Captures critical errors and dispatches auto-fix to GitHub Actions
 """
 
@@ -24,6 +26,16 @@ from app.adapters.infrastructure.ai_gateway_token_utils import (  # noqa: F401
 )
 
 logger = logging.getLogger(__name__)
+
+_TRUTHY_VALUES = frozenset({"1", "true", "yes", "on"})
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    """Read a boolean switch from the environment (empty value means unset)."""
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() in _TRUTHY_VALUES
 
 
 class AIGateway(NexusComponent):
@@ -53,6 +65,10 @@ class AIGateway(NexusComponent):
     # Gemini Cannon Shot (External Fallback)
     DEFAULT_GEMINI_MODEL = "gemini-1.5-pro"  # Changed from gemini-flash-latest
     DEFAULT_VENICE_MODEL = "venice-uncensored-1-2"
+    # Respan Gateway default model: "provider/model" as the gateway expects it.
+    # The gateway routes `claude-*`, `gemini-*`, `groq/...` and plain model names
+    # to the provider that owns them, so the Groq High Gear model is the default.
+    RESPAN_MODEL_PREFIX = "groq/"
     
     def __init__(
         self,
@@ -69,6 +85,10 @@ class AIGateway(NexusComponent):
         # Optional Venice parameters are appended to preserve positional compatibility.
         venice_api_key: Optional[str] = None,
         venice_model: Optional[str] = None,
+        # Optional Respan Gateway parameters (appended for positional compatibility).
+        enable_respan: Optional[bool] = None,
+        respan_model: Optional[str] = None,
+        respan_config: Optional[Any] = None,
     ):
         """
         Initialize AI Gateway with multiple provider support and Gears system.
@@ -81,6 +101,12 @@ class AIGateway(NexusComponent):
             groq_low_gear_model: Low Gear model name (defaults to DEFAULT_LOW_GEAR_MODEL or GROQ_LOW_GEAR_MODEL env var)
             gemini_model: Gemini model name (defaults to DEFAULT_GEMINI_MODEL or GEMINI_MODEL env var)
             venice_model: Venice model name (defaults to DEFAULT_VENICE_MODEL or VENICE_MODEL env var)
+            enable_respan: Open the in-process Respan Gateway (default: RESPAN_GATEWAY_ENABLED)
+            respan_model: Model sent to the Respan Gateway (default: RESPAN_MODEL env var or
+                "groq/<High Gear model>", which the gateway routes by provider prefix)
+            respan_config: Gateway config as a dict or TOML string (default: the existing
+                gateway.toml, the RESPAN_GATEWAY_CONFIG file, or the provider keys in the
+                environment)
             default_provider: Default provider for routing (GROQ by default; Venice can be forced explicitly)
             enable_auto_repair: Enable auto-repair on critical errors
             github_adapter: Optional GitHubAdapter instance for auto-repair
@@ -114,6 +140,20 @@ class AIGateway(NexusComponent):
             or os.getenv("VENICE_MODEL")
             or self.DEFAULT_VENICE_MODEL
         )
+        self.respan_model = (
+            respan_model
+            or os.getenv("RESPAN_MODEL")
+            or f"{self.RESPAN_MODEL_PREFIX}{self.groq_high_gear_model}"
+        )
+        self.respan_enabled = (
+            enable_respan
+            if enable_respan is not None
+            else _env_flag("RESPAN_GATEWAY_ENABLED")
+        )
+        self.respan_config = respan_config
+        self.respan_config_path = os.getenv("RESPAN_GATEWAY_CONFIG") or None
+        self.respan_gateway = None
+        self.respan_client = None
         
         self.default_provider = default_provider
         self.enable_auto_repair = enable_auto_repair
@@ -138,6 +178,7 @@ class AIGateway(NexusComponent):
         self._initialize_groq()
         self._initialize_gemini()
         self._initialize_venice()
+        self._initialize_respan()
         
         logger.info(
             f"AI Gateway initialized with Gears System:\n"
@@ -148,6 +189,7 @@ class AIGateway(NexusComponent):
             f"  - Groq available: {self.groq_client is not None}\n"
             f"  - Gemini available: {self.gemini_client is not None}\n"
             f"  - Venice available: {self.venice_client is not None}\n"
+            f"  - Respan Gateway available: {self.respan_client is not None}\n"
             f"  - Auto-repair: {self.enable_auto_repair}"
         )
     
@@ -222,6 +264,60 @@ class AIGateway(NexusComponent):
         except Exception as e:
             logger.error("Failed to initialize Venice client: %s", e)
 
+    def _initialize_respan(self) -> None:
+        """Open the in-process Respan Gateway when the integration is enabled.
+
+        The gateway is open-source and spends the developer's own provider keys
+        (``GROQ_API_KEY``, ``GEMINI_API_KEY``, ...): no Respan account, credits or
+        tracing export is involved. It reads an existing ``gateway.toml`` (or the
+        file in ``RESPAN_GATEWAY_CONFIG``); without one it discovers the providers
+        whose keys are in the environment and routes by model name.
+
+        Failures (missing package, no provider key) only disable the provider and
+        keep the direct Groq/Gemini/Venice clients working.
+        """
+        if not self.respan_enabled:
+            logger.debug(
+                "Respan Gateway disabled (set RESPAN_GATEWAY_ENABLED=true to enable)."
+            )
+            return
+
+        try:
+            import respan_gateway as rg
+        except ImportError:
+            logger.warning(
+                "respan-gateway not installed. Install with: pip install respan-gateway==0.3.0"
+            )
+            return
+
+        try:
+            if self.respan_config is not None:
+                self.respan_gateway = rg.Gateway(config=self.respan_config)
+            elif self.respan_config_path:
+                self.respan_gateway = rg.Gateway.from_file(self.respan_config_path)
+            else:
+                self.respan_gateway = rg.Gateway()
+            self.respan_client = self.respan_gateway.openai()
+            logger.info(
+                "Respan Gateway initialized (model=%s, providers=%s)",
+                self.respan_model,
+                [provider.get("name") for provider in self.respan_gateway.providers()],
+            )
+        except Exception as e:
+            logger.warning("Respan Gateway unavailable, using direct providers: %s", e)
+            self.respan_gateway = None
+            self.respan_client = None
+
+    def close(self) -> None:
+        """Close the in-process Respan Gateway and the servers it started."""
+        gateway, self.respan_gateway = self.respan_gateway, None
+        self.respan_client = None
+        if gateway is not None:
+            try:
+                gateway.close()
+            except Exception as e:
+                logger.debug("Failed to close Respan Gateway: %s", e)
+
     def count_tokens(self, text: str) -> int:
         """
         Count tokens in the given text.
@@ -260,6 +356,8 @@ class AIGateway(NexusComponent):
                 return LLMProvider.GEMINI
             elif force_provider == LLMProvider.VENICE and self.venice_client:
                 return LLMProvider.VENICE
+            elif force_provider == LLMProvider.RESPAN and self.respan_client:
+                return LLMProvider.RESPAN
             logger.warning(f"Forced provider {force_provider} not available, using auto-selection")
         
         # Multimodal always goes to Gemini (Groq doesn't support it yet)
@@ -292,6 +390,13 @@ class AIGateway(NexusComponent):
                 logger.warning(
                     f"Payload exceeds threshold but Gemini not available, using Groq"
                 )
+        
+        # Respan Gateway, when enabled, is the routing layer for text completions:
+        # a single OpenAI-compatible client decides the provider/model (gateway.toml
+        # routes, model-name routing) and retries/falls back inside those routes.
+        if self.respan_client is not None:
+            logger.debug("Using Respan Gateway as routing layer (%s)", self.respan_model)
+            return LLMProvider.RESPAN
         
         # Default to Groq for cost-effectiveness (if available)
         if self.groq_client:
@@ -342,6 +447,8 @@ class AIGateway(NexusComponent):
                 return await self._generate_with_groq(messages, functions)
             elif provider == LLMProvider.GEMINI:
                 return await self._generate_with_gemini(messages, functions)
+            elif provider == LLMProvider.RESPAN:
+                return await self._generate_with_respan(messages, functions)
             else:
                 return await self._generate_with_venice(messages, functions)
         except Exception as e:
@@ -623,6 +730,41 @@ class AIGateway(NexusComponent):
             "model": self.venice_model,
         }
 
+    async def _generate_with_respan(
+        self,
+        messages: List[Dict[str, str]],
+        functions: Optional[List[Any]] = None,
+    ) -> Dict[str, Any]:
+        """Generate a completion through the in-process Respan Gateway.
+
+        ``gw.openai()`` is an ``openai.OpenAI`` that talks to the gateway without
+        a socket, so the response keeps the OpenAI-compatible shape the other
+        providers already return.
+        """
+        if not self.respan_client:
+            raise ValueError("Respan Gateway client not initialized")
+
+        request_params: Dict[str, Any] = {
+            "model": self.respan_model,
+            "messages": messages,
+        }
+        if functions:
+            tools = self._convert_functions_to_groq_tools(functions)
+            if tools:
+                request_params["tools"] = tools
+                request_params["tool_choice"] = "auto"
+
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: self.respan_client.chat.completions.create(**request_params),
+        )
+        return {
+            "provider": LLMProvider.RESPAN.value,
+            "response": response,
+            "model": self.respan_model,
+        }
+
     def _convert_functions_to_groq_tools(self, functions: List[Any]) -> List[Dict[str, Any]]:
         """
         Convert Gemini function declarations to Groq's tool format.
@@ -757,6 +899,20 @@ class AIGateway(NexusComponent):
             if self.venice_client:
                 response = await self._generate_with_venice(messages, functions)
                 response["fallback_from"] = LLMProvider.GEMINI.value
+                return response
+        elif failed_provider == LLMProvider.RESPAN:
+            # The gateway already retried inside its routes; fall back to the
+            # direct providers so a gateway failure does not end the request.
+            if self.groq_client:
+                response = await self._generate_with_groq(messages, functions)
+            elif self.gemini_client:
+                response = await self._generate_with_gemini(messages, functions)
+            elif self.venice_client:
+                response = await self._generate_with_venice(messages, functions)
+            else:
+                response = None
+            if response is not None:
+                response["fallback_from"] = LLMProvider.RESPAN.value
                 return response
         elif failed_provider == LLMProvider.VENICE:
             if self.groq_client:
