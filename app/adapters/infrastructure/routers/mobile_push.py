@@ -141,7 +141,9 @@ def dispatch_mobile_speak(user_id: str, device_id: str, text: str) -> dict[str, 
 def _verify_mobile_notify_key(supplied: str | None) -> None:
     expected = os.getenv("JARVIS_MOBILE_NOTIFY_KEY", "").strip()
     value = (supplied or "").strip()
-    if len(expected) < 32 or not value or not hmac.compare_digest(expected, value):
+    if len(expected) < 32:
+        raise HTTPException(status_code=503, detail="Mobile notification service is not configured")
+    if not value or not hmac.compare_digest(expected, value):
         raise HTTPException(status_code=401, detail="Invalid mobile notification credential")
 
 

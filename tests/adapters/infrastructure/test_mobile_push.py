@@ -438,7 +438,7 @@ def test_offline_notification_event_persists_text_and_sends_only_opaque_id(monke
     assert sender.event_types == ["notification"]
 
 
-def test_agent_notification_requires_dedicated_credential(monkeypatch):
+def test_agent_notification_fails_closed_when_server_key_is_missing(monkeypatch):
     client, _database, _sender, _auth = _setup(monkeypatch)
     monkeypatch.delenv("JARVIS_MOBILE_NOTIFY_KEY", raising=False)
 
@@ -446,6 +446,19 @@ def test_agent_notification_requires_dedicated_credential(monkeypatch):
         "/v1/mobile/push/notify",
         json={"device_id": "phone-1", "text": "Teste"},
         headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 503
+
+
+def test_agent_notification_rejects_wrong_service_key(monkeypatch):
+    client, _database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "a" * 64)
+
+    response = client.post(
+        "/v1/mobile/push/notify",
+        json={"device_id": "phone-1", "text": "Teste"},
+        headers={"X-Jarvis-Mobile-Notify-Key": "b" * 64},
     )
 
     assert response.status_code == 401

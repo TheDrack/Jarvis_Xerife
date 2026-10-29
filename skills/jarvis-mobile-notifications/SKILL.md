@@ -34,7 +34,7 @@ Use `-Mode speak` only when audio is requested. The script requires HTTPS, choos
 Chat messages from the Android app use its authenticated `POST /v1/message` flow. Do not ask the user to paste a mobile JWT into a prompt or logs. If chat submission fails, inspect the app's sanitized HTTP error, session refresh logs, and server health.
 
 ## Common failures
-- `401`: dedicated notification credential is absent or mismatched.
+- `401`: the supplied dedicated notification credential is incorrect.\n- `503`: the server-side notification credential or Firebase configuration is missing.
 - `404`: no matching registered/connected device or no active FCM registration.
 - `409`: multiple devices match; specify both device and user IDs.
 - `502`: delivery was not confirmed or the provider failed.
