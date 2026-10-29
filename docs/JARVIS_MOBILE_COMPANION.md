@@ -143,7 +143,7 @@ Na inspeção somente leitura do projeto Supabase `saibtpdehhprttqlgqdt`, as qua
 - Ao reconectar, o Android consulta a fila autenticada, exibe notificações permitidas e reproduz voz `pt-BR`; o sistema Android ainda pode restringir o serviço em segundo plano.
 - O APK não depende de credenciais de provedor externo; a entrega offline é eventual e exige que o app volte a conectar ao Jarvis.
 
-- A migration local `20261024202104_mobile_push_delivery.sql` cria registros de dispositivos e eventos privados com RLS e acesso apenas a `service_role`; a migration correspondente já está aplicada no Supabase sob a versão remota `20261024213552`.
+- A migration `20261024213552_mobile_push_delivery.sql` cria o registro de dispositivos sem tokens de provedores e a fila privada de eventos, com RLS e acesso apenas a `service_role`; a migração de transição remove o registro legado em instalações existentes.
 - A validação local específica da segunda etapa foi: `test_mobile_push.py`, `test_mobile_sessions.py` e `test_mobile_bridge_auth.py` — **23 passed**; depois, a suíte completa passou com **1504 passed, 4 skipped**. O CI da PR #587 está em execução.
 - Ainda é obrigatório implantar o backend, aplicar a migração e validar o fluxo em telefone físico.
 
