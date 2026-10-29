@@ -38,7 +38,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.google.firebase.messaging.FirebaseMessaging
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -77,9 +76,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        if (FirebaseBootstrap.initialize(this) && vault.readRefreshToken() != null) {
-            registerFcmToken()
-        }
         speech = TextToSpeech(this) { status ->
             speechReady.value = status == TextToSpeech.SUCCESS
             if (status == TextToSpeech.SUCCESS) speech?.language = Locale("pt", "BR")
@@ -108,7 +104,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        handlePushIntent(intent)
     }
 
     override fun onResume() {
@@ -149,21 +144,6 @@ class MainActivity : ComponentActivity() {
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(serviceIntent)
         else startService(serviceIntent)
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        handlePushIntent(intent)
-    }
-
-    private fun handlePushIntent(source: Intent?) {
-        val eventId = source?.getStringExtra(PushSpeechService.EXTRA_EVENT_ID) ?: return
-        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
-        if (!prefs.getBoolean("presence_enabled", false) || vault.readRefreshToken().isNullOrBlank()) return
-        val speechIntent = Intent(this, PushSpeechService::class.java)
-            .putExtra(PushSpeechService.EXTRA_EVENT_ID, eventId)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(speechIntent) else startService(speechIntent)
     }
 
     private fun login(baseUrl: String, username: String, password: String, result: (String?) -> Unit) {
@@ -215,7 +195,6 @@ class MainActivity : ComponentActivity() {
             }
             runOnUiThread {
                 result(outcome)
-                if (outcome == null) registerFcmToken()
             }
         }
     }
@@ -285,23 +264,7 @@ class MainActivity : ComponentActivity() {
             }
             runOnUiThread {
                 result?.invoke(outcome)
-                if (outcome == null) registerFcmToken()
             }
-        }
-    }
-
-    private fun registerFcmToken() {
-        if (!FirebaseBootstrap.initialize(applicationContext)) return
-        try {
-            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    task.result?.takeIf { it.isNotBlank() }?.let { token ->
-                        MobilePushClient.registerCurrentDevice(applicationContext, token)
-                    }
-                }
-            }
-        } catch (_: Exception) {
-            // FCM remains optional until the Firebase project configuration is injected at build time.
         }
     }
 
@@ -321,7 +284,7 @@ class MainActivity : ComponentActivity() {
         stopPresence()
         executor.execute {
             try {
-                if (!refreshToken.isNullOrBlank()) MobilePushClient.revokePushNow(applicationContext)
+                if (!refreshToken.isNullOrBlank()) MobilePushClient.revokeDeviceNow(applicationContext)
                 // Push revocation may refresh/rotate the session; revoke with the latest token.
                 val currentRefreshToken = vault.readRefreshToken() ?: refreshToken
                 if (!currentRefreshToken.isNullOrBlank() && !deviceId.isNullOrBlank() && baseUrl.startsWith("https://")) {
@@ -355,7 +318,6 @@ class MainActivity : ComponentActivity() {
         val accessToken = vault.read() ?: return
         val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
         prefs.edit().putBoolean("presence_enabled", true).apply()
-        registerFcmToken()
         val baseUrl = prefs.getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL)
             ?: BuildConfig.DEFAULT_API_BASE_URL
         val intent = Intent(this, BridgeService::class.java)
@@ -368,7 +330,6 @@ class MainActivity : ComponentActivity() {
         getSharedPreferences("jarvis_session", MODE_PRIVATE).edit()
             .putBoolean("presence_enabled", false).apply()
         stopService(Intent(this, BridgeService::class.java))
-        stopService(Intent(this, PushSpeechService::class.java))
     }
 
     private fun speak(text: String) {

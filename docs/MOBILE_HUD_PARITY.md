@@ -3,7 +3,7 @@
 ## Papel de cada cliente
 
 - HUD (`app/static/index.html`): interface web/PWA na nuvem. É o protótipo inicial e continua existindo; não é descartado. Funciona enquanto a aba estiver aberta.
-- App Android (`mobile/android`): cliente com maior capacidade de execução e presença. Funciona com o app fechado, via notificações FCM e serviço em primeiro plano, quando permitido pelo Android.
+- App Android (`mobile/android`): cliente com maior capacidade de execução e presença. Processa eventos pela fila do Supabase quando o serviço de presença reconecta; sem push externo, não garante entrega enquanto o processo está parado.
 - Núcleo Jarvis: fonte única de verdade. HUD e App consomem os mesmos contratos HTTP autenticados. Nenhum dos dois guarda memória própria.
 
 Resultado esperado: tudo o que o HUD faz, o App também faz; o App acrescenta presença, notificações e execução no aparelho, com permissões explícitas.
@@ -21,7 +21,7 @@ Resultado esperado: tudo o que o HUD faz, o App também faz; o App acrescenta pr
 | Telemetria de bateria | Sim | **Não** | `POST /v1/telemetry` |
 | Localização e mapa | Sim (Leaflet + Nominatim) | **Não** | `POST /v1/telemetry`; Nominatim |
 | Progresso do roadmap | Sim | **Não** | `GET /v1/roadmap/progress` |
-| Presença com app fechado | Não | Sim (FCM + serviço em primeiro plano) | `/v1/mobile/push/*`; `/v1/local-bridge` |
+| Presença com app fechado | Não | Condicional (fila após reconexão + serviço em primeiro plano) | `/v1/mobile/push/*`; `/v1/local-bridge` |
 | Ações remotas | Chat | Somente `speak` | `/v1/local-bridge/send-task` |
 
 ## Princípios
@@ -57,6 +57,6 @@ Resultado esperado: tudo o que o HUD faz, o App também faz; o App acrescenta pr
 
 ## Bloqueios externos já conhecidos
 
-- Configuração do projeto Firebase e das credenciais FCM (cliente e servidor).
+- Registro autenticado do dispositivo, migração da fila de eventos e configuração da chave dedicada do agente.
 - Deploy do backend com `SUPABASE_SERVICE_ROLE_KEY` confirmada no ambiente.
 - Reconciliação do histórico de migrations Supabase, citada em `docs/JARVIS_MOBILE_COMPANION.md`.
