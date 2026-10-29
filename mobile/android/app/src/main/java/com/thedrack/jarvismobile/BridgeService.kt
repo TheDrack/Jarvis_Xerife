@@ -38,6 +38,7 @@ class BridgeService : Service() {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(25, TimeUnit.SECONDS)
         .build()
     @Volatile private var socket: WebSocket? = null
     private var tts: TextToSpeech? = null
@@ -131,6 +132,7 @@ class BridgeService : Service() {
                 }
 
                 override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                    if (socket !== webSocket) return
                     socket = null
                     if (!stopping) {
                         val closeReason = reason.take(60).ifBlank { "sem detalhe" }
@@ -140,6 +142,7 @@ class BridgeService : Service() {
                 }
 
                 override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    if (socket !== webSocket) return
                     socket = null
                     if (response?.code == 403 || response?.code == 401) {
                         updateNotification("Sessão expirou; tentando renovação segura")
