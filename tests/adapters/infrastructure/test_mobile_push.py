@@ -111,12 +111,14 @@ class FakeSender:
     def __init__(self, configured=True):
         self.configured = configured
         self.sent = []
+        self.event_types = []
 
     def is_configured(self):
         return self.configured
 
-    def send_event(self, fcm_token, event_id):
+    def send_event(self, fcm_token, event_id, event_type="speak"):
         self.sent.append((fcm_token, event_id))
+        self.event_types.append(event_type)
 
 
 class FakeAuth:
@@ -139,6 +141,9 @@ class FakeAuth:
 
 
 class FakeBridgeManager:
+    def get_connected_devices(self):
+        return []
+
     def is_device_connected(self, _device_id):
         return False
 
@@ -407,3 +412,75 @@ def test_return_activity_prefers_websocket_when_phone_is_connected(monkeypatch):
     assert calls[0][2] is None
     assert sender.sent == []
     assert database.tables[mobile_push.PUSH_EVENT_TABLE] == []
+
+
+
+def test_offline_notification_event_persists_text_and_sends_only_opaque_id(monkeypatch):
+    _client, database, sender, _auth = _setup(monkeypatch)
+    result = mobile_push.dispatch_mobile_event(
+        "user-42", "phone-1", "Estoque atualizado", mode="notification", title="Jarvis"
+    )
+
+    assert result["status"] == "queued"
+    event = database.tables[mobile_push.PUSH_EVENT_TABLE][0]
+    assert event["event_type"] == "notification"
+    assert event["payload"] == {
+        "action": "notification",
+        "parameters": {"title": "Jarvis", "text": "Estoque atualizado"},
+    }
+    assert sender.sent == [("f" * 64, result["event_id"])]
+    assert sender.event_types == ["notification"]
+
+
+def test_agent_notification_requires_dedicated_credential(monkeypatch):
+    client, _database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.delenv("JARVIS_MOBILE_NOTIFY_KEY", raising=False)
+
+    response = client.post(
+        "/v1/mobile/push/notify",
+        json={"device_id": "phone-1", "text": "Teste"},
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 401
+
+
+def test_agent_notification_uses_registered_device_and_returns_queued_ack_id(monkeypatch):
+    client, database, sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+
+    response = client.post(
+        "/v1/mobile/push/notify",
+        json={
+            "device_id": "phone-1",
+            "user_id": "user-42",
+            "title": "Jarvis",
+            "text": "Teste de notificação",
+            "mode": "notification",
+        },
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+    assert response.json()["transport"] == "fcm"
+    event = database.tables[mobile_push.PUSH_EVENT_TABLE][0]
+    assert event["event_id"] == response.json()["event_id"]
+    assert event["event_type"] == "notification"
+    assert sender.event_types == ["notification"]
+
+
+def test_agent_device_listing_never_exposes_fcm_tokens(monkeypatch):
+    client, _database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+
+    response = client.get(
+        "/v1/mobile/push/agent/devices",
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    device = response.json()["devices"][0]
+    assert device["device_id"] == "phone-1"
+    assert device["push_registered"] is True
+    assert "fcm_token" not in device
