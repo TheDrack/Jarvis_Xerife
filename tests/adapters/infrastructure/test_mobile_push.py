@@ -56,6 +56,8 @@ class FakeAuth:
     def verify_token(self, token):
         if token == "valid":
             return {"sub": "user-42", "user_id": "user-42", "device_id": "phone-1", "client": "jarvis-mobile"}
+        if token == "wrong-device":
+            return {"sub": "user-42", "user_id": "user-42", "device_id": "phone-2", "client": "jarvis-mobile"}
         return None
 
 
@@ -140,3 +142,99 @@ def test_agent_event_status_reports_expired(monkeypatch):
     db.tables[mobile_push.EVENT_TABLE].append({"event_id": event_id, "user_id": "user-42", "device_id": "phone-1", "event_type": "notification", "payload": {}, "expires_at": (datetime.now(timezone.utc)-timedelta(minutes=1)).isoformat(), "acknowledged_at": None})
     response = client.get(f"/v1/mobile/push/agent/events/{event_id}", headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64})
     assert response.status_code == 200 and response.json()["status"] == "expired"
+
+
+def test_registration_rejects_device_id_not_bound_to_session(monkeypatch):
+    client, _, _ = setup(monkeypatch)
+    response = client.post(
+        "/v1/mobile/push/register",
+        json={"device_id": "phone-2"},
+        headers={"Authorization": "Bearer valid"},
+    )
+    assert response.status_code == 403
+
+
+def test_return_activity_queues_speech_for_registered_offline_phone(monkeypatch):
+    client, db, _ = setup(monkeypatch)
+    assert register(client).status_code == 204
+    key = "return-activity-key-that-is-long-enough-123456"
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", key)
+    response = client.post("/v1/mobile/push/return-activity", headers={"X-Jarvis-Return-Activity-Key": key})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "queued" and payload["transport"] == "queue"
+    event = db.tables[mobile_push.EVENT_TABLE][0]
+    assert event["event_type"] == "speak"
+    assert "Você voltou ao computador" in event["payload"]["parameters"]["text"]
+
+
+def test_return_activity_rejects_ambiguous_device_selection(monkeypatch):
+    client, db, _ = setup(monkeypatch)
+    assert register(client).status_code == 204
+    db.tables[mobile_push.DEVICE_TABLE].append({
+        "user_id": "user-99", "device_id": "phone-99", "revoked_at": None,
+    })
+    key = "return-activity-key-that-is-long-enough-123456"
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", key)
+    response = client.post("/v1/mobile/push/return-activity", headers={"X-Jarvis-Return-Activity-Key": key})
+    assert response.status_code == 409
+    assert db.tables[mobile_push.EVENT_TABLE] == []
+
+
+def test_return_activity_prefers_connected_websocket(monkeypatch):
+    client, db, manager = setup(monkeypatch, {"mobile:user-42:phone-1"})
+    assert register(client).status_code == 204
+    key = "return-activity-key-that-is-long-enough-123456"
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", key)
+    response = client.post("/v1/mobile/push/return-activity", headers={"X-Jarvis-Return-Activity-Key": key})
+    assert response.status_code == 200
+    assert response.json() == {"status": "delivered", "transport": "websocket"}
+    assert manager.sent[0][0] == "mobile:user-42:phone-1"
+    assert db.tables[mobile_push.EVENT_TABLE] == []
+
+
+def test_agent_device_listing_exposes_no_provider_tokens(monkeypatch):
+    client, _, _ = setup(monkeypatch, {"mobile:user-42:phone-1"})
+    assert register(client).status_code == 204
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+    response = client.get("/v1/mobile/push/agent/devices", headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64})
+    assert response.status_code == 200
+    device = response.json()["devices"][0]
+    assert device["connected"] is True
+    assert device["registered"] is True
+    assert not any("token" in key.lower() for key in device)
+
+
+def test_agent_notification_requires_disambiguation_when_multiple_devices_match(monkeypatch):
+    client, db, _ = setup(monkeypatch)
+    assert register(client).status_code == 204
+    db.tables[mobile_push.DEVICE_TABLE].append({
+        "user_id": "user-42", "device_id": "phone-2", "revoked_at": None,
+    })
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+    response = client.post(
+        "/v1/mobile/push/notify",
+        json={"user_id": "user-42", "text": "Teste"},
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+    assert response.status_code == 409
+    assert db.tables[mobile_push.EVENT_TABLE] == []
+
+
+def test_agent_event_status_reports_acknowledged_without_payload(monkeypatch):
+    client, db, _ = setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+    event_id = "d2a6f6d2-5312-4b58-9c3a-90a1f8e27e25"
+    db.tables[mobile_push.EVENT_TABLE].append({
+        "event_id": event_id, "user_id": "user-42", "device_id": "phone-1",
+        "event_type": "notification", "payload": {},
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat(),
+        "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+    })
+    response = client.get(
+        f"/v1/mobile/push/agent/events/{event_id}",
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "acknowledged"
+    assert "payload" not in response.json()
