@@ -231,7 +231,7 @@ def test_migration_restricts_table_to_server_role_and_enables_rls():
         root / "supabase" / "migrations" / "20261029120000_environment_observations.sql"
     ).read_text(encoding="utf-8")
     assert "enable row level security" in migration.lower()
-    assert "revoke all on table public.jarvis_environment_observations from public, anon, authenticated" in migration.lower()
+    assert "revoke all on table public.jarvis_environment_observations from public, anon, authenticated, service_role" in migration.lower()
     assert "grant select, insert on table public.jarvis_environment_observations to service_role" in migration.lower()
     assert "unique (user_id, request_id)" in migration.lower()
 
@@ -244,3 +244,15 @@ def test_payload_size_is_bounded(monkeypatch):
         headers={"Authorization": "Bearer valid"},
     )
     assert response.status_code == 422
+
+
+
+def test_follow_up_migration_revokes_unneeded_server_privileges():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[3]
+    migration = (
+        root / "supabase" / "migrations" / "20261029110600_environment_observations_least_privilege.sql"
+    ).read_text(encoding="utf-8").lower()
+    assert "revoke all on table public.jarvis_environment_observations" in migration
+    assert "from public, anon, authenticated, service_role" in migration
+    assert "grant select, insert on table public.jarvis_environment_observations to service_role" in migration
