@@ -15,7 +15,6 @@ from fastapi.concurrency import run_in_threadpool
 from app.adapters.infrastructure.routers.mobile_push import (
     MobilePushDeviceNotRegistered,
     MobilePushStorageUnavailable,
-    dispatch_mobile_speak,
     queue_mobile_event,
 )
 from app.core.nexus import nexus
