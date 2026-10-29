@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Dict, Iterator, List, Set, Tuple
 
@@ -61,7 +62,7 @@ _FILE_REF_RES = (_FILE_REF_RE, _DOTTED_FILE_REF_RE)
 # A lista é auditada: `test_allowlist_has_no_stale_entries` remove a necessidade de
 # manter exceções que voltaram a existir ou que nenhum doc usa mais.
 _ALLOWED_MISSING: Dict[str, str] = {
-    # Artefatos gerados em runtime (não versionados).
+    # Artefatos gerados em runtime e não versionados.
     "CORE_LOGIC_CONSOLIDATED.txt": "gerado pelo pipeline `sync_drive` (consolidator)",
     "data/nexus_registry.jrvs": "espelho .jrvs criado sob demanda pelo document_store",
     # Nomes citados em exemplos de log/CLI, não arquivos do repositório.
@@ -74,13 +75,14 @@ _ALLOWED_MISSING: Dict[str, str] = {
 
 
 def _repo_paths() -> List[Path]:
-    """Todos os arquivos versionáveis do repositório (sem caches/dependências)."""
-    paths: List[Path] = []
-    for dirpath, dirnames, filenames in os.walk(REPO_ROOT):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
-        for name in filenames:
-            paths.append(Path(dirpath, name))
-    return paths
+    """Arquivos rastreados pelo Git e presentes no checkout atual."""
+    result = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "ls-files", "-z"],
+        check=True,
+        capture_output=True,
+    )
+    paths = [REPO_ROOT / item.decode("utf-8") for item in result.stdout.split(b"\0") if item]
+    return [path for path in paths if path.is_file()]
 
 
 def _normalize(token: str) -> str:

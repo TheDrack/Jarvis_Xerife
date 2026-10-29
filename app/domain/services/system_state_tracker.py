@@ -123,6 +123,8 @@ class SystemStateTracker(NexusComponent):
         Returns:
             Lista de dicionários de snapshot, do mais recente ao mais antigo.
         """
+        if limit <= 0:
+            return []
         return list(reversed(self._history[-limit:]))
 
     # ------------------------------------------------------------------
