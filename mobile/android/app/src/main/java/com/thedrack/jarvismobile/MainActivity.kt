@@ -135,8 +135,12 @@ class MainActivity : ComponentActivity() {
 
     private fun setLocationSharing(enabled: Boolean) {
         val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
-        val allowed = enabled && hasLocationPermission() && hasBackgroundLocationPermission() &&
-            vault.readRefreshToken() != null
+        val allowed = LocationSharingPolicy.isAuthorized(
+            userOptIn = enabled,
+            foregroundPermissionGranted = hasLocationPermission(),
+            backgroundPermissionGranted = hasBackgroundLocationPermission(),
+            authenticated = !vault.readRefreshToken().isNullOrBlank()
+        )
         prefs.edit().putBoolean("location_sharing_enabled", allowed).apply()
         val serviceIntent = Intent(this, LocationTrackingService::class.java)
         if (!allowed) {
