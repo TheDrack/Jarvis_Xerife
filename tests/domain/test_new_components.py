@@ -54,6 +54,16 @@ class TestSystemStateTracker:
 
         assert len(tracker._history) == 2
 
+    @pytest.mark.parametrize("limit", [0, -1])
+    def test_get_recent_snapshots_non_positive_limit_returns_empty(self, limit):
+        """Limites não positivos devem retornar zero snapshots, sem semântica de slice negativa."""
+        from app.domain.services.system_state_tracker import SystemStateTracker
+
+        tracker = SystemStateTracker.__new__(SystemStateTracker)
+        tracker._history = [{"n": 1}, {"n": 2}, {"n": 3}]
+
+        assert tracker.get_recent_snapshots(limit) == []
+
     def test_get_health_metrics_empty(self):
         """get_health_metrics com histórico vazio deve retornar status 'unknown'."""
         from app.domain.services.system_state_tracker import SystemStateTracker
