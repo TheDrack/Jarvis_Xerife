@@ -224,7 +224,7 @@ def test_api_server_registers_authenticated_observation_router():
     assert "app.include_router(create_environment_observations_router(get_current_user))" in api
 
 
-def test_migration_restricts_table_to_server_role_and_enables_rls():
+def test_baseline_migration_defines_observation_schema_and_enables_rls():
     from pathlib import Path
     root = Path(__file__).resolve().parents[3]
     migration = (

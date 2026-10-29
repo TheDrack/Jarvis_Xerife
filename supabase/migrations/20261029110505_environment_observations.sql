@@ -1,5 +1,5 @@
--- Consolidated, versioned observations from existing Jarvis desktop and Android clients.
--- The API uses the server-only service role; client roles never access this table directly.
+-- Initial schema for consolidated, versioned observations from the existing Jarvis desktop and Android clients.
+-- Access is restricted by the immediately following least-privilege migration.
 create table if not exists public.jarvis_environment_observations (
     id uuid primary key default gen_random_uuid(),
     user_id text not null check (length(user_id) between 1 and 320),
@@ -23,5 +23,3 @@ create index if not exists jarvis_environment_observations_device_latest_idx
        (user_id, device_id, source_device_type, observation_type, received_at desc);
 
 alter table public.jarvis_environment_observations enable row level security;
-revoke all on table public.jarvis_environment_observations from public, anon, authenticated, service_role;
-grant select, insert on table public.jarvis_environment_observations to service_role;
