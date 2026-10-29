@@ -20,7 +20,7 @@ class FakeBridgeManager:
     async def handle_message(self, device_id, data):
         self.messages.append((device_id, data))
 
-    def disconnect(self, device_id):
+    def disconnect(self, device_id, websocket=None):
         self.disconnected.append(device_id)
 
     def is_device_connected(self, device_id):
