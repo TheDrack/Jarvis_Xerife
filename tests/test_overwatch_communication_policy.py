@@ -1,4 +1,4 @@
-﻿from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from app.adapters.infrastructure.overwatch_adapter import OverwatchDaemon
 

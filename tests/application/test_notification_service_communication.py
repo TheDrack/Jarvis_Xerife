@@ -1,4 +1,4 @@
-﻿from unittest.mock import patch
+from unittest.mock import patch
 
 from app.application.services.notification_service import NotificationService
 from app.application.services.user_communication_service import CommunicationPriority
