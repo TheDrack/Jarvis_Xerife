@@ -8,6 +8,8 @@ import java.net.URL
 data class MobilePushEvent(val eventId: String, val text: String)
 
 object MobilePushClient {
+    private val refreshLock = Any()
+
     internal data class HttpResult(val code: Int, val body: String)
 
     fun registerCurrentDevice(context: Context, fcmToken: String) {
@@ -73,10 +75,10 @@ object MobilePushClient {
         body: String?
     ): HttpResult? {
         val vault = TokenVault(context)
-        var accessToken = vault.read() ?: refreshSession(context) ?: return null
+        var accessToken = vault.read() ?: refreshAccessToken(context) ?: return null
         var result = perform(context, path, method, body, accessToken) ?: return null
         if (result.code == 401) {
-            accessToken = refreshSession(context) ?: return null
+            accessToken = refreshAccessToken(context, accessToken) ?: return null
             result = perform(context, path, method, body, accessToken) ?: return null
         }
         return result
@@ -86,19 +88,37 @@ object MobilePushClient {
     internal fun publicGet(context: Context, path: String): HttpResult? =
         perform(context, path, "GET", null, null)
 
-    private fun refreshSession(context: Context): String? {
+    /**
+     * Single-flight refresh shared by the Activity, push client, and foreground bridge.
+     * If another caller already rotated the token, reuse the newer access token instead
+     * of replaying the old refresh token (which correctly revokes its token family).
+     */
+    internal fun refreshAccessToken(
+        context: Context,
+        rejectedAccessToken: String? = null
+    ): String? = synchronized(refreshLock) {
         val vault = TokenVault(context)
-        val refreshToken = vault.readRefreshToken() ?: return null
+        val latestAccess = vault.read()
+        if (
+            !rejectedAccessToken.isNullOrBlank() &&
+            !latestAccess.isNullOrBlank() &&
+            latestAccess != rejectedAccessToken
+        ) {
+            return@synchronized latestAccess
+        }
+
+        val refreshToken = vault.readRefreshToken() ?: return@synchronized null
         val prefs = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
-        val deviceId = prefs.getString("bridge_device_id", null) ?: return null
+        val deviceId = prefs.getString("bridge_device_id", null) ?: return@synchronized null
         val body = JSONObject().put("refresh_token", refreshToken).put("device_id", deviceId).toString()
-        val result = perform(context, "/v1/mobile/session/refresh", "POST", body, null) ?: return null
-        if (result.code !in 200..299) return null
-        return try {
+        val result = perform(context, "/v1/mobile/session/refresh", "POST", body, null)
+            ?: return@synchronized null
+        if (result.code !in 200..299) return@synchronized null
+        try {
             val payload = JSONObject(result.body)
             val access = payload.optString("access_token")
             val replacement = payload.optString("refresh_token")
-            if (access.isBlank() || replacement.isBlank()) return null
+            if (access.isBlank() || replacement.isBlank()) return@synchronized null
             vault.save(access, replacement)
             access
         } catch (_: Exception) {
