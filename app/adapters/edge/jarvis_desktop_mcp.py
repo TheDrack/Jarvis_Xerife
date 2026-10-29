@@ -51,7 +51,7 @@ mcp = FastMCP(
         "android_* tools target the explicitly configured authorized Android device. Never "
         "silently redirect one target to the other. The user chooses the connection software "
         "and transport; Tailscale, Aperture, and RDC are examples, not requirements. MCP is "
-        "the tool interface, not a mandated network route. At session/task start, discover live "
+        "the tool interface, not a mandated network route. At session/task start, call jarvis_agent_bootstrap before other Jarvis operations, then discover live "
         "tools and read AGENTS.md, docs/skills-connectors/CATALOG.md, and "
         "docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md when repository files are available. "
         "Load relevant persisted Jarvis memory and task state, reconcile against live evidence, "
