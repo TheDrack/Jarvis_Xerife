@@ -22,6 +22,10 @@ class FakeQuery:
         self.payload = None
         self.filters = {}
 
+    def select(self, _columns):
+        self.operation = "select"
+        return self
+
     def insert(self, payload):
         self.operation, self.payload = "insert", payload
         return self
@@ -34,12 +38,19 @@ class FakeQuery:
         self.filters[key] = value
         return self
 
+    def limit(self, _limit):
+        return self
+
     def execute(self):
+        if self.operation == "select":
+            rows = self.client.selected_rows.get(self.table_name, [])
+            matches = [row for row in rows if all(row.get(key) == value for key, value in self.filters.items())]
+            return FakeResponse(matches)
         if self.operation == "insert":
             self.client.inserted.append(self.payload)
             return FakeResponse([self.payload])
         if self.operation == "update":
-            self.client.updated.append((self.payload, dict(self.filters)))
+            self.client.updated.append((self.table_name, self.payload, dict(self.filters)))
             return FakeResponse([])
         raise AssertionError("Unexpected fake database operation")
 
@@ -64,6 +75,7 @@ class FakeSupabase:
         self.inserted = []
         self.updated = []
         self.rpc_calls = []
+        self.selected_rows = {}
         self.rpc_data = {
             "user_id": "user-42",
             "username": "felipe@example.com",
@@ -73,7 +85,7 @@ class FakeSupabase:
         }
 
     def table(self, name):
-        assert name == mobile_sessions.SESSION_TABLE
+        assert name in {mobile_sessions.SESSION_TABLE, "jarvis_mobile_devices"}
         return FakeQuery(self, name)
 
     def rpc(self, name, params):
@@ -210,6 +222,11 @@ def test_revoke_hashes_token_and_scopes_to_device(monkeypatch):
     database = FakeSupabase()
     client, _ = _client(monkeypatch, database)
     token = "refresh-token-to-revoke-that-is-long-enough"
+    database.selected_rows[mobile_sessions.SESSION_TABLE] = [{
+        "user_id": "user-42",
+        "token_hash": sha256(token.encode()).hexdigest(),
+        "device_id": "android-1",
+    }]
 
     response = client.post(
         "/v1/mobile/session/revoke",
@@ -223,6 +240,11 @@ def test_revoke_hashes_token_and_scopes_to_device(monkeypatch):
         "p_token_hash": sha256(token.encode()).hexdigest(),
         "p_device_id": "android-1",
     }
+    assert len(database.updated) == 1
+    table_name, payload, filters = database.updated[0]
+    assert table_name == "jarvis_mobile_devices"
+    assert payload["revoked_at"]
+    assert filters == {"user_id": "user-42", "device_id": "android-1"}
 
 
 

@@ -182,11 +182,11 @@ def create_mobile_sessions_router() -> APIRouter:
 
             if user_id:
                 try:
-                    client.table("jarvis_mobile_push_devices").update(
+                    client.table("jarvis_mobile_devices").update(
                         {"revoked_at": datetime.now(timezone.utc).isoformat()}
                     ).eq("user_id", str(user_id)).eq("device_id", device_id).execute()
                 except Exception:
-                    logger.info("Push registration revocation skipped; push schema may not be installed")
+                    logger.info("Mobile device registration revocation skipped; device schema may not be installed")
         except HTTPException:
             raise
         except Exception as exc:
