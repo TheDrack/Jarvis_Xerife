@@ -89,12 +89,15 @@ class SoldierBridgeManager(LocalBridgeManager):
         # Register with SoldierRegistry (best-effort)
         self._register_with_registry(device_id, device_type, capabilities or [])
 
-    def disconnect(self, device_id: str) -> None:
-        """Handle soldier disconnection and update registry."""
-        super().disconnect(device_id)
+    def disconnect(self, device_id: str, websocket: Optional[WebSocket] = None) -> bool:
+        """Disconnect only the socket that still owns this device registration."""
+        disconnected = super().disconnect(device_id, websocket)
+        if not disconnected:
+            return False
         self.device_capabilities.pop(device_id, None)
-        # Update registry (best-effort)
+        # Update registry only when the active connection was actually removed.
         self._unregister_from_registry(device_id)
+        return True
 
     # ------------------------------------------------------------------
     # Capability-aware routing
