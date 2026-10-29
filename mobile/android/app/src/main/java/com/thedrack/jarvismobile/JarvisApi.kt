@@ -29,14 +29,14 @@ object JarvisApi {
         require(trimmed.isNotEmpty()) { "Digite uma mensagem." }
         require(trimmed.length <= MAX_MESSAGE_CHARS) { "Mensagem longa demais (máximo $MAX_MESSAGE_CHARS caracteres)." }
         val body = JSONObject().put("text", trimmed).toString()
-        val result = MobilePushClient.authenticatedRequest(context, "/v1/message", "POST", body)
+        val result = MobileApiClient.authenticatedRequest(context, "/v1/message", "POST", body)
             ?: return ChatReply(false, "", "Sem conexão com o Jarvis.")
         return JarvisParsing.parseChatReply(result.code, result.body)
     }
 
     /** Lê o status público (GET /v1/status). Retorna null se o servidor não responder. */
     fun fetchStatus(context: Context): JarvisStatus? {
-        val result = MobilePushClient.publicGet(context, "/v1/status") ?: return null
+        val result = MobileApiClient.publicGet(context, "/v1/status") ?: return null
         return JarvisParsing.parseStatus(result.code, result.body)
     }
 }

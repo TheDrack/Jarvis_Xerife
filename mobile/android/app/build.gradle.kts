@@ -20,10 +20,6 @@ android {
         versionName = "0.2.0"
         buildConfigField("String", "DEFAULT_API_BASE_URL", "\"https://jarvis-api-c47i.onrender.com\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${buildConfigString("GOOGLE_WEB_CLIENT_ID")}\"")
-        buildConfigField("String", "FCM_API_KEY", "\"${buildConfigString("JARVIS_FCM_API_KEY")}\"")
-        buildConfigField("String", "FCM_APP_ID", "\"${buildConfigString("JARVIS_FCM_APP_ID")}\"")
-        buildConfigField("String", "FCM_PROJECT_ID", "\"${buildConfigString("JARVIS_FCM_PROJECT_ID")}\"")
-        buildConfigField("String", "FCM_SENDER_ID", "\"${buildConfigString("JARVIS_FCM_SENDER_ID")}\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {
@@ -55,8 +51,6 @@ dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.android.gms:play-services-auth:21.3.0")
-    implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
-    implementation("com.google.firebase:firebase-messaging")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")

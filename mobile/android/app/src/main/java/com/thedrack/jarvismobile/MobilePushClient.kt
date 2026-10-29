@@ -5,62 +5,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-data class MobilePushEvent(val eventId: String, val text: String)
-
-object MobilePushClient {
+object MobileApiClient {
     internal data class HttpResult(val code: Int, val body: String)
-
-    fun registerCurrentDevice(context: Context, fcmToken: String) {
-        if (fcmToken.isBlank()) return
-        TokenVault(context).savePushToken(fcmToken)
-        val prefs = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("presence_enabled", false)) return
-        Thread {
-            val deviceId = prefs.getString("bridge_device_id", null) ?: return@Thread
-            request(
-                context,
-                "/v1/mobile/push/register",
-                "POST",
-                JSONObject().put("device_id", deviceId).put("fcm_token", fcmToken).toString()
-            )
-        }.start()
-    }
-
-    fun fetchEvent(context: Context, eventId: String): MobilePushEvent? {
-        val result = request(context, "/v1/mobile/push/events/$eventId", "GET", null) ?: return null
-        return try {
-            val root = JSONObject(result.body)
-            val payload = root.optJSONObject("payload") ?: return null
-            if (payload.optString("action") != "speak") return null
-            val parameters = payload.optJSONObject("parameters") ?: return null
-            val text = parameters.optString("text").trim()
-            if (text.isBlank() || text.length > 1000) return null
-            MobilePushEvent(eventId, text)
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    fun acknowledge(context: Context, eventId: String): Boolean =
-        request(context, "/v1/mobile/push/events/$eventId/ack", "POST", null) != null
-
-    fun revokePushNow(context: Context): Boolean {
-        val prefs = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
-        val deviceId = prefs.getString("bridge_device_id", null) ?: return false
-        return request(
-            context,
-            "/v1/mobile/push/revoke",
-            "POST",
-            JSONObject().put("device_id", deviceId).toString()
-        ) != null
-    }
-
-    private fun request(
-        context: Context,
-        path: String,
-        method: String,
-        body: String?
-    ): HttpResult? = authenticatedRequest(context, path, method, body)?.takeIf { it.code in 200..299 }
 
     /**
      * Chamada autenticada que devolve o status HTTP mesmo em erro (o chat mostra a mensagem do servidor).

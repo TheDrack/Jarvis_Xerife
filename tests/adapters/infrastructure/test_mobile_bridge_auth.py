@@ -164,6 +164,62 @@ def test_bridge_task_dispatch_rejects_another_users_mobile_device(monkeypatch):
     assert manager.sent_tasks == []
 
 
+def test_return_activity_uses_only_connected_mobile_websocket(monkeypatch):
+    manager = FakeBridgeManager()
+
+    async def send_task(device_id, task, api_key=None):
+        manager.sent_tasks.append((device_id, task, api_key))
+        return {"success": True, "result": "speech_completed"}
+
+    manager.send_task = send_task
+    manager.get_connected_soldiers = lambda: [
+        {"device_id": "mobile:user-123:phone-1", "device_type": "mobile", "capabilities": ["tts"]}
+    ]
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", "x" * 40)
+    client = _client(monkeypatch, manager)
+
+    response = client.post(
+        "/v1/mobile/push/return-activity",
+        headers={"X-Jarvis-Return-Activity-Key": "x" * 40},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "delivered", "transport": "websocket"}
+    assert manager.sent_tasks[0][0] == "mobile:user-123:phone-1"
+    assert manager.sent_tasks[0][1]["action"] == "speak"
+    assert manager.sent_tasks[0][2] is None
+
+
+def test_return_activity_fails_closed_when_mobile_is_offline(monkeypatch):
+    manager = FakeBridgeManager()
+    monkeypatch.setenv("JARVIS_RETURN_ACTIVITY_KEY", "x" * 40)
+    client = _client(monkeypatch, manager)
+
+    response = client.post(
+        "/v1/mobile/push/return-activity",
+        headers={"X-Jarvis-Return-Activity-Key": "x" * 40},
+    )
+
+    assert response.status_code == 409
+    assert manager.sent_tasks == []
+
+
+def test_mobile_task_dispatch_requires_live_websocket_and_never_falls_back(monkeypatch):
+    manager = FakeBridgeManager()
+    manager.is_device_connected = lambda device_id: False
+    client = _client(monkeypatch, manager)
+
+    response = client.post(
+        "/v1/local-bridge/send-task?device_id=mobile%3Auser-123%3Aphone-1",
+        json={"action": "speak", "parameters": {"text": "Jarvis teste"}},
+        headers={"Authorization": "Bearer valid"},
+    )
+
+    assert response.status_code == 409
+    assert "WebSocket" in response.json()["detail"]
+    assert manager.sent_tasks == []
+
+
 def test_mobile_task_dispatch_never_receives_desktop_bridge_secret(monkeypatch):
     manager = FakeBridgeManager()
     client = _client(monkeypatch, manager)

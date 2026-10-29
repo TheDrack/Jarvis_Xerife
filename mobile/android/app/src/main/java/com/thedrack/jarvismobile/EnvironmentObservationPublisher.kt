@@ -129,7 +129,7 @@ object EnvironmentObservationPublisher {
             observations += buildObservation(deviceId, snapshot, "location_snapshot", location = location)
         }
         observations.forEach { observation ->
-            MobilePushClient.authenticatedRequest(context, "/v1/environment/observations", "POST", observation.toString())
+            MobileApiClient.authenticatedRequest(context, "/v1/environment/observations", "POST", observation.toString())
         }
     }
 }
