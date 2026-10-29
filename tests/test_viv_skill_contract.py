@@ -27,3 +27,12 @@ def test_viv_skill_requires_live_connector_discovery_research_and_resolution():
         "não testado",
     ):
         assert phrase in skill
+
+def test_catalog_viv_skill_is_a_separate_markdown_table_row():
+    catalog = (ROOT / "docs/skills-connectors/CATALOG.md").read_text(encoding="utf-8")
+    rows = catalog.splitlines()
+
+    assert r"\n| VIV — Verificação Inicial de Voo |" not in catalog
+    assert any(row.startswith("| Visual navigation |") for row in rows)
+    assert any(row.startswith("| VIV — Verificação Inicial de Voo |") for row in rows)
+
