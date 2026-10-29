@@ -212,3 +212,34 @@ def test_storage_unavailable_fails_closed(monkeypatch):
         headers={"Authorization": "Bearer valid"},
     )
     assert response.status_code == 503
+
+
+
+def test_api_server_registers_authenticated_observation_router():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[3]
+    api = (root / "app" / "adapters" / "infrastructure" / "api_server.py").read_text(encoding="utf-8")
+    assert "create_environment_observations_router" in api
+    assert "app.include_router(create_environment_observations_router(get_current_user))" in api
+
+
+def test_migration_restricts_table_to_server_role_and_enables_rls():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[3]
+    migration = (
+        root / "supabase" / "migrations" / "20261029120000_environment_observations.sql"
+    ).read_text(encoding="utf-8")
+    assert "enable row level security" in migration.lower()
+    assert "revoke all on table public.jarvis_environment_observations from public, anon, authenticated" in migration.lower()
+    assert "grant select, insert on table public.jarvis_environment_observations to service_role" in migration.lower()
+    assert "unique (user_id, request_id)" in migration.lower()
+
+
+def test_payload_size_is_bounded(monkeypatch):
+    client = make_client(monkeypatch, Database())
+    response = client.post(
+        "/v1/environment/observations",
+        json=observation(payload={"blob": "x" * (33 * 1024)}),
+        headers={"Authorization": "Bearer valid"},
+    )
+    assert response.status_code == 422
