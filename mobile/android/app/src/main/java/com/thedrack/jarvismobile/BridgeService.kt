@@ -244,6 +244,25 @@ class BridgeService : Service() {
         if (!stopping) connect()
     }
 
+    private val observationRunnable = object : Runnable {
+        override fun run() {
+            if (stopping) return
+            publishEnvironmentObservations()
+            handler.postDelayed(this, OBSERVATION_INTERVAL_MS)
+        }
+    }
+
+    private fun publishEnvironmentObservations() {
+        if (deviceId.isBlank() || token.isBlank()) return
+        Thread {
+            try {
+                EnvironmentObservationPublisher.publish(applicationContext, deviceId, true)
+            } catch (error: Exception) {
+                android.util.Log.w("JarvisMobile", "Environment observation publish failed: " + error.javaClass.simpleName)
+            }
+        }.start()
+    }
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
