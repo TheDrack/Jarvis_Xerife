@@ -167,3 +167,15 @@ A correção de autenticação foi mesclada na main. As migrations de sessões m
 - Para habilitar: configurar o mesmo segredo aleatório em JARVIS_RETURN_ACTIVITY_KEY no serviço Render e no Windows (variável do usuário ou arquivo protegido). Configurar também as credenciais FCM do servidor e do build Android para que a rota funcione quando o WebSocket estiver offline.
 - Se FCM não estiver configurado, a fala por WebSocket ainda pode funcionar quando o telefone estiver conectado; o fallback offline retorna erro explícito e não afirma entrega.
 - Testes adicionados cobrem credencial ausente/incorreta, escolha de transporte FCM, falha fechada com mais de um telefone e requisição do watcher sem registrar o segredo.
+
+
+## Incremento 5 — notificações arbitrárias autenticadas de agentes
+
+O endpoint `POST /v1/mobile/push/notify` permite que um agente autorizado envie uma notificação visível ou uma mensagem de voz sem obter o Bearer token do app móvel.
+
+- A autenticação usa uma chave de serviço dedicada `JARVIS_MOBILE_NOTIFY_KEY` no servidor Render e no cliente autorizado; ela não reutiliza `API_KEY_LOCAL` nem `JARVIS_RETURN_ACTIVITY_KEY`.
+- O agente pode consultar `GET /v1/mobile/push/agent/devices`, que retorna apenas IDs, estado de conexão e estado de registro push — nunca tokens FCM.
+- O corpo aceita `text` (1–1000 caracteres), `title` (1–80), `mode` (`notification` ou `speak`) e, quando houver mais de um aparelho, `device_id` e `user_id` explícitos.
+- Com WebSocket ativo, o servidor aguarda o `task_result` do app. Sem WebSocket, envia um evento FCM opaco e devolve `event_id`; consulte `GET /v1/mobile/push/agent/events/{event_id}` para verificar `queued`, `acknowledged` ou `expired`.
+- O APK precisa ser atualizado para renderizar notificações no canal WebSocket e no FCM. O fallback FCM requer registro do aparelho, credenciais Firebase no servidor e configuração Firebase no build Android.
+- No Windows, `scripts/send_mobile_notification.ps1` lê a chave do ambiente do usuário ou de `%LOCALAPPDATA%\\Jarvis_Xerife\\config\\mobile_notify\\mobile_notify.key`. Não imprima nem registre a chave.
