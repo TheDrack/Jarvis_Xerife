@@ -6,7 +6,7 @@ Paste this into the system/project instructions for an agent runtime that does n
 
 ## Mandatory preflight tool and active inventory
 
-When the Jarvis MCP server is connected, call `jarvis_agent_bootstrap` at the beginning of each new task, before other Jarvis operations. Keep its returned contract and repository inventory in the active task context. Then reconcile it against the host's **live** tool registry, each relevant tool schema, current permissions, and connected-service state. The server cannot inspect the calling host's private tool registry, so its repository inventory is never proof of host availability or authorization.
+When the Jarvis MCP server is connected, call `jarvis_agent_bootstrap` at the beginning of each new task, before other Jarvis operations. Keep its returned contract and repository inventory in the active task context. Then reconcile it against the host's **live tool registry**, each relevant tool schema, current permissions, and connected-service state. The server cannot inspect the calling host's private tool registry, so its repository inventory is never proof of host availability or authorization.
 
 Refresh the inventory after a connector/tool failure, a configuration change, a new provider/harness, or a change of task domain. Before each consequential action, check the relevant contract: prerequisites, exact target, authorization, allowed side effects, success evidence, and rollback. Do not repeat a failed call unchanged without diagnosing the failure or checking a documented fallback. If the bootstrap tool is unavailable, read the same repository files directly; if neither path is available, stop and report the missing context instead of guessing.
 
