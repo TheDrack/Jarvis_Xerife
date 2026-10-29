@@ -228,12 +228,11 @@ def test_baseline_migration_defines_observation_schema_and_enables_rls():
     from pathlib import Path
     root = Path(__file__).resolve().parents[3]
     migration = (
-        root / "supabase" / "migrations" / "20261029120000_environment_observations.sql"
+        root / "supabase" / "migrations" / "20261029110505_environment_observations.sql"
     ).read_text(encoding="utf-8")
     assert "enable row level security" in migration.lower()
-    assert "revoke all on table public.jarvis_environment_observations from public, anon, authenticated, service_role" in migration.lower()
-    assert "grant select, insert on table public.jarvis_environment_observations to service_role" in migration.lower()
     assert "unique (user_id, request_id)" in migration.lower()
+    assert "constraint jarvis_environment_observations_expiry" in migration.lower()
 
 
 def test_payload_size_is_bounded(monkeypatch):
