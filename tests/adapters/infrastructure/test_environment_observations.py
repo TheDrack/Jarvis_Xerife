@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
+import pytest
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -255,3 +257,31 @@ def test_follow_up_migration_revokes_unneeded_server_privileges():
     assert "revoke all on table public.jarvis_environment_observations" in migration
     assert "from public, anon, authenticated, service_role" in migration
     assert "grant select, insert on table public.jarvis_environment_observations to service_role" in migration
+
+
+def test_location_snapshot_requires_mobile_opt_in_and_valid_coordinates():
+    valid = observation(
+        source_device_type="mobile",
+        observation_type="location_snapshot",
+        payload={"location_opt_in": True, "location": {"latitude": -27.5, "longitude": -48.5, "accuracy_m": 12.0}},
+    )
+    module.EnvironmentObservationCreate(**valid)
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(**dict(valid, source_device_type="desktop"))
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(**dict(valid, payload={"location": {"latitude": -27.5, "longitude": -48.5}}))
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(**dict(valid, payload={"location_opt_in": True, "location": {"latitude": 91, "longitude": -48.5}}))
+
+
+def test_expired_location_snapshot_hides_coordinates():
+    now = datetime.now(timezone.utc)
+    row = {
+        "device_id": "phone-1", "source_device_type": "mobile", "observation_type": "location_snapshot",
+        "observed_at": now.isoformat(), "received_at": (now - timedelta(minutes=3)).isoformat(),
+        "expires_at": (now - timedelta(minutes=1)).isoformat(),
+        "payload": {"location_opt_in": True, "location": {"latitude": -27.5, "longitude": -48.5}},
+    }
+    result = module._public_observation(row, now)
+    assert result["freshness"] == "stale"
+    assert result["payload"] == {}

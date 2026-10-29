@@ -1,6 +1,7 @@
 package com.thedrack.jarvismobile
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -24,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -97,6 +99,7 @@ class MainActivity : ComponentActivity() {
                         onLogout = ::logout,
                         onStartPresence = ::startPresence,
                         onStopPresence = ::stopPresence,
+                        onLocationSharingChanged = ::setLocationSharing,
                         onSpeak = { speak("Jarvis Mobile ativo. Canal de voz local funcionando.") },
                         onSendChat = ::sendChat,
                         onFetchStatus = ::fetchStatus,
@@ -106,6 +109,35 @@ class MainActivity : ComponentActivity() {
             }
         }
         handlePushIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!this::vault.isInitialized) return
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        if (prefs.getBoolean("location_sharing_enabled", false)) {
+            if (hasLocationPermission()) setLocationSharing(true)
+            else prefs.edit().putBoolean("location_sharing_enabled", false).apply()
+        }
+    }
+
+    private fun hasLocationPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    private fun setLocationSharing(enabled: Boolean) {
+        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        val allowed = enabled && hasLocationPermission()
+        prefs.edit().putBoolean("location_sharing_enabled", allowed).apply()
+        if (!allowed) return
+        val deviceId = getOrCreateDeviceId()
+        executor.execute {
+            try {
+                EnvironmentObservationPublisher.publish(applicationContext, deviceId, BridgeService.isRunning, includeLocation = true)
+            } catch (error: Exception) {
+                android.util.Log.w("JarvisMobile", "Location observation publish failed: " + error.javaClass.simpleName)
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -372,6 +404,7 @@ private fun JarvisMobileScreen(
     onLogout: () -> Unit,
     onStartPresence: () -> Unit,
     onStopPresence: () -> Unit,
+    onLocationSharingChanged: (Boolean) -> Unit,
     onSpeak: () -> Unit,
     onSendChat: (String, (ChatReply) -> Unit) -> Unit,
     onFetchStatus: ((JarvisStatus?) -> Unit) -> Unit,
@@ -393,6 +426,9 @@ private fun JarvisMobileScreen(
     var chatNotice by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<JarvisStatus?>(null) }
     val context = LocalContext.current
+    var locationSharingEnabled by remember {
+        mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("location_sharing_enabled", false))
+    }
 
     fun newId(): Long {
         val id = nextId
@@ -428,6 +464,22 @@ private fun JarvisMobileScreen(
         } else {
             presenceActive = false
             message = "A permissão de notificações é necessária para a presença em segundo plano."
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        val granted = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true || grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        if (granted) {
+            locationSharingEnabled = true
+            context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).edit().putBoolean("location_sharing_enabled", true).apply()
+            onLocationSharingChanged(true)
+            message = "Localização ativada. O Jarvis recebe coordenadas somente enquanto a opção estiver ligada."
+        } else {
+            locationSharingEnabled = false
+            context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).edit().putBoolean("location_sharing_enabled", false).apply()
+            message = "Permissão de localização negada; nenhum dado de localização será enviado."
         }
     }
 
@@ -584,6 +636,35 @@ private fun JarvisMobileScreen(
                         enabled = presenceActive,
                         modifier = Modifier.padding(top = 8.dp)
                     ) { Text("Parar presença") }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Compartilhar localização")
+                            Text("Opcional; exige permissão e funciona quando o app está em primeiro plano.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(
+                            checked = locationSharingEnabled,
+                            onCheckedChange = { enabled ->
+                                if (!enabled) {
+                                    locationSharingEnabled = false
+                                    context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).edit().putBoolean("location_sharing_enabled", false).apply()
+                                    onLocationSharingChanged(false)
+                                    message = "Compartilhamento de localização interrompido."
+                                } else if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    locationSharingEnabled = true
+                                    context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).edit().putBoolean("location_sharing_enabled", true).apply()
+                                    onLocationSharingChanged(true)
+                                    message = "Compartilhamento de localização ativado."
+                                } else {
+                                    locationPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                                }
+                            }
+                        )
+                    }
                     Button(
                         onClick = {
                             onStopPresence()

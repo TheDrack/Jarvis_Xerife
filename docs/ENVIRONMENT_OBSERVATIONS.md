@@ -13,9 +13,13 @@ The existing desktop agent and native Android app are independent data providers
 
 ## Data minimization and freshness
 
-Android reports only active transport (wifi, cellular, ethernet, vpn, or unknown), internet/validation availability, and metering status. It does not collect SSID/BSSID, GPS, or neighbor devices. Desktop reports interface metadata and entries already in the OS ARP cache; it sends no probes and performs no port scan. Payloads containing credentials or precise-location fields are rejected.
+Android reports active transport, internet/validation availability, and metering status by default. Location is a separate location_snapshot and is sent only after the user enables the in-app switch and grants coarse or fine Android location permission. Collection is limited to the foreground app; background presence updates never include coordinates. The app does not collect SSID/BSSID or neighbor devices. Desktop reports interface metadata and entries already in the OS ARP cache; it sends no probes and performs no port scan. Payloads containing credentials or precise-location fields are rejected.
 
-A network snapshot expires five minutes after server receipt; presence expires after two minutes. An expired record is stale, not proof that the device is offline. No record means unknown. ARP cache absence does not prove a device is offline.
+A network snapshot expires five minutes after server receipt; presence and location snapshots expire after two minutes. Expired location payloads are hidden by the API, so stale coordinates are not returned. An expired record is stale, not proof that the device is offline. No record means unknown. ARP cache absence does not prove a device is offline.
+
+## Android location opt-in
+
+Location sharing is off by default. The user must enable Compartilhar localização in the existing Android app and grant either approximate (coarse) or precise (fine) location permission. Turning the switch off stops further location submissions; revoking Android permission also prevents collection. Location is collected only when the app is in the foreground, not by the background presence service. The API accepts location only in a mobile location_snapshot with location_opt_in=true, validates coordinate ranges, and expires the snapshot after two minutes.
 
 ## Desktop opt-in configuration
 
