@@ -284,7 +284,7 @@ class MainActivity : ComponentActivity() {
         stopPresence()
         executor.execute {
             try {
-                if (!refreshToken.isNullOrBlank()) MobilePushClient.revokePushNow(applicationContext)
+                if (!refreshToken.isNullOrBlank()) MobilePushClient.revokeDeviceNow(applicationContext)
                 // Push revocation may refresh/rotate the session; revoke with the latest token.
                 val currentRefreshToken = vault.readRefreshToken() ?: refreshToken
                 if (!currentRefreshToken.isNullOrBlank() && !deviceId.isNullOrBlank() && baseUrl.startsWith("https://")) {
