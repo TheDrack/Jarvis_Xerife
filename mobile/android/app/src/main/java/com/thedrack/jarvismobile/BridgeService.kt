@@ -1,11 +1,13 @@
 package com.thedrack.jarvismobile
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -13,6 +15,8 @@ import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -174,18 +178,63 @@ class BridgeService : Service() {
         val taskId = message.optString("task_id")
         if (taskId.isBlank() || taskId.length > 200) return
         val action = message.optString("action")
-        if (action != "speak") {
-            sendTaskResult(taskId, false, "unsupported_action")
-            return
-        }
         val parameters = message.optJSONObject("parameters") ?: JSONObject()
-        val speechText = parameters.optString("text")
-        if (speechText.isBlank() || speechText.length > 1000) {
-            sendTaskResult(taskId, false, "invalid_text")
-            return
+        val text = parameters.optString("text").trim()
+        when (action) {
+            "speak" -> {
+                if (text.isBlank() || text.length > 1000) {
+                    sendTaskResult(taskId, false, "invalid_text")
+                } else if (!ttsReady || tts?.speak(text, TextToSpeech.QUEUE_ADD, null, taskId) != TextToSpeech.SUCCESS) {
+                    sendTaskResult(taskId, false, "tts_unavailable")
+                }
+            }
+            "notification" -> {
+                val title = parameters.optString("title", "Jarvis").trim().ifBlank { "Jarvis" }
+                if (text.isBlank() || text.length > 1000 || title.length > 80) {
+                    sendTaskResult(taskId, false, "invalid_notification")
+                } else if (showTaskNotification(taskId, title, text)) {
+                    sendTaskResult(taskId, true, "notification_posted")
+                } else {
+                    sendTaskResult(taskId, false, "notifications_unavailable")
+                }
+            }
+            else -> sendTaskResult(taskId, false, "unsupported_action")
         }
-        if (!ttsReady || tts?.speak(speechText, TextToSpeech.QUEUE_ADD, null, taskId) != TextToSpeech.SUCCESS) {
-            sendTaskResult(taskId, false, "tts_unavailable")
+    }
+
+    private fun showTaskNotification(taskId: String, title: String, text: String): Boolean {
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) return false
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(
+                    JarvisFirebaseMessagingService.EVENT_CHANNEL_ID,
+                    "Jarvis — avisos e presença",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply { description = "Notificações e avisos do Jarvis" }
+            )
+        }
+        val intent = Intent(this, MainActivity::class.java)
+        val pending = PendingIntent.getActivity(
+            this, taskId.hashCode(), intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, JarvisFirebaseMessagingService.EVENT_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setContentIntent(pending)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+        return try {
+            NotificationManagerCompat.from(this).notify(taskId.hashCode(), notification)
+            true
+        } catch (_: SecurityException) {
+            false
         }
     }
 

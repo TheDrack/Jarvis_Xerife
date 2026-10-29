@@ -72,10 +72,12 @@ class FirebasePushSender:
             logger.error("Firebase credential initialization failed (%s)", type(exc).__name__)
             raise FirebasePushNotConfigured("Firebase credentials could not be initialized") from None
 
-    def send_event(self, fcm_token: str, event_id: str) -> None:
-        """Send only an opaque event ID; event text stays in the authenticated API."""
+    def send_event(self, fcm_token: str, event_id: str, event_type: str = "speak") -> None:
+        """Send an opaque event ID; event text stays in the authenticated API."""
         if not fcm_token or len(fcm_token) > 4096 or not event_id:
             raise ValueError("A valid FCM token and event ID are required")
+        if event_type not in {"speak", "notification"}:
+            raise ValueError("Unsupported mobile event type")
         credentials, project_id = self._load_credentials()
         if credentials.expired or not credentials.token:
             from google.auth.transport.requests import Request
@@ -97,7 +99,7 @@ class FirebasePushSender:
                 "token": fcm_token,
                 "data": {
                     "event_id": event_id,
-                    "event_type": "speak",
+                    "event_type": event_type,
                 },
                 "android": {
                     "priority": "HIGH",

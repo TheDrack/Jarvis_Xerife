@@ -5,7 +5,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-data class MobilePushEvent(val eventId: String, val text: String)
+data class MobilePushEvent(val eventId: String, val eventType: String, val title: String, val text: String)
 
 object MobilePushClient {
     private val refreshLock = Any()
@@ -33,11 +33,14 @@ object MobilePushClient {
         return try {
             val root = JSONObject(result.body)
             val payload = root.optJSONObject("payload") ?: return null
-            if (payload.optString("action") != "speak") return null
+            val eventType = root.optString("event_type")
+            val action = payload.optString("action")
+            if (eventType !in setOf("speak", "notification") || action != eventType) return null
             val parameters = payload.optJSONObject("parameters") ?: return null
             val text = parameters.optString("text").trim()
-            if (text.isBlank() || text.length > 1000) return null
-            MobilePushEvent(eventId, text)
+            val title = parameters.optString("title", "Jarvis").trim().ifBlank { "Jarvis" }
+            if (text.isBlank() || text.length > 1000 || title.length > 80) return null
+            MobilePushEvent(eventId, eventType, title, text)
         } catch (_: Exception) {
             null
         }

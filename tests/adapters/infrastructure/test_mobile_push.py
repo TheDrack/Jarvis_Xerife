@@ -111,12 +111,14 @@ class FakeSender:
     def __init__(self, configured=True):
         self.configured = configured
         self.sent = []
+        self.event_types = []
 
     def is_configured(self):
         return self.configured
 
-    def send_event(self, fcm_token, event_id):
+    def send_event(self, fcm_token, event_id, event_type="speak"):
         self.sent.append((fcm_token, event_id))
+        self.event_types.append(event_type)
 
 
 class FakeAuth:
@@ -139,8 +141,15 @@ class FakeAuth:
 
 
 class FakeBridgeManager:
-    def is_device_connected(self, _device_id):
-        return False
+    def __init__(self, connected=None):
+        self.connected = set(connected or [])
+        self.sent_tasks = []
+
+    def get_connected_devices(self):
+        return list(self.connected)
+
+    def is_device_connected(self, device_id):
+        return device_id in self.connected
 
     def get_connected_soldiers(self):
         return []
@@ -151,15 +160,17 @@ class FakeBridgeManager:
     def disconnect(self, *_args):
         pass
 
-    async def send_task(self, *_args, **_kwargs):
-        raise AssertionError("Offline fallback should be used")
+    async def send_task(self, device_id, task, **_kwargs):
+        self.sent_tasks.append((device_id, task))
+        return {"success": True, "result": "notification_posted"}
 
 
-def _setup(monkeypatch, database=None, sender=None):
+def _setup(monkeypatch, database=None, sender=None, bridge_manager=None):
     auth = FakeAuth()
     db = database or FakeDatabase()
     push_sender = sender or FakeSender()
-    monkeypatch.setattr(nexus, "resolve", lambda name: auth if name == "auth_adapter" else FakeBridgeManager())
+    manager = bridge_manager or FakeBridgeManager()
+    monkeypatch.setattr(nexus, "resolve", lambda name: auth if name == "auth_adapter" else manager)
     monkeypatch.setattr(mobile_push, "get_supabase_admin_client", lambda: db)
     monkeypatch.setattr(mobile_push, "_push_sender", push_sender)
     app = FastAPI()
@@ -407,3 +418,166 @@ def test_return_activity_prefers_websocket_when_phone_is_connected(monkeypatch):
     assert calls[0][2] is None
     assert sender.sent == []
     assert database.tables[mobile_push.PUSH_EVENT_TABLE] == []
+
+
+
+def test_offline_notification_event_persists_text_and_sends_only_opaque_id(monkeypatch):
+    _client, database, sender, _auth = _setup(monkeypatch)
+    result = mobile_push.dispatch_mobile_event(
+        "user-42", "phone-1", "Estoque atualizado", mode="notification", title="Jarvis"
+    )
+
+    assert result["status"] == "queued"
+    event = database.tables[mobile_push.PUSH_EVENT_TABLE][0]
+    assert event["event_type"] == "notification"
+    assert event["payload"] == {
+        "action": "notification",
+        "parameters": {"title": "Jarvis", "text": "Estoque atualizado"},
+    }
+    assert sender.sent == [("f" * 64, result["event_id"])]
+    assert sender.event_types == ["notification"]
+
+
+def test_agent_notification_fails_closed_when_server_key_is_missing(monkeypatch):
+    client, _database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.delenv("JARVIS_MOBILE_NOTIFY_KEY", raising=False)
+
+    response = client.post(
+        "/v1/mobile/push/notify",
+        json={"device_id": "phone-1", "text": "Teste"},
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 503
+
+
+def test_agent_notification_rejects_wrong_service_key(monkeypatch):
+    client, _database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "a" * 64)
+
+    response = client.post(
+        "/v1/mobile/push/notify",
+        json={"device_id": "phone-1", "text": "Teste"},
+        headers={"X-Jarvis-Mobile-Notify-Key": "b" * 64},
+    )
+
+    assert response.status_code == 401
+
+
+def test_agent_notification_uses_registered_device_and_returns_queued_ack_id(monkeypatch):
+    client, database, sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+
+    response = client.post(
+        "/v1/mobile/push/notify",
+        json={
+            "device_id": "phone-1",
+            "user_id": "user-42",
+            "title": "Jarvis",
+            "text": "Teste de notificação",
+            "mode": "notification",
+        },
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+    assert response.json()["transport"] == "fcm"
+    event = database.tables[mobile_push.PUSH_EVENT_TABLE][0]
+    assert event["event_id"] == response.json()["event_id"]
+    assert event["event_type"] == "notification"
+    assert sender.event_types == ["notification"]
+
+
+def test_agent_device_listing_never_exposes_fcm_tokens(monkeypatch):
+    client, _database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+
+    response = client.get(
+        "/v1/mobile/push/agent/devices",
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    device = response.json()["devices"][0]
+    assert device["device_id"] == "phone-1"
+    assert device["push_registered"] is True
+    assert "fcm_token" not in device
+
+
+
+def test_agent_notification_uses_websocket_and_waits_for_task_ack(monkeypatch):
+    manager = FakeBridgeManager(connected={"mobile:user-42:phone-1"})
+    client, database, sender, _auth = _setup(monkeypatch, bridge_manager=manager)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+
+    response = client.post(
+        "/v1/mobile/push/notify",
+        json={
+            "device_id": "phone-1",
+            "user_id": "user-42",
+            "title": "Jarvis",
+            "text": "Teste pelo WebSocket",
+            "mode": "notification",
+        },
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "delivered"
+    assert response.json()["transport"] == "websocket"
+    assert manager.sent_tasks == [(
+        "mobile:user-42:phone-1",
+        {"action": "notification", "parameters": {"title": "Jarvis", "text": "Teste pelo WebSocket"}},
+    )]
+    assert database.tables[mobile_push.PUSH_EVENT_TABLE] == []
+    assert sender.sent == []
+
+
+
+def test_agent_event_status_reports_acknowledged_without_exposing_payload(monkeypatch):
+    client, database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+    event_id = "d2a6f6d2-5312-4b58-9c3a-90a1f8e27e25"
+    database.tables[mobile_push.PUSH_EVENT_TABLE].append({
+        "event_id": event_id,
+        "user_id": "user-42",
+        "device_id": "phone-1",
+        "event_type": "notification",
+        "payload": {},
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=2)).isoformat(),
+        "acknowledged_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    response = client.get(
+        f"/v1/mobile/push/agent/events/{event_id}",
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "acknowledged"
+    assert "payload" not in response.json()
+
+
+def test_agent_event_status_reports_expired_unacknowledged_event(monkeypatch):
+    client, database, _sender, _auth = _setup(monkeypatch)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+    event_id = "a5f3a8a8-1ed9-4a2b-a84a-cb3df5bb0e31"
+    database.tables[mobile_push.PUSH_EVENT_TABLE].append({
+        "event_id": event_id,
+        "user_id": "user-42",
+        "device_id": "phone-1",
+        "event_type": "notification",
+        "payload": {"action": "notification", "parameters": {"text": "private"}},
+        "expires_at": (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(),
+        "acknowledged_at": None,
+    })
+
+    response = client.get(
+        f"/v1/mobile/push/agent/events/{event_id}",
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "expired"
+    assert "payload" not in response.json()
