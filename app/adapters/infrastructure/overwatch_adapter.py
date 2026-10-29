@@ -31,6 +31,7 @@ import logging
 import os
 import threading
 import time
+import unicodedata
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Set
 
@@ -474,11 +475,15 @@ class OverwatchDaemon(NexusComponent):
                 from app.application.services.user_communication_service import CommunicationPriority
                 notifier = nexus.resolve("notification_service")
                 if notifier is not None and hasattr(notifier, "communicate_user"):
-                    lowered = message.casefold()
+                    normalized_message = unicodedata.normalize("NFKD", message.casefold())
+                    normalized_message = "".join(
+                        character for character in normalized_message
+                        if not unicodedata.combining(character)
+                    )
                     priority = (
                         CommunicationPriority.CRITICAL
-                        if any(term in lowered for term in (
-                            "intruso", "n?o autorizado", "nao autorizado", "arp-spoof",
+                        if any(term in normalized_message for term in (
+                            "intruso", "nao autorizado", "arp-spoof",
                             "ataque", "attack", "security breach",
                         ))
                         else CommunicationPriority.NORMAL
