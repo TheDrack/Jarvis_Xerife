@@ -3,7 +3,7 @@ name: 🚀 JARVIS Integrated Evolution
 on:
   workflow_dispatch:  # Execução manual quando necessário
   schedule:
-    - cron: "0 2 * * *"  # Execução diária às 02:00 UTC (loop completo com Gatekeeper)
+    - cron: "0 * * * *"  # Verificação horária; o gate EVOLUTION_ENABLED continua obrigatório
 
 permissions:
   contents: write
