@@ -121,6 +121,9 @@ class BridgeService : Service() {
                     retryCount = 0
                     updateNotification("Conectado ao Jarvis")
                     webSocket.send(JSONObject().put("type", "status").put("status", "ready").toString())
+                    publishEnvironmentObservations()
+                    handler.removeCallbacks(observationRunnable)
+                    handler.postDelayed(observationRunnable, OBSERVATION_INTERVAL_MS)
                 }
 
                 override fun onMessage(webSocket: WebSocket, text: String) {
@@ -298,7 +301,7 @@ class BridgeService : Service() {
         const val EXTRA_BASE_URL = "api_base_url"
         const val EXTRA_TOKEN = "access_token"
         private const val CHANNEL_ID = "jarvis_presence"
-        private const val NOTIFICATION_ID = 5821
+        private const val NOTIFICATION_ID = 5821\n        private const val OBSERVATION_INTERVAL_MS = 60_000L
         @Volatile var isRunning: Boolean = false
             private set
     }
