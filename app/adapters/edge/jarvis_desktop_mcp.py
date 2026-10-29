@@ -120,7 +120,7 @@ def jarvis_agent_bootstrap() -> dict[str, Any]:
             unavailable[name] = f"{type(exc).__name__}: {exc}"
 
     return {
-        "protocol": "JCMP/1.1",
+        "protocol": "JCMP/1.0",
         "source": "repository_baseline",
         "documents_loaded": sorted(loaded),
         "documents_unavailable": unavailable,
