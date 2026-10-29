@@ -43,7 +43,7 @@ class JarvisFirebaseMessagingService : FirebaseMessagingService() {
             if (!canPostNotifications()) return
             val event = MobilePushClient.fetchEvent(applicationContext, eventId) ?: return
             if (event.eventType != "notification") return
-            if (showEventNotification(eventId, event.title, event.text)) {
+            if (showEventNotification(eventId, event.title, event.text, launchSpeechOnTap = false)) {
                 MobilePushClient.acknowledge(applicationContext, eventId)
             }
             return
@@ -84,10 +84,11 @@ class JarvisFirebaseMessagingService : FirebaseMessagingService() {
     private fun showEventNotification(
         eventId: String,
         title: String = "Jarvis",
-        text: String = "O Jarvis tem uma mensagem de voz pronta."
+        text: String = "O Jarvis tem uma mensagem de voz pronta.",
+        launchSpeechOnTap: Boolean = true
     ): Boolean {
         val intent = Intent(this, MainActivity::class.java)
-            .putExtra(PushSpeechService.EXTRA_EVENT_ID, eventId)
+        if (launchSpeechOnTap) intent.putExtra(PushSpeechService.EXTRA_EVENT_ID, eventId)
         val pending = PendingIntent.getActivity(
             this,
             eventId.hashCode(),
