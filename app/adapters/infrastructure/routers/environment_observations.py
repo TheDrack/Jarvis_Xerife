@@ -180,7 +180,7 @@ def create_environment_observations_router(get_current_user) -> APIRouter:
             "payload": observation.payload,
         }
         try:
-            inserted = _rows(database.table(TABLE).insert(record).execute())
+            inserted = _rows(database.table(TABLE).insert(record).select("*").execute())
             if inserted:
                 return {"accepted": True, "duplicate": False, "observation": _public_observation(inserted[0], now)}
         except Exception as exc:
