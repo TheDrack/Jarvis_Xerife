@@ -4,6 +4,9 @@ import logging
 from typing import Any, Dict
 
 from app.core.nexus import nexus, NexusComponent
+from app.application.services.user_communication_service import (
+    CommunicationPriority, UserCommunicationService, dispatch_to_mobile,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +17,7 @@ class NotificationService(NexusComponent):
     def __init__(self):
         # Lista de interfaces prioritárias que o Jarvis deve tentar usar
         self.interface_priority = ["telegram_adapter", "whatsapp_adapter", "discord_adapter"]
+        self.user_communication = UserCommunicationService()
 
     def execute(self, context: Dict[str, Any] = None) -> Dict[str, Any]:
         """Implementação do contrato NexusComponent."""
@@ -43,6 +47,28 @@ class NotificationService(NexusComponent):
         
         logger.warning("❌ Nenhuma interface disponível para envio de notificação.")
         return False
+
+    def communicate_user(
+        self, event_key: str, message: str,
+        priority: CommunicationPriority = CommunicationPriority.NORMAL,
+    ) -> Dict[str, Any]:
+        """Deliver a grounded event to the paired phone using presence-aware policy.
+
+        Presence is used only when a live service is registered; otherwise it is
+        unknown and non-urgent messages are deferred rather than interrupting.
+        """
+        presence = "unknown"
+        try:
+            presence_service = nexus.resolve("presence_service")
+            if presence_service is not None:
+                snapshot = presence_service.evaluate()
+                presence = getattr(getattr(snapshot, "state", None), "value", "unknown")
+        except Exception as exc:
+            logger.debug("Presence unavailable for communication policy (%s)", type(exc).__name__)
+        return self.user_communication.communicate(
+            event_key=event_key, message=message, priority=priority, presence=presence,
+            dispatch=dispatch_to_mobile,
+        )
 
     def _get_target_id(self, interface_id: str) -> str:
         """Busca o ID de destino correto baseado na interface."""
