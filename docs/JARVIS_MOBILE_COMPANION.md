@@ -112,7 +112,7 @@ O primeiro incremento foi implementado nesta branch:
 
 ## Estado desta proposta
 
-A base nativa e a sessão móvel renovável/revogável estão implementadas; as migrations já estão aplicadas no Supabase. O login ainda depende do deploy do backend e da chave administrativa no ambiente de servidor. O canal de eventos ainda não é uma solução conclusiva de presença persistente. Não marcar a integração PC→telefone como concluída até configurar FCM, configurar a chave do watcher e testar em dispositivo Android real.
+A base nativa e a sessão móvel renovável/revogável estão implementadas; as migrations já estão aplicadas no Supabase. O login ainda depende do deploy do backend e da chave administrativa no ambiente de servidor. O canal de eventos ainda não é uma solução conclusiva de presença persistente. Não marcar a integração PC→telefone como concluída até configurar a chave do watcher e testar em dispositivo Android real.
 ## Incremento 2 — sessão móvel renovável e revogável
 
 - Adiciona `POST /v1/mobile/session/login`, `POST /v1/mobile/session/refresh` e `POST /v1/mobile/session/revoke`.

@@ -43,7 +43,6 @@ networkx>=3.0
 # Telemetria e Chamadas API (Substitui o SDK do Render)
 httpx>=0.25.0
 requests>=2.31.0
-google-auth>=2.40.0
 
 # Respan SDK tracing for direct Python LLM SDK calls (optional without RESPAN_API_KEY).
 respan-ai==4.2.4

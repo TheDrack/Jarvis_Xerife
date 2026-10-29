@@ -28,6 +28,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 
 /**
@@ -53,6 +54,7 @@ class BridgeService : Service() {
     private var deviceId = ""
     private var retryCount = 0
     private var stopping = false
+    private val queuedEventIds = ConcurrentHashMap.newKeySet<String>()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -91,14 +93,14 @@ class BridgeService : Service() {
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) = Unit
                         override fun onDone(utteranceId: String?) {
-                            if (!utteranceId.isNullOrBlank()) sendTaskResult(utteranceId, true, "speech_completed")
+                            if (!utteranceId.isNullOrBlank()) onSpeechCompleted(utteranceId, true, "speech_completed")
                         }
                         @Deprecated("Deprecated by Android; required for API compatibility")
                         override fun onError(utteranceId: String?) {
-                            if (!utteranceId.isNullOrBlank()) sendTaskResult(utteranceId, false, "speech_failed")
+                            if (!utteranceId.isNullOrBlank()) onSpeechCompleted(utteranceId, false, "speech_failed")
                         }
                         override fun onError(utteranceId: String?, errorCode: Int) {
-                            if (!utteranceId.isNullOrBlank()) sendTaskResult(utteranceId, false, "speech_failed_" + errorCode)
+                            if (!utteranceId.isNullOrBlank()) onSpeechCompleted(utteranceId, false, "speech_failed_" + errorCode)
                         }
                     })
                     connect()
@@ -126,6 +128,15 @@ class BridgeService : Service() {
                     retryCount = 0
                     updateNotification("Conectado ao Jarvis")
                     webSocket.send(JSONObject().put("type", "status").put("status", "ready").toString())
+                    Thread {
+                        try {
+                            MobilePushClient.registerCurrentDevice(applicationContext, deviceId)
+                            val pending = MobilePushClient.fetchPendingEvents(applicationContext)
+                            handler.post { pending.forEach { handleQueuedEvent(it) } }
+                        } catch (_: Exception) {
+                            updateNotification("Conectado; fila móvel será sincronizada na próxima tentativa")
+                        }
+                    }.start()
                     publishEnvironmentObservations()
                     handler.removeCallbacks(observationRunnable)
                     handler.postDelayed(observationRunnable, OBSERVATION_INTERVAL_MS)
@@ -210,7 +221,7 @@ class BridgeService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
                 NotificationChannel(
-                    JarvisFirebaseMessagingService.EVENT_CHANNEL_ID,
+                    EVENT_CHANNEL_ID,
                     "Jarvis — avisos e presença",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply { description = "Notificações e avisos do Jarvis" }
@@ -221,7 +232,7 @@ class BridgeService : Service() {
             this, taskId.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        val notification = NotificationCompat.Builder(this, JarvisFirebaseMessagingService.EVENT_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, EVENT_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(text)
@@ -236,6 +247,27 @@ class BridgeService : Service() {
         } catch (_: SecurityException) {
             false
         }
+    }
+
+    private fun handleQueuedEvent(event: MobilePushEvent) {
+        if (!queuedEventIds.add(event.eventId)) return
+        when (event.eventType) {
+            "notification" -> {
+                if (showTaskNotification(event.eventId, event.title, event.text)) {
+                    Thread { MobilePushClient.acknowledge(applicationContext, event.eventId) }.start()
+                    queuedEventIds.remove(event.eventId)
+                } else queuedEventIds.remove(event.eventId)
+            }
+            "speak" -> {
+                if (!ttsReady || tts?.speak(event.text, TextToSpeech.QUEUE_ADD, null, event.eventId) != TextToSpeech.SUCCESS) queuedEventIds.remove(event.eventId)
+            }
+        }
+    }
+
+    private fun onSpeechCompleted(taskId: String, success: Boolean, result: String) {
+        if (queuedEventIds.remove(taskId)) {
+            if (success) Thread { MobilePushClient.acknowledge(applicationContext, taskId) }.start()
+        } else sendTaskResult(taskId, success, result)
     }
 
     private fun sendTaskResult(taskId: String, success: Boolean, result: String) {
@@ -345,6 +377,7 @@ class BridgeService : Service() {
         const val EXTRA_TOKEN = "access_token"
         private const val CHANNEL_ID = "jarvis_presence"
         private const val NOTIFICATION_ID = 5821
+        const val EVENT_CHANNEL_ID = "jarvis_native_events"
         private const val OBSERVATION_INTERVAL_MS = 60_000L
         @Volatile var isRunning: Boolean = false
             private set

@@ -12,52 +12,46 @@ object MobilePushClient {
 
     internal data class HttpResult(val code: Int, val body: String)
 
-    fun registerCurrentDevice(context: Context, fcmToken: String) {
-        if (fcmToken.isBlank()) return
-        TokenVault(context).savePushToken(fcmToken)
-        val prefs = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("presence_enabled", false)) return
-        Thread {
-            val deviceId = prefs.getString("bridge_device_id", null) ?: return@Thread
-            request(
-                context,
-                "/v1/mobile/push/register",
-                "POST",
-                JSONObject().put("device_id", deviceId).put("fcm_token", fcmToken).toString()
-            )
-        }.start()
+    fun registerCurrentDevice(context: Context, deviceId: String) {
+        if (deviceId.isBlank()) return
+        request(context, "/v1/mobile/push/register", "POST", JSONObject().put("device_id", deviceId).toString())
     }
 
-    fun fetchEvent(context: Context, eventId: String): MobilePushEvent? {
-        val result = request(context, "/v1/mobile/push/events/$eventId", "GET", null) ?: return null
+    fun fetchPendingEvents(context: Context): List<MobilePushEvent> {
+        val result = request(context, "/v1/mobile/push/events/pending", "GET", null) ?: return emptyList()
         return try {
-            val root = JSONObject(result.body)
+            val events = JSONObject(result.body).optJSONArray("events") ?: return emptyList()
+            (0 until events.length()).mapNotNull { index -> parseEvent(events.optJSONObject(index) ?: return@mapNotNull null) }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    private fun parseEvent(root: JSONObject): MobilePushEvent? {
+        return try {
             val payload = root.optJSONObject("payload") ?: return null
+            val eventId = root.optString("event_id")
             val eventType = root.optString("event_type")
-            val action = payload.optString("action")
-            if (eventType !in setOf("speak", "notification") || action != eventType) return null
+            if (eventId.isBlank() || eventType !in setOf("speak", "notification")) return null
             val parameters = payload.optJSONObject("parameters") ?: return null
+            if (payload.optString("action") != eventType) return null
             val text = parameters.optString("text").trim()
             val title = parameters.optString("title", "Jarvis").trim().ifBlank { "Jarvis" }
             if (text.isBlank() || text.length > 1000 || title.length > 80) return null
             MobilePushEvent(eventId, eventType, title, text)
-        } catch (_: Exception) {
-            null
-        }
+        } catch (_: Exception) { null }
+    }
+
+    fun fetchEvent(context: Context, eventId: String): MobilePushEvent? {
+        val result = request(context, "/v1/mobile/push/events/$eventId", "GET", null) ?: return null
+        return parseEvent(JSONObject(result.body).put("event_id", eventId))
     }
 
     fun acknowledge(context: Context, eventId: String): Boolean =
         request(context, "/v1/mobile/push/events/$eventId/ack", "POST", null) != null
 
-    fun revokePushNow(context: Context): Boolean {
+    fun revokeDeviceNow(context: Context): Boolean {
         val prefs = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
         val deviceId = prefs.getString("bridge_device_id", null) ?: return false
-        return request(
-            context,
-            "/v1/mobile/push/revoke",
-            "POST",
-            JSONObject().put("device_id", deviceId).toString()
-        ) != null
+        return request(context, "/v1/mobile/push/revoke", "POST", JSONObject().put("device_id", deviceId).toString()) != null
     }
 
     private fun request(

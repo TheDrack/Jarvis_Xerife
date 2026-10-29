@@ -12,11 +12,11 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 
-from app.adapters.infrastructure.firebase_push import FirebasePushDeliveryError, FirebasePushNotConfigured
 from app.adapters.infrastructure.routers.mobile_push import (
     MobilePushDeviceNotRegistered,
     MobilePushStorageUnavailable,
     dispatch_mobile_speak,
+    queue_mobile_event,
 )
 from app.core.nexus import nexus
 
@@ -128,25 +128,23 @@ def create_bridge_router() -> APIRouter:
                 mobile_device_id = device_id[len(mobile_prefix):]
                 if not mobile_device_id:
                     raise HTTPException(status_code=422, detail="Invalid mobile device ID")
-                if task.get("action") != "speak":
-                    raise HTTPException(status_code=422, detail="Offline mobile delivery supports speak tasks only")
                 parameters = task.get("parameters")
                 text = parameters.get("text") if isinstance(parameters, dict) else None
+                title = parameters.get("title", "Jarvis") if isinstance(parameters, dict) else "Jarvis"
                 try:
                     return await run_in_threadpool(
-                        dispatch_mobile_speak, principal, mobile_device_id, text
+                        queue_mobile_event, principal, mobile_device_id, text,
+                        mode=task.get("action", "speak"), title=title,
                     )
                 except ValueError as exc:
                     raise HTTPException(status_code=422, detail=str(exc)) from None
                 except MobilePushDeviceNotRegistered:
-                    raise HTTPException(status_code=404, detail="Mobile device has no active push registration") from None
-                except (FirebasePushNotConfigured, MobilePushStorageUnavailable):
-                    raise HTTPException(status_code=503, detail="Mobile push delivery is not configured") from None
-                except FirebasePushDeliveryError:
-                    raise HTTPException(status_code=502, detail="Mobile push delivery failed") from None
+                    raise HTTPException(status_code=404, detail="Mobile device is not registered") from None
+                except MobilePushStorageUnavailable:
+                    raise HTTPException(status_code=503, detail="Mobile event storage is not configured") from None
                 except Exception as exc:
-                    logger.error("Mobile push dispatch failed (%s)", type(exc).__name__)
-                    raise HTTPException(status_code=503, detail="Mobile push dispatch failed") from None
+                    logger.error("Mobile event queue failed (%s)", type(exc).__name__)
+                    raise HTTPException(status_code=503, detail="Mobile event queue failed") from None
             raise HTTPException(status_code=404, detail=f"Device {device_id} is not connected")
         # Mobile speech/notification clients do not execute local desktop commands
         # and must never receive the server's local-bridge secret.
