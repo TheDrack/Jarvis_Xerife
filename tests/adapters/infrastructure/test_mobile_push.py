@@ -141,11 +141,15 @@ class FakeAuth:
 
 
 class FakeBridgeManager:
-    def get_connected_devices(self):
-        return []
+    def __init__(self, connected=None):
+        self.connected = set(connected or [])
+        self.sent_tasks = []
 
-    def is_device_connected(self, _device_id):
-        return False
+    def get_connected_devices(self):
+        return list(self.connected)
+
+    def is_device_connected(self, device_id):
+        return device_id in self.connected
 
     def get_connected_soldiers(self):
         return []
@@ -156,15 +160,17 @@ class FakeBridgeManager:
     def disconnect(self, *_args):
         pass
 
-    async def send_task(self, *_args, **_kwargs):
-        raise AssertionError("Offline fallback should be used")
+    async def send_task(self, device_id, task, **_kwargs):
+        self.sent_tasks.append((device_id, task))
+        return {"success": True, "result": "notification_posted"}
 
 
-def _setup(monkeypatch, database=None, sender=None):
+def _setup(monkeypatch, database=None, sender=None, bridge_manager=None):
     auth = FakeAuth()
     db = database or FakeDatabase()
     push_sender = sender or FakeSender()
-    monkeypatch.setattr(nexus, "resolve", lambda name: auth if name == "auth_adapter" else FakeBridgeManager())
+    manager = bridge_manager or FakeBridgeManager()
+    monkeypatch.setattr(nexus, "resolve", lambda name: auth if name == "auth_adapter" else manager)
     monkeypatch.setattr(mobile_push, "get_supabase_admin_client", lambda: db)
     monkeypatch.setattr(mobile_push, "_push_sender", push_sender)
     app = FastAPI()
@@ -484,3 +490,32 @@ def test_agent_device_listing_never_exposes_fcm_tokens(monkeypatch):
     assert device["device_id"] == "phone-1"
     assert device["push_registered"] is True
     assert "fcm_token" not in device
+
+
+
+def test_agent_notification_uses_websocket_and_waits_for_task_ack(monkeypatch):
+    manager = FakeBridgeManager(connected={"mobile:user-42:phone-1"})
+    client, database, sender, _auth = _setup(monkeypatch, bridge_manager=manager)
+    monkeypatch.setenv("JARVIS_MOBILE_NOTIFY_KEY", "k" * 64)
+
+    response = client.post(
+        "/v1/mobile/push/notify",
+        json={
+            "device_id": "phone-1",
+            "user_id": "user-42",
+            "title": "Jarvis",
+            "text": "Teste pelo WebSocket",
+            "mode": "notification",
+        },
+        headers={"X-Jarvis-Mobile-Notify-Key": "k" * 64},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "delivered"
+    assert response.json()["transport"] == "websocket"
+    assert manager.sent_tasks == [(
+        "mobile:user-42:phone-1",
+        {"action": "notification", "parameters": {"title": "Jarvis", "text": "Teste pelo WebSocket"}},
+    )]
+    assert database.tables[mobile_push.PUSH_EVENT_TABLE] == []
+    assert sender.sent == []
