@@ -87,7 +87,7 @@ def test_mobile_device_registration_requires_native_session(monkeypatch):
     response = register(client)
     assert response.status_code == 204
     assert db.tables[mobile_push.DEVICE_TABLE][0]["device_id"] == "phone-1"
-    assert "fcm_token" not in db.tables[mobile_push.DEVICE_TABLE][0]
+    assert not any("token" in key.lower() for key in db.tables[mobile_push.DEVICE_TABLE][0])
 
 
 def test_agent_notification_queues_for_offline_registered_device(monkeypatch):
