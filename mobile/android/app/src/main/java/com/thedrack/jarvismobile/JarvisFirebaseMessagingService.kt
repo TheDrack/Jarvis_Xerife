@@ -33,15 +33,24 @@ class JarvisFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val eventId = message.data["event_id"] ?: return
         val eventType = message.data["event_type"] ?: return
-        if (eventType != "speak" || runCatching { UUID.fromString(eventId) }.isFailure) return
+        if (eventType !in setOf("speak", "notification") || runCatching { UUID.fromString(eventId) }.isFailure) return
 
         val prefs = getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("presence_enabled", false)) return
 
         ensureNotificationChannel()
+        if (eventType == "notification") {
+            if (!canPostNotifications()) return
+            val event = MobilePushClient.fetchEvent(applicationContext, eventId) ?: return
+            if (event.eventType != "notification") return
+            if (showEventNotification(eventId, event.title, event.text)) {
+                MobilePushClient.acknowledge(applicationContext, eventId)
+            }
+            return
+        }
+
         showEventNotification(eventId)
         if (message.priority != RemoteMessage.PRIORITY_HIGH || !canPostNotifications()) return
-
         try {
             val intent = Intent(this, PushSpeechService::class.java)
                 .putExtra(PushSpeechService.EXTRA_EVENT_ID, eventId)
@@ -72,7 +81,11 @@ class JarvisFirebaseMessagingService : FirebaseMessagingService() {
         }
     }
 
-    private fun showEventNotification(eventId: String) {
+    private fun showEventNotification(
+        eventId: String,
+        title: String = "Jarvis",
+        text: String = "O Jarvis tem uma mensagem de voz pronta."
+    ): Boolean {
         val intent = Intent(this, MainActivity::class.java)
             .putExtra(PushSpeechService.EXTRA_EVENT_ID, eventId)
         val pending = PendingIntent.getActivity(
@@ -83,17 +96,18 @@ class JarvisFirebaseMessagingService : FirebaseMessagingService() {
         )
         val notification = NotificationCompat.Builder(this, EVENT_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Jarvis")
-            .setContentText("O Jarvis tem uma mensagem de voz pronta.")
+            .setContentTitle(title)
+            .setContentText(text)
             .setContentIntent(pending)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
-        try {
+        return try {
             NotificationManagerCompat.from(this).notify(eventId.hashCode(), notification)
+            true
         } catch (_: SecurityException) {
-            // User disabled notification permission; don't attempt background speech without it.
+            false
         }
     }
 
