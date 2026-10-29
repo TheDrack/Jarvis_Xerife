@@ -125,6 +125,14 @@ def create_api_server(
         background_tasks.add_task(telegram.handle_update, data, _callback)
         return {"ok": True}
 
+    @app.get("/network-devices", response_class=HTMLResponse)
+    async def network_devices_dashboard():
+        """Serve the network dashboard; its device data remains protected by API auth."""
+        html_file = Path(__file__).resolve().parents[2] / "static" / "network-devices.html"
+        if html_file.is_file():
+            return HTMLResponse(content=html_file.read_text(encoding="utf-8"))
+        raise HTTPException(status_code=503, detail="Network devices dashboard unavailable")
+
     @app.get("/", response_class=HTMLResponse)
     async def root():
         """Root endpoint – serves the Stark Industries HUD interface."""
