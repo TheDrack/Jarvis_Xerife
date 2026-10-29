@@ -60,15 +60,15 @@ class LocationTrackingService : Service() {
     }
 
     private fun sharingIsAuthorized(): Boolean {
-        val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
         val foregroundGranted =
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val backgroundGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
-        return prefs.getBoolean("location_sharing_enabled", false) &&
-            foregroundGranted && backgroundGranted &&
-            TokenVault(applicationContext).readRefreshToken() != null
+        val authenticated = !TokenVault(applicationContext).readRefreshToken().isNullOrBlank()
+        val optedIn = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+            .getBoolean("location_sharing_enabled", false)
+        return LocationSharingPolicy.isAuthorized(optedIn, foregroundGranted, backgroundGranted, authenticated)
     }
 
     private val publishRunnable = object : Runnable {
