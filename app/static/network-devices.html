@@ -17,7 +17,7 @@ main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice
 .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}.metric,.panel{background:linear-gradient(145deg,#102235,#0a1725);border:1px solid var(--line);border-radius:14px}.metric{padding:16px}.metric-label{font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}.metric-value{font-size:28px;font-weight:700;margin-top:4px}.metric-detail{font-size:11px;color:var(--muted)}
 .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}.toolbar input,.toolbar select{min-width:160px;flex:1;background:#081522;color:#e5f4ff;border:1px solid var(--line);border-radius:9px;padding:11px;font:inherit}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 12px}.section-title h2{font-size:14px;letter-spacing:.1em;text-transform:uppercase;margin:0}.count{color:var(--muted);font-size:12px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:12px}.device{min-width:0;padding:15px;position:relative;overflow:hidden}.device:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:#365166}.device.online:before{background:var(--green)}.device.offline:before{background:var(--red)}.device.unknown:before{background:var(--amber)}
-.device-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.device-icon{font-size:22px}.device-name{font-size:15px;font-weight:650;overflow-wrap:anywhere}.device-type{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:99px;font-size:11px;border:1px solid var(--line);white-space:nowrap}.pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}.pill.online{color:var(--green);border-color:#43e0a044}.pill.offline{color:var(--red);border-color:#ff667a44}.pill.unknown{color:var(--amber)}.details{display:grid;gap:5px;margin:13px 0;color:var(--muted);font-size:12px}.details span{overflow-wrap:anywhere}.details b{color:#cce3f2;font-weight:500}.tags{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0}.tag{font-size:10px;color:#b7d8eb;background:#132b3c;border:1px solid #24465b;border-radius:6px;padding:3px 6px}.device-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.device-actions button{font-size:12px;padding:7px 9px}.empty{grid-column:1/-1;padding:28px;text-align:center;color:var(--muted);border:1px dashed #24465b;border-radius:12px}.camera-preview{width:100%;aspect-ratio:16/9;background:#030a10;border:1px solid var(--line);border-radius:9px;margin-top:12px;object-fit:contain}.error{color:var(--red)}footer{color:var(--muted);font-size:11px;margin-top:24px}
+.device-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.device-icon{font-size:22px}.device-name{font-size:15px;font-weight:650;overflow-wrap:anywhere}.device-type{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:99px;font-size:11px;border:1px solid var(--line);white-space:nowrap}.pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}.pill.online{color:var(--green);border-color:#43e0a044}.pill.offline{color:var(--red);border-color:#ff667a44}.pill.unknown{color:var(--amber)}.pill.fresh{color:var(--green);border-color:#43e0a044}.pill.stale{color:var(--amber);border-color:#ffbd5944}.details{display:grid;gap:5px;margin:13px 0;color:var(--muted);font-size:12px}.details span{overflow-wrap:anywhere}.details b{color:#cce3f2;font-weight:500}.tags{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0}.tag{font-size:10px;color:#b7d8eb;background:#132b3c;border:1px solid #24465b;border-radius:6px;padding:3px 6px}.device-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.device-actions button{font-size:12px;padding:7px 9px}.empty{grid-column:1/-1;padding:28px;text-align:center;color:var(--muted);border:1px dashed #24465b;border-radius:12px}.camera-preview{width:100%;aspect-ratio:16/9;background:#030a10;border:1px solid var(--line);border-radius:9px;margin-top:12px;object-fit:contain}.error{color:var(--red)}footer{color:var(--muted);font-size:11px;margin-top:24px}
 @media(max-width:720px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-value{font-size:23px}header{position:static}.header-actions{width:100%}.header-actions>*{flex:1;text-align:center}}
 </style>
 </head>
@@ -34,7 +34,12 @@ main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice
     <div class="metric"><div class="metric-label">Offline</div><div class="metric-value" id="offlineMetric">—</div><div class="metric-detail">Último estado informado</div></div>
     <div class="metric"><div class="metric-label">Câmeras</div><div class="metric-value" id="cameraMetric">—</div><div class="metric-detail">Capacidade registrada</div></div>
   </section>
-  <section class="panel" style="padding:16px;margin-bottom:20px" aria-labelledby="discoveryHeading">\n    <div class="section-title" style="margin-top:0"><h2 id="discoveryHeading">⌕ Vizinhos detectados no cache local</h2><span class="count" id="discoveryCount">Não consultado</span></div>\n    <p class="sub" id="discoveryStatus" role="status">A descoberta é passiva e mostra apenas endereços já conhecidos pelo sistema operacional. Não é um scanner de rede.</p>\n    <div class="grid" id="discoveryGrid" style="margin-top:12px"><div class="empty">Clique em “Descobrir vizinhos” para consultar o cache local do host Jarvis.</div></div>\n  </section>\n  <div class="toolbar">
+  <section class="panel" style="padding:16px;margin-bottom:20px" aria-labelledby="discoveryHeading">\n    <div class="section-title" style="margin-top:0"><h2 id="discoveryHeading">⌕ Vizinhos detectados no cache local</h2><span class="count" id="discoveryCount">Não consultado</span></div>\n    <p class="sub" id="discoveryStatus" role="status">A descoberta é passiva e mostra apenas endereços já conhecidos pelo sistema operacional. Não é um scanner de rede.</p>\n    <div class="grid" id="discoveryGrid" style="margin-top:12px"><div class="empty">Clique em “Descobrir vizinhos” para consultar o cache local do host Jarvis.</div></div>\n  </section>\n  <section class="panel" style="padding:16px;margin-bottom:20px" aria-labelledby="observationHeading">
+    <div class="section-title" style="margin-top:0"><h2 id="observationHeading">◉ Observações atuais · Desktop + Mobile</h2><span class="count" id="observationCount">Não consultado</span></div>
+    <p class="sub" id="observationsStatus" role="status">Dados autenticados consolidados pelo Render e persistidos no Supabase. Ausência significa desconhecido; dados expirados aparecem como desatualizados.</p>
+    <div class="grid" id="observationGrid" style="margin-top:12px"><div class="empty">Consultando as últimas observações dos dispositivos…</div></div>
+  </section>
+  <div class="toolbar">
     <input id="search" type="search" placeholder="Buscar nome, IP, tipo ou capacidade…" aria-label="Buscar dispositivos">
     <select id="kindFilter" aria-label="Filtrar tipo"><option value="all">Todos os tipos</option><option value="camera">Câmeras</option><option value="computer">Computadores</option><option value="other">Outros dispositivos</option></select>
     <select id="statusFilter" aria-label="Filtrar status"><option value="all">Todos os status</option><option value="online">Online</option><option value="offline">Offline</option><option value="unknown">Desconhecido</option></select>
@@ -149,6 +154,58 @@ main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice
       $('discoverBtn').textContent = '⌕ Descobrir vizinhos';
     }
   }
+  async function loadObservations() {
+    const token = localStorage.getItem(TOKEN_KEY), expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
+    if (!token || (expiry && Date.now() >= expiry)) {
+      $('observationCount').textContent = 'Sessão necessária';
+      $('observationsStatus').textContent = 'Entre no HUD para consultar as observações autenticadas.';
+      $('observationGrid').innerHTML = '<div class="empty">Estado desconhecido: autenticação ausente ou expirada.</div>';
+      return;
+    }
+    try {
+      const response = await fetch('/v1/environment/observations/latest', {
+        headers: {Authorization:'Bearer '+token}, cache:'no-store'
+      });
+      if (response.status === 401) throw new Error('Sessão inválida; entre novamente no HUD.');
+      if (!response.ok) throw new Error('API de observações respondeu HTTP '+response.status);
+      const result = await response.json();
+      const observations = Array.isArray(result.observations) ? result.observations : [];
+      $('observationCount').textContent = observations.length + ' observação(ões)';
+      if (!observations.length) {
+        $('observationGrid').innerHTML = '<div class="empty">Nenhum dispositivo enviou observações ainda. O estado é desconhecido, não offline.</div>';
+        return;
+      }
+      $('observationsStatus').textContent = 'Servidor consultado: ' + new Date(result.server_time || Date.now()).toLocaleString() + '. A validade é calculada pelo servidor.';
+      $('observationGrid').innerHTML = observations.map(item => {
+        const payload = item.payload && typeof item.payload === 'object' ? item.payload : {};
+        const fresh = item.freshness === 'fresh';
+        const state = fresh ? 'fresh' : 'stale';
+        const stateLabel = fresh ? 'Atual' : 'Desatualizado';
+        let details = '';
+        if (item.observation_type === 'network_snapshot') {
+          if (item.source_device_type === 'mobile') {
+            details = '<span><b>Rede:</b> '+escapeHtml(text(payload.network_type))+'</span>' +
+              '<span><b>Internet:</b> '+escapeHtml(payload.validated ? 'validada' : payload.internet_available ? 'não validada' : 'indisponível')+'</span>' +
+              '<span><b>VPN:</b> '+escapeHtml(payload.vpn_active ? 'ativa' : 'não detectada')+'</span>';
+          } else {
+            details = '<span><b>Interfaces:</b> '+escapeHtml(Array.isArray(payload.interfaces) ? payload.interfaces.length : 0)+'</span>' +
+              '<span><b>Vizinhos ARP:</b> '+escapeHtml(Array.isArray(payload.neighbors) ? payload.neighbors.length : 0)+' (cache passivo)</span>' +
+              '<span><b>Sondagens ativas:</b> nenhuma</span>';
+          }
+        } else {
+          details = '<span><b>Presença informada:</b> '+escapeHtml(payload.active === true ? 'ativa' : payload.active === false ? 'inativa' : 'não informada')+'</span>' +
+            '<span><b>Contexto:</b> '+escapeHtml(text(payload.app_state))+'</span>';
+        }
+        return '<article class="panel device '+state+'"><div class="device-top"><div><div class="device-name">'+escapeHtml(text(item.device_id))+'</div><div class="device-type">'+escapeHtml(text(item.source_device_type))+' · '+escapeHtml(text(item.observation_type))+'</div></div><span class="pill '+state+'">'+stateLabel+'</span></div>' +
+          '<div class="details">'+details+'<span><b>Recebido:</b> '+escapeHtml(item.received_at ? new Date(item.received_at).toLocaleString() : '—')+'</span>' +
+          '<span><b>Idade:</b> '+escapeHtml(item.age_seconds == null ? 'desconhecida' : item.age_seconds+' s')+'</span></div></article>';
+      }).join('');
+    } catch (error) {
+      $('observationCount').textContent = 'Indisponível';
+      $('observationsStatus').textContent = error.message;
+      $('observationGrid').innerHTML = '<div class="empty error">'+escapeHtml(error.message)+'</div>';
+    }
+  }
   async function loadDevices() {
     const token = localStorage.getItem(TOKEN_KEY), expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
     if (!token || (expiry && Date.now() >= expiry)) {
@@ -178,9 +235,10 @@ main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice
     if (detail) { const device=devices.find(d=>String(d.id)===detail.dataset.details); if(device) alert(JSON.stringify(device,null,2)); }
   });
   ['search','kindFilter','statusFilter','sortFilter'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',render));
-  $('refreshBtn').addEventListener('click',loadDevices);\n  $('discoverBtn').addEventListener('click',discoverNeighbors);
+  $('refreshBtn').addEventListener('click',()=>{loadDevices();loadObservations();});\n  $('discoverBtn').addEventListener('click',discoverNeighbors);
   loadDevices();
-  refreshTimer = window.setInterval(loadDevices,15000);
+  loadObservations();
+  refreshTimer = window.setInterval(()=>{loadDevices();loadObservations();},15000);
   window.addEventListener('pagehide',()=>{if(refreshTimer)window.clearInterval(refreshTimer);});
 })();
 </script>
