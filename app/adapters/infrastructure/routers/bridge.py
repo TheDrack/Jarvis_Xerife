@@ -95,7 +95,7 @@ def create_bridge_router() -> APIRouter:
                     logger.exception("Error handling bridge message from %s", canonical_device_id)
                     await websocket.send_json({"type": "error", "error": "Message handling failed"})
         finally:
-            bridge_manager.disconnect(canonical_device_id)
+            bridge_manager.disconnect(canonical_device_id, websocket)
 
     @router.get("/v1/local-bridge/devices")
     async def list_connected_devices(

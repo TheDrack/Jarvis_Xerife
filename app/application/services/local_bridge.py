@@ -68,23 +68,30 @@ class LocalBridgeManager(NexusComponent):
             "timestamp": datetime.now().isoformat()
         })
     
-    def disconnect(self, device_id: str):
+    def disconnect(self, device_id: str, websocket: Optional[WebSocket] = None) -> bool:
         """
-        Handle disconnection of a device.
-        
-        Args:
-            device_id: ID of the disconnected device
+        Remove a device only when the disconnect belongs to its current socket.
+
+        Passing the socket protects a replacement connection from a stale
+        connection's finally/callback. Omitting it preserves the legacy
+        unconditional-disconnect contract for existing internal callers.
+
+        Returns:
+            True when the current device registration was removed; False when
+            a supplied socket is stale or no current connection exists.
         """
-        if device_id in self.active_connections:
-            del self.active_connections[device_id]
-        
-        if device_id in self.device_types:
-            del self.device_types[device_id]
-        
-        if device_id in self.task_queues:
-            del self.task_queues[device_id]
-        
-        logger.info(f"Device disconnected: {device_id}")
+        current = self.active_connections.get(device_id)
+        if current is None:
+            return False
+        if websocket is not None and current is not websocket:
+            logger.info("Ignoring stale disconnect for device: %s", device_id)
+            return False
+
+        self.active_connections.pop(device_id, None)
+        self.device_types.pop(device_id, None)
+        self.task_queues.pop(device_id, None)
+        logger.info("Device disconnected: %s", device_id)
+        return True
     
     def get_device_type(self, device_id: str) -> str:
         """
