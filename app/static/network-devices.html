@@ -24,17 +24,17 @@ main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice
 <body>
 <header>
   <div class="brand"><div class="brand-mark" aria-hidden="true">⌘</div><div><h1>JARVIS / NETWORK</h1><div class="sub">Inventário de dispositivos · painel operacional</div></div></div>
-  <div class="header-actions"><a class="btn" href="/">← Voltar ao HUD</a><button id="refreshBtn" type="button">↻ Atualizar agora</button></div>
+  <div class="header-actions"><a class="btn" href="/">← Voltar ao HUD</a><button id="discoverBtn" type="button">⌕ Descobrir vizinhos</button><button id="refreshBtn" type="button">↻ Atualizar agora</button></div>
 </header>
 <main>
-  <div class="notice"><strong>Fonte:</strong> dispositivos registrados no Jarvis. O estado online/offline reflete o último heartbeat registrado; ausência no inventário não prova que um dispositivo está desligado. Descoberta de rede passiva pode ser adicionada separadamente.</div>
+  <div class="notice"><strong>Fonte:</strong> dispositivos registrados no Jarvis. O estado online/offline reflete o último heartbeat registrado; ausência no inventário não prova que um dispositivo está desligado. A descoberta abaixo lê somente o cache ARP local, sem sondar hosts; em hospedagem cloud ela fica indisponível porque não representa a LAN do usuário.</div>
   <section class="metrics" aria-label="Resumo dos dispositivos">
     <div class="metric"><div class="metric-label">Dispositivos</div><div class="metric-value" id="totalMetric">—</div><div class="metric-detail">Inventariados</div></div>
     <div class="metric"><div class="metric-label">Online</div><div class="metric-value" id="onlineMetric">—</div><div class="metric-detail">Heartbeat informado</div></div>
     <div class="metric"><div class="metric-label">Offline</div><div class="metric-value" id="offlineMetric">—</div><div class="metric-detail">Último estado informado</div></div>
     <div class="metric"><div class="metric-label">Câmeras</div><div class="metric-value" id="cameraMetric">—</div><div class="metric-detail">Capacidade registrada</div></div>
   </section>
-  <div class="toolbar">
+  <section class="panel" style="padding:16px;margin-bottom:20px" aria-labelledby="discoveryHeading">\n    <div class="section-title" style="margin-top:0"><h2 id="discoveryHeading">⌕ Vizinhos detectados no cache local</h2><span class="count" id="discoveryCount">Não consultado</span></div>\n    <p class="sub" id="discoveryStatus" role="status">A descoberta é passiva e mostra apenas endereços já conhecidos pelo sistema operacional. Não é um scanner de rede.</p>\n    <div class="grid" id="discoveryGrid" style="margin-top:12px"><div class="empty">Clique em “Descobrir vizinhos” para consultar o cache local do host Jarvis.</div></div>\n  </section>\n  <div class="toolbar">
     <input id="search" type="search" placeholder="Buscar nome, IP, tipo ou capacidade…" aria-label="Buscar dispositivos">
     <select id="kindFilter" aria-label="Filtrar tipo"><option value="all">Todos os tipos</option><option value="camera">Câmeras</option><option value="computer">Computadores</option><option value="other">Outros dispositivos</option></select>
     <select id="statusFilter" aria-label="Filtrar status"><option value="all">Todos os status</option><option value="online">Online</option><option value="offline">Offline</option><option value="unknown">Desconhecido</option></select>
@@ -108,6 +108,47 @@ main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice
     $('cameraGrid').innerHTML = cameras.length ? cameras.map(cameraCard).join('') : '<div class="empty">Nenhuma câmera registrada com capacidade camera/ONVIF/RTSP.</div>';
     $('deviceGrid').innerHTML = others.length ? others.map(deviceCard).join('') : '<div class="empty">Nenhum outro dispositivo corresponde aos filtros.</div>';
   }
+  async function discoverNeighbors() {
+    const token = localStorage.getItem(TOKEN_KEY), expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
+    if (!token || (expiry && Date.now() >= expiry)) {
+      $('discoveryStatus').textContent = 'Sessão ausente ou expirada. Entre novamente no HUD.';
+      return;
+    }
+    $('discoverBtn').disabled = true;
+    $('discoverBtn').textContent = 'Consultando…';
+    $('discoveryStatus').textContent = 'Consultando cache ARP local do host Jarvis…';
+    try {
+      const response = await fetch('/v1/network/discovery', {
+        headers: {Authorization:'Bearer '+token},
+        cache: 'no-store'
+      });
+      if (response.status === 401) throw new Error('Sessão inválida; entre novamente no HUD.');
+      if (!response.ok) throw new Error('API respondeu HTTP '+response.status);
+      const result = await response.json();
+      const neighbors = Array.isArray(result.devices) ? result.devices : [];
+      $('discoveryCount').textContent = result.available ? neighbors.length+' vizinho(s)' : 'Indisponível';
+      $('discoveryStatus').textContent = result.message || 'Sem detalhes da descoberta.';
+      if (!result.available) {
+        $('discoveryGrid').innerHTML = '<div class="empty">'+escapeHtml(result.message || 'Descoberta indisponível neste host.')+'</div>';
+        return;
+      }
+      if (!neighbors.length) {
+        $('discoveryGrid').innerHTML = '<div class="empty">O cache ARP não contém vizinhos válidos neste momento. Isso não significa que a rede esteja vazia.</div>';
+        return;
+      }
+      $('discoveryGrid').innerHTML = neighbors.map(host => {
+        const match = devices.find(d => String(d.last_ip || '') === host.ip);
+        return '<article class="panel device unknown"><div class="device-top"><div><div class="device-name">'+escapeHtml(match ? match.name : 'Host não registrado')+'</div><div class="device-type">VIZINHO ARP · NÃO É HEARTBEAT</div></div><span class="pill unknown">'+(match ? 'Inventariado' : 'Novo no inventário')+'</span></div><div class="details"><span><b>IP:</b> '+escapeHtml(host.ip)+'</span><span><b>MAC:</b> '+escapeHtml(host.mac)+'</span><span><b>Interface:</b> '+escapeHtml(host.interface || '—')+'</span></div></article>';
+      }).join('');
+    } catch (error) {
+      $('discoveryCount').textContent = 'Erro';
+      $('discoveryStatus').textContent = error.message;
+      $('discoveryGrid').innerHTML = '<div class="empty error">'+escapeHtml(error.message)+'</div>';
+    } finally {
+      $('discoverBtn').disabled = false;
+      $('discoverBtn').textContent = '⌕ Descobrir vizinhos';
+    }
+  }
   async function loadDevices() {
     const token = localStorage.getItem(TOKEN_KEY), expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
     if (!token || (expiry && Date.now() >= expiry)) {
@@ -137,7 +178,7 @@ main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice
     if (detail) { const device=devices.find(d=>String(d.id)===detail.dataset.details); if(device) alert(JSON.stringify(device,null,2)); }
   });
   ['search','kindFilter','statusFilter','sortFilter'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',render));
-  $('refreshBtn').addEventListener('click',loadDevices);
+  $('refreshBtn').addEventListener('click',loadDevices);\n  $('discoverBtn').addEventListener('click',discoverNeighbors);
   loadDevices();
   refreshTimer = window.setInterval(loadDevices,15000);
   window.addEventListener('pagehide',()=>{if(refreshTimer)window.clearInterval(refreshTimer);});
