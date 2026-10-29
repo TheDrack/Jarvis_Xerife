@@ -62,6 +62,7 @@ main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice
   const $ = id => document.getElementById(id);
   let devices = [];
   let refreshTimer = null;
+  let observationTimer = null;
   const cameraNames = new Set(['camera','ip_camera','webcam','rtsp','onvif','video','câmera','camara']);
   const text = value => value == null || value === '' ? '—' : String(value);
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -238,8 +239,9 @@ main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice
   $('refreshBtn').addEventListener('click',()=>{loadDevices();loadObservations();});\n  $('discoverBtn').addEventListener('click',discoverNeighbors);
   loadDevices();
   loadObservations();
-  refreshTimer = window.setInterval(()=>{loadDevices();loadObservations();},15000);
-  window.addEventListener('pagehide',()=>{if(refreshTimer)window.clearInterval(refreshTimer);});
+  refreshTimer = window.setInterval(loadDevices,15000);
+  observationTimer = window.setInterval(loadObservations,15000);
+  window.addEventListener('pagehide',()=>{if(refreshTimer)window.clearInterval(refreshTimer);if(observationTimer)window.clearInterval(observationTimer);});
 })();
 </script>
 </body>
