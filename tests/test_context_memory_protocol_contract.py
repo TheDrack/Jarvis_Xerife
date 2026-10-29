@@ -55,3 +55,25 @@ def test_status_envelope_defaults_to_not_persisted():
     envelope = json.loads(match.group(1))
     assert envelope["protocol"] == "JCMP/1.0"
     assert envelope["memory_update"]["persisted"] is False
+
+
+def test_mcp_exposes_a_canonical_agent_bootstrap_inventory():
+    server = _read("app/adapters/edge/jarvis_desktop_mcp.py")
+    startup = _read("docs/skills-connectors/STARTUP_PROMPT.md")
+    catalog = _read("docs/skills-connectors/CATALOG.md")
+    assert "def jarvis_agent_bootstrap(" in server
+    assert '"capability_inventory"' in server
+    assert '"context_memory_protocol"' in server
+    assert '"status": "not_visible_to_jarvis_server"' in server
+    assert "call `jarvis_agent_bootstrap`" in startup
+    assert "call `jarvis_agent_bootstrap`" in catalog
+    assert "live tool registry" in startup.casefold()
+    assert "never treat its baseline as proof of availability" in _read("AGENTS.md").casefold()
+
+
+def test_bootstrap_refresh_is_required_after_failures_and_domain_changes():
+    startup = _read("docs/skills-connectors/STARTUP_PROMPT.md").casefold()
+    catalog = _read("docs/skills-connectors/CATALOG.md").casefold()
+    assert "after a connector/tool failure" in startup
+    assert "after failure or a domain/provider change" in catalog
+    assert "do not repeat a failed call unchanged" in startup

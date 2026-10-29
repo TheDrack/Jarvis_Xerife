@@ -51,7 +51,7 @@ mcp = FastMCP(
         "android_* tools target the explicitly configured authorized Android device. Never "
         "silently redirect one target to the other. The user chooses the connection software "
         "and transport; Tailscale, Aperture, and RDC are examples, not requirements. MCP is "
-        "the tool interface, not a mandated network route. At session/task start, discover live "
+        "the tool interface, not a mandated network route. At session/task start, call jarvis_agent_bootstrap before other Jarvis operations, then discover live "
         "tools and read AGENTS.md, docs/skills-connectors/CATALOG.md, and "
         "docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md when repository files are available. "
         "Load relevant persisted Jarvis memory and task state, reconcile against live evidence, "
@@ -94,6 +94,67 @@ if _HTTP_TRANSPORT == "streamable-http":
         allowed_origins=_allowed_origins,
     )
 navigator = VisualNavigationAdapter()
+
+
+@mcp.tool()
+def jarvis_agent_bootstrap() -> dict[str, Any]:
+    """Return the canonical Jarvis startup contract and repo capability inventory.
+
+    Call this at the start of a task before other Jarvis operations. This is a
+    repository baseline, not a substitute for inspecting the calling host's
+    live tool registry, permissions, or connected services.
+    """
+    documents = {
+        "agent_contract": _REPO_ROOT / "AGENTS.md",
+        "catalog": _REPO_ROOT / "docs" / "skills-connectors" / "CATALOG.md",
+        "capability_inventory": _REPO_ROOT / "docs" / "skills-connectors" / "CAPABILITY_INVENTORY.md",
+        "context_memory_protocol": _REPO_ROOT / "docs" / "skills-connectors" / "CONTEXT_MEMORY_PROTOCOL.md",
+        "startup_prompt": _REPO_ROOT / "docs" / "skills-connectors" / "STARTUP_PROMPT.md",
+    }
+    loaded: dict[str, str] = {}
+    unavailable: dict[str, str] = {}
+    for name, path in documents.items():
+        try:
+            loaded[name] = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            unavailable[name] = f"{type(exc).__name__}: {exc}"
+
+    return {
+        "protocol": "JCMP/1.0",
+        "source": "repository_baseline",
+        "documents_loaded": sorted(loaded),
+        "documents_unavailable": unavailable,
+        "documents": loaded,
+        "runtime_registry": {
+            "status": "not_visible_to_jarvis_server",
+            "required_action": (
+                "Inspect the calling host's live tool/MCP registry and schemas; "
+                "reconcile it with this repository baseline."
+            ),
+        },
+        "mandatory_preflight": [
+            "Read host/project instructions and this catalog/protocol.",
+            "Inspect live tools, schemas, authorization and connection state; never infer them from documentation.",
+            "Load relevant persistent task/memory state and reconcile it against live evidence.",
+            "Before an action, confirm prerequisites, allowed side effects, success evidence and rollback.",
+            "After a tool failure or domain/connector change, refresh discovery and consult the relevant skill before retrying.",
+            "At milestones/handoff, report evidence, blockers, next action and whether memory persistence was confirmed.",
+        ],
+        "claim_policy": {
+            "allowed_statuses": [
+                "IMPLEMENTED",
+                "AVAILABLE_IN_RUNTIME",
+                "AUTHORIZED",
+                "TESTED",
+                "PRODUCTION_VERIFIED",
+                "FAILED",
+                "UNAVAILABLE_IN_RUNTIME",
+                "NOT_TESTED",
+                "BLOCKED_BY_AUTHORIZATION",
+            ],
+            "rule": "Never claim a stronger status than the evidence proves.",
+        },
+    }
 
 
 @mcp.tool()
