@@ -6,9 +6,10 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 from uuid import UUID
+import math
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, root_validator, validator
 
 from app.adapters.infrastructure.api_models import User
 from app.adapters.infrastructure.supabase_client import get_supabase_admin_client
@@ -22,10 +23,10 @@ FUTURE_CLOCK_SKEW = timedelta(minutes=5)
 TTL_BY_TYPE = {
     "network_snapshot": timedelta(minutes=5),
     "presence": timedelta(minutes=2),
+    "location_snapshot": timedelta(minutes=2),
 }
 FORBIDDEN_PAYLOAD_KEYS = {
-    "ssid", "bssid", "latitude", "longitude", "location",
-    "password", "token", "authorization", "api_key", "secret",
+    "ssid", "bssid", "password", "token", "authorization", "api_key", "secret",
 }
 
 
@@ -34,7 +35,7 @@ class EnvironmentObservationCreate(BaseModel):
 
     device_id: str = Field(min_length=1, max_length=128)
     source_device_type: Literal["desktop", "mobile"]
-    observation_type: Literal["network_snapshot", "presence"]
+    observation_type: Literal["network_snapshot", "presence", "location_snapshot"]
     schema_version: Literal[1] = 1
     request_id: UUID
     observed_at: datetime
@@ -78,6 +79,46 @@ class EnvironmentObservationCreate(BaseModel):
                     check_keys(nested)
         check_keys(value)
         return value
+
+    @root_validator(skip_on_failure=True)
+    def validate_location_consent(cls, values: dict[str, Any]) -> dict[str, Any]:
+        payload = values.get("payload") or {}
+        location_keys = {"latitude", "longitude", "location", "accuracy_m", "captured_at", "precision"}
+        found_location_data = False
+        def inspect(item: Any) -> None:
+            nonlocal found_location_data
+            if isinstance(item, dict):
+                for key, nested in item.items():
+                    if str(key).strip().lower() in location_keys:
+                        found_location_data = True
+                    inspect(nested)
+            elif isinstance(item, list):
+                for nested in item:
+                    inspect(nested)
+        inspect(payload)
+        if not found_location_data:
+            if values.get("observation_type") == "location_snapshot":
+                raise ValueError("location_snapshot requires an opted-in location payload")
+            return values
+        if (values.get("source_device_type") != "mobile"
+                or values.get("observation_type") != "location_snapshot"
+                or payload.get("location_opt_in") is not True):
+            raise ValueError("location requires explicit mobile location opt-in")
+        location = payload.get("location")
+        if not isinstance(location, dict):
+            raise ValueError("location must be an object")
+        latitude, longitude = location.get("latitude"), location.get("longitude")
+        if (isinstance(latitude, bool) or not isinstance(latitude, (int, float))
+                or not math.isfinite(float(latitude)) or not -90 <= float(latitude) <= 90):
+            raise ValueError("location latitude is invalid")
+        if (isinstance(longitude, bool) or not isinstance(longitude, (int, float))
+                or not math.isfinite(float(longitude)) or not -180 <= float(longitude) <= 180):
+            raise ValueError("location longitude is invalid")
+        accuracy = location.get("accuracy_m")
+        if accuracy is not None and (isinstance(accuracy, bool) or not isinstance(accuracy, (int, float))
+                or not math.isfinite(float(accuracy)) or float(accuracy) < 0):
+            raise ValueError("location accuracy is invalid")
+        return values
 
 
 def _owner_id(user: User) -> str:
@@ -123,6 +164,9 @@ def _public_observation(row: dict[str, Any], now: datetime) -> dict[str, Any]:
     received_at = _parse_datetime(row.get("received_at"))
     expires_at = _parse_datetime(row.get("expires_at"))
     age_seconds = max(0, int((now - received_at).total_seconds())) if received_at else None
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    if row.get("observation_type") == "location_snapshot" and expires_at and expires_at <= now:
+        payload = {}
     return {
         "device_id": row.get("device_id"),
         "source_device_type": row.get("source_device_type"),
@@ -133,7 +177,7 @@ def _public_observation(row: dict[str, Any], now: datetime) -> dict[str, Any]:
         "expires_at": row.get("expires_at"),
         "freshness": "fresh" if expires_at and expires_at > now else "stale",
         "age_seconds": age_seconds,
-        "payload": row.get("payload") if isinstance(row.get("payload"), dict) else {},
+        "payload": payload,
     }
 
 

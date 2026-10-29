@@ -34,6 +34,19 @@ class EnvironmentObservationTest {
     }
 
     @Test
+    fun locationPayloadIsSeparateAndOptIn() {
+        val location = JSONObject().put("latitude", -27.5954).put("longitude", -48.5480)
+            .put("accuracy_m", 18.0).put("captured_at", "2026-10-29T12:00:00Z").put("precision", "fine")
+        val json = EnvironmentObservationPublisher.buildObservation(
+            "phone-1", snapshot, observationType = "location_snapshot",
+            observedAt = "2026-10-29T12:00:00Z", requestId = "req-location", location = location
+        )
+        assertEquals("location_snapshot", json.getString("observation_type"))
+        assertTrue(json.getJSONObject("payload").getBoolean("location_opt_in"))
+        assertEquals(-27.5954, json.getJSONObject("payload").getJSONObject("location").getDouble("latitude"), 0.0001)
+    }
+
+    @Test
     fun presencePayloadStatesServiceActivityWithoutSensitiveFields() {
         val json: JSONObject = EnvironmentObservationPublisher.buildObservation(
             "phone-1", snapshot, observationType = "presence", presenceActive = true,
