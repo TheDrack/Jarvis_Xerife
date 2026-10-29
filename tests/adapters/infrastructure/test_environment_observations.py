@@ -25,7 +25,8 @@ class Query:
         self.descending = False
 
     def select(self, *_args):
-        self.operation = "select"
+        if self.operation != "insert":
+            self.operation = "select"
         return self
 
     def insert(self, payload):
