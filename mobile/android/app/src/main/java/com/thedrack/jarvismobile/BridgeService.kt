@@ -195,8 +195,12 @@ class BridgeService : Service() {
             "speak" -> {
                 if (text.isBlank() || text.length > 1000) {
                     sendTaskResult(taskId, false, "invalid_text")
-                } else if (!ttsReady || tts?.speak(text, TextToSpeech.QUEUE_ADD, null, taskId) != TextToSpeech.SUCCESS) {
-                    sendTaskResult(taskId, false, "tts_unavailable")
+                } else {
+                    // The notification is best-effort; speech must continue when notifications are disabled.
+                    showTaskNotification(taskId, "Jarvis", text)
+                    if (!ttsReady || tts?.speak(text, TextToSpeech.QUEUE_ADD, null, taskId) != TextToSpeech.SUCCESS) {
+                        sendTaskResult(taskId, false, "tts_unavailable")
+                    }
                 }
             }
             "notification" -> {
@@ -236,6 +240,7 @@ class BridgeService : Service() {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(pending)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
