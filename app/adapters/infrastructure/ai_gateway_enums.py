@@ -11,6 +11,9 @@ class LLMProvider(str, Enum):
     GROQ = "groq"
     GEMINI = "gemini"
     VENICE = "venice"
+    # Open-source Respan Gateway opened in-process; it routes by model name
+    # across the providers whose keys already exist in the environment.
+    RESPAN = "respan"
 
 
 class GroqGear(str, Enum):
