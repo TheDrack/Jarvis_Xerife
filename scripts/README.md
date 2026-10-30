@@ -221,11 +221,13 @@ The test will:
 
 You can integrate the auto-fixer with GitHub Actions to automatically fix failing CI/CD builds.
 
-**Active workflow (`.github/workflows/homeostase.yml` — "🧬 JARVIS Self Healing V3"):**
+**Active workflows:**
 
-Triggers on pull requests, on completion of the workflows listed in its
-`workflow_run` event, and manually (`workflow_dispatch` with an `error_log`
-input). The `homeostasis` job runs the test suite and then:
+- `.github/workflows/jarvis-pr-validation.yml` runs the complete pytest suite for pull requests. It has `contents: read`, disables checkout credential persistence, references no repository secrets, and never invokes the healer.
+- `.github/workflows/homeostase.yml` is the privileged recovery path. It runs only for failed/timed-out/cancelled workflow runs originating from the trusted `main` branch, or for manual dispatch from `main`. It always checks out `main` and does not process pull-request workflow runs.
+- The healer may use provider keys while generating a proposal, but the final pytest execution runs after those keys are removed from the environment. Eligible changes are staged only from `app/`, `scripts/`, `tests/`, and `docs/`; workflow files are excluded. Every automatic correction is pushed to a unique branch and proposed through a PR. The workflow does not push to `main`.
+
+The healer command remains:
 
 ```bash
 uv run python scripts/jarvis_healer.py \
@@ -234,11 +236,7 @@ uv run python scripts/jarvis_healer.py \
   [--workflow-log failed_workflow_logs.txt] [--dry-run]
 ```
 
-`jarvis_healer.py` parses the reports and applies the minimal fix (use
-`--dry-run` to only list what it would change). `auto_fixer_logic.py` remains the
-issue-driven entry point: it reads `ISSUE_BODY` / `ISSUE_ID` from the environment
-(see the section above) and opens the corresponding PR, so it can be wired to a
-custom CI job as shown below.
+`jarvis_healer.py` parses the reports and applies the minimal fix (use `--dry-run` to only list what it would change). `auto_fixer_logic.py` remains the issue-driven entry point: it reads `ISSUE_BODY` / `ISSUE_ID` from the environment (see the section above) and opens the corresponding PR, so it can be wired to a custom CI job as shown below.
 
 **Example minimal workflow for custom CI auto-healing:**
 

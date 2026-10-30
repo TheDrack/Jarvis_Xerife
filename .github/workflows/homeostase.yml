@@ -1,10 +1,8 @@
 name: "🧬 JARVIS Self Healing V3"
 
 on:
-  pull_request:
-    branches: [main, master, develop]
   workflow_run:
-    workflows: 
+    workflows:
       - "Copilot coding agent"
       - "Copilot code review"
       - "Repo Lifecycle Governance"
@@ -14,60 +12,80 @@ on:
       - "🚀 JARVIS Integrated Evolution"
       - "🧬 Validação — Auto-Evolução e Multi-LLM"
     types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       error_log:
-        description: 'Log de erro da produção'
+        description: "Log de erro da produção"
         required: false
-        default: ''
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jarvis-homeostasis-trusted
+  cancel-in-progress: false
 
 jobs:
   homeostasis:
-    name: "🧪 Vistoria e Auto-Cura"
+    name: "🧪 Vistoria e Auto-Cura (trusted main only)"
+    if: >-
+      ${{
+        (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+        (
+          github.event_name == 'workflow_run' &&
+          github.event.workflow_run.head_branch == 'main' &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          (
+            github.event.workflow_run.event == 'push' ||
+            github.event.workflow_run.event == 'schedule' ||
+            github.event.workflow_run.event == 'workflow_dispatch'
+          ) &&
+          (
+            github.event.workflow_run.conclusion == 'failure' ||
+            github.event.workflow_run.conclusion == 'timed_out' ||
+            github.event.workflow_run.conclusion == 'cancelled'
+          )
+        )
+      }}
     runs-on: ubuntu-latest
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: true
-
+    timeout-minutes: 35
     permissions:
+      actions: read
       contents: write
       pull-requests: write
 
     steps:
-      - name: 🛰️ Checkout
+      - name: 🛰️ Checkout trusted default branch
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          token: ${{ secrets.GIT_PAT }}
-          ref: ${{ github.head_ref || github.ref_name || 'main' }}
+          ref: main
+          persist-credentials: false
 
       - name: 🔍 Verificação de Gatilho
         id: gatekeeper
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           HEALER_GIT_NAME: "JARVIS"
         run: |
           set -e
-
           LAST_COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an' 2>/dev/null || true)
           LAST_COMMIT_EMAIL=$(git log -1 --pretty=format:'%ae' 2>/dev/null || true)
-
           if [[ "$LAST_COMMIT_AUTHOR" == "$HEALER_GIT_NAME" ]] || [[ "$LAST_COMMIT_EMAIL" == "jarvis@simbiose.ai" ]]; then
             echo "authorized=false" >> "$GITHUB_OUTPUT"
-            echo "⚠️ Ultimo commit foi do JARVIS. Pulando para evitar loop."
+            echo "Último commit foi do JARVIS. Pulando para evitar loop."
             exit 0
           fi
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             echo "authorized=true" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          elif [[ "$EVENT_NAME" == "workflow_run" ]] &&
+               { [[ "$WORKFLOW_CONCLUSION" == "failure" ]] ||
+                 [[ "$WORKFLOW_CONCLUSION" == "timed_out" ]] ||
+                 [[ "$WORKFLOW_CONCLUSION" == "cancelled" ]]; }; then
             echo "authorized=true" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            CONCLUSION="${{ github.event.workflow_run.conclusion }}"
-            if [[ "$CONCLUSION" == "failure" ]] || [[ "$CONCLUSION" == "timed_out" ]] || [[ "$CONCLUSION" == "cancelled" ]]; then
-              echo "authorized=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "authorized=false" >> "$GITHUB_OUTPUT"
-            fi
           else
             echo "authorized=false" >> "$GITHUB_OUTPUT"
           fi
@@ -83,7 +101,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: 🔧 Instalação do DNA
         if: steps.gatekeeper.outputs.authorized == 'true'
@@ -95,38 +113,31 @@ jobs:
         if: steps.gatekeeper.outputs.authorized == 'true' && github.event_name == 'workflow_run'
         id: fetch_failed_logs
         env:
-          GH_TOKEN: ${{ secrets.GIT_PAT || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GIT_PAT || github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          WORKFLOW_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -e
-
-          RUN_ID="${{ github.event.workflow_run.id }}"
           LOGS_FILE="failed_workflow_logs.txt"
-
-          echo "# Workflow com Falha: ${{ github.event.workflow_run.name }}" > "$LOGS_FILE"
-          echo "# Run ID: $RUN_ID | SHA: ${{ github.event.workflow_run.head_sha }}" >> "$LOGS_FILE"
-          echo "" >> "$LOGS_FILE"
-
+          printf '# Workflow com Falha: %s\n' "$WORKFLOW_NAME" > "$LOGS_FILE"
+          printf '# Run ID: %s | SHA: %s\n\n' "$RUN_ID" "$WORKFLOW_SHA" >> "$LOGS_FILE"
           FAILED_JOBS_FILE="/tmp/failed_jobs.txt"
-          gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/jobs" \
-            --jq '.jobs[] | select(.conclusion=="failure") | "\(.id) \(.name)"' \
-            > "$FAILED_JOBS_FILE" 2>/dev/null || true
-
+          gh api "repos/$REPOSITORY/actions/runs/$RUN_ID/jobs" --jq '.jobs[] | select(.conclusion=="failure") | "\(.id) \(.name)"' > "$FAILED_JOBS_FILE" 2>/dev/null || true
           if [ ! -s "$FAILED_JOBS_FILE" ]; then
-            echo "⚠️ Nenhum job com falha encontrado ou indisponível." >> "$LOGS_FILE"
+            echo "Nenhum job com falha encontrado ou indisponível." >> "$LOGS_FILE"
           fi
-
           while IFS=' ' read -r job_id job_name; do
             [ -z "$job_id" ] && continue
-            echo "=== JOB: $job_name (ID: $job_id) ===" >> "$LOGS_FILE"
-            if gh api "repos/${{ github.repository }}/actions/jobs/$job_id/logs" \
-              --header "Accept: application/vnd.github.v3.raw" >> "$LOGS_FILE" 2>/dev/null; then
+            printf '=== JOB: %s (ID: %s) ===\n' "$job_name" "$job_id" >> "$LOGS_FILE"
+            if gh api "repos/$REPOSITORY/actions/jobs/$job_id/logs" --header "Accept: application/vnd.github.v3.raw" >> "$LOGS_FILE" 2>/dev/null; then
               true
             else
-              echo "Log indisponível para job $job_id" >> "$LOGS_FILE"
+              printf 'Log indisponível para job %s\n' "$job_id" >> "$LOGS_FILE"
             fi
             echo "" >> "$LOGS_FILE"
           done < "$FAILED_JOBS_FILE"
-
           echo "logs_file=$LOGS_FILE" >> "$GITHUB_OUTPUT"
           if [ -s "$LOGS_FILE" ]; then
             echo "has_logs=true" >> "$GITHUB_OUTPUT"
@@ -142,96 +153,71 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          PRODUCTION_ERROR_LOG: ${{ inputs.error_log }}
           PYTHONPATH: "."
         run: |
-          PYTEST_IGNORES="--ignore=tests/test_engine.py --ignore=tests/test_system_commands.py"
+          set -e
+          PYTEST_ARGS=(--ignore=tests/test_engine.py --ignore=tests/test_system_commands.py)
           set +e
-          uv run pytest $PYTEST_IGNORES --json-report --json-report-file="$RUNNER_TEMP/report.json" > "$RUNNER_TEMP/pytest_log.txt" 2>&1
+          uv run pytest "${PYTEST_ARGS[@]}" --json-report --json-report-file="$RUNNER_TEMP/report.json" > "$RUNNER_TEMP/pytest_log.txt" 2>&1
           PYTEST_EXIT=$?
           set -e
           echo "::group::Resumo do pytest (1ª execução, exit=$PYTEST_EXIT)"
           tail -n 40 "$RUNNER_TEMP/pytest_log.txt" || true
           echo "::endgroup::"
-
-          PRODUCTION_LOG_ARG=""
-          if [[ -n "${{ github.event.inputs.error_log }}" ]]; then
-            echo "${{ github.event.inputs.error_log }}" > production_error.log
-            PRODUCTION_LOG_ARG="--production-log production_error.log"
+          PRODUCTION_LOG_ARGS=()
+          if [[ -n "$PRODUCTION_ERROR_LOG" ]]; then
+            printf '%s\n' "$PRODUCTION_ERROR_LOG" > production_error.log
+            PRODUCTION_LOG_ARGS=(--production-log production_error.log)
           fi
-
-          WORKFLOW_LOG_ARG=""
+          WORKFLOW_LOG_ARGS=()
           if [[ -f "failed_workflow_logs.txt" ]]; then
-            WORKFLOW_LOG_ARG="--workflow-log failed_workflow_logs.txt"
+            WORKFLOW_LOG_ARGS=(--workflow-log failed_workflow_logs.txt)
           fi
-
-          # Falha do healer não é falha de teste: a verificação final abaixo decide
           set +e
-          uv run python scripts/jarvis_healer.py --report "$RUNNER_TEMP/report.json" --log "$RUNNER_TEMP/pytest_log.txt" $PRODUCTION_LOG_ARG $WORKFLOW_LOG_ARG 2>&1 | tee "$RUNNER_TEMP/healer.log"
+          uv run python scripts/jarvis_healer.py --report "$RUNNER_TEMP/report.json" --log "$RUNNER_TEMP/pytest_log.txt" "${PRODUCTION_LOG_ARGS[@]}" "${WORKFLOW_LOG_ARGS[@]}" 2>&1 | tee "$RUNNER_TEMP/healer.log"
           HEALER_EXIT=${PIPESTATUS[0]}
           set -e
           if [[ $HEALER_EXIT -ne 0 ]]; then
             echo "::warning::healer terminou sem corrigir (exit $HEALER_EXIT)"
           fi
-
+          unset GROQ_API_KEY GEMINI_API_KEY OPENROUTER_API_KEY MISTRAL_API_KEY
           set +e
-          uv run pytest $PYTEST_IGNORES --json-report --json-report-file="$RUNNER_TEMP/report_final.json" > "$RUNNER_TEMP/final_log.txt" 2>&1
+          uv run pytest "${PYTEST_ARGS[@]}" --json-report --json-report-file="$RUNNER_TEMP/report_final.json" > "$RUNNER_TEMP/final_log.txt" 2>&1
           FINAL_EXIT=$?
           set -e
-
           echo "::group::Resumo do pytest (final)"
           tail -n 40 "$RUNNER_TEMP/final_log.txt" || true
           echo "::endgroup::"
           echo "pytest_exit_final=$FINAL_EXIT"
-
-          # Se a suíte continuar falhando, reverta apenas os arquivos cujo estado
-          # ainda corresponde à tentativa de cura; conflitos não são sobrescritos.
           if [[ $FINAL_EXIT -ne 0 && -f "$RUNNER_TEMP/healer.log" ]]; then
-            uv run python scripts/jarvis_recovery_cli.py --restore-from-log "$RUNNER_TEMP/healer.log" \
-              || echo "::warning::recuperação automática incompleta; intervenção necessária"
+            uv run python scripts/jarvis_recovery_cli.py --restore-from-log "$RUNNER_TEMP/healer.log" || echo "::warning::recuperação automática incompleta; intervenção necessária"
           fi
-
-          # Sucesso = código de saída do pytest após a auto-cura (sem heurística por grep)
           if [[ $FINAL_EXIT -eq 0 ]]; then
-             echo "status=success" >> $GITHUB_OUTPUT
+            echo "status=success" >> "$GITHUB_OUTPUT"
           else
-             echo "status=partial" >> $GITHUB_OUTPUT
+            echo "status=partial" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: 🛠️ Commit & Push (Sincronização de Correção)
+      - name: 🛠️ Criar branch e Pull Request da correção
         if: steps.gatekeeper.outputs.authorized == 'true' && steps.healing_process.outputs.status == 'success'
         env:
           GH_TOKEN: ${{ secrets.GIT_PAT }}
+          EVENT_NAME: ${{ github.event_name }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           set -e
-
-          CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-          # Evita commitear lixo de CI: logs, reports, caches, envs
-          git add app scripts tests docs *.md Dockerfile *.yml *.yaml Makefile *.ini setup.py
-          git add .github
+          gh auth setup-git
+          git add -- app scripts tests docs
           git rm -r --cached .pytest_cache htmlcov .venv_tests logs backups 2>/dev/null || true
-
           if ! git diff --staged --quiet; then
-            git commit -m "fix(jarvis): auto-cura aplicada via ${{ github.event_name }} [${{ steps.healing_process.outputs.status }}]"
-
-            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              PUSH_TARGET="${{ github.head_ref }}"
-              git push origin HEAD:"$PUSH_TARGET" || true
-              # A autocura não faz merge de PR automaticamente. Testes verdes
-              # permitem propor a correção, não substituem a aprovação do mantenedor.
-            elif [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-              HEAL_BRANCH="jarvis/heal-${{ github.run_id }}"
-              git checkout -b "$HEAL_BRANCH"
-              git push origin HEAD:"$HEAL_BRANCH" || true
-              gh pr create \
-                --title "🛡️ JARVIS: Auto-Cura após falha em '${{ github.event.workflow_run.name }}'" \
-                --body "Correções automáticas aplicadas pelo healer após falha no workflow." \
-                --head "$HEAL_BRANCH" --base main || true
-            else
-              git push origin HEAD:"$CURRENT_BRANCH" || true
-            fi
+            git commit -m "fix(jarvis): auto-cura proposta via $EVENT_NAME [run $GITHUB_RUN_ID]"
+            HEAL_BRANCH="jarvis/heal-$GITHUB_RUN_ID"
+            git switch -c "$HEAL_BRANCH"
+            git push origin "HEAD:$HEAL_BRANCH"
+            gh pr create --title "JARVIS: Auto-Cura (run $GITHUB_RUN_ID)" --body "Correção automática proposta após validação em código confiável da main. Revisão humana e CI permanecem obrigatórios." --head "$HEAL_BRANCH" --base main
           else
-            echo "Nenhuma alteração necessária no DNA."
+            echo "Nenhuma alteração elegível necessária."
           fi
 
       - name: ✅ Verifica resultado do pytest
