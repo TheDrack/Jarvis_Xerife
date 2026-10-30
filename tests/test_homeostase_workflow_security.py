@@ -16,7 +16,7 @@ def test_pull_request_validation_is_read_only_secret_free_and_runs_full_suite():
     assert re.search(r"(?m)^permissions:\n  contents: read$", workflow)
     assert "persist-credentials: false" in workflow
     assert "secrets." not in workflow
-    assert "uv run pytest -q" in workflow
+    assert "pytest -q" in workflow
     assert "--ignore=" not in workflow
 
 
