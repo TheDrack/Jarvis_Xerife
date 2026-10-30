@@ -25,16 +25,16 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Set up UV
-        uses: astral-sh/setup-uv@v7
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          enable-cache: true
           python-version: "3.11"
 
-      - name: Install test dependencies
+      - name: Install complete test dependencies
         run: |
-          uv venv --clear --python 3.11
-          uv pip install -r requirements/core.txt pytest 'pytest-asyncio>=0.23.0' pytest-json-report pytest-cov pytest-mock anyio autopep8 requests pillow opencv-python-headless 'mcp>=1.26,<2'
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest 'pytest-asyncio>=0.23.0' pytest-cov pytest-mock anyio Pillow opencv-python-headless
 
       - name: Run complete pytest suite
-        run: uv run pytest -q
+        run: pytest -q
