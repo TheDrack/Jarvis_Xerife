@@ -3,10 +3,19 @@
 from pathlib import Path
 import re
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PR_WORKFLOW = ROOT / ".github" / "workflows" / "jarvis-pr-validation.yml"
 HEAL_WORKFLOW = ROOT / ".github" / "workflows" / "homeostase.yml"
+
+
+def test_both_workflow_files_are_valid_yaml_with_jobs():
+    for path in (PR_WORKFLOW, HEAL_WORKFLOW):
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        assert isinstance(document, dict)
+        assert isinstance(document.get("jobs"), dict)
 
 
 def test_pull_request_validation_is_read_only_secret_free_and_runs_full_suite():
