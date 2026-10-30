@@ -1,0 +1,40 @@
+name: "JARVIS PR Validation (unprivileged)"
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jarvis-pr-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: "Full pytest suite (no secrets, read-only)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up UV
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          uv venv --clear --python 3.11
+          uv pip install -r requirements/core.txt pytest 'pytest-asyncio>=0.23.0' pytest-json-report pytest-cov pytest-mock anyio autopep8 requests pillow opencv-python-headless 'mcp>=1.26,<2'
+
+      - name: Run complete pytest suite
+        run: uv run pytest -q
