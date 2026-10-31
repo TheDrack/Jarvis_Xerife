@@ -79,6 +79,7 @@ class BrowserTrafficObserver:
         self._next_id = 1
         self._next_request_id = 1
         self._request_ids: dict[int, int] = {}
+        self._request_started_at: dict[int, float] = {}
         self._playwright: Any = None
         self._browser: Any = None
         self._contexts: list[Any] = []
@@ -114,7 +115,9 @@ class BrowserTrafficObserver:
         with self._lock:
             request_id = self._next_request_id
             self._next_request_id += 1
-            self._request_ids[self._request_key(request)] = request_id
+            request_key = self._request_key(request)
+            self._request_ids[request_key] = request_id
+            self._request_started_at[request_key] = time.monotonic()
             capture_payloads = self._capture_payloads
         fields: dict[str, Any] = {
             "request_id": request_id,
@@ -143,7 +146,7 @@ class BrowserTrafficObserver:
     def _on_response(self, response: Any) -> None:
         url, host = sanitizar_url(response.url)
         with self._lock:
-            request_id = self._request_ids.pop(self._request_key(response.request), None)
+            request_id = self._request_ids.get(self._request_key(response.request))
         try:
             content_type = response.headers.get("content-type")
         except Exception:
@@ -158,10 +161,28 @@ class BrowserTrafficObserver:
             content_type=content_type,
         )
 
+    def _on_request_finished(self, request: Any) -> None:
+        url, host = sanitizar_url(request.url)
+        request_key = self._request_key(request)
+        with self._lock:
+            request_id = self._request_ids.pop(request_key, None)
+            started_at = self._request_started_at.pop(request_key, None)
+        duration_ms = round((time.monotonic() - started_at) * 1000, 2) if started_at is not None else None
+        self._emit(
+            "http_request_finished",
+            request_id=request_id,
+            method=request.method,
+            url=url,
+            host=host,
+            duration_ms=duration_ms,
+        )
+
     def _on_request_failed(self, request: Any) -> None:
         url, host = sanitizar_url(request.url)
+        request_key = self._request_key(request)
         with self._lock:
-            request_id = self._request_ids.pop(self._request_key(request), None)
+            request_id = self._request_ids.pop(request_key, None)
+            self._request_started_at.pop(request_key, None)
         self._emit(
             "http_request_failed",
             request_id=request_id,
@@ -209,6 +230,7 @@ class BrowserTrafficObserver:
             context.on("request", self._on_request)
             context.on("response", self._on_response)
             context.on("requestfailed", self._on_request_failed)
+            context.on("requestfinished", self._on_request_finished)
             context.on("page", self._attach_page)
             for page in context.pages:
                 self._attach_page(page)
