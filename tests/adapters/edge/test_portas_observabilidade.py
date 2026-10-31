@@ -144,3 +144,9 @@ def test_http_response_correlates_with_request():
     response_event = observer.events()["events"][1]
     assert response_event["request_id"] == request_event["request_id"]
     assert response_event["content_type"] == "application/json"
+
+
+def test_binary_websocket_payload_never_exposes_raw_bytes():
+    payload = sanitizar_payload(b"\x00private-binary-token", enabled=True)
+    assert payload == {"kind": "binary", "bytes": len(b"\x00private-binary-token")}
+    assert "preview_hex" not in payload
