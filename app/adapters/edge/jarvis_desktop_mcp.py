@@ -28,6 +28,7 @@ from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, track
 from app.core.nexus import nexus
 from app.adapters.edge.portas_visualizacao import registrar_visualizacao_portas
 from app.adapters.edge.portas_utilizacao import registrar_utilizacao_portas
+from app.adapters.edge.portas_observabilidade import registrar_observabilidade_portas
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -599,6 +600,7 @@ def _portas_content(meta: dict[str, Any], png: bytes | None = None) -> list[Any]
 
 registrar_visualizacao_portas(mcp, tracked_action, _portas_content)
 registrar_utilizacao_portas(mcp, tracked_action)
+registrar_observabilidade_portas(mcp, tracked_action)
 
 
 if __name__ == "__main__":
