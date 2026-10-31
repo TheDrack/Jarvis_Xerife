@@ -1,6 +1,6 @@
 ---
 name: jarvis-portas-browser
-description: Use Jarvis browser portas to inspect and run declarative macros on the user's already-open Chromium through CDP. Use for listing portas, auditing a porta before running it, observing the current tab, or running a porta with its risk rules.
+description: Use Jarvis browser portas to inspect and run declarative macros and observe HTTP(S)/WebSocket traffic in the user's already-open Chromium through CDP. Use for listing portas, auditing a porta, observing traffic, or running a porta with its risk rules.
 ---
 
 # Jarvis Portas de Navegador
@@ -18,6 +18,14 @@ Portas são macros JSON com vocabulário fechado de passos (`goto`, `esperar`, `
    - Macros com `risco: "acao"` exigem `user_confirmed: true`. Sem isso, a tool devolve `confirmation_required`, e você deve pedir autorização ao usuário antes de repetir.
    - Macros `leitura` rodam sem confirmação adicional.
 
+## Observabilidade HTTP(S) e WebSocket
+
+- `portas_trafego_iniciar(capturar_payloads=False)` começa a capturar requisições, respostas, falhas e frames WebSocket em todas as abas dos contextos CDP anexados.
+- `portas_trafego_eventos(limit, after_id, host_contains)` lê eventos em buffer limitado e permite polling incremental por ID.
+- `portas_trafego_status` e `portas_trafego_parar` consultam e encerram a sessão sem fechar o navegador.
+- Payloads ficam desabilitados por padrão. Habilite previews apenas quando necessário; valores de campos conhecidos como tokens/senhas/cookies são redigidos, mas não se deve presumir que toda informação sensível arbitrária seja detectável.
+- A observação é do tráfego do Chromium anexado, não de toda a rede/IP da máquina. Tráfego de outros processos requer instrumentação própria.
+
 ## Fluxo recomendado
 
 1. Chame `portas_listar` para ver o que existe.
@@ -29,7 +37,7 @@ Portas são macros JSON com vocabulário fechado de passos (`goto`, `esperar`, `
 ## Regras de segurança
 
 - Não crie macro de leitura com `clicar` ou `digitar`. O núcleo rejeita isso ao carregar.
-- `goto` só funciona para domínios em `dominios_permitidos`.
+- `goto` só aceita HTTP/HTTPS, sem credenciais embutidas, e respeita `dominios_permitidos`.
 - Saídas retornam apenas o que a macro declara em `ler`. Nunca tente obter cookies ou tokens.
 - A porta CDP 9222 deve ficar em localhost e, de preferência, em perfil dedicado de automação.
 - Só automatize sites onde o usuário tem conta ou permissão, e respeite os termos de cada um.
