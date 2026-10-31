@@ -90,3 +90,57 @@ def test_event_buffer_is_bounded_and_supports_incremental_filtering():
     assert result["count"] == 1
     assert result["events"][0]["type"] == "http_response"
     assert result["next_after_id"] == 2
+
+
+def test_http_request_capture_is_opt_in_and_redacts_sensitive_fields():
+    class FakeRequest:
+        url = "https://api.example.test/camera?token=query-secret"
+        method = "POST"
+        resource_type = "xhr"
+        post_data = '{"operation":"ptz","password":"body-secret","direction":"left"}'
+        headers = {
+            "content-type": "application/json",
+            "authorization": "Bearer header-secret",
+            "cookie": "session=secret",
+            "x-requested-with": "XMLHttpRequest",
+        }
+
+    observer = BrowserTrafficObserver()
+    observer._capture_payloads = True
+    request = FakeRequest()
+    observer._on_request(request)
+    event = observer.events()["events"][0]
+    assert event["method"] == "POST"
+    assert event["resource_type"] == "xhr"
+    assert "query-secret" not in event["url"]
+    assert "body-secret" not in event["request_payload"]["preview"]
+    assert "header-secret" not in str(event)
+    assert "cookie" not in event.get("safe_headers", {})
+    assert event["safe_headers"]["content-type"] == "application/json"
+
+
+def test_http_response_correlates_with_request():
+    class FakeRequest:
+        url = "https://api.example.test/camera"
+        method = "GET"
+        resource_type = "fetch"
+        post_data = None
+        headers = {}
+
+    class FakeResponse:
+        url = "https://api.example.test/camera"
+        status = 200
+        status_text = "OK"
+        headers = {"content-type": "application/json"}
+
+        def __init__(self, request):
+            self.request = request
+
+    observer = BrowserTrafficObserver()
+    request = FakeRequest()
+    observer._on_request(request)
+    request_event = observer.events()["events"][0]
+    observer._on_response(FakeResponse(request))
+    response_event = observer.events()["events"][1]
+    assert response_event["request_id"] == request_event["request_id"]
+    assert response_event["content_type"] == "application/json"
