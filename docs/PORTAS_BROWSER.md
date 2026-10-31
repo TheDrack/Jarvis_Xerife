@@ -15,7 +15,7 @@ Macros JSON e observabilidade HTTP(S)/WebSocket no Chromium já aberto via CDP l
 
 ## Observabilidade de tráfego
 
-- `portas_trafego_iniciar` conecta ao Chromium por CDP e observa requisições/respostas/falhas HTTP(S) em todos os contextos e frames WebSocket nas abas anexadas.
+- `portas_trafego_iniciar` conecta ao Chromium por CDP e observa requisições/respostas/finalizações/falhas HTTP(S) em todos os contextos e frames WebSocket nas abas anexadas.
 - `portas_trafego_eventos` consulta o buffer incremental, com filtro por host e cursor `after_id`.
 - `portas_trafego_status` informa estado e quantidade de abas; `portas_trafego_parar` desconecta sem fechar o Chromium.
 - `portas_trafego_limpar` limpa o buffer em memória.
