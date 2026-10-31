@@ -150,3 +150,30 @@ def test_binary_websocket_payload_never_exposes_raw_bytes():
     payload = sanitizar_payload(b"\x00private-binary-token", enabled=True)
     assert payload == {"kind": "binary", "bytes": len(b"\x00private-binary-token")}
     assert "preview_hex" not in payload
+
+def test_request_response_correlation_survives_distinct_playwright_wrappers():
+    implementation = object()
+
+    class FakeRequest:
+        _impl_obj = implementation
+        url = "https://api.example.test/action"
+        method = "POST"
+        resource_type = "fetch"
+        post_data = None
+        headers = {}
+
+    class FakeResponse:
+        url = "https://api.example.test/action"
+        status = 204
+        status_text = "No Content"
+        headers = {"content-type": "application/json"}
+
+        def __init__(self):
+            self.request = FakeRequest()
+
+    observer = BrowserTrafficObserver()
+    observer._on_request(FakeRequest())
+    request_event = observer.events()["events"][0]
+    observer._on_response(FakeResponse())
+    response_event = observer.events()["events"][1]
+    assert response_event["request_id"] == request_event["request_id"]
