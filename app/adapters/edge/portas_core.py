@@ -47,8 +47,20 @@ def _validar_macro(macro: dict[str, Any], origem: str) -> None:
 
 
 def _dominio_ok(url: str, permitidos: list[str]) -> bool:
-    host = urlparse(url).hostname or ""
-    return any(host == d or host.endswith("." + d) for d in permitidos)
+    """Accept only credential-free HTTP(S) URLs on an exact or subdomain allowlist."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme.lower() not in {"http", "https"}:
+            return False
+        if parsed.username is not None or parsed.password is not None:
+            return False
+        host = (parsed.hostname or "").rstrip(".").lower()
+        if not host:
+            return False
+        allowed = (str(domain).strip().rstrip(".").lower() for domain in permitidos)
+        return any(host == domain or host.endswith("." + domain) for domain in allowed if domain)
+    except (TypeError, ValueError):
+        return False
 
 
 @contextmanager
