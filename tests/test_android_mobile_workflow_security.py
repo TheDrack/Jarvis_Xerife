@@ -69,7 +69,10 @@ def test_publisher_only_downloads_artifact_and_uses_scoped_write_token():
     assert publisher["needs"] == "build-release"
     assert publisher["permissions"] == {"contents": "write"}
     assert not any(step.get("uses", "").startswith("actions/checkout@") for step in publisher["steps"])
-    assert "GH_TOKEN: ${{ github.token }}" in str(publisher["steps"])
+    publish_step = next(
+        step for step in publisher["steps"] if step.get("name") == "Publish release APK"
+    )
+    assert publish_step["env"]["GH_TOKEN"] == "${{ github.token }}"
     assert "secrets." not in str(publisher["steps"])
     assert "gradle " not in str(publisher["steps"])
 
