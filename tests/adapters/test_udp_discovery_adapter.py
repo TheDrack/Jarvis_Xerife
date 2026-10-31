@@ -57,7 +57,7 @@ def test_ssdp_probe_uses_only_multicast_and_closes_socket():
         TimeoutError(),
     ]
     with patch("app.adapters.edge.udp_discovery_adapter.socket.socket", return_value=sock), \
-         patch("app.adapters.edge.udp_discovery_adapter.time.monotonic", side_effect=[0, 0, 0, 3]):
+         patch("app.adapters.edge.udp_discovery_adapter.time.monotonic", side_effect=lambda: 3 if sock.recvfrom.call_count >= 2 else 0):
         result = discover_ssdp(timeout=1)
     assert result["count"] == 1
     assert result["devices"][0]["source_ip"] == "192.168.1.4"
