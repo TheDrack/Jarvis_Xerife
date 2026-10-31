@@ -1,0 +1,14 @@
+{
+  "nome": "ler_titulo",
+  "descricao": "Abre uma URL permitida e retorna o título principal da página",
+  "risco": "leitura",
+  "parametros": {
+    "url": {"tipo": "string", "obrigatorio": true}
+  },
+  "dominios_permitidos": ["exemplo.com"],
+  "passos": [
+    {"acao": "goto", "valor": "{url}"},
+    {"acao": "esperar", "seletor": "h1", "timeout_ms": 8000},
+    {"acao": "ler", "seletor": "h1", "saida": "titulo"}
+  ]
+}
