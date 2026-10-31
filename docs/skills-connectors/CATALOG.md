@@ -47,6 +47,7 @@ A skill is portable operating guidance, not a connector or a grant of permission
 | LLM/model routing and cost | llm_router, model/gateway adapters, CostTrackerAdapter | Model availability depends on current credentials, provider status, routing configuration, and policy. Discover current providers rather than assuming a model is usable. |
 | Memory and context | Semantic/procedural/working memory components, consolidated context, vector memory and context protocol | Distinguish source code from active backend connectivity and persisted state. Never claim provider-native memory was updated without confirmation. |
 | Windows desktop / visual control | app/adapters/edge/jarvis_desktop_mcp.py, jarvis_desktop_cli.py, JSONL bridge, UI Automation and visual templates | Requires a reachable interactive Windows session and exposed tool/process bridge. Prefer accessibility/DOM, then templates, then authorized physical input. Observe and verify each action; stop on ambiguity. |
+| Browser portas (macros via CDP) | app/adapters/edge/portas_core.py, portas_visualizacao.py, portas_utilizacao.py, data/portas/macros/*.json | Two verticals: visualização (`portas_listar`, `portas_descrever`, `portas_observar_aba`, read-only) and utilização (`porta_<nome>`). Macros with risk `acao` require `user_confirmed=true`. Requires Chromium with remote debugging on localhost:9222. Domain allowlist per macro; validate on the actual browser profile. |
 | Remote connectivity | Preferred documented route: RDC → Aperture → Tailscale → Jarvis; private Tailscale Serve upstream | This route is installation-specific, not public access. Check actual runtime connectors, grants, Tailscale reachability, and interactive session. Direct routes are documented fallbacks, not authorization bypasses. |
 | Android workflows | Android navigation skill and Android-related repository modules/workflows | Skill presence does not prove a device is paired or reachable. Inspect live device/connector state before actions. |
 | Observability and status | Status service, structured/audit logs, Render logs and CI evidence | Logs may be partial or stale. Report timestamp, source, and limits. Avoid raw prompts, arguments, results, or secrets in logs. |
@@ -77,6 +78,7 @@ The table describes integration families in the repository/installation; it does
 - [Multi-agent platform and task protocol](../architecture/jarvis-multi-agent-platform.md)
 - [Remote access: RDC → Aperture → Tailscale → Jarvis](../ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md)
 - [Visual navigation](../NAVEGACAO_VISUAL.md)
+- [Browser portas](../PORTAS_BROWSER.md)
 - [Usage guide](../GUIA_DE_USO.md)
 - [Declarative execution plans](../architecture/declarative-execution-plans.md)
 - [Project status and roadmap](../STATUS.md)
