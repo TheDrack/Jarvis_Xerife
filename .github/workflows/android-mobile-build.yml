@@ -1,4 +1,4 @@
-﻿name: Android Mobile Build
+name: Android Mobile Build
 
 on:
   workflow_dispatch:
@@ -12,14 +12,22 @@ on:
       - "mobile/android/**"
       - ".github/workflows/android-mobile-build.yml"
 
+# PR builds need only read access. Release publication receives write access
+# in a separate trusted job below.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  assemble:
+  assemble-debug:
+    name: Test and assemble debug APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -44,9 +52,35 @@ jobs:
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+  publish-release:
+    name: Build and publish signed release APK
+    # A selected workflow_dispatch ref is not inherently trusted. Keep release
+    # signing and repository writes on the protected default branch only.
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
+    needs: assemble-debug
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+      - name: Install Android SDK platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
       - name: Check release signing configuration
         id: release-signing
-        if: contains(fromJSON('["push","workflow_dispatch"]'), github.event_name)
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -69,7 +103,7 @@ jobs:
             echo "::warning::Release signing secrets are incomplete; skipping signed release. The debug APK artifact remains available."
           fi
       - name: Assemble release APK
-        if: contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && steps.release-signing.outputs.configured == 'true'
+        if: steps.release-signing.outputs.configured == 'true'
         working-directory: mobile/android
         env:
           GOOGLE_WEB_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
@@ -80,7 +114,7 @@ jobs:
           ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: gradle --no-daemon :app:assembleRelease
       - name: Publish release APK
-        if: contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) && steps.release-signing.outputs.configured == 'true'
+        if: steps.release-signing.outputs.configured == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -89,4 +123,3 @@ jobs:
             --title "Jarvis Mobile (build ${{ github.run_number }})" \
             --notes "APK gerado a partir de ${{ github.sha }}." \
             --latest
-
