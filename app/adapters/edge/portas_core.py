@@ -6,7 +6,9 @@ O Chromium é o já aberto pelo usuário (CDP). Nenhuma ação roda na importaç
 """
 from __future__ import annotations
 
+import ipaddress
 import json
+import os
 import threading
 import time
 from contextlib import contextmanager
@@ -14,7 +16,32 @@ from pathlib import Path
 from typing import Any, Iterator
 from urllib.parse import urlparse
 
-CDP_URL = "http://127.0.0.1:9222"
+CDP_URL = os.environ.get("JARVIS_CDP_URL", "http://127.0.0.1:9222")
+
+
+def configurar_cdp_url(url: str) -> dict[str, Any]:
+    """Configura endpoint CDP local; aceita HTTP(S) ou WS(S), somente loopback."""
+    global CDP_URL
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme.lower() not in {"http", "https", "ws", "wss"}:
+            return {"success": False, "error": "Esquema CDP inválido; use http(s) ou ws(s)."}
+        if parsed.username is not None or parsed.password is not None:
+            return {"success": False, "error": "Credenciais embutidas no endpoint CDP não são permitidas."}
+        host = parsed.hostname or ""
+        try:
+            loopback = ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            loopback = host.lower() == "localhost"
+        if not loopback:
+            return {"success": False, "error": "CDP só pode escutar em localhost/loopback."}
+        _ = parsed.port
+        if not parsed.port:
+            return {"success": False, "error": "Endpoint CDP precisa declarar uma porta."}
+    except (TypeError, ValueError):
+        return {"success": False, "error": "URL CDP inválida."}
+    CDP_URL = url
+    return {"success": True, "cdp_url": CDP_URL}
 RISCOS_VALIDOS = {"leitura", "acao"}
 ACOES_VALIDAS = {"goto", "esperar", "clicar", "digitar", "ler"}
 INTERVALO_MIN_S = 2.0
