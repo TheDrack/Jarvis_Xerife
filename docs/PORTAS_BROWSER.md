@@ -1,11 +1,17 @@
 # Portas de navegador
 
-Macros JSON e observabilidade HTTP(S)/WebSocket no Chromium já aberto (CDP em `127.0.0.1:9222`), expostas como tools MCP.
+Macros JSON e observabilidade HTTP(S)/WebSocket no Chromium já aberto via CDP local (por padrão `127.0.0.1:9222`, ou endpoint WS dinâmico do agent-browser), expostas como tools MCP.
 
 ## Duas vertentes
 
 - **Visualização** (`portas_visualizacao.py`): `portas_listar`, `portas_descrever`, `portas_observar_aba`. Somente leitura, sempre liberada.
 - **Utilização** (`portas_utilizacao.py`): `porta_<nome>`, uma por macro. Macros com `risco: "acao"` exigem `user_confirmed: true`.
+
+## Conexão CDP
+
+- Por padrão, o núcleo tenta `http://127.0.0.1:9222`.
+- Para sessões agent-browser, chame `portas_cdp_descobrir_agent_browser(session)`; o endpoint `ws://127.0.0.1:<porta>/devtools/browser/...` é descoberto e configurado automaticamente.
+- `portas_cdp_configurar(url)` aceita endpoint HTTP(S)/WS(S) somente em loopback. Endpoints CDP remotos são recusados.
 
 ## Observabilidade de tráfego
 
