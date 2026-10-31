@@ -202,5 +202,3 @@ def test_observer_captura_frames_websocket_reais_via_chromium():
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]
