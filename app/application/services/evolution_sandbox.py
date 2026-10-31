@@ -97,8 +97,12 @@ class EvolutionSandbox(NexusComponent):
             ``{"passed": bool, "test_output": str, "errors": list}``
         """
         if not self.enabled:
-            logger.info("[EvolutionSandbox] Sandbox desabilitado (SANDBOX_ENABLED=false).")
-            return {"passed": True, "test_output": "sandbox_disabled", "errors": []}
+            logger.warning("[EvolutionSandbox] Sandbox desabilitado; proposta não validada.")
+            return {
+                "passed": False,
+                "test_output": "sandbox_disabled",
+                "errors": ["sandbox_disabled: code proposal was not validated"],
+            }
 
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + "_" + uuid.uuid4().hex[:8]
         sandbox_dir = self.sandbox_base / ts
