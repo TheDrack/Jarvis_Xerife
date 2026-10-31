@@ -27,10 +27,14 @@ def _resumo(macro: dict[str, Any]) -> dict[str, Any]:
 def registrar_visualizacao_portas(
     mcp: Any,
     tracked_action: Callable[[str], Callable[..., Any]],
-    content_fn: Callable[[dict[str, Any]], list[Any]],
+    content_fn: Callable[..., list[Any]],
     macros_dir: Path = _MACROS_DIR,
 ) -> None:
-    """Registra as tools de visualização. Recebe o decorador e o formatador de imagem do servidor."""
+    """Registra as tools de visualização.
+
+    content_fn(meta: dict, png: bytes | None = None) -> list: monta texto + imagem MCP,
+    o mesmo formato usado por _content() em jarvis_desktop_mcp.py.
+    """
     catalogo = carregar_macros(macros_dir)
 
     @mcp.tool()
@@ -60,4 +64,4 @@ def registrar_visualizacao_portas(
             png = captura_aba_atual()
         except Exception as exc:
             return content_fn({"success": False, "error": str(exc)})
-        return content_fn({"success": True, "screenshot_base64_bytes": len(png)}, png=png)
+        return content_fn({"success": True, "tamanho_bytes": len(png)}, png)
