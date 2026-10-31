@@ -101,15 +101,16 @@ class TestEvolutionGatekeeperCoreProtection:
         ok, reason = gk._check_core_protection(change)
         assert ok is False
 
-    def test_approves_with_override(self):
-        """Com gatekeeper_override=True, deve aprovar mudanças no núcleo."""
+    def test_legacy_override_cannot_bypass_core_protection(self):
+        """O campo legado gatekeeper_override não pode ignorar a proteção do núcleo."""
         gk = EvolutionGatekeeper()
         change = {
             "files_modified": ["app/core/nexus.py"],
             "gatekeeper_override": True,
         }
         ok, reason = gk._check_core_protection(change)
-        assert ok is True
+        assert ok is False
+        assert "core_file_protected" in reason
 
     def test_approves_non_core_file(self):
         """Deve aprovar mudança em arquivo fora do núcleo."""
@@ -117,6 +118,34 @@ class TestEvolutionGatekeeperCoreProtection:
         change = {"files_modified": ["app/application/services/llm_router.py"]}
         ok, reason = gk._check_core_protection(change)
         assert ok is True
+
+
+class TestEvolutionGatekeeperSandboxFailClosed:
+    """Propostas de código não podem ser aprovadas sem validação efetiva."""
+
+    def test_blocks_code_proposal_when_sandbox_unavailable(self):
+        gk = EvolutionGatekeeper()
+        with patch("app.application.services.evolution_gatekeeper.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = None
+            ok, reason = gk._check_sandbox({"proposed_code": "print('candidate')"})
+        assert ok is False
+        assert "sandbox_unavailable" in reason
+
+    def test_blocks_code_proposal_when_sandbox_raises(self):
+        gk = EvolutionGatekeeper()
+        mock_sandbox = MagicMock()
+        mock_sandbox.test_proposal.side_effect = RuntimeError("sandbox crashed")
+        with patch("app.application.services.evolution_gatekeeper.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = mock_sandbox
+            ok, reason = gk._check_sandbox({"proposed_code": "print('candidate')"})
+        assert ok is False
+        assert "sandbox_error" in reason
+
+    def test_metadata_only_change_does_not_require_code_sandbox(self):
+        gk = EvolutionGatekeeper()
+        ok, reason = gk._check_sandbox({"files_modified": ["docs/README.md"]})
+        assert ok is True
+        assert reason == "ok"
 
 
 class TestEvolutionGatekeeperStability:
