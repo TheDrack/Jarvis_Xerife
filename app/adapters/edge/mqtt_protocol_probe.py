@@ -9,7 +9,7 @@ def _target(value: str) -> str:
     address=ipaddress.ip_address(str(value).strip())
     if not isinstance(address,ipaddress.IPv4Address) or not address.is_private or address.is_loopback or address.is_link_local or address.is_multicast:
         raise ValueError("MQTT probe aceita somente IPv4 privado RFC1918, exceto loopback/link-local.")
-    if address not in tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8","172.16.0.0/12","192.168.0.0/16")):
+    if not any(address in ipaddress.ip_network(n) for n in ("10.0.0.0/8","172.16.0.0/12","192.168.0.0/16")):
         raise ValueError("Destino fora do escopo RFC1918.")
     return str(address)
 
@@ -52,6 +52,7 @@ def probe_mqtt(host: str, *, port: int=1883, timeout: float=1.0, use_tls: bool|N
     payload=struct.pack("!H",len(cid))+cid
     packet=bytes((0x10,))+_encode_remaining(len(variable)+len(payload))+variable+payload
     raw=None
+    conn=None
     try:
         raw=socket.create_connection((address,port),timeout=bounded)
         conn=ssl.create_default_context().wrap_socket(raw,server_hostname=address) if tls else raw
@@ -64,8 +65,9 @@ def probe_mqtt(host: str, *, port: int=1883, timeout: float=1.0, use_tls: bool|N
     except (OSError,ssl.SSLError,TimeoutError,ConnectionError,ValueError) as exc:
         return {"success":False,"confirmed":False,"protocol":"mqtt","tls":tls,"error":type(exc).__name__}
     finally:
-        if raw is not None:
-            try:
-                # MQTT DISCONNECT only if broker connection still open; closing is also safe.
-                raw.close()
+        if conn is not None:
+            try: conn.close()
+            except OSError: pass
+        elif raw is not None:
+            try: raw.close()
             except OSError: pass

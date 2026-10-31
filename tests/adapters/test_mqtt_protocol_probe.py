@@ -1,4 +1,4 @@
-﻿import socket, threading
+import socket, threading
 import pytest
 from unittest.mock import patch
 from app.adapters.edge.mqtt_protocol_probe import probe_mqtt
@@ -34,3 +34,8 @@ def test_mqtt_probe_rejects_non_private_targets():
 
 def test_mqtt_probe_rejects_unsupported_port():
     with pytest.raises(ValueError): probe_mqtt("192.168.1.2",port=1884)
+
+
+def test_mqtt_probe_accepts_rfc1918_address():
+    from app.adapters.edge.mqtt_protocol_probe import _target
+    assert _target('10.0.0.21') == '10.0.0.21'

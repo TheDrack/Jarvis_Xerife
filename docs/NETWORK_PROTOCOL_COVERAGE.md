@@ -61,7 +61,7 @@ Explicitly sends one SSDP M-SEARCH and one ONVIF WS-Discovery SOAP Probe to the 
 
 ## Operational limits
 
-- No real network scan was run while implementing or testing these adapters.
+- No production network scan was run. MQTT CONNECT/CONNACK/DISCONNECT was verified against a temporary local broker bound to the workstation interface. An mDNS PTR query was sent on the local link but no device responded; parser behavior is covered by synthetic DNS packets.
 - Passive ARP discovery remains separate from active host inspection.
 - Do not assume the user's LAN is `/24`; the TCP inspector requires an explicit target IP.
 - Multicast discovery is an active local-link operation and is invoked only by its dedicated MCP tool.
