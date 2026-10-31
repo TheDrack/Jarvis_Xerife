@@ -26,6 +26,7 @@
 | Android navigation | Android device/navigation workflows; read constraints and prerequisites first | [SKILL.md](../../skills/jarvis-android-navigation/SKILL.md) |
 | Context and memory | Bootstrap, reconcile, compact, deduplicate, and persist useful context across compatible runtimes | [SKILL.md](../../skills/jarvis-context-memory/SKILL.md) and [protocol](CONTEXT_MEMORY_PROTOCOL.md) |
 | Multi-agent coordination | Leader assignment, task envelopes, shared ledger, handoffs, parallel-work controls, evidence | [SKILL.md](../../skills/jarvis-multi-agent-coordination/SKILL.md) and [platform architecture](../architecture/jarvis-multi-agent-platform.md) |
+| Browser portas | Inspect and run declarative browser macros on the already-open Chromium via CDP, split into visualização (read-only) and utilização (confirmation for ação) | [SKILL.md](../../skills/jarvis-portas-browser/SKILL.md) and [portas runbook](../PORTAS_BROWSER.md) |
 | Visual navigation | Windows desktop observation and operation through Jarvis MCP/JSONL bridge, UI Automation, templates, and verified recipes | [SKILL.md](../../skills/jarvis-visual-navigation/SKILL.md) and [visual navigation runbook](../NAVEGACAO_VISUAL.md) |
 | VIV — Verificação Inicial de Voo | Standard startup/readiness audit: re-read relevant skills, discover live connectors, inspect schemas/permissions, research failures, apply authorized fixes, test, and report evidence | [SKILL.md](../../skills/jarvis-viv/SKILL.md) and [full VIV procedure](../POS_INSTALACAO.md) |
 
