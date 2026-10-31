@@ -63,15 +63,29 @@ def _dominio_ok(url: str, permitidos: list[str]) -> bool:
         return False
 
 
+def _selecionar_pagina(contexto: Any) -> Any:
+    """Prefere a aba visível; faz fallback para a última aba criada."""
+    paginas = list(contexto.pages)
+    if not paginas:
+        return contexto.new_page()
+    for pagina in reversed(paginas):
+        try:
+            if pagina.evaluate("document.visibilityState") == "visible":
+                return pagina
+        except Exception:
+            continue
+    return paginas[-1]
+
+
 @contextmanager
 def _abrir_pagina() -> Iterator[Any]:
-    """Anexa ao Chromium já aberto via CDP e entrega a aba atual (ou nova)."""
+    """Anexa ao Chromium já aberto via CDP e entrega a aba visível (ou nova)."""
     from playwright.sync_api import sync_playwright  # importação tardia
 
     with sync_playwright() as p:
         navegador = p.chromium.connect_over_cdp(CDP_URL)
         contexto = navegador.contexts[0]
-        pagina = contexto.pages[0] if contexto.pages else contexto.new_page()
+        pagina = _selecionar_pagina(contexto)
         yield pagina
 
 
