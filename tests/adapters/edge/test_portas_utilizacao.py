@@ -72,3 +72,43 @@ def test_macro_de_leitura_com_clique_e_rejeitada(tmp_path: Path):
     )
     with pytest.raises(ValueError, match="não pode clicar"):
         portas_core.carregar_macros(tmp_path)
+
+
+@pytest.mark.parametrize("url", [
+    "file://exemplo.com/C:/Windows/win.ini",
+    "ftp://exemplo.com/arquivo",
+    "javascript://exemplo.com/alert(1)",
+    "https://user:password@exemplo.com/",
+])
+def test_esquema_nao_http_ou_credenciais_sao_bloqueados(monkeypatch, url):
+    from contextlib import contextmanager
+
+    class Pagina:
+        def goto(self, target):
+            raise AssertionError("navegação insegura não deveria ocorrer")
+
+    @contextmanager
+    def falsa():
+        yield Pagina()
+
+    monkeypatch.setattr(portas_core, "_abrir_pagina", falsa)
+    macro = _macro("leitura", [{"acao": "goto", "valor": url}])
+    resultado = executar_porta(macro, {}, user_confirmed=False)
+    assert resultado["success"] is False
+    assert "domínio fora da lista" in resultado["error"]
+
+
+def test_https_em_dominio_allowlisted_e_aceito(monkeypatch):
+    from contextlib import contextmanager
+
+    class Pagina:
+        def goto(self, target):
+            self.url = target
+
+    @contextmanager
+    def falsa():
+        yield Pagina()
+
+    monkeypatch.setattr(portas_core, "_abrir_pagina", falsa)
+    macro = _macro("leitura", [{"acao": "goto", "valor": "https://exemplo.com/"}])
+    assert executar_porta(macro, {}, user_confirmed=False) == {"success": True, "saidas": {}}
