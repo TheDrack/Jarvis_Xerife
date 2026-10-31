@@ -18,6 +18,12 @@ Portas são macros JSON com vocabulário fechado de passos (`goto`, `esperar`, `
    - Macros com `risco: "acao"` exigem `user_confirmed: true`. Sem isso, a tool devolve `confirmation_required`, e você deve pedir autorização ao usuário antes de repetir.
    - Macros `leitura` rodam sem confirmação adicional.
 
+## Conexão CDP dinâmica
+
+- Se o Chromium/agent-browser não estiver no `127.0.0.1:9222`, use `portas_cdp_descobrir_agent_browser(session="default")` para obter o WebSocket CDP da sessão e configurar o núcleo.
+- Para um endpoint obtido por outro meio, use `portas_cdp_configurar(url)`. O endpoint precisa ser loopback; destinos CDP remotos são recusados.
+- O mesmo endpoint é compartilhado pelas macros e pelo observador.
+
 ## Observabilidade HTTP(S) e WebSocket
 
 - `portas_trafego_iniciar(capturar_payloads=False)` começa a capturar requisições, respostas, falhas e frames WebSocket em todas as abas dos contextos CDP anexados.
