@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Iterator
 from urllib.parse import urlparse
 
-CDP_URL = os.environ.get("JARVIS_CDP_URL", "http://127.0.0.1:9222")
+CDP_URL = os.environ.get("JARVIS_CDP_URL") or os.environ.get("PORTAS_CDP_URL") or "http://127.0.0.1:9222"
 
 
 def configurar_cdp_url(url: str) -> dict[str, Any]:
