@@ -40,7 +40,8 @@ jobs:
       - name: Testes unitários das portas
         run: |
           xvfb-run -a python -m pytest tests/adapters/edge/test_portas_visualizacao.py \
-            tests/adapters/edge/test_portas_utilizacao.py -v -o addopts=""
+            tests/adapters/edge/test_portas_utilizacao.py \
+            tests/adapters/edge/test_portas_observabilidade.py -v -o addopts=""
 
   integration:
     name: Integração (Chromium via CDP)
