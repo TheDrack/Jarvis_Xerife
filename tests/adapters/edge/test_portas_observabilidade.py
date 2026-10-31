@@ -188,3 +188,22 @@ def test_cdp_endpoint_accepts_local_websocket_and_rejects_remote_hosts(monkeypat
     assert rejected["success"] is False
     assert "loopback" in rejected["error"]
     monkeypatch.setattr(portas_core, "CDP_URL", original)
+
+
+def test_request_finished_reports_duration_and_same_request_id():
+    class FakeRequest:
+        url = "https://api.example.test/camera"
+        method = "POST"
+        resource_type = "xhr"
+        post_data = None
+        headers = {}
+
+    observer = BrowserTrafficObserver()
+    request = FakeRequest()
+    observer._on_request(request)
+    request_event = observer.events()["events"][0]
+    observer._on_request_finished(request)
+    finished_event = observer.events()["events"][1]
+    assert finished_event["type"] == "http_request_finished"
+    assert finished_event["request_id"] == request_event["request_id"]
+    assert finished_event["duration_ms"] is not None
