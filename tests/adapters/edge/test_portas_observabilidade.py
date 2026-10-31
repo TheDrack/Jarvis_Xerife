@@ -178,11 +178,13 @@ def test_request_response_correlation_survives_distinct_playwright_wrappers():
     response_event = observer.events()["events"][1]
     assert response_event["request_id"] == request_event["request_id"]
 
-def test_cdp_endpoint_accepts_local_websocket_and_rejects_remote_hosts():
-    from app.adapters.edge.portas_core import configurar_cdp_url
+def test_cdp_endpoint_accepts_local_websocket_and_rejects_remote_hosts(monkeypatch):
+    from app.adapters.edge import portas_core
 
-    accepted = configurar_cdp_url("ws://127.0.0.1:56415/devtools/browser/test-id")
-    rejected = configurar_cdp_url("ws://192.168.1.10:9222/devtools/browser/test-id")
+    original = portas_core.CDP_URL
+    accepted = portas_core.configurar_cdp_url("ws://127.0.0.1:56415/devtools/browser/test-id")
+    rejected = portas_core.configurar_cdp_url("ws://192.168.1.10:9222/devtools/browser/test-id")
     assert accepted["success"] is True
     assert rejected["success"] is False
     assert "loopback" in rejected["error"]
+    monkeypatch.setattr(portas_core, "CDP_URL", original)
