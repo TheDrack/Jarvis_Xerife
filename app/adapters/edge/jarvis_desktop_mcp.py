@@ -527,6 +527,32 @@ def network_inspect_device(ip_address: str) -> dict[str, Any]:
     from app.adapters.edge.network_discovery_adapter import inspect_private_address
     return inspect_private_address(ip_address)
 
+@mcp.tool()
+def network_probe_private_device(
+    ip_address: str,
+    ports: list[int] | None = None,
+    timeout: float = 0.75,
+    protocol_checks: bool = True,
+) -> dict[str, Any]:
+    """Inspect exactly one explicitly supplied RFC1918 IPv4 host using bounded TCP checks and minimal HTTP(S)/RTSP handshakes. Sends active probes only to that host; never scans a subnet. TLS certificate validation remains enabled."""
+    from app.adapters.edge.network_protocol_inspector import inspect_private_device
+    try:
+        return inspect_private_device(
+            ip_address, ports=ports, timeout=timeout, protocol_checks=protocol_checks
+        )
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
+
+@mcp.tool()
+def network_discover_camera_protocols(timeout: float = 2.0) -> dict[str, Any]:
+    """Explicitly send bounded SSDP and ONVIF WS-Discovery UDP multicast probes on the local link. Does not scan subnets, authenticate, or open video streams. Timeout is 0.2-5 seconds per protocol."""
+    from app.adapters.edge.udp_discovery_adapter import discover_camera_protocols
+    try:
+        return discover_camera_protocols(timeout=timeout)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
+
+
 # Android navigation tools are registered additively on the same MCP server.
 # Existing desktop tool implementations and their default behavior remain unchanged.
 @mcp.tool()
