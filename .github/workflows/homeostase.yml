@@ -157,7 +157,8 @@ jobs:
           PYTHONPATH: "."
         run: |
           set -e
-          PYTEST_ARGS=(--ignore=tests/test_engine.py --ignore=tests/test_system_commands.py)
+          # Self-healing must validate the complete suite; never hide valid tests.
+          PYTEST_ARGS=()
           set +e
           uv run pytest "${PYTEST_ARGS[@]}" --json-report --json-report-file="$RUNNER_TEMP/report.json" > "$RUNNER_TEMP/pytest_log.txt" 2>&1
           PYTEST_EXIT=$?
