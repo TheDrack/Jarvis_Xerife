@@ -72,7 +72,7 @@ class EvolutionGatekeeper(NexusComponent):
 
         Campos aceitos em *context*:
             proposed_change (dict) — mudança proposta com campo "files_modified".
-            gatekeeper_override (bool) — ignora proteção do núcleo se True.
+            gatekeeper_override não é aceito; arquivos do núcleo exigem revisão fora do fluxo autônomo.
 
         Returns:
             {"approved": bool, "reason": str}
@@ -97,7 +97,7 @@ class EvolutionGatekeeper(NexusComponent):
         Args:
             proposed_change: Dicionário com campos:
                 files_modified (list[str])  — arquivos que serão modificados.
-                gatekeeper_override (bool)  — ignora proteção do núcleo.
+                gatekeeper_override (legado) — ignorado; não concede exceção.
                 capability_id (str)         — ID da capability a ser evoluída.
 
         Returns:
@@ -221,10 +221,6 @@ class EvolutionGatekeeper(NexusComponent):
 
     def _check_core_protection(self, proposed_change: Dict[str, Any]) -> Tuple[bool, str]:
         """(d) Bloqueia mudanças em arquivos do núcleo salvo com override."""
-        if proposed_change.get("gatekeeper_override"):
-            logger.info("[EvolutionGatekeeper] gatekeeper_override=True — proteção do núcleo ignorada.")
-            return True, "ok"
-
         files: List[str] = proposed_change.get("files_modified", [])
         for f in files:
             normalized = Path(f).as_posix()
@@ -235,8 +231,8 @@ class EvolutionGatekeeper(NexusComponent):
     def _check_sandbox(self, proposed_change: Dict[str, Any]) -> Tuple[bool, str]:
         """(e) Testa o código proposto em sandbox isolado via EvolutionSandbox.
 
-        Se o EvolutionSandbox não estiver disponível ou estiver desabilitado,
-        a verificação passa por padrão (fail-open para desenvolvimento local).
+        Mudanças sem código proposto seguem pelo fluxo normal. Propostas de
+        código exigem sandbox disponível e aprovação explícita; falhas são fail-closed.
         """
         proposed_code: str = proposed_change.get("proposed_code", "")
         target_file: str = proposed_change.get("target_file", "")
@@ -248,16 +244,16 @@ class EvolutionGatekeeper(NexusComponent):
         try:
             sandbox = nexus.resolve("evolution_sandbox")
             if sandbox is None:
-                logger.debug("[EvolutionGatekeeper] EvolutionSandbox indisponível — verificação pulada.")
-                return True, "ok"
+                logger.warning("[EvolutionGatekeeper] EvolutionSandbox indisponível — proposta de código bloqueada.")
+                return False, "sandbox_unavailable: code_proposal_requires_validation"
             result = sandbox.test_proposal(proposed_code, target_file)
             if result.get("passed", False):
                 return True, "ok"
             errors = "; ".join(result.get("errors", []))
             return False, f"sandbox_failed: {errors or 'tests_failed'}"
         except Exception as exc:
-            logger.warning("[EvolutionGatekeeper] Erro no EvolutionSandbox: %s — passando.", exc)
-            return True, "ok"
+            logger.warning("[EvolutionGatekeeper] Erro no EvolutionSandbox: %s — bloqueando proposta.", exc)
+            return False, f"sandbox_error: {exc}"
 
     # ------------------------------------------------------------------
     # Audit logging
