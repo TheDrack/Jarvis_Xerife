@@ -26,6 +26,9 @@ from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
 from app.core.nexus import nexus
+from app.adapters.edge.portas_visualizacao import registrar_visualizacao_portas
+from app.adapters.edge.portas_utilizacao import registrar_utilizacao_portas
+from app.adapters.edge.portas_observabilidade import registrar_observabilidade_portas
 
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -584,6 +587,20 @@ def android_press_key(keycode: str) -> dict[str, Any]:
 def android_type_text(text: str) -> dict[str, Any]:
     """Type text into the currently focused Android field; maximum 2000 characters."""
     return _android_navigation_adapter().type_text(text)
+
+
+# --- Portas de navegador (vertentes de visualização e utilização) ---
+def _portas_content(meta: dict[str, Any], png: bytes | None = None) -> list[Any]:
+    """Mesmo formato de _content, com a captura PNG da aba quando houver."""
+    blocks = _content(meta, include_frames=False)
+    if png is not None:
+        blocks.append(Image(data=png, format="png"))
+    return blocks
+
+
+registrar_visualizacao_portas(mcp, tracked_action, _portas_content)
+registrar_utilizacao_portas(mcp, tracked_action)
+registrar_observabilidade_portas(mcp, tracked_action)
 
 
 if __name__ == "__main__":

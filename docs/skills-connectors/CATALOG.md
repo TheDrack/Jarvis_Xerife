@@ -26,6 +26,7 @@
 | Android navigation | Android device/navigation workflows; read constraints and prerequisites first | [SKILL.md](../../skills/jarvis-android-navigation/SKILL.md) |
 | Context and memory | Bootstrap, reconcile, compact, deduplicate, and persist useful context across compatible runtimes | [SKILL.md](../../skills/jarvis-context-memory/SKILL.md) and [protocol](CONTEXT_MEMORY_PROTOCOL.md) |
 | Multi-agent coordination | Leader assignment, task envelopes, shared ledger, handoffs, parallel-work controls, evidence | [SKILL.md](../../skills/jarvis-multi-agent-coordination/SKILL.md) and [platform architecture](../architecture/jarvis-multi-agent-platform.md) |
+| Browser portas | Inspect/run declarative macros and observe HTTP(S)/WebSocket traffic on Chromium via local CDP, including dynamic agent-browser sessions; visualization, utilization and traffic-observer tools | [SKILL.md](../../skills/jarvis-portas-browser/SKILL.md) and [portas runbook](../PORTAS_BROWSER.md) |
 | Visual navigation | Windows desktop observation and operation through Jarvis MCP/JSONL bridge, UI Automation, templates, and verified recipes | [SKILL.md](../../skills/jarvis-visual-navigation/SKILL.md) and [visual navigation runbook](../NAVEGACAO_VISUAL.md) |
 | VIV — Verificação Inicial de Voo | Standard startup/readiness audit: re-read relevant skills, discover live connectors, inspect schemas/permissions, research failures, apply authorized fixes, test, and report evidence | [SKILL.md](../../skills/jarvis-viv/SKILL.md) and [full VIV procedure](../POS_INSTALACAO.md) |
 
@@ -47,6 +48,7 @@ A skill is portable operating guidance, not a connector or a grant of permission
 | LLM/model routing and cost | llm_router, model/gateway adapters, CostTrackerAdapter | Model availability depends on current credentials, provider status, routing configuration, and policy. Discover current providers rather than assuming a model is usable. |
 | Memory and context | Semantic/procedural/working memory components, consolidated context, vector memory and context protocol | Distinguish source code from active backend connectivity and persisted state. Never claim provider-native memory was updated without confirmation. |
 | Windows desktop / visual control | app/adapters/edge/jarvis_desktop_mcp.py, jarvis_desktop_cli.py, JSONL bridge, UI Automation and visual templates | Requires a reachable interactive Windows session and exposed tool/process bridge. Prefer accessibility/DOM, then templates, then authorized physical input. Observe and verify each action; stop on ambiguity. |
+| Browser portas and traffic observer (CDP) | app/adapters/edge/portas_core.py, portas_visualizacao.py, portas_utilizacao.py, portas_observabilidade.py, data/portas/macros/*.json | Visualização and macro utilization plus bounded in-memory HTTP(S)/WebSocket event capture across attached Chromium contexts. Payload previews are opt-in and redacted; requires Chromium CDP on localhost:9222. Not a host-wide packet capture. |
 | Remote connectivity | Preferred documented route: RDC → Aperture → Tailscale → Jarvis; private Tailscale Serve upstream | This route is installation-specific, not public access. Check actual runtime connectors, grants, Tailscale reachability, and interactive session. Direct routes are documented fallbacks, not authorization bypasses. |
 | Android workflows | Android navigation skill and Android-related repository modules/workflows | Skill presence does not prove a device is paired or reachable. Inspect live device/connector state before actions. |
 | Observability and status | Status service, structured/audit logs, Render logs and CI evidence | Logs may be partial or stale. Report timestamp, source, and limits. Avoid raw prompts, arguments, results, or secrets in logs. |
@@ -77,6 +79,7 @@ The table describes integration families in the repository/installation; it does
 - [Multi-agent platform and task protocol](../architecture/jarvis-multi-agent-platform.md)
 - [Remote access: RDC → Aperture → Tailscale → Jarvis](../ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md)
 - [Visual navigation](../NAVEGACAO_VISUAL.md)
+- [Browser portas](../PORTAS_BROWSER.md)
 - [Usage guide](../GUIA_DE_USO.md)
 - [Declarative execution plans](../architecture/declarative-execution-plans.md)
 - [Project status and roadmap](../STATUS.md)
