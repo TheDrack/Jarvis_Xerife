@@ -12,8 +12,8 @@ on:
       - "mobile/android/**"
       - ".github/workflows/android-mobile-build.yml"
 
-# PR builds need only read access. Release publication receives write access
-# in a separate trusted job below.
+# PR and build jobs are read-only. Repository writes are isolated in the
+# publication job, which never checks out or executes project code.
 permissions:
   contents: read
 
@@ -53,15 +53,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  publish-release:
-    name: Build and publish signed release APK
-    # A selected workflow_dispatch ref is not inherently trusted. Keep release
-    # signing and repository writes on the protected default branch only.
+  build-release:
+    name: Build signed release APK (trusted main only)
     if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
     needs: assemble-debug
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
+    outputs:
+      signing_configured: ${{ steps.release-signing.outputs.configured }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,12 +113,33 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: gradle --no-daemon :app:assembleRelease
-      - name: Publish release APK
+      - name: Upload signed release APK
         if: steps.release-signing.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-mobile-release-apk
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 1
+
+  publish-release:
+    name: Publish signed release APK
+    if: ${{ needs.build-release.outputs.signing_configured == 'true' && (github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') }}
+    needs: build-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download signed release APK
+        uses: actions/download-artifact@v4
+        with:
+          name: jarvis-mobile-release-apk
+          path: release-artifact
+      - name: Publish release APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp mobile/android/app/build/outputs/apk/release/app-release.apk jarvis-mobile.apk
+          cp release-artifact/app-release.apk jarvis-mobile.apk
           gh release create "mobile-build-${{ github.run_number }}" jarvis-mobile.apk \
             --title "Jarvis Mobile (build ${{ github.run_number }})" \
             --notes "APK gerado a partir de ${{ github.sha }}." \
