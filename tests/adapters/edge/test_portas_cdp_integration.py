@@ -78,21 +78,24 @@ def test_captura_da_aba_atual_devolve_png():
 
 
 def test_observer_captura_requisicoes_http_do_chromium():
+    from playwright.sync_api import sync_playwright
     from app.adapters.edge.portas_observabilidade import BrowserTrafficObserver
 
     observer = BrowserTrafficObserver()
     started = observer.start(cdp_url=CDP_URL)
     assert started["success"] is True
-    page = None
     try:
-        context = observer._contexts[0]
-        page = context.new_page()
-        page.goto(PAGE_URL)
-        page.evaluate("fetch(window.location.href)")
-        events = observer.events(limit=100)["events"]
-        assert any(event["type"] == "http_request" and event.get("host") == urlparse(PAGE_URL).hostname for event in events)
-        assert any(event["type"] == "http_response" and event.get("status") == 200 for event in events)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.connect_over_cdp(CDP_URL)
+            context = browser.contexts[0]
+            page = context.new_page()
+            try:
+                page.goto(PAGE_URL)
+                page.evaluate("fetch(window.location.href)")
+                events = observer.events(limit=100)["events"]
+                assert any(event["type"] == "http_request" and event.get("host") == urlparse(PAGE_URL).hostname for event in events)
+                assert any(event["type"] == "http_response" and event.get("status") == 200 for event in events)
+            finally:
+                page.close()
     finally:
-        if page is not None:
-            page.close()
         observer.stop()
