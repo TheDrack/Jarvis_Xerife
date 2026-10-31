@@ -103,12 +103,18 @@ class BrowserTrafficObserver:
             self._next_id += 1
             self._events.append(event)
 
+    @staticmethod
+    def _request_key(request: Any) -> int:
+        # Playwright may create a fresh Python wrapper for response.request;
+        # the underlying implementation object remains stable across wrappers.
+        return id(getattr(request, "_impl_obj", request))
+
     def _on_request(self, request: Any) -> None:
         url, host = sanitizar_url(request.url)
         with self._lock:
             request_id = self._next_request_id
             self._next_request_id += 1
-            self._request_ids[id(request)] = request_id
+            self._request_ids[self._request_key(request)] = request_id
             capture_payloads = self._capture_payloads
         fields: dict[str, Any] = {
             "request_id": request_id,
@@ -137,7 +143,7 @@ class BrowserTrafficObserver:
     def _on_response(self, response: Any) -> None:
         url, host = sanitizar_url(response.url)
         with self._lock:
-            request_id = self._request_ids.pop(id(response.request), None)
+            request_id = self._request_ids.pop(self._request_key(response.request), None)
         try:
             content_type = response.headers.get("content-type")
         except Exception:
@@ -155,7 +161,7 @@ class BrowserTrafficObserver:
     def _on_request_failed(self, request: Any) -> None:
         url, host = sanitizar_url(request.url)
         with self._lock:
-            request_id = self._request_ids.pop(id(request), None)
+            request_id = self._request_ids.pop(self._request_key(request), None)
         self._emit(
             "http_request_failed",
             request_id=request_id,
