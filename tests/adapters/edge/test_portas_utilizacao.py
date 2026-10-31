@@ -112,3 +112,22 @@ def test_https_em_dominio_allowlisted_e_aceito(monkeypatch):
     monkeypatch.setattr(portas_core, "_abrir_pagina", falsa)
     macro = _macro("leitura", [{"acao": "goto", "valor": "https://exemplo.com/"}])
     assert executar_porta(macro, {}, user_confirmed=False) == {"success": True, "saidas": {}}
+
+
+def test_seleciona_aba_visivel_em_vez_da_primeira():
+    from app.adapters.edge.portas_core import _selecionar_pagina
+
+    class Pagina:
+        def __init__(self, visibility):
+            self.visibility = visibility
+
+        def evaluate(self, script):
+            return self.visibility
+
+    hidden = Pagina("hidden")
+    visible = Pagina("visible")
+
+    class Contexto:
+        pages = [hidden, visible]
+
+    assert _selecionar_pagina(Contexto()) is visible
