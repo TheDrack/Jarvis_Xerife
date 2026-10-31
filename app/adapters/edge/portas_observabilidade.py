@@ -6,10 +6,10 @@ autenticação, corpos HTTP ou payloads WebSocket por padrão.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import threading
-import time
 from collections import deque
 from datetime import datetime, timezone
 from typing import Any
@@ -74,7 +74,7 @@ def sanitizar_payload(payload: str | bytes, enabled: bool) -> dict[str, Any]:
 
 
 class BrowserTrafficObserver:
-    """Observador singleton para todas as abas dos contextos ligados via CDP."""
+    """Observador persistente; Playwright roda em loop asyncio dedicado."""
 
     def __init__(self, max_events: int = 2000) -> None:
         self._lock = threading.RLock()
@@ -88,6 +88,10 @@ class BrowserTrafficObserver:
         self._capture_payloads = False
         self._started_at: str | None = None
         self._cdp_url = CDP_URL
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._thread: threading.Thread | None = None
+        self._startup_event: threading.Event | None = None
+        self._startup_error: str | None = None
 
     def _emit(self, event_type: str, **fields: Any) -> None:
         with self._lock:
@@ -102,50 +106,23 @@ class BrowserTrafficObserver:
 
     def _on_request(self, request: Any) -> None:
         url, host = sanitizar_url(request.url)
-        self._emit(
-            "http_request",
-            method=request.method,
-            url=url,
-            host=host,
-            resource_type=request.resource_type,
-        )
+        self._emit("http_request", method=request.method, url=url, host=host, resource_type=request.resource_type)
 
     def _on_response(self, response: Any) -> None:
         url, host = sanitizar_url(response.url)
-        self._emit(
-            "http_response",
-            url=url,
-            host=host,
-            status=response.status,
-            status_text=response.status_text,
-        )
+        self._emit("http_response", url=url, host=host, status=response.status, status_text=response.status_text)
 
     def _on_request_failed(self, request: Any) -> None:
         url, host = sanitizar_url(request.url)
-        self._emit(
-            "http_request_failed",
-            method=request.method,
-            url=url,
-            host=host,
-            failure=request.failure,
-        )
+        self._emit("http_request_failed", method=request.method, url=url, host=host, failure=request.failure)
 
     def _on_websocket(self, websocket: Any) -> None:
         url, host = sanitizar_url(websocket.url)
         self._emit("websocket_open", url=url, host=host)
-        websocket.on(
-            "framesent",
-            lambda payload: self._on_websocket_frame("sent", websocket, payload),
-        )
-        websocket.on(
-            "framereceived",
-            lambda payload: self._on_websocket_frame("received", websocket, payload),
-        )
+        websocket.on("framesent", lambda payload: self._on_websocket_frame("sent", websocket, payload))
+        websocket.on("framereceived", lambda payload: self._on_websocket_frame("received", websocket, payload))
         websocket.on("close", lambda: self._emit("websocket_close", url=url, host=host))
-        websocket.on(
-            "socketerror",
-            lambda error: self._emit("websocket_error", url=url, host=host, error=str(error)[:256]),
-        )
+        websocket.on("socketerror", lambda error: self._emit("websocket_error", url=url, host=host, error=str(error)[:256]))
 
     def _on_websocket_frame(self, direction: str, websocket: Any, payload: str | bytes) -> None:
         url, host = sanitizar_url(websocket.url)
@@ -165,6 +142,63 @@ class BrowserTrafficObserver:
             self._attached_pages.add(marker)
         page.on("websocket", self._on_websocket)
 
+    async def _connect(self, cdp_url: str) -> None:
+        from playwright.async_api import async_playwright
+
+        self._playwright = await async_playwright().start()
+        self._browser = await self._playwright.chromium.connect_over_cdp(cdp_url)
+        self._contexts = list(self._browser.contexts)
+        if not self._contexts:
+            raise RuntimeError("CDP conectado, mas nenhum BrowserContext está disponível.")
+        for context in self._contexts:
+            context.on("request", self._on_request)
+            context.on("response", self._on_response)
+            context.on("requestfailed", self._on_request_failed)
+            context.on("page", self._attach_page)
+            for page in context.pages:
+                self._attach_page(page)
+        with self._lock:
+            self._active = True
+            self._started_at = datetime.now(timezone.utc).isoformat()
+
+    async def _shutdown(self) -> None:
+        playwright = self._playwright
+        self._playwright = None
+        self._browser = None
+        self._contexts = []
+        with self._lock:
+            self._active = False
+            self._attached_pages.clear()
+        if playwright is not None:
+            await playwright.stop()
+
+    def _run_loop(self, cdp_url: str) -> None:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        self._loop = loop
+        try:
+            loop.run_until_complete(self._connect(cdp_url))
+        except Exception as exc:
+            self._startup_error = f"{type(exc).__name__}: {exc}"
+            try:
+                loop.run_until_complete(self._shutdown())
+            except Exception:
+                pass
+            if self._startup_event is not None:
+                self._startup_event.set()
+            loop.close()
+            return
+        if self._startup_event is not None:
+            self._startup_event.set()
+        try:
+            loop.run_forever()
+        finally:
+            try:
+                loop.run_until_complete(self._shutdown())
+            except Exception:
+                pass
+            loop.close()
+
     def start(self, *, cdp_url: str = CDP_URL, capture_payloads: bool = False, max_events: int = 2000) -> dict[str, Any]:
         with self._lock:
             if self._active:
@@ -173,55 +207,34 @@ class BrowserTrafficObserver:
             self._events = deque(maxlen=max(100, min(int(max_events), 10000)))
             self._next_id = 1
             self._cdp_url = cdp_url
+            self._startup_error = None
+            self._startup_event = threading.Event()
+            startup_event = self._startup_event
+            self._thread = threading.Thread(target=self._run_loop, args=(cdp_url,), name="jarvis-browser-traffic", daemon=True)
+            thread = self._thread
+            thread.start()
 
-        try:
-            from playwright.sync_api import sync_playwright
-
-            playwright = sync_playwright().start()
-            browser = playwright.chromium.connect_over_cdp(cdp_url)
-            contexts = list(browser.contexts)
-            if not contexts:
-                playwright.stop()
-                return {"success": False, "error": "CDP conectado, mas nenhum BrowserContext está disponível."}
-
-            for context in contexts:
-                context.on("request", self._on_request)
-                context.on("response", self._on_response)
-                context.on("requestfailed", self._on_request_failed)
-                context.on("page", self._attach_page)
-                for page in context.pages:
-                    self._attach_page(page)
-
-            with self._lock:
-                self._playwright = playwright
-                self._browser = browser
-                self._contexts = contexts
-                self._active = True
-                self._started_at = datetime.now(timezone.utc).isoformat()
-            return self.status()
-        except Exception as exc:
-            try:
-                if "playwright" in locals():
-                    playwright.stop()
-            except Exception:
-                pass
-            return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+        if not startup_event.wait(timeout=20):
+            return {"success": False, "error": "Timeout conectando ao Chromium via CDP (20s)."}
+        if self._startup_error:
+            return {"success": False, "error": self._startup_error}
+        return self.status()
 
     def stop(self) -> dict[str, Any]:
         with self._lock:
             if not self._active:
                 return {"success": True, "active": False, "events_buffered": len(self._events)}
-            playwright = self._playwright
-            self._active = False
-            self._playwright = None
-            self._browser = None
-            self._contexts = []
-            self._attached_pages.clear()
+            loop = self._loop
+            thread = self._thread
+        if loop is None or thread is None:
+            return {"success": False, "error": "loop de observabilidade indisponível"}
         try:
-            if playwright is not None:
-                playwright.stop()
+            future = asyncio.run_coroutine_threadsafe(self._shutdown(), loop)
+            future.result(timeout=10)
+            loop.call_soon_threadsafe(loop.stop)
+            thread.join(timeout=10)
         except Exception as exc:
-            return {"success": False, "active": False, "error": f"{type(exc).__name__}: {exc}"}
+            return {"success": False, "active": self._active, "error": f"{type(exc).__name__}: {exc}"}
         return {"success": True, "active": False, "events_buffered": len(self._events)}
 
     def status(self) -> dict[str, Any]:
@@ -259,7 +272,6 @@ class BrowserTrafficObserver:
             removed = len(self._events)
             self._events.clear()
             return {"success": True, "cleared": removed}
-
 
 observer = BrowserTrafficObserver()
 
