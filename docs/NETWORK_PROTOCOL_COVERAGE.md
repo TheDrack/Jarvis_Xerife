@@ -19,9 +19,9 @@ This matrix distinguishes an existing library, a working transport, device disco
 | RTP / RTCP | Pending | Requires observing negotiated media flows and parsing media/control packets. |
 | SSDP / UPnP | Integrated in this branch | UDP multicast M-SEARCH, bounded 0.2-5 s collection, metadata parser and deduplication. No automatic access to LOCATION or authentication. |
 | ONVIF / WS-Discovery | Integrated in this branch | SOAP multicast probe for NetworkVideoTransmitter and XML parser rejecting DTD / ENTITY. SSDP and ONVIF are separate protocols. |
-| MQTT / MQTT-TLS | Partial | Existing publish/subscribe adapter. The new inspector identifies ports 1883 / 8883 only; no MQTT handshake or topic inspection yet. |
+| MQTT / MQTT-TLS | Partial; minimal CONNECT/CONNACK probe added | `network_probe_mqtt` sends one unauthenticated MQTT 3.1.1 clean-session CONNECT, reads CONNACK, then sends DISCONNECT. TLS on 8883 uses default certificate validation. No credentials, PUBLISH, SUBSCRIBE, or topic payload inspection. |
 | DNS | Partial | Reverse DNS lookup exists; no comprehensive DNS telemetry. |
-| mDNS | Pending | No mDNS observer is integrated. |
+| mDNS / DNS-SD | Partial; PTR discovery added | `network_discover_mdns` sends one bounded PTR query for `_services._dns-sd._udp.local` and parses bounded DNS-SD PTR answers. It does not resolve/fetch advertised endpoints or capture general DNS traffic. |
 | ARP | Integrated, passive | Reads the OS neighbor cache. Inactive devices may not appear. |
 | ICMP | Pending as observability | No integrated ICMP telemetry has been verified. |
 | IPv4 | Partial | Passive ARP and RFC1918 IPv4 host inspection. |
@@ -39,6 +39,14 @@ Accepts exactly one explicitly supplied RFC1918 IPv4 address. The default TCP po
 
 An open port is evidence only that a TCP socket accepted a connection. HTTP, HTTPS, or RTSP is confirmed only when its minimal protocol response is compatible.
 
+### `network_probe_mqtt`
+
+Accepts one RFC1918 IPv4 host and port 1883 or 8883. Sends one MQTT 3.1.1 CONNECT with a random client ID and clean-session flag, reads CONNACK, then sends DISCONNECT. No username/password, PUBLISH, SUBSCRIBE, or topic access. Port 8883 uses TLS with standard certificate verification. This creates a brief broker connection and should be invoked only on an explicitly selected host.
+
+### `network_discover_mdns
+
+Sends one mDNS DNS-SD PTR query to `224.0.0.251:5353`, with a bounded response window. It parses PTR service announcements only and does not resolve or fetch endpoints.
+
 ### `network_discover_camera_protocols`
 
 Explicitly sends one SSDP M-SEARCH and one ONVIF WS-Discovery SOAP Probe to the local-link multicast group `239.255.255.250`, ports 1900 and 3702 respectively. Collection timeout is limited to 0.2-5 seconds per protocol. It parses response metadata only; it does not fetch device descriptions, authenticate, or open media streams. It requires the Jarvis MCP process to be on the same local link as the devices.
@@ -46,7 +54,7 @@ Explicitly sends one SSDP M-SEARCH and one ONVIF WS-Discovery SOAP Probe to the 
 ## Next integrations
 
 1. Validate SSDP and ONVIF discovery against actual cameras, including explicit interface selection and multiple network adapters.
-2. Add mDNS and DNS observability without storing sensitive payloads.
+2. Validate mDNS discovery on a real local link and add bounded DNS observability without storing sensitive payloads.
 3. Add MQTT connection-state and session metrics without recording payloads or credentials by default.
 4. Integrate ETW / WFP and optional Npcap for Windows process and packet visibility.
 5. Treat IPv6 / NDP, QUIC / HTTP/3, WebRTC, RTP / RTCP and IPC as independent modules.

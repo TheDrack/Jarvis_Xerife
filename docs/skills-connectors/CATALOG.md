@@ -98,3 +98,5 @@ The table describes integration families in the repository/installation; it does
 ## Mandatory first-use verification: VIV
 
 The catalog bootstrap is only the discovery stage. Every agent must also execute the [Verificação Inicial de Vôo (VIV)](../POS_INSTALACAO.md) on first use of an installation and after material environment/connector changes. Inventory and safely test live tools/capabilities, record evidence and explicit states, research each material failure, implement fixes with regression tests, rerun focused and full tests, and report unresolved/unavailable items. Never infer access from catalog presence, never disable valid tests, and do not mutate production without explicit authorization.
+
+- **Network protocol inspection:** `network_probe_private_device` performs bounded single-host TCP/HTTP/HTTPS/RTSP inspection; `network_probe_mqtt` validates MQTT CONNECT/CONNACK without credentials or topic access; `network_discover_mdns` and `network_discover_camera_protocols` perform local-link DNS-SD, SSDP, and ONVIF discovery. These are explicit active probes, not passive host-wide monitoring.

@@ -553,6 +553,25 @@ def network_discover_camera_protocols(timeout: float = 2.0) -> dict[str, Any]:
         return {"success": False, "error": str(exc)}
 
 
+@mcp.tool()
+def network_probe_mqtt(ip_address: str, port: int = 1883, timeout: float = 1.0) -> dict[str, Any]:
+    """Perform one unauthenticated MQTT 3.1.1 CONNECT/CONNACK check against one RFC1918 host; no publish/subscribe."""
+    from app.adapters.edge.mqtt_protocol_probe import probe_mqtt
+    try:
+        return probe_mqtt(ip_address, port=port, timeout=timeout)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
+
+
+@mcp.tool()
+def network_discover_mdns(timeout: float = 2.0, service: str = "_services._dns-sd._udp.local") -> dict[str, Any]:
+    """Send one bounded mDNS DNS-SD PTR query on the local IPv4 link; does not access advertised endpoints."""
+    from app.adapters.edge.mdns_discovery_adapter import discover_mdns
+    try:
+        return discover_mdns(timeout=timeout, service=service)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
+
 # Android navigation tools are registered additively on the same MCP server.
 # Existing desktop tool implementations and their default behavior remain unchanged.
 @mcp.tool()
