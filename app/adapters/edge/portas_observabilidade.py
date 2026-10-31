@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from app.adapters.edge.portas_core import CDP_URL
+from app.adapters.edge import portas_core
 
 
 _REDACT_KEYS = re.compile(r"(pass(word)?|token|secret|auth|cookie|api.?key|credential|session)", re.I)
@@ -86,7 +86,7 @@ class BrowserTrafficObserver:
         self._active = False
         self._capture_payloads = False
         self._started_at: str | None = None
-        self._cdp_url = CDP_URL
+        self._cdp_url = portas_core.CDP_URL
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._startup_event: threading.Event | None = None
@@ -254,13 +254,14 @@ class BrowserTrafficObserver:
                 pass
             loop.close()
 
-    def start(self, *, cdp_url: str = CDP_URL, capture_payloads: bool = False, max_events: int = 2000) -> dict[str, Any]:
+    def start(self, *, cdp_url: str | None = None, capture_payloads: bool = False, max_events: int = 2000) -> dict[str, Any]:
         with self._lock:
             if self._active:
                 return self.status()
             self._capture_payloads = bool(capture_payloads)
             self._events = deque(maxlen=max(100, min(int(max_events), 10000)))
             self._next_id = 1
+            cdp_url = cdp_url or portas_core.CDP_URL
             self._cdp_url = cdp_url
             self._startup_error = None
             self._startup_event = threading.Event()
@@ -333,6 +334,45 @@ observer = BrowserTrafficObserver()
 
 def registrar_observabilidade_portas(mcp: Any, tracked_action: Any) -> None:
     """Registra as ferramentas de controle e consulta do observador."""
+
+    @mcp.tool()
+    @tracked_action("Configurando endpoint CDP do Chromium")
+    def portas_cdp_configurar(url: str) -> dict[str, Any]:
+        """Define endpoint CDP local (localhost); aceita ws:// dinâmico do agent-browser."""
+        return portas_core.configurar_cdp_url(url)
+
+    @mcp.tool()
+    @tracked_action("Descobrindo endpoint CDP do agent-browser")
+    def portas_cdp_descobrir_agent_browser(session: str = "default") -> dict[str, Any]:
+        """Obtém o endpoint CDP de uma sessão agent-browser e configura o núcleo."""
+        import re
+        import shutil
+        import subprocess
+
+        executable = shutil.which("agent-browser")
+        if not executable:
+            return {"success": False, "error": "agent-browser não está no PATH do processo MCP."}
+        if not session or not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", session):
+            return {"success": False, "error": "Nome de sessão inválido."}
+        try:
+            completed = subprocess.run(
+                [executable, "--session", session, "get", "cdp-url"],
+                capture_output=True,
+                text=True,
+                timeout=12,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+        match = re.search(r"wss?://127\.0\.0\.1:\d+/[^\s]+|https?://(?:127\.0\.0\.1|localhost):\d+", completed.stdout)
+        if completed.returncode != 0 or not match:
+            return {
+                "success": False,
+                "error": "Não foi possível obter endpoint CDP local.",
+                "detail": completed.stderr[-500:],
+            }
+        configured = portas_core.configurar_cdp_url(match.group(0))
+        return {**configured, "session": session, "source": "agent-browser"}
 
     @mcp.tool()
     @tracked_action("Iniciando observabilidade do navegador")
