@@ -43,7 +43,7 @@ An open port is evidence only that a TCP socket accepted a connection. HTTP, HTT
 
 Accepts one RFC1918 IPv4 host and port 1883 or 8883. Sends one MQTT 3.1.1 CONNECT with a random client ID and clean-session flag, reads CONNACK, then sends DISCONNECT. No username/password, PUBLISH, SUBSCRIBE, or topic access. Port 8883 uses TLS with standard certificate verification. This creates a brief broker connection and should be invoked only on an explicitly selected host.
 
-### `network_discover_mdns
+### `network_discover_mdns`
 
 Sends one mDNS DNS-SD PTR query to `224.0.0.251:5353`, with a bounded response window. It parses PTR service announcements only and does not resolve or fetch endpoints.
 
