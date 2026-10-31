@@ -1,5 +1,3 @@
-[Reading 202 lines from start (total: 202 lines, 0 remaining)]
-
 """Teste de integração das portas contra um Chromium real via CDP.
 
 Só roda quando PORTAS_CDP_URL e PORTAS_TEST_URL estão definidos (ver
