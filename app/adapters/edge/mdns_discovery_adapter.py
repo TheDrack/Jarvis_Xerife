@@ -1,4 +1,4 @@
-﻿"""Bounded mDNS DNS-SD service discovery on the local IPv4 link."""
+"""Bounded mDNS DNS-SD service discovery on the local IPv4 link."""
 from __future__ import annotations
 import ipaddress, socket, struct, time
 from typing import Any
