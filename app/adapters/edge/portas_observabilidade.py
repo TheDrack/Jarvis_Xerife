@@ -53,11 +53,8 @@ def _redact_json(value: Any) -> Any:
 def sanitizar_payload(payload: str | bytes, enabled: bool) -> dict[str, Any]:
     """Retorna metadados por padrão; com opt-in, devolve preview limitado e redigido."""
     if isinstance(payload, bytes):
-        result: dict[str, Any] = {"kind": "binary", "bytes": len(payload)}
-        if enabled:
-            result["preview_hex"] = payload[:128].hex()
-            result["truncated"] = len(payload) > 128
-        return result
+        # Binary payloads remain metadata-only even with text preview enabled.
+        return {"kind": "binary", "bytes": len(payload)}
 
     raw = str(payload)
     result = {"kind": "text", "characters": len(raw)}
@@ -80,6 +77,8 @@ class BrowserTrafficObserver:
         self._lock = threading.RLock()
         self._events: deque[dict[str, Any]] = deque(maxlen=max_events)
         self._next_id = 1
+        self._next_request_id = 1
+        self._request_ids: dict[int, int] = {}
         self._playwright: Any = None
         self._browser: Any = None
         self._contexts: list[Any] = []
@@ -106,15 +105,65 @@ class BrowserTrafficObserver:
 
     def _on_request(self, request: Any) -> None:
         url, host = sanitizar_url(request.url)
-        self._emit("http_request", method=request.method, url=url, host=host, resource_type=request.resource_type)
+        with self._lock:
+            request_id = self._next_request_id
+            self._next_request_id += 1
+            self._request_ids[id(request)] = request_id
+            capture_payloads = self._capture_payloads
+        fields: dict[str, Any] = {
+            "request_id": request_id,
+            "method": request.method,
+            "url": url,
+            "host": host,
+            "resource_type": request.resource_type,
+        }
+        if capture_payloads:
+            try:
+                post_data = request.post_data
+                if post_data is not None:
+                    fields["request_payload"] = sanitizar_payload(post_data, True)
+            except Exception:
+                fields["request_payload"] = {"unavailable": True}
+            try:
+                headers = request.headers
+                safe_names = {"content-type", "accept", "x-requested-with"}
+                fields["safe_headers"] = {
+                    key.lower(): value for key, value in headers.items() if key.lower() in safe_names
+                }
+            except Exception:
+                fields["safe_headers"] = {}
+        self._emit("http_request", **fields)
 
     def _on_response(self, response: Any) -> None:
         url, host = sanitizar_url(response.url)
-        self._emit("http_response", url=url, host=host, status=response.status, status_text=response.status_text)
+        with self._lock:
+            request_id = self._request_ids.pop(id(response.request), None)
+        try:
+            content_type = response.headers.get("content-type")
+        except Exception:
+            content_type = None
+        self._emit(
+            "http_response",
+            request_id=request_id,
+            url=url,
+            host=host,
+            status=response.status,
+            status_text=response.status_text,
+            content_type=content_type,
+        )
 
     def _on_request_failed(self, request: Any) -> None:
         url, host = sanitizar_url(request.url)
-        self._emit("http_request_failed", method=request.method, url=url, host=host, failure=request.failure)
+        with self._lock:
+            request_id = self._request_ids.pop(id(request), None)
+        self._emit(
+            "http_request_failed",
+            request_id=request_id,
+            method=request.method,
+            url=url,
+            host=host,
+            failure=request.failure,
+        )
 
     def _on_websocket(self, websocket: Any) -> None:
         url, host = sanitizar_url(websocket.url)
