@@ -13,6 +13,7 @@ PyAutoGUI>=0.9.54
 opencv-python>=4.8.0
 Pillow>=10.0.0
 mcp>=1.26,<2
+playwright>=1.50,<2
 pywinauto>=0.6.9
 pynput>=1.7.6
 pyperclip>=1.8.2
