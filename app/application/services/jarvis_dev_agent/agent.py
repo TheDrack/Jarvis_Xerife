@@ -381,9 +381,9 @@ class JarvisDevAgent(NexusComponent):
         try:
             gatekeeper = nexus.resolve("evolution_gatekeeper")
             if gatekeeper is None:
-                # Sem gatekeeper = aprovação automática (modo desenvolvimento)
-                logger.debug("[JarvisDevAgent] Gatekeeper indisponível — aprovação automática.")
-                return {"approved": True, "reason": "no_gatekeeper"}
+                # Autoevolução de código nunca pode contornar o Gatekeeper.
+                logger.error("[JarvisDevAgent] Gatekeeper indisponível — bloqueando proposta.")
+                return {"approved": False, "reason": "gatekeeper_unavailable"}
             proposed_change = {"files_modified": [], "proposed_code": code, "cap_id": cap_id}
             approved, reason = gatekeeper.approve_evolution(proposed_change)
             return {"approved": approved, "reason": reason}

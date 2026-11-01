@@ -72,7 +72,7 @@ class EvolutionGatekeeper(NexusComponent):
 
         Campos aceitos em *context*:
             proposed_change (dict) — mudança proposta com campo "files_modified".
-            gatekeeper_override (bool) — ignora proteção do núcleo se True.
+            gatekeeper_override não é aceito; arquivos do núcleo exigem revisão fora do fluxo autônomo.
 
         Returns:
             {"approved": bool, "reason": str}
@@ -97,7 +97,7 @@ class EvolutionGatekeeper(NexusComponent):
         Args:
             proposed_change: Dicionário com campos:
                 files_modified (list[str])  — arquivos que serão modificados.
-                gatekeeper_override (bool)  — ignora proteção do núcleo.
+                gatekeeper_override (legado) — ignorado; não concede exceção.
                 capability_id (str)         — ID da capability a ser evoluída.
 
         Returns:
@@ -148,7 +148,7 @@ class EvolutionGatekeeper(NexusComponent):
     # ------------------------------------------------------------------
 
     def _check_test_count(self) -> Tuple[bool, str]:
-        """(a) Verifica se o número de testes coletados não regrediu."""
+        """Bloqueia a evolução quando a coleta de testes não é comprovadamente válida."""
         try:
             result = subprocess.run(
                 [sys.executable, "-m", "pytest", "--co", "-q", "--tb=no"],
@@ -156,35 +156,46 @@ class EvolutionGatekeeper(NexusComponent):
                 text=True,
                 timeout=60,
             )
-            output = result.stdout + result.stderr
-            count = _parse_test_count(output)
-            logger.info("[EvolutionGatekeeper] Testes coletados: %d", count)
-
-            if self._last_test_count is None:
-                # Primeira execução: registra baseline
-                self._last_test_count = count
-                if self.min_test_count > 0 and count < self.min_test_count:
-                    return False, f"test_count_below_minimum: {count} < {self.min_test_count}"
-                return True, "ok"
-
-            if count < self._last_test_count:
-                return (
-                    False,
-                    f"test_regression: {count} testes < {self._last_test_count} (ciclo anterior)",
-                )
-
-            self._last_test_count = count
-            return True, "ok"
-
         except subprocess.TimeoutExpired:
-            logger.warning("[EvolutionGatekeeper] Timeout ao coletar testes — permitindo por precaução.")
-            return True, "ok"
+            logger.warning("[EvolutionGatekeeper] Timeout ao coletar testes — bloqueando proposta.")
+            return False, "test_collection_timeout"
         except FileNotFoundError:
-            logger.warning("[EvolutionGatekeeper] pytest não encontrado — pulando verificação.")
-            return True, "ok"
+            logger.warning("[EvolutionGatekeeper] pytest não encontrado — bloqueando proposta.")
+            return False, "test_collection_unavailable"
         except Exception as exc:
-            logger.warning("[EvolutionGatekeeper] Erro ao verificar testes: %s — permitindo.", exc)
-            return True, "ok"
+            logger.exception("[EvolutionGatekeeper] Falha ao coletar testes — bloqueando proposta.")
+            return False, f"test_collection_error: {type(exc).__name__}"
+
+        return_code = getattr(result, "returncode", None)
+        if return_code != 0:
+            logger.warning(
+                "[EvolutionGatekeeper] Coleta de testes terminou com código %r — bloqueando proposta.",
+                return_code,
+            )
+            return False, f"test_collection_failed: pytest_exit_code={return_code}"
+
+        output = f"{result.stdout or ''}\n{result.stderr or ''}"
+        count = _parse_test_count(output)
+        if count <= 0:
+            logger.warning(
+                "[EvolutionGatekeeper] Pytest não informou uma contagem positiva de testes — bloqueando proposta."
+            )
+            return False, "test_collection_unrecognized_or_empty"
+
+        logger.info("[EvolutionGatekeeper] Testes coletados: %d", count)
+
+        if self.min_test_count > 0 and count < self.min_test_count:
+            return False, f"test_count_below_minimum: {count} < {self.min_test_count}"
+
+        if self._last_test_count is not None and count < self._last_test_count:
+            return (
+                False,
+                f"test_regression: {count} testes < {self._last_test_count} (ciclo anterior)",
+            )
+
+        # Só atualiza o baseline depois de uma coleta bem-sucedida e reconhecida.
+        self._last_test_count = count
+        return True, "ok"
 
     def _check_recent_stability(self) -> Tuple[bool, str]:
         """(b) Verifica se não houve rollback nos últimos N ciclos."""
@@ -221,10 +232,6 @@ class EvolutionGatekeeper(NexusComponent):
 
     def _check_core_protection(self, proposed_change: Dict[str, Any]) -> Tuple[bool, str]:
         """(d) Bloqueia mudanças em arquivos do núcleo salvo com override."""
-        if proposed_change.get("gatekeeper_override"):
-            logger.info("[EvolutionGatekeeper] gatekeeper_override=True — proteção do núcleo ignorada.")
-            return True, "ok"
-
         files: List[str] = proposed_change.get("files_modified", [])
         for f in files:
             normalized = Path(f).as_posix()
@@ -235,8 +242,8 @@ class EvolutionGatekeeper(NexusComponent):
     def _check_sandbox(self, proposed_change: Dict[str, Any]) -> Tuple[bool, str]:
         """(e) Testa o código proposto em sandbox isolado via EvolutionSandbox.
 
-        Se o EvolutionSandbox não estiver disponível ou estiver desabilitado,
-        a verificação passa por padrão (fail-open para desenvolvimento local).
+        Mudanças sem código proposto seguem pelo fluxo normal. Propostas de
+        código exigem sandbox disponível e aprovação explícita; falhas são fail-closed.
         """
         proposed_code: str = proposed_change.get("proposed_code", "")
         target_file: str = proposed_change.get("target_file", "")
@@ -248,16 +255,16 @@ class EvolutionGatekeeper(NexusComponent):
         try:
             sandbox = nexus.resolve("evolution_sandbox")
             if sandbox is None:
-                logger.debug("[EvolutionGatekeeper] EvolutionSandbox indisponível — verificação pulada.")
-                return True, "ok"
+                logger.warning("[EvolutionGatekeeper] EvolutionSandbox indisponível — proposta de código bloqueada.")
+                return False, "sandbox_unavailable: code_proposal_requires_validation"
             result = sandbox.test_proposal(proposed_code, target_file)
             if result.get("passed", False):
                 return True, "ok"
             errors = "; ".join(result.get("errors", []))
             return False, f"sandbox_failed: {errors or 'tests_failed'}"
         except Exception as exc:
-            logger.warning("[EvolutionGatekeeper] Erro no EvolutionSandbox: %s — passando.", exc)
-            return True, "ok"
+            logger.warning("[EvolutionGatekeeper] Erro no EvolutionSandbox: %s — bloqueando proposta.", exc)
+            return False, f"sandbox_error: {exc}"
 
     # ------------------------------------------------------------------
     # Audit logging

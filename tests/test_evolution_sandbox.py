@@ -38,19 +38,19 @@ class TestEvolutionSandboxInit:
 
 
 class TestSandboxDisabled:
-    def test_disabled_sandbox_always_passes(self, sandbox):
-        """Quando SANDBOX_ENABLED=false, deve retornar passed=True sem executar testes."""
+    def test_disabled_sandbox_reports_not_validated(self, sandbox):
+        """Sandbox desabilitado nunca pode declarar uma proposta como validada."""
         sandbox.configure({"enabled": False})
         result = sandbox.test_proposal("def invalid(:", "")
-        assert result["passed"] is True
+        assert result["passed"] is False
         assert result["test_output"] == "sandbox_disabled"
-        assert result["errors"] == []
+        assert result["errors"]
 
-    def test_execute_with_disabled_sandbox(self, sandbox):
-        """execute() com sandbox desabilitado retorna success=True."""
+    def test_execute_with_disabled_sandbox_reports_failure(self, sandbox):
+        """execute() com sandbox desabilitado informa que a proposta não foi validada."""
         sandbox.configure({"enabled": False})
         result = sandbox.execute({"proposal_code": "def x(): pass"})
-        assert result["success"] is True
+        assert result["success"] is False
 
 
 class TestSandboxSyntaxValidation:
