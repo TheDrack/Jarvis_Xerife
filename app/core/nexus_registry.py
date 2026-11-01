@@ -6,6 +6,7 @@ Mixed into JarvisNexus so the registry logic lives in its own file while
 still having access to the instance attributes ``_cache``, ``_mutated``,
 ``base_dir`` and ``gist_id`` that JarvisNexus defines in ``__init__``.
 """
+import json
 import logging
 import os
 import time
@@ -24,25 +25,48 @@ class _NexusRegistryMixin:
     # Local registry helpers
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _normalise_registry(data: dict) -> Dict[str, str]:
+        """Convert stored module.Class paths to importable module paths."""
+        components = data.get("components", {}) if isinstance(data, dict) else {}
+        if not isinstance(components, dict):
+            return {}
+
+        result: Dict[str, str] = {}
+        for component_id, path in components.items():
+            if not isinstance(component_id, str) or not isinstance(path, str):
+                continue
+            parts = path.rsplit(".", 1)
+            if len(parts) == 2 and parts[1] and parts[1][0].isupper():
+                result[component_id] = parts[0]
+            else:
+                result[component_id] = path
+        return result
+
     def _load_local_registry(self) -> Dict[str, str]:
-        """Read nexus_registry.jrvs; if missing locally, try Supabase Storage as fallback."""
+        """Load the local JRVS registry, falling back to its human-readable JSON source."""
         registry_path = os.path.join(self.base_dir, "data", "nexus_registry.jrvs")
         try:
-            data = _jrvs_read(registry_path)
-            result: Dict[str, str] = {}
-            for component_id, path in data.get("components", {}).items():
-                parts = path.rsplit(".", 1)
-                if len(parts) == 2 and parts[1] and parts[1][0].isupper():
-                    result[component_id] = parts[0]
-                else:
-                    result[component_id] = path
-            return result
+            return self._normalise_registry(_jrvs_read(registry_path))
         except (FileNotFoundError, JrvsDecodeError, OSError):
             pass
 
-        # --- Supabase fallback: download registry from cloud if local file missing ---
+        # The JSON file is the versioned source of truth. A clean portable
+        # checkout may not have the generated/ignored .jrvs mirror and may not
+        # have access to Supabase Storage; do not force filesystem-wide Nexus
+        # discovery when the local JSON registry is already available.
+        json_path = os.path.join(self.base_dir, "data", "nexus_registry.json")
         try:
-            # CORREÇÃO: Silencia o aviso do NexusComponent já que esta instanciação 
+            with open(json_path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            logger.info("[NEXUS] JRVS registry unavailable; using local JSON registry.")
+            return self._normalise_registry(data)
+        except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError):
+            pass
+
+        # --- Supabase fallback: download registry from cloud if both local files are missing ---
+        try:
+            # CORREÇÃO: Silencia o aviso do NexusComponent já que esta instanciação
             # direta é intencional durante o boot do Nexus (evita loop circular).
             nexus_context.resolving = True
             try:
@@ -57,15 +81,7 @@ class _NexusRegistryMixin:
                 with open(registry_path, "wb") as fh:
                     fh.write(raw)
                 logger.info("[NEXUS] nexus_registry.jrvs restaurado do Supabase Storage.")
-                data = _jrvs_read(registry_path)
-                result = {}
-                for component_id, path in data.get("components", {}).items():
-                    parts = path.rsplit(".", 1)
-                    if len(parts) == 2 and parts[1] and parts[1][0].isupper():
-                        result[component_id] = parts[0]
-                    else:
-                        result[component_id] = path
-                return result
+                return self._normalise_registry(_jrvs_read(registry_path))
         except Exception as exc:
             logger.debug("[NEXUS] Supabase fallback indisponível: %s", exc)
 
