@@ -36,6 +36,7 @@ def test_installer_build_only_checks_out_the_selected_sha_without_persisting_cre
     assert checkouts[0]["with"]["ref"] == "${{ github.sha }}"
     assert checkouts[0]["with"]["persist-credentials"] == "false"
     assert "secrets." not in str(build)
+    assert "GITHUB_TOKEN" not in str(build)
 
 
 def test_build_is_limited_to_main_or_versioned_release_tags():
@@ -60,18 +61,30 @@ def test_release_tag_must_be_reachable_from_main():
     assert "git merge-base --is-ancestor" in verification["run"]
 
 
-def test_release_publication_is_separate_and_does_not_execute_project_code():
+def test_release_publication_is_separate_and_token_is_scoped_to_release_action():
     workflow = _load_workflow()
     publish = workflow["jobs"]["publish-release"]
+    steps = _steps(publish)
 
     assert publish["needs"] == "build-windows"
     assert "startsWith(github.ref, 'refs/tags/v')" in publish["if"]
     assert not any(
         step.get("uses", "").startswith("actions/checkout@")
-        for step in _steps(publish)
+        for step in steps
     )
     assert any(
         step.get("uses", "").startswith("actions/download-artifact@")
-        for step in _steps(publish)
+        for step in steps
     )
-    assert "contents" not in str(publish.get("env", {}))
+
+    release_steps = [
+        step for step in steps
+        if step.get("uses", "").startswith("softprops/action-gh-release@")
+    ]
+    assert len(release_steps) == 1
+    assert release_steps[0]["env"]["GITHUB_TOKEN"] == "${{ github.token }}"
+    assert all(
+        "GITHUB_TOKEN" not in str(step)
+        for step in steps
+        if step is not release_steps[0]
+    )
