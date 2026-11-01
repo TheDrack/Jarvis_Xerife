@@ -76,9 +76,16 @@ def redact_server_header(value: str) -> str:
 def parse_arp_addresses(content: str, network: ipaddress.IPv4Network) -> set[str]:
     """Extract valid host addresses from localized arp -a output."""
     found: set[str] = set()
-    for value in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", content):
+    mac_pattern = re.compile(r"(?i)\\b[0-9a-f]{2}(?:[:-][0-9a-f]{2}){5}\\b")
+    for line in content.splitlines():
+        # Ignore ARP interface headers and other lines that do not describe a neighbor.
+        if not mac_pattern.search(line):
+            continue
+        match = re.search(r"\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b", line)
+        if not match:
+            continue
         try:
-            address = ipaddress.ip_address(value)
+            address = ipaddress.ip_address(match.group(0))
         except ValueError:
             continue
         if isinstance(address, ipaddress.IPv4Address) and address in network and address not in {
