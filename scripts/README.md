@@ -417,3 +417,8 @@ export GOOGLE_API_KEY="your-key"
 ## License
 
 Part of the Jarvis Assistant project. See [LICENSE](../LICENSE) for details.
+
+
+### network_inventory/lan_inventory.py
+
+Bounded, opt-in workstation LAN inventory. Run from the repository root with `python -m scripts.network_inventory.lan_inventory` or pass an explicit RFC1918 subnet using `--network`. Reports stay outside the checkout by default in `%USERPROFILE%\JarvisNetworkTools\reports`. Scope, probe limits, privacy behavior, and safety constraints: [LAN inventory utility](../docs/LAN_INVENTORY_TOOL.md).

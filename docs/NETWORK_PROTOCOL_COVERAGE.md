@@ -67,3 +67,8 @@ Explicitly sends one SSDP M-SEARCH and one ONVIF WS-Discovery SOAP Probe to the 
 - Multicast discovery is an active local-link operation and is invoked only by its dedicated MCP tool.
 - Encrypted traffic is not treated as readable without authorized endpoint instrumentation.
 - The CDP observer is not a host-wide packet sensor.
+
+
+## Workstation subnet inventory utility
+
+The standalone CLI at `scripts/network_inventory/lan_inventory.py` provides explicitly invoked ICMP + ARP-cache + bounded TCP inventory for one RFC1918 IPv4 subnet (maximum 1,024 addresses). It is separate from the passive cloud-safe discovery API and is not exposed as an MCP/HTTP endpoint. It does not authenticate or modify devices. HTTP inspection retains only a status line and sanitized Server header; JSON/CSV reports are written outside the repository by default. See [LAN inventory utility](LAN_INVENTORY_TOOL.md).
