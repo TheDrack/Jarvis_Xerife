@@ -5,9 +5,10 @@ intentionally imported only by the opt-in Host profile.
 """
 from __future__ import annotations
 
+import heapq
 import platform
 import socket
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 
 from app.domain.ports.host_port import (
@@ -77,30 +78,26 @@ class PsutilHostAdapter(HostPort):
             disks=tuple(disks),
         )
 
-    def list_processes(self, limit: int = 50) -> Sequence[ProcessInfo]:
-        limit = self.validate_process_limit(limit)
-        results: list[ProcessInfo] = []
-
+    def _iter_process_info(self) -> Iterator[ProcessInfo]:
+        """Yield readable process snapshots without retaining the full process table."""
         for process in self._psutil.process_iter(
             attrs=["pid", "name", "status", "memory_info", "create_time"]
         ):
             try:
                 info = process.info
-                results.append(
-                    ProcessInfo(
-                        pid=int(info["pid"]),
-                        name=str(info.get("name") or "unknown"),
-                        status=str(info.get("status") or "unknown"),
-                        cpu_percent=float(process.cpu_percent(interval=None)),
-                        memory_rss_bytes=int(
-                            getattr(info.get("memory_info"), "rss", 0) or 0
-                        ),
-                        created_at_epoch=(
-                            float(info["create_time"])
-                            if info.get("create_time") is not None
-                            else None
-                        ),
-                    )
+                yield ProcessInfo(
+                    pid=int(info["pid"]),
+                    name=str(info.get("name") or "unknown"),
+                    status=str(info.get("status") or "unknown"),
+                    cpu_percent=float(process.cpu_percent(interval=None)),
+                    memory_rss_bytes=int(
+                        getattr(info.get("memory_info"), "rss", 0) or 0
+                    ),
+                    created_at_epoch=(
+                        float(info["create_time"])
+                        if info.get("create_time") is not None
+                        else None
+                    ),
                 )
             except (
                 self._psutil.NoSuchProcess,
@@ -109,8 +106,21 @@ class PsutilHostAdapter(HostPort):
             ):
                 continue
 
-        results.sort(
-            key=lambda item: (item.cpu_percent, item.memory_rss_bytes),
-            reverse=True,
+    def list_processes(self, limit: int = 50) -> Sequence[ProcessInfo]:
+        """Return top-N processes using O(limit) intermediate memory.
+
+        The process table still has to be traversed to identify the true top-N,
+        but the adapter no longer builds and sorts a list containing every
+        process on the host.
+        """
+        limit = self.validate_process_limit(limit)
+        ranked = heapq.nlargest(
+            limit,
+            enumerate(self._iter_process_info()),
+            key=lambda entry: (
+                entry[1].cpu_percent,
+                entry[1].memory_rss_bytes,
+                -entry[0],
+            ),
         )
-        return tuple(results[:limit])
+        return tuple(process for _, process in ranked)
