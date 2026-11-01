@@ -1,8 +1,13 @@
+import asyncio
 import ipaddress
+
 import pytest
 
+from scripts.network_inventory import lan_inventory
 from scripts.network_inventory.lan_inventory import (
-    parse_arp_addresses, redact_server_header, validate_network,
+    parse_arp_addresses,
+    redact_server_header,
+    validate_network,
 )
 
 
@@ -43,6 +48,90 @@ def test_server_header_redacts_serial_number():
 
 
 def test_probe_profile_is_bounded():
-    from scripts.network_inventory import lan_inventory
     assert len(lan_inventory.PORTS) <= 16
     assert lan_inventory.MAX_ADDRESSES == 1024
+
+
+class _FakePingProcess:
+    def __init__(self, semaphore, *, finish_immediately=False):
+        self.returncode = None
+        self.kill_called = False
+        self.reaped = False
+        self.semaphore_held_during_reap = None
+        self.wait_started = asyncio.Event()
+        self._finished = asyncio.Event()
+        self._semaphore = semaphore
+        if finish_immediately:
+            self._finished.set()
+
+    async def wait(self):
+        self.wait_started.set()
+        await self._finished.wait()
+        self.semaphore_held_during_reap = self._semaphore.locked()
+        self.returncode = -9 if self.kill_called else 0
+        self.reaped = True
+        return self.returncode
+
+    def kill(self):
+        self.kill_called = True
+        self._finished.set()
+
+
+@pytest.mark.parametrize("cancel_task", [False, True], ids=["timeout", "cancellation"])
+def test_ping_host_kills_and_reaps_child_before_releasing_semaphore(
+    monkeypatch, cancel_task
+):
+    async def scenario():
+        semaphore = asyncio.Semaphore(1)
+        process = _FakePingProcess(semaphore)
+
+        async def create_subprocess_exec(*args, **kwargs):
+            return process
+
+        monkeypatch.setattr(
+            lan_inventory.asyncio,
+            "create_subprocess_exec",
+            create_subprocess_exec,
+        )
+        monkeypatch.setattr(lan_inventory, "PING_TIMEOUT", 0.01)
+
+        task = asyncio.create_task(lan_inventory.ping_host("192.168.1.10", semaphore))
+        await asyncio.wait_for(process.wait_started.wait(), timeout=1)
+
+        if cancel_task:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            assert await task is False
+
+        assert process.kill_called
+        assert process.reaped
+        assert process.returncode == -9
+        assert process.semaphore_held_during_reap is True
+        assert semaphore.locked() is False
+
+    asyncio.run(scenario())
+
+
+def test_ping_host_does_not_kill_a_child_that_exited_normally(monkeypatch):
+    async def scenario():
+        semaphore = asyncio.Semaphore(1)
+        process = _FakePingProcess(semaphore, finish_immediately=True)
+
+        async def create_subprocess_exec(*args, **kwargs):
+            return process
+
+        monkeypatch.setattr(
+            lan_inventory.asyncio,
+            "create_subprocess_exec",
+            create_subprocess_exec,
+        )
+
+        assert await lan_inventory.ping_host("192.168.1.10", semaphore) is True
+        assert process.reaped
+        assert process.returncode == 0
+        assert process.kill_called is False
+        assert semaphore.locked() is False
+
+    asyncio.run(scenario())
