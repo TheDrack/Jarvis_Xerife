@@ -149,9 +149,9 @@ jobs:
           fi
 
           # Execução do motor de evolução (EvolutionOrchestrator via Nexus)
-          if ! python scripts/evolve_all_pending.py \\
-            --cap-id "$CAP_ID" \\
-            --max-attempts 3 \\
+          if ! python scripts/evolve_all_pending.py \
+            --cap-id "$CAP_ID" \
+            --max-attempts 3 \
             --roadmap-context "$(cat mission_context.txt)"; then
               echo "❌ Falha crítica no motor de evolução ($CAP_ID)."
               exit 1
@@ -167,9 +167,9 @@ jobs:
             git push origin "$BRANCH_NAME"
 
             echo "📢 Criando Pull Request..."
-            PR_URL=$(gh pr create \\
-                         --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \\
-                         --body "### 🧠 Evolução JARVIS\n**Missão:** ${{ steps.flow.outputs.mission_desc }}\n\n*Aguardando validação da Homeostase.*" \\
+            PR_URL=$(gh pr create \
+                         --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
+                         --body "### 🧠 Evolução JARVIS\n**Missão:** ${{ steps.flow.outputs.mission_desc }}\n\n*Aguardando validação da Homeostase.*" \
                          --base main --head "$BRANCH_NAME")
 
             echo "pr_number=$(echo $PR_URL | awk -F'/' '{print $6}')" >> $GITHUB_OUTPUT
