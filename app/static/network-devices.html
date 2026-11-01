@@ -106,8 +106,8 @@ main{max-width:1500px;margin:auto;padding:22px clamp(14px,3vw,36px) 48px}.notice
    const stateLabel=i.operational_status||'unknown';
    const stateClass=stateLabel==='up'?'online':stateLabel==='down'?'offline':'unknown';
    const scopeLabel=i.scope||'unknown';
-   const speed=i.speed_mbps?' | '+i.speed_mbps+' Mbps':'';
-   const mtu=i.mtu?' | MTU '+i.mtu:'';
+   const speed=i.speed_mbps&&i.scope!=='overlay'?' | '+i.speed_mbps+' Mbps':'';
+   const mtu=i.mtu&&i.scope!=='overlay'?' | MTU '+i.mtu:'';
    return '<div class="row-item"><div class="main"><b>'+esc(i.interface)+'</b><div class="meta mono">'+esc(i.address)+' | '+esc(i.network||'rede nao informada')+'</div><div class="meta">'+esc(i.netmask||'mascara nao informada')+esc(speed)+esc(mtu)+'</div></div><div class="actions"><span class="pill '+stateClass+'">'+esc(stateLabel)+'</span><span class="pill '+(scopeLabel==='private'?'online':'unknown')+'">'+esc(scopeLabel)+'</span></div></div>';
   }).join(''):empty('Nenhuma interface IPv4 retornada pelo host da API.');
  }

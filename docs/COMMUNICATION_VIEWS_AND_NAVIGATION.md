@@ -7,7 +7,7 @@ The authenticated route `/network-devices` is the Jarvis operational view for re
 ## Views
 
 - **Overview:** registered device counts, heartbeat state, interface count, current API session and latest environment observations.
-- **Interfaces:** IPv4 interface addresses, network masks, operational state, speed and MTU reported by the host running the API. Scope distinguishes RFC1918 private, link-local, CGNAT/overlay and public addresses. In cloud deployments this is the cloud host/container, not the user's LAN.
+- **Interfaces:** IPv4 interface addresses, network masks, operational state, speed and MTU reported by the host running the API. Scope distinguishes RFC1918 private, link-local, CGNAT/overlay and public addresses. Synthetic speed/MTU values from overlay interfaces are not presented as physical link metrics. In cloud deployments this is the cloud host/container, not the user's LAN.
 - **Devices:** authenticated inventory with search, type/status filters, sort order, last known IP, network type and capabilities.
 - **Cameras:** quick navigation to camera-classified inventory entries. HTTP(S) preview URLs may be displayed only when they contain no embedded credentials. RTSP endpoints are not embedded in browser previews.
 - **Discovery:** passive ARP cache, explicit SSDP/ONVIF multicast discovery and explicit mDNS DNS-SD PTR query.

@@ -83,3 +83,8 @@ def test_interface_view_reports_optional_dependency_unavailability():
     html = DASHBOARD.read_text(encoding="utf-8")
     assert "data.success===false" in html
     assert "Inventario de interfaces indisponivel" in html
+
+
+def test_dashboard_does_not_present_virtual_overlay_metrics_as_physical_link_speed():
+    html = DASHBOARD.read_text(encoding="utf-8")
+    assert "i.scope!=='overlay'" in html
