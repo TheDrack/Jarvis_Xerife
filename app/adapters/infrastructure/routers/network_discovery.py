@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StrictInt
 
 from app.adapters.infrastructure.api_models import User
 from app.application.services.network_discovery_service import discover_passive_neighbors
@@ -10,7 +10,7 @@ from app.application.services.network_discovery_service import discover_passive_
 
 class DeviceInspectionRequest(BaseModel):
     ip_address: str = Field(..., min_length=7, max_length=45)
-    ports: list[int] | None = Field(default=None, min_length=1, max_length=32)
+    ports: list[StrictInt] | None = Field(default=None, min_length=1, max_length=32)
     timeout: float = Field(default=0.75, ge=0.2, le=3.0)
     protocol_checks: bool = True
 

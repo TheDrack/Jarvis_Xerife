@@ -165,3 +165,11 @@ def test_network_views_require_the_injected_user_dependency():
     client = TestClient(app)
     assert client.get("/v1/network/interfaces").status_code == 401
     assert client.get("/v1/network/interfaces", headers={"Authorization": "Bearer test-token"}).status_code == 200
+
+
+def test_device_inspection_rejects_boolean_port_values():
+    response = _client().post(
+        "/v1/network/device/inspect",
+        json={"ip_address": "192.168.1.20", "ports": [80, True]},
+    )
+    assert response.status_code == 422
