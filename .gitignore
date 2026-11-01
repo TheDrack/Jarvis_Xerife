@@ -123,3 +123,5 @@ issue_url.txt
 # Removemos o ignore para permitir que a auto-evolução seja commitada
 !.github/metabolism_logs/
 !.github/metabolism_markers/
+
+.venv-host/
