@@ -88,3 +88,10 @@ def test_interface_view_reports_optional_dependency_unavailability():
 def test_dashboard_does_not_present_virtual_overlay_metrics_as_physical_link_speed():
     html = DASHBOARD.read_text(encoding="utf-8")
     assert "i.scope!=='overlay'" in html
+
+
+def test_dashboard_uses_server_freshness_and_does_not_assume_token_is_valid():
+    html = DASHBOARD.read_text(encoding="utf-8")
+    assert "o.freshness!=='fresh'" in html
+    assert "state.apiReady?'API autenticada'" in html
+    assert "Token presente / API nao confirmada" in html
