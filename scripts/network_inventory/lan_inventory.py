@@ -99,6 +99,7 @@ async def ping_host(address: str, semaphore: asyncio.Semaphore) -> bool:
     async with semaphore:
         command = (["ping", "-n", "1", "-w", "500", address] if platform.system().lower() == "windows"
                    else ["ping", "-c", "1", "-W", "1", address])
+        process = None
         try:
             process = await asyncio.create_subprocess_exec(
                 *command, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL
@@ -106,6 +107,17 @@ async def ping_host(address: str, semaphore: asyncio.Semaphore) -> bool:
             return await asyncio.wait_for(process.wait(), timeout=PING_TIMEOUT) == 0
         except (OSError, asyncio.TimeoutError):
             return False
+        finally:
+            # wait_for() cancels the wait coroutine on timeout, not the child process.
+            # Reap the child before releasing the semaphore so timed-out and cancelled
+            # probes cannot escape the inventory's concurrency accounting.
+            if process is not None and process.returncode is None:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    # The process may have exited between the returncode check and kill.
+                    pass
+                await process.wait()
 
 
 async def probe_port(address: str, port: int, semaphore: asyncio.Semaphore) -> bool:
