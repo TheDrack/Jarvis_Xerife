@@ -229,6 +229,8 @@ python -c "from app.adapters.infrastructure.docker_sandbox import DockerSandbox;
 - → Veja [docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md](docs/skills-connectors/CONTEXT_MEMORY_PROTOCOL.md) para o protocolo de inicialização e consolidação de memória das IAs.
 - → Veja [docs/STATUS.md](docs/STATUS.md) para status detalhado
 - → Veja [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para arquitetura completa
+- → Veja [docs/architecture/JARVIS_OS_HARNESS.md](docs/architecture/JARVIS_OS_HARNESS.md) para a arquitetura do harness e do Jarvis OS.
+- → Veja [docs/JARVIS_OS_FOUNDATION.md](docs/JARVIS_OS_FOUNDATION.md) para o plano de implementação JOF 0.1.
 - → Veja [docs/NEXUS.md](docs/NEXUS.md) para documentação do Nexus DI
 - → Veja [docs/CURIOSITY_PROTOCOL.md](docs/CURIOSITY_PROTOCOL.md) para transformar descobertas em oportunidades verificáveis.
 - → A saudação de reencontro usa `reconnection_briefing` para resumir descobertas, PRs e testes com status verificado.
