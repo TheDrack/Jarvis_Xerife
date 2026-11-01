@@ -1,4 +1,4 @@
-﻿"""Portable host contracts.
+"""Portable host contracts.
 
 The portable Harness depends on these abstractions, never on OS-specific APIs.
 """
