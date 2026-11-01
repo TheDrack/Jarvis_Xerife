@@ -6,6 +6,19 @@ from enum import Enum
 from typing import Any, Mapping
 
 
+def _normalize_string_tuple(values: Any, field_name: str) -> tuple[str, ...]:
+    """Normalize model requirement labels without splitting scalar strings."""
+    if isinstance(values, (str, bytes)):
+        raise TypeError(f"{field_name} must be an iterable of strings, not a string")
+    try:
+        normalized = tuple(values)
+    except TypeError as exc:
+        raise TypeError(f"{field_name} must be an iterable of strings") from exc
+    if any(not isinstance(item, str) or not item.strip() for item in normalized):
+        raise ValueError(f"{field_name} must contain only non-empty strings")
+    return normalized
+
+
 class TaskStatus(str, Enum):
     PROPOSED = "proposed"
     READY = "ready"
@@ -89,6 +102,19 @@ class TaskSpec:
             raise ValueError("deadline_seconds must be positive")
         if self.risk_level not in {"low", "medium", "high", "critical"}:
             raise ValueError("risk_level must be low, medium, high, or critical")
+
+        object.__setattr__(
+            self,
+            "required_model_capabilities",
+            _normalize_string_tuple(
+                self.required_model_capabilities, "required_model_capabilities"
+            ),
+        )
+        object.__setattr__(
+            self,
+            "required_modalities",
+            _normalize_string_tuple(self.required_modalities, "required_modalities"),
+        )
 
 
 @dataclass(frozen=True)
