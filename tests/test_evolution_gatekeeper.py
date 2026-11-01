@@ -14,48 +14,90 @@ from app.application.services.evolution_gatekeeper import (
 
 
 class TestEvolutionGatekeeperTestCount:
-    """Testa verificação (a): contagem de testes."""
+    """A coleta de testes só aprova quando o resultado é verificável."""
 
-    def test_approves_when_count_stable(self):
-        """Deve aprovar quando a contagem de testes não regrediu."""
+    @staticmethod
+    def _result(stdout="350 tests collected\\n", stderr="", returncode=0):
+        result = MagicMock()
+        result.stdout = stdout
+        result.stderr = stderr
+        result.returncode = returncode
+        return result
+
+    def test_approves_when_count_is_stable(self):
         gk = EvolutionGatekeeper()
-        # Simula retorno do pytest --co -q
-        mock_result = MagicMock()
-        mock_result.stdout = "350 tests collected\n"
-        mock_result.stderr = ""
-
-        with patch("subprocess.run", return_value=mock_result):
+        with patch("subprocess.run", return_value=self._result()):
             ok, reason = gk._check_test_count()
-        assert ok is True
+        assert (ok, reason) == (True, "ok")
         assert gk._last_test_count == 350
 
-    def test_blocks_when_count_regresses(self):
-        """Deve bloquear quando a contagem de testes regrediu."""
+    def test_blocks_when_count_regresses_without_overwriting_baseline(self):
         gk = EvolutionGatekeeper()
         gk._last_test_count = 350
-
-        mock_result = MagicMock()
-        mock_result.stdout = "300 tests collected\n"
-        mock_result.stderr = ""
-
-        with patch("subprocess.run", return_value=mock_result):
+        with patch("subprocess.run", return_value=self._result("300 tests collected\\n")):
             ok, reason = gk._check_test_count()
         assert ok is False
         assert "test_regression" in reason
+        assert gk._last_test_count == 350
 
-    def test_approves_on_pytest_not_found(self):
-        """Deve permitir se pytest não está instalado."""
+    def test_blocks_when_pytest_is_not_found(self):
         gk = EvolutionGatekeeper()
         with patch("subprocess.run", side_effect=FileNotFoundError):
             ok, reason = gk._check_test_count()
-        assert ok is True
+        assert ok is False
+        assert reason == "test_collection_unavailable"
+        assert gk._last_test_count is None
 
-    def test_approves_on_timeout(self):
-        """Deve permitir em caso de timeout."""
+    def test_blocks_on_collection_timeout(self):
         gk = EvolutionGatekeeper()
         with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("pytest", 60)):
             ok, reason = gk._check_test_count()
-        assert ok is True
+        assert ok is False
+        assert reason == "test_collection_timeout"
+        assert gk._last_test_count is None
+
+    def test_blocks_when_pytest_returns_nonzero_even_with_a_count(self):
+        gk = EvolutionGatekeeper()
+        result = self._result("350 tests collected\\n", "collection error", 1)
+        with patch("subprocess.run", return_value=result):
+            ok, reason = gk._check_test_count()
+        assert ok is False
+        assert reason == "test_collection_failed: pytest_exit_code=1"
+        assert gk._last_test_count is None
+
+    def test_blocks_when_collection_output_has_no_recognized_count(self):
+        gk = EvolutionGatekeeper()
+        result = self._result("pytest: internal collection error\\n")
+        with patch("subprocess.run", return_value=result):
+            ok, reason = gk._check_test_count()
+        assert ok is False
+        assert reason == "test_collection_unrecognized_or_empty"
+        assert gk._last_test_count is None
+
+    def test_blocks_when_collection_reports_zero_tests(self):
+        gk = EvolutionGatekeeper()
+        result = self._result("0 tests collected\\n")
+        with patch("subprocess.run", return_value=result):
+            ok, reason = gk._check_test_count()
+        assert ok is False
+        assert reason == "test_collection_unrecognized_or_empty"
+        assert gk._last_test_count is None
+
+    def test_blocks_when_collection_raises_unexpected_error(self):
+        gk = EvolutionGatekeeper()
+        with patch("subprocess.run", side_effect=RuntimeError("runner unavailable")):
+            ok, reason = gk._check_test_count()
+        assert ok is False
+        assert reason == "test_collection_error: RuntimeError"
+        assert gk._last_test_count is None
+
+    def test_blocks_when_count_is_below_configured_minimum(self):
+        gk = EvolutionGatekeeper(min_test_count=400)
+        with patch("subprocess.run", return_value=self._result("350 tests collected\\n")):
+            ok, reason = gk._check_test_count()
+        assert ok is False
+        assert reason == "test_count_below_minimum: 350 < 400"
+        assert gk._last_test_count is None
 
 
 class TestEvolutionGatekeeperFrozenFiles:
@@ -178,6 +220,7 @@ class TestEvolutionGatekeeperFullFlow:
         mock_result = MagicMock()
         mock_result.stdout = "400 tests collected\n"
         mock_result.stderr = ""
+        mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result), \
              patch("app.application.services.evolution_gatekeeper.nexus") as mock_nexus:
@@ -199,6 +242,7 @@ class TestEvolutionGatekeeperFullFlow:
         mock_result = MagicMock()
         mock_result.stdout = "400 tests collected\n"
         mock_result.stderr = ""
+        mock_result.returncode = 0
 
         mock_reward_provider = MagicMock()
         mock_reward_provider.calculate_reward.return_value = 0.9
@@ -228,6 +272,7 @@ class TestEvolutionGatekeeperFullFlow:
         mock_result = MagicMock()
         mock_result.stdout = "400 tests collected\n"
         mock_result.stderr = ""
+        mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result), \
              patch("app.application.services.evolution_gatekeeper.nexus") as mock_nexus:
@@ -244,6 +289,7 @@ class TestEvolutionGatekeeperFullFlow:
         mock_result = MagicMock()
         mock_result.stdout = "300 tests collected\n"
         mock_result.stderr = ""
+        mock_result.returncode = 0
 
         with patch("subprocess.run", return_value=mock_result), \
              patch("app.application.services.evolution_gatekeeper.nexus") as mock_nexus:
