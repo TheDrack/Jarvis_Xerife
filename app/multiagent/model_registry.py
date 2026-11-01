@@ -6,7 +6,9 @@ provider SDK. Credentials and transport clients stay inside provider adapters.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import isfinite
 from threading import RLock
+from types import MappingProxyType
 from typing import Iterable, Mapping
 
 
@@ -33,20 +35,53 @@ class ModelProfile:
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{field_name} must be a non-empty string")
+
+        if not isinstance(self.available, bool):
+            raise TypeError("available must be a bool")
+        if isinstance(self.max_concurrency, bool) or not isinstance(self.max_concurrency, int):
+            raise TypeError("max_concurrency must be an integer")
         if self.max_concurrency < 1:
             raise ValueError("max_concurrency must be >= 1")
+
         for field_name in ("context_window", "max_output_tokens"):
             value = getattr(self, field_name)
-            if value is not None and value < 1:
-                raise ValueError(f"{field_name} must be positive when provided")
+            if value is not None:
+                if isinstance(value, bool) or not isinstance(value, int):
+                    raise TypeError(f"{field_name} must be an integer when provided")
+                if value < 1:
+                    raise ValueError(f"{field_name} must be positive when provided")
+
         for field_name in ("estimated_cost_per_1k_tokens", "estimated_latency_ms"):
             value = getattr(self, field_name)
-            if value is not None and value < 0:
-                raise ValueError(f"{field_name} must be non-negative when provided")
+            if value is not None:
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    raise TypeError(f"{field_name} must be numeric when provided")
+                if not isfinite(value) or value < 0:
+                    raise ValueError(f"{field_name} must be finite and non-negative")
+
+        for field_name in ("capabilities", "modalities"):
+            values = getattr(self, field_name)
+            try:
+                normalized = frozenset(values)
+            except TypeError as exc:
+                raise TypeError(f"{field_name} must be an iterable of strings") from exc
+            if any(not isinstance(item, str) or not item.strip() for item in normalized):
+                raise ValueError(f"{field_name} must contain only non-empty strings")
+            object.__setattr__(self, field_name, normalized)
+
         if not self.modalities:
             raise ValueError("at least one modality must be declared")
-        if any(not item.strip() for item in self.capabilities | self.modalities):
-            raise ValueError("capabilities and modalities must contain non-empty values")
+
+        if not isinstance(self.metadata, Mapping):
+            raise TypeError("metadata must be a mapping of strings to strings")
+        metadata = dict(self.metadata)
+        if any(
+            not isinstance(key, str) or not key.strip()
+            or not isinstance(value, str)
+            for key, value in metadata.items()
+        ):
+            raise ValueError("metadata keys and values must be strings; keys cannot be empty")
+        object.__setattr__(self, "metadata", MappingProxyType(metadata))
 
 
 class ModelRegistry:
@@ -61,6 +96,8 @@ class ModelRegistry:
     def register(self, profile: ModelProfile, *, replace: bool = False) -> None:
         if not isinstance(profile, ModelProfile):
             raise TypeError("profile must be a ModelProfile")
+        if not isinstance(replace, bool):
+            raise TypeError("replace must be a bool")
         with self._lock:
             if profile.model_id in self._profiles and not replace:
                 raise ValueError(f"model already registered: {profile.model_id}")
@@ -87,12 +124,15 @@ class ModelRegistry:
     ) -> tuple[ModelProfile, ...]:
         """Return available profiles satisfying declared task requirements.
 
-        An empty provider_ids value means no provider restriction. Selection
-        among eligible profiles (cost/latency/load policy) belongs to scheduler.
+        An omitted or empty provider_ids value means no provider restriction.
+        Selection among eligible profiles (cost/latency/load policy) belongs
+        to the scheduler.
         """
         capabilities = frozenset(required_capabilities)
         modalities = frozenset(required_modalities)
         providers = None if provider_ids is None else frozenset(provider_ids)
+        if not providers:
+            providers = None
         with self._lock:
             candidates = tuple(self._profiles.values())
         return tuple(
