@@ -528,49 +528,14 @@ def network_inspect_device(ip_address: str) -> dict[str, Any]:
     return inspect_private_address(ip_address)
 
 @mcp.tool()
-def network_probe_private_device(
-    ip_address: str,
-    ports: list[int] | None = None,
-    timeout: float = 0.75,
-    protocol_checks: bool = True,
-) -> dict[str, Any]:
-    """Inspect exactly one explicitly supplied RFC1918 IPv4 host using bounded TCP checks and minimal HTTP(S)/RTSP handshakes. Sends active probes only to that host; never scans a subnet. TLS certificate validation remains enabled."""
-    from app.adapters.edge.network_protocol_inspector import inspect_private_device
-    try:
-        return inspect_private_device(
-            ip_address, ports=ports, timeout=timeout, protocol_checks=protocol_checks
-        )
-    except ValueError as exc:
-        return {"success": False, "error": str(exc)}
+def network_capture_etw(duration_seconds: int = 10, keywords: str = "0xFFFFFFFFFFFFFFFF") -> dict[str, Any]:
+    """Capture bounded Windows TCP/IP ETW metadata; no packet payloads are captured.
 
-@mcp.tool()
-def network_discover_camera_protocols(timeout: float = 2.0) -> dict[str, Any]:
-    """Explicitly send bounded SSDP and ONVIF WS-Discovery UDP multicast probes on the local link. Does not scan subnets, authenticate, or open video streams. Timeout is 0.2-5 seconds per protocol."""
-    from app.adapters.edge.udp_discovery_adapter import discover_camera_protocols
-    try:
-        return discover_camera_protocols(timeout=timeout)
-    except ValueError as exc:
-        return {"success": False, "error": str(exc)}
-
-
-@mcp.tool()
-def network_probe_mqtt(ip_address: str, port: int = 1883, timeout: float = 1.0) -> dict[str, Any]:
-    """Perform one unauthenticated MQTT 3.1.1 CONNECT/CONNACK check against one RFC1918 host; no publish/subscribe."""
-    from app.adapters.edge.mqtt_protocol_probe import probe_mqtt
-    try:
-        return probe_mqtt(ip_address, port=port, timeout=timeout)
-    except ValueError as exc:
-        return {"success": False, "error": str(exc)}
-
-
-@mcp.tool()
-def network_discover_mdns(timeout: float = 2.0, service: str = "_services._dns-sd._udp.local") -> dict[str, Any]:
-    """Send one bounded mDNS DNS-SD PTR query on the local IPv4 link; does not access advertised endpoints."""
-    from app.adapters.edge.mdns_discovery_adapter import discover_mdns
-    try:
-        return discover_mdns(timeout=timeout, service=service)
-    except ValueError as exc:
-        return {"success": False, "error": str(exc)}
+    Use on demand for diagnostics. Duration is limited to 1-60 seconds. The broad
+    default keyword mask maximizes event coverage; consumers decide what to retain.
+    """
+    from app.adapters.edge.windows_etw_network_adapter import capture_tcpip_events
+    return capture_tcpip_events(duration_seconds=duration_seconds, keywords=keywords)
 
 # Android navigation tools are registered additively on the same MCP server.
 # Existing desktop tool implementations and their default behavior remain unchanged.
@@ -652,5 +617,4 @@ if __name__ == "__main__":
     if _HTTP_TRANSPORT not in {"stdio", "streamable-http"}:
         raise SystemExit("JARVIS_DESKTOP_TRANSPORT deve ser stdio ou streamable-http.")
     mcp.run(transport=_HTTP_TRANSPORT)
-
 
