@@ -12,6 +12,19 @@ from types import MappingProxyType
 from typing import Iterable, Mapping
 
 
+def _normalize_string_set(values: Iterable[str], field_name: str) -> frozenset[str]:
+    """Normalize a collection of labels without treating one string as many labels."""
+    if isinstance(values, (str, bytes)):
+        raise TypeError(f"{field_name} must be an iterable of strings, not a string")
+    try:
+        normalized = frozenset(values)
+    except TypeError as exc:
+        raise TypeError(f"{field_name} must be an iterable of strings") from exc
+    if any(not isinstance(item, str) or not item.strip() for item in normalized):
+        raise ValueError(f"{field_name} must contain only non-empty strings")
+    return normalized
+
+
 @dataclass(frozen=True)
 class ModelProfile:
     """Public capability and operational metadata for one model/runtime."""
@@ -60,13 +73,7 @@ class ModelProfile:
                     raise ValueError(f"{field_name} must be finite and non-negative")
 
         for field_name in ("capabilities", "modalities"):
-            values = getattr(self, field_name)
-            try:
-                normalized = frozenset(values)
-            except TypeError as exc:
-                raise TypeError(f"{field_name} must be an iterable of strings") from exc
-            if any(not isinstance(item, str) or not item.strip() for item in normalized):
-                raise ValueError(f"{field_name} must contain only non-empty strings")
+            normalized = _normalize_string_set(getattr(self, field_name), field_name)
             object.__setattr__(self, field_name, normalized)
 
         if not self.modalities:
@@ -128,9 +135,15 @@ class ModelRegistry:
         Selection among eligible profiles (cost/latency/load policy) belongs
         to the scheduler.
         """
-        capabilities = frozenset(required_capabilities)
-        modalities = frozenset(required_modalities)
-        providers = None if provider_ids is None else frozenset(provider_ids)
+        capabilities = _normalize_string_set(
+            required_capabilities, "required_capabilities"
+        )
+        modalities = _normalize_string_set(required_modalities, "required_modalities")
+        providers = (
+            None
+            if provider_ids is None
+            else _normalize_string_set(provider_ids, "provider_ids")
+        )
         if not providers:
             providers = None
         with self._lock:

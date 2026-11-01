@@ -6,6 +6,19 @@ from enum import Enum
 from typing import Any, Mapping
 
 
+def _normalize_string_tuple(values: Any, field_name: str) -> tuple[str, ...]:
+    """Normalize label collections without treating scalar strings as iterables."""
+    if isinstance(values, (str, bytes)):
+        raise TypeError(f"{field_name} must be an iterable of strings, not a string")
+    try:
+        normalized = tuple(values)
+    except TypeError as exc:
+        raise TypeError(f"{field_name} must be an iterable of strings") from exc
+    if any(not isinstance(item, str) or not item.strip() for item in normalized):
+        raise ValueError(f"{field_name} must contain only non-empty strings")
+    return normalized
+
+
 class TaskStatus(str, Enum):
     PROPOSED = "proposed"
     READY = "ready"
@@ -55,6 +68,11 @@ class AgentProfile:
             raise ValueError("success rates must be between 0 and 1")
         if not isinstance(self.model_provider, str) or not self.model_provider.strip():
             raise ValueError("model_provider must be a non-empty string")
+        object.__setattr__(
+            self,
+            "available_tools",
+            _normalize_string_tuple(self.available_tools, "available_tools"),
+        )
 
 
 @dataclass(frozen=True)
@@ -89,6 +107,19 @@ class TaskSpec:
             raise ValueError("deadline_seconds must be positive")
         if self.risk_level not in {"low", "medium", "high", "critical"}:
             raise ValueError("risk_level must be low, medium, high, or critical")
+
+        for field_name in (
+            "required_tools",
+            "constraints",
+            "acceptance_criteria",
+            "required_model_capabilities",
+            "required_modalities",
+        ):
+            object.__setattr__(
+                self,
+                field_name,
+                _normalize_string_tuple(getattr(self, field_name), field_name),
+            )
 
 
 @dataclass(frozen=True)
