@@ -3,21 +3,36 @@ name: 🖥️ Build and Release Jarvis Installer
 on:
   workflow_dispatch:
 
+# Building project code never needs repository write permissions.
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  actions: write
+  contents: read
 
 jobs:
   build-windows:
+    name: Build Windows installer (trusted main or release tag)
+    if: ${{ github.event_name == 'workflow_dispatch' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
     runs-on: windows-latest
+    permissions:
+      contents: read
 
     steps:
-      - name: 🛰️ Checkout code
+      - name: 🛰️ Checkout selected trusted ref
         uses: actions/checkout@v5
         with:
-          token: ${{ github.token }}
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify release tag belongs to main history
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git merge-base --is-ancestor $env:GITHUB_SHA refs/remotes/origin/main
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Release tags must point to a commit reachable from main."
+            exit 1
+          }
 
       - name: 📦 Set up uv
         uses: astral-sh/setup-uv@v7
@@ -28,83 +43,71 @@ jobs:
         run: uv python install 3.13
 
       - name: 🔧 Install dependencies
+        shell: pwsh
         run: |
           uv venv
-          # Dependências explícitas + projeto
           uv pip install pyinstaller bcrypt==4.0.1 passlib[bcrypt]==1.7.4
           if (Test-Path "requirements.txt") { uv pip install -r requirements.txt }
-        shell: pwsh
 
-      - name: 🔍 Verificar estrutura do projeto
+      - name: 🔍 Verify project structure
+        shell: pwsh
         run: |
           Write-Host "📁 Workspace: $(Get-Location)"
-          Write-Host "Verificando arquivos esperados..."
           if (Test-Path "app/runtime/pipeline_runner.py") {
-            Write-Host "[OK] pipeline_runner.py encontrado."
+            Write-Host "[OK] pipeline_runner.py found."
           } else {
-            Write-Host "[ERROR] pipeline_runner.py não encontrado em app/runtime/"
-            ls -Recurse
+            Write-Error "pipeline_runner.py not found in app/runtime/"
             exit 1
           }
-          if (Test-Path "main.py") {
-            Write-Host "[OK] main.py encontrado na raiz."
-          } else {
-            Write-Host "[WARN] main.py não encontrado na raiz; o pipeline pode ser o ponto de entrada esperado."
-          }
-        shell: pwsh
 
-      # 🔑 AQUI entra o mesmo padrão do pipeline funcional
-      - name: 🧠 Run JARVIS Pipeline (Build Installer)
+      - name: 🧠 Run JARVIS installer pipeline
         env:
           PIPELINE: build_installer
           PIPELINE_STRICT: "true"
-
+        shell: pwsh
         run: |
-          Write-Host "📁 Workspace: $(Get-Location)"
-          Write-Host "🐍 Python:"
-          uv run python --version
-          Write-Host "🧠 Pipeline selecionado: $env:PIPELINE"
-
-          # Garante que o pacote 'app' é resolvível
           $env:PYTHONPATH = "$(Get-Location)"
+          uv run python app/runtime/pipeline_runner.py
 
-          $PIPELINE_RUNNER = "app/runtime/pipeline_runner.py"
-
-          if (Test-Path $PIPELINE_RUNNER) {
-            Write-Host "🚀 Executando pipeline JARVIS..."
-            uv run python $PIPELINE_RUNNER
-            Write-Host "✅ Pipeline executado com sucesso."
-          } else {
-            Write-Host "❌ Erro: pipeline_runner.py não encontrado em app/runtime/"
-            exit 1
-          }
-
-      - name: ✅ Verify build
+      - name: ✅ Verify build artifact
+        shell: pwsh
         run: |
           if (Test-Path "dist\Jarvis_Installer.exe") {
             $item = Get-Item "dist\Jarvis_Installer.exe"
             Write-Host "✓ Executable built successfully: $($item.FullName)"
           } else {
-            Write-Host "✗ Executable not found in dist/"
+            Write-Error "Executable not found in dist/"
             exit 1
           }
-        shell: pwsh
 
-      - name: 📦 Upload artifact
+      - name: 📦 Upload installer artifact
         uses: actions/upload-artifact@v6
         with:
           name: Jarvis_Installer
           path: dist/Jarvis_Installer.exe
           retention-days: 30
           if-no-files-found: error
-          compression-level: 6      # Release só é criada quando o fluxo é acionado a partir de uma tag v*.
-      # Se o objetivo for criar release também no workflow_dispatch sem tag,
-      # ajuste este `if` ou adicione um step de criação de tag antes.
-      - name: 🏷️ Create Release (on tag)
-        if: startsWith(github.ref, 'refs/tags/v')
+          compression-level: 6
+
+  publish-release:
+    name: Publish release (tag only)
+    if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v') && needs.build-windows.result == 'success' }}
+    needs: build-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Jarvis_Installer
+          path: release-artifact
+
+      - name: 🏷️ Create GitHub release
         uses: softprops/action-gh-release@v3
         with:
-          files: dist/Jarvis_Installer.exe
+          tag_name: ${{ github.ref_name }}
+          files: release-artifact/Jarvis_Installer.exe
           draft: false
           prerelease: false
         env:
