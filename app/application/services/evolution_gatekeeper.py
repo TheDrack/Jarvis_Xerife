@@ -148,7 +148,7 @@ class EvolutionGatekeeper(NexusComponent):
     # ------------------------------------------------------------------
 
     def _check_test_count(self) -> Tuple[bool, str]:
-        """(a) Verifica se o número de testes coletados não regrediu."""
+        """Bloqueia a evolução quando a coleta de testes não é comprovadamente válida."""
         try:
             result = subprocess.run(
                 [sys.executable, "-m", "pytest", "--co", "-q", "--tb=no"],
@@ -156,35 +156,46 @@ class EvolutionGatekeeper(NexusComponent):
                 text=True,
                 timeout=60,
             )
-            output = result.stdout + result.stderr
-            count = _parse_test_count(output)
-            logger.info("[EvolutionGatekeeper] Testes coletados: %d", count)
-
-            if self._last_test_count is None:
-                # Primeira execução: registra baseline
-                self._last_test_count = count
-                if self.min_test_count > 0 and count < self.min_test_count:
-                    return False, f"test_count_below_minimum: {count} < {self.min_test_count}"
-                return True, "ok"
-
-            if count < self._last_test_count:
-                return (
-                    False,
-                    f"test_regression: {count} testes < {self._last_test_count} (ciclo anterior)",
-                )
-
-            self._last_test_count = count
-            return True, "ok"
-
         except subprocess.TimeoutExpired:
-            logger.warning("[EvolutionGatekeeper] Timeout ao coletar testes — permitindo por precaução.")
-            return True, "ok"
+            logger.warning("[EvolutionGatekeeper] Timeout ao coletar testes — bloqueando proposta.")
+            return False, "test_collection_timeout"
         except FileNotFoundError:
-            logger.warning("[EvolutionGatekeeper] pytest não encontrado — pulando verificação.")
-            return True, "ok"
+            logger.warning("[EvolutionGatekeeper] pytest não encontrado — bloqueando proposta.")
+            return False, "test_collection_unavailable"
         except Exception as exc:
-            logger.warning("[EvolutionGatekeeper] Erro ao verificar testes: %s — permitindo.", exc)
-            return True, "ok"
+            logger.exception("[EvolutionGatekeeper] Falha ao coletar testes — bloqueando proposta.")
+            return False, f"test_collection_error: {type(exc).__name__}"
+
+        return_code = getattr(result, "returncode", None)
+        if return_code != 0:
+            logger.warning(
+                "[EvolutionGatekeeper] Coleta de testes terminou com código %r — bloqueando proposta.",
+                return_code,
+            )
+            return False, f"test_collection_failed: pytest_exit_code={return_code}"
+
+        output = f"{result.stdout or ''}\n{result.stderr or ''}"
+        count = _parse_test_count(output)
+        if count <= 0:
+            logger.warning(
+                "[EvolutionGatekeeper] Pytest não informou uma contagem positiva de testes — bloqueando proposta."
+            )
+            return False, "test_collection_unrecognized_or_empty"
+
+        logger.info("[EvolutionGatekeeper] Testes coletados: %d", count)
+
+        if self.min_test_count > 0 and count < self.min_test_count:
+            return False, f"test_count_below_minimum: {count} < {self.min_test_count}"
+
+        if self._last_test_count is not None and count < self._last_test_count:
+            return (
+                False,
+                f"test_regression: {count} testes < {self._last_test_count} (ciclo anterior)",
+            )
+
+        # Só atualiza o baseline depois de uma coleta bem-sucedida e reconhecida.
+        self._last_test_count = count
+        return True, "ok"
 
     def _check_recent_stability(self) -> Tuple[bool, str]:
         """(b) Verifica se não houve rollback nos últimos N ciclos."""
