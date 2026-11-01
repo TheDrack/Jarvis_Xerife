@@ -20,9 +20,10 @@ de execução isolada:
   repositório, não dentro do diretório temporário.
 - Portanto, `passed=true` demonstra apenas que a sintaxe foi aceita e que a suíte
   do checkout atual passou; não demonstra que o código proposto foi exercitado.
-- `EvolutionGatekeeper._check_test_count()` ainda precisa tratar falha de coleta,
-  timeout, ausência do pytest, saída não reconhecida e código de retorno diferente
-  de zero como estados não validados.
+- `EvolutionGatekeeper._check_test_count()` agora exige código de saída zero
+  e uma contagem positiva reconhecida; timeout, ausência do pytest, exceções, código
+  diferente de zero e saída vazia/não reconhecida bloqueiam a proposta sem alterar
+  o baseline anterior.
 - O caminho de `EvolutionOrchestrator` faz uma verificação preliminar antes de
   receber o código do LLM; o caminho que aplica patches da memória procedural via
   `CrystallizerEngine` precisa de uma verificação vinculada ao código candidato.
