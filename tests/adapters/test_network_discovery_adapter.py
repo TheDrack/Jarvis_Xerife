@@ -50,3 +50,13 @@ class NetworkDiscoveryAdapterTests(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+
+class NetworkInterfaceScopeTests(unittest.TestCase):
+    def test_interface_scope_distinguishes_rfc1918_link_local_overlay_and_public(self):
+        from app.adapters.edge.network_discovery_adapter import _interface_scope
+
+        self.assertEqual(_interface_scope(ipaddress.ip_address("10.0.0.21")), "private")
+        self.assertEqual(_interface_scope(ipaddress.ip_address("169.254.93.107")), "link_local")
+        self.assertEqual(_interface_scope(ipaddress.ip_address("100.114.218.33")), "overlay")
+        self.assertEqual(_interface_scope(ipaddress.ip_address("8.8.8.8")), "public")
