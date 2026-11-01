@@ -1,6 +1,8 @@
 """Tests for the shared multi-agent contracts and assignment policy."""
 import pytest
 
+from app.multiagent.model_registry import ModelProfile, ModelRegistry
+
 from app.multiagent import (
     AgentProfile,
     CostBenefitScheduler,
@@ -149,3 +151,92 @@ def test_contract_rejects_invalid_values():
         AgentProfile("agent", success_rates={"coding": 1.5})
     with pytest.raises(ValueError):
         TaskSpec(task_id="x", objective="y", risk_level="unknown")
+
+
+
+def test_scheduler_uses_registry_to_match_model_capabilities_and_modalities():
+    registry = ModelRegistry([
+        ModelProfile(
+            model_id="text-model",
+            provider_id="provider-a",
+            runtime_kind="remote_api",
+            capabilities={"chat", "tools"},
+            modalities={"text"},
+        ),
+        ModelProfile(
+            model_id="vision-model",
+            provider_id="provider-b",
+            runtime_kind="local_runtime",
+            capabilities={"chat", "vision"},
+            modalities={"text", "image"},
+        ),
+    ])
+    task = TaskSpec(
+        task_id="inspect-image",
+        objective="Analyze the supplied image",
+        required_model_capabilities=("vision",),
+        required_modalities=("text", "image"),
+    )
+    agents = [
+        AgentProfile("text-agent", model_provider="provider-a", model_id="text-model"),
+        AgentProfile("vision-agent", model_provider="provider-b", model_id="vision-model"),
+    ]
+
+    assignment = CostBenefitScheduler(model_registry=registry).choose(
+        task, agents, leader_id="leader"
+    )
+
+    assert assignment.assigned_agent_id == "vision-agent"
+    assert assignment.selected_model_id == "vision-model"
+    assert assignment.to_dict()["selected_model_id"] == "vision-model"
+
+
+def test_scheduler_fails_closed_when_task_requires_model_registry_but_none_is_configured():
+    task = TaskSpec(
+        task_id="vision-task",
+        objective="Analyze image",
+        required_model_capabilities=("vision",),
+        required_modalities=("text", "image"),
+    )
+    with pytest.raises(NoEligibleAgentError, match="no ModelRegistry is configured"):
+        CostBenefitScheduler().choose(
+            task,
+            [AgentProfile("agent", model_provider="provider", model_id="vision-model")],
+            leader_id="leader",
+        )
+
+
+def test_scheduler_excludes_unavailable_or_provider_mismatched_model_profiles():
+    registry = ModelRegistry([
+        ModelProfile(
+            model_id="offline",
+            provider_id="provider-a",
+            runtime_kind="remote_api",
+            available=False,
+        ),
+        ModelProfile(
+            model_id="other-provider",
+            provider_id="provider-b",
+            runtime_kind="remote_api",
+        ),
+    ])
+    task = TaskSpec(task_id="general", objective="Do work")
+    agents = [
+        AgentProfile("offline-agent", model_provider="provider-a", model_id="offline"),
+        AgentProfile("mismatch-agent", model_provider="provider-a", model_id="other-provider"),
+    ]
+
+    with pytest.raises(NoEligibleAgentError):
+        CostBenefitScheduler(model_registry=registry).choose(
+            task, agents, leader_id="leader"
+        )
+
+
+def test_scheduler_keeps_legacy_agent_selection_without_model_registry():
+    task = TaskSpec(task_id="legacy", objective="Continue legacy scheduling")
+    assignment = CostBenefitScheduler().choose(
+        task, [AgentProfile("legacy-agent", model_provider="provider-a")],
+        leader_id="leader",
+    )
+    assert assignment.assigned_agent_id == "legacy-agent"
+    assert assignment.selected_model_id is None
