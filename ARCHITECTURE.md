@@ -49,6 +49,9 @@ graph LR
     app_adapters_edge["<b>edge</b><br/><hr/>📄 macrodroid_adapter.py: MacroDroidAdapter, can_execute<br/>📄 tts_adapter.py: TTSAdapter, execute<br/>📄 keyboard_adapter.py: KeyboardAdapter, execute, type_text<br/>📄 background_window_input.py: pack_point, click_window_background, enum_callback<br/>📄 environment_observation_publisher.py: build_desktop_observations, publish_observation, configured_observation_target<br/>📄 network_discovery_adapter.py: network_interfaces<br/>📄 windows_etw_network_adapter.py: parse_tracerpt_xml<br/>📄 security_audit_adapter.py: TacticalCommandPort, NearbyDevice<br/>📄 hardware_controller.py: HardwareController, execute<br/>📄 portas_observabilidade.py: sanitizar_url, sanitizar_payload<br/>📄 automation_adapter.py: AutomationAdapter, execute<br/>📄 jarvis_desktop_mcp.py: jarvis_agent_bootstrap, curiosity_capture<br/>📄 web_adapter.py: WebAdapter, execute<br/>📄 android_navigation_adapter.py: AndroidNavigationAdapter<br/>📄 jarvis_local_agent.py: JarvisLocalAgent, execute<br/>📄 portas_visualizacao.py: registrar_visualizacao_portas, portas_listar<br/>📄 worker_pc.py: main<br/>📄 portas_core.py: configurar_cdp_url, carregar_macros<br/>📄 portas_utilizacao.py: executar_porta, porta<br/>📄 voice_engine.py: JarvisEngine, execute<br/>📄 voice_adapter.py: VoiceAdapter, execute<br/>📄 active_recruiter_adapter.py: ActiveRecruiterAdapter, execute<br/>📄 navigation_gps.py: from, RouteStep, Route<br/>📄 mdns_discovery_adapter.py: parse_mdns_response, discover_mdns<br/>📄 combined_voice_provider.py: CombinedVoiceProvider, execute"]
     class app_adapters_edge adapter
     app_adapters --> app_adapters_edge
+    app_adapters_edge_host["<b>host</b><br/><hr/>📄 psutil_host_adapter.py: PsutilHostAdapter, get_identity"]
+    class app_adapters_edge_host adapter
+    app_adapters_edge --> app_adapters_edge_host
     app_core["<b>core</b><br/><hr/>📄 config.py: Settings, decrypt_api_key, decrypt_database_url<br/>📄 encryption.py: get_hardware_id, derive_key_from_hardware, encrypt_value<br/>📄 nexus.py: JarvisNexus<br/>📄 llm_config.py: LLMConfig, use_llm_command_interpretation, use_llm_capability_detection<br/>📄 recovery_store.py: RecoveryError<br/>📄 nexus_exceptions.py: ImportTimeoutError, InstantiateTimeoutError, instantiation<br/>📄 nexus_discovery.py: finders<br/>📄 nexuscomponent.py: NexusComponent"]
     class app_core core
     app --> app_core
@@ -121,7 +124,7 @@ graph LR
     app_domain_analysis["<b>analysis</b><br/><hr/>📄 performance_analyzer.py: PerformanceAnalyzer, execute"]
     class app_domain_analysis support
     app_domain --> app_domain_analysis
-    app_domain_ports["<b>ports</b><br/><hr/>📄 device_control_port.py: from, class, DeviceControlPort"]
+    app_domain_ports["<b>ports</b><br/><hr/>📄 device_control_port.py: from, class, DeviceControlPort<br/>📄 host_port.py: from, HostIdentity, DiskUsage"]
     class app_domain_ports port
     app_domain --> app_domain_ports
     app_domain_models["<b>models</b><br/><hr/>📄 viability.py: RiskLevel, ImpactLevel, class<br/>📄 command.py: CommandType, Intent<br/>📄 system_state.py: SystemStatus, execute, Config<br/>📄 capability_alias_registry.py: from, AliasRegistryError, UnknownAliasError<br/>📄 adapter_registry.py: class, to_dict, AdapterRegistry<br/>📄 device.py: Device, execute, Capability<br/>📄 agent.py: ActionType, TaskSource, TaskPriority<br/>📄 capability.py: JarvisCapability, execute<br/>📄 mission.py: class, execute, to_dict<br/>📄 evolution_reward.py: EvolutionReward, execute<br/>📄 thought_log.py: InteractionStatus, ThoughtLog, Config<br/>📄 soldier.py: SoldierStatus, SoldierRegistration, soldier_id_not_empty"]
