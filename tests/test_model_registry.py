@@ -90,6 +90,8 @@ def test_profile_snapshots_mutable_capabilities_and_metadata():
     "kwargs",
     [
         {"capabilities": {"chat", 42}},
+        {"capabilities": "tools"},
+        {"modalities": "text"},
         {"modalities": {"text", ""}},
         {"metadata": {"": "value"}},
         {"metadata": {"key": 42}},
@@ -107,3 +109,18 @@ def test_profile_rejects_invalid_metadata_and_operational_values(kwargs):
             runtime_kind="local_runtime",
             **kwargs,
         )
+
+
+@pytest.mark.parametrize(
+    "filters",
+    [
+        {"required_capabilities": "vision"},
+        {"required_modalities": "text"},
+        {"provider_ids": "api-a"},
+    ],
+)
+def test_eligibility_rejects_scalar_string_filters(filters):
+    registry = ModelRegistry([make_profile("a", "api-a")])
+
+    with pytest.raises(TypeError):
+        registry.eligible(**filters)
