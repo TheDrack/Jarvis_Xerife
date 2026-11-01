@@ -61,17 +61,22 @@ def test_snapshot_is_immutable():
         snapshot.cpu_percent = 99.0
 
 
-def test_host_adapter_dependency_is_optional_and_explicit():
+def test_host_adapter_dependency_is_optional_and_explicit(monkeypatch):
+    import builtins
+
     from app.adapters.edge.host.psutil_host_adapter import PsutilHostAdapter
 
-    try:
-        adapter = PsutilHostAdapter()
-    except RuntimeError as exc:
-        assert "requirements/host.txt" in str(exc)
-    else:
-        assert adapter.get_identity().hostname
-        assert adapter.get_resources().memory_total_bytes > 0
-        assert len(adapter.list_processes(limit=5)) <= 5
+    original_import = builtins.__import__
+
+    def import_without_psutil(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "psutil":
+            raise ImportError("psutil intentionally unavailable in this test")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", import_without_psutil)
+    with pytest.raises(RuntimeError, match="requirements/host.txt"):
+        PsutilHostAdapter()
+
 
 def test_psutil_adapter_normalizes_linux_host_without_os_specific_calls(monkeypatch):
     from types import SimpleNamespace
@@ -153,3 +158,65 @@ def test_psutil_adapter_normalizes_linux_host_without_os_specific_calls(monkeypa
             created_at_epoch=1234.5,
         ),
     )
+
+
+def test_psutil_adapter_selects_stable_top_n_from_a_lazy_process_iterator(monkeypatch):
+    from types import SimpleNamespace
+
+    import app.adapters.edge.host.psutil_host_adapter as adapter_module
+    from app.adapters.edge.host.psutil_host_adapter import PsutilHostAdapter
+
+    records = [
+        (1, 10.0, 1000),
+        (2, 20.0, 50),
+        (3, 20.0, 80),
+        (4, 20.0, 80),
+        (5, 5.0, 5000),
+    ]
+
+    class FakeProcess:
+        def __init__(self, pid, cpu, rss):
+            self.info = {
+                "pid": pid,
+                "name": f"process-{pid}",
+                "status": "running",
+                "memory_info": SimpleNamespace(rss=rss),
+                "create_time": float(pid),
+            }
+            self._cpu = cpu
+
+        def cpu_percent(self, interval=None):
+            return self._cpu
+
+    class FakePsutil:
+        class NoSuchProcess(Exception):
+            pass
+
+        class AccessDenied(Exception):
+            pass
+
+        class ZombieProcess(Exception):
+            pass
+
+        @staticmethod
+        def process_iter(attrs):
+            assert attrs == ["pid", "name", "status", "memory_info", "create_time"]
+            return (
+                FakeProcess(pid, cpu, rss)
+                for pid, cpu, rss in records
+            )
+
+    original_nlargest = adapter_module.heapq.nlargest
+
+    def assert_lazy_top_n(n, iterable, key=None):
+        assert n == 3
+        assert iter(iterable) is iterable
+        assert not isinstance(iterable, (list, tuple))
+        return original_nlargest(n, iterable, key=key)
+
+    monkeypatch.setattr(adapter_module.heapq, "nlargest", assert_lazy_top_n)
+
+    processes = PsutilHostAdapter(psutil_module=FakePsutil).list_processes(limit=3)
+
+    assert [process.pid for process in processes] == [3, 4, 2]
+    assert len(processes) == 3
