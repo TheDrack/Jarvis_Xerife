@@ -1,9 +1,9 @@
 """Packaging metadata must not initialize the application runtime."""
 import builtins
 import runpy
+import sys
+import types
 from pathlib import Path
-
-import setuptools
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +14,10 @@ def test_setup_metadata_does_not_import_application_runtime(monkeypatch):
     captured = {}
     original_import = builtins.__import__
 
+    fake_setuptools = types.ModuleType("setuptools")
+    fake_setuptools.setup = lambda **kwargs: captured.update(kwargs)
+    fake_setuptools.find_packages = lambda **kwargs: ["app"]
+
     def reject_application_import(name, globals=None, locals=None, fromlist=(), level=0):
         if name == "app" or name.startswith("app."):
             raise AssertionError(
@@ -21,8 +25,7 @@ def test_setup_metadata_does_not_import_application_runtime(monkeypatch):
             )
         return original_import(name, globals, locals, fromlist, level)
 
-    monkeypatch.setattr(setuptools, "setup", lambda **kwargs: captured.update(kwargs))
-    monkeypatch.setattr(setuptools, "find_packages", lambda **kwargs: ["app"])
+    monkeypatch.setitem(sys.modules, "setuptools", fake_setuptools)
     monkeypatch.setattr(builtins, "__import__", reject_application_import)
 
     runpy.run_path(str(SETUP_FILE), run_name="__setup_metadata_test__")
