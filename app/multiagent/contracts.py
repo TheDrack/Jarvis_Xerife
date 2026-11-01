@@ -40,6 +40,7 @@ class AgentProfile:
     estimated_latency_seconds: float = 0.0
     environment: str = "unknown"
     model_provider: str = "unknown"
+    model_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.agent_id.strip():
@@ -72,6 +73,8 @@ class TaskSpec:
     acceptance_criteria: tuple[str, ...] = ()
     parent_task_id: str | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    required_model_capabilities: tuple[str, ...] = ()
+    required_modalities: tuple[str, ...] = ("text",)
 
     def __post_init__(self) -> None:
         if not self.task_id.strip():
@@ -108,6 +111,7 @@ class TaskAssignment:
     status: TaskStatus = TaskStatus.CLAIMED
     parent_task_id: str | None = None
     required_model_provider: str | None = None
+    selected_model_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable envelope for MCP, HTTP, or a task queue."""
@@ -128,4 +132,5 @@ class TaskAssignment:
             "status": self.status.value,
             "parent_task_id": self.parent_task_id,
             "required_model_provider": self.required_model_provider,
+            "selected_model_id": self.selected_model_id,
         }
