@@ -51,7 +51,7 @@
     "audit_logger": "app.adapters.infrastructure.audit_logger.AuditLogger",
     "reward_adapter": "app.adapters.infrastructure.reward_adapter.RewardAdapter",
     "reward_logger": "app.adapters.infrastructure.reward_logger.RewardLogger",
-    "adapter_registry": "app.adapters.infrastructure.adapter_registry.AdapterRegistry",
+    "adapter_registry": "app.domain.models.adapter_registry.AdapterRegistry",
     "jrvs_translator": "app.application.services.jrvs_translator.JrvsTranslator",
     "jrvs_cloud_storage": "app.adapters.infrastructure.jrvs_cloud_storage.JrvsCloudStorage",
     "websocket_manager": "app.adapters.infrastructure.websocket_manager.WebSocketManager",
