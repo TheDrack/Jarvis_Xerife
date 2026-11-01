@@ -195,3 +195,87 @@ class TestNexusRegistrySync:
 
         mock_update.assert_not_called()
         assert nexus._mutated is True  # still dirty
+
+
+
+def test_load_local_registry_falls_back_to_versioned_json_when_jrvs_is_missing(tmp_path):
+    """A clean checkout must seed Nexus from JSON without JRVS or Supabase."""
+    import json
+
+    from app.core.nexus import JarvisNexus
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    registry = {
+        "components": {
+            "adapter_registry": "app.domain.models.adapter_registry.AdapterRegistry",
+            "audit_logger": "app.adapters.infrastructure.audit_logger.AuditLogger",
+        }
+    }
+    (data_dir / "nexus_registry.json").write_text(
+        json.dumps(registry), encoding="utf-8"
+    )
+
+    nexus = JarvisNexus.__new__(JarvisNexus)
+    nexus.base_dir = str(tmp_path)
+
+    with patch(
+        "app.core.nexus_registry._jrvs_read",
+        side_effect=FileNotFoundError("generated JRVS mirror is absent"),
+    ):
+        loaded = nexus._load_local_registry()
+
+    assert loaded == {
+        "adapter_registry": "app.domain.models.adapter_registry",
+        "audit_logger": "app.adapters.infrastructure.audit_logger",
+    }
+
+
+def test_json_registry_resolves_adapter_registry_in_nexus_strict_mode(tmp_path):
+    """The JSON fallback must avoid a filesystem-wide discovery in strict mode."""
+    import json
+    from pathlib import Path
+    from threading import RLock
+
+    from app.core.nexus import JarvisNexus
+    from app.domain.models.adapter_registry import AdapterRegistry
+
+    project_root = Path(__file__).resolve().parents[1]
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    registry = {
+        "components": {
+            "adapter_registry": "app.domain.models.adapter_registry.AdapterRegistry",
+        }
+    }
+    (data_dir / "nexus_registry.json").write_text(
+        json.dumps(registry), encoding="utf-8"
+    )
+
+    nexus = JarvisNexus.__new__(JarvisNexus)
+    nexus.base_dir = str(tmp_path)
+    nexus._cache = {}
+    nexus._path_map = {}
+    nexus._lock = RLock()
+    nexus._executor = None
+
+    try:
+        with patch(
+            "app.core.nexus_registry._jrvs_read",
+            side_effect=FileNotFoundError("generated JRVS mirror is absent"),
+        ):
+            nexus._cache.update(nexus._load_local_registry())
+
+        with patch("app.core.nexus_discovery.NEXUS_STRICT_MODE", True):
+            resolved = nexus.resolve_class("adapter_registry")
+
+        assert resolved is AdapterRegistry
+        assert nexus._cache["adapter_registry"] == (
+            "app.domain.models.adapter_registry"
+        )
+        assert project_root.joinpath(
+            "app", "domain", "models", "adapter_registry.py"
+        ).is_file()
+    finally:
+        if nexus._executor is not None:
+            nexus._executor.shutdown(wait=True)
