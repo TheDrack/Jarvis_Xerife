@@ -1,57 +1,104 @@
-"""Regression tests for TaskSpec model-requirement collection inputs."""
+"""Regression tests for immutable agent/task string-collection contracts."""
 import pytest
 
-from app.multiagent.contracts import TaskSpec
+from app.multiagent.contracts import AgentProfile, TaskSpec
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["repo.read", b"repo.read"],
+)
+def test_agent_profile_rejects_scalar_available_tools(value):
+    with pytest.raises(TypeError, match="not a string"):
+        AgentProfile(agent_id="agent", available_tools=value)
 
 
 @pytest.mark.parametrize(
     ("field_name", "value"),
     [
-        ("required_model_capabilities", "vision"),
-        ("required_model_capabilities", b"vision"),
-        ("required_modalities", "image"),
-        ("required_modalities", b"image"),
+        (field_name, value)
+        for field_name in (
+            "required_tools",
+            "constraints",
+            "acceptance_criteria",
+            "required_model_capabilities",
+            "required_modalities",
+        )
+        for value in ("label", b"label")
     ],
 )
-def test_task_spec_rejects_scalar_model_requirement_strings(field_name, value):
+def test_task_spec_rejects_scalar_string_collections(field_name, value):
     with pytest.raises(TypeError, match="not a string"):
         TaskSpec(
             task_id="task",
-            objective="Validate model requirements",
+            objective="Validate contract collections",
             **{field_name: value},
         )
 
 
-def test_task_spec_normalizes_model_requirement_iterables_to_immutable_tuples():
-    capabilities = (item for item in ("vision", "tools"))
-    modalities = ["text", "image"]
-
+def test_agent_and_task_contracts_normalize_iterables_to_immutable_tuples():
+    profile = AgentProfile(
+        agent_id="agent",
+        available_tools=["repo.read", "pytest"],
+    )
     task = TaskSpec(
         task_id="vision-task",
         objective="Analyze an image",
-        required_model_capabilities=capabilities,
-        required_modalities=modalities,
+        required_tools=["image.read"],
+        constraints=(item for item in ("read-only", "bounded")),
+        acceptance_criteria=["return evidence"],
+        required_model_capabilities=(item for item in ("vision", "tools")),
+        required_modalities=["text", "image"],
     )
 
+    assert profile.available_tools == ("repo.read", "pytest")
+    assert isinstance(profile.available_tools, tuple)
+    assert task.required_tools == ("image.read",)
+    assert task.constraints == ("read-only", "bounded")
+    assert task.acceptance_criteria == ("return evidence",)
     assert task.required_model_capabilities == ("vision", "tools")
     assert task.required_modalities == ("text", "image")
-    assert isinstance(task.required_model_capabilities, tuple)
-    assert isinstance(task.required_modalities, tuple)
+    assert all(
+        isinstance(value, tuple)
+        for value in (
+            task.required_tools,
+            task.constraints,
+            task.acceptance_criteria,
+            task.required_model_capabilities,
+            task.required_modalities,
+        )
+    )
 
 
 @pytest.mark.parametrize(
-    ("field_name", "value"),
+    "value",
     [
-        ("required_model_capabilities", ("vision", "")),
-        ("required_model_capabilities", ("vision", 1)),
-        ("required_modalities", ("text", None)),
-        ("required_modalities", ("image", b"text")),
+        ("valid", ""),
+        ("valid", 1),
+        ("valid", None),
+        ("valid", b"not-text"),
     ],
 )
-def test_task_spec_rejects_empty_or_non_string_model_requirement_labels(field_name, value):
+def test_agent_profile_rejects_invalid_tool_labels(value):
     with pytest.raises(ValueError, match="only non-empty strings"):
-        TaskSpec(
-            task_id="task",
-            objective="Validate model requirements",
-            **{field_name: value},
-        )
+        AgentProfile(agent_id="agent", available_tools=value)
+
+
+@pytest.mark.parametrize(
+    "field_name",
+    [
+        "required_tools",
+        "constraints",
+        "acceptance_criteria",
+        "required_model_capabilities",
+        "required_modalities",
+    ],
+)
+def test_task_spec_rejects_empty_and_non_string_labels(field_name):
+    for value in (("valid", ""), ("valid", 1), ("valid", None), ("valid", b"not-text")):
+        with pytest.raises(ValueError, match="only non-empty strings"):
+            TaskSpec(
+                task_id="task",
+                objective="Validate contract labels",
+                **{field_name: value},
+            )
