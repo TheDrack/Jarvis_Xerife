@@ -1,4 +1,4 @@
-﻿# Jarvis OS — Host Foundation 0.1
+# Jarvis OS — Host Foundation 0.1
 
 ## Scope
 
@@ -25,15 +25,32 @@ Install the optional dependency with:
 The adapter is not imported by the portable Harness by default. Do not make
 psutil a mandatory dependency of requirements/core.txt.
 
-## Security properties
+## Security and resource properties
 
 - The initial adapter is read-only.
-- Process inventory is bounded to 1..500 records.
+- The returned process inventory is limited to 1..500 records.
+- Process selection traverses the process table but retains only O(limit)
+  intermediate records using top-N selection; scan time still depends on the
+  total number of processes visible to the host.
 - Command lines, environment variables, open files and credentials are not
   collected.
 - Per-process access-denied, vanished and zombie processes are skipped.
 - No shell execution, service mutation, process termination or privilege
   elevation is exposed by this contract.
+
+## Sampling and integration constraints
+
+- psutil's first `Process.cpu_percent(interval=None)` sample for a process is
+  documented as an unusable `0.0` warm-up value. The first process inventory
+  may therefore be ranked primarily by RSS; callers should collect a later
+  snapshot before treating CPU ranking as meaningful.
+- `get_resources()` currently calls `psutil.cpu_percent(interval=0.1)`, which
+  blocks the calling thread for the sampling interval. Do not call this
+  synchronous adapter directly from an async event loop; the future Host
+  application service must offload blocking telemetry to a worker thread or
+  expose an asynchronous facade.
+- Host integration is not connected to the composition root/API in this
+  milestone, so these constraints do not currently block the portable Harness.
 
 ## Next increments
 
