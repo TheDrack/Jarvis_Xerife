@@ -1,58 +1,40 @@
-name: 🔄 Migrate to Nexus DI
+name: 🔄 Migrate to Nexus DI (dry-run only)
 
 on:
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Simular migração sem modificar (dry-run)'
-        required: false
-        default: 'true'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
-      create_backup:
-        description: 'Criar backup antes de migrar'
-        required: false
-        default: 'true'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
+
+permissions:
+  contents: read
 
 env:
-  PYTHON_VERSION: '3.12'
+  PYTHON_VERSION: "3.12"
 
 jobs:
   migrate:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-    
+      contents: read
+
     steps:
-      - name: 📥 Checkout do repositório
+      - name: Checkout trusted main without persisted credentials
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
 
-      - name: 🐍 Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: 🔄 Executar migração Nexus DI
-        id: migrate
-        env:
-          DRY_RUN: ${{ github.event.inputs.dry_run }}
-          CREATE_BACKUP: ${{ github.event.inputs.create_backup }}
+      - name: Run Nexus DI migration preview
         run: |
-          python scripts/migrate_to_nexus_di.py \
-            $([ "$DRY_RUN" = "true" ] && echo "--dry-run" || echo "--apply") \
-            $([ "$CREATE_BACKUP" = "true" ] && echo "--backup") \
-            --report nexus_di_migration_report.txt
+          set -euo pipefail
+          python scripts/migrate_to_nexus_di.py --dry-run --report nexus_di_migration_report.txt
 
-      - name: 📊 Upload do relatório
+      - name: Upload migration report
         if: always()
         uses: actions/upload-artifact@v6
         with:
@@ -60,46 +42,17 @@ jobs:
           path: |
             nexus_di_migration_report.txt
             migrate_nexus_di.log
+          if-no-files-found: warn
           retention-days: 30
 
-      - name: 📦 Upload do backup (se criado)
-        if: github.event.inputs.create_backup == 'true' && github.event.inputs.dry_run == 'false'
-        uses: actions/upload-artifact@v6
-        with:
-          name: nexus-di-backup-${{ github.run_id }}
-          path: .backups/nexus_di_migration/*.py
-          retention-days: 30
-
-      - name: 📝 Commit das mudanças (se não for dry-run)
-        if: github.event.inputs.dry_run == 'false'
+      - name: Write summary
+        if: always()
         run: |
-          set -e
-
-          git config --local user.email "jarvis-bot@github.com"
-          git config --local user.name "JARVIS Nexus DI Migration"
-
-          # Evita commitear artefatos de CI e 백업s
-          git add app scripts tests data docs
-          git add *.md Dockerfile *.yml *.yaml Makefile *.ini *.toml setup.py
-          git add .github
-          git rm -r --cached .pytest_cache htmlcov .venv_tests logs backups .backups 2>/dev/null || true
-
-          if ! git diff --staged --quiet; then
-            git commit -m "🔄 [JARVIS] Migrate to Nexus DI: removed direct imports"
-            git push
-          else
-            echo "Nenhuma mudança para comitar."
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 📋 Resumo no Step Summary
-        run: |
-          echo "## 🔄 Nexus DI Migration Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Verifique o relatório completo nos artefatos." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Métrica | Valor |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Modo | ${{ github.event.inputs.dry_run == 'true' && 'DRY-RUN' || 'APPLY' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Backup | ${{ github.event.inputs.create_backup }} |" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Nexus DI migration preview"
+            echo ""
+            echo "Mode: **DRY-RUN ONLY**"
+            echo ""
+            echo "No repository files were modified and no commit or push was attempted."
+            echo "Download the report artifact to review proposed changes."
+          } >> "$GITHUB_STEP_SUMMARY"
