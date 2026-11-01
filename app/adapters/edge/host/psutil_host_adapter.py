@@ -1,4 +1,4 @@
-﻿"""Optional psutil-backed host adapter for Windows and Linux.
+"""Optional psutil-backed host adapter for Windows and Linux.
 
 Install the optional dependency from requirements/host.txt. This module is
 intentionally imported only by the opt-in Host profile.
