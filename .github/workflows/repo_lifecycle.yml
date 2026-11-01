@@ -1,58 +1,59 @@
-name: Repo Lifecycle Governance
+name: Repo Lifecycle Governance (preview)
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   governance:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout trusted main without persisted credentials
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
-      - name: Repo Lifecycle Governance
+      - name: Run lifecycle governance in isolated runner checkout
         env:
           PIPELINE_STRICT: "false"
         run: |
-          echo "========================================"
-          echo " Repo Lifecycle Governance"
-          echo "========================================"
-          set -o pipefail
+          set -euo pipefail
           python scripts/repo_lifecycle_governance.py 2>&1 | tee repo_lifecycle_governance.log
-          EXIT_CODE=${PIPESTATUS[0]}
-          if [[ $EXIT_CODE -ne 0 ]]; then
-            echo "❌ repo_lifecycle_governance.py falhou com código $EXIT_CODE"
-            exit $EXIT_CODE
-          fi
-          if grep -qiE "error|fatal|traceback|exception" repo_lifecycle_governance.log; then
-            echo "⚠️ repo_lifecycle_governance.py retornou mas contém avisos/erros no log."
-          fi
+          git add -N -- .
+          git diff --binary -- . > repo_lifecycle_governance.patch
+          git status --short > repo_lifecycle_governance_status.txt
 
-      - name: Commit frozen changes (no PR, no merge)
+      - name: Upload proposed changes and execution log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: repo-lifecycle-preview-${{ github.run_id }}
+          path: |
+            repo_lifecycle_governance.log
+            repo_lifecycle_governance.patch
+            repo_lifecycle_governance_status.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Write summary
+        if: always()
         run: |
-          set -e
-
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git config user.name "governance-bot"
-            git config user.email "governance@bot"
-
-            # Evita commitear lixo de CI: logs, caches, artefatos, envs
-            git add app scripts tests data docs
-            git add *.md Dockerfile *.yml *.yaml Makefile *.ini *.toml setup.py
-            git add .github
-            git rm -r --cached .pytest_cache htmlcov .venv_tests logs backups .backups 2>/dev/null || true
-
-            if ! git diff --staged --quiet; then
-              git commit -m "chore: lifecycle governance (freeze/unfreeze)"
-              git push
-            else
-              echo "Arquivos marcados, mas sem mudança para comitar."
-            fi
-          else
-            echo "No changes to commit"
-          fi
+          {
+            echo "## Repo lifecycle governance preview"
+            echo ""
+            echo "The script ran only in the ephemeral GitHub Actions checkout."
+            echo "No commit or push was attempted; review the patch artifact before proposing changes."
+          } >> "$GITHUB_STEP_SUMMARY"
