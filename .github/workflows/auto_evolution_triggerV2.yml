@@ -83,13 +83,13 @@ jobs:
               last_msg = os.popen("git log -1 --pretty=%B").read()
               print(f"--- ANALISANDO DNA ---\nMsg: {last_msg.strip()}")
 
-              is_auto_evolution = bool(re.search(r'auto-evolution|mission-\\d+', last_msg, re.IGNORECASE))
+              is_auto_evolution = bool(re.search(r'auto-evolution|mission-\d+', last_msg, re.IGNORECASE))
               is_sync = "Inventory Synchronized" in last_msg
 
               # Sincronização lógica do Roadmap
               if is_auto_evolution and not is_sync:
                   print("🎯 DNA de Evolução detectado. Sincronizando inventário...")
-                  match = re.search(r'CAP-\\d+', last_msg)
+                  match = re.search(r'CAP-\d+', last_msg)
                   if match:
                       cap_id = match.group()
                       if auto.mark_mission_as_completed(cap_id):
@@ -169,7 +169,7 @@ jobs:
             echo "📢 Criando Pull Request..."
             PR_URL=$(gh pr create \\
                          --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \\
-                         --body "### 🧠 Evolução JARVIS\\n**Missão:** ${{ steps.flow.outputs.mission_desc }}\\n\\n*Aguardando validação da Homeostase.*" \\
+                         --body "### 🧠 Evolução JARVIS\n**Missão:** ${{ steps.flow.outputs.mission_desc }}\n\n*Aguardando validação da Homeostase.*" \\
                          --base main --head "$BRANCH_NAME")
 
             echo "pr_number=$(echo $PR_URL | awk -F'/' '{print $6}')" >> $GITHUB_OUTPUT
