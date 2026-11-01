@@ -6,242 +6,134 @@
 <meta name="referrer" content="no-referrer">
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#07111f">
-<title>JARVIS · Dispositivos da rede</title>
+<title>JARVIS  Central de comunicacoes</title>
 <style>
-:root{color-scheme:dark;--bg:#07111f;--panel:#0d1b2a;--line:#18354a;--cyan:#49d9ff;--green:#43e0a0;--amber:#ffbd59;--red:#ff667a;--muted:#91a9bb}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#10283a 0,var(--bg) 55%);color:#e5f4ff;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
-header{position:sticky;top:0;z-index:5;background:#07111feF;border-bottom:1px solid var(--line);backdrop-filter:blur(14px);padding:16px clamp(16px,3vw,36px);display:flex;gap:18px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:12px}.brand-mark{display:grid;place-items:center;width:42px;height:42px;border:1px solid var(--cyan);border-radius:12px;color:var(--cyan);font-size:21px;box-shadow:0 0 22px #49d9ff22}h1{font-size:18px;letter-spacing:.12em;margin:0}.sub{color:var(--muted);font-size:12px}.header-actions{display:flex;gap:8px;flex-wrap:wrap}
-button,a.btn{font:inherit;border:1px solid #24506a;background:#10283a;color:#dff7ff;border-radius:9px;padding:9px 12px;text-decoration:none;cursor:pointer}button:hover,a.btn:hover{border-color:var(--cyan);color:var(--cyan)}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
-main{max-width:1440px;margin:auto;padding:24px clamp(14px,3vw,36px) 48px}.notice{padding:12px 14px;border:1px solid var(--line);border-radius:12px;color:var(--muted);margin-bottom:18px}.notice strong{color:var(--cyan)}
-.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}.metric,.panel{background:linear-gradient(145deg,#102235,#0a1725);border:1px solid var(--line);border-radius:14px}.metric{padding:16px}.metric-label{font-size:11px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}.metric-value{font-size:28px;font-weight:700;margin-top:4px}.metric-detail{font-size:11px;color:var(--muted)}
-.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}.toolbar input,.toolbar select{min-width:160px;flex:1;background:#081522;color:#e5f4ff;border:1px solid var(--line);border-radius:9px;padding:11px;font:inherit}.section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 12px}.section-title h2{font-size:14px;letter-spacing:.1em;text-transform:uppercase;margin:0}.count{color:var(--muted);font-size:12px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:12px}.device{min-width:0;padding:15px;position:relative;overflow:hidden}.device:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:#365166}.device.online:before{background:var(--green)}.device.offline:before{background:var(--red)}.device.unknown:before{background:var(--amber)}
-.device-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.device-icon{font-size:22px}.device-name{font-size:15px;font-weight:650;overflow-wrap:anywhere}.device-type{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:99px;font-size:11px;border:1px solid var(--line);white-space:nowrap}.pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}.pill.online{color:var(--green);border-color:#43e0a044}.pill.offline{color:var(--red);border-color:#ff667a44}.pill.unknown{color:var(--amber)}.pill.fresh{color:var(--green);border-color:#43e0a044}.pill.stale{color:var(--amber);border-color:#ffbd5944}.details{display:grid;gap:5px;margin:13px 0;color:var(--muted);font-size:12px}.details span{overflow-wrap:anywhere}.details b{color:#cce3f2;font-weight:500}.tags{display:flex;gap:5px;flex-wrap:wrap;margin:10px 0}.tag{font-size:10px;color:#b7d8eb;background:#132b3c;border:1px solid #24465b;border-radius:6px;padding:3px 6px}.device-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}.device-actions button{font-size:12px;padding:7px 9px}.empty{grid-column:1/-1;padding:28px;text-align:center;color:var(--muted);border:1px dashed #24465b;border-radius:12px}.camera-preview{width:100%;aspect-ratio:16/9;background:#030a10;border:1px solid var(--line);border-radius:9px;margin-top:12px;object-fit:contain}.error{color:var(--red)}footer{color:var(--muted);font-size:11px;margin-top:24px}
-@media(max-width:720px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-value{font-size:23px}header{position:static}.header-actions{width:100%}.header-actions>*{flex:1;text-align:center}}
+:root{color-scheme:dark;--bg:#07111f;--panel:#0d1b2a;--panel2:#102438;--line:#1b3a50;--cyan:#49d9ff;--green:#43e0a0;--amber:#ffbd59;--red:#ff667a;--muted:#91a9bb;--text:#e5f4ff}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 50% -15%,#17374d 0,var(--bg) 52%);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;min-height:100vh}
+a{color:var(--cyan);text-decoration:none}a:hover{text-decoration:underline}button,input,select{font:inherit}button,.button{border:1px solid #28516a;background:#10283a;color:#e5f4ff;border-radius:9px;padding:9px 12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:7px}button:hover,.button:hover{border-color:var(--cyan);color:var(--cyan)}button:disabled{opacity:.45;cursor:not-allowed}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+header{position:sticky;top:0;z-index:10;background:#07111fee;border-bottom:1px solid var(--line);backdrop-filter:blur(14px);padding:13px clamp(14px,3vw,36px)}.head{max-width:1500px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.brand{display:flex;align-items:center;gap:12px}.mark{width:42px;height:42px;border:1px solid var(--cyan);border-radius:12px;display:grid;place-items:center;color:var(--cyan);font-size:20px;box-shadow:0 0 22px #49d9ff22}.brand h1{font-size:16px;letter-spacing:.14em;margin:0}.sub{color:var(--muted);font-size:12px}.head-actions,.nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.nav{max-width:1500px;margin:12px auto 0;gap:6px}.nav a{padding:6px 10px;border:1px solid transparent;border-radius:7px;color:#b8d1e0;font-size:12px}.nav a:hover{border-color:var(--line);background:#102438;text-decoration:none;color:var(--cyan)}
+main{max-width:1500px;margin:auto;padding:22px clamp(14px,3vw,36px) 48px}.notice{padding:12px 14px;border:1px solid var(--line);border-radius:12px;color:var(--muted);margin-bottom:18px;background:#0c1c2a}.notice strong{color:var(--cyan)}.section{margin:26px 0;scroll-margin-top:125px}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 12px}.section-head h2{font-size:14px;letter-spacing:.1em;text-transform:uppercase;margin:0}.count{color:var(--muted);font-size:12px}.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;margin-bottom:18px}.metric,.panel,.device{background:linear-gradient(145deg,#102438,#0a1725);border:1px solid var(--line);border-radius:13px}.metric{padding:14px}.metric-label{font-size:10px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase}.metric-value{font-size:26px;font-weight:700;margin-top:3px}.metric-detail{font-size:11px;color:var(--muted)}.layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.panel{padding:15px;min-width:0}.panel h3{font-size:13px;margin:0 0 8px}.panel p{color:var(--muted);font-size:12px;margin:4px 0 12px}.toolbar{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 14px}.toolbar input,.toolbar select,.field input,.field select{min-width:0;background:#081522;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;width:100%}.toolbar>*{flex:1;min-width:150px}.field{display:grid;gap:5px;min-width:0}.field label{font-size:11px;color:#bfd5e4}.form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.form-actions{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:12px}.hint{font-size:11px;color:var(--muted);margin-top:8px}.result{margin-top:12px;padding:11px;border:1px solid var(--line);border-radius:9px;background:#071522;min-height:44px;overflow-wrap:anywhere}.result:empty{display:none}.result.error{border-color:#ff667a66;color:#ff9aa8}.result.success{border-color:#43e0a066}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:11px}.device{padding:14px;position:relative;overflow:hidden;min-width:0}.device:before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:#365166}.device.online:before{background:var(--green)}.device.offline:before{background:var(--red)}.device.unknown:before{background:var(--amber)}.device-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.device-icon{font-size:22px}.device-name{font-weight:650;overflow-wrap:anywhere}.device-type{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em}.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border:1px solid var(--line);border-radius:99px;font-size:10px;white-space:nowrap}.pill:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}.online{color:var(--green)}.offline{color:var(--red)}.unknown{color:var(--amber)}.details{display:grid;gap:5px;margin:12px 0;color:var(--muted);font-size:11px}.details b{color:#cce3f2;font-weight:500}.tags{display:flex;gap:5px;flex-wrap:wrap;margin:9px 0}.tag{font-size:10px;color:#b7d8eb;background:#132b3c;border:1px solid #24465b;border-radius:6px;padding:3px 6px}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.actions button{font-size:11px;padding:7px 9px}.camera-preview{width:100%;aspect-ratio:16/9;background:#030a10;border:1px solid var(--line);border-radius:8px;margin-top:10px;object-fit:contain}.empty{grid-column:1/-1;padding:24px;text-align:center;color:var(--muted);border:1px dashed #24465b;border-radius:10px}.muted{color:var(--muted)}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px}.list{display:grid;gap:8px}.row-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:#0a1926}.row-item .main{min-width:0;overflow-wrap:anywhere}.row-item .meta{font-size:11px;color:var(--muted)}.camera-preview[hidden]{display:none}.statusline{font-size:11px;color:var(--muted)}footer{color:var(--muted);font-size:11px;margin-top:24px}
+@media(max-width:950px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:680px){header{position:static}.layout{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr}.head-actions>*{flex:1}.nav{overflow-x:auto;flex-wrap:nowrap}.nav a{white-space:nowrap}.section{scroll-margin-top:12px}}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand"><div class="brand-mark" aria-hidden="true">⌘</div><div><h1>JARVIS / NETWORK</h1><div class="sub">Inventário de dispositivos · painel operacional</div></div></div>
-  <div class="header-actions"><a class="btn" href="/">← Voltar ao HUD</a><button id="discoverBtn" type="button">⌕ Descobrir vizinhos</button><button id="refreshBtn" type="button">↻ Atualizar agora</button></div>
+ <div class="head">
+  <div class="brand"><div class="mark" aria-hidden="true">J</div><div><h1>JARVIS / COMMUNICATIONS</h1><div class="sub">Visao operacional  descoberta  navegacao de dispositivos</div></div></div>
+  <div class="head-actions"><a class="button" href="/"> Voltar ao HUD</a><button id="refreshBtn" type="button"> Atualizar visao</button></div>
+ </div>
+ <nav class="nav" aria-label="Navegacao da central">
+  <a href="#overview">Visao geral</a><a href="#interfaces">Interfaces</a><a href="#devices">Dispositivos</a><a href="#cameras">Cameras</a><a href="#discovery">Descoberta</a><a href="#inspect">Inspecao</a><a href="#services">Servicos</a>
+ </nav>
 </header>
 <main>
-  <div class="notice"><strong>Fonte:</strong> dispositivos registrados no Jarvis. O estado online/offline reflete o último heartbeat registrado; ausência no inventário não prova que um dispositivo está desligado. A descoberta abaixo lê somente o cache ARP local, sem sondar hosts; em hospedagem cloud ela fica indisponível porque não representa a LAN do usuário.</div>
-  <section class="metrics" aria-label="Resumo dos dispositivos">
-    <div class="metric"><div class="metric-label">Dispositivos</div><div class="metric-value" id="totalMetric">—</div><div class="metric-detail">Inventariados</div></div>
-    <div class="metric"><div class="metric-label">Online</div><div class="metric-value" id="onlineMetric">—</div><div class="metric-detail">Heartbeat informado</div></div>
-    <div class="metric"><div class="metric-label">Offline</div><div class="metric-value" id="offlineMetric">—</div><div class="metric-detail">Último estado informado</div></div>
-    <div class="metric"><div class="metric-label">Câmeras</div><div class="metric-value" id="cameraMetric">—</div><div class="metric-detail">Capacidade registrada</div></div>
-  </section>
-  <section class="panel" style="padding:16px;margin-bottom:20px" aria-labelledby="discoveryHeading">\n    <div class="section-title" style="margin-top:0"><h2 id="discoveryHeading">⌕ Vizinhos detectados no cache local</h2><span class="count" id="discoveryCount">Não consultado</span></div>\n    <p class="sub" id="discoveryStatus" role="status">A descoberta é passiva e mostra apenas endereços já conhecidos pelo sistema operacional. Não é um scanner de rede.</p>\n    <div class="grid" id="discoveryGrid" style="margin-top:12px"><div class="empty">Clique em “Descobrir vizinhos” para consultar o cache local do host Jarvis.</div></div>\n  </section>\n  <section class="panel" style="padding:16px;margin-bottom:20px" aria-labelledby="observationHeading">
-    <div class="section-title" style="margin-top:0"><h2 id="observationHeading">◉ Observações atuais · Desktop + Mobile</h2><span class="count" id="observationCount">Não consultado</span></div>
-    <p class="sub" id="observationsStatus" role="status">Dados autenticados consolidados pelo Render e persistidos no Supabase. Ausência significa desconhecido; dados expirados aparecem como desatualizados.</p>
-    <div class="grid" id="observationGrid" style="margin-top:12px"><div class="empty">Consultando as últimas observações dos dispositivos…</div></div>
-  </section>
-  <div class="toolbar">
-    <input id="search" type="search" placeholder="Buscar nome, IP, tipo ou capacidade…" aria-label="Buscar dispositivos">
-    <select id="kindFilter" aria-label="Filtrar tipo"><option value="all">Todos os tipos</option><option value="camera">Câmeras</option><option value="computer">Computadores</option><option value="other">Outros dispositivos</option></select>
-    <select id="statusFilter" aria-label="Filtrar status"><option value="all">Todos os status</option><option value="online">Online</option><option value="offline">Offline</option><option value="unknown">Desconhecido</option></select>
-    <select id="sortFilter" aria-label="Ordenar dispositivos"><option value="name">Nome (A–Z)</option><option value="status">Online primeiro</option><option value="recent">Última comunicação</option></select>
+ <div class="notice"><strong>Escopo:</strong> inventario e heartbeat sao leitura passiva. Descobertas SSDP/ONVIF e mDNS enviam sondagens multicast locais apenas quando solicitadas. A inspecao TCP e o teste MQTT atuam somente no endereco privado informado. Nenhuma acao abre streams, autentica em dispositivos ou altera configuracoes. Nenhuma varredura de sub-rede e executada.</div>
+ <section class="section" id="overview">
+  <div class="section-head"><h2>Visao geral</h2><span class="count" id="runtimeStatus">Aguardando autenticacao</span></div>
+  <div class="metrics">
+   <div class="metric"><div class="metric-label">Dispositivos registrados</div><div class="metric-value" id="totalMetric"></div><div class="metric-detail">Inventario Jarvis</div></div>
+   <div class="metric"><div class="metric-label">Online</div><div class="metric-value" id="onlineMetric"></div><div class="metric-detail">Heartbeat informado</div></div>
+   <div class="metric"><div class="metric-label">Offline</div><div class="metric-value" id="offlineMetric"></div><div class="metric-detail">Ultimo estado conhecido</div></div>
+   <div class="metric"><div class="metric-label">Cameras</div><div class="metric-value" id="cameraMetric"></div><div class="metric-detail">Capacidade registrada</div></div>
+   <div class="metric"><div class="metric-label">Interfaces locais</div><div class="metric-value" id="interfaceMetric"></div><div class="metric-detail">Host desta API</div></div>
   </div>
-  <section id="cameraSection">
-    <div class="section-title"><h2>▣ Acesso rápido · Câmeras</h2><span class="count" id="cameraCount">0 dispositivos</span></div>
-    <div class="grid" id="cameraGrid"><div class="empty">Carregando câmeras registradas…</div></div>
-  </section>
-  <section>
-    <div class="section-title"><h2>▤ Computadores e dispositivos</h2><span class="count" id="deviceCount">0 dispositivos</span></div>
-    <div class="grid" id="deviceGrid"><div class="empty">Carregando inventário…</div></div>
-  </section>
-  <footer id="updatedAt">Aguardando conexão com a API autenticada do Jarvis.</footer>
+  <div class="layout">
+   <article class="panel"><h3>Estado da sessao</h3><div class="details" id="sessionDetails"><span>Verificando sessao autenticada...</span></div></article>
+   <article class="panel"><h3>Ultimas observacoes</h3><div class="list" id="observationList"><div class="empty">Aguardando consulta.</div></div></article>
+  </div>
+ </section>
+ <section class="section" id="interfaces">
+  <div class="section-head"><h2>Interfaces e rotas locais</h2><span class="count" id="interfaceCount">Nao consultado</span></div>
+  <div class="panel"><p>Enderecos das interfaces do host que executa esta API. Em uma implantacao cloud, estes enderecos pertencem ao container/servidor, nao necessariamente a rede do computador do usuario.</p><div class="list" id="interfaceList"><div class="empty">Carregando interfaces...</div></div></div>
+ </section>
+ <section class="section" id="devices">
+  <div class="section-head"><h2>Inventario de dispositivos</h2><span class="count" id="deviceCount">0 dispositivos</span></div>
+  <div class="toolbar"><input id="search" type="search" placeholder="Buscar nome, IP, tipo ou capacidade" aria-label="Buscar dispositivos"><select id="kindFilter" aria-label="Filtrar tipo"><option value="all">Todos os tipos</option><option value="camera">Cameras</option><option value="computer">Computadores</option><option value="other">Outros</option></select><select id="statusFilter" aria-label="Filtrar status"><option value="all">Todos os estados</option><option value="online">Online</option><option value="offline">Offline</option><option value="unknown">Desconhecido</option></select><select id="sortFilter" aria-label="Ordenar"><option value="name">Nome (AZ)</option><option value="status">Online primeiro</option><option value="recent">Comunicacao recente</option></select></div>
+  <div class="grid" id="deviceGrid"><div class="empty">Carregando inventario autenticado...</div></div>
+ </section>
+ <section class="section" id="cameras">
+  <div class="section-head"><h2>Navegacao rapida  Cameras</h2><span class="count" id="cameraCount">0 cameras</span></div>
+  <div class="grid" id="cameraGrid"><div class="empty">Nenhuma camera registrada no inventario.</div></div>
+ </section>
+ <section class="section" id="discovery">
+  <div class="section-head"><h2>Descoberta local</h2><span class="count">Acoes manuais</span></div>
+  <div class="layout">
+   <article class="panel"><h3>Vizinhos conhecidos pelo sistema</h3><p>Consulta somente o cache ARP/neighbour do host. Nao envia pacotes de descoberta.</p><button id="discoverNeighborsBtn" type="button">Consultar cache local</button><div class="result" id="neighborsResult" role="status"></div><div class="list" id="neighborList"><div class="empty">Ainda nao consultado.</div></div></article>
+   <article class="panel"><h3>Cameras  SSDP + ONVIF</h3><p>Envia M-SEARCH SSDP e WS-Discovery ONVIF multicast no enlace local. Nao autentica nem abre video.</p><button id="discoverCamerasBtn" type="button">Descobrir cameras</button><div class="result" id="cameraDiscoveryResult" role="status"></div><div class="list" id="cameraDiscoveryList"><div class="empty">Ainda nao consultado.</div></div></article>
+   <article class="panel"><h3>Servicos  mDNS / DNS-SD</h3><p>Consulta registros PTR do servico selecionado. Os endpoints anunciados nao sao acessados.</p><div class="field"><label for="mdnsService">Nome do servico</label><select id="mdnsService"><option value="_services._dns-sd._udp.local">Todos os servicos DNS-SD</option><option value="_http._tcp.local">HTTP / Web</option><option value="_https._tcp.local">HTTPS</option><option value="_ssh._tcp.local">SSH</option><option value="_workstation._tcp.local">Workstation</option><option value="_ipp._tcp.local">Impressoras IPP</option></select></div><div class="form-actions"><button id="discoverMdnsBtn" type="button">Consultar mDNS</button></div><div class="result" id="mdnsResult" role="status"></div><div class="list" id="mdnsList"><div class="empty">Ainda nao consultado.</div></div></article>
+   <article class="panel"><h3>Dispositivos encontrados</h3><p>Resultados de descoberta sao temporarios nesta tela. Use Inspecionar host para uma consulta TCP explicita.</p><div class="list" id="discoveredDevices"><div class="empty">Nenhum resultado novo.</div></div></article>
+  </div>
+ </section>
+ <section class="section" id="inspect">
+  <div class="section-head"><h2>Inspecao de um dispositivo</h2><span class="count">Host unico  IPv4 privado</span></div>
+  <div class="panel"><p>Consulta TCP limitada a um unico endereco RFC1918. Portas padrao selecionadas abaixo; nenhuma varredura de sub-rede. HTTP(S) usa HEAD, RTSP usa OPTIONS e a validacao TLS permanece ativa.</p>
+   <div class="form-grid"><div class="field"><label for="inspectIp">Endereco IPv4 privado</label><input id="inspectIp" type="text" inputmode="decimal" placeholder="192.168.1.50" autocomplete="off"></div><div class="field"><label for="inspectPorts">Portas TCP (separadas por virgula)</label><input id="inspectPorts" type="text" value="22,80,443,554,8000,8080,8554,1883,8883"></div><div class="field"><label for="inspectTimeout">Timeout por conexao</label><select id="inspectTimeout"><option value="0.5">0,5 s</option><option value="0.75" selected>0,75 s</option><option value="1.5">1,5 s</option><option value="3">3 s</option></select></div></div>
+   <div class="form-actions"><button id="inspectBtn" type="button">Inspecionar host informado</button><span class="hint">O endereco precisa pertencer a 10/8, 172.16/12 ou 192.168/16.</span></div><div class="result" id="inspectResult" role="status"></div><div class="list" id="inspectList"></div>
+  </div>
+ </section>
+ <section class="section" id="services">
+  <div class="section-head"><h2>Teste de servico  MQTT</h2><span class="count">Handshake sem credenciais</span></div>
+  <div class="panel"><p>Abre uma conexao temporaria com um unico broker e executa CONNECT/CONNACK/DISCONNECT. Nao envia usuario/senha, PUBLISH ou SUBSCRIBE.</p><div class="form-grid"><div class="field"><label for="mqttIp">IPv4 privado do broker</label><input id="mqttIp" type="text" inputmode="decimal" placeholder="192.168.1.60"></div><div class="field"><label for="mqttPort">Porta</label><select id="mqttPort"><option value="1883">1883  MQTT</option><option value="8883">8883  MQTT TLS</option></select></div><div class="field"><label for="mqttTimeout">Timeout</label><select id="mqttTimeout"><option value="0.5">0,5 s</option><option value="1" selected>1 s</option><option value="2">2 s</option><option value="3">3 s</option></select></div></div><div class="form-actions"><button id="mqttProbeBtn" type="button">Testar broker</button></div><div class="result" id="mqttResult" role="status"></div></div>
+ </section>
+ <footer id="updatedAt">Aguardando conexao com a API autenticada do Jarvis.</footer>
+  <dialog id="deviceDialog" style="max-width:min(760px,92vw);max-height:80vh;overflow:auto;background:#0d1b2a;color:#e5f4ff;border:1px solid #49d9ff;border-radius:12px;padding:18px"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><h2 style="font-size:14px;margin:0">Detalhes do dispositivo</h2><button id="closeDeviceDialog" type="button">Fechar</button></div><pre id="deviceDialogContent" style="white-space:pre-wrap;overflow-wrap:anywhere;color:#bcd8e8;font-size:12px"></pre></dialog>
 </main>
 <script>
 (() => {
-  const TOKEN_KEY = 'jarvis_auth_token';
-  const EXPIRY_KEY = 'jarvis_token_expiry';
-  const $ = id => document.getElementById(id);
-  let devices = [];
-  let refreshTimer = null;
-  let observationTimer = null;
-  const cameraNames = new Set(['camera','ip_camera','webcam','rtsp','onvif','video','câmera','camara']);
-  const text = value => value == null || value === '' ? '—' : String(value);
-  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  const caps = device => Array.isArray(device.capabilities) ? device.capabilities : [];
-  const capNames = device => caps(device).map(cap => String(cap.name || '').toLowerCase());
-  const isCamera = device => capNames(device).some(name => cameraNames.has(name) || /camera|câmera|camara|onvif|rtsp/.test(name)) || /camera|câmera|camara/i.test(String(device.type || ''));
-  const isComputer = device => /desktop|computer|pc|laptop|server|workstation/i.test(String(device.type || device.name || ''));
-  const kind = device => isCamera(device) ? 'camera' : isComputer(device) ? 'computer' : 'other';
-  const statusOf = device => ['online','offline'].includes(String(device.status || '').toLowerCase()) ? String(device.status).toLowerCase() : 'unknown';
-  const lastSeen = device => device.last_seen ? new Date(device.last_seen) : null;
-  const fmtDate = value => { const d = value instanceof Date ? value : value ? new Date(value) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleString() : 'Sem registro'; };
-  function streamFor(device) {
-    for (const cap of caps(device)) {
-      const meta = cap.metadata && typeof cap.metadata === 'object' ? cap.metadata : {};
-      const candidate = meta.snapshot_url || meta.stream_url || meta.preview_url || meta.url;
-      if (typeof candidate === 'string') {
-        try { const url = new URL(candidate, window.location.origin); if (['http:','https:'].includes(url.protocol) && !url.username && !url.password) return url.href; } catch (_) {}
-      }
-    }
-    return null;
-  }
-  function cameraCard(device) {
-    const status = statusOf(device), stream = streamFor(device);
-    const actions = stream ? '<button type="button" data-open-stream="'+device.id+'">Abrir visualização ↗</button>' : '<button type="button" disabled title="Cadastre uma URL HTTP(S) de preview nas capacidades da câmera">Preview não configurado</button>';
-    return '<article class="panel device '+status+'"><div class="device-top"><div><div class="device-icon" aria-hidden="true">▣</div><div class="device-name">'+escapeHtml(device.name)+'</div><div class="device-type">'+escapeHtml(device.type)+'</div></div><span class="pill '+status+'">'+(status==='unknown'?'Desconhecido':status==='online'?'Online':'Offline')+'</span></div>'+
-      (stream ? '<img class="camera-preview" loading="lazy" alt="Preview da câmera '+escapeHtml(device.name)+'" src="'+escapeHtml(stream)+'" referrerpolicy="no-referrer" onerror="this.style.display='none'">' : '<div class="camera-preview" style="display:grid;place-items:center;color:#63859a">▧<br>Preview indisponível</div>')+
-      '<div class="details"><span><b>IP:</b> '+escapeHtml(text(device.last_ip))+'</span><span><b>Última comunicação:</b> '+escapeHtml(fmtDate(lastSeen(device)))+'</span></div><div class="tags">'+caps(device).map(c=>'<span class="tag">'+escapeHtml(c.name)+'</span>').join('')+'</div><div class="device-actions">'+actions+'</div></article>';
-  }
-  function deviceCard(device) {
-    const status = statusOf(device);
-    return '<article class="panel device '+status+'"><div class="device-top"><div><div class="device-icon" aria-hidden="true">'+(isComputer(device)?'▣':'◈')+'</div><div class="device-name">'+escapeHtml(device.name)+'</div><div class="device-type">'+escapeHtml(device.type)+'</div></div><span class="pill '+status+'">'+(status==='unknown'?'Desconhecido':status==='online'?'Online':'Offline')+'</span></div>'+
-      '<div class="details"><span><b>IP:</b> '+escapeHtml(text(device.last_ip))+'</span><span><b>Rede:</b> '+escapeHtml(text(device.network_type))+' · '+escapeHtml(text(device.network_id))+'</span><span><b>Última comunicação:</b> '+escapeHtml(fmtDate(lastSeen(device)))+'</span></div><div class="tags">'+caps(device).map(c=>'<span class="tag">'+escapeHtml(c.name)+'</span>').join('')+'</div><div class="device-actions"><button type="button" data-copy-ip="'+escapeHtml(device.last_ip || '')+'" '+(device.last_ip?'':'disabled')+'>Copiar IP</button><button type="button" data-details="'+device.id+'">Detalhes</button></div></article>';
-  }
-  function filtered() {
-    const query = $('search').value.trim().toLowerCase(), k = $('kindFilter').value, st = $('statusFilter').value, sort = $('sortFilter').value;
-    return devices.filter(d => {
-      const searchable = [d.name,d.type,d.last_ip,d.network_id,d.network_type,...capNames(d)].join(' ').toLowerCase();
-      return (!query || searchable.includes(query)) && (k==='all' || kind(d)===k) && (st==='all' || statusOf(d)===st);
-    }).sort((a,b) => sort==='status' ? ({online:0,unknown:1,offline:2}[statusOf(a)]-({online:0,unknown:1,offline:2}[statusOf(b)]) || String(a.name).localeCompare(String(b.name))) : sort==='recent' ? ((lastSeen(b)?.getTime()||0)-(lastSeen(a)?.getTime()||0)) : String(a.name).localeCompare(String(b.name)));
-  }
-  function render() {
-    const rows = filtered(), cameras = rows.filter(isCamera), others = rows.filter(d => !isCamera(d));
-    $('totalMetric').textContent = devices.length;
-    $('onlineMetric').textContent = devices.filter(d=>statusOf(d)==='online').length;
-    $('offlineMetric').textContent = devices.filter(d=>statusOf(d)==='offline').length;
-    $('cameraMetric').textContent = devices.filter(isCamera).length;
-    $('cameraCount').textContent = cameras.length+' dispositivo(s)';
-    $('deviceCount').textContent = others.length+' dispositivo(s)';
-    $('cameraGrid').innerHTML = cameras.length ? cameras.map(cameraCard).join('') : '<div class="empty">Nenhuma câmera registrada com capacidade camera/ONVIF/RTSP.</div>';
-    $('deviceGrid').innerHTML = others.length ? others.map(deviceCard).join('') : '<div class="empty">Nenhum outro dispositivo corresponde aos filtros.</div>';
-  }
-  async function discoverNeighbors() {
-    const token = localStorage.getItem(TOKEN_KEY), expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
-    if (!token || (expiry && Date.now() >= expiry)) {
-      $('discoveryStatus').textContent = 'Sessão ausente ou expirada. Entre novamente no HUD.';
-      return;
-    }
-    $('discoverBtn').disabled = true;
-    $('discoverBtn').textContent = 'Consultando…';
-    $('discoveryStatus').textContent = 'Consultando cache ARP local do host Jarvis…';
-    try {
-      const response = await fetch('/v1/network/discovery', {
-        headers: {Authorization:'Bearer '+token},
-        cache: 'no-store'
-      });
-      if (response.status === 401) throw new Error('Sessão inválida; entre novamente no HUD.');
-      if (!response.ok) throw new Error('API respondeu HTTP '+response.status);
-      const result = await response.json();
-      const neighbors = Array.isArray(result.devices) ? result.devices : [];
-      $('discoveryCount').textContent = result.available ? neighbors.length+' vizinho(s)' : 'Indisponível';
-      $('discoveryStatus').textContent = result.message || 'Sem detalhes da descoberta.';
-      if (!result.available) {
-        $('discoveryGrid').innerHTML = '<div class="empty">'+escapeHtml(result.message || 'Descoberta indisponível neste host.')+'</div>';
-        return;
-      }
-      if (!neighbors.length) {
-        $('discoveryGrid').innerHTML = '<div class="empty">O cache ARP não contém vizinhos válidos neste momento. Isso não significa que a rede esteja vazia.</div>';
-        return;
-      }
-      $('discoveryGrid').innerHTML = neighbors.map(host => {
-        const match = devices.find(d => String(d.last_ip || '') === host.ip);
-        return '<article class="panel device unknown"><div class="device-top"><div><div class="device-name">'+escapeHtml(match ? match.name : 'Host não registrado')+'</div><div class="device-type">VIZINHO ARP · NÃO É HEARTBEAT</div></div><span class="pill unknown">'+(match ? 'Inventariado' : 'Novo no inventário')+'</span></div><div class="details"><span><b>IP:</b> '+escapeHtml(host.ip)+'</span><span><b>MAC:</b> '+escapeHtml(host.mac)+'</span><span><b>Interface:</b> '+escapeHtml(host.interface || '—')+'</span></div></article>';
-      }).join('');
-    } catch (error) {
-      $('discoveryCount').textContent = 'Erro';
-      $('discoveryStatus').textContent = error.message;
-      $('discoveryGrid').innerHTML = '<div class="empty error">'+escapeHtml(error.message)+'</div>';
-    } finally {
-      $('discoverBtn').disabled = false;
-      $('discoverBtn').textContent = '⌕ Descobrir vizinhos';
-    }
-  }
-  async function loadObservations() {
-    const token = localStorage.getItem(TOKEN_KEY), expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
-    if (!token || (expiry && Date.now() >= expiry)) {
-      $('observationCount').textContent = 'Sessão necessária';
-      $('observationsStatus').textContent = 'Entre no HUD para consultar as observações autenticadas.';
-      $('observationGrid').innerHTML = '<div class="empty">Estado desconhecido: autenticação ausente ou expirada.</div>';
-      return;
-    }
-    try {
-      const response = await fetch('/v1/environment/observations/latest', {
-        headers: {Authorization:'Bearer '+token}, cache:'no-store'
-      });
-      if (response.status === 401) throw new Error('Sessão inválida; entre novamente no HUD.');
-      if (!response.ok) throw new Error('API de observações respondeu HTTP '+response.status);
-      const result = await response.json();
-      const observations = Array.isArray(result.observations) ? result.observations : [];
-      $('observationCount').textContent = observations.length + ' observação(ões)';
-      if (!observations.length) {
-        $('observationGrid').innerHTML = '<div class="empty">Nenhum dispositivo enviou observações ainda. O estado é desconhecido, não offline.</div>';
-        return;
-      }
-      $('observationsStatus').textContent = 'Servidor consultado: ' + new Date(result.server_time || Date.now()).toLocaleString() + '. A validade é calculada pelo servidor.';
-      $('observationGrid').innerHTML = observations.map(item => {
-        const payload = item.payload && typeof item.payload === 'object' ? item.payload : {};
-        const fresh = item.freshness === 'fresh';
-        const state = fresh ? 'fresh' : 'stale';
-        const stateLabel = fresh ? 'Atual' : 'Desatualizado';
-        let details = '';
-        if (item.observation_type === 'network_snapshot') {
-          if (item.source_device_type === 'mobile') {
-            details = '<span><b>Rede:</b> '+escapeHtml(text(payload.network_type))+'</span>' +
-              '<span><b>Internet:</b> '+escapeHtml(payload.validated ? 'validada' : payload.internet_available ? 'não validada' : 'indisponível')+'</span>' +
-              '<span><b>VPN:</b> '+escapeHtml(payload.vpn_active ? 'ativa' : 'não detectada')+'</span>';
-          } else {
-            details = '<span><b>Interfaces:</b> '+escapeHtml(Array.isArray(payload.interfaces) ? payload.interfaces.length : 0)+'</span>' +
-              '<span><b>Vizinhos ARP:</b> '+escapeHtml(Array.isArray(payload.neighbors) ? payload.neighbors.length : 0)+' (cache passivo)</span>' +
-              '<span><b>Sondagens ativas:</b> nenhuma</span>';
-          }
-        } else {
-          details = '<span><b>Presença informada:</b> '+escapeHtml(payload.active === true ? 'ativa' : payload.active === false ? 'inativa' : 'não informada')+'</span>' +
-            '<span><b>Contexto:</b> '+escapeHtml(text(payload.app_state))+'</span>';
-        }
-        return '<article class="panel device '+state+'"><div class="device-top"><div><div class="device-name">'+escapeHtml(text(item.device_id))+'</div><div class="device-type">'+escapeHtml(text(item.source_device_type))+' · '+escapeHtml(text(item.observation_type))+'</div></div><span class="pill '+state+'">'+stateLabel+'</span></div>' +
-          '<div class="details">'+details+'<span><b>Recebido:</b> '+escapeHtml(item.received_at ? new Date(item.received_at).toLocaleString() : '—')+'</span>' +
-          '<span><b>Idade:</b> '+escapeHtml(item.age_seconds == null ? 'desconhecida' : item.age_seconds+' s')+'</span></div></article>';
-      }).join('');
-    } catch (error) {
-      $('observationCount').textContent = 'Indisponível';
-      $('observationsStatus').textContent = error.message;
-      $('observationGrid').innerHTML = '<div class="empty error">'+escapeHtml(error.message)+'</div>';
-    }
-  }
-  async function loadDevices() {
-    const token = localStorage.getItem(TOKEN_KEY), expiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
-    if (!token || (expiry && Date.now() >= expiry)) {
-      $('updatedAt').innerHTML = '<span class="error">Sessão ausente ou expirada.</span> <a href="/">Volte ao HUD e entre novamente.</a>';
-      $('cameraGrid').innerHTML = $('deviceGrid').innerHTML = '<div class="empty">Autenticação necessária para carregar o inventário.</div>';
-      return;
-    }
-    $('refreshBtn').disabled = true; $('refreshBtn').textContent = 'Atualizando…';
-    try {
-      const response = await fetch('/v1/devices', {headers:{Authorization:'Bearer '+token},cache:'no-store'});
-      if (response.status === 401) { $('updatedAt').innerHTML = '<span class="error">Sessão inválida.</span> <a href="/">Entre novamente no HUD.</a>'; return; }
-      if (!response.ok) throw new Error('API respondeu HTTP '+response.status);
-      const data = await response.json();
-      devices = Array.isArray(data.devices) ? data.devices : [];
-      render();
-      $('updatedAt').textContent = 'Última atualização: '+new Date().toLocaleString()+' · atualização automática a cada 15 s.';
-    } catch (error) {
-      $('updatedAt').innerHTML = '<span class="error">Falha ao carregar inventário: '+escapeHtml(error.message)+'</span>';
-    } finally { $('refreshBtn').disabled = false; $('refreshBtn').textContent = '↻ Atualizar agora'; }
-  }
-  document.addEventListener('click', async event => {
-    const stream = event.target.closest('[data-open-stream]');
-    if (stream) { const device = devices.find(d=>String(d.id)===stream.dataset.openStream), url = device && streamFor(device); if(url) window.open(url,'_blank','noopener,noreferrer'); return; }
-    const copy = event.target.closest('[data-copy-ip]');
-    if (copy && copy.dataset.copyIp) { try { await navigator.clipboard.writeText(copy.dataset.copyIp); copy.textContent='IP copiado ✓'; } catch (_) { copy.textContent='Cópia bloqueada'; } return; }
-    const detail = event.target.closest('[data-details]');
-    if (detail) { const device=devices.find(d=>String(d.id)===detail.dataset.details); if(device) alert(JSON.stringify(device,null,2)); }
-  });
-  ['search','kindFilter','statusFilter','sortFilter'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',render));
-  $('refreshBtn').addEventListener('click',()=>{loadDevices();loadObservations();});\n  $('discoverBtn').addEventListener('click',discoverNeighbors);
-  loadDevices();
-  loadObservations();
-  refreshTimer = window.setInterval(loadDevices,15000);
-  observationTimer = window.setInterval(loadObservations,15000);
-  window.addEventListener('pagehide',()=>{if(refreshTimer)window.clearInterval(refreshTimer);if(observationTimer)window.clearInterval(observationTimer);});
+ 'use strict';
+ const TOKEN_KEY='jarvis_auth_token', EXPIRY_KEY='jarvis_token_expiry';
+ const $=id=>document.getElementById(id);
+ const state={devices:[],interfaces:[],observations:[],discovered:[],refreshTimer:null};
+ const cameraNames=new Set(['camera','ip_camera','webcam','rtsp','onvif','video','camera_access']);
+ const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+ const fmtDate=value=>{if(!value)return 'Sem registro';const d=new Date(value);return Number.isNaN(d.getTime())?'Sem registro':d.toLocaleString();};
+ const caps=d=>Array.isArray(d.capabilities)?d.capabilities:[];
+ const capNames=d=>caps(d).map(c=>String(c.name||'').toLowerCase());
+ const isCamera=d=>capNames(d).some(n=>cameraNames.has(n)||/camera|onvif|rtsp|camera/.test(n))||/camera|camera|onvif|rtsp/i.test(String(d.type||''));
+ const isComputer=d=>/desktop|computer|pc|laptop|server|workstation/i.test(String(d.type||d.name||''));
+ const kind=d=>isCamera(d)?'camera':isComputer(d)?'computer':'other';
+ const statusOf=d=>['online','offline'].includes(String(d.status||'').toLowerCase())?String(d.status).toLowerCase():'unknown';
+ function token(){const value=localStorage.getItem(TOKEN_KEY),expiry=Number(localStorage.getItem(EXPIRY_KEY)||0);return value&&(!expiry||Date.now()<expiry)?value:null;}
+ async function api(path,{method='GET',body}={}){const auth=token();if(!auth)throw new Error('Sessao ausente ou expirada. Entre novamente pelo HUD.');const response=await fetch(path,{method,headers:{Authorization:'Bearer '+auth,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store'});if(response.status===401)throw new Error('Sessao invalida. Entre novamente pelo HUD.');const data=await response.json().catch(()=>({detail:'Resposta invalida da API'}));if(!response.ok)throw new Error(data.detail||data.message||('HTTP '+response.status));return data;}
+ function busy(button,active,label){button.disabled=active;if(active){button.dataset.label=button.textContent;button.textContent=label||'Consultando...';}else{button.textContent=button.dataset.label||button.textContent;delete button.dataset.label;}}
+ function result(id,message,type='success'){const node=$(id);node.className='result '+type;node.textContent=message;}
+ function empty(message){return '<div class="empty">'+esc(message)+'</div>';}
+ function safePreview(device){for(const cap of caps(device)){const meta=cap.metadata&&typeof cap.metadata==='object'?cap.metadata:{};const candidate=meta.snapshot_url||meta.preview_url||meta.stream_url||meta.url;if(typeof candidate!=='string')continue;try{const u=new URL(candidate,location.origin);if(['http:','https:'].includes(u.protocol)&&!u.username&&!u.password)return u.href;}catch(_){}}return null;}
+ function renderOverview(){const online=state.devices.filter(d=>statusOf(d)==='online').length;const offline=state.devices.filter(d=>statusOf(d)==='offline').length;const cameras=state.devices.filter(isCamera);$('totalMetric').textContent=state.devices.length;$('onlineMetric').textContent=online;$('offlineMetric').textContent=offline;$('cameraMetric').textContent=cameras.length;$('interfaceMetric').textContent=state.interfaces.length;$('runtimeStatus').textContent=token()?'API autenticada':'Sem sessao';$('sessionDetails').innerHTML='<span><b>API:</b> /v1/* autenticada</span><span><b>Inventario:</b> '+state.devices.length+' dispositivo(s)</span><span><b>Interfaces:</b> '+state.interfaces.length+' no host da API</span><span><b>Atualizacao automatica:</b> somente inventario e observacoes (15 s)</span><span><b>Sondagens ativas:</b> somente por clique explicito</span>';}
+ function renderInterfaces(){
+  $('interfaceCount').textContent=state.interfaces.length+' interface(s)';
+  $('interfaceList').innerHTML=state.interfaces.length?state.interfaces.map(i=>{
+   const stateLabel=i.operational_status||'unknown';
+   const stateClass=stateLabel==='up'?'online':stateLabel==='down'?'offline':'unknown';
+   const scopeLabel=i.scope||'unknown';
+   const speed=i.speed_mbps?' | '+i.speed_mbps+' Mbps':'';
+   const mtu=i.mtu?' | MTU '+i.mtu:'';
+   return '<div class="row-item"><div class="main"><b>'+esc(i.interface)+'</b><div class="meta mono">'+esc(i.address)+' | '+esc(i.network||'rede nao informada')+'</div><div class="meta">'+esc(i.netmask||'mascara nao informada')+esc(speed)+esc(mtu)+'</div></div><div class="actions"><span class="pill '+stateClass+'">'+esc(stateLabel)+'</span><span class="pill '+(scopeLabel==='private'?'online':'unknown')+'">'+esc(scopeLabel)+'</span></div></div>';
+  }).join(''):empty('Nenhuma interface IPv4 retornada pelo host da API.');
+ }
+ function streamFor(d){return safePreview(d);}
+ function deviceCard(d){const status=statusOf(d),camera=isCamera(d),preview=camera?streamFor(d):null;const tags=caps(d).map(c=>'<span class="tag">'+esc(c.name)+'</span>').join('');return '<article class="device '+status+'"><div class="device-top"><div><div class="device-icon">'+(camera?'':isComputer(d)?'':'')+'</div><div class="device-name">'+esc(d.name)+'</div><div class="device-type">'+esc(d.type||'dispositivo')+'</div></div><span class="pill '+status+'">'+(status==='unknown'?'Desconhecido':status==='online'?'Online':'Offline')+'</span></div>'+(preview?'<img class="camera-preview" loading="lazy" alt="Preview '+esc(d.name)+'" src="'+esc(preview)+'" referrerpolicy="no-referrer" onerror="this.hidden=true">':'')+'<div class="details"><span><b>IP:</b> '+esc(d.last_ip||'Nao informado')+'</span><span><b>Rede:</b> '+esc(d.network_type||d.network_id||'Nao informada')+'</span><span><b>Ultima comunicacao:</b> '+esc(fmtDate(d.last_seen))+'</span></div><div class="tags">'+tags+'</div><div class="actions"><button type="button" data-inspect-ip="'+esc(d.last_ip||'')+'" '+(!d.last_ip?'disabled':'')+'>Inspecionar host</button><button type="button" data-device-details="'+esc(d.id)+'">Detalhes</button></div></article>';}
+ function filtered(){const q=$('search').value.trim().toLowerCase(),k=$('kindFilter').value,s=$('statusFilter').value;const list=state.devices.filter(d=>(!q||[d.name,d.type,d.last_ip,...capNames(d)].join(' ').toLowerCase().includes(q))&&(k==='all'||kind(d)===k)&&(s==='all'||statusOf(d)===s));const sort=$('sortFilter').value;list.sort((a,b)=>sort==='status'?(['online','offline','unknown'].indexOf(statusOf(a))-['online','offline','unknown'].indexOf(statusOf(b))):sort==='recent'?(new Date(b.last_seen||0)-new Date(a.last_seen||0)):String(a.name).localeCompare(String(b.name),'pt-BR'));return list;}
+ function renderDevices(){const list=filtered();$('deviceCount').textContent=list.length+' de '+state.devices.length+' dispositivo(s)';$('deviceGrid').innerHTML=list.length?list.map(deviceCard).join(''):empty('Nenhum dispositivo corresponde aos filtros.');const cameras=state.devices.filter(isCamera).sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR'));$('cameraCount').textContent=cameras.length+' camera(s)';$('cameraGrid').innerHTML=cameras.length?cameras.map(deviceCard).join(''):empty('Nenhuma camera cadastrada. Execute a descoberta SSDP/ONVIF ou registre uma camera no inventario.');}
+ function renderObservations(){const list=state.observations.slice(0,6);$('observationList').innerHTML=list.length?list.map(o=>'<div class="row-item"><div class="main"><b>'+esc(o.device_name||o.device_id||'Dispositivo')+'</b><div class="meta">'+esc(o.observation_type||'observacao')+'  '+esc(fmtDate(o.received_at))+'</div></div><span class="pill '+(o.is_stale?'unknown':'online')+'">'+(o.is_stale?'Desatualizada':'Recente')+'</span></div>').join(''):empty('Nenhuma observacao disponivel.');}
+ async function loadDevices(){try{const data=await api('/v1/devices');state.devices=Array.isArray(data.devices)?data.devices:[];renderDevices();renderOverview();$('updatedAt').textContent='Inventario atualizado em '+new Date().toLocaleString()+'.';}catch(e){$('deviceGrid').innerHTML=empty(e.message);$('runtimeStatus').textContent='Falha no inventario';$('updatedAt').textContent=e.message;}}
+ async function loadInterfaces(){try{const data=await api('/v1/network/interfaces');if(data.success===false)throw new Error(data.message||'Inventario de interfaces indisponivel.');state.interfaces=Array.isArray(data.interfaces)?data.interfaces:[];renderInterfaces();renderOverview();}catch(e){$('interfaceList').innerHTML=empty(e.message);$('interfaceCount').textContent='Indisponivel';}}
+ async function loadObservations(){try{const data=await api('/v1/environment/observations/latest');state.observations=Array.isArray(data.observations)?data.observations:Array.isArray(data.items)?data.items:[];renderObservations();}catch(e){$('observationList').innerHTML=empty(e.message);}}
+ async function loadAll(){await Promise.all([loadDevices(),loadInterfaces(),loadObservations()]);}
+ function renderNeighborResults(data){const items=Array.isArray(data.devices)?data.devices:[];$('neighborList').innerHTML=items.length?items.map(d=>'<div class="row-item"><div class="main"><b class="mono">'+esc(d.ip)+'</b><div class="meta mono">'+esc(d.mac||'MAC nao informado')+'</div></div><button type="button" data-inspect-ip="'+esc(d.ip)+'">Inspecionar</button></div>').join(''):empty(data.message||'Nenhum vizinho encontrado no cache.');}
+ async function discoverNeighbors(){const b=$('discoverNeighborsBtn');busy(b,true);try{const data=await api('/v1/network/discovery');result('neighborsResult',data.message||'Consulta passiva concluida.');renderNeighborResults(data);}catch(e){result('neighborsResult',e.message,'error');}finally{busy(b,false);}}
+ function addDiscovered(items,kindLabel){for(const item of items){const ip=item.source_ip||item.ip||item.address;if(ip&& !state.discovered.some(d=>d.ip===ip&&d.kind===kindLabel))state.discovered.push({ip,kind:kindLabel,detail:item});}renderDiscovered();}
+ function renderDiscovered(){$('discoveredDevices').innerHTML=state.discovered.length?state.discovered.map(d=>'<div class="row-item"><div class="main"><b class="mono">'+esc(d.ip)+'</b><div class="meta">'+esc(d.kind)+'  '+esc(d.detail.manufacturer||d.detail.model||d.detail.server||d.detail.service_type||'Metadados de descoberta')+'</div></div><button type="button" data-inspect-ip="'+esc(d.ip)+'">Inspecionar</button></div>').join(''):empty('Nenhum resultado novo.');}
+ async function discoverCameras(){const b=$('discoverCamerasBtn');busy(b,true);try{const data=await api('/v1/network/cameras/discover',{method:'POST',body:{timeout:2}});const ssdp=data.ssdp?.devices||[],onvif=data.onvif?.devices||[];addDiscovered(ssdp,'SSDP');addDiscovered(onvif,'ONVIF');const count=ssdp.length+onvif.length;result('cameraDiscoveryResult',count+' resultado(s): '+ssdp.length+' SSDP e '+onvif.length+' ONVIF.'+(Object.keys(data.errors||{}).length?' Algumas sondagens falharam: '+Object.keys(data.errors).join(', '):''),data.success?'success':'error');const all=[...ssdp.map(x=>({...x,source_ip:x.source_ip||x.ip,protocol:'SSDP'})),...onvif.map(x=>({...x,source_ip:x.source_ip||x.ip,protocol:'ONVIF'}))];$('cameraDiscoveryList').innerHTML=all.length?all.map(d=>'<div class="row-item"><div class="main"><b>'+esc(d.name||d.model||d.manufacturer||d.source_ip||'Camera')+'</b><div class="meta">'+esc(d.protocol)+'  '+esc(d.source_ip||'IP nao informado')+'</div><div class="meta">'+esc(d.service_type||d.server||d.xaddrs||'')+'</div></div><button type="button" data-inspect-ip="'+esc(d.source_ip||'')+'" '+(!d.source_ip?'disabled':'')+'>Inspecionar</button></div>').join(''):empty('Nenhuma camera respondeu as sondagens. Isso nao prova que estejam desligadas.');}catch(e){result('cameraDiscoveryResult',e.message,'error');}finally{busy(b,false);}}
+ async function discoverMdns(){const b=$('discoverMdnsBtn');busy(b,true);try{const data=await api('/v1/network/mdns/discover',{method:'POST',body:{timeout:2,service:$('mdnsService').value}});const records=data.records||[];result('mdnsResult',records.length+' registro(s) PTR recebidos.');$('mdnsList').innerHTML=records.length?records.map(r=>'<div class="row-item"><div class="main"><b>'+esc(r.instance||'Instancia')+'</b><div class="meta">'+esc(r.service||'Servico')+'  '+esc(r.source_ip||'origem desconhecida')+'</div></div><span class="pill online">PTR</span></div>').join(''):empty('Nenhuma resposta mDNS para este servico.');addDiscovered(records.map(r=>({...r,ip:r.source_ip})),'mDNS');}catch(e){result('mdnsResult',e.message,'error');}finally{busy(b,false);}}
+ function showInspection(data){const ports=data.open_ports||[];const protocols=data.protocols||{};const rows=ports.map(p=>'<div class="row-item"><div class="main"><b>TCP '+esc(p.port)+'</b><div class="meta">'+esc(p.service||'servico desconhecido')+'</div></div><span class="pill online">Aberta</span></div>');for(const [name,p] of Object.entries(protocols)){rows.push('<div class="row-item"><div class="main"><b>'+esc(name.toUpperCase())+'</b><div class="meta">'+esc(p.status||p.reason||p.error||'resposta recebida')+'</div></div><span class="pill '+(p.confirmed?'online':'unknown')+'">'+(p.confirmed?'Confirmado':'Nao confirmado')+'</span></div>');}$('inspectList').innerHTML=rows.length?rows.join(''):empty('Nenhuma porta selecionada respondeu.');}
+ async function inspectHost(ip){if(ip)$('inspectIp').value=ip;const target=$('inspectIp').value.trim();const ports=$('inspectPorts').value.split(',').map(v=>Number(v.trim())).filter(Number.isInteger);if(!target){result('inspectResult','Informe um endereco IPv4 privado.','error');return;}if(!ports.length||ports.length>32){result('inspectResult','Informe de 1 a 32 portas TCP validas.','error');return;}const b=$('inspectBtn');busy(b,true);try{const data=await api('/v1/network/device/inspect',{method:'POST',body:{ip_address:target,ports,timeout:Number($('inspectTimeout').value),protocol_checks:true}});result('inspectResult','Inspecao concluida para '+data.target+'. '+(data.open_ports||[]).length+' porta(s) TCP aberta(s).');showInspection(data);}catch(e){result('inspectResult',e.message,'error');$('inspectList').innerHTML='';}finally{busy(b,false);}}
+ async function probeMqtt(){const target=$('mqttIp').value.trim();if(!target){result('mqttResult','Informe o IPv4 privado do broker.','error');return;}const b=$('mqttProbeBtn');busy(b,true);try{const data=await api('/v1/network/mqtt/probe',{method:'POST',body:{ip_address:target,port:Number($('mqttPort').value),timeout:Number($('mqttTimeout').value)}});result('mqttResult',data.success?'Broker MQTT respondeu ao handshake CONNACK.':'Sem confirmacao MQTT: '+(data.error||'resposta nao confirmada')+(data.connack_code!==undefined?'  CONNACK '+data.connack_code:''),data.success?'success':'error');}catch(e){result('mqttResult',e.message,'error');}finally{busy(b,false);}}
+ document.addEventListener('click',event=>{const inspect=event.target.closest('[data-inspect-ip]');if(inspect){inspectHost(inspect.dataset.inspectIp);$('inspect').scrollIntoView({behavior:'smooth'});return;}const detail=event.target.closest('[data-device-details]');if(detail){const d=state.devices.find(x=>String(x.id)===detail.dataset.deviceDetails);if(d){$('deviceDialogContent').textContent=JSON.stringify(d,null,2);$('deviceDialog').showModal();}}});
+ $('closeDeviceDialog').addEventListener('click',()=>$('deviceDialog').close());
+ ['search','kindFilter','statusFilter','sortFilter'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',renderDevices));
+ $('refreshBtn').addEventListener('click',loadAll);$('discoverNeighborsBtn').addEventListener('click',discoverNeighbors);$('discoverCamerasBtn').addEventListener('click',discoverCameras);$('discoverMdnsBtn').addEventListener('click',discoverMdns);$('inspectBtn').addEventListener('click',()=>inspectHost());$('mqttProbeBtn').addEventListener('click',probeMqtt);
+ loadAll();state.refreshTimer=window.setInterval(()=>{loadDevices();loadObservations();},15000);window.addEventListener('pagehide',()=>{if(state.refreshTimer)clearInterval(state.refreshTimer);});
 })();
 </script>
 </body>
