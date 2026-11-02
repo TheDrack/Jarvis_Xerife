@@ -76,6 +76,9 @@ graph LR
     app_runtime["<b>runtime</b><br/><hr/>📄 pipeline_runner.py: CloudMock, run_pipeline"]
     class app_runtime support
     app --> app_runtime
+    app_runtime_toolbox["<b>toolbox</b><br/><hr/>📄 toolchains.py: ToolchainStep, ToolchainManifest, from_file<br/>📄 contracts.py: ToolRequest, ToolResult, ToolAuthorizationDecision<br/>📄 audit.py: JsonlToolAuditSink<br/>📄 authorization.py: ToolAuthorizationPolicy, authorize_tool"]
+    class app_runtime_toolbox support
+    app_runtime --> app_runtime_toolbox
     app_application["<b>application</b><br/><hr/>📄 return_activity_service.py: class, was_idle"]
     class app_application support
     app --> app_application
@@ -139,11 +142,17 @@ graph LR
     app_domain_memory["<b>memory</b><br/><hr/>📄 semantic_memory.py: SemanticMemory, configure<br/>📄 working_memory.py: WorkingMemoryEntry, WorkingMemory<br/>📄 prospective_memory.py: ProspectiveMemory"]
     class app_domain_memory support
     app_domain --> app_domain_memory
+    app_domain_tools["<b>tools</b><br/><hr/>📄 registry.py: DuplicateToolManifestError, ToolRegistry<br/>📄 contracts.py: HealthPolicy, validate_periodic_interval, RateLimitPolicy"]
+    class app_domain_tools support
+    app_domain --> app_domain_tools
     config["<b>config</b>"]
     class config support
     config_pipelines["<b>pipelines</b>"]
     class config_pipelines support
     config --> config_pipelines
+    config_toolchains["<b>toolchains</b>"]
+    class config_toolchains support
+    config --> config_toolchains
     mobile["<b>mobile</b>"]
     class mobile support
     mobile_android["<b>android</b>"]
