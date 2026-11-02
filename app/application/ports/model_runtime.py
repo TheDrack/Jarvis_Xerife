@@ -7,7 +7,8 @@ from math import isfinite
 from typing import Protocol, runtime_checkable
 
 
-_ALLOWED_ROLES = frozenset({"system", "user", "assistant", "tool"})
+# Tool-call payloads are deliberately excluded from this text-only first contract.
+_ALLOWED_ROLES = frozenset({"system", "user", "assistant"})
 
 
 @dataclass(frozen=True)
