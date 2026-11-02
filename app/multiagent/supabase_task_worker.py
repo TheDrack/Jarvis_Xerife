@@ -53,7 +53,11 @@ class SupabaseTaskQueueMiniAgent:
                 "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for the native worker."
             )
         llm_client = FreeLLMAPIClient.from_env()
-        provider = os.getenv("FREELLMAPI_PROVIDER", "").strip().lower()
+        provider = (
+            os.getenv("JARVIS_AGENT_MODEL_PROVIDER")
+            or os.getenv("FREELLMAPI_PROVIDER")
+            or ""
+        ).strip().lower()
         if provider in {"", "unknown"}:
             if os.getenv("FREELLMAPI_API_KEY", "").strip():
                 provider = "unknown"
