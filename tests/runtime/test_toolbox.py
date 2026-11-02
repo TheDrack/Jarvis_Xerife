@@ -376,7 +376,9 @@ def test_registry_loads_checked_in_manifests():
     assert (
         registry.get("telegram.send_message").requires_idempotency_key is True
     )
-    assert registry.get("drive.upload_backup").operation == "upload_backup"
+    assert (
+        registry.get("drive.upload_backup").operation == "upload_backup_scoped"
+    )
 
 
 def test_legacy_authorizer_requires_confirmation_for_explicitly_allowlisted_drive():
@@ -398,7 +400,12 @@ def test_checked_in_telegram_manifest_dispatches_adapter_method():
         def can_execute(self, context=None):
             return True
 
-        def send_message(self, text, chat_id=None):
+        def send_message_scoped(self, text, chat_id=None):
+            if chat_id != "test-chat":
+                return {
+                    "success": False,
+                    "error_code": "telegram_chat_scope_mismatch",
+                }
             calls.append((text, chat_id))
             return {"ok": True, "result": {"message_id": 7}}
 
@@ -434,7 +441,7 @@ def test_checked_in_drive_manifest_dispatches_atomic_adapter_method():
         def can_execute(self, context=None):
             return True
 
-        def upload_backup(self, context):
+        def upload_backup_scoped(self, context):
             calls.append(context)
             return {
                 "success": True,
@@ -467,7 +474,7 @@ def test_checked_in_drive_manifest_does_not_accept_failed_adapter_result():
         def can_execute(self, context=None):
             return True
 
-        def upload_backup(self, context):
+        def upload_backup_scoped(self, context):
             return {"success": False, "error_code": "file_not_found"}
 
     dispatcher = ToolDispatcher(

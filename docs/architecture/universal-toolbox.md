@@ -25,13 +25,13 @@ Nexus remains the dependency-injection container. The Tool Registry is not an au
 ## Initial compatibility surface
 
 The checked-in registry exposes five atomic tools:
-- telegram.get_updates as read-only.
-- telegram.send_message as active, requiring a policy-verified approval reference and an idempotency key.
-- drive.upload_backup as active, requiring a policy-verified approval reference and an idempotency key.
+- telegram.get_updates as read-only, without exposing the offset parameter that acknowledges/consumes updates.
+- telegram.send_message as active, requiring a policy-verified approval reference and an idempotency key; the Toolbox wrapper can only target the configured Telegram chat.
+- drive.upload_backup as active, requiring a policy-verified approval reference and an idempotency key; the adapter only uploads the canonical repository snapshot `CORE_LOGIC_CONSOLIDATED.txt`, never an arbitrary caller-supplied path.
 - network.get_interfaces as read-only local interface inventory.
 - network.discover_devices as read-only ARP-cache inspection limited to an RFC1918 /24 or smaller; it sends no probes.
 
-The Drive adapter exposes an atomic upload_backup(context) operation while retaining execute(context) for existing pipelines. The Telegram adapter reports local token readiness through can_execute(); this does not claim a successful remote API health check.
+The Toolbox uses DriveUploader.upload_backup_scoped(context), restricted to the canonical snapshot. The legacy upload_backup(context)/execute(context) path remains unchanged for existing trusted pipelines; it is not the bounded Toolbox capability. The Telegram adapter reports local token readiness through can_execute(); this does not claim a successful remote API health check.
 
 ## Security and execution semantics
 

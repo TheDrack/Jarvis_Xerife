@@ -86,6 +86,21 @@ class TelegramAdapter(NexusComponent):
             )
             return None
 
+    def send_message_scoped(self, text: str, chat_id: Any = None) -> Any:
+        """Toolbox wrapper that can only message the configured Telegram chat."""
+        configured_chat = self.chat_id
+        if not configured_chat:
+            return {
+                "success": False,
+                "error_code": "telegram_chat_not_configured",
+            }
+        if chat_id is not None and str(chat_id) != configured_chat:
+            return {
+                "success": False,
+                "error_code": "telegram_chat_scope_mismatch",
+            }
+        return self.send_message(text, configured_chat)
+
     def send_document(
         self, file_path: str, caption: str = "", chat_id: Any = None
     ) -> Any:

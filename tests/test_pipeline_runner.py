@@ -214,7 +214,7 @@ def test_tool_step_uses_dispatcher_and_trusted_approval(pipeline_dir):
                 "test_tool",
                 tool_approvals={
                     "telegram.send_message": {
-                        "scope": "telegram:approved-chat",
+                        "scope": "telegram:configured-chat",
                         "approval_id": "approval-from-trusted-runtime",
                         "idempotency_key": "backup-2026-11-02",
                     }

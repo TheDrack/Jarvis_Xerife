@@ -54,9 +54,10 @@ class ToolchainManifest(BaseModel):
         for step in self.steps:
             missing = set(step.depends_on) - known
             if missing:
-                raise ValueError(f"Step '{
-                        step.step_id}' depende de steps inexistentes: {
-                        sorted(missing)}")
+                raise ValueError(
+                    f"Step '{step.step_id}' depende de steps inexistentes: "
+                    f"{sorted(missing)}"
+                )
             if step.step_id in step.depends_on:
                 raise ValueError(
                     f"Step '{step.step_id}' não pode depender de si mesmo."
@@ -158,8 +159,8 @@ class ToolchainRunner:
                 results[step.step_id] = self._skipped(
                     step.tool_id,
                     "dependency_failed",
-                    f"Dependências não concluídas: {
-                        ', '.join(failed_dependencies)}",
+                    f"Dependências não concluídas: "
+                    f"{', '.join(failed_dependencies)}",
                 )
                 if not chain.continue_on_error:
                     stopped = True

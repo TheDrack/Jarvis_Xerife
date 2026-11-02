@@ -78,9 +78,8 @@ class ToolRegistry:
         with self._lock:
             if key in self._manifests and not replace:
                 raise DuplicateToolManifestError(
-                    f"tool manifest already registered: {
-                        snapshot.tool_id}@{
-                        snapshot.version}"
+                    f"tool manifest already registered: "
+                    f"{snapshot.tool_id}@{snapshot.version}"
                 )
             self._manifests[key] = snapshot
 

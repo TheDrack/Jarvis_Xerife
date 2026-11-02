@@ -356,9 +356,10 @@ class ToolDispatcher:
 
             operation = getattr(adapter, manifest.operation, None)
             if not callable(operation):
-                raise LookupError(f"Operação '{
-                        manifest.operation}' não existe em '{
-                        manifest.adapter_id}'.")
+                raise LookupError(
+                    f"Operação '{manifest.operation}' não existe em "
+                    f"'{manifest.adapter_id}'."
+                )
             operation_started = True
             if inspect.iscoroutinefunction(operation):
                 output = await asyncio.wait_for(

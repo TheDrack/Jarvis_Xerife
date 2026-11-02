@@ -3,6 +3,7 @@
 
 import logging
 import os
+from pathlib import Path
 from typing import Any, Dict
 
 from app.core.nexus import NexusComponent
@@ -60,6 +61,13 @@ class DriveUploader(NexusComponent):
             return None
 
     @staticmethod
+    def _allowed_backup_path() -> Path:
+        """Return the sole repository artifact this tool may upload."""
+        return (
+            Path(__file__).resolve().parents[3] / "CORE_LOGIC_CONSOLIDATED.txt"
+        )
+
+    @staticmethod
     def _extract_file_path(context: Dict[str, Any]):
         result = context.get("result", {})
         if isinstance(result, dict) and result.get("file_path"):
@@ -71,8 +79,42 @@ class DriveUploader(NexusComponent):
                 return consolidator.get("file_path")
         return None
 
+    def upload_backup_scoped(self, context: dict) -> dict:
+        """Toolbox-only upload restricted to the canonical repository snapshot."""
+        file_path = self._extract_file_path(context)
+        if not file_path:
+            return {"success": False, "error_code": "file_not_found"}
+        allowed_path = self._allowed_backup_path()
+        try:
+            candidate = Path(file_path)
+            if not candidate.is_absolute():
+                candidate = allowed_path.parent / candidate
+            if allowed_path.is_symlink() or candidate.is_symlink():
+                return {
+                    "success": False,
+                    "error_code": "file_path_not_allowed",
+                }
+            candidate_absolute = Path(os.path.abspath(candidate))
+            allowed_absolute = Path(os.path.abspath(allowed_path))
+            if os.path.normcase(str(candidate_absolute)) != os.path.normcase(
+                str(allowed_absolute)
+            ):
+                return {
+                    "success": False,
+                    "error_code": "file_path_not_allowed",
+                }
+            resolved_path = candidate.resolve(strict=True)
+            resolved_allowed = allowed_path.resolve(strict=True)
+        except (OSError, RuntimeError, TypeError):
+            return {"success": False, "error_code": "file_not_found"}
+        if resolved_path != resolved_allowed or not resolved_path.is_file():
+            return {"success": False, "error_code": "file_path_not_allowed"}
+        return self.upload_backup(
+            {"result": {"file_path": str(resolved_path)}}
+        )
+
     def upload_backup(self, context: dict) -> dict:
-        """Atomic operation exposed through the Universal Toolbox."""
+        """Legacy upload operation retained for existing trusted pipelines."""
         file_path = self._extract_file_path(context)
         if not file_path or not os.path.isfile(file_path):
             return {"success": False, "error_code": "file_not_found"}
