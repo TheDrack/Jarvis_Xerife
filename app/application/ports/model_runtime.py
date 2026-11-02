@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from math import isfinite
 from typing import Protocol, runtime_checkable
@@ -144,11 +143,15 @@ class ModelRuntimeError(RuntimeError):
         retryable: bool = False,
     ) -> None:
         super().__init__(message)
-        if not code.strip() or not provider_id.strip():
-            raise ValueError("error code and provider_id must be non-empty")
+        if not isinstance(code, str) or not code.strip():
+            raise ValueError("error code must be a non-empty string")
+        if not isinstance(provider_id, str) or not provider_id.strip():
+            raise ValueError("provider_id must be a non-empty string")
+        if not isinstance(retryable, bool):
+            raise TypeError("retryable must be a bool")
         self.code = code
         self.provider_id = provider_id
-        self.retryable = bool(retryable)
+        self.retryable = retryable
 
 
 @runtime_checkable
