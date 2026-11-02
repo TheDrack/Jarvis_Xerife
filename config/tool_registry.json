@@ -212,6 +212,254 @@
         "required": ["success"],
         "additionalProperties": false
       }
+    },
+    {
+      "tool_id": "intelligence.news.search",
+      "version": "1.0.0",
+      "description": "Search recent public news articles through GDELT DOC and preserve publisher provenance.",
+      "adapter_id": "public_intelligence_adapter",
+      "operation": "fetch_gdelt_articles",
+      "provider": "GDELT DOC 2.0",
+      "origin": "third_party",
+      "capabilities": [
+        "intelligence.news.search"
+      ],
+      "permissions": [
+        "intelligence.public.read"
+      ],
+      "allowed_scopes": [
+        "local",
+        "intelligence:public"
+      ],
+      "execution_mode": "read_only",
+      "trust_level": "untrusted",
+      "data_classification": "public",
+      "rate_limit": {
+        "requests": 10,
+        "window_seconds": 60
+      },
+      "timeout_seconds": 15,
+      "cost_units": 1,
+      "idempotency": "not_applicable",
+      "license": "GDELT API; publisher terms apply",
+      "terms_uri": "https://www.gdeltproject.org/",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    {
+      "tool_id": "intelligence.events.eonet",
+      "version": "1.0.0",
+      "description": "Consulta eventos ambientais p?blicos e geometrias da NASA EONET.",
+      "adapter_id": "public_intelligence_adapter",
+      "operation": "fetch_eonet_events",
+      "provider": "NASA EONET v3",
+      "origin": "third_party",
+      "capabilities": [
+        "intelligence.events.environment"
+      ],
+      "permissions": [
+        "intelligence.public.read"
+      ],
+      "allowed_scopes": [
+        "local",
+        "intelligence:public"
+      ],
+      "execution_mode": "read_only",
+      "trust_level": "untrusted",
+      "data_classification": "public",
+      "rate_limit": {
+        "requests": 10,
+        "window_seconds": 60
+      },
+      "timeout_seconds": 15,
+      "cost_units": 1,
+      "idempotency": "not_applicable",
+      "license": "NASA EONET metadata; source terms apply",
+      "terms_uri": "https://eonet.gsfc.nasa.gov/docs/v3",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    {
+      "tool_id": "intelligence.events.earthquakes",
+      "version": "1.0.0",
+      "description": "Consulta o feed GeoJSON p?blico de terremotos recentes do USGS.",
+      "adapter_id": "public_intelligence_adapter",
+      "operation": "fetch_usgs_earthquakes",
+      "provider": "USGS Earthquake Hazards Program",
+      "origin": "third_party",
+      "capabilities": [
+        "intelligence.events.seismic"
+      ],
+      "permissions": [
+        "intelligence.public.read"
+      ],
+      "allowed_scopes": [
+        "local",
+        "intelligence:public"
+      ],
+      "execution_mode": "read_only",
+      "trust_level": "untrusted",
+      "data_classification": "public",
+      "rate_limit": {
+        "requests": 10,
+        "window_seconds": 60
+      },
+      "timeout_seconds": 15,
+      "cost_units": 1,
+      "idempotency": "not_applicable",
+      "license": "USGS public feed; attribution required",
+      "terms_uri": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/geojson.php",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    {
+      "tool_id": "intelligence.snapshot.collect",
+      "version": "1.0.0",
+      "description": "Collect a bounded public intelligence snapshot with per-source health.",
+      "adapter_id": "public_intelligence_adapter",
+      "operation": "collect_public_snapshot",
+      "provider": "GDELT DOC 2.0; NASA EONET v3; USGS Earthquake Hazards Program",
+      "origin": "third_party",
+      "capabilities": [
+        "intelligence.snapshot.read"
+      ],
+      "permissions": [
+        "intelligence.public.read"
+      ],
+      "allowed_scopes": [
+        "local",
+        "intelligence:public"
+      ],
+      "execution_mode": "read_only",
+      "trust_level": "untrusted",
+      "data_classification": "public",
+      "rate_limit": {
+        "requests": 5,
+        "window_seconds": 60
+      },
+      "timeout_seconds": 30,
+      "cost_units": 3,
+      "idempotency": "not_applicable",
+      "license": "Each source retains its own terms; see Universal Intelligence ADR",
+      "terms_uri": "https://github.com/TheDrack/Jarvis_Xerife/blob/main/docs/architecture/jarvis-universal-intelligence.md",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "source_id",
+                "available",
+                "observed_at"
+              ],
+              "properties": {
+                "source_id": {
+                  "type": "string"
+                },
+                "available": {
+                  "type": "boolean"
+                },
+                "observed_at": {
+                  "type": "string"
+                },
+                "error_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "events",
+          "sources"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }
