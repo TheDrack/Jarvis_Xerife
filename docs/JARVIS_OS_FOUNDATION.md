@@ -19,7 +19,11 @@ The first deliverable is a portable foundation, not a bootable distribution and 
 - Ensure profile selection is declarative and opt-in.
 - Report requested/enabled/available/authorized/tested states separately.
 - Keep host-only dependencies out of the portable core.
-- The configuration contract exposes `OPERATING_PROFILE` (default `harness`) and the separate `OPERATING_PROFILE_ENABLED` opt-in for non-harness profiles. The report keeps availability, authorization and test evidence independent; it does not probe the host, activate services, or grant privileges. Runtime evidence must be supplied by the corresponding runtime, policy and validation components.
+- The configuration contract exposes `OPERATING_PROFILE` (default `harness`) and the
+  separate `OPERATING_PROFILE_ENABLED` opt-in for non-harness profiles. The report
+  keeps availability, authorization and test evidence independent; it does not probe
+  the host, activate services, or grant privileges. Runtime evidence must come from
+  the corresponding runtime, policy and validation components.
 
 ### C. Provider-neutral model and agent contracts
 - Inventory current API and local model adapters.
