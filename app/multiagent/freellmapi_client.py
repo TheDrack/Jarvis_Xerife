@@ -56,8 +56,13 @@ class FreeLLMAPIClient:
             raise ValueError("api_key must not be empty")
         if not model.strip():
             raise ValueError("model must not be empty")
-        if timeout_seconds <= 0:
-            raise ValueError("timeout_seconds must be positive")
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("timeout_seconds must be finite and positive")
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
@@ -112,8 +117,12 @@ class FreeLLMAPIClient:
         """Return text and routing telemetry from an OpenAI-compatible completion."""
         if not messages:
             raise ValueError("messages must not be empty")
-        if not 1 <= max_tokens <= 8192:
-            raise ValueError("max_tokens must be between 1 and 8192")
+        if (
+            isinstance(max_tokens, bool)
+            or not isinstance(max_tokens, int)
+            or not 1 <= max_tokens <= 8192
+        ):
+            raise ValueError("max_tokens must be an integer between 1 and 8192")
         if not 0.0 <= temperature <= 2.0:
             raise ValueError("temperature must be between 0 and 2")
         timeout = self.timeout_seconds if timeout_seconds is None else timeout_seconds
