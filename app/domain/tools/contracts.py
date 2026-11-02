@@ -115,8 +115,20 @@ class ToolManifest(BaseModel):
     @field_validator("version")
     @classmethod
     def validate_semver(cls, value: str) -> str:
-        if not _SEMVER_PATTERN.fullmatch(value):
+        match = _SEMVER_PATTERN.fullmatch(value)
+        if match is None:
             raise ValueError("version must follow semantic versioning (MAJOR.MINOR.PATCH)")
+
+        prerelease = match.group(4)
+        build = match.group(5)
+        for identifier in (prerelease or "").split(".") if prerelease else ():
+            if not identifier:
+                raise ValueError("semantic version identifiers must not be empty")
+            if identifier.isdigit() and len(identifier) > 1 and identifier.startswith("0"):
+                raise ValueError("numeric prerelease identifiers must not contain leading zeros")
+        for identifier in (build or "").split(".") if build else ():
+            if not identifier:
+                raise ValueError("semantic version build identifiers must not be empty")
         return value
 
     @field_validator("capabilities")
@@ -156,6 +168,11 @@ class ToolManifest(BaseModel):
                 "credentials must be references using secret://, env://, or vault://; "
                 "raw credential values are forbidden"
             )
+        for value in values:
+            reference_path = value.split("://", 1)[1]
+            segments = reference_path.split("/")
+            if any(segment in {"", ".", ".."} for segment in segments):
+                raise ValueError("credential references must not contain empty or traversal path segments")
         if len(set(values)) != len(values):
             raise ValueError("credential references must not contain duplicates")
         return values
