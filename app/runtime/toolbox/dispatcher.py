@@ -76,9 +76,9 @@ class ToolDispatcher:
         self._event_sink = event_sink
         self._max_idempotency_entries = max(1, int(max_idempotency_entries))
         self._lock = threading.RLock()
-        self._inflight: dict[tuple[str, str, str, str], str] = {}
+        self._inflight: dict[tuple[str, str, str, str, str], str] = {}
         self._completed: dict[
-            tuple[str, str, str, str], tuple[str, ToolResult]
+            tuple[str, str, str, str, str], tuple[str, ToolResult]
         ] = {}
         self._rate_calls: dict[str, Any] = {}
         self._breaker_failures: dict[str, int] = {}
@@ -255,7 +255,11 @@ class ToolDispatcher:
                 envelope.idempotency_key
                 and manifest.idempotency_mode == "process"
             ):
+                # Idempotency keys belong to an authenticated principal. Keeping
+                # the principal in the namespace prevents one tenant from reserving
+                # another tenant's key or causing a false cross-tenant conflict.
                 idempotency_ref = (
+                    authorization_decision.principal_id,
                     manifest.tool_id,
                     manifest.version,
                     requested_capability,

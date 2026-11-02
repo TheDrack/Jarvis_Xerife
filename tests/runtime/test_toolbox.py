@@ -260,6 +260,51 @@ def test_process_idempotency_prevents_duplicate_side_effect(registry):
     assert calls == ["once"]
 
 
+def test_process_idempotency_is_scoped_to_authenticated_principal(registry):
+    calls = []
+
+    class CountingAdapter:
+        def write(self, value):
+            calls.append(value)
+            return {"written": value}
+
+    class PrincipalAwarePolicy:
+        def authorize_tool(self, request, manifest):
+            principal_id = {
+                "approval-a": "principal-a",
+                "approval-b": "principal-b",
+            }[request.approval_id]
+            return ToolAuthorizationDecision(
+                granted=True,
+                principal_id=principal_id,
+                session_id=f"session-{principal_id}",
+                tool_id=manifest.tool_id,
+                tool_version=manifest.version,
+                capability=request.capability or manifest.capabilities[0],
+                scope=request.scope,
+                operation=manifest.operation,
+                approval_id=request.approval_id,
+                correlation_id=request.correlation_id,
+                expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
+            )
+
+    dispatcher = ToolDispatcher(
+        registry,
+        resolver=lambda _: CountingAdapter(),
+        authorizer=PrincipalAwarePolicy(),
+    )
+    base_request = {
+        "tool_id": "sample.write",
+        "arguments": {"value": "same-payload"},
+        "idempotency_key": "shared-client-key",
+    }
+    first = dispatcher.dispatch({**base_request, "approval_id": "approval-a"})
+    second = dispatcher.dispatch({**base_request, "approval_id": "approval-b"})
+
+    assert first.success is True
+    assert second.success is True
+    assert calls == ["same-payload", "same-payload"]
+
 def test_process_idempotency_isolated_by_tool_version_and_capability(registry):
     calls = []
 
