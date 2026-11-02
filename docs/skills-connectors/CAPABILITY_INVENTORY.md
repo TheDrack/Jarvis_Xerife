@@ -20,6 +20,7 @@ Never infer the latter states from file names, README claims, inventory metadata
 
 | Capability | Repository entry points | Evidence / limitation to disclose |
 |---|---|---|
+| Universal Tool Registry (metadata foundation) | app/domain/tools/contracts.py, app/domain/tools/registry.py, ADR-001 | Implemented as a process-local metadata registry with exact version/capability lookup. No dispatcher, health probe, adapter execution, authorization, credential resolution, persistence, or production verification is delivered. |
 | Common skill and connector bootstrap | docs/skills-connectors/CATALOG.md, CONTEXT_MEMORY_PROTOCOL.md, skills/*/SKILL.md | Portable guidance is present. Whether every harness automatically reads it at conversation start must be verified per host. |
 | Multi-agent leader/scheduler contracts | app/multiagent/contracts, scheduler/leader/transport modules; [platform design](../architecture/jarvis-multi-agent-platform.md) | Cost-benefit scheduler and task-scoped roles are documented; real multi-runtime end-to-end execution, supervision, heartbeat, and lease renewal remain acceptance items in the architecture document. |
 | Durable task/message queue | Supabase queue adapter and migrations 202610230002–202610230004 | Repo has adapter/migrations; do not assume these migrations are applied to production without checking the target project's migration history. |
