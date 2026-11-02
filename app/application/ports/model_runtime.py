@@ -18,7 +18,7 @@ class ModelMessage:
     content: str
 
     def __post_init__(self) -> None:
-        if self.role not in _ALLOWED_ROLES:
+        if not isinstance(self.role, str) or self.role not in _ALLOWED_ROLES:
             raise ValueError(f"unsupported model message role: {self.role!r}")
         if not isinstance(self.content, str) or not self.content.strip():
             raise ValueError("model message content must be a non-empty string")
