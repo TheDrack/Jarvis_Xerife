@@ -26,9 +26,9 @@ External projects such as OSIRIS (https://github.com/Pendia/OSIRIS-Dashboard-OSI
 
 PublicIntelligenceAdapter provides GDELT DOC article search, NASA EONET open events and the USGS all-day earthquake GeoJSON feed. It emits the common IntelligenceEvent/IntelligenceEvidence contract. Requests are bounded, time-limited and HTTPS-only for source links; article bodies and raw provider payloads are not persisted. Source failure is explicit; absence of returned events is not evidence that no event exists.
 
-This first slice does not yet generate briefings, forecast scenarios, run on a schedule, write to a database, or render a map. It is a tested source integration foundation only.
+This increment adds a pure application-level synthesis service. It removes repeated records with the same source/event identity, preserves source health, and emits conservative same-URL or exact-headline correlation candidates. Candidate relationships never assert independent corroboration. Durable history, semantic entity resolution, briefing composition, scheduling, delivery and map rendering remain separate increments.
 
-## Data and trust model
+## Intelligence Core 0.2\n\n`IntelligenceCore` is a deterministic, provider-neutral application service. It does not call providers, persist records, schedule work or deliver notifications. Exact duplicate suppression uses `(source_id, event_id)`; candidate grouping uses canonical URL equality or exact normalized headline equality within the same domain/category and a 24-hour window. Events and evidence are retained individually. Correlation IDs are stable for the same event set. A candidate is not corroboration, and distinct source count is not an independence score.\n\n## Data and trust model
 
 - Preserve publisher/source URL, publication time and collection time separately.
 - A source record is an observation or claim, not an established fact.

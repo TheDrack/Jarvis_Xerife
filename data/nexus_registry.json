@@ -90,7 +90,8 @@
     "curiosity_engine": "app.application.services.curiosity_engine.CuriosityEngine",
     "curiosity_intake": "app.application.services.curiosity_intake.CuriosityIntake",
     "reconnection_briefing": "app.application.services.reconnection_briefing.ReconnectionBriefing",
-    "public_intelligence_adapter": "app.adapters.infrastructure.intelligence.public_intelligence_adapter.PublicIntelligenceAdapter"
+    "public_intelligence_adapter": "app.adapters.infrastructure.intelligence.public_intelligence_adapter.PublicIntelligenceAdapter",
+    "intelligence_core": "app.application.services.intelligence_core.IntelligenceCore"
   },
   "metadata": {
     "version": "2026.03",
