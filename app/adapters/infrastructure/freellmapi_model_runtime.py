@@ -54,6 +54,13 @@ class FreeLLMAPIModelRuntimeAdapter:
                 provider_id=self.provider_id,
                 retryable=exc.retryable,
             ) from exc
+        except ValueError as exc:
+            raise ModelRuntimeError(
+                "FreeLLMAPI rejected the normalized invocation limits.",
+                code="invalid_request",
+                provider_id=self.provider_id,
+                retryable=False,
+            ) from exc
 
         raw_usage = response.get("usage")
         usage_data: Mapping[str, Any] = raw_usage if isinstance(raw_usage, Mapping) else {}
