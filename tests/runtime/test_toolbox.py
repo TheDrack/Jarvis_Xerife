@@ -417,6 +417,10 @@ def test_registry_loads_checked_in_manifests():
         "drive.upload_backup",
         "network.get_interfaces",
         "network.discover_devices",
+        "intelligence.news.search",
+        "intelligence.events.eonet",
+        "intelligence.events.earthquakes",
+        "intelligence.snapshot.collect",
     }
     assert (
         registry.get("telegram.send_message").requires_idempotency_key is True

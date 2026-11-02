@@ -24,11 +24,18 @@
 - Canonical architecture decision: [ADR-001](../architecture/ADR-001-universal-tool-registry.md) and [Universal Toolbox ADR](../architecture/universal-toolbox.md).
 - Canonical metadata contract and registry: `app/domain/tools/contracts.py` and `app/domain/tools/registry.py`. Runtime execution reuses this registry; `app/runtime/toolbox/registry.py` is only a compatibility import, not a second catalog.
 - Dispatcher and DAG toolchains live in `app/runtime/toolbox/`; manifests are in `config/tool_registry.json` and `config/toolchains/*.json`.
-- The first catalog contains five atomic tools for Telegram, Drive backup upload, local interface inventory, and passive ARP-cache discovery. Telegram send is bounded to the configured chat; get_updates does not expose the acknowledgement offset. The Toolbox Drive operation is restricted to the canonical repository snapshot; the legacy adapter method remains for existing pipelines. This does not mean the other connector families have been migrated.
+- The current catalog contains nine atomic tools: five initial Telegram, Drive backup, local interface and passive ARP-cache tools, three read-only public source capabilities (GDELT, NASA EONET and USGS), and one aggregated public-intelligence snapshot. Telegram send is bounded to the configured chat; get_updates does not expose the acknowledgement offset. The Toolbox Drive operation is restricted to the canonical repository snapshot; the legacy adapter method remains for existing pipelines. This does not mean the other connector families have been migrated.
 - Input/output contracts use JSON Schema; scope, timeout, process-local rate limits/circuit breakers, idempotency, audit events and toolchain budgets are enforced by the runtime.
 - Dispatch requires a dedicated host-backed ToolAuthorizationPolicy. No production principal/session resolver or approval verifier is registered yet, so real dispatch remains fail-closed. The legacy CapabilityAuthorizer is not treated as proof of identity or approval.
 - Resolve exact `tool_id` + `version`; capability lookup is exact, not substring-based. A missing version is tolerated only when the registry has exactly one version.
 - Registry membership is not availability, authorization, health, testing, or production verification. Distributed idempotency/quotas, shared durable audit, remote health probes, and migration of GitHub/Supabase/Render/browser/other connectors remain pending.
+
+## Jarvis Universal Intelligence — initial source foundation
+
+- Architecture and integration boundary: [Universal Intelligence](../architecture/jarvis-universal-intelligence.md) and [ADR-002](../architecture/ADR-002-jarvis-universal-intelligence.md).
+- Public-source adapter: `app/adapters/infrastructure/intelligence/public_intelligence_adapter.py`, normalized contracts: `app/domain/intelligence/contracts.py`.
+- Initial read-only sources registered in Nexus/Tool Registry: GDELT DOC article search, NASA EONET open events, and USGS all-day earthquake feed. The personal/entity Eagle OSINT adapter remains separate.
+- These manifests are descriptive and the current production ToolAuthorizationPolicy is still not wired; do not claim live dispatcher execution. Source adapters are not yet scheduled, persisted, briefed, or rendered on the geospatial surface.
 
 ## Portable Jarvis skills
 

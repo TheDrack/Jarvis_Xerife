@@ -1,0 +1,66 @@
+# Jarvis Universal Intelligence — Architecture 0.1
+
+## Purpose
+
+Universal Intelligence is the synthesis layer of Jarvis. It combines user-directed context, public/global information, local operational state and Jarvis engineering telemetry into a traceable view. It is not a replacement for Nexus, the universal Toolbox, the Jarvis OS host foundation, or existing provider projects.
+
+## Integration rule: reuse, isolate, normalize
+
+External projects such as OSIRIS (https://github.com/Pendia/OSIRIS-Dashboard-OSINT) and God's Eye View (https://github.com/bilawalsidhu/gods-eye-view) are reference implementations and optional capability providers. Jarvis owns its contracts, policy, memory, orchestration and user experience. External capabilities are consumed through Jarvis ports/adapters; do not fork their runtime into Jarvis core or modify Jarvis core to match their internals.
+
+- OSIRIS is a reference for source aggregation, domain layers, progressive loading and evidence-linked multi-agent forecast UX.
+- God's Eye View is a reference for 3D geospatial rendering, source-layer isolation, viewport-aware loading and attribution.
+- Provider implementations remain replaceable without changing agents, memory, Nexus or Jarvis OS.
+
+## Logical layers
+
+1. Inputs: user-directed preferences/routines; public news and event feeds; Jarvis repo/CI/service state; host/device observations.
+2. Source adapters: bounded, read-only connectors. Agents do not import provider SDKs or issue HTTP calls directly.
+3. Normalized knowledge: immutable events and evidence references with source ID, publisher, URL, publication/collection times, terms, location and domain.
+4. Intelligence services: deduplication, entity/event resolution, corroboration, contradiction detection, classification and briefing composition.
+5. Agent analysis: task-scoped agents produce sourced claims, uncertainty and dissent; external content is untrusted data, never executable instruction.
+6. Presentation: briefing feed, alert inbox, searchable history and geospatial view. The map is a view over normalized events, not a separate source of truth.
+7. Delivery: existing Jarvis channels and OS surfaces; schedules require a real scheduler/worker, not metadata alone.
+
+## Initial read-only source slice (0.1)
+
+PublicIntelligenceAdapter provides GDELT DOC article search, NASA EONET open events and the USGS all-day earthquake GeoJSON feed. It emits the common IntelligenceEvent/IntelligenceEvidence contract. Requests are bounded, time-limited and HTTPS-only for source links; article bodies and raw provider payloads are not persisted. Source failure is explicit; absence of returned events is not evidence that no event exists.
+
+This first slice does not yet generate briefings, forecast scenarios, run on a schedule, write to a database, or render a map. It is a tested source integration foundation only.
+
+## Data and trust model
+
+- Preserve publisher/source URL, publication time and collection time separately.
+- A source record is an observation or claim, not an established fact.
+- Corroboration must link independent evidence; repeated syndication is not independent confirmation.
+- Track source terms/license metadata. Code licenses do not license third-party datasets or assets.
+- Do not ingest private data, identify/track named people, perform facial recognition, or turn public cameras into individual surveillance.
+- Never expose provider credentials to the browser, model prompts, logs or source control.
+- Geospatial and forecast outputs are informational, not navigation, emergency-response or safety-critical guidance.
+
+## Jarvis OS compatibility
+
+Domain contracts and application services remain OS-neutral. Host-specific scheduling, storage, notification and rendering are adapters selected by Nexus. The current Windows environment is a development host, not a permanent architectural dependency. The same intelligence contracts must run under the future Jarvis OS host profile.
+
+## Next increments
+
+1. Register public source capabilities in the canonical Tool Registry and Nexus with read-only policy.
+2. Add source health, cache/ETag, bounded retry/backoff and per-source rate budgets.
+3. Implement deterministic deduplication and event grouping without claiming semantic identity from title similarity alone.
+4. Add evidence/corroboration and contradiction contracts.
+5. Compose the Portuguese daily briefing with citations and explicit fact/claim/inference/scenario separation.
+6. Connect a real durable scheduler/worker and idempotent delivery.
+7. Build a geospatial presentation adapter after comparing MapLibre/Cesium/deck.gl requirements, performance and licenses.
+8. Add user preference/direction feedback and Jarvis self-maintenance signals as separate domains.
+
+## Research and licensing notes
+
+- OSIRIS repository declares MIT for code; verify each source/data/asset's own terms before reuse.
+- God's Eye View declares MIT for code, but its DATA_SOURCES.md carves out third-party datasets and assets. TeleGeography submarine cable data is CC BY-NC-SA and must not be bundled in a commercial distribution without permission.
+- GDELT DOC 2.0 exposes JSON article-list results and a rolling three-month search window; retain original publisher URLs and do not assume GDELT grants redistribution rights to article content.
+- NASA EONET v3 returns event metadata, source links and dated GeoJSON geometry; preserve source references and its metadata disclaimer.
+- USGS recommends real-time GeoJSON feeds for display applications; retain event-page URLs and magnitude/time/location fields.
+
+## Status semantics
+
+Code exists, unit-tested, CI-tested, connected, authorized, scheduled and end-to-end verified are separate states. Do not mark a source or workflow production-ready without evidence.
