@@ -2,6 +2,7 @@
 """Configuration management for Jarvis Assistant using pydantic-settings"""
 
 import logging
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
 
@@ -9,6 +10,11 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.encryption import decrypt_value, is_encrypted
+from app.core.operating_profiles import (
+    OperatingProfile,
+    OperatingProfileReport,
+    build_operating_profile_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +25,12 @@ class Settings(BaseSettings):
     # Application Settings
     app_name: str = "Jarvis Assistant"
     version: str = "1.0.0"
+
+    # Operating profile selection is declarative; it never grants permissions.
+    # Non-harness profiles require OPERATING_PROFILE_ENABLED=true as a separate
+    # opt-in; neither setting grants permissions or activates host services.
+    operating_profile: OperatingProfile = OperatingProfile.HARNESS
+    operating_profile_enabled: bool = False
 
     # User Settings
     user_id: Optional[str] = None
@@ -107,6 +119,26 @@ class Settings(BaseSettings):
                     "Please run the setup wizard again."
                 ) from e
         return v
+
+    def get_operating_profile_report(
+        self,
+        *,
+        available_profiles: Iterable[OperatingProfile | str] | None = None,
+        authorized_profiles: Iterable[OperatingProfile | str] = (),
+        tested_profiles: Iterable[OperatingProfile | str] = (),
+    ) -> OperatingProfileReport:
+        """Return profile state without probing the host or exposing secrets.
+
+        Availability, authorization and test evidence must come from their
+        respective runtime/policy/validation sources; Settings never infers them.
+        """
+        return build_operating_profile_report(
+            self.operating_profile,
+            enabled=self.operating_profile_enabled,
+            available_profiles=available_profiles,
+            authorized_profiles=authorized_profiles,
+            tested_profiles=tested_profiles,
+        )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
