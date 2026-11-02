@@ -123,8 +123,13 @@ class FreeLLMAPIClient:
             or not 1 <= max_tokens <= 8192
         ):
             raise ValueError("max_tokens must be an integer between 1 and 8192")
-        if not 0.0 <= temperature <= 2.0:
-            raise ValueError("temperature must be between 0 and 2")
+        if (
+            isinstance(temperature, bool)
+            or not isinstance(temperature, (int, float))
+            or not isfinite(temperature)
+            or not 0.0 <= temperature <= 2.0
+        ):
+            raise ValueError("temperature must be finite and between 0 and 2")
         timeout = self.timeout_seconds if timeout_seconds is None else timeout_seconds
         if (
             isinstance(timeout, bool)
