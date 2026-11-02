@@ -56,7 +56,7 @@ class SupabaseTaskQueueMiniAgent:
         provider = os.getenv("FREELLMAPI_PROVIDER", "").strip().lower()
         if provider in {"", "unknown"}:
             if os.getenv("FREELLMAPI_API_KEY", "").strip():
-                provider = "custom"
+                provider = "unknown"
             elif os.getenv("GROQ_API_KEY", "").strip():
                 provider = "groq"
             elif os.getenv("VENICE_API_KEY", "").strip():
