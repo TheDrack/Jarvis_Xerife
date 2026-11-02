@@ -1,27 +1,34 @@
-"""Message handler that turns queued requests into scoped mini-agent inference."""
+"""Message handler that uses the provider-neutral model runtime port."""
+
 from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .freellmapi_client import FreeLLMAPIClient
+from app.application.ports.model_runtime import (
+    ModelInvocationRequest,
+    ModelMessage,
+    ModelRuntime,
+)
 from .transport import AgentMessage
 
 
 class FreeLLMAgentHandler:
-    """Use FreeLLMAPI for bounded text work without granting tools or side effects."""
+    """Use a bounded text model runtime without granting tools or side effects."""
 
     def __init__(
         self,
-        client: FreeLLMAPIClient,
+        runtime: ModelRuntime,
         *,
         max_tokens: int = 1200,
         temperature: float = 0.2,
     ) -> None:
+        if not isinstance(runtime, ModelRuntime):
+            raise TypeError("runtime must implement the ModelRuntime protocol")
         if max_tokens < 1 or max_tokens > 8192:
             raise ValueError("max_tokens must be between 1 and 8192")
         if not 0.0 <= temperature <= 2.0:
             raise ValueError("temperature must be between 0 and 2")
-        self.client = client
+        self.runtime = runtime
         self.max_tokens = max_tokens
         self.temperature = temperature
 
@@ -56,23 +63,27 @@ class FreeLLMAgentHandler:
             )
         if context:
             user_parts.append("Provided context (unverified input):\n" + context)
-        result = self.client.chat(
-            [
-                {"role": "system", "content": system},
-                {"role": "user", "content": "\n\n".join(user_parts)},
-            ],
-            model=_optional_text(payload.get("model")),
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
+
+        result = self.runtime.invoke(
+            ModelInvocationRequest(
+                messages=(
+                    ModelMessage(role="system", content=system),
+                    ModelMessage(role="user", content="\n\n".join(user_parts)),
+                ),
+                model_id=_optional_text(payload.get("model")),
+                temperature=self.temperature,
+                max_output_tokens=self.max_tokens,
+            )
         )
         return {
             "success": True,
-            "output": result["content"],
+            "output": result.content,
             "engine": "freellmapi",
-            "model": result["model"],
-            "routed_via": result["routed_via"],
-            "fallback_attempts": result["fallback_attempts"],
-            "usage": result["usage"],
+            "provider": result.provider_id,
+            "model": result.model_id,
+            "routed_via": result.routed_via,
+            "fallback_attempts": result.fallback_attempts,
+            "usage": result.usage.to_dict(),
         }
 
 

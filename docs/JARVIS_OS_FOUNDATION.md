@@ -31,6 +31,11 @@ The first deliverable is a portable foundation, not a bootable distribution and 
 - Keep provider SDKs inside adapters.
 - Remove hard-coded provider assumptions from generic task scheduling only after compatibility tests exist.
 - Support multiple providers and runtimes simultaneously, including external agent runtimes.
+- The first `ModelRuntime` port now defines normalized messages, bounded invocation requests,
+  result/usage metadata, sanitized retry-aware errors and an explicit cancellation contract.
+  `FreeLLMAPIModelRuntimeAdapter` is the first implementation and is used by both existing
+  mini-agent worker composition roots; this does not yet unify `LLMRouter`, `AIGateway`
+  or `ModelOrchestrator`.
 
 ### D. Multi-agent runtime
 - Reuse existing task/message contracts, scheduler and queue.
@@ -54,8 +59,9 @@ The first deliverable is a portable foundation, not a bootable distribution and 
 
 1. Architecture and repository map.
 2. Profile/configuration contract and compatibility tests.
-3. Provider-neutral model/agent contracts.
-4. Multi-provider registry and scheduler integration.
+3. Provider-neutral model/agent contracts and first FreeLLMAPI runtime adapter.
+4. Bind the model registry to runtime adapters and integrate capability-aware selection
+   without removing the existing provider-specific routes until compatibility tests pass.
 5. Local harness packaging and clean-environment test.
 6. Optional host manager and systemd integration.
 7. Disposable VM boot test.

@@ -16,6 +16,7 @@ from typing import Any
 from dotenv import load_dotenv
 from supabase import create_client
 
+from app.adapters.infrastructure.freellmapi_model_runtime import FreeLLMAPIModelRuntimeAdapter
 from app.multiagent import AgentProfile, AgentWorker, FreeLLMAPIClient, FreeLLMAgentHandler, SupabaseAgentStore, SupabaseQueueConnector
 
 LOG = logging.getLogger("jarvis.multiagent.worker")
@@ -28,6 +29,23 @@ def _required_env(name: str) -> str:
     return value
 
 
+def _configured_model_provider() -> str:
+    explicit = (
+        os.getenv("JARVIS_AGENT_MODEL_PROVIDER")
+        or os.getenv("FREELLMAPI_PROVIDER")
+        or ""
+    ).strip().lower()
+    if explicit and explicit != "unknown":
+        return explicit
+    if os.getenv("FREELLMAPI_API_KEY", "").strip():
+        return "unknown"
+    if os.getenv("GROQ_API_KEY", "").strip():
+        return "groq"
+    if os.getenv("VENICE_API_KEY", "").strip():
+        return "venice"
+    return "unknown"
+
+
 def _build_profile(agent_id: str) -> AgentProfile:
     return AgentProfile(
         agent_id=agent_id,
@@ -38,7 +56,7 @@ def _build_profile(agent_id: str) -> AgentProfile:
         coordination_cost=float(os.getenv("JARVIS_AGENT_COORDINATION_COST", "0.01")),
         estimated_latency_seconds=float(os.getenv("JARVIS_AGENT_LATENCY_SECONDS", "15")),
         environment=os.getenv("JARVIS_AGENT_ENVIRONMENT", "worker"),
-        model_provider=os.getenv("JARVIS_AGENT_MODEL_PROVIDER", "freellmapi").strip().lower(),
+        model_provider=_configured_model_provider(),
     )
 
 
@@ -58,8 +76,11 @@ def main() -> int:
         poll_interval_seconds=float(os.getenv("JARVIS_QUEUE_POLL_SECONDS", "0.5")),
     )
     inference = FreeLLMAPIClient.from_env()
+    runtime = FreeLLMAPIModelRuntimeAdapter(
+        inference, provider_id=profile.model_provider
+    )
     handler = FreeLLMAgentHandler(
-        inference,
+        runtime,
         max_tokens=int(os.getenv("JARVIS_AGENT_MAX_TOKENS", "1200")),
         temperature=float(os.getenv("JARVIS_AGENT_TEMPERATURE", "0.2")),
     )
