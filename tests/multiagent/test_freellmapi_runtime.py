@@ -327,3 +327,5 @@ def test_model_invocation_request_rejects_invalid_limits_and_messages():
         )
     with pytest.raises(ValueError, match="messages"):
         ModelInvocationRequest(messages=())
+    with pytest.raises(ValueError, match="role"):
+        ModelMessage(role="tool", content="tool output")
