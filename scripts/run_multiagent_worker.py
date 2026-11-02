@@ -30,11 +30,10 @@ def _required_env(name: str) -> str:
 
 
 def _configured_model_provider() -> str:
-    explicit = (
-        os.getenv("JARVIS_AGENT_MODEL_PROVIDER")
-        or os.getenv("FREELLMAPI_PROVIDER")
-        or ""
-    ).strip().lower()
+    explicit = os.getenv("JARVIS_AGENT_MODEL_PROVIDER", "").strip().lower()
+    if explicit and explicit != "unknown":
+        return explicit
+    explicit = os.getenv("FREELLMAPI_PROVIDER", "").strip().lower()
     if explicit and explicit != "unknown":
         return explicit
     if os.getenv("FREELLMAPI_API_KEY", "").strip():
