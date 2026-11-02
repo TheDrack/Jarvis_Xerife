@@ -17,11 +17,10 @@ def test_evolution_batch_script_requires_explicit_opt_in():
         env=env,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=30,
     )
     assert result.returncode == 2
     output = (result.stdout or "") + (result.stderr or "")
-    # Exit code 2 is the script's explicit paused-gate contract. Some runners capture
-    # subprocess output inconsistently; when text is available, validate it too.
-    if output:
-        assert "Autoevolução pausada" in output or "EVOLUTION_PAUSED" in output
+    # The parent process must decode the child UTF-8 stream explicitly on Windows.
+    assert "Autoevolução pausada:" in output or "EVOLUTION_PAUSED" in output
