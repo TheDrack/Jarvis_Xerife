@@ -80,6 +80,8 @@ def test_chat_maps_http_error_without_leaking_response_body():
             client.chat([{"role": "user", "content": "hello"}])
         assert "secret upstream detail" not in str(err.value)
         assert "test-secret" not in str(err.value)
+        assert err.value.code == "rate_limited"
+        assert err.value.retryable is True
     finally:
         owned.close()
 
@@ -131,8 +133,8 @@ def test_handler_scopes_request_and_returns_provider_telemetry():
     system, user = request.messages
     assert "no tool execution" in system.content
     assert "Summarize these findings" in user.content
-    assert "Do not invent sources" in user["content"]
-    assert "Only one short finding was supplied." in user["content"]
+    assert "Do not invent sources" in user.content
+    assert "Only one short finding was supplied." in user.content
     assert request.model_id is None
     assert request.max_output_tokens == 1200
     assert request.temperature == 0.2
