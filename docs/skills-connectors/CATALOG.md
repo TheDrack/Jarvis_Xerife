@@ -19,6 +19,15 @@
 - Before a consequential tool call, verify the relevant schema, target, prerequisites, authorization, side effects, success signal, and rollback. After failure or a domain/provider change, refresh discovery before retrying.
 - This is an operational contract, not a claim that every external harness enforces it automatically. Configure each provider's startup instructions and verify with a fresh-session acceptance test.
 
+## Universal Tool Registry — metadata foundation
+
+- Canonical architecture decision: [ADR-001](../architecture/ADR-001-universal-tool-registry.md).
+- Current code entry points: `app/domain/tools/contracts.py` and `app/domain/tools/registry.py`.
+- This increment registers and discovers versioned ToolManifest metadata only. It does not execute adapters, probe health, resolve credentials, or authorize calls.
+- Resolve exact `tool_id` + `version`; capability lookup is exact, not substring-based.
+- Registry membership is not availability, authorization, testing, or production verification. Use the live host/MCP registry and policy boundary before any action.
+- Dispatcher, execution broker, adapter bindings, toolchains, persistence, and connector migration remain pending.
+
 ## Portable Jarvis skills
 
 | Skill | Use it for | Canonical entry point |
