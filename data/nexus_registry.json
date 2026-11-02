@@ -90,16 +90,17 @@
     "curiosity_engine": "app.application.services.curiosity_engine.CuriosityEngine",
     "curiosity_intake": "app.application.services.curiosity_intake.CuriosityIntake",
     "reconnection_briefing": "app.application.services.reconnection_briefing.ReconnectionBriefing",
-    "public_intelligence_adapter": "app.adapters.infrastructure.intelligence.public_intelligence_adapter.PublicIntelligenceAdapter"
+    "public_intelligence_adapter": "app.adapters.infrastructure.intelligence.public_intelligence_adapter.PublicIntelligenceAdapter",
+    "intelligence_core": "app.application.services.intelligence_core.IntelligenceCore"
   },
   "metadata": {
     "version": "2026.03",
     "last_updated": "2026-10-24T00:00:00Z",
-    "total_components": 91,
+    "total_components": 92,
     "core_components": 15,
     "memory_components": 5,
     "adapter_components": 42,
-    "service_components": 25,
+    "service_components": 26,
     "edge_components": 11,
     "macrodroid_integration": true,
     "ci_cd_friendly": true
