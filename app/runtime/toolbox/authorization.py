@@ -26,5 +26,3 @@ class ToolAuthorizationPolicy(Protocol):
     ) -> ToolAuthorizationDecision | Awaitable[ToolAuthorizationDecision]:
         """Return a decision bound to this exact request."""
         ...
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

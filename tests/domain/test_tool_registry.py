@@ -201,5 +201,3 @@ def test_registry_requires_version_when_multiple_versions_exist():
 
     with pytest.raises(ValueError, match="tool_version is required"):
         registry.get_unique("telegram.send_message")
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

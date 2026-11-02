@@ -53,5 +53,3 @@ Never infer the latter states from file names, README claims, inventory metadata
 ## Roadmap rule
 
 The canonical progress table is in [STATUS.md](../STATUS.md). Only mark an item complete when its acceptance criteria are supported by repository changes and passing tests; production-facing items additionally require deployment/runtime evidence. Do not convert a proposed feature, a capability inventory flag, or a merged PR into a completed production capability.
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

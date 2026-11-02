@@ -231,5 +231,3 @@ class NetworkDiscoveryAdapter(NexusComponent):
             "success": False,
             "error": "Ação de descoberta ausente ou não suportada.",
         }
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

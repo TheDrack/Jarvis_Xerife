@@ -29,5 +29,3 @@ def test_telegram_adapter_reports_missing_token_as_not_ready(monkeypatch):
     monkeypatch.delenv("TELEGRAM_TOKEN", raising=False)
     adapter = TelegramAdapter()
     assert adapter.can_execute() is False
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

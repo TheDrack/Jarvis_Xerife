@@ -142,5 +142,3 @@ class EvidenceRecord(BaseModel):
     transformations: list[str] = Field(default_factory=list)
     corroborates: list[str] = Field(default_factory=list)
     confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

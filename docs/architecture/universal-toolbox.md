@@ -58,5 +58,3 @@ The Drive adapter exposes an atomic upload_backup(context) operation while retai
 ## Consequences
 
 The initial dispatcher defines one validated execution boundary for the first communication/storage adapters without rewriting Nexus or breaking the current pipeline contract. It fails closed unless the host registers a trusted ToolAuthorizationPolicy; no production policy is wired in this increment. Future migrations must add contract tests and runtime evidence per adapter family.
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

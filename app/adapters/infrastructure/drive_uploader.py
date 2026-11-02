@@ -136,5 +136,3 @@ class DriveUploader(NexusComponent):
         elif self.config_data.get("strict_mode") is True:
             raise RuntimeError(result.get("error_code", "drive_upload_failed"))
         return context
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

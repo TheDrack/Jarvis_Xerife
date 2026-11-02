@@ -314,5 +314,3 @@ class ToolchainRunner:
             error_code=code,
             error_message=message,
         )
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

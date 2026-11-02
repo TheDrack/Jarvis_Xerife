@@ -1177,5 +1177,3 @@ def test_canonical_manifest_supports_non_object_output_schema():
     )
 
     assert manifest.output_schema["type"] == "array"
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

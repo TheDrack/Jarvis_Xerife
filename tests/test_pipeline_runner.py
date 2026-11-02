@@ -280,5 +280,3 @@ def test_tool_step_does_not_read_approval_from_yaml(pipeline_dir):
     assert captured["request"].approval_id is None
     assert captured["request"].idempotency_key is None
     assert result["status"] == "partial"
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

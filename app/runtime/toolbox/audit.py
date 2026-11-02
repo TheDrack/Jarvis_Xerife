@@ -28,5 +28,3 @@ class JsonlToolAuditSink:
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
                 handle.flush()
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

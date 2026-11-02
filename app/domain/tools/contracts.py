@@ -422,5 +422,3 @@ class ToolManifest(BaseModel):
     @property
     def requires_idempotency_key(self) -> bool:
         return self.idempotency == "required"
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

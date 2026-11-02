@@ -336,5 +336,3 @@ class TelegramAdapter(NexusComponent):
         if file_path and os.path.exists(file_path):
             self.send_document(file_path, caption="📦 *Nexus DNA Backup*")
         return context
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]
