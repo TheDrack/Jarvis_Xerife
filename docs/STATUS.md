@@ -1,7 +1,7 @@
 # JARVIS — Status do Projeto
 
 **Versão:** 2.0.0  
-**Revisão documental:** 2026-10-26  
+**Revisão documental:** 2026-11-02
 **Escopo desta revisão:** alinhar catálogo de habilidades/capacidades e roadmap ao que está documentado. Não equivale a uma auditoria completa do runtime nem a uma confirmação de deploy.
 
 ## Visão geral e qualidade da evidência
@@ -11,7 +11,8 @@
 | Arquitetura hexagonal e Nexus DI | Implementados e cobertos por testes segundo a auditoria de entregas | Reexecutar CI no HEAD atual antes de usar métricas antigas como estado corrente |
 | Auto-evolução e self-healing | Há motor, gatekeeper, sandbox local de evolução e workflows de recuperação | Manter mutação automática sob opt-in; revisar proteção de arquivos críticos e resultado de cada workflow |
 | JarvisDevAgent | Fluxo de desenvolvimento e registro de jobs existem | A auditoria identificou promessas não cumpridas: AdapterRegistry sem consumidor de produção, execução de código existente não priorizada de forma comprovada e geração automática de pipelines não entregue |
-| PipelineRunner | Runner consome pipelines YAML e resolve passos pelo Nexus | Não declarar que o Jarvis gera automaticamente pipelines reutilizáveis |
+| PipelineRunner | Runner consome pipelines YAML; branch de desenvolvimento adiciona etapas explícitas tool_id via dispatcher | Migração de todos os passos legados e validação de CI ainda pendentes |
+| Universal Toolbox | Registry versionado canônico, dispatcher com JSON Schema e policy port, toolchains DAG, adapters Telegram/Drive/rede passiva e audit JSONL local implementados no clone da branch issue-680-universal-toolbox | 140 testes focados passaram; suíte completa local Windows/Python 3.12: 2040 passed, 11 skipped, 48 warnings, 61% de cobertura global. O HEAD remoto da PR #681 teve CI verde antes destas alterações locais; a CI da versão atual ainda está pendente. Policy de autorização de produção, auditoria compartilhada durável, idempotência distribuída e migração dos demais conectores permanecem pendentes |
 | Inventário de capabilities | data/capabilities.json existe | Contagens anteriores são históricas: auditoria de 2026-10-16 encontrou 78 de 102 arquivos como stubs e nenhum teste exercitando os IDs cap_0XX/Cap0XX. Recontar e validar comportamento antes de alterar o estado de cada capability |
 | Soldier Mesh / edge | Há modelos, registry, adapters e testes relacionados | Continua parcial até existir validação ponta a ponta com dispositivos reais |
 | Otimização econômica | CostTrackerAdapter está descrito como integrado ao llm_router | ResourceOptimizer não foi encontrado pela auditoria; não marcar fase como completa |
@@ -33,6 +34,7 @@
 | Trilha — harness multiagente e fila compartilhada | **Implementação parcial** | Contratos, scheduler, transporte, fila e worker existem; faltam os critérios operacionais listados em docs/architecture/jarvis-multi-agent-platform.md. |
 | Trilha — execução declarativa auditável | **Código integrado; validação de produção pendente** | PRs #610–#613 integraram TaskRunner, limites de aprovação, diário Supabase e orquestrador. Confirmar deploy atual, gravação real e comportamento runtime. |
 | Trilha — descoberta universal de skills/connectors | **Documentação atualizada; adoção por host pendente** | Catálogo comum agora lista skills e famílias de capacidades; cada host deve carregar o catálogo e descobrir ferramentas vivas. Não pressupor injeção automática em todos os provedores. |
+| Trilha — Universal Toolbox / Toolchains | **Implementação local validada; integração/produção pendentes** | Issue #680. Contratos, registry canônico, dispatcher, policy port fail-closed, toolchains DAG e primeira integração PipelineRunner estão implementados no clone e cobertos por 140 testes focados e 2040 testes da suíte completa. Exigir push/PR atualizado, CI verde, revisão de segurança, policy host-backed, migração gradual de conectores e evidência runtime antes de fechar. |
 
 ## Pendências prioritárias sustentadas pela auditoria
 
@@ -58,3 +60,5 @@
 ## Regra de atualização do roadmap
 
 Só marcar como concluído quando os critérios de aceitação correspondentes tiverem evidência verificável. Para funcionalidades de produção, exigir também confirmação de deploy, saúde e conectividade reais. Um arquivo, skill, migração, PR merged ou campo status=complete no inventário, isoladamente, não comprova comportamento funcional.
+
+[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

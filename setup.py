@@ -23,6 +23,7 @@ setup(
     packages=find_packages(exclude=["tests*"]),
     install_requires=[
         "pydantic>=2.0.0",
+        "jsonschema>=4.20.0",
         "google-genai",
         "fastapi>=0.104.0",
         "sqlmodel>=0.0.14",
@@ -31,3 +32,5 @@ setup(
         "edge": ["pyautogui", "speechrecognition", "pynput"],
     },
 )
+
+[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

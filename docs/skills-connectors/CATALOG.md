@@ -19,14 +19,16 @@
 - Before a consequential tool call, verify the relevant schema, target, prerequisites, authorization, side effects, success signal, and rollback. After failure or a domain/provider change, refresh discovery before retrying.
 - This is an operational contract, not a claim that every external harness enforces it automatically. Configure each provider's startup instructions and verify with a fresh-session acceptance test.
 
-## Universal Tool Registry — metadata foundation
+## Universal Tool Registry and execution runtime — incremental foundation
 
-- Canonical architecture decision: [ADR-001](../architecture/ADR-001-universal-tool-registry.md).
-- Current code entry points: `app/domain/tools/contracts.py` and `app/domain/tools/registry.py`.
-- This increment registers and discovers versioned ToolManifest metadata only. It does not execute adapters, probe health, resolve credentials, or authorize calls.
-- Resolve exact `tool_id` + `version`; capability lookup is exact, not substring-based.
-- Registry membership is not availability, authorization, testing, or production verification. Use the live host/MCP registry and policy boundary before any action.
-- Dispatcher, execution broker, adapter bindings, toolchains, persistence, and connector migration remain pending.
+- Canonical architecture decision: [ADR-001](../architecture/ADR-001-universal-tool-registry.md) and [Universal Toolbox ADR](../architecture/universal-toolbox.md).
+- Canonical metadata contract and registry: `app/domain/tools/contracts.py` and `app/domain/tools/registry.py`. Runtime execution reuses this registry; `app/runtime/toolbox/registry.py` is only a compatibility import, not a second catalog.
+- Dispatcher and DAG toolchains live in `app/runtime/toolbox/`; manifests are in `config/tool_registry.json` and `config/toolchains/*.json`.
+- The first catalog contains five atomic tools for Telegram, Drive backup upload, local interface inventory, and passive ARP-cache discovery. This does not mean the other connector families have been migrated.
+- Input/output contracts use JSON Schema; scope, timeout, process-local rate limits/circuit breakers, idempotency, audit events and toolchain budgets are enforced by the runtime.
+- Dispatch requires a dedicated host-backed ToolAuthorizationPolicy. No production principal/session resolver or approval verifier is registered yet, so real dispatch remains fail-closed. The legacy CapabilityAuthorizer is not treated as proof of identity or approval.
+- Resolve exact `tool_id` + `version`; capability lookup is exact, not substring-based. A missing version is tolerated only when the registry has exactly one version.
+- Registry membership is not availability, authorization, health, testing, or production verification. Distributed idempotency/quotas, shared durable audit, remote health probes, and migration of GitHub/Supabase/Render/browser/other connectors remain pending.
 
 ## Portable Jarvis skills
 
@@ -53,7 +55,8 @@ A skill is portable operating guidance, not a connector or a grant of permission
 | Capability discovery | Nexus DI/discovery, AdapterRegistry, data/capabilities.json, capability detector and gap-reporting services | Resolve the current component through Nexus or inspect live registry. Inventory metadata can be stale and capability files may be stubs; verify implementation and tests before claiming a behavior is complete. |
 | Self-healing and recovery | scripts/jarvis_healer.py, CI workflows, recovery history subsystem | Preserve failure evidence; verify tests and health after repair. Rollback must be verified and must not overwrite concurrent changes. |
 | Auto-evolution / code generation | EvolutionOrchestrator, EvolutionGatekeeper, EvolutionSandbox, JarvisDevAgent and evolution scripts | Treat generated changes as proposals; validate syntax, security boundaries, tests, diff, and CI. DockerSandbox is documented as lacking a production consumer/test in the delivery audit; do not claim container isolation unless verified. |
-| Pipelines | config/pipelines/*.yml, app/runtime/pipeline_runner.py | Runner consumes declared YAML and resolves steps through Nexus. Do not claim that arbitrary pipeline YAML is automatically generated. |
+| Pipelines | config/pipelines/*.yml, app/runtime/pipeline_runner.py | Runner consumes declared YAML and resolves legacy steps through Nexus; explicit tool_id steps use the universal dispatcher and require trusted runtime approval for side effects. Legacy pipelines remain compatible during migration. |
+| Universal Toolbox | app/runtime/toolbox/, config/tool_registry.json, config/toolchains/*.json | Versioned manifests, JSON Schema validation, Nexus adapter resolution, scope gates, host-supplied principal/session/tool-bound authorization policy, process-scoped idempotency, per-process timeout/rate-limit/circuit-breaker controls, secret-free JSONL events, provenance-aware EvidenceRecord contracts, and budgeted DAG toolchains with safe read-only retry are implemented in the current development branch. Dispatch now requires a dedicated principal/session/tool-bound authorization policy; the legacy caller-string/boolean-confirmation authorizer is not accepted. No production authorization policy is wired yet, so runtime dispatch remains fail-closed. Remote provider health, distributed idempotency/quotas, durable shared audit, cancellation of in-flight synchronous provider calls, and all-connector migration remain incomplete. See [Universal Toolbox ADR](../architecture/universal-toolbox.md). |
 | LLM/model routing and cost | llm_router, model/gateway adapters, CostTrackerAdapter | Model availability depends on current credentials, provider status, routing configuration, and policy. Discover current providers rather than assuming a model is usable. |
 | Memory and context | Semantic/procedural/working memory components, consolidated context, vector memory and context protocol | Distinguish source code from active backend connectivity and persisted state. Never claim provider-native memory was updated without confirmation. |
 | Windows desktop / visual control | app/adapters/edge/jarvis_desktop_mcp.py, jarvis_desktop_cli.py, JSONL bridge, UI Automation and visual templates | Requires a reachable interactive Windows session and exposed tool/process bridge. Prefer accessibility/DOM, then templates, then authorized physical input. Observe and verify each action; stop on ambiguity. |
@@ -112,3 +115,5 @@ The table describes integration families in the repository/installation; it does
 The catalog bootstrap is only the discovery stage. Every agent must also execute the [Verificação Inicial de Vôo (VIV)](../POS_INSTALACAO.md) on first use of an installation and after material environment/connector changes. Inventory and safely test live tools/capabilities, record evidence and explicit states, research each material failure, implement fixes with regression tests, rerun focused and full tests, and report unresolved/unavailable items. Never infer access from catalog presence, never disable valid tests, and do not mutate production without explicit authorization.
 
 - **Network protocol inspection:** `network_probe_private_device` performs bounded single-host TCP/HTTP/HTTPS/RTSP inspection; `network_probe_mqtt` validates MQTT CONNECT/CONNACK without credentials or topic access; `network_discover_mdns` and `network_discover_camera_protocols` perform local-link DNS-SD, SSDP, and ONVIF discovery. These are explicit active probes, not passive host-wide monitoring.
+
+[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

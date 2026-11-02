@@ -17,6 +17,7 @@ def make_manifest(**overrides):
         "version": "1.0.0",
         "description": "Send a Telegram message.",
         "adapter_id": "telegram_adapter",
+        "operation": "send_message",
         "provider": "telegram",
         "capabilities": ["telegram.message.send"],
         "input_schema": {
@@ -76,7 +77,9 @@ def test_manifest_rejects_invalid_contract_metadata(overrides):
 
 
 def test_read_only_manifest_cannot_declare_side_effects():
-    with pytest.raises(ValidationError, match="read_only tools cannot declare side effects"):
+    with pytest.raises(
+        ValidationError, match="read_only tools cannot declare side effects"
+    ):
         make_manifest(
             execution_mode="read_only",
             permissions=[],
@@ -115,7 +118,10 @@ def test_registry_rejects_duplicate_tool_version_unless_replace_is_explicit():
     replacement = make_manifest(description="Updated description.")
     registry.register(replacement, replace=True)
 
-    assert registry.get("telegram.send_message", "1.0.0").description == "Updated description."
+    assert (
+        registry.get("telegram.send_message", "1.0.0").description
+        == "Updated description."
+    )
     assert len(registry) == 1
 
 
@@ -183,3 +189,17 @@ def test_registry_list_is_stably_sorted():
         "alpha.lookup",
         "zeta.lookup",
     ]
+
+
+def test_registry_requires_version_when_multiple_versions_exist():
+    registry = ToolRegistry(
+        [
+            make_manifest(),
+            make_manifest(version="2.0.0"),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="tool_version is required"):
+        registry.get_unique("telegram.send_message")
+
+[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

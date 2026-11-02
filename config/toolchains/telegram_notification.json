@@ -1,0 +1,19 @@
+{
+  "toolchain_id": "communication.telegram_notification",
+  "version": "1.0.0",
+  "description": "Envia uma notificação Telegram após aprovação explícita do runtime.",
+  "continue_on_error": false,
+  "steps": [
+    {
+      "step_id": "send_notification",
+      "tool_id": "telegram.send_message",
+      "tool_version": "1.0.0",
+      "capability": "messaging.send",
+      "arguments": {
+        "text": "Notificação Jarvis"
+      }
+    }
+  ]
+}
+
+[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]
