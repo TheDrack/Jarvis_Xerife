@@ -129,8 +129,8 @@ def test_handler_scopes_request_and_returns_provider_telemetry():
 
     request = calls[0]
     system, user = request.messages
-    assert "no tool execution" in system["content"]
-    assert "Summarize these findings" in user["content"]
+    assert "no tool execution" in system.content
+    assert "Summarize these findings" in user.content
     assert "Do not invent sources" in user["content"]
     assert "Only one short finding was supplied." in user["content"]
     assert request.model_id is None
