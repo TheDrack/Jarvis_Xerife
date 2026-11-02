@@ -4,7 +4,7 @@
 import logging
 import os
 import textwrap
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,27 +15,23 @@ from app.runtime.pipeline_runner import run_pipeline
 def _make_pipeline_config(strict_mode: bool = False) -> str:
     """Return a minimal pipeline YAML string."""
     strict_str = "true" if strict_mode else "false"
-    return textwrap.dedent(
-        f"""\
+    return textwrap.dedent(f"""\
         components:
           my_step:
             id: "my_component"
             config:
               strict_mode: {strict_str}
-        """
-    )
+        """)
 
 
 def _make_hint_path_config(hint_path: str) -> str:
     """Return a pipeline YAML string with a hint_path on the component."""
-    return textwrap.dedent(
-        f"""\
+    return textwrap.dedent(f"""\
         components:
           my_step:
             id: "my_component"
             hint_path: "{hint_path}"
-        """
-    )
+        """)
 
 
 @pytest.fixture
@@ -44,7 +40,9 @@ def pipeline_dir(tmp_path):
     cfg_dir = tmp_path / "config" / "pipelines"
     cfg_dir.mkdir(parents=True)
     (cfg_dir / "test_pipeline.yml").write_text(_make_pipeline_config())
-    (cfg_dir / "test_strict.yml").write_text(_make_pipeline_config(strict_mode=True))
+    (cfg_dir / "test_strict.yml").write_text(
+        _make_pipeline_config(strict_mode=True)
+    )
     (cfg_dir / "test_hint_path.yml").write_text(
         _make_hint_path_config("app/adapters/infrastructure/my_component.py")
     )
@@ -54,7 +52,9 @@ def pipeline_dir(tmp_path):
 class TestCloudMockDetection:
     """pipeline_runner must treat CloudMock as a real failure, not a silent success."""
 
-    def test_cloudmock_skips_execute_and_logs_error(self, pipeline_dir, caplog):
+    def test_cloudmock_skips_execute_and_logs_error(
+        self, pipeline_dir, caplog
+    ):
         """When Nexus returns a CloudMock, execute() must NOT be called and an error logged."""
         mock_instance = CloudMock("my_component")
         mock_instance.execute = MagicMock()  # spy to ensure it's not called
@@ -170,3 +170,113 @@ class TestHintPathForwarding:
             target_id="my_component",
             hint_path=None,
         )
+
+
+def test_tool_step_uses_dispatcher_and_trusted_approval(pipeline_dir):
+    from app.runtime.toolbox import ToolResult
+
+    cfg = pipeline_dir / "config" / "pipelines" / "test_tool.yml"
+    cfg.write_text(
+        textwrap.dedent("""\
+        strict: true
+        components:
+          telegram_notice:
+            tool_id: "telegram.send_message"
+            tool_version: "1.0.0"
+            capability: "messaging.send"
+            arguments:
+              text: "Backup concluído"
+    """),
+        encoding="utf-8",
+    )
+
+    captured = {}
+
+    class FakeDispatcher:
+        def dispatch(self, request):
+            captured["request"] = request
+            return ToolResult(
+                tool_id=request.tool_id,
+                request_id=request.request_id,
+                success=True,
+                status="succeeded",
+                output={"ok": True},
+            )
+
+    with patch(
+        "app.runtime.pipeline_runner._get_tool_dispatcher",
+        return_value=FakeDispatcher(),
+    ):
+        original_dir = os.getcwd()
+        try:
+            os.chdir(pipeline_dir)
+            result = run_pipeline(
+                "test_tool",
+                tool_approvals={
+                    "telegram.send_message": {
+                        "scope": "telegram:configured-chat",
+                        "approval_id": "approval-from-trusted-runtime",
+                        "idempotency_key": "backup-2026-11-02",
+                    }
+                },
+            )
+        finally:
+            os.chdir(original_dir)
+
+    request = captured["request"]
+    assert request.tool_id == "telegram.send_message"
+    assert request.arguments == {"text": "Backup concluído"}
+    assert request.caller == "pipeline_runner"
+    assert request.tool_version == "1.0.0"
+    assert request.capability == "messaging.send"
+    assert request.approval_id == "approval-from-trusted-runtime"
+    assert request.idempotency_key == "backup-2026-11-02"
+    assert result["status"] == "success"
+    assert result["tool_results"]["telegram_notice"]["status"] == "succeeded"
+
+
+def test_tool_step_does_not_read_approval_from_yaml(pipeline_dir):
+    from app.runtime.toolbox import ToolResult
+
+    cfg = pipeline_dir / "config" / "pipelines" / "test_tool_unapproved.yml"
+    cfg.write_text(
+        textwrap.dedent("""\
+        strict: false
+        components:
+          telegram_notice:
+            tool_id: "telegram.send_message"
+            human_confirmed: true
+            idempotency_key: "yaml-must-not-authorize"
+            arguments:
+              text: "Mensagem"
+    """),
+        encoding="utf-8",
+    )
+
+    captured = {}
+
+    class FakeDispatcher:
+        def dispatch(self, request):
+            captured["request"] = request
+            return ToolResult(
+                tool_id=request.tool_id,
+                request_id=request.request_id,
+                success=False,
+                status="rejected",
+                error_code="approval_reference_required",
+            )
+
+    with patch(
+        "app.runtime.pipeline_runner._get_tool_dispatcher",
+        return_value=FakeDispatcher(),
+    ):
+        original_dir = os.getcwd()
+        try:
+            os.chdir(pipeline_dir)
+            result = run_pipeline("test_tool_unapproved")
+        finally:
+            os.chdir(original_dir)
+
+    assert captured["request"].approval_id is None
+    assert captured["request"].idempotency_key is None
+    assert result["status"] == "partial"

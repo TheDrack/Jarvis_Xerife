@@ -23,6 +23,7 @@ setup(
     packages=find_packages(exclude=["tests*"]),
     install_requires=[
         "pydantic>=2.0.0",
+        "jsonschema>=4.20.0",
         "google-genai",
         "fastapi>=0.104.0",
         "sqlmodel>=0.0.14",

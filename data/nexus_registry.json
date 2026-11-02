@@ -29,6 +29,7 @@
     "env_secrets_provider": "app.adapters.infrastructure.env_secrets_provider.EnvSecretsProvider",
     "osint_search": "app.adapters.edge.osint_search_adapter.OsintSearchAdapter",
     "eagle_osint_adapter": "app.adapters.edge.eagle_osint_adapter.EagleOsintAdapter",
+    "network_discovery_adapter": "app.adapters.edge.network_discovery_adapter.NetworkDiscoveryAdapter",
     "security_audit_adapter": "app.adapters.edge.security_audit_adapter.SecurityAuditAdapter",
     "cost_tracker_adapter": "app.adapters.infrastructure.cost_tracker_adapter.CostTrackerAdapter",
     "capability_index_service": "app.application.services.capability_index_service.CapabilityIndexService",
@@ -93,12 +94,12 @@
   "metadata": {
     "version": "2026.03",
     "last_updated": "2026-10-24T00:00:00Z",
-    "total_components": 92,
+    "total_components": 93,
     "core_components": 15,
     "memory_components": 5,
     "adapter_components": 42,
     "service_components": 25,
-    "edge_components": 10,
+    "edge_components": 11,
     "macrodroid_integration": true,
     "ci_cd_friendly": true
   }

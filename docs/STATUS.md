@@ -1,7 +1,7 @@
 # JARVIS — Status do Projeto
 
 **Versão:** 2.0.0  
-**Revisão documental:** 2026-10-26  
+**Revisão documental:** 2026-11-02
 **Escopo desta revisão:** alinhar catálogo de habilidades/capacidades e roadmap ao que está documentado. Não equivale a uma auditoria completa do runtime nem a uma confirmação de deploy.
 
 ## Visão geral e qualidade da evidência
@@ -11,7 +11,8 @@
 | Arquitetura hexagonal e Nexus DI | Implementados e cobertos por testes segundo a auditoria de entregas | Reexecutar CI no HEAD atual antes de usar métricas antigas como estado corrente |
 | Auto-evolução e self-healing | Há motor, gatekeeper, sandbox local de evolução e workflows de recuperação | Manter mutação automática sob opt-in; revisar proteção de arquivos críticos e resultado de cada workflow |
 | JarvisDevAgent | Fluxo de desenvolvimento e registro de jobs existem | A auditoria identificou promessas não cumpridas: AdapterRegistry sem consumidor de produção, execução de código existente não priorizada de forma comprovada e geração automática de pipelines não entregue |
-| PipelineRunner | Runner consome pipelines YAML e resolve passos pelo Nexus | Não declarar que o Jarvis gera automaticamente pipelines reutilizáveis |
+| PipelineRunner | Runner consome pipelines YAML; branch de desenvolvimento adiciona etapas explícitas tool_id via dispatcher | Migração de todos os passos legados e validação de CI ainda pendentes |
+| Universal Toolbox | Registry versionado canônico, dispatcher fail-closed com JSON Schema, toolchains DAG, adapters Telegram/Drive/rede passiva e audit JSONL local implementados na PR #681 (draft) | No commit de código `ca21d51098239d211ec1843ba06eea15d1ca3603`, CI Linux/Python 3.11.17 e Windows/Python 3.12.10 aprovou a suíte completa em ambos: 2043 passed, 12 skipped; cobertura 60%. A revisão de segurança, policy host-backed, auditoria/estado distribuídos, idempotência distribuída e migração dos demais conectores permanecem pendentes. |
 | Inventário de capabilities | data/capabilities.json existe | Contagens anteriores são históricas: auditoria de 2026-10-16 encontrou 78 de 102 arquivos como stubs e nenhum teste exercitando os IDs cap_0XX/Cap0XX. Recontar e validar comportamento antes de alterar o estado de cada capability |
 | Soldier Mesh / edge | Há modelos, registry, adapters e testes relacionados | Continua parcial até existir validação ponta a ponta com dispositivos reais |
 | Otimização econômica | CostTrackerAdapter está descrito como integrado ao llm_router | ResourceOptimizer não foi encontrado pela auditoria; não marcar fase como completa |
@@ -20,6 +21,7 @@
 | Diário de planos no Supabase | Migrações e adaptador estão no repositório; migrações de tabela e grants foram registradas no projeto Supabase nesta rodada de trabalho | Ainda é necessário confirmar insert real via adaptador no deploy atual; existência da tabela não prova integração operacional |
 | Catálogo comum de agentes | Catálogo de skills/connectors e protocolo de memória existem; quatro skills portáteis foram localizadas no repositório | A leitura automática no início de toda conversa depende de cada host/harness e precisa ser validada por runtime |
 | Deploy Render | Serviço configurado para deploy por novo commit após checks; deploy pode ser sujeito a cooldown externo configurado pelo operador | Confirmar SHA do deploy e health check após a janela de cooldown; merge não é prova de deploy |
+| Governança da branch main | **Proteção ausente; issue #682 aberta** | API do GitHub confirmou `protected=false`, `protection.enabled=false` e zero rulesets. Exigir PR e o check de validação sempre executado; o workflow path-filtered da fila precisa de agregador antes de ser obrigatório globalmente. |
 
 ## Roadmap — estado conservador
 
@@ -33,6 +35,7 @@
 | Trilha — harness multiagente e fila compartilhada | **Implementação parcial** | Contratos, scheduler, transporte, fila e worker existem; faltam os critérios operacionais listados em docs/architecture/jarvis-multi-agent-platform.md. |
 | Trilha — execução declarativa auditável | **Código integrado; validação de produção pendente** | PRs #610–#613 integraram TaskRunner, limites de aprovação, diário Supabase e orquestrador. Confirmar deploy atual, gravação real e comportamento runtime. |
 | Trilha — descoberta universal de skills/connectors | **Documentação atualizada; adoção por host pendente** | Catálogo comum agora lista skills e famílias de capacidades; cada host deve carregar o catálogo e descobrir ferramentas vivas. Não pressupor injeção automática em todos os provedores. |
+| Trilha — Universal Toolbox / Toolchains | **Implementação em PR #681; revisão e produção pendentes** | Issue #680. Registry, dispatcher fail-closed, toolchains DAG e integração inicial do PipelineRunner estão na PR draft. No commit de código `ca21d51098239d211ec1843ba06eea15d1ca3603`, CI Linux/Python 3.11.17 e Windows/Python 3.12.10 aprovou a suíte completa em ambos: 2043 passed, 12 skipped; cobertura 60%. Permanecem pendentes revisão de segurança, policy host-backed, estado/audit distribuídos, migração gradual e validação runtime. |
 
 ## Pendências prioritárias sustentadas pela auditoria
 
@@ -44,6 +47,7 @@
 6. Validar multiagente ponta a ponta: dois runtimes reais, heartbeat, supervisão, renovação de lease, deduplicação e recuperação de mensagens expiradas.
 7. Verificar o deploy do commit integrado, endpoint /health e gravação de evento via adaptador Supabase, sem executar capacidades com efeitos externos.
 8. Validar em cada harness se o catálogo e as skills são carregados no bootstrap de uma conversa nova.
+9. Proteger `main` com PR obrigatório e validação CI obrigatória, conforme issue #682; o estado atual não bloqueia push direto nem exige checks.
 
 ## Documentos de referência
 

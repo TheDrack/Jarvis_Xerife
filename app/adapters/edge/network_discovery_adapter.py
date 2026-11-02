@@ -1,4 +1,5 @@
 """Read-only local network discovery with explicit private-network scope."""
+
 from __future__ import annotations
 
 import ipaddress
@@ -8,6 +9,7 @@ import socket
 import subprocess
 from typing import Any
 
+from app.core.nexuscomponent import NexusComponent
 
 _PRIVATE = (
     ipaddress.ip_network("10.0.0.0/8"),
@@ -22,13 +24,19 @@ def _private_network(cidr: str) -> ipaddress.IPv4Network:
     try:
         network = ipaddress.ip_network(cidr, strict=False)
     except ValueError as exc:
-        raise ValueError("Informe uma rede IPv4 CIDR valida, por exemplo 192.168.1.0/24.") from exc
+        raise ValueError(
+            "Informe uma rede IPv4 CIDR valida, por exemplo 192.168.1.0/24."
+        ) from exc
     if not isinstance(network, ipaddress.IPv4Network):
         raise ValueError("A descoberta aceita apenas redes IPv4.")
     if not any(network.subnet_of(private) for private in _PRIVATE):
-        raise ValueError("Escopo negado: somente redes RFC1918 privadas sao permitidas.")
+        raise ValueError(
+            "Escopo negado: somente redes RFC1918 privadas sao permitidas."
+        )
     if network.prefixlen < _MAX_PREFIX:
-        raise ValueError("Escopo muito amplo. Limite maximo: 256 enderecos (/24 ou menor).")
+        raise ValueError(
+            "Escopo muito amplo. Limite maximo: 256 enderecos (/24 ou menor)."
+        )
     return network
 
 
@@ -56,20 +64,37 @@ def network_interfaces() -> dict[str, Any]:
                     continue
                 try:
                     ip = ipaddress.ip_address(address.address)
-                    if not isinstance(ip, ipaddress.IPv4Address) or ip.is_loopback:
+                    if (
+                        not isinstance(ip, ipaddress.IPv4Address)
+                        or ip.is_loopback
+                    ):
                         continue
                     netmask = address.netmask or "255.255.255.0"
-                    network = ipaddress.ip_network(f"{address.address}/{netmask}", strict=False)
-                    results.append({
-                        "interface": name,
-                        "address": str(ip),
-                        "netmask": address.netmask or "",
-                        "network": str(network),
-                        "scope": _interface_scope(ip),
-                        "operational_status": "up" if stats and stats.isup else "down" if stats else "unknown",
-                        "speed_mbps": stats.speed if stats and stats.speed > 0 else None,
-                        "mtu": stats.mtu if stats and stats.mtu > 0 else None,
-                    })
+                    network = ipaddress.ip_network(
+                        f"{address.address}/{netmask}", strict=False
+                    )
+                    results.append(
+                        {
+                            "interface": name,
+                            "address": str(ip),
+                            "netmask": address.netmask or "",
+                            "network": str(network),
+                            "scope": _interface_scope(ip),
+                            "operational_status": (
+                                "up"
+                                if stats and stats.isup
+                                else "down" if stats else "unknown"
+                            ),
+                            "speed_mbps": (
+                                stats.speed
+                                if stats and stats.speed > 0
+                                else None
+                            ),
+                            "mtu": (
+                                stats.mtu if stats and stats.mtu > 0 else None
+                            ),
+                        }
+                    )
                 except ValueError:
                     continue
         return {"success": True, "interfaces": results, "count": len(results)}
@@ -90,14 +115,24 @@ def discover_devices(cidr: str) -> dict[str, Any]:
     elif platform.system().lower() in {"linux", "darwin"}:
         command = ["arp", "-an"]
     else:
-        return {"success": False, "error": "Sistema operacional nao suportado para leitura ARP."}
+        return {
+            "success": False,
+            "error": "Sistema operacional nao suportado para leitura ARP.",
+        }
     try:
         completed = subprocess.run(
-            command, capture_output=True, text=True, timeout=4, check=False,
+            command,
+            capture_output=True,
+            text=True,
+            timeout=4,
+            check=False,
             shell=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return {"success": False, "error": f"Nao foi possivel consultar a tabela ARP: {exc}"}
+        return {
+            "success": False,
+            "error": f"Nao foi possivel consultar a tabela ARP: {exc}",
+        }
     devices: dict[str, dict[str, str]] = {}
     for line in completed.stdout.splitlines():
         mac_match = re.search(r"(?i)([0-9a-f]{2}(?:[:-][0-9a-f]{2}){5})", line)
@@ -122,9 +157,14 @@ def discover_devices(cidr: str) -> dict[str, Any]:
         "method": "os_arp_cache",
         "active_probes_sent": 0,
         "scope": str(network),
-        "devices": sorted(devices.values(), key=lambda item: ipaddress.ip_address(item["ip"])),
+        "devices": sorted(
+            devices.values(), key=lambda item: ipaddress.ip_address(item["ip"])
+        ),
         "count": len(devices),
-        "note": "Somente entradas ja presentes no cache ARP; dispositivos inativos podem nao aparecer.",
+        "note": (
+            "Somente entradas ja presentes no cache ARP; "
+            "dispositivos inativos podem nao aparecer."
+        ),
     }
 
 
@@ -134,8 +174,13 @@ def inspect_private_address(address: str) -> dict[str, Any]:
         ip = ipaddress.ip_address(address.strip())
     except ValueError:
         return {"success": False, "error": "Endereco IP invalido."}
-    if not isinstance(ip, ipaddress.IPv4Address) or not any(ip in net for net in _PRIVATE):
-        return {"success": False, "error": "Escopo negado: informe um IPv4 privado RFC1918."}
+    if not isinstance(ip, ipaddress.IPv4Address) or not any(
+        ip in net for net in _PRIVATE
+    ):
+        return {
+            "success": False,
+            "error": "Escopo negado: informe um IPv4 privado RFC1918.",
+        }
     try:
         hostname = socket.gethostbyaddr(str(ip))[0]
     except (OSError, socket.herror):
@@ -147,3 +192,42 @@ def inspect_private_address(address: str) -> dict[str, Any]:
         "method": "reverse_dns_only",
         "ports_scanned": False,
     }
+
+
+class NetworkDiscoveryAdapter(NexusComponent):
+    """Nexus adapter exposing bounded, read-only local network discovery tools."""
+
+    def __init__(self):
+        self.config_data: dict[str, Any] = {}
+
+    def configure(self, config: dict[str, Any]) -> None:
+        self.config_data = config
+
+    def can_execute(self, context: dict[str, Any] | None = None) -> bool:
+        return True
+
+    def network_interfaces(self) -> dict[str, Any]:
+        return network_interfaces()
+
+    def discover_devices(self, cidr: str) -> dict[str, Any]:
+        return discover_devices(cidr)
+
+    def inspect_private_address(self, address: str) -> dict[str, Any]:
+        return inspect_private_address(address)
+
+    def execute(self, context: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Legacy Nexus entry point; atomic methods are preferred by ToolDispatcher."""
+        context = context or {}
+        action = context.get("action")
+        if action == "network_interfaces":
+            return self.network_interfaces()
+        if action == "discover_devices":
+            return self.discover_devices(str(context.get("cidr", "")))
+        if action == "inspect_private_address":
+            return self.inspect_private_address(
+                str(context.get("address", ""))
+            )
+        return {
+            "success": False,
+            "error": "Ação de descoberta ausente ou não suportada.",
+        }

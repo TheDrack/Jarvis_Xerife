@@ -2,7 +2,7 @@
 
 **Scope:** repo-derived discovery map for compatible agent harnesses.  
 **Source of truth:** source code, tests, live connector registry, deployment state, and the delivery audit—not the status field alone.  
-**Last reviewed:** 2026-10-26 (documentation review; not a complete production runtime audit).
+**Last reviewed:** 2026-11-02 (repository implementation and test review; not a complete production runtime audit).
 
 ## How to interpret status
 
@@ -20,6 +20,7 @@ Never infer the latter states from file names, README claims, inventory metadata
 
 | Capability | Repository entry points | Evidence / limitation to disclose |
 |---|---|---|
+| Universal Tool Registry (metadata layer) | app/domain/tools/contracts.py, app/domain/tools/registry.py, ADR-001 | Canonical process-local registry with versioned ToolManifest snapshots, exact capability lookup, schema validation, duplicate protection and compatibility loading. Registry membership does not prove adapter health, authorization or execution. |
 | Common skill and connector bootstrap | docs/skills-connectors/CATALOG.md, CONTEXT_MEMORY_PROTOCOL.md, skills/*/SKILL.md | Portable guidance is present. Whether every harness automatically reads it at conversation start must be verified per host. |
 | Multi-agent leader/scheduler contracts | app/multiagent/contracts, scheduler/leader/transport modules; [platform design](../architecture/jarvis-multi-agent-platform.md) | Cost-benefit scheduler and task-scoped roles are documented; real multi-runtime end-to-end execution, supervision, heartbeat, and lease renewal remain acceptance items in the architecture document. |
 | Durable task/message queue | Supabase queue adapter and migrations 202610230002–202610230004 | Repo has adapter/migrations; do not assume these migrations are applied to production without checking the target project's migration history. |
@@ -28,7 +29,8 @@ Never infer the latter states from file names, README claims, inventory metadata
 | Capability inventory and Nexus discovery | data/capabilities.json, app/core/nexus.py, discovery and capability manager services | Metadata needs auditing: the historical delivery audit found 78/102 capability files were stubs and none of the capability IDs were exercised by tests at that audit point. Treat counts as historical until rerun. |
 | Auto-evolution | EvolutionOrchestrator, EvolutionGatekeeper, EvolutionSandbox, scripts/evolve_all_pending.py | Audit documented gaps in protected paths and discovery of already-existing implementations. Auto-evolution should remain opt-in/paused until current gates and tests are confirmed. |
 | Self-healing CI | scripts/jarvis_healer.py, workflow files | Historical CI runs show automated recovery workflow exists; every claim must be tied to the specific current run and its outcome. |
-| YAML pipelines | config/pipelines/*.yml, app/runtime/pipeline_runner.py | Runner consumes existing YAML. Automatic generation of reusable pipelines was marked not delivered in the delivery audit. |
+| YAML pipelines | config/pipelines/*.yml, app/runtime/pipeline_runner.py | Legacy Nexus steps remain supported; explicit tool_id steps route through ToolDispatcher and can receive approval only from trusted runtime parameters. Automatic pipeline generation and full legacy migration are not delivered. |
+| Universal Toolbox / toolchains | app/runtime/toolbox/, config/tool_registry.json, config/toolchains/*.json | Registry, typed manifests, JSON Schema argument/output validation, principal/session/tool-bound authorization gates, adapter resolution, process-scoped idempotency, per-process timeout/rate-limit/circuit breaker, JSONL event sink, provenance-aware EvidenceRecord, and budgeted DAG execution with read-only retry are implemented in the current development branch. Dispatch requires a principal/session/tool-bound authorization policy; no production policy is wired yet, so live dispatch remains fail-closed. Focused tests pass; distributed idempotency/quotas, remote provider health checks, shared audit persistence, in-flight synchronous cancellation and all-adapter migration remain incomplete. Not production-verified. |
 | Desktop UI automation | app/adapters/edge/jarvis_desktop_mcp.py, jarvis_desktop_cli.py, visual navigation skill | Requires Windows interactive session, installed edge dependencies and an exposed local/remote bridge. Validate on the actual host. |
 | Browser portas and traffic observer (CDP) | app/adapters/edge/portas_*.py, data/portas/macros | Implemented on PR branch; unit tests cover macro authorization, URL scheme allowlisting, URL/payload redaction and WebSocket event callbacks. CI integration test attaches to Chromium/CDP and captures HTTP events. WebSocket frames via real CDP and the user's persistent browser profile remain runtime acceptance items. |
 | Android navigation | skills/jarvis-android-navigation/SKILL.md and Android-related modules/workflows | Skill exists; paired device and end-to-end hardware behavior must be checked live. |

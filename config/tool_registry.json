@@ -1,0 +1,217 @@
+{
+  "schema_version": "1.0.0",
+  "tools": [
+    {
+      "tool_id": "telegram.get_updates",
+      "version": "1.0.0",
+      "description": "Lê atualizações pendentes sem avançar o offset de confirmação do Telegram.",
+      "adapter_id": "telegram_adapter",
+      "operation": "get_updates",
+      "provider": "Telegram Bot API",
+      "origin": "third_party",
+      "capabilities": ["messaging.receive"],
+      "permissions": ["telegram.bot:read_updates"],
+      "allowed_scopes": ["local", "telegram:updates"],
+      "execution_mode": "read_only",
+      "trust_level": "untrusted",
+      "data_classification": "internal",
+      "credential_refs": ["env://TELEGRAM_TOKEN"],
+      "rate_limit": {"requests": 60, "window_seconds": 60},
+      "timeout_seconds": 30,
+      "cost_units": 1,
+      "idempotency": "not_applicable",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "timeout": {"type": "integer", "minimum": 0, "maximum": 50}
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {"type": "object"}
+      }
+    },
+    {
+      "tool_id": "telegram.send_message",
+      "version": "1.0.0",
+      "description": "Envia uma mensagem para um chat Telegram.",
+      "adapter_id": "telegram_adapter",
+      "operation": "send_message_scoped",
+      "provider": "Telegram Bot API",
+      "origin": "third_party",
+      "capabilities": ["messaging.send"],
+      "permissions": ["telegram.bot:send_message"],
+      "allowed_scopes": ["local", "telegram:configured-chat"],
+      "execution_mode": "active_bounded",
+      "trust_level": "untrusted",
+      "data_classification": "internal",
+      "side_effects": ["send_message"],
+      "credential_refs": ["env://TELEGRAM_TOKEN"],
+      "rate_limit": {"requests": 60, "window_seconds": 60, "burst": 10},
+      "timeout_seconds": 30,
+      "cost_units": 1,
+      "idempotency": "required",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "chat_id": {"type": ["string", "integer"]}
+        },
+        "required": ["text"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {"type": "boolean"},
+          "result": {"type": "object"}
+        },
+        "required": ["ok"],
+        "additionalProperties": true
+      }
+    },
+    {
+      "tool_id": "network.get_interfaces",
+      "version": "1.0.0",
+      "description": "Lista interfaces IPv4 locais e seu estado operacional sem enviar probes.",
+      "adapter_id": "network_discovery_adapter",
+      "operation": "network_interfaces",
+      "provider": "Local operating system",
+      "origin": "local",
+      "capabilities": ["network.inventory.read"],
+      "permissions": ["network.interfaces.read"],
+      "allowed_scopes": ["local", "network:passive"],
+      "execution_mode": "read_only",
+      "trust_level": "system",
+      "data_classification": "internal",
+      "rate_limit": {"requests": 20, "window_seconds": 60},
+      "timeout_seconds": 10,
+      "cost_units": 1,
+      "idempotency": "not_applicable",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "interfaces": {"type": "array", "items": {"type": "object"}},
+          "count": {"type": "integer"}
+        },
+        "required": ["success", "interfaces", "count"],
+        "additionalProperties": true
+      }
+    },
+    {
+      "tool_id": "network.discover_devices",
+      "version": "1.0.0",
+      "description": "Lê somente o cache ARP local para uma rede RFC1918 /24 ou menor; não envia probes.",
+      "adapter_id": "network_discovery_adapter",
+      "operation": "discover_devices",
+      "provider": "Local operating system ARP cache",
+      "origin": "local",
+      "capabilities": ["network.discovery.passive"],
+      "permissions": ["network.arp_cache.read"],
+      "allowed_scopes": ["local", "network:passive"],
+      "execution_mode": "read_only",
+      "trust_level": "system",
+      "data_classification": "internal",
+      "rate_limit": {"requests": 6, "window_seconds": 60},
+      "timeout_seconds": 10,
+      "circuit_breaker_threshold": 3,
+      "cost_units": 2,
+      "idempotency": "not_applicable",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cidr": {
+            "type": "string",
+            "minLength": 9,
+            "maxLength": 18,
+            "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}/([0-9]|[12][0-9]|3[0-2])$"
+          }
+        },
+        "required": ["cidr"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "method": {"type": "string"},
+          "active_probes_sent": {"type": "integer", "const": 0},
+          "scope": {"type": "string"},
+          "devices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ip": {"type": "string"},
+                "mac": {"type": "string"}
+              },
+              "required": ["ip", "mac"],
+              "additionalProperties": false
+            }
+          },
+          "count": {"type": "integer"},
+          "note": {"type": "string"}
+        },
+        "required": ["success", "method", "active_probes_sent", "scope", "devices", "count"],
+        "additionalProperties": true
+      }
+    },
+    {
+      "tool_id": "drive.upload_backup",
+      "version": "1.0.0",
+      "description": "Executa o upload do artefato de backup presente no contexto do pipeline.",
+      "adapter_id": "drive_uploader",
+      "operation": "upload_backup_scoped",
+      "provider": "Google Drive API",
+      "origin": "third_party",
+      "capabilities": ["storage.upload"],
+      "permissions": ["google.drive:file.create"],
+      "allowed_scopes": ["local", "drive:backup"],
+      "execution_mode": "active_bounded",
+      "trust_level": "untrusted",
+      "data_classification": "confidential",
+      "side_effects": ["upload_backup"],
+      "credential_refs": ["env://G_JSON"],
+      "rate_limit": {"requests": 30, "window_seconds": 60},
+      "timeout_seconds": 30,
+      "cost_units": 5,
+      "idempotency": "required",
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "context": {"type": "object"}
+        },
+        "required": ["context"],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "success": {"type": "boolean"},
+          "file_id": {"type": "string"},
+          "file_name": {"type": "string"},
+          "error_code": {"type": "string"}
+        },
+        "required": ["success"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
