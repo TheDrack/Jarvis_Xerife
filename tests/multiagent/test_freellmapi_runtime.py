@@ -3,6 +3,14 @@ from __future__ import annotations
 import httpx
 import pytest
 
+from app.adapters.infrastructure.freellmapi_model_runtime import FreeLLMAPIModelRuntimeAdapter
+from app.application.ports.model_runtime import (
+    ModelInvocationRequest,
+    ModelInvocationResult,
+    ModelMessage,
+    ModelRuntimeError,
+    ModelUsage,
+)
 from app.multiagent.freellmapi_client import FreeLLMAPIClient, FreeLLMAPIError
 from app.multiagent.freellmapi_handler import FreeLLMAgentHandler
 from app.multiagent.transport import AgentMessage
@@ -72,6 +80,8 @@ def test_chat_maps_http_error_without_leaking_response_body():
             client.chat([{"role": "user", "content": "hello"}])
         assert "secret upstream detail" not in str(err.value)
         assert "test-secret" not in str(err.value)
+        assert err.value.code == "rate_limited"
+        assert err.value.retryable is True
     finally:
         owned.close()
 
@@ -87,16 +97,22 @@ def test_from_env_requires_explicit_api_key(monkeypatch):
 def test_handler_scopes_request_and_returns_provider_telemetry():
     calls = []
 
-    class FakeClient:
-        def chat(self, messages, **kwargs):
-            calls.append((messages, kwargs))
-            return {
-                "content": "Analysis complete.",
-                "model": "qwen/mini",
-                "routed_via": "provider/qwen",
-                "fallback_attempts": 1,
-                "usage": {"total_tokens": 20},
-            }
+    class FakeRuntime:
+        def invoke(self, request):
+            calls.append(request)
+            return ModelInvocationResult(
+                provider_id="venice",
+                model_id="qwen/mini",
+                content="Analysis complete.",
+                usage=ModelUsage(total_tokens=20),
+                routed_via="provider/qwen",
+                fallback_attempts=1,
+            )
+
+        supports_cancellation = False
+
+        def cancel(self, request_id):
+            return False
 
     message = AgentMessage.create(
         task_id="task-1",
@@ -111,30 +127,39 @@ def test_handler_scopes_request_and_returns_provider_telemetry():
             "context": "Only one short finding was supplied.",
         },
     )
-    result = FreeLLMAgentHandler(FakeClient())(message)
+    result = FreeLLMAgentHandler(FakeRuntime())(message)
 
-    system, user = calls[0][0]
-    assert "no tool execution" in system["content"]
-    assert "Summarize these findings" in user["content"]
-    assert "Do not invent sources" in user["content"]
-    assert "Only one short finding was supplied." in user["content"]
-    assert calls[0][1]["model"] is None
+    request = calls[0]
+    system, user = request.messages
+    assert "no tool execution" in system.content
+    assert "Summarize these findings" in user.content
+    assert "Do not invent sources" in user.content
+    assert "Only one short finding was supplied." in user.content
+    assert request.model_id is None
+    assert request.max_output_tokens == 1200
+    assert request.temperature == 0.2
     assert result["engine"] == "freellmapi"
+    assert result["provider"] == "venice"
     assert result["routed_via"] == "provider/qwen"
     assert result["fallback_attempts"] == 1
     assert result["success"] is True
 
 
 def test_handler_rejects_missing_objective_without_calling_model():
-    class FakeClient:
-        def chat(self, *args, **kwargs):
+    class FakeRuntime:
+        supports_cancellation = False
+
+        def invoke(self, request):
             raise AssertionError("must not call inference")
+
+        def cancel(self, request_id):
+            return False
 
     message = AgentMessage.create(
         task_id="task-1", sender_id="leader", recipient_id="mini-1",
         kind="request", payload={},
     )
-    assert FreeLLMAgentHandler(FakeClient())(message) == {
+    assert FreeLLMAgentHandler(FakeRuntime())(message) == {
         "success": False, "error": "missing_objective"
     }
 
@@ -209,3 +234,98 @@ def test_chat_does_not_retry_a_timeout_that_would_outlive_the_lease(monkeypatch)
         owned.close()
 
     assert len(calls) == 1, "a timeout must not be retried inside the same lease"
+
+
+
+def test_model_runtime_adapter_normalizes_usage_and_routing_metadata():
+    def respond(request):
+        body = __import__("json").loads(request.content)
+        assert body["model"] == "model-x"
+        assert body["max_tokens"] == 77
+        return httpx.Response(
+            200,
+            json={
+                "model": "provider/model-x",
+                "choices": [{"message": {"content": "Normalized output"}}],
+                "usage": {
+                    "prompt_tokens": 11,
+                    "completion_tokens": 7,
+                    "total_tokens": 18,
+                },
+            },
+            headers={"X-Routed-Via": "provider/model-x", "X-Fallback-Attempts": "1"},
+        )
+
+    client, owned = client_for(respond)
+    try:
+        runtime = FreeLLMAPIModelRuntimeAdapter(client, provider_id="groq")
+        result = runtime.invoke(
+            ModelInvocationRequest(
+                messages=(ModelMessage(role="user", content="hello"),),
+                model_id="model-x",
+                max_output_tokens=77,
+                timeout_seconds=3.0,
+            )
+        )
+    finally:
+        owned.close()
+
+    assert result.provider_id == "groq"
+    assert result.model_id == "provider/model-x"
+    assert result.content == "Normalized output"
+    assert result.usage == ModelUsage(
+        input_tokens=11, output_tokens=7, total_tokens=18
+    )
+    assert result.routed_via == "provider/model-x"
+    assert result.fallback_attempts == 1
+
+
+def test_model_runtime_adapter_maps_rate_limit_to_retryable_sanitized_error():
+    client, owned = client_for(
+        lambda request: httpx.Response(429, text="secret upstream response body")
+    )
+    try:
+        runtime = FreeLLMAPIModelRuntimeAdapter(client, provider_id="venice")
+        with pytest.raises(ModelRuntimeError) as captured:
+            runtime.invoke(
+                ModelInvocationRequest(
+                    messages=(ModelMessage(role="user", content="hello"),)
+                )
+            )
+    finally:
+        owned.close()
+
+    error = captured.value
+    assert error.code == "rate_limited"
+    assert error.provider_id == "venice"
+    assert error.retryable is True
+    assert "secret upstream response body" not in str(error)
+
+
+def test_model_runtime_adapter_explicitly_reports_cancellation_unsupported():
+    client, owned = client_for(lambda request: httpx.Response(
+        200, json={"choices": [{"message": {"content": "ok"}}]}
+    ))
+    try:
+        runtime = FreeLLMAPIModelRuntimeAdapter(client)
+        assert runtime.supports_cancellation is False
+        assert runtime.cancel("request-1") is False
+    finally:
+        owned.close()
+
+
+def test_model_invocation_request_rejects_invalid_limits_and_messages():
+    with pytest.raises(ValueError, match="temperature"):
+        ModelInvocationRequest(
+            messages=(ModelMessage(role="user", content="hello"),),
+            temperature=float("nan"),
+        )
+    with pytest.raises(ValueError, match="max_output_tokens"):
+        ModelInvocationRequest(
+            messages=(ModelMessage(role="user", content="hello"),),
+            max_output_tokens=0,
+        )
+    with pytest.raises(ValueError, match="messages"):
+        ModelInvocationRequest(messages=())
+    with pytest.raises(ValueError, match="role"):
+        ModelMessage(role="tool", content="tool output")

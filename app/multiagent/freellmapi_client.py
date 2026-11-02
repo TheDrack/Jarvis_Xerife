@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from math import isfinite
 from typing import Any, Mapping, Sequence
 
 import httpx
@@ -23,7 +24,18 @@ TRANSPORT_RETRY_DELAY_SECONDS = 0.5
 
 
 class FreeLLMAPIError(RuntimeError):
-    """A request to the configured FreeLLMAPI gateway failed."""
+    """A sanitized request failure with stable retry metadata."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "provider_error",
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.retryable = bool(retryable)
 
 
 class FreeLLMAPIClient:
@@ -44,8 +56,13 @@ class FreeLLMAPIClient:
             raise ValueError("api_key must not be empty")
         if not model.strip():
             raise ValueError("model must not be empty")
-        if timeout_seconds <= 0:
-            raise ValueError("timeout_seconds must be positive")
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, (int, float))
+            or not isfinite(timeout_seconds)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("timeout_seconds must be finite and positive")
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.model = model
@@ -95,14 +112,32 @@ class FreeLLMAPIClient:
         model: str | None = None,
         temperature: float = 0.2,
         max_tokens: int = 1200,
+        timeout_seconds: float | None = None,
     ) -> dict[str, Any]:
         """Return text and routing telemetry from an OpenAI-compatible completion."""
         if not messages:
             raise ValueError("messages must not be empty")
-        if not 1 <= max_tokens <= 8192:
-            raise ValueError("max_tokens must be between 1 and 8192")
-        if not 0.0 <= temperature <= 2.0:
-            raise ValueError("temperature must be between 0 and 2")
+        if (
+            isinstance(max_tokens, bool)
+            or not isinstance(max_tokens, int)
+            or not 1 <= max_tokens <= 8192
+        ):
+            raise ValueError("max_tokens must be an integer between 1 and 8192")
+        if (
+            isinstance(temperature, bool)
+            or not isinstance(temperature, (int, float))
+            or not isfinite(temperature)
+            or not 0.0 <= temperature <= 2.0
+        ):
+            raise ValueError("temperature must be finite and between 0 and 2")
+        timeout = self.timeout_seconds if timeout_seconds is None else timeout_seconds
+        if (
+            isinstance(timeout, bool)
+            or not isinstance(timeout, (int, float))
+            or not isfinite(timeout)
+            or timeout <= 0
+        ):
+            raise ValueError("timeout_seconds must be finite and positive")
 
         request_body = {
             "model": model or self.model,
@@ -119,20 +154,32 @@ class FreeLLMAPIClient:
         owned_client = self._client is None
         client = self._client or httpx.Client(timeout=self.timeout_seconds)
         try:
-            response = self._post_completion(client, headers, request_body)
+            response = self._post_completion(
+                client, headers, request_body, timeout_seconds=float(timeout)
+            )
             if response.is_error:
+                status = response.status_code
+                code = "rate_limited" if status == 429 else (
+                    "provider_unavailable" if status >= 500 else "provider_rejected"
+                )
                 raise FreeLLMAPIError(
-                    f"FreeLLMAPI returned HTTP {response.status_code}."
+                    f"FreeLLMAPI returned HTTP {status}.",
+                    code=code,
+                    retryable=status == 429 or status >= 500,
                 )
             try:
                 data = response.json()
                 content = data["choices"][0]["message"]["content"]
             except (ValueError, KeyError, IndexError, TypeError) as exc:
                 raise FreeLLMAPIError(
-                    "FreeLLMAPI returned an invalid chat-completion response."
+                    "FreeLLMAPI returned an invalid chat-completion response.",
+                    code="invalid_response",
                 ) from exc
             if not isinstance(content, str) or not content.strip():
-                raise FreeLLMAPIError("FreeLLMAPI returned empty or non-text content.")
+                raise FreeLLMAPIError(
+                    "FreeLLMAPI returned empty or non-text content.",
+                    code="empty_response",
+                )
             return {
                 "content": content.strip(),
                 "model": data.get("model") or request_body["model"],
@@ -143,9 +190,17 @@ class FreeLLMAPIClient:
                 "usage": data.get("usage") if isinstance(data.get("usage"), dict) else {},
             }
         except httpx.TimeoutException as exc:
-            raise FreeLLMAPIError("FreeLLMAPI request timed out.") from exc
+            raise FreeLLMAPIError(
+                "FreeLLMAPI request timed out.",
+                code="timeout",
+                retryable=False,
+            ) from exc
         except httpx.HTTPError as exc:
-            raise FreeLLMAPIError("FreeLLMAPI gateway is unreachable.") from exc
+            raise FreeLLMAPIError(
+                "FreeLLMAPI gateway is unreachable.",
+                code="transport_error",
+                retryable=True,
+            ) from exc
         finally:
             if owned_client:
                 client.close()
@@ -155,6 +210,8 @@ class FreeLLMAPIClient:
         client: httpx.Client,
         headers: Mapping[str, str],
         request_body: Mapping[str, Any],
+        *,
+        timeout_seconds: float | None = None,
     ) -> httpx.Response:
         """POST the completion, retrying only transient transport failures."""
         last_error: httpx.TransportError | None = None
@@ -164,7 +221,7 @@ class FreeLLMAPIClient:
                     f"{self.base_url}/chat/completions",
                     headers=dict(headers),
                     json=dict(request_body),
-                    timeout=self.timeout_seconds,
+                    timeout=timeout_seconds or self.timeout_seconds,
                 )
             except httpx.TimeoutException:
                 raise

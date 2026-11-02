@@ -7,6 +7,8 @@ import threading
 from datetime import datetime, timezone
 from typing import Any
 
+from app.adapters.infrastructure.freellmapi_model_runtime import FreeLLMAPIModelRuntimeAdapter
+
 from .freellmapi_client import FreeLLMAPIClient
 from .freellmapi_handler import FreeLLMAgentHandler
 from .transport import AgentMessage
@@ -51,20 +53,23 @@ class SupabaseTaskQueueMiniAgent:
                 "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for the native worker."
             )
         llm_client = FreeLLMAPIClient.from_env()
-        provider = os.getenv("FREELLMAPI_PROVIDER", "").strip().lower()
+        provider = os.getenv("JARVIS_AGENT_MODEL_PROVIDER", "").strip().lower()
+        if provider in {"", "unknown"}:
+            provider = os.getenv("FREELLMAPI_PROVIDER", "").strip().lower()
         if provider in {"", "unknown"}:
             if os.getenv("FREELLMAPI_API_KEY", "").strip():
-                provider = "custom"
+                provider = "unknown"
             elif os.getenv("GROQ_API_KEY", "").strip():
                 provider = "groq"
             elif os.getenv("VENICE_API_KEY", "").strip():
                 provider = "venice"
             else:
                 provider = "unknown"
+        runtime = FreeLLMAPIModelRuntimeAdapter(llm_client, provider_id=provider)
         return cls(
             client=client,
             agent_id=(agent_id or os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1")).strip(),
-            handler=FreeLLMAgentHandler(llm_client),
+            handler=FreeLLMAgentHandler(runtime),
             lease_seconds=int(os.getenv("JARVIS_TASK_QUEUE_LEASE_SECONDS", "90")),
             model_provider=provider,
         )

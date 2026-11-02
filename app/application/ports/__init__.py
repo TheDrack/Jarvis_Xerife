@@ -4,6 +4,14 @@
 from .action_provider import ActionProvider
 from .history_provider import HistoryProvider
 from .memory_provider import MemoryProvider
+from .model_runtime import (
+    ModelInvocationRequest,
+    ModelInvocationResult,
+    ModelMessage,
+    ModelRuntime,
+    ModelRuntimeError,
+    ModelUsage,
+)
 from .system_controller import SystemController
 from .tactical_command_port import TacticalCommandPort
 from .voice_provider import VoiceProvider
@@ -17,6 +25,12 @@ __all__ = [
     "SystemController",
     "HistoryProvider",
     "MemoryProvider",
+    "ModelMessage",
+    "ModelInvocationRequest",
+    "ModelInvocationResult",
+    "ModelUsage",
+    "ModelRuntime",
+    "ModelRuntimeError",
     "TacticalCommandPort",
     "VisualNavigationPort",
 ]
