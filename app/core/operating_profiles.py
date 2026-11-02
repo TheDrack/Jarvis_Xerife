@@ -105,7 +105,9 @@ class OperatingProfileReport:
         expected_order = tuple(OperatingProfile)
         actual_order = tuple(status.profile for status in self.profiles)
         if actual_order != expected_order:
-            raise ValueError("profiles must contain every operating profile in canonical order")
+            raise ValueError(
+                "profiles must contain every operating profile in canonical order"
+            )
 
         requested = tuple(
             status.profile for status in self.profiles if status.requested
