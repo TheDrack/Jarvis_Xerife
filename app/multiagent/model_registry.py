@@ -11,6 +11,8 @@ from threading import RLock
 from types import MappingProxyType
 from typing import Iterable, Mapping
 
+from app.application.ports.model_runtime import ModelRuntime, ModelRuntimeError
+
 
 def _normalize_string_set(values: Iterable[str], field_name: str) -> frozenset[str]:
     """Normalize a collection of labels without treating one string as many labels."""
@@ -155,3 +157,74 @@ class ModelRegistry:
             and modalities.issubset(profile.modalities)
             and (providers is None or profile.provider_id in providers)
         )
+
+
+
+class ModelRuntimeBindings:
+    """Resolve a registered model profile to its provider runtime adapter.
+
+    ModelRegistry remains the source of model metadata. This class owns only
+    the provider-to-runtime composition map; it does not probe provider health,
+    authorize external actions, or select among eligible models.
+    """
+
+    def __init__(self, runtimes: Mapping[str, ModelRuntime] | None = None) -> None:
+        self._lock = RLock()
+        self._runtimes: dict[str, ModelRuntime] = {}
+        for provider_id, runtime in (runtimes or {}).items():
+            self.register(provider_id, runtime)
+
+    def register(
+        self,
+        provider_id: str,
+        runtime: ModelRuntime,
+        *,
+        replace: bool = False,
+    ) -> None:
+        if not isinstance(provider_id, str) or not provider_id.strip():
+            raise ValueError("provider_id must be a non-empty string")
+        if not isinstance(runtime, ModelRuntime):
+            raise TypeError("runtime must implement the ModelRuntime protocol")
+        if not isinstance(replace, bool):
+            raise TypeError("replace must be a bool")
+        key = provider_id.strip().lower()
+        runtime_provider = getattr(runtime, "provider_id", None)
+        if isinstance(runtime_provider, str) and runtime_provider.strip():
+            if runtime_provider.strip().lower() != key:
+                raise ValueError("runtime provider_id does not match its binding key")
+        with self._lock:
+            if key in self._runtimes and not replace:
+                raise ValueError(f"runtime already bound for provider: {key}")
+            self._runtimes[key] = runtime
+
+    def unregister(self, provider_id: str) -> bool:
+        if not isinstance(provider_id, str) or not provider_id.strip():
+            raise ValueError("provider_id must be a non-empty string")
+        with self._lock:
+            return self._runtimes.pop(provider_id.strip().lower(), None) is not None
+
+    def resolve(self, profile: ModelProfile) -> ModelRuntime:
+        """Resolve one explicit profile; never silently substitute a provider."""
+        if not isinstance(profile, ModelProfile):
+            raise TypeError("profile must be a ModelProfile")
+        if not profile.available:
+            raise ModelRuntimeError(
+                "The requested model is marked unavailable.",
+                code="model_unavailable",
+                provider_id=profile.provider_id,
+                retryable=False,
+            )
+        with self._lock:
+            runtime = self._runtimes.get(profile.provider_id.strip().lower())
+        if runtime is None:
+            raise ModelRuntimeError(
+                "No runtime adapter is registered for the model provider.",
+                code="runtime_not_registered",
+                provider_id=profile.provider_id,
+                retryable=False,
+            )
+        return runtime
+
+    def list_provider_ids(self) -> tuple[str, ...]:
+        with self._lock:
+            return tuple(sorted(self._runtimes))
