@@ -204,3 +204,22 @@ def test_intelligence_collection_resolves_local_services_through_nexus(monkeypat
     assert resolved == ["PublicIntelligenceAdapter", "IntelligenceCore"]
     assert adapter.closed
     assert runtime.last_intelligence["unique_event_count"] == 0
+
+def test_cinematic_hud_assets_and_fullscreen_controls_are_served():
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    svg = client.get("/static/jarvis-icon.svg")
+    ico = client.get("/favicon.ico")
+    assert svg.status_code == 200
+    assert "svg" in svg.headers["content-type"]
+    assert "<svg" in svg.text
+    assert ico.status_code == 200
+    assert tuple(ico.content[:4]) == (0, 0, 1, 0)
+
+    html = client.get("/")
+    assert html.status_code == 200
+    assert "/static/jarvis-icon.svg" in html.text
+    assert 'id="fullscreenToggle"' in html.text
+    assert "requestFullscreen" in html.text
+    assert "prefers-reduced-motion" in html.text
+    assert "hud-enter" in html.text
