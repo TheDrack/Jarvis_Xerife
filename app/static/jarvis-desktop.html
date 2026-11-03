@@ -180,7 +180,7 @@ function syncFullscreenControl(active=Boolean(document.fullscreenElement)){fulls
 async function toggleFullscreen(){try{const bridge=window.pywebview?.api;if(typeof bridge?.set_fullscreen==='function'){nativeFullscreen=await bridge.set_fullscreen(!nativeFullscreen);syncFullscreenControl(nativeFullscreen);return;}if(document.fullscreenElement){await document.exitFullscreen();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();}else{$('footerStatus').textContent='Tela cheia indisponível neste host.';}}catch(e){$('footerStatus').textContent='Tela cheia bloqueada pelo host: '+e.message;}syncFullscreenControl();}
 fullscreenButton.addEventListener('click',toggleFullscreen);
 document.addEventListener('fullscreenchange',()=>syncFullscreenControl());
-document.addEventListener('keydown',event=>{if(event.key==='F11'){event.preventDefault();toggleFullscreen();}else if(event.key==='Escape'&&nativeFullscreen){event.preventDefault();window.pywebview?.api?.set_fullscreen(false).then(active=>{nativeFullscreen=active;syncFullscreenControl(active);}).catch(e=>$('footerStatus').textContent='Falha ao sair da tela cheia: '+e.message);}});
+document.addEventListener('keydown',event=>{if(event.key==='F11'){event.preventDefault();toggleFullscreen();}else if(event.key==='Escape'&&nativeFullscreen){event.preventDefault();const bridge=window.pywebview?.api;if(typeof bridge?.set_fullscreen==='function'){bridge.set_fullscreen(false).then(active=>{nativeFullscreen=active;syncFullscreenControl(active);}).catch(e=>$('footerStatus').textContent='Falha ao sair da tela cheia: '+e.message);}}});
 window.addEventListener('pywebviewready',()=>{nativeFullscreen=false;syncFullscreenControl(false);});
 syncFullscreenControl();
 
