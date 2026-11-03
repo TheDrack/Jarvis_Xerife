@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from app.adapters.edge.network_discovery_adapter import discover_devices, network_interfaces
@@ -20,6 +20,8 @@ from app.adapters.infrastructure.routers.intelligence_dashboard import build_int
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
+_ICON_PATH = _REPO_ROOT / "app" / "static" / "jarvis-icon.svg"
+_WINDOWS_ICON_PATH = _REPO_ROOT / "desktop" / "jarvis.ico"
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
 _RFC1918 = tuple(ipaddress.ip_network(value) for value in (
     "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"
@@ -214,6 +216,18 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         if not _HTML_PATH.is_file():
             raise HTTPException(status_code=503, detail="Interface Jarvis Desktop nao encontrada.")
         return HTMLResponse(_HTML_PATH.read_text(encoding="utf-8"))
+
+    @app.get("/static/jarvis-icon.svg", include_in_schema=False)
+    async def desktop_icon_svg() -> FileResponse:
+        if not _ICON_PATH.is_file():
+            raise HTTPException(status_code=404, detail="Ícone Jarvis indisponível.")
+        return FileResponse(_ICON_PATH, media_type="image/svg+xml")
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    async def desktop_icon_ico() -> FileResponse:
+        if not _WINDOWS_ICON_PATH.is_file():
+            raise HTTPException(status_code=404, detail="Ícone Jarvis indisponível.")
+        return FileResponse(_WINDOWS_ICON_PATH, media_type="image/vnd.microsoft.icon")
 
     @app.get("/api/health")
     async def health() -> dict[str, Any]:

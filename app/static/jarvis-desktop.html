@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07111d">
+<link rel="icon" type="image/svg+xml" href="/static/jarvis-icon.svg">
 <title>JARVIS · Desktop</title>
 <style>
 :root{color-scheme:dark;--bg:#07111d;--panel:#0b1a29;--panel2:#102235;--line:#1d3a50;--cyan:#55d9f2;--blue:#3b91bb;--green:#67e6b1;--amber:#f5c56b;--red:#ff7888;--muted:#7694a9;--text:#e8f5fb}
@@ -37,6 +38,45 @@ button,input{font:inherit}button{border:1px solid var(--line);background:#10283a
 .modal{position:fixed;inset:0;background:#020810eF;display:none;place-items:center;padding:20px;z-index:20}.modal.show{display:grid}.modal-card{width:min(400px,100%);background:#0c1d2c;border:1px solid #2d6681;border-radius:16px;padding:23px;box-shadow:0 20px 80px #0009}.modal-card h2{margin:0 0 7px;letter-spacing:.12em;font-size:17px}.modal-card p{margin:0 0 16px;color:var(--muted);font-size:11px}.modal-card input{width:100%;background:#071421;border:1px solid #2b5269;color:white;border-radius:9px;padding:13px;letter-spacing:.45em;font-size:20px;text-align:center;outline:none}.modal-card button{width:100%;margin-top:11px}.pair-error{color:var(--red);font-size:10px;margin-top:8px;min-height:14px}
 @media(max-width:900px){.shell{grid-template-columns:72px minmax(0,1fr)}.rail{padding:16px 8px}.brand{justify-content:center;padding:0 0 22px}.brand>div:last-child,.nav .label,.rail-foot .foot-label{display:none}.nav button{justify-content:center;padding:13px 5px}.nav .glyph{font-size:18px}.main{padding:0 16px}.grid-home{grid-template-columns:1fr 1fr}.grid-intel,.grid-network{grid-template-columns:1fr 1fr}.orb{width:min(28vh,200px)}}
 @media(max-width:620px){.shell{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 62px}.rail{grid-row:2;border:0;border-top:1px solid var(--line);padding:5px 10px;background:#081522}.brand,.rail-foot{display:none}.nav{height:100%;grid-template-columns:repeat(3,1fr);gap:5px}.nav button{display:flex;flex-direction:column;gap:2px;padding:5px;border-radius:8px;font-size:9px}.nav .label{display:block}.nav .glyph{font-size:16px}.main{grid-row:1;grid-template-rows:54px minmax(0,1fr) 22px;padding:0 11px}.top{gap:8px}.top h1{font-size:13px}.eyebrow{font-size:8px}.top-right{gap:6px}.status-chip{padding:6px 8px;font-size:8px}.clock{font-size:10px}.content{padding:11px 0 8px}.page-head{height:42px}.page-head h2{font-size:15px}.page-head p{font-size:9px}.page-head .actions button{font-size:9px;padding:7px 8px}.grid-home{height:calc(100% - 42px);grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) minmax(110px,.62fr);gap:7px}.hero{grid-column:1/-1}.orb{width:min(22vh,150px)}.hero-label{margin-top:7px}.hero-label b{font-size:10px}.hero-label small{font-size:8px}.summary{padding:9px;gap:6px}.section-label{font-size:8px}.metric-row{gap:5px}.metric{padding:7px}.metric strong{font-size:17px}.metric span{font-size:8px}.layer-row{padding:6px 0}.layer-row b{font-size:9px}.layer-row small{font-size:8px}.state{font-size:7px;padding:4px 5px}.bottom-stat{gap:7px}.bottom-stat .panel{padding:9px}.bottom-stat strong{font-size:13px}.bottom-stat small{font-size:8px}.grid-intel,.grid-network{height:calc(100% - 42px);grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,.78fr);gap:7px}.feed,.source-grid,.list-panel{padding:9px;gap:6px}.feed-list,.rows{gap:5px}.event{padding:7px}.event b{font-size:9px}.event small{font-size:8px}.source{padding:7px}.source b{font-size:9px}.source small{font-size:8px}.network-left,.network-right{gap:7px}.row-item{padding:6px 7px}.row-item b{font-size:8px}.row-item small{font-size:7px}.pill{font-size:7px;padding:3px 5px}.footer{font-size:7px}.footer span:last-child{display:none}}
+
+/* Cinematic HUD layer — additive overrides, preserving existing responsive layout. */
+:root{--line:rgba(85,217,242,.14);--cyan:#79e7ff;--muted:#86a9bb}
+button{border:1px solid transparent;background:linear-gradient(115deg,rgba(19,65,87,.46),rgba(8,24,39,.22));border-radius:3px;transition:color .22s ease,background .28s ease,border-color .28s ease,box-shadow .32s ease,transform .32s cubic-bezier(.2,.8,.2,1),filter .28s ease}
+button:hover{border-color:rgba(85,217,242,.52);background:rgba(23,91,119,.28);box-shadow:0 0 22px rgba(57,202,239,.12),inset 0 0 18px rgba(57,202,239,.08);transform:translateY(-1px);filter:brightness(1.16)}
+button:focus-visible{outline:1px solid var(--cyan);outline-offset:3px;box-shadow:0 0 18px rgba(85,217,242,.2)}
+.shell{position:relative;isolation:isolate}
+.shell:before{content:"";position:fixed;inset:0;pointer-events:none;z-index:10;opacity:.16;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(111,220,255,.035) 4px),linear-gradient(115deg,transparent 15%,rgba(79,211,244,.035) 50%,transparent 85%);mix-blend-mode:screen}
+.rail{border-right:0;background:linear-gradient(90deg,rgba(5,15,26,.92),rgba(7,19,31,.54));box-shadow:18px 0 50px rgba(0,0,0,.16)}
+.brand-mark{border:0;border-radius:50%;background:radial-gradient(circle,rgba(100,228,255,.24),rgba(25,96,128,.08) 58%,transparent 70%);box-shadow:0 0 28px rgba(70,211,244,.3),inset 0 0 22px rgba(85,217,242,.2);position:relative}
+.brand-mark:after{content:"";position:absolute;inset:-5px;border:1px solid rgba(85,217,242,.34);border-radius:50%;clip-path:polygon(0 0,100% 0,100% 25%,0 25%,0 75%,100% 75%,100% 100%,0 100%)}
+.nav{gap:11px;margin-top:10px}
+.nav button{position:relative;border:0;border-radius:2px;padding:13px 12px;transition:all .3s ease}
+.nav button:before{content:"";position:absolute;left:0;top:18%;height:64%;width:1px;background:var(--cyan);transform:scaleY(0);transition:transform .28s ease;box-shadow:0 0 12px var(--cyan)}
+.nav button:hover:before,.nav button.active:before{transform:scaleY(1)}
+.nav button.active{background:linear-gradient(90deg,rgba(45,166,202,.18),transparent 92%);box-shadow:inset 0 0 25px rgba(45,166,202,.06);color:#e7fbff}
+.nav button.active .glyph,.nav button:hover .glyph{filter:drop-shadow(0 0 7px var(--cyan))}
+.top{border-bottom:1px solid rgba(85,217,242,.12)}
+.status-chip{border:0;border-left:1px solid rgba(85,217,242,.34);border-radius:0;background:linear-gradient(90deg,rgba(34,119,151,.16),transparent);letter-spacing:.1em}
+.hud-control{width:34px;height:34px;padding:0;border:0;border-radius:50%;font-size:21px;color:var(--cyan);background:radial-gradient(circle,rgba(50,155,191,.16),transparent 70%);font-weight:300}
+.hud-control:hover{transform:rotate(45deg);box-shadow:0 0 22px rgba(85,217,242,.25)}
+.content{perspective:1200px}
+.page.active{animation:hud-enter .48s cubic-bezier(.2,.75,.25,1) both}
+@keyframes hud-enter{from{opacity:0;transform:translateY(9px) scale(.992);filter:blur(3px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
+.panel{border:0;border-radius:2px;background:linear-gradient(135deg,rgba(13,37,54,.72),rgba(5,17,29,.58));box-shadow:inset 0 1px rgba(126,225,255,.12),0 18px 50px rgba(0,0,0,.12);transition:background .35s ease,box-shadow .35s ease,transform .35s ease}
+.panel:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,rgba(112,222,255,.045),transparent 34%,transparent 70%,rgba(112,222,255,.025));opacity:.7}
+.panel:hover{background:linear-gradient(135deg,rgba(15,48,68,.82),rgba(6,20,33,.72));box-shadow:inset 0 1px rgba(126,225,255,.22),0 18px 55px rgba(0,0,0,.2),0 0 25px rgba(49,180,216,.06)}
+.hero{background:radial-gradient(ellipse at center,rgba(23,95,123,.2),rgba(7,23,37,.44) 55%,rgba(5,14,24,.4))}
+.orb{border-color:rgba(72,203,233,.58);box-shadow:0 0 55px rgba(49,191,231,.16),inset 0 0 50px rgba(49,191,231,.12);animation:orb-drift 12s ease-in-out infinite}
+@keyframes orb-drift{50%{transform:rotate(8deg) scale(1.025);filter:brightness(1.12)}}
+.metric,.event,.source,.row-item{border:0;border-left:1px solid rgba(85,217,242,.2);border-radius:1px;background:linear-gradient(90deg,rgba(15,48,67,.42),rgba(7,22,35,.24));transition:background .25s ease,transform .25s ease,border-color .25s ease}
+.metric:hover,.event:hover,.source:hover,.row-item:hover{background:linear-gradient(90deg,rgba(27,83,108,.34),rgba(7,22,35,.24));border-left-color:var(--cyan);transform:translateX(2px)}
+.layer-row{border-top-color:rgba(85,217,242,.1)}
+.state,.pill{border:0;border-radius:0;border-left:1px solid rgba(85,217,242,.38);background:rgba(44,139,170,.08)}
+.footer{border-top-color:rgba(85,217,242,.1)}
+.modal-card{border:0;border-top:1px solid rgba(85,217,242,.5);border-radius:2px;background:linear-gradient(145deg,rgba(13,39,57,.98),rgba(5,15,26,.98));box-shadow:0 25px 100px #000b,0 0 35px rgba(54,190,225,.12)}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+@media(max-width:620px){.hud-control{width:28px;height:28px;font-size:18px}}
+
 </style>
 </head>
 <body>
@@ -53,7 +93,7 @@ button,input{font:inherit}button{border:1px solid var(--line);background:#10283a
 <main class="main">
  <header class="top">
   <div><div class="eyebrow">JARVIS OPERATING INTERFACE</div><h1 id="viewTitle">COMMAND CENTER</h1></div>
-  <div class="top-right"><span class="status-chip" id="coreChip">● LOCAL CORE</span><span class="clock" id="clock">--:--:--</span></div>
+  <div class="top-right"><span class="status-chip" id="coreChip">● LOCAL CORE</span><button class="hud-control" id="fullscreenToggle" type="button" aria-label="Ativar tela cheia" title="Tela cheia (F11)">⛶</button><span class="clock" id="clock">--:--:--</span></div>
  </header>
  <section class="content">
   <section class="page active" id="page-home">
@@ -132,7 +172,16 @@ $('adbList').innerHTML=peerRows+adbRows||'<div class="row-item"><div><b>Android 
 $('refreshNetwork').addEventListener('click',()=>refreshNetwork().catch(e=>$('footerStatus').textContent=e.message));
 async function refreshAll(){try{await refreshStatus();await Promise.all([refreshIntel(),refreshNetwork()]);$('updatedAt').textContent='SYNC '+time();}catch(e){if(e.message.includes('Pareie')||e.message.includes('Sessao')){state.token='';sessionStorage.removeItem(tokenKey);showPair();}else $('footerStatus').textContent='SYNC ERROR · '+e.message;}}
 $('refreshAll').addEventListener('click',refreshAll);
-setInterval(()=>{$('clock').textContent=time();},1000);$('clock').textContent=time();
+
+const fullscreenButton=$('fullscreenToggle');
+function syncFullscreenControl(){const active=Boolean(document.fullscreenElement);fullscreenButton.textContent=active?'⤢':'⛶';fullscreenButton.title=active?'Sair da tela cheia (F11)':'Ativar tela cheia (F11)';fullscreenButton.setAttribute('aria-label',active?'Sair da tela cheia':'Ativar tela cheia');}
+async function toggleFullscreen(){try{if(document.fullscreenElement){await document.exitFullscreen();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();}else{$('footerStatus').textContent='Tela cheia indisponível neste host.';}}catch(e){$('footerStatus').textContent='Tela cheia bloqueada pelo host: '+e.message;}syncFullscreenControl();}
+fullscreenButton.addEventListener('click',toggleFullscreen);
+document.addEventListener('fullscreenchange',syncFullscreenControl);
+document.addEventListener('keydown',event=>{if(event.key==='F11'){event.preventDefault();toggleFullscreen();}});
+syncFullscreenControl();
+
+setInterval(()=>$('clock').textContent=time(),1000);$('clock').textContent=time();
 (async()=>{await bootstrap();if(state.token){await refreshAll();setInterval(()=>{if(state.token)refreshAll();},15000);}else{setInterval(bootstrap,5000);}if(['127.0.0.1','localhost','::1'].includes(location.hostname))setInterval(bootstrap,5000);})();
 })();
 </script>
