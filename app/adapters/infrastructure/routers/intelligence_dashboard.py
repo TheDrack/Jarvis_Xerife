@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
+
+from app.application.services.intelligence_collector import collect_live_intelligence
 
 
 def _configured(variable: str) -> bool:
@@ -40,8 +42,8 @@ def build_intelligence_status() -> dict[str, Any]:
                 "id": "public_intelligence",
                 "label": "Public Intelligence",
                 "implementation": "implemented",
-                "runtime": "not_scheduled",
-                "details": "GDELT, NASA EONET e USGS; coleta ainda não conectada ao runtime.",
+                "runtime": "on_demand",
+                "details": "GDELT, NASA EONET e USGS; coleta autenticada sob demanda, sem agendamento contínuo.",
             },
             {
                 "id": "gods_eye_view",
@@ -74,10 +76,16 @@ def build_intelligence_status() -> dict[str, Any]:
                 "detail": "Contratos e adaptadores com testes unitários.",
             },
             {
+                "id": "collection",
+                "label": "Coleta operacional",
+                "state": "on_demand",
+                "detail": "Endpoint autenticado executa fontes em paralelo e preserva sucesso parcial; ainda sem recorrência.",
+            },
+            {
                 "id": "normalization",
                 "label": "Normalização e síntese",
                 "state": "implemented",
-                "detail": "IntelligenceCore determinístico; ainda sem coleta agendada.",
+                "detail": "IntelligenceCore determinístico, executado pelo coletor autenticado sob demanda.",
             },
             {
                 "id": "durable_history",
@@ -110,7 +118,7 @@ def build_intelligence_status() -> dict[str, Any]:
             "browser_receives_provider_credentials": False,
         },
         "limitations": [
-            "Sem serviço de coleta conectado, eventos e observações não estão disponíveis nesta tela.",
+            "A coleta é sob demanda; não existe agendamento contínuo nem snapshot persistido conectado ao painel.",
             "Estado de configuração não equivale a health check do serviço externo.",
             "O estado remoto da migration do Supabase não é consultado por este endpoint.",
             "O adaptador de histórico ainda não está conectado ao endpoint de coleta.",
@@ -118,7 +126,9 @@ def build_intelligence_status() -> dict[str, Any]:
     }
 
 
-def create_intelligence_dashboard_router(get_current_user) -> APIRouter:
+def create_intelligence_dashboard_router(
+    get_current_user, collector=collect_live_intelligence
+) -> APIRouter:
     router = APIRouter(tags=["intelligence-dashboard"])
 
     @router.get("/intelligence", response_class=HTMLResponse, include_in_schema=False)
@@ -133,5 +143,14 @@ def create_intelligence_dashboard_router(get_current_user) -> APIRouter:
         _current_user=Depends(get_current_user),
     ) -> dict[str, Any]:
         return build_intelligence_status()
+
+    @router.post("/v1/intelligence/collect")
+    async def collect_intelligence(
+        limit: int = Query(default=50, ge=1, le=100),
+        _current_user=Depends(get_current_user),
+    ) -> dict[str, Any]:
+        """Run one authenticated, read-only collection across configured sources."""
+        report = await collector(limit=limit)
+        return report.model_dump(mode="json")
 
     return router

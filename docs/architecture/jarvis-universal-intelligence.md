@@ -88,14 +88,15 @@ Domain contracts and application services remain OS-neutral. Host-specific sched
 
 ## Next increments
 
-1. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
-2. Implement the append-only Supabase persistence port/adapter, verify idempotent writes against PostgreSQL, and reconcile remote migration history before applying the schema; define retention before recurring high-volume ingestion.
-3. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
-4. Add evidence/corroboration and contradiction contracts.
-5. Compose the Portuguese daily briefing with citations and explicit fact/claim/inference/scenario separation.
-6. Connect a real durable scheduler/worker and idempotent delivery.
-7. Build a geospatial presentation adapter after comparing MapLibre/Cesium/deck.gl requirements, performance and licenses.
-8. Add user preference/direction feedback and Jarvis self-maintenance signals as separate domains.
+1. **Implemented in the current development increment:** authenticated `POST /v1/intelligence/collect` runs Public Intelligence and configured OSIRIS concurrently, includes God's Eye View only when its local MCP entrypoint and bounded area are configured, preserves partial source failures, and returns the deterministic IntelligenceCore report. The dashboard exposes an explicit “Coletar agora” action. This is on-demand/read-only collection; it does not schedule polling or persist results.
+2. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
+3. Implement the append-only Supabase persistence port/adapter, verify idempotent writes against PostgreSQL, and reconcile remote migration history before applying the schema; define retention before recurring high-volume ingestion.
+4. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
+5. Add evidence/corroboration and contradiction contracts.
+6. Compose the Portuguese daily briefing with citations and explicit fact/claim/inference/scenario separation.
+7. Connect a real durable scheduler/worker and idempotent delivery.
+8. Build a geospatial presentation adapter after comparing MapLibre/Cesium/deck.gl requirements, performance and licenses.
+9. Add user preference/direction feedback and Jarvis self-maintenance signals as separate domains.
 
 ## Research and licensing notes
 

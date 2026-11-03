@@ -4,15 +4,17 @@ from fastapi.testclient import TestClient
 
 from app.adapters.infrastructure.routers.intelligence_dashboard import (
     build_intelligence_status,
+    collect_live_intelligence,
     create_intelligence_dashboard_router,
 )
 
 
-def _client(user_dependency=None):
+def _client(user_dependency=None, collector=None):
     app = FastAPI()
     app.include_router(
         create_intelligence_dashboard_router(
-            user_dependency or (lambda: {"username": "test-user"})
+            user_dependency or (lambda: {"username": "test-user"}),
+            collector=collector or collect_live_intelligence,
         )
     )
     return TestClient(app)
