@@ -216,7 +216,11 @@ def test_weather_skips_unknown_providers_and_uses_trusted_provider_fallback(adap
     ])
 
     batch = adapter_factory(data).collect_events()
-    weather = [event for event in batch.events if event.source_id in {"nasa_eonet", "noaa_nws", "gdacs"}]
+    weather = [
+        event
+        for event in batch.events
+        if event.source_id in {"nasa_eonet", "noaa_nws", "gdacs"}
+    ]
 
     assert len(weather) == 4
     assert all(event.url.scheme == "https" for event in weather)

@@ -46,7 +46,7 @@ This adapter is unit-tested with an injected fake MCP session. It has not been v
 
 ## OSIRIS REST adapter 0.6
 
-OsirisRestAdapter consumes only the fixed read-only \`/api/earthquakes\`, \`/api/fires\`, \`/api/news\` and \`/api/weather\` routes. It uses HTTPS, rejects redirects, streams responses with a 4 MB byte cap, applies a 12-second timeout and limits each normalized route to 100 records. The base origin is supplied explicitly or through \`JARVIS_OSIRIS_API_BASE_URL\`; no default live deployment is assumed.
+OsirisRestAdapter consumes only the fixed read-only `/api/earthquakes`, `/api/fires`, `/api/news` and `/api/weather` routes. It uses HTTPS, rejects redirects, streams responses with a 4 MB byte cap, applies a 12-second timeout and limits each normalized route to 100 records. The base origin is supplied explicitly or through `JARVIS_OSIRIS_API_BASE_URL`; no default live deployment is assumed.
 
 Earthquakes preserve USGS event IDs, event times, magnitudes, coordinates and event-page links. Fires preserve distinct NASA FIRMS and NASA EONET provider identities, bounded source attributes and minute-level acquisition timestamps without inventing times for date-only records. News preserves original publisher links, publisher labels and publication times, including ISO and RFC 2822 dates. OSIRIS keyword-derived country-anchor coordinates are not converted into event geolocation.
 
