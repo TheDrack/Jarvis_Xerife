@@ -1,6 +1,7 @@
 import pytest
 
-from app.multiagent.model_registry import ModelProfile, ModelRegistry
+from app.multiagent.model_registry import ModelProfile, ModelRegistry, ModelRuntimeBindings
+from app.application.ports.model_runtime import ModelInvocationRequest, ModelInvocationResult, ModelUsage
 
 
 def make_profile(model_id, provider_id):
@@ -124,3 +125,67 @@ def test_eligibility_rejects_scalar_string_filters(filters):
 
     with pytest.raises(TypeError):
         registry.eligible(**filters)
+
+
+
+class FakeRuntime:
+    supports_cancellation = False
+
+    def __init__(self, provider_id="provider"):
+        self.provider_id = provider_id
+        self.calls = []
+
+    def invoke(self, request):
+        self.calls.append(request)
+        return ModelInvocationResult(
+            provider_id=self.provider_id,
+            model_id=request.model_id or "default",
+            content="ok",
+            usage=ModelUsage(),
+        )
+
+    def cancel(self, request_id):
+        return False
+
+
+def test_runtime_bindings_resolve_exact_provider_for_registered_profile():
+    profile = make_profile("model-a", "provider-a")
+    runtime = FakeRuntime("provider-a")
+    bindings = ModelRuntimeBindings({"provider-a": runtime})
+
+    assert bindings.resolve(profile) is runtime
+    assert bindings.list_provider_ids() == ("provider-a",)
+
+
+def test_runtime_bindings_reject_missing_provider_adapter():
+    bindings = ModelRuntimeBindings()
+
+    from app.application.ports.model_runtime import ModelRuntimeError\n\n    with pytest.raises(ModelRuntimeError, match="No runtime adapter"):
+        bindings.resolve(make_profile("model-a", "provider-missing"))
+
+
+def test_runtime_bindings_reject_unavailable_model_before_dispatch():
+    profile = ModelProfile(
+        model_id="offline", provider_id="provider-a",
+        runtime_kind="remote_api", available=False,
+    )
+    bindings = ModelRuntimeBindings({"provider-a": FakeRuntime("provider-a")})
+
+    from app.application.ports.model_runtime import ModelRuntimeError\n\n    with pytest.raises(ModelRuntimeError, match="marked unavailable"):
+        bindings.resolve(profile)
+
+
+def test_runtime_bindings_reject_provider_identity_mismatch():
+    with pytest.raises(ValueError, match="does not match"):
+        ModelRuntimeBindings({"provider-a": FakeRuntime("provider-b")})
+
+
+def test_runtime_bindings_require_explicit_replacement():
+    first = FakeRuntime("provider-a")
+    second = FakeRuntime("provider-a")
+    bindings = ModelRuntimeBindings({"provider-a": first})
+
+    with pytest.raises(ValueError, match="already bound"):
+        bindings.register("provider-a", second)
+    bindings.register("provider-a", second, replace=True)
+    assert bindings.resolve(make_profile("model-a", "provider-a")) is second
