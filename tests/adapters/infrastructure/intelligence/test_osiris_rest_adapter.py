@@ -67,6 +67,14 @@ def payloads():
                 "time": "0845",
                 "frp": 17.2,
                 "type": "fire",
+            }, {
+                "lat": -15.7,
+                "lng": -70.6,
+                "date": "2026-11-03",
+                "time": "",
+                "frp": 100,
+                "type": "volcano",
+                "title": "[VOLCANO] Test eruption",
             }],
         },
         "news": {
@@ -94,7 +102,7 @@ def payloads():
 def test_collects_upstream_event_shapes_and_preserves_provenance(adapter_factory):
     batch = adapter_factory(payloads()).collect_events(limit=10)
 
-    assert len(batch.events) == 3
+    assert len(batch.events) == 4
     assert all(source.available for source in batch.sources)
     earthquake = next(event for event in batch.events if event.category == "earthquake")
     fire = next(event for event in batch.events if event.category == "wildfire")
@@ -112,6 +120,12 @@ def test_collects_upstream_event_shapes_and_preserves_provenance(adapter_factory
     assert fire.evidence.publisher == "NASA FIRMS"
     assert fire.evidence.url.host == "firms.modaps.eosdis.nasa.gov"
     assert fire.occurred_at == datetime(2026, 11, 3, 8, 45, tzinfo=timezone.utc)
+
+    volcano = next(event for event in batch.events if event.category == "volcano")
+    assert volcano.source_id == "nasa_eonet"
+    assert volcano.evidence.source_id == "nasa_eonet"
+    assert volcano.evidence.publisher == "NASA EONET"
+    assert volcano.occurred_at is None  # Date-only upstream data has no invented time.
 
     assert news.published_at == datetime(2026, 11, 3, 8, 0, tzinfo=timezone.utc)
     assert news.location is None
