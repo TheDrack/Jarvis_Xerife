@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 SOURCE_NAME = "OSIRIS Dashboard"
 SOURCE_REPOSITORY = "https://github.com/Pendia/OSIRIS-Dashboard-OSINT"
 _ROUTE_SPECS = {
-    "earthquakes": ("earthquakes", "usgs_earthquakes"),
-    "fires": ("fires", "nasa_fires"),
+    "earthquakes": ("earthquakes", "osiris_earthquakes"),
+    "fires": ("fires", "osiris_fires"),
     "news": ("news", "osiris_news"),
 }
 _SOURCE_TERMS = {
@@ -38,9 +38,13 @@ _SOURCE_TERMS = {
         "OSIRIS aggregation of USGS earthquake GeoJSON; preserve USGS event-page "
         "attribution and original USGS data terms."
     ),
-    "nasa_fires": (
-        "OSIRIS aggregation of NASA FIRMS and NASA EONET; underlying dataset "
-        "attribution and terms apply independently."
+    "nasa_firms": (
+        "OSIRIS aggregation of NASA FIRMS active-fire observations; underlying "
+        "dataset attribution and terms apply independently."
+    ),
+    "nasa_eonet": (
+        "OSIRIS aggregation of NASA EONET volcanic-event metadata; underlying "
+        "dataset attribution and terms apply independently."
     ),
     "osiris_news": (
         "OSIRIS public news/OSINT feed; original publisher/channel rights and "
@@ -317,12 +321,8 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
                 event_type == "volcano"
                 or str(row.get("title", "")).startswith("[VOLCANO]")
             )
-            source_id = "nasa_fires"
-            publisher = (
-                "NASA EONET"
-                if is_volcano or "EONET" in route_source.upper()
-                else "NASA FIRMS"
-            )
+            source_id = "nasa_eonet" if is_volcano else "nasa_firms"
+            publisher = "NASA EONET" if is_volcano else "NASA FIRMS"
             evidence_url = _EONET_URL if publisher == "NASA EONET" else _FIRMS_URL
             identity = _digest(
                 publisher,

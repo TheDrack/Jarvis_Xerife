@@ -107,6 +107,8 @@ def test_collects_upstream_event_shapes_and_preserves_provenance(adapter_factory
 
     assert fire.category == "wildfire"
     assert fire.location.longitude == -48.5
+    assert fire.source_id == "nasa_firms"
+    assert fire.evidence.source_id == "nasa_firms"
     assert fire.evidence.publisher == "NASA FIRMS"
     assert fire.evidence.url.host == "firms.modaps.eosdis.nasa.gov"
     assert fire.occurred_at == datetime(2026, 11, 3, 8, 45, tzinfo=timezone.utc)
@@ -135,8 +137,8 @@ def test_keeps_partial_results_when_one_route_fails(adapter_factory):
     assert len(batch.events) == 2
     health = {source.source_id: source for source in batch.sources}
     assert health["usgs_earthquakes"].available is True
-    assert health["nasa_fires"].available is False
-    assert health["nasa_fires"].error_code == "HTTPStatusError"
+    assert health["osiris_fires"].available is False
+    assert health["osiris_fires"].error_code == "HTTPStatusError"
     assert health["osiris_news"].available is True
 
 
@@ -198,7 +200,7 @@ def test_route_level_error_payload_is_not_reported_as_empty_success(adapter_fact
     batch = adapter_factory(data).collect_events()
 
     health = {source.source_id: source for source in batch.sources}
-    assert health["nasa_fires"].available is False
+    assert health["osiris_fires"].available is False
     assert health["nasa_fires"].error_code == "RuntimeError"
 
 
