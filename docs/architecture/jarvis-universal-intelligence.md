@@ -44,15 +44,17 @@ Returned aircraft, vessel and satellite rows become IntelligenceObservation reco
 
 This adapter is unit-tested with an injected fake MCP session. It has not been verified against a configured live God's Eye View checkout or running app. No endpoint, credentials, database, scheduler, production service or deployment is configured by this change. GEV's MIT code license does not grant rights to underlying data/assets; provider attribution and dataset terms remain applicable.
 
-## OSIRIS REST adapter 0.5
+## OSIRIS REST adapter 0.6
 
-OsirisRestAdapter consumes only the fixed read-only \`/api/earthquakes\`, \`/api/fires\` and \`/api/news\` routes. It uses HTTPS, rejects redirects, streams responses with a 4 MB byte cap, applies a 12-second timeout and limits each normalized route to 100 records. The base origin is supplied explicitly or through \`JARVIS_OSIRIS_API_BASE_URL\`; no default live deployment is assumed.
+OsirisRestAdapter consumes only the fixed read-only `/api/earthquakes`, `/api/fires`, `/api/news` and `/api/weather` routes. It uses HTTPS, rejects redirects, streams responses with a 4 MB byte cap, applies a 12-second timeout and limits each normalized route to 100 records. The base origin is supplied explicitly or through `JARVIS_OSIRIS_API_BASE_URL`; no default live deployment is assumed.
 
-Earthquakes preserve USGS event IDs, event times, magnitudes, coordinates and event-page links. Fires preserve bounded FIRMS/EONET fields and distinguish date-only records from minute-level acquisition timestamps. News preserves the original publisher link, publisher label and publication time, including ISO and RFC 2822 dates. OSIRIS keyword-derived country-anchor coordinates are deliberately not converted into event geolocation.
+Earthquakes preserve USGS event IDs, event times, magnitudes, coordinates and event-page links. Fires preserve NASA FIRMS source attributes and minute-level acquisition timestamps without inventing times for date-only records. OSIRIS /api/fires volcano rows are skipped because they omit the original EONET event ID; the canonical EONET event is ingested through /api/weather instead. News preserves original publisher links, publisher labels and publication times, including ISO and RFC 2822 dates. OSIRIS keyword-derived country-anchor coordinates are not converted into event geolocation.
+
+Weather alerts preserve the underlying NASA EONET, NOAA/NWS or GDACS provider identity, source URL, category, severity, area and expiry metadata. EONET positions are retained only because the upstream route emits Point geometries; GDACS positions come from explicit RSS geo:lat/geo:long values. NOAA/NWS coordinates are omitted because OSIRIS averages polygon vertices into a representative marker without returning the original geometry type. Date fields are retained as source metadata rather than assigned a universal occurred_at/published_at meaning because their semantics differ by provider.
 
 Each route reports independent SourceHealth; one route failure does not discard successful route data. Non-HTTPS publisher links and malformed records are dropped. The feed's risk score and source-side political labels are not treated as verified analysis or corroboration. Cross-post metadata is not converted into multiple independent evidence records.
 
-The adapter is unit-tested against fixtures matching the upstream route shapes. It has not been connected to a configured live OSIRIS deployment; no credentials, production endpoint, Nexus registration, database, scheduler or deployment are changed. Weather, flights, maritime and satellite routes remain separate follow-up increments because their geometry precision, moving-entity semantics, payload sizes and source behavior require dedicated contracts and controls.
+The adapter is unit-tested against fixtures matching the upstream route shapes. It has not been connected to a configured live OSIRIS deployment; no credentials, production endpoint, Nexus registration, database, scheduler or deployment are changed. Flights, maritime and satellite feeds remain deferred because GEV already supplies moving-entity observation capability; duplicating those feeds requires a separate coverage, privacy and retention justification.
 
 ## Intelligence Core 0.2
 
@@ -75,14 +77,13 @@ Domain contracts and application services remain OS-neutral. Host-specific sched
 ## Next increments
 
 1. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
-2. Add the OSIRIS weather, flights, maritime and satellite routes with explicit geometry/moving-entity controls.
-3. Add durable observation history and retention policies.
-4. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
-5. Add evidence/corroboration and contradiction contracts.
-6. Compose the Portuguese daily briefing with citations and explicit fact/claim/inference/scenario separation.
-7. Connect a real durable scheduler/worker and idempotent delivery.
-8. Build a geospatial presentation adapter after comparing MapLibre/Cesium/deck.gl requirements, performance and licenses.
-9. Add user preference/direction feedback and Jarvis self-maintenance signals as separate domains.
+2. Add durable event and observation history with retention policies.
+3. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
+4. Add evidence/corroboration and contradiction contracts.
+5. Compose the Portuguese daily briefing with citations and explicit fact/claim/inference/scenario separation.
+6. Connect a real durable scheduler/worker and idempotent delivery.
+7. Build a geospatial presentation adapter after comparing MapLibre/Cesium/deck.gl requirements, performance and licenses.
+8. Add user preference/direction feedback and Jarvis self-maintenance signals as separate domains.
 
 ## Research and licensing notes
 
