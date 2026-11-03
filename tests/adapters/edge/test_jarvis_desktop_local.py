@@ -213,7 +213,6 @@ def test_intelligence_collection_resolves_local_services_through_nexus(monkeypat
 def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch):
     from app.core.nexus import nexus
     from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
-    import app.adapters.infrastructure.intelligence.osiris_rest_adapter as osiris_module
     import app.adapters.infrastructure.intelligence.gods_eye_mcp_adapter as gev_module
 
     calls = []
@@ -273,10 +272,11 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
     services = {
         "PublicIntelligenceAdapter": FakePublicAdapter(),
         "IntelligenceCore": FakeEngine(),
+        "OsirisRestAdapter": FakeOsirisAdapter(),
     }
     monkeypatch.setattr(nexus, "resolve", lambda target_id, **_kwargs: services[target_id])
-    monkeypatch.setattr(osiris_module, "OsirisRestAdapter", FakeOsirisAdapter)
     monkeypatch.setattr(gev_module, "GodsEyeMcpAdapter", FakeGevAdapter)
+    monkeypatch.setenv("JARVIS_OSIRIS_API_BASE_URL", "https://osirisai.live")
     monkeypatch.setenv("JARVIS_GEV_AREA_WEST", "-80")
     monkeypatch.setenv("JARVIS_GEV_AREA_SOUTH", "-40")
     monkeypatch.setenv("JARVIS_GEV_AREA_EAST", "-79")

@@ -321,8 +321,6 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
     @app.post("/api/intelligence/collect")
     async def collect_intelligence(_client: str = Depends(require_local_token)) -> dict[str, Any]:
         from app.core.nexus import nexus
-        from app.adapters.infrastructure.intelligence.osiris_rest_adapter import OsirisRestAdapter
-
         adapter = nexus.resolve(
             "PublicIntelligenceAdapter",
             hint_path="app.adapters.infrastructure.intelligence.public_intelligence_adapter.py",
@@ -333,7 +331,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             hint_path="app.application.services.intelligence_core.py",
             use_cache=False,
         )
-        osiris = OsirisRestAdapter()
+        osiris = None
         gev = None
         try:
             if not callable(getattr(adapter, "collect_public_events", None)):
@@ -347,10 +345,27 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
 
             # OSIRIS is optional. Its adapter returns explicit NotConfigured health
             # without making network requests when no HTTPS origin is configured.
-            osiris_batch = await asyncio.wait_for(
-                asyncio.to_thread(osiris.collect_events, 20),
-                timeout=55,
-            )
+            if os.getenv("JARVIS_OSIRIS_API_BASE_URL", "").strip():
+                osiris = nexus.resolve(
+                    "OsirisRestAdapter",
+                    hint_path="app.adapters.infrastructure.intelligence.osiris_rest_adapter.py",
+                    use_cache=False,
+                )
+                osiris_batch = await asyncio.wait_for(
+                    asyncio.to_thread(osiris.collect_events, 20),
+                    timeout=55,
+                )
+            else:
+                osiris_batch = IntelligenceBatch(
+                    sources=tuple(
+                        SourceHealth(source_id=source_id, available=False,
+                                     error_code="NotConfigured")
+                        for source_id in (
+                            "osiris_earthquakes", "osiris_fires",
+                            "osiris_news", "osiris_weather",
+                        )
+                    )
+                )
 
             area_names = ("WEST", "SOUTH", "EAST", "NORTH")
             area_values = {name: os.getenv(f"JARVIS_GEV_AREA_{name}", "").strip() for name in area_names}
@@ -391,7 +406,10 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             close = getattr(adapter, "close", None)
             if callable(close):
                 close()
-            osiris.close()
+            if osiris is not None:
+                close_osiris = getattr(osiris, "close", None)
+                if callable(close_osiris):
+                    close_osiris()
 
     @app.get("/api/intelligence/latest")
     async def latest_intelligence(_client: str = Depends(require_local_token)) -> dict[str, Any]:
