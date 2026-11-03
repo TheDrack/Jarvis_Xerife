@@ -6,6 +6,7 @@ request, and succeed only when the capability is properly authorized with
 explicit human confirmation.
 """
 
+from pathlib import Path
 from typing import Any, Dict, Optional
 from unittest.mock import MagicMock, patch
 
@@ -210,13 +211,19 @@ class TestEagleOsintAdapterAuthorization:
         """execute() must return success=False when search() raises RuntimeError."""
         adapter = self._make_adapter(permissive_authorizer, mock_secrets, redactor, tmp_path)
 
-        with patch.object(adapter, "search", side_effect=RuntimeError("API unavailable")):
+        with patch.object(
+            adapter,
+            "search",
+            side_effect=RuntimeError("API unavailable for target@example.com"),
+        ):
             result = adapter.execute(
                 {"user": "alice", "query": "target", "human_confirmed": True}
             )
 
         assert result["success"] is False
         assert "API unavailable" in result["error"]
+        assert "target@example.com" not in result["error"]
+        assert "[EMAIL_REDACTED]" in result["error"]
 
 
 # ---------------------------------------------------------------------------
@@ -270,3 +277,41 @@ class TestOsintPiiSanitization:
         saved = jrvs_codec.read_file(result["path"])
         assert "john.doe@secret.com" not in str(saved)
         assert "[EMAIL_REDACTED]" in str(saved)
+
+    def test_target_pii_is_redacted_from_dossier_filename_metadata_and_audit_log(
+        self, permissive_authorizer, mock_secrets, redactor, tmp_path, monkeypatch, caplog
+    ):
+        """Email targets must not leak through filenames, metadata, audit records or logs."""
+        monkeypatch.chdir(tmp_path)
+        adapter = EagleOsintAdapter(
+            secrets_provider=mock_secrets,
+            pii_redactor=redactor,
+            authorizer=permissive_authorizer,
+            recon_dir=tmp_path,
+        )
+
+        with patch.object(adapter, "search", return_value={"status": "fixture"}):
+            result = adapter.execute(
+                {
+                    "user": "analyst@example.com",
+                    "query": "target@example.com",
+                    "human_confirmed": True,
+                }
+            )
+
+        assert result["success"] is True
+        dossier_path = Path(result["path"])
+        assert dossier_path.exists()
+        assert "target@example.com" not in str(dossier_path)
+
+        dossier = jrvs_codec.read_file(dossier_path)
+        assert dossier["_meta"]["entity"] == "[EMAIL_REDACTED]"
+        assert "target@example.com" not in str(dossier)
+
+        audit = jrvs_codec.read_file(tmp_path / "data" / "audit_osint.jrvs")
+        assert audit[-1]["target"] == "[EMAIL_REDACTED]"
+        assert audit[-1]["user"] == "[EMAIL_REDACTED]"
+        assert "target@example.com" not in str(audit)
+        assert "analyst@example.com" not in str(audit)
+        assert "target@example.com" not in caplog.text
+        assert "analyst@example.com" not in caplog.text

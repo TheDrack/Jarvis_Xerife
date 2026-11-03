@@ -12,13 +12,14 @@ Security rules
   required (``osint_search`` is a sensitive capability).
 * Raw results are sanitized through :class:`PiiRedactor` before persistence.
 * Sanitized dossiers are persisted in the binary ``.jrvs`` format under
-  ``data/recon/<entity>.jrvs`` using :mod:`app.utils.jrvs_codec`.
+  ``data/recon/dossier_<opaque-id>.jrvs`` using :mod:`app.utils.jrvs_codec`; target PII is
+  redacted from stored metadata, audit records and log messages.
 * Each search generates an audit log entry (timestamp, target, authorization status).
 """
 
 import datetime
 import logging
-import re
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -33,14 +34,14 @@ from app.utils import jrvs_codec
 
 logger = logging.getLogger(__name__)
 
+
+def _utc_timestamp() -> str:
+    """Return an ISO-8601 UTC timestamp with the legacy trailing Z format."""
+    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 _RECON_DIR = Path("data/recon")
 _EAGLE_BASE_URL = "https://api.eagle-osint.io/v1"
-_SAFE_ENTITY_RE = re.compile(r"[^a-zA-Z0-9._@\-]")
-
-
-def _safe_filename(entity: str) -> str:
-    """Convert an entity string into a safe filename stem."""
-    return _SAFE_ENTITY_RE.sub("_", entity)[:128]
 
 
 class EagleOsintAdapter(OsintProvider, NexusComponent):
@@ -106,23 +107,27 @@ class EagleOsintAdapter(OsintProvider, NexusComponent):
                 payload={"human_confirmed": human_confirmed},
             )
         except (PermissionError, ValueError) as exc:
-            logger.warning("🚫 [EagleOsint] Busca bloqueada para usuário '%s': %s", user, exc)
-            self._write_audit(user=user, target=query, authorized=False, error=str(exc))
-            return {"success": False, "error": str(exc)}
+            safe_user = self._redactor.sanitize(str(user))
+            safe_error = self._redactor.sanitize(str(exc))
+            logger.warning("🚫 [EagleOsint] Busca bloqueada para usuário '%s': %s", safe_user, safe_error)
+            self._write_audit(user=safe_user, target=query, authorized=False, error=safe_error)
+            return {"success": False, "error": safe_error}
 
         self._write_audit(user=user, target=query, authorized=True)
 
         try:
             results = self.search(query)
         except RuntimeError as exc:
-            logger.error("❌ [EagleOsint] Falha na busca OSINT: %s", exc)
-            return {"success": False, "error": str(exc)}
+            safe_error = self._redactor.sanitize(str(exc))
+            logger.error("❌ [EagleOsint] Falha na busca OSINT: %s", safe_error)
+            return {"success": False, "error": safe_error}
 
         path = self._persist(entity=query, data=results)
         summary = self._build_summary(results)
 
+        safe_query = self._redactor.sanitize(query)
         logger.info(
-            "✅ [EagleOsint] Recon concluído para '%s'. Dossier salvo em '%s'.", query, path
+            "✅ [EagleOsint] Recon concluído para '%s'. Dossier salvo em '%s'.", safe_query, path
         )
         return {"success": True, "summary": summary, "path": str(path)}
 
@@ -176,7 +181,7 @@ class EagleOsintAdapter(OsintProvider, NexusComponent):
         """Sanitize *data* via PiiRedactor and persist as a .jrvs dossier.
 
         Args:
-            entity: Target entity name (used as filename stem).
+            entity: Target entity name; only its redacted form is stored in metadata.
             data: Raw OSINT results dict.
 
         Returns:
@@ -185,11 +190,13 @@ class EagleOsintAdapter(OsintProvider, NexusComponent):
         # Sanitize every string value in the result tree
         sanitized = self._sanitize_recursive(data)
         sanitized["_meta"] = {
-            "entity": entity,
-            "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "entity": self._redactor.sanitize(entity),
+            "generated_at": _utc_timestamp(),
         }
 
-        filename = _safe_filename(entity) + ".jrvs"
+        # Never put the raw search target in a filesystem path. A random identifier
+        # also avoids collisions when distinct targets redact to the same placeholder.
+        filename = f"dossier_{uuid.uuid4().hex}.jrvs"
         path = self._recon_dir / filename
         jrvs_codec.write_file(path, sanitized)
         return path
@@ -225,14 +232,14 @@ class EagleOsintAdapter(OsintProvider, NexusComponent):
             error: Optional error message when blocked.
         """
         entry: Dict[str, Any] = {
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-            "user": user,
-            "target": target,
+            "timestamp": _utc_timestamp(),
+            "user": self._redactor.sanitize(str(user)),
+            "target": self._redactor.sanitize(str(target)),
             "capability": "osint_search",
             "authorized": authorized,
         }
         if error:
-            entry["error"] = error
+            entry["error"] = self._redactor.sanitize(str(error))
 
         log_path = Path("data/audit_osint.jrvs")
         # Append to existing log or create new one
@@ -247,7 +254,7 @@ class EagleOsintAdapter(OsintProvider, NexusComponent):
         jrvs_codec.write_file(log_path, existing)
         logger.info(
             "📋 [EagleOsint] Auditoria registada: user='%s', target='%s', autorizado=%s",
-            user,
-            target,
+            entry["user"],
+            entry["target"],
             authorized,
         )
