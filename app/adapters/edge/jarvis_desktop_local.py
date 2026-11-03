@@ -294,12 +294,26 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 health = [value for key, value in latest_health.items() if key.startswith("osiris_")]
                 if health:
                     available = sum(bool(value.get("available")) for value in health)
-                    source["runtime"] = "healthy" if available == len(health) else ("degraded" if available else "unavailable")
+                    has_errors = any(value.get("error_code") for value in health)
+                    source["runtime"] = (
+                        "healthy" if available == len(health) and not has_errors
+                        else ("degraded" if available else "unavailable")
+                    )
                     source["details"] = f"{available}/{len(health)} rotas OSIRIS disponíveis na última coleta."
             elif source_id == "gods_eye_view" and "gods_eye_view" in latest_health:
                 health = latest_health["gods_eye_view"]
-                source["runtime"] = "healthy" if health.get("available") else "unavailable"
-                source["details"] = "Estado observado na última consulta MCP read-only."
+                if not health.get("available"):
+                    source["runtime"] = "unavailable"
+                elif health.get("error_code"):
+                    source["runtime"] = "degraded"
+                else:
+                    source["runtime"] = "healthy"
+                error_code = health.get("error_code")
+                source["details"] = (
+                    f"Consulta MCP read-only com falha parcial: {error_code}."
+                    if error_code
+                    else "Estado observado na última consulta MCP read-only."
+                )
         payload["data_plane"] = {
             "available": bool(latest_health and any(item.get("available") for item in latest_health.values())),
             "reason": None if latest_health and any(item.get("available") for item in latest_health.values()) else "no_source_available",
