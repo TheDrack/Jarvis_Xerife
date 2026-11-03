@@ -34,6 +34,12 @@ from app.utils import jrvs_codec
 
 logger = logging.getLogger(__name__)
 
+
+def _utc_timestamp() -> str:
+    """Return an ISO-8601 UTC timestamp with the legacy trailing Z format."""
+    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 _RECON_DIR = Path("data/recon")
 _EAGLE_BASE_URL = "https://api.eagle-osint.io/v1"
 
@@ -185,7 +191,7 @@ class EagleOsintAdapter(OsintProvider, NexusComponent):
         sanitized = self._sanitize_recursive(data)
         sanitized["_meta"] = {
             "entity": self._redactor.sanitize(entity),
-            "generated_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "generated_at": _utc_timestamp(),
         }
 
         # Never put the raw search target in a filesystem path. A random identifier
@@ -226,7 +232,7 @@ class EagleOsintAdapter(OsintProvider, NexusComponent):
             error: Optional error message when blocked.
         """
         entry: Dict[str, Any] = {
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "timestamp": _utc_timestamp(),
             "user": self._redactor.sanitize(str(user)),
             "target": self._redactor.sanitize(str(target)),
             "capability": "osint_search",
