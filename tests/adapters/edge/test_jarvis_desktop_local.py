@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
+import threading
 
 import pytest
 from pathlib import Path
@@ -179,6 +181,8 @@ def test_intelligence_collection_resolves_local_services_through_nexus(monkeypat
 
         def collect_public_events(self, limit):
             assert limit == 20
+            with pytest.raises(RuntimeError):
+                asyncio.get_running_loop()
             return IntelligenceBatch()
 
         def close(self):
@@ -249,6 +253,8 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
     class FakePublicAdapter:
         def collect_public_events(self, limit):
             assert limit == 20
+            with pytest.raises(RuntimeError):
+                asyncio.get_running_loop()
             return IntelligenceBatch(sources=(SourceHealth(source_id="public_intelligence", available=True),))
 
         def close(self):
@@ -260,6 +266,8 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
 
         def collect_events(self, limit):
             assert limit == 20
+            with pytest.raises(RuntimeError):
+                asyncio.get_running_loop()
             calls.append("osiris_collected")
             return IntelligenceBatch(sources=(SourceHealth(source_id="osiris_earthquakes", available=True),))
 
@@ -366,3 +374,72 @@ async def test_intelligence_status_marks_partial_gev_as_degraded():
     assert "PartialFailure" in gev["details"]
     assert payload["data_plane"]["available"] is True
     assert payload["data_plane"]["observation_count"] == 9
+
+
+@pytest.mark.asyncio
+async def test_sync_io_worker_does_not_block_the_event_loop():
+    from app.adapters.edge.jarvis_desktop_local import _run_sync_io_off_loop
+
+    started = threading.Event()
+    release = threading.Event()
+    expected = object()
+
+    def blocking_call():
+        started.set()
+        if not release.wait(timeout=2):
+            raise RuntimeError("test worker was not released")
+        return expected
+
+    task = asyncio.create_task(_run_sync_io_off_loop(blocking_call))
+    try:
+        assert await asyncio.to_thread(started.wait, 1)
+        await asyncio.wait_for(asyncio.sleep(0), timeout=0.1)
+    finally:
+        release.set()
+
+    assert await task is expected
+
+
+@pytest.mark.asyncio
+async def test_sync_io_cancellation_waits_before_adapter_cleanup():
+    from app.adapters.edge.jarvis_desktop_local import _run_sync_io_off_loop
+
+    started = threading.Event()
+    release = threading.Event()
+    worker_finished = threading.Event()
+    adapter_closed = threading.Event()
+
+    class BlockingAdapter:
+        def collect(self):
+            started.set()
+            if not release.wait(timeout=2):
+                raise RuntimeError("test worker was not released")
+            worker_finished.set()
+            return object()
+
+        def close(self):
+            assert worker_finished.is_set()
+            adapter_closed.set()
+
+    adapter = BlockingAdapter()
+
+    async def collect_then_close():
+        try:
+            return await _run_sync_io_off_loop(adapter.collect)
+        finally:
+            adapter.close()
+
+    task = asyncio.create_task(collect_then_close())
+    assert await asyncio.to_thread(started.wait, 1)
+    task.cancel()
+    await asyncio.sleep(0)
+
+    assert not task.done()
+    assert not adapter_closed.is_set()
+
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert worker_finished.is_set()
+    assert adapter_closed.is_set()
