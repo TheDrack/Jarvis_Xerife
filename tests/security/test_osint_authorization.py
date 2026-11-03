@@ -211,13 +211,19 @@ class TestEagleOsintAdapterAuthorization:
         """execute() must return success=False when search() raises RuntimeError."""
         adapter = self._make_adapter(permissive_authorizer, mock_secrets, redactor, tmp_path)
 
-        with patch.object(adapter, "search", side_effect=RuntimeError("API unavailable")):
+        with patch.object(
+            adapter,
+            "search",
+            side_effect=RuntimeError("API unavailable for target@example.com"),
+        ):
             result = adapter.execute(
                 {"user": "alice", "query": "target", "human_confirmed": True}
             )
 
         assert result["success"] is False
         assert "API unavailable" in result["error"]
+        assert "target@example.com" not in result["error"]
+        assert "[EMAIL_REDACTED]" in result["error"]
 
 
 # ---------------------------------------------------------------------------
