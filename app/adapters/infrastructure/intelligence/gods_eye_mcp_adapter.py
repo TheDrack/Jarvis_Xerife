@@ -212,9 +212,17 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
     @staticmethod
     def _is_safe_query_tool(definition: Any, required_property: str) -> bool:
         annotations = _field(definition, "annotations", {}) or {}
-        if _field(annotations, "readOnlyHint") is not True:
+        read_only_hint = _field(annotations, "readOnlyHint")
+        if read_only_hint is None:
+            # MCP SDK model objects expose snake_case attributes, while JSON
+            # wire dictionaries use camelCase annotation keys.
+            read_only_hint = _field(annotations, "read_only_hint", False)
+        destructive_hint = _field(annotations, "destructiveHint")
+        if destructive_hint is None:
+            destructive_hint = _field(annotations, "destructive_hint", False)
+        if read_only_hint is not True:
             return False
-        if _field(annotations, "destructiveHint") is True:
+        if destructive_hint is True:
             return False
         schema = _field(definition, "inputSchema", None)
         if schema is None:
