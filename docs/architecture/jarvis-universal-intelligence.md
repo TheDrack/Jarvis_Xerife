@@ -44,6 +44,15 @@ Returned aircraft, vessel and satellite rows become IntelligenceObservation reco
 
 This adapter is unit-tested with an injected fake MCP session. It has not been verified against a configured live God's Eye View checkout or running app. No endpoint, credentials, database, scheduler, production service or deployment is configured by this change. GEV's MIT code license does not grant rights to underlying data/assets; provider attribution and dataset terms remain applicable.
 
+## Optional OSIRIS REST event adapter
+
+- Adapter: \`app/adapters/infrastructure/intelligence/osiris_rest_adapter.py\`; class: \`OsirisRestAdapter\`.
+- Opt-in HTTPS integration through \`JARVIS_OSIRIS_API_BASE_URL\` or an explicit constructor origin.
+- Calls only \`/api/earthquakes\`, \`/api/fires\` and \`/api/news\`; no user-controlled route, query, redirect or remote URL fetcher.
+- Each route is independently bounded to 100 records, a 4 MB streamed response and a 12-second timeout by default; source health preserves partial failures.
+- News country-anchor coordinates are intentionally not treated as event coordinates. News items require an HTTPS original publisher link and a valid ISO/RFC 2822 publication timestamp.
+- Unit tests use upstream-shaped fixtures and an injected HTTPX MockTransport. No live OSIRIS deployment is configured or verified.
+
 ## Intelligence Core 0.2
 
 IntelligenceCore is a pure, provider-neutral application service. It performs no network calls, persistence, scheduling or delivery. For repeated (source_id, event_id) identities, the newest observed_at wins; equal timestamps are resolved by the lexicographically greatest canonical JSON serialization of the complete event. This rule is independent of input order. Candidate correlations use canonical URL equality or exact normalized headlines within the same domain/category and a 24-hour window. Original events and evidence remain separate; a candidate is not corroboration.
