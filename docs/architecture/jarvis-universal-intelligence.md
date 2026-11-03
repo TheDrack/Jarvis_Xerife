@@ -44,14 +44,15 @@ Returned aircraft, vessel and satellite rows become IntelligenceObservation reco
 
 This adapter is unit-tested with an injected fake MCP session. It has not been verified against a configured live God's Eye View checkout or running app. No endpoint, credentials, database, scheduler, production service or deployment is configured by this change. GEV's MIT code license does not grant rights to underlying data/assets; provider attribution and dataset terms remain applicable.
 
-## Optional OSIRIS REST event adapter
+## OSIRIS REST adapter 0.5
 
-- Adapter: \`app/adapters/infrastructure/intelligence/osiris_rest_adapter.py\`; class: \`OsirisRestAdapter\`.
-- Opt-in HTTPS integration through \`JARVIS_OSIRIS_API_BASE_URL\` or an explicit constructor origin.
-- Calls only \`/api/earthquakes\`, \`/api/fires\` and \`/api/news\`; no user-controlled route, query, redirect or remote URL fetcher.
-- Each route is independently bounded to 100 records, a 4 MB streamed response and a 12-second timeout by default; source health preserves partial failures.
-- News country-anchor coordinates are intentionally not treated as event coordinates. News items require an HTTPS original publisher link and a valid ISO/RFC 2822 publication timestamp.
-- Unit tests use upstream-shaped fixtures and an injected HTTPX MockTransport. No live OSIRIS deployment is configured or verified.
+OsirisRestAdapter consumes only the fixed read-only \`/api/earthquakes\`, \`/api/fires\` and \`/api/news\` routes. It uses HTTPS, rejects redirects, streams responses with a 4 MB byte cap, applies a 12-second timeout and limits each normalized route to 100 records. The base origin is supplied explicitly or through \`JARVIS_OSIRIS_API_BASE_URL\`; no default live deployment is assumed.
+
+Earthquakes preserve USGS event IDs, event times, magnitudes, coordinates and event-page links. Fires preserve bounded FIRMS/EONET fields and distinguish date-only records from minute-level acquisition timestamps. News preserves the original publisher link, publisher label and publication time, including ISO and RFC 2822 dates. OSIRIS keyword-derived country-anchor coordinates are deliberately not converted into event geolocation.
+
+Each route reports independent SourceHealth; one route failure does not discard successful route data. Non-HTTPS publisher links and malformed records are dropped. The feed's risk score and source-side political labels are not treated as verified analysis or corroboration. Cross-post metadata is not converted into multiple independent evidence records.
+
+The adapter is unit-tested against fixtures matching the upstream route shapes. It has not been connected to a configured live OSIRIS deployment; no credentials, production endpoint, Nexus registration, database, scheduler or deployment are changed. Weather, flights, maritime and satellite routes remain separate follow-up increments because their geometry precision, moving-entity semantics, payload sizes and source behavior require dedicated contracts and controls.
 
 ## Intelligence Core 0.2
 
@@ -73,8 +74,7 @@ Domain contracts and application services remain OS-neutral. Host-specific sched
 
 ## Next increments
 
-1. Add the per-route OSIRIS REST adapter with upstream-derived fixtures.
-2. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
+1. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
 3. Add durable observation history and retention policies.
 4. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
 5. Add evidence/corroboration and contradiction contracts.
