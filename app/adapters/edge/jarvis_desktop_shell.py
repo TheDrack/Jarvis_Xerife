@@ -53,6 +53,27 @@ def _storage_path() -> Path:
     return path
 
 
+
+class DesktopWindowBridge:
+    """Expose only the native window operations required by the local HUD."""
+
+    def __init__(self) -> None:
+        self._window = None
+        self._fullscreen = False
+
+    def bind_window(self, window) -> None:
+        self._window = window
+
+    def set_fullscreen(self, enabled: bool) -> bool:
+        if self._window is None:
+            raise RuntimeError("A janela nativa do Jarvis ainda não foi inicializada.")
+        desired = bool(enabled)
+        if desired != self._fullscreen:
+            self._window.toggle_fullscreen()
+            self._fullscreen = desired
+        return self._fullscreen
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Jarvis Desktop — núcleo local com acesso opcional pela LAN.")
     parser.add_argument("--port", type=int, default=8766)
@@ -75,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     server = None
+    window_bridge = DesktopWindowBridge()
     try:
         if args.remote_url:
             start_url = build_start_url(args.remote_url, args.page)
@@ -83,9 +105,10 @@ def main(argv: list[str] | None = None) -> int:
             host = "127.0.0.1" if args.loopback_only else "0.0.0.0"
             server, _thread = run_local_server(host=host, port=args.port)
             start_url = f"http://127.0.0.1:{args.port}/"
-        webview.create_window(
+        window = webview.create_window(
             "JARVIS · Desktop",
             url=start_url,
+            js_api=None if args.remote_url else window_bridge,
             width=1500,
             height=940,
             min_size=(1024, 680),
@@ -93,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
             text_select=True,
             background_color="#07111d",
         )
+        if not args.remote_url:
+            window_bridge.bind_window(window)
         webview.start(
             gui="edgechromium",
             debug=args.debug,
