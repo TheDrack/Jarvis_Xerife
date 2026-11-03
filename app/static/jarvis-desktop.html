@@ -175,11 +175,13 @@ async function refreshAll(){try{await refreshStatus();await Promise.all([refresh
 $('refreshAll').addEventListener('click',()=>runButtonAction($('refreshAll'),'Atualizando...',refreshAll));
 
 const fullscreenButton=$('fullscreenToggle');
-function syncFullscreenControl(){const active=Boolean(document.fullscreenElement);fullscreenButton.textContent=active?'⤢':'⛶';fullscreenButton.title=active?'Sair da tela cheia (F11)':'Ativar tela cheia (F11)';fullscreenButton.setAttribute('aria-label',active?'Sair da tela cheia':'Ativar tela cheia');}
-async function toggleFullscreen(){try{if(document.fullscreenElement){await document.exitFullscreen();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();}else{$('footerStatus').textContent='Tela cheia indisponível neste host.';}}catch(e){$('footerStatus').textContent='Tela cheia bloqueada pelo host: '+e.message;}syncFullscreenControl();}
+let nativeFullscreen=false;
+function syncFullscreenControl(active=Boolean(document.fullscreenElement)){fullscreenButton.textContent=active?'⤢':'⛶';fullscreenButton.title=active?'Sair da tela cheia (F11)':'Ativar tela cheia (F11)';fullscreenButton.setAttribute('aria-label',active?'Sair da tela cheia':'Ativar tela cheia');}
+async function toggleFullscreen(){try{const bridge=window.pywebview?.api;if(typeof bridge?.set_fullscreen==='function'){nativeFullscreen=await bridge.set_fullscreen(!nativeFullscreen);syncFullscreenControl(nativeFullscreen);return;}if(document.fullscreenElement){await document.exitFullscreen();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();}else{$('footerStatus').textContent='Tela cheia indisponível neste host.';}}catch(e){$('footerStatus').textContent='Tela cheia bloqueada pelo host: '+e.message;}syncFullscreenControl();}
 fullscreenButton.addEventListener('click',toggleFullscreen);
-document.addEventListener('fullscreenchange',syncFullscreenControl);
-document.addEventListener('keydown',event=>{if(event.key==='F11'){event.preventDefault();toggleFullscreen();}});
+document.addEventListener('fullscreenchange',()=>syncFullscreenControl());
+document.addEventListener('keydown',event=>{if(event.key==='F11'){event.preventDefault();toggleFullscreen();}else if(event.key==='Escape'&&nativeFullscreen){event.preventDefault();window.pywebview?.api?.set_fullscreen(false).then(active=>{nativeFullscreen=active;syncFullscreenControl(active);}).catch(e=>$('footerStatus').textContent='Falha ao sair da tela cheia: '+e.message);}});
+window.addEventListener('pywebviewready',()=>{nativeFullscreen=false;syncFullscreenControl(false);});
 syncFullscreenControl();
 
 setInterval(()=>$('clock').textContent=time(),1000);$('clock').textContent=time();
