@@ -70,7 +70,7 @@ The first durable-history schema is defined by ADR-004 and migration `2026110310
 - RLS is enabled. `PUBLIC`, `anon`, `authenticated` and `service_role` are revoked before granting only `SELECT` and `INSERT` to the server-side `service_role`; no application UPDATE/DELETE/TRUNCATE permission is granted.
 - No retention job or arbitrary TTL is introduced. Retention, archival and partitioning must be defined from measured ingestion volume before recurring high-volume GEV collection.
 
-**Implementation state:** the migration and ADR are present locally but have not been applied to Supabase. The connected project's migration ledger does not match the local migration filename versions, so remote migration/push operations remain blocked pending reconciliation. The persistence port/adapter and PostgreSQL integration tests are the next code increment. The adapter must use the existing server-only `get_supabase_admin_client()` and fail closed; it must never fall back to the public client.
+**Implementation state:** PR #715 connected the append-only adapter to the authenticated on-demand collection endpoint. Writes are gated by `JARVIS_INTELLIGENCE_HISTORY_ENABLED`, documented as `false` by default. Read-only inspection of the active Supabase project confirmed both history tables exist and have RLS enabled. The remote migration ledger records version `20261103184307` with name `20261103100304_intelligence_history`, while the local file prefix is `20261103100304`; the main `Supabase Preview` check fails because remote migration versions are not found in the local migrations directory. No migration repair or DDL was performed. Exact role grants and successful adapter insert/reload remain unverified because SQL introspection was denied. The adapter must use the existing server-only `get_supabase_admin_client()` and fail closed; it must never fall back to the public client.
 
 ## Data and trust model
 
@@ -88,13 +88,13 @@ Domain contracts and application services remain OS-neutral. Host-specific sched
 
 ## Next increments
 
-1. **Implemented in the current development increment:** authenticated `POST /v1/intelligence/collect` runs Public Intelligence and configured OSIRIS concurrently, includes God's Eye View only when its local MCP entrypoint and bounded area are configured, preserves partial source failures, and returns the deterministic IntelligenceCore report. The dashboard exposes an explicit “Coletar agora” action. This is on-demand/read-only collection; it does not schedule polling or persist results.
+1. **Implemented:** authenticated `POST /v1/intelligence/collect` runs Public Intelligence and configured OSIRIS concurrently, includes God's Eye View only when its local MCP entrypoint and bounded area are configured, preserves partial source failures, and returns the deterministic IntelligenceCore report. The dashboard exposes “Coletar agora”. PR #715 also wires append-only persistence behind `JARVIS_INTELLIGENCE_HISTORY_ENABLED`; the documented default remains `false`. Collection is still on-demand, not scheduled.
 2. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
-3. Implement the append-only Supabase persistence port/adapter, verify idempotent writes against PostgreSQL, and reconcile remote migration history before applying the schema; define retention before recurring high-volume ingestion.
+3. Reconcile the existing remote/local migration ledger without blindly reapplying DDL; verify exact role grants and idempotent insert/reload in a disposable PostgreSQL environment. Only then consider enabling the history flag. Define retention from measured ingestion volume before recurring high-volume ingestion.
 4. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
 5. Add evidence/corroboration and contradiction contracts.
 6. Compose the Portuguese daily briefing with citations and explicit fact/claim/inference/scenario separation.
-7. Connect a real durable scheduler/worker and idempotent delivery.
+7. Review and validate the recurring worker proposed in PR #716. Its lease/telemetry migration is not applied remotely and its worker tables are absent; keep both worker/history flags off until migration reconciliation, role checks and multi-instance lease tests are complete. Idempotent delivery remains a separate increment.
 8. Build a geospatial presentation adapter after comparing MapLibre/Cesium/deck.gl requirements, performance and licenses.
 9. Add user preference/direction feedback and Jarvis self-maintenance signals as separate domains.
 
