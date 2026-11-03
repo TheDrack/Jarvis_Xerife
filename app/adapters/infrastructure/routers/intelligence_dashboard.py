@@ -87,8 +87,8 @@ def build_intelligence_status() -> dict[str, Any]:
             {
                 "id": "persistence_adapter",
                 "label": "Adaptador de persistência",
-                "state": "not_implemented",
-                "detail": "Próxima etapa; deverá usar somente o cliente administrativo server-side.",
+                "state": "implemented_not_connected",
+                "detail": "Adaptador append-only disponível; ainda não conectado ao coletor e exige cliente admin server-side.",
             },
             {
                 "id": "presentation",
@@ -100,7 +100,7 @@ def build_intelligence_status() -> dict[str, Any]:
         "history": {
             "migration_file_present": migration_present,
             "remote_migration_state": "unverified",
-            "persistence_adapter": "not_implemented",
+            "persistence_adapter": "implemented_not_connected",
             "production_write_performed": False,
         },
         "security": {
@@ -112,6 +112,7 @@ def build_intelligence_status() -> dict[str, Any]:
             "Sem serviço de coleta conectado, eventos e observações não estão disponíveis nesta tela.",
             "Estado de configuração não equivale a health check do serviço externo.",
             "O estado remoto da migration do Supabase não é consultado por este endpoint.",
+            "O adaptador de histórico ainda não está conectado ao endpoint de coleta.",
         ],
     }
 
