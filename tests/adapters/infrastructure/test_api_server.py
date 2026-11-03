@@ -424,6 +424,30 @@ class TestAPIServer(NexusComponent):
         assert "Internal server error" in response.json()["detail"]
 
 
+    def test_intelligence_dashboard_is_served(self, client):
+        test_client, _ = client
+        response = test_client.get("/intelligence")
+        assert response.status_code == 200
+        assert "UNIVERSAL INTELLIGENCE" in response.text
+        assert "/v1/intelligence/status" in response.text
+
+    def test_intelligence_status_requires_authentication(self, client):
+        test_client, _ = client
+        response = test_client.get("/v1/intelligence/status")
+        assert response.status_code == 401
+
+    def test_intelligence_status_returns_truthful_runtime_state(self, client, auth_token):
+        test_client, _ = client
+        response = test_client.get(
+            "/v1/intelligence/status",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["data_plane"]["available"] is False
+        assert data["data_plane"]["event_count"] is None
+        assert data["history"]["remote_migration_state"] == "unverified"
+
 class TestJarvisDispatchEndpoint(NexusComponent):
 
     def execute(self, context: dict):

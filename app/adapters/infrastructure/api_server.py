@@ -21,6 +21,9 @@ from app.adapters.infrastructure.routers.dev_agent import create_dev_agent_route
 from app.adapters.infrastructure.routers.devices import create_devices_router
 from app.adapters.infrastructure.routers.network_discovery import create_network_discovery_router
 from app.adapters.infrastructure.routers.environment_observations import create_environment_observations_router
+from app.adapters.infrastructure.routers.intelligence_dashboard import (
+    create_intelligence_dashboard_router,
+)
 from app.adapters.infrastructure.routers.evolution import create_evolution_router
 from app.adapters.infrastructure.routers.extensions import create_extensions_router
 from app.adapters.infrastructure.routers.github import create_github_router
@@ -213,6 +216,7 @@ def create_api_server(
     app.include_router(create_extensions_router(extension_manager, get_current_user))
     app.include_router(create_network_discovery_router(get_current_user))
     app.include_router(create_environment_observations_router(get_current_user))
+    app.include_router(create_intelligence_dashboard_router(get_current_user))
     if device_service:
         app.include_router(create_devices_router(device_service, db_adapter, get_current_user))
     app.include_router(create_missions_router(get_current_user))
