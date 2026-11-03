@@ -188,7 +188,7 @@ def test_weather_preserves_provider_provenance_without_false_geolocation(adapter
     assert nws.url.host == "api.weather.gov"
 
 
-def test_weather_drops_unknown_providers_and_nontraceable_items(adapter_factory):
+def test_weather_skips_unknown_providers_and_uses_trusted_provider_fallback(adapter_factory):
     data = payloads()
     data["weather"]["events"].extend([
         {
@@ -208,8 +208,12 @@ def test_weather_drops_unknown_providers_and_nontraceable_items(adapter_factory)
     batch = adapter_factory(data).collect_events()
     weather = [event for event in batch.events if event.source_id in {"nasa_eonet", "noaa_nws", "gdacs"}]
 
-    assert len(weather) == 3
+    assert len(weather) == 4
     assert all(event.url.scheme == "https" for event in weather)
+    assert not any(event.title == "Unknown provider event" for event in weather)
+    fallback = next(event for event in weather if event.title == "No valid source")
+    assert fallback.url.host == "api.weather.gov"
+    assert fallback.url.path == "/alerts/active"
 
 def test_parses_rfc_2822_publication_dates(adapter_factory):
     data = payloads()
