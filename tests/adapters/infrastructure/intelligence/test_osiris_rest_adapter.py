@@ -176,7 +176,11 @@ def test_collects_upstream_event_shapes_and_preserves_provenance(adapter_factory
 
 def test_weather_preserves_provider_provenance_without_false_geolocation(adapter_factory):
     batch = adapter_factory(payloads()).collect_events()
-    weather = [event for event in batch.events if event.source_id in {"nasa_eonet", "noaa_nws", "gdacs"}]
+    weather = [
+        event
+        for event in batch.events
+        if event.source_id in {"nasa_eonet", "noaa_nws", "gdacs"}
+    ]
 
     assert len(weather) == 3
     assert {event.source_id for event in weather} == {"nasa_eonet", "noaa_nws", "gdacs"}
