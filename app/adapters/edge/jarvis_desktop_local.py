@@ -350,13 +350,27 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
     return app
 
 
+def _build_uvicorn_config(app: FastAPI, host: str, port: int) -> Any:
+    import uvicorn
+
+    return uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_level="warning",
+        access_log=False,
+        server_header=False,
+        proxy_headers=False,
+        forwarded_allow_ips="",
+    )
+
+
 def run_local_server(host: str = "0.0.0.0", port: int = 8766) -> tuple[Any, Any]:
     """Start Uvicorn in a daemon thread; returns (server, thread)."""
     import threading
     import uvicorn
 
-    config = uvicorn.Config(create_local_app(), host=host, port=port, log_level="warning",
-                            access_log=False, server_header=False)
+    config = _build_uvicorn_config(create_local_app(), host, port)
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, name="jarvis-local-api", daemon=True)
     thread.start()

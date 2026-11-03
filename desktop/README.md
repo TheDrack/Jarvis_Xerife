@@ -14,7 +14,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start_jarvis_desktop.ps1
 ```
 
 The default listener is port 8766 on local/private interfaces. The API rejects public
-source addresses and non-private Host headers. The launch script does not create firewall rules.
+source addresses and non-private Host headers. Uvicorn proxy headers are disabled, so
+client identity is not derived from an untrusted `X-Forwarded-For` value. The launch
+script does not create firewall rules.
 To explicitly open the legacy cloud HUD instead of the local core, use
 `python -m app.adapters.edge.jarvis_desktop_shell --base-url https://your-jarvis-host.example --page intelligence`.
 The local core remains the default. If the machine is on an untrusted network, use loopback-only mode:

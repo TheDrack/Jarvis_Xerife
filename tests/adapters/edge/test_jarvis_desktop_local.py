@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.adapters.edge.jarvis_desktop_local import (
     LocalRuntime,
+    _build_uvicorn_config,
     _host_name,
     _is_allowed_address,
     _tailscale_snapshot,
@@ -36,6 +37,20 @@ def test_host_parser_handles_ipv4_ipv6_and_ports():
     assert _host_name("192.168.1.2:8766") == "192.168.1.2"
     assert _host_name("[::1]:8766") == "::1"
     assert _host_name("localhost:8766") == "localhost"
+
+
+def test_uvicorn_does_not_trust_forwarded_client_headers():
+    config = _build_uvicorn_config(create_local_app(), "0.0.0.0", 8766)
+    assert config.proxy_headers is False
+    assert config.forwarded_allow_ips == ""
+
+
+def test_public_client_cannot_spoof_loopback_with_forwarded_for():
+    response = _client(LocalRuntime(), "8.8.8.8").get(
+        "/api/bootstrap",
+        headers={"X-Forwarded-For": "127.0.0.1"},
+    )
+    assert response.status_code == 403
 
 
 def test_tailscale_snapshot_reports_android_peer(monkeypatch):
