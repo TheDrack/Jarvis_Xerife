@@ -189,6 +189,36 @@ def _tailscale_snapshot() -> dict[str, Any]:
     }
 
 
+async def _collect_public_events_off_loop(adapter: Any, *, limit: int) -> Any:
+    """Run the synchronous public-source collector without blocking ASGI.
+
+    The route closes the adapter in its finally block. If the request is
+    cancelled, wait for the worker thread to finish before propagating
+    cancellation so adapter cleanup cannot race an in-flight HTTP request.
+    """
+    worker = asyncio.create_task(
+        asyncio.to_thread(adapter.collect_public_events, limit)
+    )
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        # shield() keeps the worker alive. Continue waiting even if the caller
+        # receives another cancellation while the synchronous client is active.
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                continue
+            except Exception:
+                break
+        if worker.done() and not worker.cancelled():
+            try:
+                worker.result()
+            except Exception:
+                pass
+        raise
+
+
 def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
     state = runtime or LocalRuntime()
     app = FastAPI(title="Jarvis Local Core", docs_url=None, redoc_url=None, openapi_url=None)
@@ -339,7 +369,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             if not callable(getattr(engine, "process", None)):
                 raise HTTPException(status_code=503, detail="IntelligenceCore indisponível no Nexus local.")
 
-            public_batch = adapter.collect_public_events(limit=20)
+            public_batch = await _collect_public_events_off_loop(adapter, limit=20)
             if not isinstance(public_batch, IntelligenceBatch):
                 public_batch = IntelligenceBatch.model_validate(public_batch)
 
