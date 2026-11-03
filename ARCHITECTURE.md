@@ -42,7 +42,7 @@ graph LR
     app_adapters_infrastructure_osint["<b>osint</b><br/><hr/>📄 eagle_osint_adapter.py: EagleOsintAdapter"]
     class app_adapters_infrastructure_osint adapter
     app_adapters_infrastructure --> app_adapters_infrastructure_osint
-    app_adapters_infrastructure_intelligence["<b>intelligence</b><br/><hr/>📄 supabase_intelligence_history.py: IntelligenceHistoryPersistenceError, SupabaseIntelligenceHistoryAdapter<br/>📄 public_intelligence_adapter.py: PublicIntelligenceAdapter"]
+    app_adapters_infrastructure_intelligence["<b>intelligence</b><br/><hr/>📄 supabase_intelligence_history_adapter.py: SupabaseIntelligenceHistoryAdapter<br/>📄 supabase_intelligence_history.py: IntelligenceHistoryPersistenceError, SupabaseIntelligenceHistoryAdapter<br/>📄 public_intelligence_adapter.py: PublicIntelligenceAdapter"]
     class app_adapters_infrastructure_intelligence adapter
     app_adapters_infrastructure --> app_adapters_infrastructure_intelligence
     app_adapters_infrastructure_secrets["<b>secrets</b><br/><hr/>📄 env_secrets_provider.py: EnvSecretsProvider, execute, get_secret"]
