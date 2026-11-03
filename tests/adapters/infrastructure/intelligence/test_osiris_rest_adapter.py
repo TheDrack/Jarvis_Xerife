@@ -184,8 +184,14 @@ def test_weather_preserves_provider_provenance_without_false_geolocation(adapter
 
     assert len(weather) == 3
     assert {event.source_id for event in weather} == {"nasa_eonet", "noaa_nws", "gdacs"}
-    assert all(event.location is None for event in weather)
+    eonet = next(event for event in weather if event.source_id == "nasa_eonet")
+    gdacs = next(event for event in weather if event.source_id == "gdacs")
+    assert eonet.location.latitude == -20.0
+    assert eonet.location.longitude == -45.0
+    assert gdacs.location.latitude == 12.0
+    assert gdacs.location.longitude == 140.0
     nws = next(event for event in weather if event.source_id == "noaa_nws")
+    assert nws.location is None
     assert "area=Example County" in nws.summary
     assert "expires=2026-11-03T12:00:00Z" in nws.summary
     assert nws.evidence.publisher == "NOAA/NWS"

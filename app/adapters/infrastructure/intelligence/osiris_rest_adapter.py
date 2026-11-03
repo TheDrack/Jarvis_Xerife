@@ -479,9 +479,23 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
                 if isinstance(value, (str, int, float)) and not isinstance(value, bool):
                     details.append(f"{key}={str(value)[:300]}")
 
-            # The upstream route averages NOAA polygon vertices into a marker
-            # but does not return the original geometry type. No weather row is
-            # promoted to a precise GeoPoint until that precision is available.
+            position = None
+            if provider != "NOAA/NWS":
+                latitude = _finite_number(row.get("lat"))
+                longitude = _finite_number(row.get("lng"))
+                if (
+                    latitude is None
+                    or longitude is None
+                    or not -90 <= latitude <= 90
+                    or not -180 <= longitude <= 180
+                ):
+                    continue
+                # EONET rows are emitted only for Point geometry; GDACS rows
+                # carry explicit geo:lat/geo:long coordinates in the RSS item.
+                position = GeoPoint(latitude=latitude, longitude=longitude)
+
+            # OSIRIS reduces NOAA polygon geometry to a representative marker
+            # without exposing the original geometry type, so NWS gets no point.
             evidence = self._evidence(
                 source_id=source_id,
                 source_name=f"{provider} (via OSIRIS)",
@@ -499,7 +513,7 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
                     summary="; ".join(details)[:4000] or None,
                     url=url,
                     observed_at=observed_at,
-                    location=None,
+                    location=position,
                     evidence=evidence,
                 )
             )
