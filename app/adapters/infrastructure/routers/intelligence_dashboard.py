@@ -1,6 +1,8 @@
 """Authenticated status API and permanent UI for Jarvis Universal Intelligence."""
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -10,6 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from app.application.services.intelligence_collector import collect_live_intelligence
+
+logger = logging.getLogger(__name__)
 
 
 def _configured(variable: str) -> bool:
@@ -96,8 +100,8 @@ def build_intelligence_status() -> dict[str, Any]:
             {
                 "id": "persistence_adapter",
                 "label": "Adaptador de persistência",
-                "state": "implemented_not_connected",
-                "detail": "Adaptador append-only disponível; ainda não conectado ao coletor e exige cliente admin server-side.",
+                "state": "on_demand",
+                "detail": "Persistência append-only integrada ao endpoint; desativada por padrão até validar migration e credenciais server-side.",
             },
             {
                 "id": "presentation",
@@ -121,13 +125,13 @@ def build_intelligence_status() -> dict[str, Any]:
             "A coleta é sob demanda; não existe agendamento contínuo nem snapshot persistido conectado ao painel.",
             "Estado de configuração não equivale a health check do serviço externo.",
             "O estado remoto da migration do Supabase não é consultado por este endpoint.",
-            "O adaptador de histórico ainda não está conectado ao endpoint de coleta.",
+            "A persistência permanece desativada por padrão; habilite somente após validar a migration e a exposição segura das tabelas no projeto remoto.",
         ],
     }
 
 
 def create_intelligence_dashboard_router(
-    get_current_user, collector=collect_live_intelligence
+    get_current_user, collector=collect_live_intelligence, history_repository=None
 ) -> APIRouter:
     router = APIRouter(tags=["intelligence-dashboard"])
 
@@ -151,6 +155,20 @@ def create_intelligence_dashboard_router(
     ) -> dict[str, Any]:
         """Run one authenticated, read-only collection across configured sources."""
         report = await collector(limit=limit)
-        return report.model_dump(mode="json")
+        history = {"status": "disabled", "reason": "feature_flag_disabled"}
+        if os.getenv("JARVIS_INTELLIGENCE_HISTORY_ENABLED", "false").strip().casefold() == "true":
+            try:
+                repository = history_repository
+                if repository is None:
+                    from app.adapters.infrastructure.intelligence.supabase_intelligence_history import (
+                        SupabaseIntelligenceHistoryAdapter,
+                    )
+                    repository = SupabaseIntelligenceHistoryAdapter.from_server_admin_client()
+                await asyncio.to_thread(repository.persist, report)
+                history = {"status": "persisted", "reason": None}
+            except Exception as exc:
+                logger.warning("Intelligence history persistence unavailable (%s)", type(exc).__name__)
+                history = {"status": "unavailable", "reason": "persistence_failed"}
+        return {"report": report.model_dump(mode="json"), "history": history}
 
     return router
