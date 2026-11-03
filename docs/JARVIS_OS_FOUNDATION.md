@@ -64,8 +64,9 @@ The first deliverable is a portable foundation, not a bootable distribution and 
 1. Architecture and repository map.
 2. Profile/configuration contract and compatibility tests.
 3. Provider-neutral model/agent contracts and first FreeLLMAPI runtime adapter.
-4. Bind the model registry to runtime adapters and integrate capability-aware selection
-   without removing the existing provider-specific routes until compatibility tests pass.
+4. Bind model profiles to provider runtime adapters in every mini-agent composition root
+   (tracked in PR #689); next integrate capability-aware model selection into the scheduler
+   and the existing LLMRouter/AIGateway/ModelOrchestrator paths only after compatibility tests pass.
 5. Local harness packaging and clean-environment test.
 6. Optional host manager and systemd integration.
 7. Disposable VM boot test.
