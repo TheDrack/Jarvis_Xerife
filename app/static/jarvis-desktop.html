@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07111d">
+<title>JARVIS · Desktop</title>
+<style>
+:root{color-scheme:dark;--bg:#07111d;--panel:#0b1a29;--panel2:#102235;--line:#1d3a50;--cyan:#55d9f2;--blue:#3b91bb;--green:#67e6b1;--amber:#f5c56b;--red:#ff7888;--muted:#7694a9;--text:#e8f5fb}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:radial-gradient(ellipse at 58% 12%,#102b40 0,#07111d 52%,#050b13 100%);color:var(--text);font:14px/1.35 "Segoe UI",system-ui,sans-serif}
+button,input{font:inherit}button{border:1px solid var(--line);background:#10283a;color:var(--text);border-radius:9px;padding:9px 13px;cursor:pointer}button:hover{border-color:var(--cyan);background:#14344a}button:disabled{opacity:.5;cursor:wait}
+.shell{height:100dvh;min-height:0;display:grid;grid-template-columns:218px minmax(0,1fr);gap:0}
+.rail{padding:22px 14px 16px;border-right:1px solid var(--line);background:linear-gradient(180deg,#091725eF,#07111df5);display:flex;flex-direction:column;min-height:0}
+.brand{display:flex;align-items:center;gap:11px;padding:3px 8px 24px}.brand-mark{width:38px;height:38px;border:1px solid var(--cyan);border-radius:50%;display:grid;place-items:center;color:var(--cyan);font-weight:700;box-shadow:0 0 18px #55d9f233,inset 0 0 12px #55d9f222}.brand b{letter-spacing:.2em;font-size:14px}.brand small{display:block;color:var(--muted);font-size:9px;letter-spacing:.22em;margin-top:2px}
+.nav{display:grid;gap:7px}.nav button{background:transparent;border-color:transparent;text-align:left;color:#9ab3c5;padding:12px 13px;display:flex;gap:12px;align-items:center}.nav button.active{background:#123148;border-color:#24506b;color:#e7fbff;box-shadow:inset 2px 0 var(--cyan)}.nav .glyph{width:18px;text-align:center;color:var(--cyan);font-size:16px}
+.rail-foot{margin-top:auto;border-top:1px solid var(--line);padding:15px 8px 0;color:var(--muted);font-size:10px;letter-spacing:.08em}.pulse{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px var(--green);margin-right:7px}
+.main{min-width:0;min-height:0;display:grid;grid-template-rows:62px minmax(0,1fr) 27px;padding:0 25px}
+.top{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1b3448;min-width:0}.eyebrow{font-size:10px;color:var(--muted);letter-spacing:.2em}.top h1{font-size:16px;letter-spacing:.08em;margin:2px 0 0;font-weight:600}.top-right{display:flex;align-items:center;gap:12px}.status-chip{border:1px solid #24506b;background:#0d2435;padding:7px 10px;border-radius:20px;font-size:10px;color:#b7d5e4;white-space:nowrap}.clock{font-variant-numeric:tabular-nums;color:var(--cyan);font-size:12px;letter-spacing:.12em}
+.content{min-height:0;overflow:hidden;padding:18px 0 14px}.page{height:100%;min-height:0;display:none}.page.active{display:block}
+.page-head{height:47px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.page-head h2{font-size:18px;letter-spacing:.08em;margin:0 0 3px}.page-head p{margin:0;color:var(--muted);font-size:11px}.actions{display:flex;gap:8px;align-items:center}
+.grid-home{height:calc(100% - 47px);display:grid;grid-template-columns:minmax(0,1.12fr) minmax(300px,.88fr);grid-template-rows: minmax(0,1fr) 128px;gap:13px}
+.panel{background:linear-gradient(145deg,#0d2030ee,#091725f2);border:1px solid var(--line);border-radius:13px;min-width:0;min-height:0;overflow:hidden;position:relative}
+.hero{display:flex;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(circle at center,#12374b55 0,#0a1a29 52%,#081522 100%)}
+.orb{width:min(34vh,250px);aspect-ratio:1;border-radius:50%;border:1px solid #48cbe9aa;display:grid;place-items:center;position:relative;box-shadow:0 0 34px #31bfe733,inset 0 0 32px #31bfe722}
+.orb:before,.orb:after{content:"";position:absolute;inset:10%;border:1px solid #3b99bd55;border-radius:50%;transform:rotateX(68deg) rotate(22deg)}.orb:after{inset:20%;transform:rotateY(68deg) rotate(-28deg);border-color:#56d9f277}
+.core{width:42%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#d5fbff 0,#59d8f0 12%,#147caa 45%,#0c3149 70%,transparent 72%);box-shadow:0 0 35px #3ed2f2aa;animation:breath 4s ease-in-out infinite}
+@keyframes breath{50%{transform:scale(1.07);filter:brightness(1.25)}}
+.hero-label{margin-top:17px;text-align:center}.hero-label b{letter-spacing:.25em;color:#d9f8ff;font-size:12px}.hero-label small{display:block;color:var(--muted);font-size:10px;margin-top:5px;letter-spacing:.16em}
+.summary{padding:17px;display:flex;flex-direction:column;gap:13px}.section-label{font-size:10px;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}.metric-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.metric{padding:12px;border:1px solid #1b3a50;background:#0b1b2a;border-radius:10px}.metric strong{font-size:23px;font-weight:500;color:var(--cyan);font-variant-numeric:tabular-nums}.metric span{display:block;color:var(--muted);font-size:10px;margin-top:3px}
+.layer-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #183246}.layer-row b{font-size:12px;letter-spacing:.08em}.layer-row small{display:block;color:var(--muted);font-size:10px;margin-top:3px}.state{font-size:9px;letter-spacing:.12em;border:1px solid #26546a;border-radius:20px;padding:5px 8px;color:var(--green);white-space:nowrap}
+.bottom-stat{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:13px}.bottom-stat .panel{padding:15px 17px}.bottom-stat strong{display:block;font-size:18px;color:#d9f8ff;font-weight:500}.bottom-stat small{color:var(--muted);font-size:10px}
+.grid-intel{height:calc(100% - 47px);display:grid;grid-template-columns: minmax(0,1fr) minmax(290px,.8fr);gap:13px}
+.feed{padding:15px;display:flex;flex-direction:column;gap:10px}.feed-list{display:grid;gap:7px;min-height:0;overflow:hidden}.event{padding:10px 11px;border:1px solid #1c3b51;background:#0b1b2a;border-radius:9px;min-width:0}.event b{display:block;font-size:11px;line-height:1.3}.event small{display:block;color:var(--muted);font-size:9px;margin-top:5px}.source-grid{display:grid;grid-template-columns:1fr;gap:9px;padding:15px}.source{display:grid;grid-template-columns:1fr auto;align-items:center;padding:10px 11px;border:1px solid #1b3a50;border-radius:9px;background:#0b1b2a}.source b{font-size:11px}.source small{display:block;color:var(--muted);font-size:9px;margin-top:3px}
+.grid-network{height:calc(100% - 47px);display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.8fr);gap:13px}
+.network-left,.network-right{display:grid;grid-template-rows:minmax(0,1fr) minmax(0,.75fr);gap:13px;min-height:0}.list-panel{padding:14px;display:flex;flex-direction:column;gap:10px}.rows{display:grid;gap:6px;min-height:0;overflow:hidden}.row-item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 10px;border:1px solid #1b3a50;background:#0a1a28;border-radius:8px;min-width:0}.row-item b{font-size:10px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row-item small{display:block;color:var(--muted);font-size:9px;margin-top:2px}.pill{font-size:8px;border:1px solid #24536a;border-radius:20px;padding:4px 7px;color:var(--green);white-space:nowrap}.pill.warn{color:var(--amber);border-color:#765b2b}.pill.off{color:var(--red);border-color:#653444}
+.footer{display:flex;align-items:center;justify-content:space-between;color:#55758a;font-size:9px;letter-spacing:.06em;border-top:1px solid #152d40}
+.modal{position:fixed;inset:0;background:#020810eF;display:none;place-items:center;padding:20px;z-index:20}.modal.show{display:grid}.modal-card{width:min(400px,100%);background:#0c1d2c;border:1px solid #2d6681;border-radius:16px;padding:23px;box-shadow:0 20px 80px #0009}.modal-card h2{margin:0 0 7px;letter-spacing:.12em;font-size:17px}.modal-card p{margin:0 0 16px;color:var(--muted);font-size:11px}.modal-card input{width:100%;background:#071421;border:1px solid #2b5269;color:white;border-radius:9px;padding:13px;letter-spacing:.45em;font-size:20px;text-align:center;outline:none}.modal-card button{width:100%;margin-top:11px}.pair-error{color:var(--red);font-size:10px;margin-top:8px;min-height:14px}
+@media(max-width:900px){.shell{grid-template-columns:72px minmax(0,1fr)}.rail{padding:16px 8px}.brand{justify-content:center;padding:0 0 22px}.brand>div:last-child,.nav .label,.rail-foot .foot-label{display:none}.nav button{justify-content:center;padding:13px 5px}.nav .glyph{font-size:18px}.main{padding:0 16px}.grid-home{grid-template-columns:1fr 1fr}.grid-intel,.grid-network{grid-template-columns:1fr 1fr}.orb{width:min(28vh,200px)}}
+@media(max-width:620px){.shell{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 62px}.rail{grid-row:2;border:0;border-top:1px solid var(--line);padding:5px 10px;background:#081522}.brand,.rail-foot{display:none}.nav{height:100%;grid-template-columns:repeat(3,1fr);gap:5px}.nav button{display:flex;flex-direction:column;gap:2px;padding:5px;border-radius:8px;font-size:9px}.nav .label{display:block}.nav .glyph{font-size:16px}.main{grid-row:1;grid-template-rows:54px minmax(0,1fr) 22px;padding:0 11px}.top{gap:8px}.top h1{font-size:13px}.eyebrow{font-size:8px}.top-right{gap:6px}.status-chip{padding:6px 8px;font-size:8px}.clock{font-size:10px}.content{padding:11px 0 8px}.page-head{height:42px}.page-head h2{font-size:15px}.page-head p{font-size:9px}.page-head .actions button{font-size:9px;padding:7px 8px}.grid-home{height:calc(100% - 42px);grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) minmax(110px,.62fr);gap:7px}.hero{grid-column:1/-1}.orb{width:min(22vh,150px)}.hero-label{margin-top:7px}.hero-label b{font-size:10px}.hero-label small{font-size:8px}.summary{padding:9px;gap:6px}.section-label{font-size:8px}.metric-row{gap:5px}.metric{padding:7px}.metric strong{font-size:17px}.metric span{font-size:8px}.layer-row{padding:6px 0}.layer-row b{font-size:9px}.layer-row small{font-size:8px}.state{font-size:7px;padding:4px 5px}.bottom-stat{gap:7px}.bottom-stat .panel{padding:9px}.bottom-stat strong{font-size:13px}.bottom-stat small{font-size:8px}.grid-intel,.grid-network{height:calc(100% - 42px);grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,.78fr);gap:7px}.feed,.source-grid,.list-panel{padding:9px;gap:6px}.feed-list,.rows{gap:5px}.event{padding:7px}.event b{font-size:9px}.event small{font-size:8px}.source{padding:7px}.source b{font-size:9px}.source small{font-size:8px}.network-left,.network-right{gap:7px}.row-item{padding:6px 7px}.row-item b{font-size:8px}.row-item small{font-size:7px}.pill{font-size:7px;padding:3px 5px}.footer{font-size:7px}.footer span:last-child{display:none}}
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="rail">
+ <div class="brand"><div class="brand-mark">J</div><div><b>J.A.R.V.I.S.</b><small>LOCAL INTELLIGENCE</small></div></div>
+ <nav class="nav">
+  <button class="active" data-page="home"><span class="glyph">⌂</span><span class="label">Overview</span></button>
+  <button data-page="intelligence"><span class="glyph">◉</span><span class="label">Intelligence</span></button>
+  <button data-page="network"><span class="glyph">⌘</span><span class="label">Network</span></button>
+ </nav>
+ <div class="rail-foot"><span class="pulse"></span><span class="foot-label">LOCAL CORE ACTIVE<br>DESKTOP / MOBILE LINK</span></div>
+</aside>
+<main class="main">
+ <header class="top">
+  <div><div class="eyebrow">JARVIS OPERATING INTERFACE</div><h1 id="viewTitle">COMMAND CENTER</h1></div>
+  <div class="top-right"><span class="status-chip" id="coreChip">● LOCAL CORE</span><span class="clock" id="clock">--:--:--</span></div>
+ </header>
+ <section class="content">
+  <section class="page active" id="page-home">
+   <div class="page-head"><div><h2>COMMAND CENTER</h2><p>Visão operacional do núcleo local</p></div><div class="actions"><button id="refreshAll">↻ Atualizar</button></div></div>
+   <div class="grid-home">
+    <article class="panel hero"><div class="orb"><div class="core"></div></div><div class="hero-label"><b>JARVIS ONLINE</b><small id="heroSub">LOCAL EXECUTION ENVIRONMENT</small></div></article>
+    <article class="panel summary">
+     <div class="section-label">SYSTEM TELEMETRY</div>
+     <div class="metric-row"><div class="metric"><strong id="eventMetric">—</strong><span>EVENTOS INTELLIGENCE</span></div><div class="metric"><strong id="deviceMetric">—</strong><span>DISPOSITIVOS NA LAN</span></div></div>
+     <div class="layer-row"><div><b>INTELLIGENCE</b><small id="intelSummary">Núcleo local pronto</small></div><span class="state" id="intelState">READY</span></div>
+     <div class="layer-row"><div><b>NETWORK</b><small id="networkSummary">Aguardando interfaces</small></div><span class="state" id="networkState">READY</span></div>
+     <div class="layer-row"><div><b>ANDROID LINK</b><small id="androidSummary">Aguardando cliente móvel</small></div><span class="state" id="androidState">STANDBY</span></div>
+    </article>
+    <div class="bottom-stat">
+     <div class="panel"><div class="section-label">LOCAL HOST</div><strong id="hostAddress">Detectando...</strong><small>LAN <span id="lanAddress">não detectado</span> · Pair code <b id="pairCodeDisplay">------</b></small></div>
+     <div class="panel"><div class="section-label">ACTIVE CLIENTS</div><strong id="clientCount">1</strong><small>PC e dispositivos pareados</small></div>
+     <div class="panel"><div class="section-label">EXECUTION MODE</div><strong>ON-DEVICE</strong><small>Sem dependência do HUD remoto</small></div>
+    </div>
+   </div>
+  </section>
+  <section class="page" id="page-intelligence">
+   <div class="page-head"><div><h2>INTELLIGENCE LAYER</h2><p>Coleta sob demanda · síntese local · evidência preservada</p></div><div class="actions"><button id="collectIntel">⟳ Coletar fontes</button></div></div>
+   <div class="grid-intel">
+    <article class="panel feed"><div class="section-label">RECENT INTELLIGENCE EVENTS</div><div class="feed-list" id="eventList"><div class="event"><b>Nenhuma coleta executada nesta sessão.</b><small>Use “Coletar fontes” para consultar GDELT, NASA EONET e USGS.</small></div></div></article>
+    <article class="panel source-grid"><div class="section-label">SOURCE PIPELINE</div>
+     <div class="source"><div><b>GDELT</b><small>Global news index · read-only</small></div><span class="pill" id="gdeltPill">ON DEMAND</span></div>
+     <div class="source"><div><b>NASA EONET</b><small>Open natural events</small></div><span class="pill" id="eonetPill">ON DEMAND</span></div>
+     <div class="source"><div><b>USGS</b><small>Earthquake GeoJSON</small></div><span class="pill" id="usgsPill">ON DEMAND</span></div>
+     <div class="source"><div><b>GOD'S EYE VIEW</b><small id="gevState">Adapter opcional · não conectado</small></div><span class="pill warn">OPTIONAL</span></div>
+     <div class="source"><div><b>OSIRIS</b><small id="osirisState">Endpoint opcional · não verificado</small></div><span class="pill warn">OPTIONAL</span></div>
+     <div class="source"><div><b>LOCAL SYNTHESIS</b><small>Deduplicação e correlação determinística</small></div><span class="pill">READY</span></div>
+    </article>
+   </div>
+  </section>
+  <section class="page" id="page-network">
+   <div class="page-head"><div><h2>NETWORK LAYER</h2><p>Interfaces locais · cache ARP passivo · clientes pareados</p></div><div class="actions"><button id="refreshNetwork">↻ Atualizar</button></div></div>
+   <div class="grid-network">
+    <div class="network-left">
+     <article class="panel list-panel"><div class="section-label">LOCAL INTERFACES</div><div class="rows" id="interfaceList"><div class="row-item"><div><b>Carregando interfaces...</b></div></div></div></article>
+     <article class="panel list-panel"><div class="section-label">TAILSCALE / ANDROID</div><div class="rows" id="adbList"><div class="row-item"><div><b>ADB não verificado</b></div></div></div></article>
+    </div>
+    <div class="network-right">
+     <article class="panel list-panel"><div class="section-label">PASSIVE LAN INVENTORY</div><div class="rows" id="neighborList"><div class="row-item"><div><b>Consultando cache ARP...</b></div></div></div></article>
+     <article class="panel list-panel"><div class="section-label">CONNECTED CLIENTS</div><div class="rows" id="clientList"><div class="row-item"><div><b>Somente dispositivos pareados</b></div></div></div></article>
+    </div>
+   </div>
+  </section>
+ </section>
+ <footer class="footer"><span id="footerStatus">LOCAL CORE · aguardando primeira leitura</span><span id="updatedAt">--</span></footer>
+</main>
+</div>
+<div class="modal" id="pairModal"><div class="modal-card"><h2>PAIR DEVICE</h2><p>Digite o código temporário exibido no Jarvis Desktop do PC para conectar este dispositivo à rede local.</p><input id="pairCode" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"><button id="pairButton">Conectar ao Jarvis</button><div class="pair-error" id="pairError"></div></div></div>
+<script>
+(()=>{'use strict';
+const $=id=>document.getElementById(id), tokenKey='jarvis_local_access', state={token:sessionStorage.getItem(tokenKey)||'',network:null,intel:null,latest:null,bootstrap:null};
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const time=()=>new Date().toLocaleTimeString('pt-BR',{hour12:false});
+function nav(page){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));$('viewTitle').textContent=({home:'COMMAND CENTER',intelligence:'INTELLIGENCE LAYER',network:'NETWORK LAYER'})[page];}
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.page)));
+async function api(path,opts={}){const headers={'Accept':'application/json',...(opts.body?{'Content-Type':'application/json'}:{}),...(state.token?{'Authorization':'Bearer '+state.token}:{})};const r=await fetch(path,{...opts,headers,cache:'no-store'});const data=await r.json().catch(()=>({detail:'Resposta inválida do núcleo local.'}));if(!r.ok)throw new Error(data.detail||('HTTP '+r.status));return data;}
+function showPair(){ $('pairModal').classList.add('show'); }
+async function bootstrap(){try{state.bootstrap=await api('/api/bootstrap');if(state.bootstrap.local_token){state.token=state.bootstrap.local_token;sessionStorage.setItem(tokenKey,state.token);$('pairModal').classList.remove('show');$('pairCode').value=state.bootstrap.pairing_code||'';}else if(!state.token){showPair();}renderAddresses();}catch(e){$('footerStatus').textContent='CORE ERROR · '+e.message;}}
+function renderAddresses(){const list=state.bootstrap?.addresses||[];const port=location.port?':'+location.port:'';const tail=list.find(item=>item.address.startsWith('100.'));const lan=list.find(item=>!item.address.startsWith('100.'));$('hostAddress').textContent=(tail||lan)?(tail||lan).address+port:'LAN indisponível';$('lanAddress').textContent=lan?lan.address+port:'não detectado';$('pairCodeDisplay').textContent=state.bootstrap?.pairing_code||'------';$('heroSub').textContent=list.length?'LOCAL HOST · '+list.length+' INTERFACE(S)':'LOCAL LOOPBACK';}
+async function pair(){const code=$('pairCode').value.trim();$('pairError').textContent='';if(!/^\d{6}$/.test(code)){$('pairError').textContent='Informe os seis dígitos.';return;}try{const data=await api('/api/pair',{method:'POST',body:JSON.stringify({code})});state.token=data.access_token;sessionStorage.setItem(tokenKey,state.token);$('pairModal').classList.remove('show');await refreshAll();}catch(e){$('pairError').textContent=e.message;}}
+$('pairButton').addEventListener('click',pair);$('pairCode').addEventListener('keydown',e=>{if(e.key==='Enter')pair();});
+async function refreshStatus(){const data=await api('/api/status');$('clientCount').textContent=String(data.clients.length||1);$('coreChip').textContent='● LOCAL CORE ONLINE';$('footerStatus').textContent='LOCAL CORE · authenticated · '+data.clients.length+' client(s)';}
+async function refreshIntel(){state.intel=await api('/api/intelligence/status');state.latest=await api('/api/intelligence/latest');const runtime=state.intel.local_runtime||{};$('eventMetric').textContent=String(runtime.event_count??0);$('intelSummary').textContent=(runtime.event_count??0)+' evento(s) sintetizado(s)';$('intelState').textContent='LOCAL READY';renderEvents(state.latest.events||[]);renderSourceHealth(state.latest.sources||[]);const sources=state.intel.sources||[];const gev=sources.find(x=>x.id==='gods_eye_view'),osiris=sources.find(x=>x.id==='osiris');$('gevState').textContent=gev?.runtime||'não configurado';$('osirisState').textContent=osiris?.runtime||'não configurado';}
+function renderEvents(events){const list=events.slice(0,5);$('eventList').innerHTML=list.length?list.map(e=>'<div class="event"><b>'+esc(e.title)+'</b><small>'+esc(e.source_id||'source')+' · '+esc(e.domain||e.category||'event')+' · '+esc(e.observed_at||'')+'</small></div>').join(''):'<div class="event"><b>Nenhum evento coletado.</b><small>A coleta é acionada manualmente e executada no PC.</small></div>';}
+async function collectIntel(){const b=$('collectIntel');b.disabled=true;b.textContent='Coletando...';try{const data=await api('/api/intelligence/collect',{method:'POST'});state.latest=data;$('eventMetric').textContent=String(data.unique_event_count||0);$('intelSummary').textContent=(data.unique_event_count||0)+' eventos · '+(data.sources||[]).filter(s=>s.available).length+' fontes ativas';renderEvents(data.events||[]);renderSourceHealth(data.sources||[]);$('footerStatus').textContent='INTELLIGENCE · coleta local concluída';}catch(e){$('footerStatus').textContent='INTELLIGENCE ERROR · '+e.message;}finally{b.disabled=false;b.textContent='⟳ Coletar fontes';}}
+function renderSourceHealth(sources){const ids={gdelt:'gdeltPill',nasa_eonet:'eonetPill',usgs_earthquakes:'usgsPill'};for(const source of sources){const el=$(ids[source.source_id]||'');if(!el)continue;el.textContent=source.available?'ONLINE':(source.error_code||'DEGRADED');el.title=source.available?'Fonte disponível':'Falha da fonte: '+(source.error_code||'indisponível');el.className='pill'+(source.available?'':' warn');}}
+$('collectIntel').addEventListener('click',collectIntel);
+async function refreshNetwork(){state.network=await api('/api/network/status');const d=state.network;$('deviceMetric').textContent=String(d.neighbors?.length||0);$('networkSummary').textContent=(d.interfaces?.length||0)+' interface(s) · '+(d.neighbors?.length||0)+' vizinho(s)';$('networkState').textContent='LOCAL READY';$('interfaceList').innerHTML=(d.interfaces||[]).slice(0,4).map(i=>'<div class="row-item"><div><b>'+esc(i.interface)+'</b><small>'+esc(i.address)+' · '+esc(i.network)+'</small></div><span class="pill">'+esc(i.operational_status||'unknown')+'</span></div>').join('')||'<div class="row-item"><div><b>Sem interface IPv4</b></div></div>';$('neighborList').innerHTML=(d.neighbors||[]).slice(0,5).map(n=>'<div class="row-item"><div><b>'+esc(n.ip)+'</b><small>'+esc(n.mac)+'</small></div><span class="pill">ARP</span></div>').join('')||'<div class="row-item"><div><b>Cache ARP vazio</b><small>Sem sondagens ativas realizadas.</small></div></div>';const peers=(d.tailscale?.peers||[]).filter(p=>p.os==='android').slice(0,3);
+const peerRows=peers.map(p=>'<div class="row-item"><div><b>'+esc(p.hostname)+'</b><small>'+esc(p.addresses?.[0]||'Android')+' · '+esc(p.last_seen||'Tailscale')+'</small></div><span class="pill '+(p.online?'':'off')+'">'+(p.online?'ONLINE':'OFFLINE')+'</span></div>').join('');
+const adbRows=(d.android_adb?.devices||[]).slice(0,2).map(x=>'<div class="row-item"><div><b>'+esc(x.serial)+'</b><small>Android ADB</small></div><span class="pill '+(x.state==='device'?'':'warn')+'">'+esc(x.state)+'</span></div>').join('');
+$('adbList').innerHTML=peerRows+adbRows||'<div class="row-item"><div><b>Android não encontrado</b><small>Conecte o telefone ao Tailscale ou ADB.</small></div></div>';const mobileClients=(d.clients||[]).filter(x=>!['127.0.0.1','::1'].includes(x.address));const androidPeer=peers[0];if(mobileClients.length){$('androidSummary').textContent=mobileClients.length+' cliente(s) autenticado(s)';$('androidState').textContent='CONNECTED';}else if(androidPeer){$('androidSummary').textContent=androidPeer.hostname+' · '+(androidPeer.online?'Tailscale online · aguardando pareamento':'Tailscale offline');$('androidState').textContent=androidPeer.online?'ONLINE':'OFFLINE';}else{$('androidSummary').textContent='Aguardando cliente móvel';$('androidState').textContent='STANDBY';}$('clientList').innerHTML=(d.clients||[]).slice(0,5).map(c=>'<div class="row-item"><div><b>'+esc(c.address)+'</b><small>Ativo há '+esc(c.last_seen_seconds)+' s</small></div><span class="pill">PAIRED</span></div>').join('')||'<div class="row-item"><div><b>Somente PC local</b><small>Conecte Android com o código de pareamento.</small></div></div>';}
+$('refreshNetwork').addEventListener('click',()=>refreshNetwork().catch(e=>$('footerStatus').textContent=e.message));
+async function refreshAll(){try{await refreshStatus();await Promise.all([refreshIntel(),refreshNetwork()]);$('updatedAt').textContent='SYNC '+time();}catch(e){if(e.message.includes('Pareie')||e.message.includes('Sessao')){state.token='';sessionStorage.removeItem(tokenKey);showPair();}else $('footerStatus').textContent='SYNC ERROR · '+e.message;}}
+$('refreshAll').addEventListener('click',refreshAll);
+setInterval(()=>{$('clock').textContent=time();},1000);$('clock').textContent=time();
+(async()=>{await bootstrap();if(state.token){await refreshAll();setInterval(()=>{if(state.token)refreshAll();},15000);}else{setInterval(bootstrap,5000);}if(['127.0.0.1','localhost','::1'].includes(location.hostname))setInterval(bootstrap,5000);})();
+})();
+</script>
+</body>
+</html>

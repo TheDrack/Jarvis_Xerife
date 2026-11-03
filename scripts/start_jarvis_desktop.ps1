@@ -1,8 +1,10 @@
 [CmdletBinding()]
 param(
+    [int]$Port = 8766,
     [ValidateSet("home", "intelligence", "network")]
     [string]$Page = "home",
     [string]$BaseUrl = $env:JARVIS_CLOUD_BASE_URL,
+    [switch]$LoopbackOnly,
     [switch]$DebugWebView
 )
 
@@ -17,22 +19,20 @@ $pythonCandidates = @(
 if (-not $pythonCandidates) {
     throw "Python 3.10+ não encontrado. Instale Python e repita."
 }
-
-$python = $pythonCandidates[0]
-& $python -c "import webview" 2>$null
+$python = [string](@($pythonCandidates)[0])
+& $python -c "import webview, fastapi, uvicorn, httpx, psutil" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    throw "pywebview não está instalado. Instale com: python -m pip install -r requirements/desktop.txt"
+    throw "Dependências desktop ausentes. Execute: python -m pip install -r requirements/desktop.txt"
 }
 
 Push-Location $repoRoot
 try {
-    $arguments = @("-m", "app.adapters.edge.jarvis_desktop_shell", "--page", $Page)
+    $arguments = @("-m", "app.adapters.edge.jarvis_desktop_shell", "--port", "$Port")
     if ($BaseUrl) {
-        $arguments += @("--base-url", $BaseUrl)
+        $arguments += @("--base-url", $BaseUrl, "--page", $Page)
     }
-    if ($DebugWebView) {
-        $arguments += "--debug"
-    }
+    if ($LoopbackOnly) { $arguments += "--loopback-only" }
+    if ($DebugWebView) { $arguments += "--debug" }
     & $python @arguments
     exit $LASTEXITCODE
 }

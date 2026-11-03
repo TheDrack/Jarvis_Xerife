@@ -1,4 +1,5 @@
-"""Native Windows shell for the shared Jarvis cloud HUD."""
+# -*- coding: utf-8 -*-
+"""Native Windows shell for Jarvis Local Core (desktop + private LAN clients)."""
 from __future__ import annotations
 
 import argparse
@@ -12,7 +13,7 @@ PAGES = {"home": "/", "intelligence": "/intelligence", "network": "/network-devi
 
 
 def normalize_cloud_url(value: str) -> str:
-    """Validate and normalize a Jarvis origin without accepting URL tricks."""
+    """Validate and normalize a Jarvis remote origin without accepting URL tricks."""
     raw = str(value or "").strip()
     if not raw:
         raise ValueError("A URL do Jarvis está vazia.")
@@ -37,7 +38,7 @@ def normalize_cloud_url(value: str) -> str:
 
 
 def build_start_url(base_url: str, page: str = "home") -> str:
-    """Build one of the explicitly supported Jarvis pages."""
+    """Build one of the explicitly supported legacy remote pages."""
     if page not in PAGES:
         raise ValueError(f"Página inválida: {page}. Opções: {', '.join(PAGES)}")
     return f"{normalize_cloud_url(base_url)}{PAGES[page]}"
@@ -53,45 +54,58 @@ def _storage_path() -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Jarvis Desktop — interface nativa conectada ao gateway remoto.")
-    parser.add_argument("--base-url", default=os.environ.get("JARVIS_CLOUD_BASE_URL", DEFAULT_CLOUD_URL))
+    parser = argparse.ArgumentParser(description="Jarvis Desktop — núcleo local com acesso opcional pela LAN.")
+    parser.add_argument("--port", type=int, default=8766)
+    parser.add_argument("--loopback-only", action="store_true",
+                        help="Restringe o painel ao próprio PC; desativa acesso Android pela LAN.")
+    parser.add_argument(
+        "--remote-url", "--base-url", dest="remote_url",
+        default=os.environ.get("JARVIS_CLOUD_BASE_URL", ""),
+        help="Abre explicitamente o HUD remoto legado em vez do núcleo local.",
+    )
     parser.add_argument("--page", choices=tuple(PAGES), default="home")
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args(argv)
-    try:
-        start_url = build_start_url(args.base_url, args.page)
-    except ValueError as exc:
-        parser.error(str(exc))
+    if not 1024 <= args.port <= 65535:
+        parser.error("--port deve estar entre 1024 e 65535.")
     try:
         import webview
     except ImportError:
         print("Dependência ausente: instale com python -m pip install -r requirements/desktop.txt.", file=sys.stderr)
         return 2
-    webview.create_window(
-        "JARVIS · Desktop",
-        url=start_url,
-        width=1440,
-        height=900,
-        min_size=(960, 640),
-        resizable=True,
-        text_select=True,
-        background_color="#070b13",
-    )
+
+    server = None
     try:
+        if args.remote_url:
+            start_url = build_start_url(args.remote_url, args.page)
+        else:
+            from app.adapters.edge.jarvis_desktop_local import run_local_server
+            host = "127.0.0.1" if args.loopback_only else "0.0.0.0"
+            server, _thread = run_local_server(host=host, port=args.port)
+            start_url = f"http://127.0.0.1:{args.port}/"
+        webview.create_window(
+            "JARVIS · Desktop",
+            url=start_url,
+            width=1500,
+            height=940,
+            min_size=(1024, 680),
+            resizable=True,
+            text_select=True,
+            background_color="#07111d",
+        )
         webview.start(
             gui="edgechromium",
             debug=args.debug,
             private_mode=False,
             storage_path=str(_storage_path()),
         )
+        return 0
     except Exception as exc:
-        print(
-            "Não foi possível iniciar o WebView2. Verifique a instalação do Microsoft Edge WebView2 Runtime. "
-            f"Detalhe: {exc}",
-            file=sys.stderr,
-        )
+        print(f"Falha ao iniciar Jarvis Desktop: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 3
-    return 0
+    finally:
+        if server is not None:
+            server.should_exit = True
 
 
 if __name__ == "__main__":

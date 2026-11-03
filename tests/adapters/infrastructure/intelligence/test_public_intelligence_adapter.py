@@ -161,7 +161,7 @@ def test_collection_reports_partial_source_failure(adapter_factory):
         "nasa_eonet",
         "usgs_earthquakes",
     }
-    assert all(source.error_code == "RuntimeError" for source in batch.sources)
+    assert all(source.error_code == "HTTP_503" for source in batch.sources)
 
 
 def test_nexus_execute_reports_capabilities_without_network_io():
