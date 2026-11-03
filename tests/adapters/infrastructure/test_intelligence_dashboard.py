@@ -61,7 +61,7 @@ def test_status_reports_history_migration_separately_from_remote_application():
 
     assert status["history"]["migration_file_present"] is True
     assert status["history"]["remote_migration_state"] == "unverified"
-    assert status["history"]["persistence_adapter"] == "implemented_not_connected"
+    assert status["history"]["persistence_adapter"] == "implemented"
     assert status["history"]["production_write_performed"] is False
 
 
