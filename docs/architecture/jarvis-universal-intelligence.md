@@ -108,3 +108,16 @@ Domain contracts and application services remain OS-neutral. Host-specific sched
 ## Status semantics
 
 Code exists, unit-tested, CI-tested, connected, authorized, scheduled and end-to-end verified are separate states. Do not mark a source or workflow production-ready without evidence.
+
+## Operational dashboard 0.1
+
+The permanent Universal Intelligence surface is served by the existing FastAPI application at `/intelligence`. The authenticated read-only status contract is `GET /v1/intelligence/status`; the main HUD links to the dashboard. The browser reuses the existing `jarvis_auth_token` session token and refreshes status every 15 seconds.
+
+The dashboard reports implementation and configuration states separately:
+- `implemented` means the adapter/core code exists; it does not mean a source is connected or scheduled.
+- `configured_not_probed` means the corresponding environment setting is present; it is not a health check.
+- `not_configured` and `not_scheduled` are explicit non-operational states.
+- `migration_defined` means the migration file exists in the deployed repository image; remote Supabase application remains `unverified`.
+- Event/observation counts remain null while no collection runtime is connected. The UI must not translate missing telemetry into zero events or fabricate map markers.
+
+The status endpoint is authenticated and returns no provider URL, token, secret, or raw payload. It performs no source calls and no database writes. The dashboard is therefore a truthful implementation/connection monitor, not yet the live intelligence feed. A future collector and history adapter must expose separately authorized read contracts before real event/observation data is rendered.

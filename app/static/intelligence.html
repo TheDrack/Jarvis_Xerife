@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#070b13">
+<title>JARVIS · Universal Intelligence</title>
+<style>
+:root{color-scheme:dark;--bg:#070b13;--panel:#0d1421;--panel2:#101b2b;--line:#1c2b40;--text:#e6f0fb;--muted:#8ca0b8;--cyan:#36d9f5;--blue:#6c9cff;--green:#42d6a0;--amber:#f3bd62;--red:#ff7584}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 12% -20%,#12304a 0,transparent 40%),var(--bg);color:var(--text);font:14px/1.5 Inter,Segoe UI,Arial,sans-serif}
+a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;padding:24px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}.brand{display:flex;align-items:center;gap:14px}.mark{width:46px;height:46px;border:1px solid #2b7893;border-radius:14px;display:grid;place-items:center;color:var(--cyan);font-size:23px;box-shadow:0 0 28px #21c9e51b}.eyebrow{font-size:10px;letter-spacing:2.2px;color:var(--cyan);font-weight:700}.brand h1{font-size:22px;margin:2px 0 0;letter-spacing:1px}.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.btn{border:1px solid #28516a;background:#102334;color:var(--cyan);border-radius:9px;padding:9px 13px;font-weight:650;cursor:pointer}.btn:hover{background:#17334a}.status-pill{border:1px solid #735d32;color:var(--amber);background:#2b2415;border-radius:99px;padding:6px 11px;font-size:11px;font-weight:700;letter-spacing:.6px}.status-pill.ok{border-color:#246e58;color:var(--green);background:#10271f}.hero{display:grid;grid-template-columns:1.45fr .8fr;gap:16px;margin-bottom:16px}.panel{background:linear-gradient(145deg,#101a29f2,#0b111cf5);border:1px solid var(--line);border-radius:15px;padding:18px;box-shadow:0 10px 40px #0002}.hero-main{min-height:190px;position:relative;overflow:hidden}.hero-main:after{content:"";position:absolute;width:240px;height:240px;border:1px solid #2dd4f51e;border-radius:50%;right:-70px;top:-80px;box-shadow:0 0 0 24px #2dd4f50a,0 0 0 48px #2dd4f507}.hero-main h2{font-size:25px;margin:8px 0}.hero-main p{color:var(--muted);max-width:620px;margin:0}.timestamp{margin-top:22px;color:#7891a9;font:11px ui-monospace,monospace}.metric{display:flex;flex-direction:column;justify-content:center;gap:7px}.metric strong{font-size:34px;color:var(--cyan);font-weight:600}.metric span{color:var(--muted)}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:25px 0 12px}.section-head h2{font-size:13px;letter-spacing:1.6px;margin:0;color:#b8cbe0}.section-head small{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.source{min-height:160px}.source-top{display:flex;justify-content:space-between;align-items:center;gap:10px}.source h3{font-size:15px;margin:0}.state{font-size:10px;letter-spacing:.6px;border-radius:99px;padding:5px 8px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}.state.good{color:var(--green);border-color:#246e58;background:#10271f}.state.warn{color:var(--amber);border-color:#735d32;background:#2b2415}.state.off{color:#a3b1c2;border-color:#34445a;background:#182231}.source p{color:var(--muted);font-size:12px;margin:14px 0 0}.pipeline{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.stage{position:relative;min-height:148px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px}.stage-num{font:11px ui-monospace,monospace;color:var(--cyan)}.stage h3{font-size:13px;margin:9px 0}.stage p{font-size:11px;color:var(--muted);margin:0}.stage .state{display:inline-block;margin-top:13px}.stage.done{border-top:2px solid var(--green)}.stage.progress{border-top:2px solid var(--cyan)}.stage.pending{border-top:2px solid #52647a}.columns{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.rows{display:grid;gap:10px}.row-item{display:flex;justify-content:space-between;gap:15px;padding:11px 0;border-bottom:1px solid #1b293a}.row-item:last-child{border-bottom:0}.row-item span{color:var(--muted)}.notice{border-left:2px solid var(--amber);padding:9px 12px;margin:9px 0;color:#b7c5d4;background:#171b20;font-size:12px}.empty{padding:28px 14px;text-align:center;border:1px dashed #2a3a4e;border-radius:11px;color:var(--muted)}.empty strong{display:block;color:#c4d4e5;margin-bottom:5px}.footer{margin:25px 0 8px;color:#63768d;font-size:11px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.error{color:var(--red)}@media(max-width:950px){.hero,.columns{grid-template-columns:1fr}.pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr 1fr}}@media(max-width:580px){.shell{padding:14px}.top{align-items:flex-start;flex-direction:column}.grid,.pipeline{grid-template-columns:1fr}.hero-main h2{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="top">
+  <div class="brand"><div class="mark">◈</div><div><div class="eyebrow">JARVIS / COGNITIVE SYSTEMS</div><h1>UNIVERSAL INTELLIGENCE</h1></div></div>
+  <div class="actions"><span id="overall" class="status-pill">VERIFICANDO ESTADO</span><button id="refresh" class="btn">↻ Atualizar</button><a class="btn" href="/">HUD principal</a></div>
+</header>
+<section class="hero">
+  <article class="panel hero-main"><div class="eyebrow">SITUAÇÃO OPERACIONAL</div><h2 id="headline">Inteligência em integração</h2><p id="summary">Consolidando fontes, normalização, histórico durável e apresentação em uma única superfície operacional.</p><div class="timestamp" id="updated">Aguardando primeira leitura autenticada…</div></article>
+  <article class="panel metric"><div class="eyebrow">TELEMETRIA DISPONÍVEL</div><strong id="eventCount">—</strong><span id="eventCaption">Eventos recebidos pelo runtime</span><div class="notice" id="telemetryNote">Aguardando confirmação do serviço de coleta.</div></article>
+</section>
+<div class="section-head"><h2>01 / FONTES E ADAPTADORES</h2><small>Configuração não equivale a conectividade</small></div>
+<section class="grid" id="sources"><article class="panel source"><p>Carregando estado das fontes…</p></article></section>
+<div class="section-head"><h2>02 / PIPELINE COGNITIVO</h2><small id="pipelineSummary">Estados reportados pela API</small></div>
+<section class="pipeline" id="pipeline"></section>
+<div class="section-head"><h2>03 / HISTÓRICO DURÁVEL E SEGURANÇA</h2><small>Persistência server-side</small></div>
+<section class="columns">
+  <article class="panel"><div class="rows" id="historyRows"><div class="row-item"><span>Schema de histórico</span><b>Verificando…</b></div></div></article>
+  <article class="panel"><div class="eyebrow">LIMITES ATUAIS</div><div id="limitations"></div></article>
+</section>
+<div class="section-head"><h2>04 / FLUXO DE EVENTOS</h2><small>Somente dados reais e rastreáveis</small></div>
+<section class="panel"><div class="empty" id="feed"><strong>Feed ainda não conectado</strong>O runtime de coleta não está ligado ao painel. Nenhum evento fictício será exibido como dado real.</div></section>
+<footer class="footer"><span>JARVIS · Universal Intelligence · interface nativa</span><span>Atualização automática a cada 15 segundos · API autenticada</span></footer>
+</div>
+<script>
+(() => {
+  const TOKEN_KEY='jarvis_auth_token';
+  const $=id=>document.getElementById(id);
+  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const labels={
+    not_configured:'NÃO CONFIGURADO',configured_not_probed:'CONFIGURADO · NÃO TESTADO',
+    not_scheduled:'NÃO AGENDADO',implemented:'IMPLEMENTADO',migration_defined:'MIGRATION DEFINIDA',
+    not_implemented:'NÃO IMPLEMENTADO',in_progress:'EM IMPLEMENTAÇÃO',unknown:'DESCONHECIDO',
+    schema_ready:'SCHEMA PREPARADO'
+  };
+  const tone=state=>['implemented','migration_defined'].includes(state)?'good':['configured_not_probed','in_progress'].includes(state)?'warn':'off';
+  const label=state=>labels[state]||String(state||'INDEFINIDO').replaceAll('_',' ').toUpperCase();
+  function showError(message){
+    $('overall').textContent='API INDISPONÍVEL';$('overall').className='status-pill';
+    $('headline').textContent='Não foi possível confirmar o estado';
+    $('summary').textContent=message;
+    $('updated').textContent='Verifique a sessão e a disponibilidade da API.';
+  }
+  function render(data){
+    $('overall').textContent='INTEGRAÇÃO PARCIAL';$('overall').className='status-pill';
+    $('headline').textContent='Camadas de inteligência em integração';
+    $('summary').textContent='Fontes, síntese determinística e schema de histórico identificados. Coleta e persistência ainda não estão conectadas ao runtime.';
+    $('updated').textContent='Última leitura: '+new Date(data.generated_at).toLocaleString('pt-BR');
+    const plane=data.data_plane||{};
+    $('eventCount').textContent=plane.available&&Number.isFinite(plane.event_count)?plane.event_count:'—';
+    $('eventCaption').textContent=plane.available?'Eventos no snapshot atual':'Eventos recebidos pelo runtime';
+    $('telemetryNote').textContent=plane.available?'Telemetria fornecida pelo runtime.':'Coleta não conectada; ausência de dados não significa ausência de eventos.';
+    $('sources').innerHTML=(data.sources||[]).map(source=>'<article class="panel source"><div class="source-top"><h3>'+esc(source.label)+'</h3><span class="state '+tone(source.runtime)+'">'+esc(label(source.runtime))+'</span></div><p>'+esc(source.details)+'</p></article>').join('');
+    const stages=data.pipeline||[];
+    const completed=stages.filter(item=>['implemented','migration_defined'].includes(item.state)).length;
+    $('pipelineSummary').textContent=completed+' de '+stages.length+' etapas com implementação/schema identificados';
+    $('pipeline').innerHTML=stages.map((stage,index)=>{
+      const cls=['implemented','migration_defined'].includes(stage.state)?'done':stage.state==='in_progress'?'progress':'pending';
+      return '<article class="stage '+cls+'"><div class="stage-num">STAGE / 0'+(index+1)+'</div><h3>'+esc(stage.label)+'</h3><p>'+esc(stage.detail)+'</p><span class="state '+tone(stage.state)+'">'+esc(label(stage.state))+'</span></article>';
+    }).join('');
+    const history=data.history||{},security=data.security||{};
+    const rows=[
+      ['Arquivo de migration',history.migration_file_present?'Presente no repositório':'Não localizado'],
+      ['Aplicação remota no Supabase',label(history.remote_migration_state)],
+      ['Adaptador de persistência',label(history.persistence_adapter)],
+      ['Escrita em produção nesta etapa',history.production_write_performed?'Sim':'Não'],
+      ['Endpoint de status',security.status_endpoint_authenticated?'Autenticado':'Não confirmado'],
+      ['Credenciais de provedores no browser',security.browser_receives_provider_credentials?'Expostas':'Não expostas']
+    ];
+    $('historyRows').innerHTML=rows.map(([name,value])=>'<div class="row-item"><span>'+esc(name)+'</span><b>'+esc(value)+'</b></div>').join('');
+    $('limitations').innerHTML=(data.limitations||[]).map(item=>'<div class="notice">'+esc(item)+'</div>').join('');
+    if(plane.available){
+      $('feed').innerHTML='<strong>Feed de eventos disponível</strong>'+esc(plane.event_count)+' eventos e '+esc(plane.observation_count)+' observações no snapshot.';
+    }else{
+      $('feed').innerHTML='<strong>Feed ainda não conectado</strong>'+esc(plane.reason||'Sem runtime de coleta disponível.')+' Nenhum evento fictício será exibido como dado real.';
+    }
+  }
+  async function load(){
+    const token=localStorage.getItem(TOKEN_KEY);
+    if(!token){showError('Sessão não encontrada. Entre pelo HUD principal e abra novamente este painel.');return;}
+    $('refresh').disabled=true;$('refresh').textContent='Consultando…';
+    try{
+      const response=await fetch('/v1/intelligence/status',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+      if(response.status===401){showError('Sessão expirada ou inválida. Entre novamente pelo HUD principal.');return;}
+      if(!response.ok)throw new Error('API respondeu HTTP '+response.status);
+      render(await response.json());
+    }catch(error){showError(error.message||'Falha de comunicação com a API.');}
+    finally{$('refresh').disabled=false;$('refresh').textContent='↻ Atualizar';}
+  }
+  $('refresh').addEventListener('click',load);
+  load();setInterval(load,15000);
+})();
+</script>
+</body>
+</html>
