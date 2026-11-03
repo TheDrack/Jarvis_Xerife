@@ -159,12 +159,14 @@ def test_desktop_interface_is_single_viewport_and_uses_local_api():
 def test_intelligence_collection_resolves_local_services_through_nexus(monkeypatch):
     from app.core.nexus import nexus
 
+    from app.domain.intelligence.contracts import IntelligenceBatch
+
     class FakeAdapter:
         closed = False
 
         def collect_public_events(self, limit):
             assert limit == 20
-            return {"batch": True}
+            return IntelligenceBatch()
 
         def close(self):
             self.closed = True
@@ -176,7 +178,7 @@ def test_intelligence_collection_resolves_local_services_through_nexus(monkeypat
 
     class FakeEngine:
         def process(self, batch):
-            assert batch == {"batch": True}
+            assert isinstance(batch, IntelligenceBatch)
             return FakeReport()
 
     adapter = FakeAdapter()
@@ -223,3 +225,91 @@ def test_cinematic_hud_assets_and_fullscreen_controls_are_served():
     assert "requestFullscreen" in html.text
     assert "prefers-reduced-motion" in html.text
     assert "hud-enter" in html.text
+
+def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch):
+    from app.core.nexus import nexus
+    from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
+    import app.adapters.infrastructure.intelligence.gods_eye_mcp_adapter as gev_module
+
+    calls = []
+
+    class FakePublicAdapter:
+        def collect_public_events(self, limit):
+            assert limit == 20
+            return IntelligenceBatch(sources=(SourceHealth(source_id="public_intelligence", available=True),))
+
+        def close(self):
+            calls.append("public_closed")
+
+    class FakeOsirisAdapter:
+        def __init__(self):
+            calls.append("osiris_created")
+
+        def collect_events(self, limit):
+            assert limit == 20
+            calls.append("osiris_collected")
+            return IntelligenceBatch(sources=(SourceHealth(source_id="osiris_earthquakes", available=True),))
+
+        def close(self):
+            calls.append("osiris_closed")
+
+    class FakeGevAdapter:
+        def __init__(self, **kwargs):
+            assert kwargs["area"] == {"west": -80.0, "south": -40.0, "east": -79.0, "north": -39.0}
+            assert kwargs["limit"] == 50
+            calls.append("gev_created")
+
+        async def collect_observations(self):
+            calls.append("gev_collected")
+            return IntelligenceBatch(sources=(SourceHealth(source_id="gods_eye_view", available=True),))
+
+    class FakeReport:
+        def model_dump(self, mode):
+            assert mode == "json"
+            return {
+                "events": [],
+                "observations": [],
+                "sources": [
+                    {"source_id": "public_intelligence", "available": True},
+                    {"source_id": "osiris_earthquakes", "available": True},
+                    {"source_id": "gods_eye_view", "available": True},
+                ],
+                "unique_event_count": 0,
+                "unique_observation_count": 0,
+            }
+
+    class FakeEngine:
+        def process(self, batch):
+            assert {item.source_id for item in batch.sources} == {
+                "public_intelligence", "osiris_earthquakes", "gods_eye_view"
+            }
+            return FakeReport()
+
+    services = {
+        "PublicIntelligenceAdapter": FakePublicAdapter(),
+        "IntelligenceCore": FakeEngine(),
+        "OsirisRestAdapter": FakeOsirisAdapter(),
+    }
+    monkeypatch.setattr(nexus, "resolve", lambda target_id, **_kwargs: services[target_id])
+    monkeypatch.setattr(gev_module, "GodsEyeMcpAdapter", FakeGevAdapter)
+    monkeypatch.setenv("JARVIS_OSIRIS_API_BASE_URL", "https://osirisai.live")
+    monkeypatch.setenv("JARVIS_GEV_AREA_WEST", "-80")
+    monkeypatch.setenv("JARVIS_GEV_AREA_SOUTH", "-40")
+    monkeypatch.setenv("JARVIS_GEV_AREA_EAST", "-79")
+    monkeypatch.setenv("JARVIS_GEV_AREA_NORTH", "-39")
+
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    response = client.post(
+        "/api/intelligence/collect",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    assert calls == [
+        "osiris_created", "osiris_collected", "gev_created", "gev_collected",
+        "public_closed", "osiris_closed",
+    ]
+    assert {item["source_id"] for item in response.json()["sources"]} == {
+        "public_intelligence", "osiris_earthquakes", "gods_eye_view"
+    }

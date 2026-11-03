@@ -1,7 +1,9 @@
 """Local-first Jarvis Desktop API shared by the Windows shell and LAN browsers."""
 from __future__ import annotations
 
+import asyncio
 import ipaddress
+import os
 import json
 import secrets
 import shutil
@@ -17,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from app.adapters.edge.network_discovery_adapter import discover_devices, network_interfaces
 from app.adapters.infrastructure.routers.intelligence_dashboard import build_intelligence_status
+from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
@@ -276,24 +279,48 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
     @app.get("/api/intelligence/status")
     async def intelligence_status(_client: str = Depends(require_local_token)) -> dict[str, Any]:
         payload = build_intelligence_status()
+        latest = state.last_intelligence or {}
+        latest_health = {
+            source.get("source_id"): source
+            for source in latest.get("sources", [])
+            if isinstance(source, dict) and source.get("source_id")
+        }
         for source in payload.get("sources", []):
-            if source.get("id") == "public_intelligence":
+            source_id = source.get("id")
+            if source_id == "public_intelligence":
                 source["runtime"] = "local_on_demand"
-                source["details"] = "Coleta pública executada pelo núcleo local sob demanda."
+                source["details"] = "GDELT, NASA EONET e USGS são coletados sob demanda pelo núcleo local."
+            elif source_id == "osiris":
+                health = [value for key, value in latest_health.items() if key.startswith("osiris_")]
+                if health:
+                    available = sum(bool(value.get("available")) for value in health)
+                    source["runtime"] = "healthy" if available == len(health) else ("degraded" if available else "unavailable")
+                    source["details"] = f"{available}/{len(health)} rotas OSIRIS disponíveis na última coleta."
+            elif source_id == "gods_eye_view" and "gods_eye_view" in latest_health:
+                health = latest_health["gods_eye_view"]
+                source["runtime"] = "healthy" if health.get("available") else "unavailable"
+                source["details"] = "Estado observado na última consulta MCP read-only."
+        payload["data_plane"] = {
+            "available": bool(latest_health and any(item.get("available") for item in latest_health.values())),
+            "reason": None if latest_health and any(item.get("available") for item in latest_health.values()) else "no_source_available",
+            "event_count": latest.get("unique_event_count", 0),
+            "observation_count": latest.get("unique_observation_count", 0),
+            "last_collection_at": latest.get("collected_at"),
+        }
         payload["local_runtime"] = {
             "execution": "local",
             "engine": "IntelligenceCore",
             "collection": "on_demand",
-            "last_collection_at": state.last_intelligence.get("collected_at") if state.last_intelligence else None,
-            "event_count": state.last_intelligence.get("unique_event_count", 0) if state.last_intelligence else 0,
-            "sources": ["GDELT", "NASA EONET", "USGS"],
+            "last_collection_at": latest.get("collected_at"),
+            "event_count": latest.get("unique_event_count", 0),
+            "observation_count": latest.get("unique_observation_count", 0),
+            "sources": ["GDELT", "NASA EONET", "USGS", "OSIRIS", "God's Eye View"],
         }
         return payload
 
     @app.post("/api/intelligence/collect")
     async def collect_intelligence(_client: str = Depends(require_local_token)) -> dict[str, Any]:
         from app.core.nexus import nexus
-
         adapter = nexus.resolve(
             "PublicIntelligenceAdapter",
             hint_path="app.adapters.infrastructure.intelligence.public_intelligence_adapter.py",
@@ -304,12 +331,71 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             hint_path="app.application.services.intelligence_core.py",
             use_cache=False,
         )
+        osiris = None
+        gev = None
         try:
             if not callable(getattr(adapter, "collect_public_events", None)):
                 raise HTTPException(status_code=503, detail="PublicIntelligenceAdapter indisponível no Nexus local.")
             if not callable(getattr(engine, "process", None)):
                 raise HTTPException(status_code=503, detail="IntelligenceCore indisponível no Nexus local.")
-            batch = adapter.collect_public_events(limit=20)
+
+            public_batch = adapter.collect_public_events(limit=20)
+            if not isinstance(public_batch, IntelligenceBatch):
+                public_batch = IntelligenceBatch.model_validate(public_batch)
+
+            # OSIRIS is optional. Its adapter returns explicit NotConfigured health
+            # without making network requests when no HTTPS origin is configured.
+            if os.getenv("JARVIS_OSIRIS_API_BASE_URL", "").strip():
+                osiris = nexus.resolve(
+                    "OsirisRestAdapter",
+                    hint_path="app.adapters.infrastructure.intelligence.osiris_rest_adapter.py",
+                    use_cache=False,
+                )
+                osiris_batch = await asyncio.wait_for(
+                    asyncio.to_thread(osiris.collect_events, 20),
+                    timeout=55,
+                )
+            else:
+                osiris_batch = IntelligenceBatch(
+                    sources=tuple(
+                        SourceHealth(source_id=source_id, available=False,
+                                     error_code="NotConfigured")
+                        for source_id in (
+                            "osiris_earthquakes", "osiris_fires",
+                            "osiris_news", "osiris_weather",
+                        )
+                    )
+                )
+
+            area_names = ("WEST", "SOUTH", "EAST", "NORTH")
+            area_values = {name: os.getenv(f"JARVIS_GEV_AREA_{name}", "").strip() for name in area_names}
+            if all(area_values.values()):
+                try:
+                    area = {name.lower(): float(value) for name, value in area_values.items()}
+                    from app.adapters.infrastructure.intelligence.gods_eye_mcp_adapter import GodsEyeMcpAdapter
+                    gev = GodsEyeMcpAdapter(
+                        area=area,
+                        api_base=os.getenv("JARVIS_GEV_API_BASE_URL", "http://127.0.0.1:4173"),
+                        limit=50,
+                        timeout_seconds=8,
+                    )
+                    gev_batch = await asyncio.wait_for(gev.collect_observations(), timeout=90)
+                except (ImportError, TypeError, ValueError, OSError, asyncio.TimeoutError) as exc:
+                    gev_batch = IntelligenceBatch(
+                        sources=(SourceHealth(source_id="gods_eye_view", available=False,
+                                              error_code=type(exc).__name__),)
+                    )
+            else:
+                gev_batch = IntelligenceBatch(
+                    sources=(SourceHealth(source_id="gods_eye_view", available=False,
+                                          error_code="AreaNotConfigured"),)
+                )
+
+            batch = IntelligenceBatch(
+                events=tuple(public_batch.events) + tuple(osiris_batch.events),
+                observations=tuple(public_batch.observations) + tuple(osiris_batch.observations) + tuple(gev_batch.observations),
+                sources=tuple(public_batch.sources) + tuple(osiris_batch.sources) + tuple(gev_batch.sources),
+            )
             report = engine.process(batch)
             payload = report.model_dump(mode="json")
             payload["collected_at"] = datetime.now(timezone.utc).isoformat()
@@ -320,6 +406,10 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             close = getattr(adapter, "close", None)
             if callable(close):
                 close()
+            if osiris is not None:
+                close_osiris = getattr(osiris, "close", None)
+                if callable(close_osiris):
+                    close_osiris()
 
     @app.get("/api/intelligence/latest")
     async def latest_intelligence(_client: str = Depends(require_local_token)) -> dict[str, Any]:
