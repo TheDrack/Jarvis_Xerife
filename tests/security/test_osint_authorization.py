@@ -283,7 +283,12 @@ class TestOsintPiiSanitization:
     ):
         """Email targets must not leak through filenames, metadata, audit records or logs."""
         monkeypatch.chdir(tmp_path)
-        adapter = self._make_adapter(permissive_authorizer, mock_secrets, redactor, tmp_path)
+        adapter = EagleOsintAdapter(
+            secrets_provider=mock_secrets,
+            pii_redactor=redactor,
+            authorizer=permissive_authorizer,
+            recon_dir=tmp_path,
+        )
 
         with patch.object(adapter, "search", return_value={"status": "fixture"}):
             result = adapter.execute(
