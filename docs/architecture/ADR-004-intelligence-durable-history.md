@@ -31,18 +31,18 @@ The existing \`execution_plan_events\` journal belongs to task execution. \`jarv
 - Observation history preserves provider identity and timestamp boundaries; it does not infer entity continuity or cross-provider identity.
 - JSONB retains the normalized contract while indexes support the first identity/time access patterns. Additional indexes should follow measured query plans.
 - The service-role key must remain server-side. The persistence adapter must use the existing server-only Supabase admin-client factory and fail closed when that credential is unavailable; it must never fall back to the public client.
-- The migration is prepared locally only. No production schema or data has been changed.
+- The history tables are present in the connected Supabase project `saibtpdehhprttqlgqdt` and RLS is enabled. The remote ledger records version `20261103184307` under the name `20261103100304_intelligence_history`, while the repository migration filename still starts with `20261103100304`. The main `Supabase Preview` check currently fails with `Remote migration versions not found in local migrations directory`. This audit performed no DDL, migration repair or data writes. Exact grants for `anon`, `authenticated` and `service_role` remain unverified because the connector denied read-only SQL introspection.
 
 ## Follow-up implementation
 
 1. **Application port and server-side adapter:** implemented in the incremental history-adapter PR. The adapter obtains credentials only through the existing service-role-only factory and fails closed when unavailable.
 2. **Canonical serialization and idempotency:** implemented with SHA-256 semantic hashes and Supabase upserts using ignore-duplicates. Event hashes exclude polling and evidence-collection timestamps; observation hashes preserve snapshot time while excluding evidence-collection timestamps.
-3. **Runtime connection:** still pending. The adapter is not called by the collection endpoint or scheduler; this increment performs no database writes.
-4. **Database integration verification:** pending. Unit tests use a fake Supabase client; both tables still require tests against a disposable local/development PostgreSQL database, including duplicate replay, changed event versions, different observation times, same-time conflicts, RLS and role grants.
+3. **Runtime connection:** the adapter is wired to the authenticated on-demand collection endpoint by PR #715. Writes remain behind `JARVIS_INTELLIGENCE_HISTORY_ENABLED`, documented as `false` by default. The deployed flag value and a successful production insert/reload have not been verified.
+4. **Database integration verification:** partial. The remote tables exist and RLS is enabled, but exact table/function grants and adapter insert/reload behavior remain unverified. Run PostgreSQL integration tests in a disposable environment and a read-only role-privilege audit before enabling the feature flag.
 5. Reconcile local migration filenames with the connected project's existing migration ledger before any remote migration operation.
 6. Define retention and archival policy before scheduling continuous observation ingestion.
 
-A successful adapter unit test is not evidence that the migration is applied, that the service-role credential exists, or that durable history is operational.
+A successful adapter unit test or the presence of remote tables is not evidence that the service-role grants are correct, the deployed credential is available, or an application insert/reload succeeds.
 ## Migration
 
 - \`supabase/migrations/20261103100304_intelligence_history.sql\`
