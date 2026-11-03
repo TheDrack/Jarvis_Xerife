@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 _RECON_DIR = Path("data/recon")
 _EAGLE_BASE_URL = "https://api.eagle-osint.io/v1"
+
+
 class EagleOsintAdapter(OsintProvider, NexusComponent):
     """Adapter that calls the Eagle OSINT API and persists results in .jrvs format.
 
@@ -103,7 +105,7 @@ class EagleOsintAdapter(OsintProvider, NexusComponent):
             safe_error = self._redactor.sanitize(str(exc))
             logger.warning("🚫 [EagleOsint] Busca bloqueada para usuário '%s': %s", safe_user, safe_error)
             self._write_audit(user=safe_user, target=query, authorized=False, error=safe_error)
-            return {"success": False, "error": str(exc)}
+            return {"success": False, "error": safe_error}
 
         self._write_audit(user=user, target=query, authorized=True)
 
@@ -173,7 +175,7 @@ class EagleOsintAdapter(OsintProvider, NexusComponent):
         """Sanitize *data* via PiiRedactor and persist as a .jrvs dossier.
 
         Args:
-            entity: Target entity name (used as filename stem).
+            entity: Target entity name; only its redacted form is stored in metadata.
             data: Raw OSINT results dict.
 
         Returns:
