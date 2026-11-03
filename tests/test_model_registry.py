@@ -160,7 +160,7 @@ def test_runtime_bindings_resolve_exact_provider_for_registered_profile():
 def test_runtime_bindings_reject_missing_provider_adapter():
     bindings = ModelRuntimeBindings()
 
-    from app.application.ports.model_runtime import ModelRuntimeError\n\n    with pytest.raises(ModelRuntimeError, match="No runtime adapter"):
+    from app.application.ports.model_runtime import ModelRuntimeError.raises(ModelRuntimeError, match="No runtime adapter"):
         bindings.resolve(make_profile("model-a", "provider-missing"))
 
 
@@ -171,7 +171,7 @@ def test_runtime_bindings_reject_unavailable_model_before_dispatch():
     )
     bindings = ModelRuntimeBindings({"provider-a": FakeRuntime("provider-a")})
 
-    from app.application.ports.model_runtime import ModelRuntimeError\n\n    with pytest.raises(ModelRuntimeError, match="marked unavailable"):
+    from app.application.ports.model_runtime import ModelRuntimeError.raises(ModelRuntimeError, match="marked unavailable"):
         bindings.resolve(profile)
 
 
