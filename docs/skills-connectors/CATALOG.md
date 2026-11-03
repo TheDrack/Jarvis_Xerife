@@ -37,6 +37,14 @@
 - Initial read-only sources registered in Nexus/Tool Registry: GDELT DOC article search, NASA EONET open events, and USGS all-day earthquake feed. The personal/entity Eagle OSINT adapter remains separate.
 - These manifests are descriptive and the current production ToolAuthorizationPolicy is still not wired; do not claim live dispatcher execution. Source adapters are not yet scheduled, persisted, briefed, or rendered on the geospatial surface.
 
+## Optional God's Eye View MCP observation adapter
+
+- Adapter: `app/adapters/infrastructure/intelligence/gods_eye_mcp_adapter.py`; port: `app/application/ports/intelligence_observation_source.py`.
+- Opt-in local Edge integration only. It discovers the live MCP tool catalog and calls only allowlisted query tools with `annotations.readOnlyHint=true`; configured area is bounded to 10 degrees per side and results are capped.
+- Requires the optional Edge MCP SDK and an explicit local checkout path in `JARVIS_GEV_MCP_ENTRYPOINT`. It accepts only a loopback app origin. It is not registered in Nexus, scheduled, persisted, or live-instance verified.
+- Aircraft, vessel and satellite snapshots become provenance-preserving `IntelligenceObservation` records. The adapter does not call UI/action tools, ingest CCTV/ALPR, resolve identity across providers, or establish track continuity.
+- Unit tests use an injected fake MCP session; a live probe requires a user-configured local GEV checkout and running app.
+
 ## Portable Jarvis skills
 
 | Skill | Use it for | Canonical entry point |
