@@ -38,6 +38,8 @@ def test_async_actions_expose_busy_state_and_restore_controls():
 def test_status_and_pairing_errors_are_announced_accessibly():
     assert 'id="footerStatus" role="status" aria-live="polite" aria-atomic="true"' in HTML
     assert 'id="pairError" role="alert"' in HTML
+    assert 'aria-label="Código temporário de pareamento"' in HTML
+    assert "if(e.key==='Enter')runButtonAction" in HTML
 
 
 def test_single_viewport_responsive_and_reduced_motion_contract_remains():
