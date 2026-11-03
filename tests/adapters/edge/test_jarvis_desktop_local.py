@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -39,10 +40,22 @@ def test_host_parser_handles_ipv4_ipv6_and_ports():
     assert _host_name("localhost:8766") == "localhost"
 
 
-def test_uvicorn_does_not_trust_forwarded_client_headers():
-    config = _build_uvicorn_config(create_local_app(), "0.0.0.0", 8766)
-    assert config.proxy_headers is False
-    assert config.forwarded_allow_ips == ""
+def test_uvicorn_does_not_trust_forwarded_client_headers(monkeypatch):
+    captured = {}
+
+    class ConfigProbe:
+        def __init__(self, app, **kwargs):
+            captured.update(kwargs)
+
+    monkeypatch.setitem(
+        sys.modules,
+        "uvicorn",
+        SimpleNamespace(Config=ConfigProbe),
+    )
+    _build_uvicorn_config(create_local_app(), "0.0.0.0", 8766)
+
+    assert captured["proxy_headers"] is False
+    assert captured["forwarded_allow_ips"] == ""
 
 
 def test_public_client_cannot_spoof_loopback_with_forwarded_for():
