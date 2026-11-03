@@ -44,7 +44,7 @@ _SOURCE_TERMS = {
         "dataset attribution and terms apply independently."
     ),
     "nasa_eonet": (
-        "OSIRIS aggregation of NASA EONET volcanic-event metadata; underlying "
+        "OSIRIS aggregation of NASA EONET open natural-event metadata; underlying "
         "dataset attribution and terms apply independently."
     ),
     "osiris_news": (
