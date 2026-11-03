@@ -102,7 +102,10 @@ a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;pad
       const response=await fetch('/v1/intelligence/collect?limit=50',{method:'POST',headers:{Authorization:'Bearer '+token},cache:'no-store'});
       if(response.status===401){showError('Sessão expirada ou inválida. Entre novamente pelo HUD principal.');return;}
       if(!response.ok)throw new Error('Coleta respondeu HTTP '+response.status);
-      renderSnapshot(await response.json());
+      const payload=await response.json();
+      renderSnapshot(payload.report||payload);
+      const history=payload.history||{};
+      $('telemetryNote').textContent+=' · Histórico: '+(history.status||'não informado').toUpperCase();
     }catch(error){showError(error.message||'Falha ao coletar fontes.');}
     finally{$('collect').disabled=false;$('collect').textContent='◎ Coletar agora';}
   }
