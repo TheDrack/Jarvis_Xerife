@@ -48,3 +48,11 @@ def test_single_viewport_responsive_and_reduced_motion_contract_remains():
     assert "@media(max-width:900px)" in HTML
     assert "@media(max-width:620px)" in HTML
     assert "@media(prefers-reduced-motion:reduce)" in HTML
+
+def test_primary_controls_are_bound_to_real_action_handlers():
+    assert "document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click'" in HTML
+    assert "$('pairButton').addEventListener('click',()=>runButtonAction" in HTML
+    assert "$('collectIntel').addEventListener('click',collectIntel)" in HTML
+    assert "$('refreshNetwork').addEventListener('click',()=>runButtonAction" in HTML
+    assert "$('refreshAll').addEventListener('click',()=>runButtonAction" in HTML
+    assert "fullscreenButton.addEventListener('click',toggleFullscreen)" in HTML
