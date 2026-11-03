@@ -6,6 +6,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
+from threading import Lock
 from urllib.parse import urlsplit, urlunsplit
 
 DEFAULT_CLOUD_URL = "https://jarvis-api-c47i.onrender.com"
@@ -60,18 +61,20 @@ class DesktopWindowBridge:
     def __init__(self) -> None:
         self._window = None
         self._fullscreen = False
+        self._lock = Lock()
 
     def bind_window(self, window) -> None:
         self._window = window
 
     def set_fullscreen(self, enabled: bool) -> bool:
-        if self._window is None:
-            raise RuntimeError("A janela nativa do Jarvis ainda não foi inicializada.")
-        desired = bool(enabled)
-        if desired != self._fullscreen:
-            self._window.toggle_fullscreen()
-            self._fullscreen = desired
-        return self._fullscreen
+        with self._lock:
+            if self._window is None:
+                raise RuntimeError("A janela nativa do Jarvis ainda não foi inicializada.")
+            desired = bool(enabled)
+            if desired != self._fullscreen:
+                self._window.toggle_fullscreen()
+                self._fullscreen = desired
+            return self._fullscreen
 
 
 def main(argv: list[str] | None = None) -> int:

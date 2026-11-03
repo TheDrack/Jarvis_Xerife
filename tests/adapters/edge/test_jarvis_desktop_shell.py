@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+import time
+
 import pytest
 
 from app.adapters.edge.jarvis_desktop_shell import build_start_url, normalize_cloud_url
@@ -43,6 +47,7 @@ def test_rejects_unknown_page():
     with pytest.raises(ValueError):
         build_start_url("https://jarvis.example", "admin")
 
+
 class _FakeDesktopWindow:
     def __init__(self):
         self.fullscreen_toggles = 0
@@ -72,3 +77,28 @@ def test_desktop_window_bridge_rejects_fullscreen_before_window_binding():
     bridge = DesktopWindowBridge()
     with pytest.raises(RuntimeError, match="janela nativa"):
         bridge.set_fullscreen(True)
+
+
+def test_desktop_window_bridge_serializes_concurrent_fullscreen_requests():
+    from app.adapters.edge.jarvis_desktop_shell import DesktopWindowBridge
+
+    class SlowWindow(_FakeDesktopWindow):
+        def toggle_fullscreen(self):
+            super().toggle_fullscreen()
+            time.sleep(0.05)
+
+    worker_count = 16
+    start = Barrier(worker_count)
+    window = SlowWindow()
+    bridge = DesktopWindowBridge()
+    bridge.bind_window(window)
+
+    def request_fullscreen():
+        start.wait()
+        return bridge.set_fullscreen(True)
+
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        results = list(executor.map(lambda _: request_fullscreen(), range(worker_count)))
+
+    assert results == [True] * worker_count
+    assert window.fullscreen_toggles == 1
