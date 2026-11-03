@@ -42,3 +42,33 @@ def test_rejects_unsafe_or_invalid_origins(value):
 def test_rejects_unknown_page():
     with pytest.raises(ValueError):
         build_start_url("https://jarvis.example", "admin")
+
+class _FakeDesktopWindow:
+    def __init__(self):
+        self.fullscreen_toggles = 0
+
+    def toggle_fullscreen(self):
+        self.fullscreen_toggles += 1
+
+
+def test_desktop_window_bridge_controls_native_fullscreen_idempotently():
+    from app.adapters.edge.jarvis_desktop_shell import DesktopWindowBridge
+
+    window = _FakeDesktopWindow()
+    bridge = DesktopWindowBridge()
+    bridge.bind_window(window)
+
+    assert bridge.set_fullscreen(True) is True
+    assert window.fullscreen_toggles == 1
+    assert bridge.set_fullscreen(True) is True
+    assert window.fullscreen_toggles == 1
+    assert bridge.set_fullscreen(False) is False
+    assert window.fullscreen_toggles == 2
+
+
+def test_desktop_window_bridge_rejects_fullscreen_before_window_binding():
+    from app.adapters.edge.jarvis_desktop_shell import DesktopWindowBridge
+
+    bridge = DesktopWindowBridge()
+    with pytest.raises(RuntimeError, match="janela nativa"):
+        bridge.set_fullscreen(True)
