@@ -21,6 +21,8 @@ respan-gateway==0.3.0
 
 # API Server (FastAPI + Uvicorn)
 fastapi>=0.104.0
+# TestClient(client=...) is required by the desktop client-IP security tests.
+starlette>=0.44.0
 uvicorn[standard]>=0.24.0
 slowapi>=0.1.9
 python-multipart>=0.0.6
