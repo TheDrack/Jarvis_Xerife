@@ -11,7 +11,8 @@ from app.application.ports.model_runtime import (
     ModelRuntimeError,
     ModelUsage,
 )
-from app.multiagent.freellmapi_client import FreeLLMAPIClient, FreeLLMAPIError
+from app.multiagent.freellmapi_client import FreeLLMAPIClient, FreeLLMAPIError, configured_provider_id
+from app.multiagent.model_runtime_factory import create_registered_model_handler
 from app.multiagent.freellmapi_handler import FreeLLMAgentHandler
 from app.multiagent.transport import AgentMessage
 
@@ -329,3 +330,42 @@ def test_model_invocation_request_rejects_invalid_limits_and_messages():
         ModelInvocationRequest(messages=())
     with pytest.raises(ValueError, match="role"):
         ModelMessage(role="tool", content="tool output")
+
+
+
+def test_registered_model_handler_composes_registry_and_provider_runtime():
+    client, owned = client_for(
+        lambda request: httpx.Response(
+            200,
+            json={"model": "provider/model-a", "choices": [{"message": {"content": "OK"}}]},
+        ),
+        model="configured/model",
+    )
+    try:
+        handler = create_registered_model_handler(client, provider_id="test-provider")
+        message = AgentMessage.create(
+            task_id="registry-task", sender_id="leader", recipient_id="mini",
+            kind="request", payload={"objective": "run"},
+        )
+        result = handler(message)
+        assert result["success"] is True
+        assert result["provider"] == "test-provider"
+        assert result["model"] == "provider/model-a"
+    finally:
+        owned.close()
+
+
+def test_configured_provider_id_prefers_explicit_identity(monkeypatch):
+    monkeypatch.setenv("JARVIS_AGENT_MODEL_PROVIDER", "venice")
+    monkeypatch.setenv("FREELLMAPI_PROVIDER", "groq")
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "gateway-key")
+    assert configured_provider_id() == "venice"
+
+
+def test_configured_provider_id_detects_fallback_provider(monkeypatch):
+    monkeypatch.delenv("JARVIS_AGENT_MODEL_PROVIDER", raising=False)
+    monkeypatch.delenv("FREELLMAPI_PROVIDER", raising=False)
+    monkeypatch.delenv("FREELLMAPI_API_KEY", raising=False)
+    monkeypatch.setenv("GROQ_API_KEY", "groq-key")
+    monkeypatch.setenv("VENICE_API_KEY", "venice-key")
+    assert configured_provider_id() == "groq"

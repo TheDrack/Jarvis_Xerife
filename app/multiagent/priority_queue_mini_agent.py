@@ -7,8 +7,9 @@ from typing import Any
 
 import httpx
 
-from .freellmapi_client import FreeLLMAPIClient
+from .freellmapi_client import FreeLLMAPIClient, configured_provider_id
 from .freellmapi_handler import FreeLLMAgentHandler
+from .model_runtime_factory import create_registered_model_handler
 from .transport import AgentMessage
 
 logger = logging.getLogger(__name__)
@@ -68,7 +69,9 @@ class PriorityQueueMiniAgent:
             username=username,
             password=password,
             agent_id=agent_id,
-            handler=FreeLLMAgentHandler(FreeLLMAPIClient.from_env()),
+            handler=create_registered_model_handler(
+                FreeLLMAPIClient.from_env(), provider_id=configured_provider_id()
+            ),
             lease_seconds=int(os.getenv("JARVIS_TASK_QUEUE_LEASE_SECONDS", "90")),
         )
 
@@ -88,7 +91,7 @@ class PriorityQueueMiniAgent:
                 "agent_id": self.agent_id,
                 "runtime_version": "jarvis-freellmapi-mini/1",
                 "environment": "local",
-                "model_provider": os.getenv("FREELLMAPI_PROVIDER", "unknown").strip().lower(),
+                "model_provider": configured_provider_id(),
                 "available_tools": ["text_reasoning"],
                 "status": "available",
                 "concurrency_limit": 1,
