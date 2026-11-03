@@ -25,6 +25,25 @@ The local core remains the default. If the machine is on an untrusted network, u
 .\scripts\start_jarvis_desktop.ps1 -LoopbackOnly
 ```
 
+## Build the native Windows application
+
+The Windows package is a one-folder PyInstaller distribution. Keep the executable and
+its `_internal` directory together; moving only the EXE breaks its bundled runtime.
+Windows requires the Microsoft Edge WebView2 Runtime.
+
+Install the project and desktop build dependencies, then build from the repository root:
+
+```powershell
+python -m pip install -r requirements.txt -r requirements/desktop.txt
+powershell -ExecutionPolicy Bypass -File .\scripts\build_jarvis_desktop.ps1
+```
+
+The validated output is `dist\JarvisDesktop\JarvisDesktop.exe`. The build script
+fails unless both the executable and bundled `_internal\desktop\jarvis.ico` asset
+exist. The icon is also embedded in the executable by `JarvisDesktop.spec`. A Windows
+shortcut should use the EXE as its icon source (for example,
+`dist\JarvisDesktop\JarvisDesktop.exe,0`) rather than referencing the source tree.
+
 ## Connect Android through Tailscale
 
 1. Open the Jarvis Desktop window on the PC.
