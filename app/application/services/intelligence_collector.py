@@ -144,5 +144,3 @@ async def collect_live_intelligence(
         sources=tuple(source for batch in batches for source in batch.sources),
     )
     return IntelligenceCore().process(merged)
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

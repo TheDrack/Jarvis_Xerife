@@ -107,5 +107,3 @@ async def test_live_collector_preserves_partial_success_when_one_source_fails():
     assert osiris.available is False
     assert osiris.error_code == "RUNTIME_ERROR"
     assert "private upstream details" not in str(report.model_dump(mode="json"))
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

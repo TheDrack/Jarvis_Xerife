@@ -122,5 +122,3 @@ The dashboard reports implementation and configuration states separately:
 - Event/observation counts remain null while no collection runtime is connected. The UI must not translate missing telemetry into zero events or fabricate map markers.
 
 The status endpoint is authenticated and returns no provider URL, token, secret, or raw payload. It performs no source calls and no database writes. The dashboard is therefore a truthful implementation/connection monitor, not yet the live intelligence feed. A future collector and history adapter must expose separately authorized read contracts before real event/observation data is rendered.
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

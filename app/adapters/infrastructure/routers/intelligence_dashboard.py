@@ -154,5 +154,3 @@ def create_intelligence_dashboard_router(
         return report.model_dump(mode="json")
 
     return router
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

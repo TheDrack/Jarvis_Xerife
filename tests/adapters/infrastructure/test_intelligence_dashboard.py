@@ -88,5 +88,3 @@ def test_main_hud_links_to_universal_intelligence():
     )
     assert 'href="/intelligence"' in hud
     assert "Abrir painel Universal Intelligence" in hud
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

@@ -72,5 +72,3 @@ def test_collect_endpoint_rejects_out_of_range_limit():
     response = TestClient(app).post("/v1/intelligence/collect?limit=1000")
 
     assert response.status_code == 422
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]
