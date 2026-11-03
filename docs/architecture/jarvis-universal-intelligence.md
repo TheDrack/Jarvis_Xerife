@@ -60,6 +60,18 @@ The adapter is unit-tested against fixtures matching the upstream route shapes. 
 
 IntelligenceCore is a pure, provider-neutral application service. It performs no network calls, persistence, scheduling or delivery. For repeated (source_id, event_id) identities, the newest observed_at wins; equal timestamps are resolved by the lexicographically greatest canonical JSON serialization of the complete event. This rule is independent of input order. Candidate correlations use canonical URL equality or exact normalized headlines within the same domain/category and a 24-hour window. Original events and evidence remain separate; a candidate is not corroboration.
 
+## Durable intelligence history 0.7
+
+The first durable-history schema is defined by ADR-004 and migration `20261103100304_intelligence_history.sql`:
+
+- `intelligence_event_snapshots` stores immutable event versions, idempotent by `(source_id, event_id, content_hash)`. The semantic hash excludes volatile observation/collection/ingestion timestamps, so unchanged polling does not create a new version.
+- `intelligence_observation_snapshots` stores immutable provider/entity/time observations, idempotent by `(source_id, entity_type, entity_id, observed_at, content_hash)`. Different observation times remain separate; same-time payload variants are retained for deterministic resolution.
+- Both tables preserve the full normalized contract in JSONB and expose relational identity/time columns for indexed queries. `observed_at` and database-side `ingested_at` are independent.
+- RLS is enabled. `PUBLIC`, `anon`, `authenticated` and `service_role` are revoked before granting only `SELECT` and `INSERT` to the server-side `service_role`; no application UPDATE/DELETE/TRUNCATE permission is granted.
+- No retention job or arbitrary TTL is introduced. Retention, archival and partitioning must be defined from measured ingestion volume before recurring high-volume GEV collection.
+
+**Implementation state:** the migration and ADR are present locally but have not been applied to Supabase. The connected project's migration ledger does not match the local migration filename versions, so remote migration/push operations remain blocked pending reconciliation. The persistence port/adapter and PostgreSQL integration tests are the next code increment. The adapter must use the existing server-only `get_supabase_admin_client()` and fail closed; it must never fall back to the public client.
+
 ## Data and trust model
 
 - Preserve publisher/source URL, publication time and collection time separately.
@@ -77,7 +89,7 @@ Domain contracts and application services remain OS-neutral. Host-specific sched
 ## Next increments
 
 1. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
-2. Add durable event and observation history with retention policies.
+2. Implement the append-only Supabase persistence port/adapter, verify idempotent writes against PostgreSQL, and reconcile remote migration history before applying the schema; define retention before recurring high-volume ingestion.
 3. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
 4. Add evidence/corroboration and contradiction contracts.
 5. Compose the Portuguese daily briefing with citations and explicit fact/claim/inference/scenario separation.
