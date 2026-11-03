@@ -42,6 +42,12 @@ def test_status_and_pairing_errors_are_announced_accessibly():
     assert "if(e.key==='Enter')runButtonAction" in HTML
 
 
+def test_fullscreen_uses_native_pywebview_bridge_and_keeps_browser_fallback():
+    assert "window.pywebview?.api" in HTML
+    assert "bridge?.set_fullscreen" in HTML
+    assert "document.documentElement.requestFullscreen()" in HTML
+    assert "event.key==='Escape'&&nativeFullscreen" in HTML
+
 def test_single_viewport_responsive_and_reduced_motion_contract_remains():
     assert "width:100%;height:100%;overflow:hidden" in HTML
     assert "height:100dvh" in HTML
