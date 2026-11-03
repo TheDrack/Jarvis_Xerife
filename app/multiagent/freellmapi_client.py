@@ -23,6 +23,22 @@ TRANSPORT_RETRY_ATTEMPTS = 2
 TRANSPORT_RETRY_DELAY_SECONDS = 0.5
 
 
+
+
+def configured_provider_id() -> str:
+    """Return the configured provider identity without exposing credentials."""
+    for name in ("JARVIS_AGENT_MODEL_PROVIDER", "FREELLMAPI_PROVIDER"):
+        value = os.getenv(name, "").strip().lower()
+        if value and value != "unknown":
+            return value
+    if os.getenv("FREELLMAPI_API_KEY", "").strip():
+        return "unknown"
+    if os.getenv("GROQ_API_KEY", "").strip():
+        return "groq"
+    if os.getenv("VENICE_API_KEY", "").strip():
+        return "venice"
+    return "unknown"
+
 class FreeLLMAPIError(RuntimeError):
     """A sanitized request failure with stable retry metadata."""
 
