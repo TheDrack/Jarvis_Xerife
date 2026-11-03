@@ -344,9 +344,14 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
                 event_type == "volcano"
                 or str(row.get("title", "")).startswith("[VOLCANO]")
             )
-            source_id = "nasa_eonet" if is_volcano else "nasa_firms"
-            publisher = "NASA EONET" if is_volcano else "NASA FIRMS"
-            evidence_url = _EONET_URL if publisher == "NASA EONET" else _FIRMS_URL
+            # OSIRIS /api/fires strips the original EONET ID from volcano rows.
+            # EONET is already ingested with canonical IDs via /api/weather and
+            # the public EONET adapter, so avoid emitting a duplicate synthetic event.
+            if is_volcano:
+                continue
+            source_id = "nasa_firms"
+            publisher = "NASA FIRMS"
+            evidence_url = _FIRMS_URL
             identity = _digest(
                 publisher,
                 event_type,
