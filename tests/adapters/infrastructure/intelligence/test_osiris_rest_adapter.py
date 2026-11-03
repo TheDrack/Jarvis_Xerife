@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import hashlib
 
 import httpx
 import pytest
@@ -148,6 +149,7 @@ def test_collects_upstream_event_shapes_and_preserves_provenance(adapter_factory
     fire = next(event for event in batch.events if event.category == "wildfire")
     news = next(event for event in batch.events if event.source_id == "osiris_news")
 
+    assert earthquake.event_id == "usgs_earthquakes:" + hashlib.sha256(b"us7000test").hexdigest()[:24]
     assert earthquake.magnitude == 4.2
     assert earthquake.location.latitude == -30.0
     assert earthquake.evidence.publisher == "USGS"
@@ -186,6 +188,7 @@ def test_weather_preserves_provider_provenance_without_false_geolocation(adapter
     assert {event.source_id for event in weather} == {"nasa_eonet", "noaa_nws", "gdacs"}
     eonet = next(event for event in weather if event.source_id == "nasa_eonet")
     gdacs = next(event for event in weather if event.source_id == "gdacs")
+    assert eonet.event_id == "nasa_eonet:" + hashlib.sha256(b"storm-1").hexdigest()[:24]
     assert eonet.location.latitude == -20.0
     assert eonet.location.longitude == -45.0
     assert gdacs.location.latitude == 12.0
