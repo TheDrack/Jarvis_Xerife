@@ -33,9 +33,13 @@ The first deliverable is a portable foundation, not a bootable distribution and 
 - Support multiple providers and runtimes simultaneously, including external agent runtimes.
 - The first `ModelRuntime` port now defines normalized messages, bounded invocation requests,
   result/usage metadata, sanitized retry-aware errors and an explicit cancellation contract.
-  `FreeLLMAPIModelRuntimeAdapter` is the first implementation and is used by both existing
-  mini-agent worker composition roots; this does not yet unify `LLMRouter`, `AIGateway`
-  or `ModelOrchestrator`.
+  `FreeLLMAPIModelRuntimeAdapter` is the first implementation. `ModelRuntimeBindings`
+  resolves a registered `ModelProfile` to the matching provider adapter, and the shared
+  `create_registered_model_handler` composition is now used by the HTTP, Supabase and
+  supervised worker roots. The HTTP worker no longer passes the raw client where a runtime
+  port is required. This remains an incremental binding: `LLMRouter`, `AIGateway` and
+  `ModelOrchestrator` are not yet unified, provider health is not probed, and model selection
+  across multiple eligible profiles is still a scheduler responsibility.
 
 ### D. Multi-agent runtime
 - Reuse existing task/message contracts, scheduler and queue.
