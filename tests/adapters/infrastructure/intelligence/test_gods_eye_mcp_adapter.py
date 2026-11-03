@@ -93,10 +93,18 @@ async def test_collects_bounded_aircraft_vessel_and_satellite_observations():
     assert satellite.attributes["name"] == "ISS"
     assert all(item.evidence[0].source_id == "gods_eye_view" for item in batch.observations)
     assert [name for name, _ in session.calls] == [
-        "aircraft_in_area", "vessels_in_area", "satellites_overhead"
+        "aircraft_in_area",
+        "vessels_in_area",
+        *("satellites_overhead" for _ in (
+            "visual", "gps-ops", "glo-ops", "galileo", "geo", "starlink", "stations"
+        )),
     ]
     assert session.calls[0][1]["area"]["bbox"] == [-49.0, -28.0, -48.0, -27.0]
     assert session.calls[2][1]["location"] == {"lat": -27.5, "lon": -48.5}
+    assert [args["group"] for name, args in session.calls if name == "satellites_overhead"] == [
+        "visual", "gps-ops", "glo-ops", "galileo", "geo", "starlink", "stations"
+    ]
+    assert satellite.attributes["group"] == "visual"
 
 
 @pytest.mark.asyncio
