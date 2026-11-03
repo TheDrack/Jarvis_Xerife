@@ -26,6 +26,8 @@ External projects such as OSIRIS (https://github.com/Pendia/OSIRIS-Dashboard-OSI
 
 PublicIntelligenceAdapter provides GDELT DOC article search, NASA EONET open events and the USGS all-day earthquake GeoJSON feed. It emits the common IntelligenceEvent/IntelligenceEvidence contract. Requests are bounded, time-limited and HTTPS-only for source links; article bodies and raw provider payloads are not persisted. Source failure is explicit; absence of returned events is not evidence that no event exists.
 
+The authenticated local collection route runs this synchronous HTTP collector with `asyncio.to_thread`, keeping the ASGI event loop available while GDELT, NASA EONET and USGS requests are in flight. The worker is shielded from request cancellation and is awaited before the route closes the adapter; no outer timeout abandons a still-running thread. Per-source HTTP timeouts remain the bound on the synchronous calls.
+
 This source slice is now followed by a deterministic application-level synthesis core. It removes repeated source/event identities, selects the newest observation, and resolves equal-timestamp payload conflicts with a canonical full-event JSON tie-breaker. Durable history, semantic entity resolution, briefing composition, scheduling, delivery and map rendering remain separate increments.
 
 ## Entity observations 0.3
