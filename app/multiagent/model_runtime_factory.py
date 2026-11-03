@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from app.adapters.infrastructure.freellmapi_model_runtime import FreeLLMAPIModelRuntimeAdapter
 from app.multiagent.freellmapi_client import FreeLLMAPIClient
 from app.multiagent.freellmapi_handler import FreeLLMAgentHandler
 from app.multiagent.model_registry import ModelProfile, ModelRegistry, ModelRuntimeBindings
@@ -25,6 +24,13 @@ def create_registered_model_handler(
         raise TypeError("client must be a FreeLLMAPIClient")
     if not isinstance(provider_id, str) or not provider_id.strip():
         raise ValueError("provider_id must be a non-empty string")
+
+    # Import at composition time to avoid a package-init cycle: the adapter
+    # imports app.multiagent.freellmapi_client, whose package initializer
+    # also exposes PriorityQueueMiniAgent and this factory.
+    from app.adapters.infrastructure.freellmapi_model_runtime import (
+        FreeLLMAPIModelRuntimeAdapter,
+    )
 
     provider = provider_id.strip().lower()
     profile = ModelProfile(

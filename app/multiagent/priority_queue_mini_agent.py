@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 
 from .freellmapi_client import FreeLLMAPIClient, configured_provider_id
+from .freellmapi_handler import FreeLLMAgentHandler
 from .model_runtime_factory import create_registered_model_handler
 from .transport import AgentMessage
 
