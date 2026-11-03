@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
+import threading
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from fastapi.testclient import TestClient
 
 from app.adapters.edge.jarvis_desktop_local import (
     LocalRuntime,
     _build_uvicorn_config,
+    _collect_public_events_off_loop,
     _host_name,
     _is_allowed_address,
     _tailscale_snapshot,
@@ -166,6 +171,12 @@ def test_intelligence_collection_resolves_local_services_through_nexus(monkeypat
 
         def collect_public_events(self, limit):
             assert limit == 20
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+            else:
+                raise AssertionError("public source collection must run outside the ASGI event loop")
             return IntelligenceBatch()
 
         def close(self):
@@ -236,6 +247,12 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
     class FakePublicAdapter:
         def collect_public_events(self, limit):
             assert limit == 20
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                pass
+            else:
+                raise AssertionError("public source collection must run outside the ASGI event loop")
             return IntelligenceBatch(sources=(SourceHealth(source_id="public_intelligence", available=True),))
 
         def close(self):
@@ -313,3 +330,75 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
     assert {item["source_id"] for item in response.json()["sources"]} == {
         "public_intelligence", "osiris_earthquakes", "gods_eye_view"
     }
+
+
+@pytest.mark.asyncio
+async def test_public_collection_worker_does_not_block_the_event_loop():
+    loop_thread_id = threading.get_ident()
+    started = threading.Event()
+    release = threading.Event()
+    expected = object()
+
+    class BlockingAdapter:
+        def collect_public_events(self, limit):
+            assert limit == 20
+            assert threading.get_ident() != loop_thread_id
+            started.set()
+            if not release.wait(timeout=2):
+                raise RuntimeError("test worker was not released")
+            return expected
+
+    task = asyncio.create_task(
+        _collect_public_events_off_loop(BlockingAdapter(), limit=20)
+    )
+    try:
+        assert await asyncio.to_thread(started.wait, 1)
+        await asyncio.wait_for(asyncio.sleep(0), timeout=0.1)
+    finally:
+        release.set()
+
+    assert await task is expected
+
+
+@pytest.mark.asyncio
+async def test_public_collection_cancellation_waits_before_adapter_cleanup():
+    started = threading.Event()
+    release = threading.Event()
+    worker_finished = threading.Event()
+    adapter_closed = threading.Event()
+
+    class BlockingAdapter:
+        def collect_public_events(self, limit):
+            assert limit == 20
+            started.set()
+            if not release.wait(timeout=2):
+                raise RuntimeError("test worker was not released")
+            worker_finished.set()
+            return object()
+
+        def close(self):
+            assert worker_finished.is_set()
+            adapter_closed.set()
+
+    adapter = BlockingAdapter()
+
+    async def collect_then_close():
+        try:
+            return await _collect_public_events_off_loop(adapter, limit=20)
+        finally:
+            adapter.close()
+
+    task = asyncio.create_task(collect_then_close())
+    assert await asyncio.to_thread(started.wait, 1)
+    task.cancel()
+    await asyncio.sleep(0)
+
+    assert not task.done()
+    assert not adapter_closed.is_set()
+
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert worker_finished.is_set()
+    assert adapter_closed.is_set()
