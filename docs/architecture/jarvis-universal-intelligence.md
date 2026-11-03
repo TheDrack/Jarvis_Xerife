@@ -75,6 +75,7 @@ Domain contracts and application services remain OS-neutral. Host-specific sched
 ## Next increments
 
 1. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
+2. Add the OSIRIS weather, flights, maritime and satellite routes with explicit geometry/moving-entity controls.
 3. Add durable observation history and retention policies.
 4. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
 5. Add evidence/corroboration and contradiction contracts.
