@@ -1,0 +1,2 @@
+# Desktop-only dependency; excluded from Render/cloud requirements.
+pywebview>=5.4,<7
