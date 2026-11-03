@@ -7,6 +7,9 @@ import hashlib
 import json
 from typing import Any
 
+from app.application.ports.intelligence_history_repository import (
+    IntelligenceHistoryRepository,
+)
 from app.domain.intelligence.contracts import (
     IntelligenceEvent,
     IntelligenceObservation,
@@ -26,7 +29,7 @@ class IntelligenceHistoryPersistenceError(RuntimeError):
     """Sanitized persistence failure that does not include request credentials."""
 
 
-class SupabaseIntelligenceHistoryAdapter:
+class SupabaseIntelligenceHistoryAdapter(IntelligenceHistoryRepository):
     """Persist immutable intelligence snapshots through a trusted server client.
 
     The adapter never creates a public/anon client and never performs UPDATE or
