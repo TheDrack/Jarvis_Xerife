@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from app.application.ports.intelligence_source import IntelligenceSource
 from app.core.nexuscomponent import NexusComponent
 from app.domain.intelligence.contracts import (
     GeoPoint,
@@ -101,7 +102,7 @@ def _digest(*parts: str) -> str:
     return hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()[:32]
 
 
-class OsirisRestAdapter(NexusComponent):
+class OsirisRestAdapter(IntelligenceSource, NexusComponent):
     """Collect bounded public events from fixed OSIRIS REST routes."""
 
     def __init__(
