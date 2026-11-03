@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from math import isfinite
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 
 class GeoPoint(BaseModel):
@@ -55,9 +56,40 @@ class SourceHealth(BaseModel):
     error_code: Optional[str] = None
 
 
+class IntelligenceObservation(BaseModel):
+    """One provider observation of a moving entity or mapped asset."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+    observation_id: str = Field(min_length=1, max_length=160)
+    source_id: str = Field(min_length=1, max_length=100)
+    entity_type: str = Field(min_length=1, max_length=80)
+    entity_id: str = Field(min_length=1, max_length=160)
+    observed_at: datetime
+    position: Optional[GeoPoint] = None
+    attributes: dict[str, str | int | float | bool | None] = Field(
+        default_factory=dict, max_length=64
+    )
+    evidence: tuple[IntelligenceEvidence, ...] = Field(min_length=1, max_length=8)
+
+    @field_validator("attributes")
+    @classmethod
+    def validate_attributes(
+        cls, value: dict[str, str | int | float | bool | None]
+    ) -> dict[str, str | int | float | bool | None]:
+        for key, item in value.items():
+            if not key or len(key) > 80:
+                raise ValueError("observation attribute keys must contain 1-80 characters")
+            if isinstance(item, str) and len(item) > 1000:
+                raise ValueError("observation string attributes must be <= 1000 characters")
+            if isinstance(item, float) and not isfinite(item):
+                raise ValueError("observation numeric attributes must be finite")
+        return value
+
+
 class IntelligenceBatch(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
     events: tuple[IntelligenceEvent, ...] = ()
+    observations: tuple[IntelligenceObservation, ...] = ()
     sources: tuple[SourceHealth, ...] = ()
 
 
@@ -79,7 +111,11 @@ class IntelligenceReport(BaseModel):
     events: tuple[IntelligenceEvent, ...] = ()
     sources: tuple[SourceHealth, ...] = ()
     correlations: tuple[IntelligenceCorrelation, ...] = ()
+    observations: tuple[IntelligenceObservation, ...] = ()
     input_event_count: int = Field(ge=0)
     unique_event_count: int = Field(ge=0)
     duplicate_event_count: int = Field(ge=0)
+    input_observation_count: int = Field(default=0, ge=0)
+    unique_observation_count: int = Field(default=0, ge=0)
+    duplicate_observation_count: int = Field(default=0, ge=0)
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

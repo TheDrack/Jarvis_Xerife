@@ -28,6 +28,12 @@ PublicIntelligenceAdapter provides GDELT DOC article search, NASA EONET open eve
 
 This source slice is now followed by a deterministic application-level synthesis core. It removes repeated source/event identities, selects the newest observation, and resolves equal-timestamp payload conflicts with a canonical full-event JSON tie-breaker. Durable history, semantic entity resolution, briefing composition, scheduling, delivery and map rendering remain separate increments.
 
+## Entity observations 0.3
+
+`IntelligenceObservation` is separate from `IntelligenceEvent`. It represents a provider's time-stamped observation of an entity or mapped asset (for example, an aircraft, vessel, satellite or camera). It requires a provider identity, entity type, stable entity ID, observation timestamp and at least one provenance record; position is optional and structured attributes are bounded scalar values.
+
+The batch/report contract carries observations and event records independently, with separate input/unique/duplicate counts. The core deduplicates only an exact provider/entity/time snapshot identity. Different timestamps remain separate history points; different providers and entities are never merged. Equal-time conflicting payloads use a canonical full-observation JSON tie-breaker, independent of input order. This is not entity resolution or track continuity: those require a separate policy and evidence.
+
 ## Intelligence Core 0.2
 
 `IntelligenceCore` is a pure, provider-neutral application service. It performs no network calls, persistence, scheduling or delivery. For repeated `(source_id, event_id)` identities, the newest `observed_at` wins; equal timestamps are resolved by the lexicographically greatest canonical JSON serialization of the complete event. This rule is independent of input order. Candidate correlations use canonical URL equality or exact normalized headlines within the same domain/category and a 24-hour window. Original events and evidence remain separate; a candidate is not corroboration.

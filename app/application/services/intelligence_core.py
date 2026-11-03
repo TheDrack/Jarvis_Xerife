@@ -12,6 +12,7 @@ from app.domain.intelligence.contracts import (
     IntelligenceBatch,
     IntelligenceCorrelation,
     IntelligenceEvent,
+    IntelligenceObservation,
     IntelligenceReport,
 )
 
@@ -55,14 +56,47 @@ class IntelligenceCore:
                 ),
             )
         )
+        unique_observations: dict[
+            tuple[str, str, str, datetime],
+            tuple[tuple[datetime, str], IntelligenceObservation],
+        ] = {}
+        for observation in batch.observations:
+            identity = (
+                observation.source_id,
+                observation.entity_type,
+                observation.entity_id,
+                self._as_utc(observation.observed_at),
+            )
+            canonical_payload = self._canonical_observation_payload(observation)
+            selection_key = (identity[3], canonical_payload)
+            current = unique_observations.get(identity)
+            if current is None or selection_key > current[0]:
+                unique_observations[identity] = (selection_key, observation)
+
+        observations = tuple(
+            sorted(
+                (entry[1] for entry in unique_observations.values()),
+                key=lambda observation: (
+                    self._as_utc(observation.observed_at),
+                    observation.source_id,
+                    observation.entity_type,
+                    observation.entity_id,
+                    observation.observation_id,
+                ),
+            )
+        )
         correlations = self._correlate(events)
         return IntelligenceReport(
             events=events,
             sources=batch.sources,
             correlations=correlations,
+            observations=observations,
             input_event_count=len(batch.events),
             unique_event_count=len(events),
             duplicate_event_count=len(batch.events) - len(events),
+            input_observation_count=len(batch.observations),
+            unique_observation_count=len(observations),
+            duplicate_observation_count=len(batch.observations) - len(observations),
         )
 
     @staticmethod
@@ -70,6 +104,18 @@ class IntelligenceCore:
         """Return a stable, complete serialization used only for deterministic ties."""
         return json.dumps(
             event.model_dump(mode="json"),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+
+    @staticmethod
+    def _canonical_observation_payload(
+        observation: IntelligenceObservation,
+    ) -> str:
+        """Return a stable, complete observation serialization for exact-time ties."""
+        return json.dumps(
+            observation.model_dump(mode="json"),
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=False,

@@ -424,6 +424,13 @@
               "additionalProperties": true
             }
           },
+          "observations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
           "sources": {
             "type": "array",
             "items": {
