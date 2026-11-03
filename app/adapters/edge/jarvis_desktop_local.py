@@ -189,6 +189,27 @@ def _tailscale_snapshot() -> dict[str, Any]:
     }
 
 
+async def _run_sync_io_off_loop(function, /, *args, **kwargs):
+    """Run blocking I/O in a worker and drain it before caller cleanup."""
+    worker = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                continue
+            except Exception:
+                break
+        if worker.done() and not worker.cancelled():
+            try:
+                worker.result()
+            except Exception:
+                pass
+        raise
+
+
 def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
     state = runtime or LocalRuntime()
     app = FastAPI(title="Jarvis Local Core", docs_url=None, redoc_url=None, openapi_url=None)
@@ -353,7 +374,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             if not callable(getattr(engine, "process", None)):
                 raise HTTPException(status_code=503, detail="IntelligenceCore indisponível no Nexus local.")
 
-            public_batch = adapter.collect_public_events(limit=20)
+            public_batch = await _run_sync_io_off_loop(adapter.collect_public_events, limit=20)
             if not isinstance(public_batch, IntelligenceBatch):
                 public_batch = IntelligenceBatch.model_validate(public_batch)
 
@@ -365,10 +386,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                     hint_path="app.adapters.infrastructure.intelligence.osiris_rest_adapter.py",
                     use_cache=False,
                 )
-                osiris_batch = await asyncio.wait_for(
-                    asyncio.to_thread(osiris.collect_events, 20),
-                    timeout=55,
-                )
+                osiris_batch = await _run_sync_io_off_loop(osiris.collect_events, 20)
             else:
                 osiris_batch = IntelligenceBatch(
                     sources=tuple(
