@@ -45,6 +45,15 @@
 - Aircraft, vessel and satellite snapshots become provenance-preserving `IntelligenceObservation` records. The adapter does not call UI/action tools, ingest CCTV/ALPR, resolve identity across providers, or establish track continuity.
 - Unit tests use an injected fake MCP session; a live probe requires a user-configured local GEV checkout and running app.
 
+## Optional OSIRIS REST event adapter
+
+- Adapter: `app/adapters/infrastructure/intelligence/osiris_rest_adapter.py`; class: `OsirisRestAdapter`.
+- Opt-in HTTPS integration through `JARVIS_OSIRIS_API_BASE_URL` or an explicit constructor origin.
+- Calls only `/api/earthquakes`, `/api/fires` and `/api/news`; no user-controlled route, query, redirect or remote URL fetcher.
+- Each route is independently bounded to 100 records, a 4 MB streamed response and a 12-second timeout by default; source health preserves partial failures.
+- News country-anchor coordinates are intentionally not treated as event coordinates. News items require an HTTPS original publisher link and a valid ISO/RFC 2822 publication timestamp.
+- Unit tests use upstream-shaped fixtures and an injected HTTPX MockTransport. No live OSIRIS deployment is configured or verified.
+
 ## Portable Jarvis skills
 
 | Skill | Use it for | Canonical entry point |
