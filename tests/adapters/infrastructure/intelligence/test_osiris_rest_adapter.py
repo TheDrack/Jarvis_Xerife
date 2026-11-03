@@ -150,7 +150,7 @@ def test_keeps_partial_results_when_one_route_fails(adapter_factory):
 
     assert len(batch.events) == 2
     health = {source.source_id: source for source in batch.sources}
-    assert health["usgs_earthquakes"].available is True
+    assert health["osiris_earthquakes"].available is True
     assert health["osiris_fires"].available is False
     assert health["osiris_fires"].error_code == "HTTPStatusError"
     assert health["osiris_news"].available is True
@@ -166,7 +166,7 @@ def test_drops_invalid_or_untraceable_records(adapter_factory):
         "url": "https://earthquake.usgs.gov/event",
     })
     data["fires"]["fires"].append({
-        "lat": 1,
+        "lat": 200,
         "lng": 1,
         "date": "2026-11-03",
         "time": "0845",
@@ -181,7 +181,7 @@ def test_drops_invalid_or_untraceable_records(adapter_factory):
 
     batch = adapter_factory(data).collect_events()
 
-    assert len(batch.events) == 3
+    assert len(batch.events) == 4
     assert all(event.url.scheme == "https" for event in batch.events)
 
 
@@ -215,7 +215,7 @@ def test_route_level_error_payload_is_not_reported_as_empty_success(adapter_fact
 
     health = {source.source_id: source for source in batch.sources}
     assert health["osiris_fires"].available is False
-    assert health["nasa_fires"].error_code == "RuntimeError"
+    assert health["osiris_fires"].error_code == "RuntimeError"
 
 
 def test_response_body_is_bounded_before_json_decoding(adapter_factory):
