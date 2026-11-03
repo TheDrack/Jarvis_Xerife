@@ -30,13 +30,23 @@ This source slice is now followed by a deterministic application-level synthesis
 
 ## Entity observations 0.3
 
-`IntelligenceObservation` is separate from `IntelligenceEvent`. It represents a provider's time-stamped observation of an entity or mapped asset (for example, an aircraft, vessel, satellite or camera). It requires a provider identity, entity type, stable entity ID, observation timestamp and at least one provenance record; position is optional and structured attributes are bounded scalar values.
+IntelligenceObservation is separate from IntelligenceEvent. It represents a provider's time-stamped observation of an entity or mapped asset (for example, an aircraft, vessel, satellite or camera). It requires a provider identity, entity type, stable entity ID, observation timestamp and at least one provenance record; position is optional and structured attributes are bounded scalar values.
 
 The batch/report contract carries observations and event records independently, with separate input/unique/duplicate counts. The core deduplicates only an exact provider/entity/time snapshot identity. Different timestamps remain separate history points; different providers and entities are never merged. Equal-time conflicting payloads use a canonical full-observation JSON tie-breaker, independent of input order. This is not entity resolution or track continuity: those require a separate policy and evidence.
 
+## God's Eye View MCP adapter 0.4
+
+GodsEyeMcpAdapter is an optional Edge adapter. It starts the configured local GEV MCP stdio process, discovers the live tools/list catalog, and invokes only the explicit query allowlist aircraft_in_area, vessels_in_area and satellites_overhead when the current definition carries annotations.readOnlyHint=true. It does not call show_in_gods_eye_view, panel_request, or other action/app-only tools.
+
+The adapter requires an explicit geographic bounding box no larger than 10 degrees per side, caps each result at 100 rows, applies per-call timeouts, and accepts only a loopback GEV API origin. The MCP entrypoint is configured through JARVIS_GEV_MCP_ENTRYPOINT or an explicit constructor argument; the process command is fixed to node, not user-supplied. The Python MCP SDK is imported lazily and is an Edge dependency (requirements/edge.txt), so core/headless imports remain independent.
+
+Returned aircraft, vessel and satellite rows become IntelligenceObservation records with deterministic IDs, timestamps, bounded scalar attributes and source provenance. Missing identities/timestamps are dropped; missing satellite coordinates remain None. Partial tool failures are reflected in SourceHealth without discarding successful rows.
+
+This adapter is unit-tested with an injected fake MCP session. It has not been verified against a configured live God's Eye View checkout or running app. No endpoint, credentials, database, scheduler, production service or deployment is configured by this change. GEV's MIT code license does not grant rights to underlying data/assets; provider attribution and dataset terms remain applicable.
+
 ## Intelligence Core 0.2
 
-`IntelligenceCore` is a pure, provider-neutral application service. It performs no network calls, persistence, scheduling or delivery. For repeated `(source_id, event_id)` identities, the newest `observed_at` wins; equal timestamps are resolved by the lexicographically greatest canonical JSON serialization of the complete event. This rule is independent of input order. Candidate correlations use canonical URL equality or exact normalized headlines within the same domain/category and a 24-hour window. Original events and evidence remain separate; a candidate is not corroboration.
+IntelligenceCore is a pure, provider-neutral application service. It performs no network calls, persistence, scheduling or delivery. For repeated (source_id, event_id) identities, the newest observed_at wins; equal timestamps are resolved by the lexicographically greatest canonical JSON serialization of the complete event. This rule is independent of input order. Candidate correlations use canonical URL equality or exact normalized headlines within the same domain/category and a 24-hour window. Original events and evidence remain separate; a candidate is not corroboration.
 
 ## Data and trust model
 
@@ -54,14 +64,15 @@ Domain contracts and application services remain OS-neutral. Host-specific sched
 
 ## Next increments
 
-1. Register public source capabilities in the canonical Tool Registry and Nexus with read-only policy.
-2. Add source health, cache/ETag, bounded retry/backoff and per-source rate budgets.
-3. Implement deterministic deduplication and event grouping without claiming semantic identity from title similarity alone.
-4. Add evidence/corroboration and contradiction contracts.
-5. Compose the Portuguese daily briefing with citations and explicit fact/claim/inference/scenario separation.
-6. Connect a real durable scheduler/worker and idempotent delivery.
-7. Build a geospatial presentation adapter after comparing MapLibre/Cesium/deck.gl requirements, performance and licenses.
-8. Add user preference/direction feedback and Jarvis self-maintenance signals as separate domains.
+1. Add the per-route OSIRIS REST adapter with upstream-derived fixtures.
+2. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
+3. Add durable observation history and retention policies.
+4. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
+5. Add evidence/corroboration and contradiction contracts.
+6. Compose the Portuguese daily briefing with citations and explicit fact/claim/inference/scenario separation.
+7. Connect a real durable scheduler/worker and idempotent delivery.
+8. Build a geospatial presentation adapter after comparing MapLibre/Cesium/deck.gl requirements, performance and licenses.
+9. Add user preference/direction feedback and Jarvis self-maintenance signals as separate domains.
 
 ## Research and licensing notes
 
