@@ -84,9 +84,9 @@ button:focus-visible{outline:1px solid var(--cyan);outline-offset:3px;box-shadow
 <aside class="rail">
  <div class="brand"><div class="brand-mark">J</div><div><b>J.A.R.V.I.S.</b><small>LOCAL INTELLIGENCE</small></div></div>
  <nav class="nav">
-  <button class="active" data-page="home"><span class="glyph">⌂</span><span class="label">Overview</span></button>
-  <button data-page="intelligence"><span class="glyph">◉</span><span class="label">Intelligence</span></button>
-  <button data-page="network"><span class="glyph">⌘</span><span class="label">Network</span></button>
+  <button type="button" class="active" data-page="home" aria-controls="page-home" aria-current="page"><span class="glyph">⌂</span><span class="label">Overview</span></button>
+  <button type="button" data-page="intelligence" aria-controls="page-intelligence"><span class="glyph">◉</span><span class="label">Intelligence</span></button>
+  <button type="button" data-page="network" aria-controls="page-network"><span class="glyph">⌘</span><span class="label">Network</span></button>
  </nav>
  <div class="rail-foot"><span class="pulse"></span><span class="foot-label">LOCAL CORE ACTIVE<br>DESKTOP / MOBILE LINK</span></div>
 </aside>
@@ -97,7 +97,7 @@ button:focus-visible{outline:1px solid var(--cyan);outline-offset:3px;box-shadow
  </header>
  <section class="content">
   <section class="page active" id="page-home">
-   <div class="page-head"><div><h2>COMMAND CENTER</h2><p>Visão operacional do núcleo local</p></div><div class="actions"><button id="refreshAll">↻ Atualizar</button></div></div>
+   <div class="page-head"><div><h2>COMMAND CENTER</h2><p>Visão operacional do núcleo local</p></div><div class="actions"><button type="button" id="refreshAll">↻ Atualizar</button></div></div>
    <div class="grid-home">
     <article class="panel hero"><div class="orb"><div class="core"></div></div><div class="hero-label"><b>JARVIS ONLINE</b><small id="heroSub">LOCAL EXECUTION ENVIRONMENT</small></div></article>
     <article class="panel summary">
@@ -115,7 +115,7 @@ button:focus-visible{outline:1px solid var(--cyan);outline-offset:3px;box-shadow
    </div>
   </section>
   <section class="page" id="page-intelligence">
-   <div class="page-head"><div><h2>INTELLIGENCE LAYER</h2><p>Coleta sob demanda · síntese local · evidência preservada</p></div><div class="actions"><button id="collectIntel">⟳ Coletar fontes</button></div></div>
+   <div class="page-head"><div><h2>INTELLIGENCE LAYER</h2><p>Coleta sob demanda · síntese local · evidência preservada</p></div><div class="actions"><button type="button" id="collectIntel">⟳ Coletar fontes</button></div></div>
    <div class="grid-intel">
     <article class="panel feed"><div class="section-label">RECENT INTELLIGENCE EVENTS</div><div class="feed-list" id="eventList"><div class="event"><b>Nenhuma coleta executada nesta sessão.</b><small>Use “Coletar fontes” para consultar GDELT, NASA EONET e USGS.</small></div></div></article>
     <article class="panel source-grid"><div class="section-label">SOURCE PIPELINE</div>
@@ -129,7 +129,7 @@ button:focus-visible{outline:1px solid var(--cyan);outline-offset:3px;box-shadow
    </div>
   </section>
   <section class="page" id="page-network">
-   <div class="page-head"><div><h2>NETWORK LAYER</h2><p>Interfaces locais · cache ARP passivo · clientes pareados</p></div><div class="actions"><button id="refreshNetwork">↻ Atualizar</button></div></div>
+   <div class="page-head"><div><h2>NETWORK LAYER</h2><p>Interfaces locais · cache ARP passivo · clientes pareados</p></div><div class="actions"><button type="button" id="refreshNetwork">↻ Atualizar</button></div></div>
    <div class="grid-network">
     <div class="network-left">
      <article class="panel list-panel"><div class="section-label">LOCAL INTERFACES</div><div class="rows" id="interfaceList"><div class="row-item"><div><b>Carregando interfaces...</b></div></div></div></article>
@@ -142,43 +142,46 @@ button:focus-visible{outline:1px solid var(--cyan);outline-offset:3px;box-shadow
    </div>
   </section>
  </section>
- <footer class="footer"><span id="footerStatus">LOCAL CORE · aguardando primeira leitura</span><span id="updatedAt">--</span></footer>
+ <footer class="footer"><span id="footerStatus" role="status" aria-live="polite" aria-atomic="true">LOCAL CORE · aguardando primeira leitura</span><span id="updatedAt">--</span></footer>
 </main>
 </div>
-<div class="modal" id="pairModal"><div class="modal-card"><h2>PAIR DEVICE</h2><p>Digite o código temporário exibido no Jarvis Desktop do PC para conectar este dispositivo à rede local.</p><input id="pairCode" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"><button id="pairButton">Conectar ao Jarvis</button><div class="pair-error" id="pairError"></div></div></div>
+<div class="modal" id="pairModal"><div class="modal-card"><h2>PAIR DEVICE</h2><p>Digite o código temporário exibido no Jarvis Desktop do PC para conectar este dispositivo à rede local.</p><input id="pairCode" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" aria-label="Código temporário de pareamento"><button type="button" id="pairButton">Conectar ao Jarvis</button><div class="pair-error" id="pairError" role="alert"></div></div></div>
 <script>
 (()=>{'use strict';
 const $=id=>document.getElementById(id), tokenKey='jarvis_local_access', state={token:sessionStorage.getItem(tokenKey)||'',network:null,intel:null,latest:null,bootstrap:null};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const time=()=>new Date().toLocaleTimeString('pt-BR',{hour12:false});
-function nav(page){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===page));$('viewTitle').textContent=({home:'COMMAND CENTER',intelligence:'INTELLIGENCE LAYER',network:'NETWORK LAYER'})[page];}
+function nav(page){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+page));document.querySelectorAll('.nav button').forEach(b=>{const active=b.dataset.page===page;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});$('viewTitle').textContent=({home:'COMMAND CENTER',intelligence:'INTELLIGENCE LAYER',network:'NETWORK LAYER'})[page];}
 document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.page)));
 async function api(path,opts={}){const headers={'Accept':'application/json',...(opts.body?{'Content-Type':'application/json'}:{}),...(state.token?{'Authorization':'Bearer '+state.token}:{})};const r=await fetch(path,{...opts,headers,cache:'no-store'});const data=await r.json().catch(()=>({detail:'Resposta inválida do núcleo local.'}));if(!r.ok)throw new Error(data.detail||('HTTP '+r.status));return data;}
 function showPair(){ $('pairModal').classList.add('show'); }
 async function bootstrap(){try{state.bootstrap=await api('/api/bootstrap');if(state.bootstrap.local_token){state.token=state.bootstrap.local_token;sessionStorage.setItem(tokenKey,state.token);$('pairModal').classList.remove('show');$('pairCode').value=state.bootstrap.pairing_code||'';}else if(!state.token){showPair();}renderAddresses();}catch(e){$('footerStatus').textContent='CORE ERROR · '+e.message;}}
 function renderAddresses(){const list=state.bootstrap?.addresses||[];const port=location.port?':'+location.port:'';const tail=list.find(item=>item.address.startsWith('100.'));const lan=list.find(item=>!item.address.startsWith('100.'));$('hostAddress').textContent=(tail||lan)?(tail||lan).address+port:'LAN indisponível';$('lanAddress').textContent=lan?lan.address+port:'não detectado';$('pairCodeDisplay').textContent=state.bootstrap?.pairing_code||'------';$('heroSub').textContent=tail?'TAILSCALE HOST · '+list.length+' INTERFACE(S)':(list.length?'LOCAL HOST · '+list.length+' INTERFACE(S)':'LOCAL LOOPBACK');}
+async function runButtonAction(button,loadingText,action){if(button.disabled)return;const originalText=button.textContent;button.disabled=true;button.setAttribute('aria-busy','true');button.textContent=loadingText;try{await action();}finally{button.disabled=false;button.removeAttribute('aria-busy');button.textContent=originalText;}}
 async function pair(){const code=$('pairCode').value.trim();$('pairError').textContent='';if(!/^\d{6}$/.test(code)){$('pairError').textContent='Informe os seis dígitos.';return;}try{const data=await api('/api/pair',{method:'POST',body:JSON.stringify({code})});state.token=data.access_token;sessionStorage.setItem(tokenKey,state.token);$('pairModal').classList.remove('show');await refreshAll();}catch(e){$('pairError').textContent=e.message;}}
-$('pairButton').addEventListener('click',pair);$('pairCode').addEventListener('keydown',e=>{if(e.key==='Enter')pair();});
+$('pairButton').addEventListener('click',()=>runButtonAction($('pairButton'),'Conectando...',pair));$('pairCode').addEventListener('keydown',e=>{if(e.key==='Enter')runButtonAction($('pairButton'),'Conectando...',pair);});
 async function refreshStatus(){const data=await api('/api/status');$('clientCount').textContent=String(data.clients.length||1);$('coreChip').textContent='● LOCAL CORE ONLINE';$('footerStatus').textContent='LOCAL CORE · authenticated · '+data.clients.length+' client(s)';}
 async function refreshIntel(){state.intel=await api('/api/intelligence/status');state.latest=await api('/api/intelligence/latest');const runtime=state.intel.local_runtime||{};$('eventMetric').textContent=String(runtime.event_count??0);$('intelSummary').textContent=(runtime.event_count??0)+' evento(s) sintetizado(s)';$('intelState').textContent='LOCAL READY';renderEvents(state.latest.events||[]);renderSourceHealth(state.latest.sources||[]);const sources=state.intel.sources||[];const gev=sources.find(x=>x.id==='gods_eye_view'),osiris=sources.find(x=>x.id==='osiris');$('gevState').textContent=gev?.runtime||'não configurado';$('osirisState').textContent=osiris?.runtime||'não configurado';}
 function renderEvents(events){const list=events.slice(0,5);$('eventList').innerHTML=list.length?list.map(e=>'<div class="event"><b>'+esc(e.title)+'</b><small>'+esc(e.source_id||'source')+' · '+esc(e.domain||e.category||'event')+' · '+esc(e.observed_at||'')+'</small></div>').join(''):'<div class="event"><b>Nenhum evento coletado.</b><small>A coleta é acionada manualmente e executada no PC.</small></div>';}
-async function collectIntel(){const b=$('collectIntel');b.disabled=true;b.textContent='Coletando...';try{const data=await api('/api/intelligence/collect',{method:'POST'});state.latest=data;$('eventMetric').textContent=String(data.unique_event_count||0);$('intelSummary').textContent=(data.unique_event_count||0)+' eventos · '+(data.sources||[]).filter(s=>s.available).length+' fontes ativas';renderEvents(data.events||[]);renderSourceHealth(data.sources||[]);$('footerStatus').textContent='INTELLIGENCE · coleta local concluída';}catch(e){$('footerStatus').textContent='INTELLIGENCE ERROR · '+e.message;}finally{b.disabled=false;b.textContent='⟳ Coletar fontes';}}
+async function collectIntel(){const b=$('collectIntel');b.disabled=true;b.setAttribute('aria-busy','true');b.textContent='Coletando...';try{const data=await api('/api/intelligence/collect',{method:'POST'});state.latest=data;$('eventMetric').textContent=String(data.unique_event_count||0);$('intelSummary').textContent=(data.unique_event_count||0)+' eventos · '+(data.sources||[]).filter(s=>s.available).length+' fontes ativas';renderEvents(data.events||[]);renderSourceHealth(data.sources||[]);$('footerStatus').textContent='INTELLIGENCE · coleta local concluída';}catch(e){$('footerStatus').textContent='INTELLIGENCE ERROR · '+e.message;}finally{b.disabled=false;b.removeAttribute('aria-busy');b.textContent='⟳ Coletar fontes';}}
 function renderSourceHealth(sources){const ids={gdelt:'gdeltPill',nasa_eonet:'eonetPill',usgs_earthquakes:'usgsPill'};for(const source of sources){const el=$(ids[source.source_id]||'');if(!el)continue;el.textContent=source.available?'ONLINE':(source.error_code||'DEGRADED');el.title=source.available?'Fonte disponível':'Falha da fonte: '+(source.error_code||'indisponível');el.className='pill'+(source.available?'':' warn');}}
 $('collectIntel').addEventListener('click',collectIntel);
 async function refreshNetwork(){state.network=await api('/api/network/status');const d=state.network;$('deviceMetric').textContent=String(d.neighbors?.length||0);$('networkSummary').textContent=(d.interfaces?.length||0)+' interface(s) · '+(d.neighbors?.length||0)+' vizinho(s)';$('networkState').textContent='LOCAL READY';$('interfaceList').innerHTML=(d.interfaces||[]).slice(0,4).map(i=>'<div class="row-item"><div><b>'+esc(i.interface)+'</b><small>'+esc(i.address)+' · '+esc(i.network)+'</small></div><span class="pill">'+esc(i.operational_status||'unknown')+'</span></div>').join('')||'<div class="row-item"><div><b>Sem interface IPv4</b></div></div>';$('neighborList').innerHTML=(d.neighbors||[]).slice(0,5).map(n=>'<div class="row-item"><div><b>'+esc(n.ip)+'</b><small>'+esc(n.mac)+'</small></div><span class="pill">ARP</span></div>').join('')||'<div class="row-item"><div><b>Cache ARP vazio</b><small>Sem sondagens ativas realizadas.</small></div></div>';const peers=(d.tailscale?.peers||[]).filter(p=>p.os==='android').slice(0,3);
 const peerRows=peers.map(p=>'<div class="row-item"><div><b>'+esc(p.hostname)+'</b><small>'+esc(p.addresses?.[0]||'Android')+' · '+esc(p.last_seen||'Tailscale')+'</small></div><span class="pill '+(p.online?'':'off')+'">'+(p.online?'ONLINE':'OFFLINE')+'</span></div>').join('');
 const adbRows=(d.android_adb?.devices||[]).slice(0,2).map(x=>'<div class="row-item"><div><b>'+esc(x.serial)+'</b><small>Android ADB</small></div><span class="pill '+(x.state==='device'?'':'warn')+'">'+esc(x.state)+'</span></div>').join('');
 $('adbList').innerHTML=peerRows+adbRows||'<div class="row-item"><div><b>Android não encontrado</b><small>Conecte o telefone ao Tailscale ou ADB.</small></div></div>';const mobileClients=(d.clients||[]).filter(x=>!['127.0.0.1','::1'].includes(x.address));const androidPeer=peers[0];if(mobileClients.length){$('androidSummary').textContent=mobileClients.length+' cliente(s) autenticado(s)';$('androidState').textContent='CONNECTED';}else if(androidPeer){$('androidSummary').textContent=androidPeer.hostname+' · '+(androidPeer.online?'Tailscale online · aguardando pareamento':'Tailscale offline');$('androidState').textContent=androidPeer.online?'ONLINE':'OFFLINE';}else{$('androidSummary').textContent='Aguardando cliente móvel';$('androidState').textContent='STANDBY';}$('clientList').innerHTML=(d.clients||[]).slice(0,5).map(c=>'<div class="row-item"><div><b>'+esc(c.address)+'</b><small>Ativo há '+esc(c.last_seen_seconds)+' s</small></div><span class="pill">PAIRED</span></div>').join('')||'<div class="row-item"><div><b>Somente PC local</b><small>Conecte Android com o código de pareamento.</small></div></div>';}
-$('refreshNetwork').addEventListener('click',()=>refreshNetwork().catch(e=>$('footerStatus').textContent=e.message));
+$('refreshNetwork').addEventListener('click',()=>runButtonAction($('refreshNetwork'),'Atualizando...',()=>refreshNetwork().catch(e=>$('footerStatus').textContent=e.message)));
 async function refreshAll(){try{await refreshStatus();await Promise.all([refreshIntel(),refreshNetwork()]);$('updatedAt').textContent='SYNC '+time();}catch(e){if(e.message.includes('Pareie')||e.message.includes('Sessao')){state.token='';sessionStorage.removeItem(tokenKey);showPair();}else $('footerStatus').textContent='SYNC ERROR · '+e.message;}}
-$('refreshAll').addEventListener('click',refreshAll);
+$('refreshAll').addEventListener('click',()=>runButtonAction($('refreshAll'),'Atualizando...',refreshAll));
 
 const fullscreenButton=$('fullscreenToggle');
-function syncFullscreenControl(){const active=Boolean(document.fullscreenElement);fullscreenButton.textContent=active?'⤢':'⛶';fullscreenButton.title=active?'Sair da tela cheia (F11)':'Ativar tela cheia (F11)';fullscreenButton.setAttribute('aria-label',active?'Sair da tela cheia':'Ativar tela cheia');}
-async function toggleFullscreen(){try{if(document.fullscreenElement){await document.exitFullscreen();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();}else{$('footerStatus').textContent='Tela cheia indisponível neste host.';}}catch(e){$('footerStatus').textContent='Tela cheia bloqueada pelo host: '+e.message;}syncFullscreenControl();}
+let nativeFullscreen=false;
+function syncFullscreenControl(active=Boolean(document.fullscreenElement)){fullscreenButton.textContent=active?'⤢':'⛶';fullscreenButton.title=active?'Sair da tela cheia (F11)':'Ativar tela cheia (F11)';fullscreenButton.setAttribute('aria-label',active?'Sair da tela cheia':'Ativar tela cheia');}
+async function toggleFullscreen(){try{const bridge=window.pywebview?.api;if(typeof bridge?.set_fullscreen==='function'){nativeFullscreen=await bridge.set_fullscreen(!nativeFullscreen);syncFullscreenControl(nativeFullscreen);return;}if(document.fullscreenElement){await document.exitFullscreen();}else if(document.documentElement.requestFullscreen){await document.documentElement.requestFullscreen();}else{$('footerStatus').textContent='Tela cheia indisponível neste host.';}}catch(e){$('footerStatus').textContent='Tela cheia bloqueada pelo host: '+e.message;}syncFullscreenControl();}
 fullscreenButton.addEventListener('click',toggleFullscreen);
-document.addEventListener('fullscreenchange',syncFullscreenControl);
-document.addEventListener('keydown',event=>{if(event.key==='F11'){event.preventDefault();toggleFullscreen();}});
+document.addEventListener('fullscreenchange',()=>syncFullscreenControl());
+document.addEventListener('keydown',event=>{if(event.key==='F11'){event.preventDefault();toggleFullscreen();}else if(event.key==='Escape'&&nativeFullscreen){event.preventDefault();const bridge=window.pywebview?.api;if(typeof bridge?.set_fullscreen==='function'){bridge.set_fullscreen(false).then(active=>{nativeFullscreen=active;syncFullscreenControl(active);}).catch(e=>$('footerStatus').textContent='Falha ao sair da tela cheia: '+e.message);}}});
+window.addEventListener('pywebviewready',()=>{nativeFullscreen=false;syncFullscreenControl(false);});
 syncFullscreenControl();
 
 setInterval(()=>$('clock').textContent=time(),1000);$('clock').textContent=time();
