@@ -49,9 +49,9 @@
 
 - Adapter: \`app/adapters/infrastructure/intelligence/osiris_rest_adapter.py\`; class: \`OsirisRestAdapter\`.
 - Opt-in HTTPS integration through \`JARVIS_OSIRIS_API_BASE_URL\` or an explicit constructor origin.
-- Calls only \`/api/earthquakes\`, \`/api/fires\` and \`/api/news\`; no user-controlled route, query, redirect or remote URL fetcher.
+- Calls only \`/api/earthquakes\`, \`/api/fires\`, \`/api/news\` and \`/api/weather\`; no user-controlled route, query, redirect or remote URL fetcher.
 - Each route is independently bounded to 100 records, a 4 MB streamed response and a 12-second timeout by default; source health preserves partial failures.
-- News country-anchor coordinates are intentionally not treated as event coordinates. News items require an HTTPS original publisher link and a valid ISO/RFC 2822 publication timestamp.
+- News country-anchor coordinates and weather-route representative centroids are intentionally not treated as exact event coordinates. Weather source identities are retained separately for NASA EONET, NOAA/NWS and GDACS.
 - Unit tests use upstream-shaped fixtures and an injected HTTPX MockTransport. No live OSIRIS deployment is configured or verified.
 
 ## Portable Jarvis skills

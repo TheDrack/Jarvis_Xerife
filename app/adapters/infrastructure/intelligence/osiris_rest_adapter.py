@@ -32,6 +32,7 @@ _ROUTE_SPECS = {
     "earthquakes": ("earthquakes", "osiris_earthquakes"),
     "fires": ("fires", "osiris_fires"),
     "news": ("news", "osiris_news"),
+    "weather": ("weather", "osiris_weather"),
 }
 _SOURCE_TERMS = {
     "usgs_earthquakes": (
@@ -50,12 +51,25 @@ _SOURCE_TERMS = {
         "OSIRIS public news/OSINT feed; original publisher/channel rights and "
         "source bias apply. Feed classification is not independent verification."
     ),
+    "noaa_nws": (
+        "OSIRIS aggregation of NOAA/NWS active alerts; preserve alert-specific "
+        "source links and NOAA data attribution."
+    ),
+    "gdacs": (
+        "OSIRIS aggregation of GDACS disaster alerts; preserve GDACS source links "
+        "and the original provider terms."
+    ),
 }
 _USGS_FEED_URL = (
     "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson"
 )
 _FIRMS_URL = "https://firms.modaps.eosdis.nasa.gov/active_fire/"
 _EONET_URL = "https://eonet.gsfc.nasa.gov/api/v3/events"
+_WEATHER_PROVIDERS = {
+    "NASA EONET": ("nasa_eonet", _EONET_URL),
+    "NOAA/NWS": ("noaa_nws", "https://api.weather.gov/alerts/active"),
+    "GDACS": ("gdacs", "https://www.gdacs.org/"),
+}
 
 
 def _parse_datetime(value: Any) -> datetime | None:
@@ -431,6 +445,66 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
             )
         return events
 
+    def _parse_weather(
+        self, payload: dict[str, Any], limit: int
+    ) -> list[IntelligenceEvent]:
+        records = payload.get("events")
+        if not isinstance(records, list):
+            raise ValueError("OSIRIS weather collection is malformed")
+        observed_at = _parse_datetime(payload.get("timestamp")) or datetime.now(timezone.utc)
+        events: list[IntelligenceEvent] = []
+
+        for row in records[:limit]:
+            if not isinstance(row, dict):
+                continue
+            external_id = row.get("id")
+            title = row.get("title")
+            provider = row.get("provider")
+            provider_spec = _WEATHER_PROVIDERS.get(provider) if isinstance(provider, str) else None
+            if (
+                not isinstance(external_id, (str, int))
+                or not str(external_id).strip()
+                or not isinstance(title, str)
+                or not title.strip()
+                or provider_spec is None
+            ):
+                continue
+
+            source_id, fallback_url = provider_spec
+            url = _https_url(row.get("source")) or fallback_url
+            category = str(row.get("category") or row.get("type") or "weather_alert")[:100]
+            details: list[str] = []
+            for key in ("type", "severity", "area", "date", "expires"):
+                value = row.get(key)
+                if isinstance(value, (str, int, float)) and not isinstance(value, bool):
+                    details.append(f"{key}={str(value)[:300]}")
+
+            # The upstream route averages NOAA polygon vertices into a marker
+            # but does not return the original geometry type. No weather row is
+            # promoted to a precise GeoPoint until that precision is available.
+            evidence = self._evidence(
+                source_id=source_id,
+                source_name=f"{provider} (via OSIRIS)",
+                url=url,
+                publisher=provider,
+                published_at=None,
+            )
+            events.append(
+                IntelligenceEvent(
+                    event_id=f"{source_id}:{_digest(str(external_id))}",
+                    source_id=source_id,
+                    domain="climate_disaster",
+                    category=category,
+                    title=title.strip()[:500],
+                    summary="; ".join(details)[:4000] or None,
+                    url=url,
+                    observed_at=observed_at,
+                    location=None,
+                    evidence=evidence,
+                )
+            )
+        return events
+
     def collect_events(self, limit: int = 50) -> IntelligenceBatch:
         """Collect fixed event routes independently, preserving partial successes."""
         if (
@@ -456,6 +530,7 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
             "earthquakes": self._parse_earthquakes,
             "fires": self._parse_fires,
             "news": self._parse_news,
+            "weather": self._parse_weather,
         }
         events: list[IntelligenceEvent] = []
         health: list[SourceHealth] = []
@@ -496,6 +571,7 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
                 "intelligence.events.seismic",
                 "intelligence.events.wildfire",
                 "intelligence.news.read",
+                "intelligence.events.weather",
             ],
         }
 
