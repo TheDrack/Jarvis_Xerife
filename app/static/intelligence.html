@@ -15,7 +15,7 @@ a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;pad
 <div class="shell">
 <header class="top">
   <div class="brand"><div class="mark">◈</div><div><div class="eyebrow">JARVIS / COGNITIVE SYSTEMS</div><h1>UNIVERSAL INTELLIGENCE</h1></div></div>
-  <div class="actions"><span id="overall" class="status-pill">VERIFICANDO ESTADO</span><button id="refresh" class="btn">↻ Atualizar</button><a class="btn" href="/">HUD principal</a></div>
+  <div class="actions"><span id="overall" class="status-pill">VERIFICANDO ESTADO</span><button id="collect" class="btn">◎ Coletar agora</button><button id="refresh" class="btn">↻ Atualizar</button><a class="btn" href="/">HUD principal</a></div>
 </header>
 <section class="hero">
   <article class="panel hero-main"><div class="eyebrow">SITUAÇÃO OPERACIONAL</div><h2 id="headline">Inteligência em integração</h2><p id="summary">Consolidando fontes, normalização, histórico durável e apresentação em uma única superfície operacional.</p><div class="timestamp" id="updated">Aguardando primeira leitura autenticada…</div></article>
@@ -41,11 +41,11 @@ a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;pad
   const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const labels={
     not_configured:'NÃO CONFIGURADO',configured_not_probed:'CONFIGURADO · NÃO TESTADO',
-    not_scheduled:'NÃO AGENDADO',implemented:'IMPLEMENTADO',migration_defined:'MIGRATION DEFINIDA',
+    not_scheduled:'NÃO AGENDADO',on_demand:'SOB DEMANDA',implemented:'IMPLEMENTADO',migration_defined:'MIGRATION DEFINIDA',
     not_implemented:'NÃO IMPLEMENTADO',in_progress:'EM IMPLEMENTAÇÃO',unknown:'DESCONHECIDO',
     schema_ready:'SCHEMA PREPARADO'
   };
-  const tone=state=>['implemented','migration_defined'].includes(state)?'good':['configured_not_probed','in_progress'].includes(state)?'warn':'off';
+  const tone=state=>['implemented','migration_defined'].includes(state)?'good':['configured_not_probed','in_progress','on_demand'].includes(state)?'warn':'off';
   const label=state=>labels[state]||String(state||'INDEFINIDO').replaceAll('_',' ').toUpperCase();
   function showError(message){
     $('overall').textContent='API INDISPONÍVEL';$('overall').className='status-pill';
@@ -67,7 +67,7 @@ a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;pad
     const completed=stages.filter(item=>['implemented','migration_defined'].includes(item.state)).length;
     $('pipelineSummary').textContent=completed+' de '+stages.length+' etapas com implementação/schema identificados';
     $('pipeline').innerHTML=stages.map((stage,index)=>{
-      const cls=['implemented','migration_defined'].includes(stage.state)?'done':stage.state==='in_progress'?'progress':'pending';
+      const cls=['implemented','migration_defined'].includes(stage.state)?'done':['in_progress','on_demand'].includes(stage.state)?'progress':'pending';
       return '<article class="stage '+cls+'"><div class="stage-num">STAGE / 0'+(index+1)+'</div><h3>'+esc(stage.label)+'</h3><p>'+esc(stage.detail)+'</p><span class="state '+tone(stage.state)+'">'+esc(label(stage.state))+'</span></article>';
     }).join('');
     const history=data.history||{},security=data.security||{};
@@ -87,6 +87,25 @@ a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;pad
       $('feed').innerHTML='<strong>Feed ainda não conectado</strong>'+esc(plane.reason||'Sem runtime de coleta disponível.')+' Nenhum evento fictício será exibido como dado real.';
     }
   }
+  function renderSnapshot(report){
+    const events=report.events||[],observations=report.observations||[],sources=report.sources||[];
+    $('eventCount').textContent=String(events.length+observations.length);
+    $('eventCaption').textContent=events.length+' eventos · '+observations.length+' observações';
+    $('telemetryNote').textContent='Coleta executada sob demanda em '+new Date(report.generated_at).toLocaleString('pt-BR');
+    $('feed').innerHTML='<strong>Snapshot real recebido</strong><div class="rows">'+sources.map(s=>'<div class="row-item"><span>'+esc(s.source_id)+'</span><b class="'+(s.available?'':'error')+'">'+(s.available?'DISPONÍVEL':'INDISPONÍVEL · '+esc(s.error_code||'ERRO'))+'</b></div>').join('')+'</div><div class="notice">'+events.length+' eventos únicos · '+observations.length+' observações únicas · '+(report.correlations||[]).length+' correlações candidatas (não são confirmação).</div>'+(events.length?'<div class="rows">'+events.slice(0,30).map(e=>'<div class="row-item"><span>'+esc(e.title)+'<small> · '+esc(e.source_id)+' · '+esc(e.category)+'</small></span><a target="_blank" rel="noopener noreferrer" href="'+esc(e.url)+'">Fonte ↗</a></div>').join('')+'</div>':'<div class="empty">Nenhum evento retornado pelas fontes nesta coleta.</div>')+(observations.length?'<div class="rows">'+observations.slice(0,30).map(o=>'<div class="row-item"><span>'+esc(o.entity_type)+' · '+esc(o.entity_id)+'</span><b>'+esc(o.position?o.position.latitude+', '+o.position.longitude:'Sem posição')+'</b></div>').join('')+'</div>':'');
+  }
+  async function collect(){
+    const token=localStorage.getItem(TOKEN_KEY);
+    if(!token){showError('Sessão não encontrada. Entre pelo HUD principal e abra novamente este painel.');return;}
+    $('collect').disabled=true;$('collect').textContent='Coletando…';
+    try{
+      const response=await fetch('/v1/intelligence/collect?limit=50',{method:'POST',headers:{Authorization:'Bearer '+token},cache:'no-store'});
+      if(response.status===401){showError('Sessão expirada ou inválida. Entre novamente pelo HUD principal.');return;}
+      if(!response.ok)throw new Error('Coleta respondeu HTTP '+response.status);
+      renderSnapshot(await response.json());
+    }catch(error){showError(error.message||'Falha ao coletar fontes.');}
+    finally{$('collect').disabled=false;$('collect').textContent='◎ Coletar agora';}
+  }
   async function load(){
     const token=localStorage.getItem(TOKEN_KEY);
     if(!token){showError('Sessão não encontrada. Entre pelo HUD principal e abra novamente este painel.');return;}
@@ -100,8 +119,11 @@ a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;pad
     finally{$('refresh').disabled=false;$('refresh').textContent='↻ Atualizar';}
   }
   $('refresh').addEventListener('click',load);
+  $('collect').addEventListener('click',collect);
   load();setInterval(load,15000);
 })();
 </script>
 </body>
 </html>
+
+[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]

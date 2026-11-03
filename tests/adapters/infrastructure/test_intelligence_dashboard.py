@@ -4,15 +4,17 @@ from fastapi.testclient import TestClient
 
 from app.adapters.infrastructure.routers.intelligence_dashboard import (
     build_intelligence_status,
+    collect_live_intelligence,
     create_intelligence_dashboard_router,
 )
 
 
-def _client(user_dependency=None):
+def _client(user_dependency=None, collector=None):
     app = FastAPI()
     app.include_router(
         create_intelligence_dashboard_router(
-            user_dependency or (lambda: {"username": "test-user"})
+            user_dependency or (lambda: {"username": "test-user"}),
+            collector=collector or collect_live_intelligence,
         )
     )
     return TestClient(app)
@@ -86,3 +88,5 @@ def test_main_hud_links_to_universal_intelligence():
     )
     assert 'href="/intelligence"' in hud
     assert "Abrir painel Universal Intelligence" in hud
+
+[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]
