@@ -177,7 +177,8 @@ def test_public_snapshot_is_json_ready_and_reports_source_health(adapter_factory
         lambda request: httpx.Response(503, json={"error": "offline"})
     )
     snapshot = adapter.collect_public_snapshot(limit=1)
-    assert set(snapshot) == {"events", "sources"}
+    assert set(snapshot) == {"events", "observations", "sources"}
+    assert snapshot["observations"] == []
     assert len(snapshot["sources"]) == 3
     assert all(source["available"] is False for source in snapshot["sources"])
     manifest = ToolRegistry.from_file().get("intelligence.snapshot.collect")
