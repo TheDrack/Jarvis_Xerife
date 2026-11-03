@@ -124,6 +124,8 @@ def discover_devices(cidr: str) -> dict[str, Any]:
             command,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=4,
             check=False,
             shell=False,
@@ -134,7 +136,7 @@ def discover_devices(cidr: str) -> dict[str, Any]:
             "error": f"Nao foi possivel consultar a tabela ARP: {exc}",
         }
     devices: dict[str, dict[str, str]] = {}
-    for line in completed.stdout.splitlines():
+    for line in (completed.stdout or "").splitlines():
         mac_match = re.search(r"(?i)([0-9a-f]{2}(?:[:-][0-9a-f]{2}){5})", line)
         if not mac_match:
             continue

@@ -303,12 +303,27 @@ class PublicIntelligenceAdapter(IntelligenceSource, NexusComponent):
                 )
                 health.append(SourceHealth(source_id=source_id, available=True))
             except (RuntimeError, ValueError, TypeError) as exc:
-                logger.warning("Intelligence source unavailable: %s", source_id)
+                cause = exc.__cause__
+                if isinstance(cause, httpx.HTTPStatusError):
+                    error_code = f"HTTP_{cause.response.status_code}"
+                elif isinstance(cause, httpx.TimeoutException):
+                    error_code = "TIMEOUT"
+                elif isinstance(cause, httpx.RequestError):
+                    error_code = "NETWORK_ERROR"
+                elif isinstance(exc, ValueError):
+                    error_code = "INVALID_RESPONSE"
+                elif isinstance(exc, TypeError):
+                    error_code = "INVALID_DATA"
+                else:
+                    error_code = type(cause).__name__ if cause else "RUNTIME_ERROR"
+                logger.warning(
+                    "Intelligence source unavailable: %s (%s)", source_id, error_code
+                )
                 health.append(
                     SourceHealth(
                         source_id=source_id,
                         available=False,
-                        error_code=type(exc).__name__,
+                        error_code=error_code,
                     )
                 )
         return IntelligenceBatch(events=tuple(events), sources=tuple(health))

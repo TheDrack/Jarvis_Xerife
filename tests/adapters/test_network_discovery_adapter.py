@@ -36,6 +36,16 @@ class NetworkDiscoveryAdapterTests(unittest.TestCase):
         run.assert_called_once()
         self.assertFalse(run.call_args.kwargs.get("shell", True))
 
+    @patch("app.adapters.edge.network_discovery_adapter.subprocess.run")
+    def test_arp_discovery_tolerates_empty_stdout(self, run):
+        run.return_value = Mock(stdout=None, returncode=0)
+        with patch("app.adapters.edge.network_discovery_adapter.platform.system", return_value="Windows"):
+            result = discover_devices("192.168.1.0/24")
+        self.assertTrue(result["success"])
+        self.assertEqual(result["devices"], [])
+        self.assertEqual(result["active_probes_sent"], 0)
+        self.assertEqual(run.call_args.kwargs.get("errors"), "replace")
+
     def test_inspection_rejects_public_address(self):
         self.assertFalse(inspect_private_address("1.1.1.1")["success"])
 
