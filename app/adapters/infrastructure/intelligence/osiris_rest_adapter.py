@@ -361,10 +361,7 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
                 time_text,
                 str(row.get("title") or ""),
             )
-            title = str(
-                row.get("title")
-                or ("Volcanic activity" if is_volcano else "Active fire detection")
-            )[:500]
+            title = str(row.get("title") or "Active fire detection")[:500]
 
             details = []
             for key in ("brightness", "confidence", "frp"):

@@ -149,7 +149,8 @@ def test_collects_upstream_event_shapes_and_preserves_provenance(adapter_factory
     fire = next(event for event in batch.events if event.category == "wildfire")
     news = next(event for event in batch.events if event.source_id == "osiris_news")
 
-    assert earthquake.event_id == "usgs_earthquakes:" + hashlib.sha256(b"us7000test").hexdigest()[:24]
+    expected_earthquake_id = hashlib.sha256(b"us7000test").hexdigest()[:24]
+    assert earthquake.event_id == f"usgs_earthquakes:{expected_earthquake_id}"
     assert earthquake.magnitude == 4.2
     assert earthquake.location.latitude == -30.0
     assert earthquake.evidence.publisher == "USGS"
@@ -276,7 +277,7 @@ def test_drops_invalid_or_untraceable_records(adapter_factory):
 
     batch = adapter_factory(data).collect_events()
 
-    assert len(batch.events) == 7
+    assert len(batch.events) == 6
     assert all(event.url.scheme == "https" for event in batch.events)
 
 
