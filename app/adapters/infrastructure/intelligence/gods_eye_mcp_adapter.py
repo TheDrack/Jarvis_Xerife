@@ -38,6 +38,9 @@ _QUERY_SPECS = {
     "vessels_in_area": ("vessel", "area", "mmsi", "observed_at"),
     "satellites_overhead": ("satellite", "location", "norad", None),
 }
+_SATELLITE_GROUPS = ("visual", "gps-ops", "glo-ops", "galileo", "geo", "starlink", "stations")
+
+
 _ATTRIBUTE_KEYS = {
     "aircraft": (
         "callsign", "altitude_m", "on_ground", "speed_mps", "course_deg",
@@ -48,7 +51,7 @@ _ATTRIBUTE_KEYS = {
         "name", "imo", "type", "destination", "speed_mps", "course_deg",
         "heading_deg", "distance_km",
     ),
-    "satellite": ("name", "elevation_deg", "azimuth_deg", "direction"),
+    "satellite": ("name", "group", "elevation_deg", "azimuth_deg", "direction"),
 }
 
 
@@ -212,9 +215,17 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
     @staticmethod
     def _is_safe_query_tool(definition: Any, required_property: str) -> bool:
         annotations = _field(definition, "annotations", {}) or {}
-        if _field(annotations, "readOnlyHint") is not True:
+        read_only_hint = _field(annotations, "readOnlyHint")
+        if read_only_hint is None:
+            # MCP SDK model objects expose snake_case attributes, while JSON
+            # wire dictionaries use camelCase annotation keys.
+            read_only_hint = _field(annotations, "read_only_hint", False)
+        destructive_hint = _field(annotations, "destructiveHint")
+        if destructive_hint is None:
+            destructive_hint = _field(annotations, "destructive_hint", False)
+        if read_only_hint is not True:
             return False
-        if _field(annotations, "destructiveHint") is True:
+        if destructive_hint is True:
             return False
         schema = _field(definition, "inputSchema", None)
         if schema is None:
@@ -287,7 +298,7 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
 
     async def collect_observations(self) -> IntelligenceBatch:
         """Discover and invoke only safe allowlisted query tools, returning partial health."""
-        observations: list[IntelligenceObservation] = []
+        observations_by_entity: dict[tuple[str, str], IntelligenceObservation] = {}
         succeeded = 0
         failed = 0
         try:
@@ -302,27 +313,48 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
                     definition = definitions.get(tool_name)
                     if definition is None or not self._is_safe_query_tool(definition, required_property):
                         continue
-                    try:
-                        result = await asyncio.wait_for(
-                            session.call_tool(tool_name, arguments=self._tool_arguments(tool_name)),
-                            timeout=self._timeout,
+
+                    groups = _SATELLITE_GROUPS if entity_type == "satellite" else (None,)
+                    for group in groups:
+                        current_count = sum(
+                            1 for kind, _ in observations_by_entity if kind == entity_type
                         )
-                        if _field(result, "isError", False):
-                            raise RuntimeError("MCP query returned an error")
-                        data = _structured_payload(result)
-                        rows = data.get("rows", [])
-                        if not isinstance(rows, list):
-                            raise ValueError("MCP query rows are malformed")
-                        for row in rows[: self._limit]:
-                            observation = self._to_observation(
-                                entity_type, row, data, timestamp_field
+                        remaining = self._limit - current_count
+                        if remaining <= 0:
+                            break
+
+                        arguments = self._tool_arguments(tool_name)
+                        arguments["limit"] = min(self._limit, remaining)
+                        if group is not None:
+                            arguments["group"] = group
+                        try:
+                            result = await asyncio.wait_for(
+                                session.call_tool(tool_name, arguments=arguments),
+                                timeout=self._timeout,
                             )
-                            if observation is not None:
-                                observations.append(observation)
-                        succeeded += 1
-                    except (asyncio.TimeoutError, RuntimeError, ValueError, TypeError):
-                        failed += 1
-                        logger.warning("God's Eye View query failed: %s", tool_name)
+                            if _field(result, "isError", False):
+                                raise RuntimeError("MCP query returned an error")
+                            data = _structured_payload(result)
+                            rows = data.get("rows", [])
+                            if not isinstance(rows, list):
+                                raise ValueError("MCP query rows are malformed")
+                            for row in rows[: arguments["limit"]]:
+                                if group is not None and isinstance(row, dict):
+                                    row = {**row, "group": group}
+                                observation = self._to_observation(
+                                    entity_type, row, data, timestamp_field
+                                )
+                                if observation is not None:
+                                    identity = (observation.entity_type, observation.entity_id)
+                                    observations_by_entity.setdefault(identity, observation)
+                            succeeded += 1
+                        except (asyncio.TimeoutError, RuntimeError, ValueError, TypeError):
+                            failed += 1
+                            logger.warning(
+                                "God's Eye View query failed: %s%s",
+                                tool_name,
+                                f" ({group})" if group else "",
+                            )
 
             available = succeeded > 0
             error_code = (
@@ -332,7 +364,7 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
                 None
             )
             return IntelligenceBatch(
-                observations=tuple(observations),
+                observations=tuple(observations_by_entity.values()),
                 sources=(
                     SourceHealth(
                         source_id=SOURCE_ID,

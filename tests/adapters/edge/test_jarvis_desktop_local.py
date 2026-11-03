@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import sys
+
+import pytest
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -313,3 +315,43 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
     assert {item["source_id"] for item in response.json()["sources"]} == {
         "public_intelligence", "osiris_earthquakes", "gods_eye_view"
     }
+
+
+@pytest.mark.asyncio
+async def test_intelligence_status_marks_partial_gev_as_degraded():
+    import httpx
+
+    runtime = LocalRuntime()
+    runtime.last_intelligence = {
+        "sources": [
+            {
+                "source_id": "gods_eye_view",
+                "available": True,
+                "error_code": "PartialFailure",
+            }
+        ],
+        "unique_event_count": 4,
+        "unique_observation_count": 9,
+        "collected_at": "2026-11-03T14:00:00+00:00",
+    }
+    transport = httpx.ASGITransport(
+        app=create_local_app(runtime),
+        client=("127.0.0.1", 54321),
+    )
+
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://127.0.0.1:8766",
+    ) as client:
+        response = await client.get(
+            "/api/intelligence/status",
+            headers={"Authorization": f"Bearer {runtime.token}"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    gev = next(source for source in payload["sources"] if source["id"] == "gods_eye_view")
+    assert gev["runtime"] == "degraded"
+    assert "PartialFailure" in gev["details"]
+    assert payload["data_plane"]["available"] is True
+    assert payload["data_plane"]["observation_count"] == 9

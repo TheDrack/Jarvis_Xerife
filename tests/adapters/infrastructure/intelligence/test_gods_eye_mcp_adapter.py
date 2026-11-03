@@ -93,10 +93,18 @@ async def test_collects_bounded_aircraft_vessel_and_satellite_observations():
     assert satellite.attributes["name"] == "ISS"
     assert all(item.evidence[0].source_id == "gods_eye_view" for item in batch.observations)
     assert [name for name, _ in session.calls] == [
-        "aircraft_in_area", "vessels_in_area", "satellites_overhead"
+        "aircraft_in_area",
+        "vessels_in_area",
+        *("satellites_overhead" for _ in (
+            "visual", "gps-ops", "glo-ops", "galileo", "geo", "starlink", "stations"
+        )),
     ]
     assert session.calls[0][1]["area"]["bbox"] == [-49.0, -28.0, -48.0, -27.0]
     assert session.calls[2][1]["location"] == {"lat": -27.5, "lon": -48.5}
+    assert [args["group"] for name, args in session.calls if name == "satellites_overhead"] == [
+        "visual", "gps-ops", "glo-ops", "galileo", "geo", "starlink", "stations"
+    ]
+    assert satellite.attributes["group"] == "visual"
 
 
 @pytest.mark.asyncio
@@ -202,3 +210,52 @@ def test_execute_reports_configuration_without_starting_mcp_process():
     assert result["success"] is True
     assert result["execution_mode"] == "read_only"
     assert result["configured"] is True
+
+
+@pytest.mark.asyncio
+async def test_accepts_mcp_sdk_snake_case_read_only_annotations():
+    safe_tool = SimpleNamespace(
+        name="aircraft_in_area",
+        annotations=SimpleNamespace(read_only_hint=True, destructive_hint=False),
+        input_schema={
+            "type": "object",
+            "properties": {"area": {"type": "object"}, "limit": {"type": "integer"}},
+            "required": ["area"],
+        },
+    )
+    destructive_tool = SimpleNamespace(
+        name="vessels_in_area",
+        annotations=SimpleNamespace(read_only_hint=True, destructive_hint=True),
+        input_schema={
+            "type": "object",
+            "properties": {"area": {"type": "object"}},
+            "required": ["area"],
+        },
+    )
+    session = FakeSession(
+        [safe_tool, destructive_tool],
+        {
+            "aircraft_in_area": {
+                "observed_at": "2026-11-03T12:00:00Z",
+                "rows": [{
+                    "id": "abc123",
+                    "lat": -27.1,
+                    "lon": -48.6,
+                    "last_contact": "2026-11-03T11:59:00Z",
+                }],
+            },
+        },
+    )
+    adapter = GodsEyeMcpAdapter(
+        area={"west": -49.0, "south": -28.0, "east": -48.0, "north": -27.0},
+        session_factory=factory(session),
+        limit=10,
+    )
+
+    batch = await adapter.collect_observations()
+
+    assert len(batch.observations) == 1
+    assert batch.observations[0].entity_type == "aircraft"
+    assert batch.sources[0].available is True
+    assert batch.sources[0].error_code is None
+    assert [name for name, _ in session.calls] == ["aircraft_in_area"]
