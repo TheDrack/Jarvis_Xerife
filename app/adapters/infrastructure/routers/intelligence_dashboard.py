@@ -23,6 +23,7 @@ def build_intelligence_status() -> dict[str, Any]:
     root = _repository_root()
     migration = root / "supabase" / "migrations" / "20261103100304_intelligence_history.sql"
     migration_present = migration.is_file()
+    adapter_present = (root / "app" / "adapters" / "infrastructure" / "intelligence" / "supabase_intelligence_history_adapter.py").is_file()
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -100,7 +101,7 @@ def build_intelligence_status() -> dict[str, Any]:
         "history": {
             "migration_file_present": migration_present,
             "remote_migration_state": "unverified",
-            "persistence_adapter": "implemented_not_connected",
+            "persistence_adapter": "implemented" if adapter_present else "not_implemented",
             "production_write_performed": False,
         },
         "security": {

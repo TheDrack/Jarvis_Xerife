@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+import logging
 import os
 import json
 import secrets
@@ -20,6 +21,8 @@ from pydantic import BaseModel, Field
 from app.adapters.edge.network_discovery_adapter import discover_devices, network_interfaces
 from app.adapters.infrastructure.routers.intelligence_dashboard import build_intelligence_status
 from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
+
+logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
@@ -335,6 +338,10 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                     if error_code
                     else "Estado observado na última consulta MCP read-only."
                 )
+        history_runtime = latest.get("history") or {}
+        payload["history"]["runtime_status"] = history_runtime.get("status", "not_checked")
+        payload["history"]["runtime_reason"] = history_runtime.get("reason")
+
         payload["data_plane"] = {
             "available": bool(latest_health and any(item.get("available") for item in latest_health.values())),
             "reason": None if latest_health and any(item.get("available") for item in latest_health.values()) else "no_source_available",
@@ -432,6 +439,26 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             payload = report.model_dump(mode="json")
             payload["collected_at"] = datetime.now(timezone.utc).isoformat()
             payload["runtime"] = "local"
+
+            from app.adapters.infrastructure.intelligence.supabase_intelligence_history_adapter import (
+                SupabaseIntelligenceHistoryAdapter,
+            )
+            history_adapter = SupabaseIntelligenceHistoryAdapter()
+            try:
+                payload["history"] = await _run_sync_io_off_loop(
+                    history_adapter.persist_batch, batch
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Intelligence history persistence unavailable (%s)",
+                    type(exc).__name__,
+                )
+                payload["history"] = {
+                    "status": "error",
+                    "reason": type(exc).__name__,
+                    "events_submitted": 0,
+                    "observations_submitted": 0,
+                }
             state.last_intelligence = payload
             return payload
         finally:
@@ -445,8 +472,36 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
 
     @app.get("/api/intelligence/latest")
     async def latest_intelligence(_client: str = Depends(require_local_token)) -> dict[str, Any]:
-        return state.last_intelligence or {"events": [], "observations": [], "sources": [],
-                                           "unique_event_count": 0, "collected_at": None}
+        from app.adapters.infrastructure.intelligence.supabase_intelligence_history_adapter import (
+            SupabaseIntelligenceHistoryAdapter,
+        )
+        try:
+            history = await _run_sync_io_off_loop(
+                SupabaseIntelligenceHistoryAdapter().load_latest, 100
+            )
+            if history.get("history_status") == "persisted":
+                latest = dict(state.last_intelligence or {})
+                latest.update(history)
+                latest["unique_event_count"] = len(history["events"])
+                latest["unique_observation_count"] = len(history["observations"])
+                latest.setdefault("sources", [])
+                latest.setdefault("collected_at", None)
+                latest["history"] = {
+                    "status": "persisted",
+                    "events_loaded": len(history["events"]),
+                    "observations_loaded": len(history["observations"]),
+                }
+                return latest
+        except Exception as exc:
+            logger.warning(
+                "Intelligence history reload unavailable (%s)", type(exc).__name__
+            )
+        return state.last_intelligence or {
+            "events": [], "observations": [], "sources": [],
+            "unique_event_count": 0, "unique_observation_count": 0,
+            "collected_at": None,
+            "history": {"status": "unavailable"},
+        }
 
     @app.get("/api/network/status")
     async def network_status(_client: str = Depends(require_local_token)) -> dict[str, Any]:
