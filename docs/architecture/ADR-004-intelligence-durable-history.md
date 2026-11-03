@@ -35,12 +35,14 @@ The existing \`execution_plan_events\` journal belongs to task execution. \`jarv
 
 ## Follow-up implementation
 
-1. Add an application persistence port and a server-side Supabase adapter.
-2. Serialize canonical payloads, compute stable semantic hashes and insert with conflict-safe idempotency.
-3. Test both tables against a disposable local/development PostgreSQL database, including duplicate replay, changed event versions, different observation times, same-time conflicts, RLS and role grants.
-4. Reconcile local migration filenames with the connected project's existing migration ledger before any remote migration operation.
-5. Define retention and archival policy before scheduling continuous observation ingestion.
+1. **Application port and server-side adapter:** implemented in the incremental history-adapter PR. The adapter obtains credentials only through the existing service-role-only factory and fails closed when unavailable.
+2. **Canonical serialization and idempotency:** implemented with SHA-256 semantic hashes and Supabase upserts using ignore-duplicates. Event hashes exclude polling and evidence-collection timestamps; observation hashes preserve snapshot time while excluding evidence-collection timestamps.
+3. **Runtime connection:** still pending. The adapter is not called by the collection endpoint or scheduler; this increment performs no database writes.
+4. **Database integration verification:** pending. Unit tests use a fake Supabase client; both tables still require tests against a disposable local/development PostgreSQL database, including duplicate replay, changed event versions, different observation times, same-time conflicts, RLS and role grants.
+5. Reconcile local migration filenames with the connected project's existing migration ledger before any remote migration operation.
+6. Define retention and archival policy before scheduling continuous observation ingestion.
 
+A successful adapter unit test is not evidence that the migration is applied, that the service-role credential exists, or that durable history is operational.
 ## Migration
 
 - \`supabase/migrations/20261103100304_intelligence_history.sql\`
