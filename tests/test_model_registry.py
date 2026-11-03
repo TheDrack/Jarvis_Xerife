@@ -1,7 +1,7 @@
 import pytest
 
 from app.multiagent.model_registry import ModelProfile, ModelRegistry, ModelRuntimeBindings
-from app.application.ports.model_runtime import ModelInvocationRequest, ModelInvocationResult, ModelUsage
+from app.application.ports.model_runtime import ModelInvocationResult, ModelRuntimeError, ModelUsage
 
 
 def make_profile(model_id, provider_id):
