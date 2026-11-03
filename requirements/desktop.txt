@@ -1,6 +1,7 @@
-# Desktop-only runtime; excluded from Render/cloud requirements.
+# Desktop-only runtime and Windows packaging; excluded from Render/cloud requirements.
 pywebview>=5.4,<7
 fastapi>=0.115,<1
 uvicorn>=0.30,<1
 httpx>=0.27,<1
 psutil>=6,<8
+pyinstaller>=6.19,<7

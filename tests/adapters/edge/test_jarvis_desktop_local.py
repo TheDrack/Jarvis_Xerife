@@ -19,12 +19,23 @@ from app.adapters.edge.jarvis_desktop_local import (
 )
 
 
+class _ClientAddressMiddleware:
+    """Set the ASGI client address without depending on a Starlette TestClient version."""
+
+    def __init__(self, app, address: str) -> None:
+        self.app = app
+        self.client = (address, 54321)
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "http":
+            scope = dict(scope)
+            scope["client"] = self.client
+        await self.app(scope, receive, send)
+
+
 def _client(runtime: LocalRuntime, address: str = "127.0.0.1") -> TestClient:
-    return TestClient(
-        create_local_app(runtime),
-        base_url=f"http://{address}:8766",
-        client=(address, 54321),
-    )
+    app = _ClientAddressMiddleware(create_local_app(runtime), address)
+    return TestClient(app, base_url=f"http://{address}:8766")
 
 
 def test_private_network_guard_accepts_loopback_lan_and_tailscale():
