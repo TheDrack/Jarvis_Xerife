@@ -44,6 +44,16 @@ Returned aircraft, vessel and satellite rows become IntelligenceObservation reco
 
 This adapter is unit-tested with an injected fake MCP session. It has not been verified against a configured live God's Eye View checkout or running app. No endpoint, credentials, database, scheduler, production service or deployment is configured by this change. GEV's MIT code license does not grant rights to underlying data/assets; provider attribution and dataset terms remain applicable.
 
+## OSIRIS REST adapter 0.5
+
+OsirisRestAdapter consumes only the fixed read-only \`/api/earthquakes\`, \`/api/fires\` and \`/api/news\` routes. It uses HTTPS, rejects redirects, streams responses with a 4 MB byte cap, applies a 12-second timeout and limits each normalized route to 100 records. The base origin is supplied explicitly or through \`JARVIS_OSIRIS_API_BASE_URL\`; no default live deployment is assumed.
+
+Earthquakes preserve USGS event IDs, event times, magnitudes, coordinates and event-page links. Fires preserve bounded FIRMS/EONET fields and distinguish date-only records from minute-level acquisition timestamps. News preserves the original publisher link, publisher label and publication time, including ISO and RFC 2822 dates. OSIRIS keyword-derived country-anchor coordinates are deliberately not converted into event geolocation.
+
+Each route reports independent SourceHealth; one route failure does not discard successful route data. Non-HTTPS publisher links and malformed records are dropped. The feed's risk score and source-side political labels are not treated as verified analysis or corroboration. Cross-post metadata is not converted into multiple independent evidence records.
+
+The adapter is unit-tested against fixtures matching the upstream route shapes. It has not been connected to a configured live OSIRIS deployment; no credentials, production endpoint, Nexus registration, database, scheduler or deployment are changed. Weather, flights, maritime and satellite routes remain separate follow-up increments because their geometry precision, moving-entity semantics, payload sizes and source behavior require dedicated contracts and controls.
+
 ## Intelligence Core 0.2
 
 IntelligenceCore is a pure, provider-neutral application service. It performs no network calls, persistence, scheduling or delivery. For repeated (source_id, event_id) identities, the newest observed_at wins; equal timestamps are resolved by the lexicographically greatest canonical JSON serialization of the complete event. This rule is independent of input order. Candidate correlations use canonical URL equality or exact normalized headlines within the same domain/category and a 24-hour window. Original events and evidence remain separate; a candidate is not corroboration.
@@ -64,8 +74,8 @@ Domain contracts and application services remain OS-neutral. Host-specific sched
 
 ## Next increments
 
-1. Add the per-route OSIRIS REST adapter with upstream-derived fixtures.
-2. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
+1. Add a configured GEV runtime probe and Nexus registration only after a real local checkout/app is available.
+2. Add the OSIRIS weather, flights, maritime and satellite routes with explicit geometry/moving-entity controls.
 3. Add durable observation history and retention policies.
 4. Add track continuity as a separate policy service; never infer identity from provider IDs alone.
 5. Add evidence/corroboration and contradiction contracts.
