@@ -1,0 +1,57 @@
+from pathlib import Path
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+MIGRATION = (
+    REPOSITORY_ROOT
+    / "supabase"
+    / "migrations"
+    / "20261104223338_lock_down_legacy_public_tables.sql"
+)
+LEGACY_TABLES = {
+    "capabilities",
+    "command_results",
+    "devices",
+    "interactions",
+    "jarvis_capabilities",
+    "thought_logs",
+    "user",
+}
+
+
+def test_legacy_table_lockdown_migration_covers_every_audited_table():
+    sql = MIGRATION.read_text(encoding="utf-8")
+
+    for table in LEGACY_TABLES:
+        assert f"'{table}'" in sql
+
+
+def test_legacy_table_lockdown_revokes_table_and_column_privileges():
+    sql = MIGRATION.read_text(encoding="utf-8")
+
+    assert "REVOKE ALL PRIVILEGES ON TABLE" in sql
+    assert "REVOKE ALL PRIVILEGES (%s) ON TABLE" in sql
+    assert "FROM PUBLIC, anon, authenticated" in sql
+
+
+def test_legacy_table_lockdown_removes_the_role_only_policy_idempotently():
+    sql = MIGRATION.read_text(encoding="utf-8")
+
+    assert "DROP POLICY IF EXISTS" in sql
+    assert "Enable all for authenticated users" in sql
+
+
+def test_legacy_table_lockdown_does_not_revoke_service_role():
+    sql = MIGRATION.read_text(encoding="utf-8")
+
+    # Inspect executable SQL only; comments may legitimately describe
+    # service_role and revocations without representing a SQL statement.
+    executable_lines = [
+        line for line in sql.splitlines() if not line.lstrip().startswith("--")
+    ]
+    revoke_lines = [
+        line for line in executable_lines if "REVOKE" in line.upper()
+    ]
+
+    assert revoke_lines
+    assert all("service_role" not in line.lower() for line in revoke_lines)
