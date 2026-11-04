@@ -6,7 +6,7 @@ MIGRATION = (
     REPOSITORY_ROOT
     / "supabase"
     / "migrations"
-    / "20261104192500_lock_down_legacy_public_tables.sql"
+    / "20261104223338_lock_down_legacy_public_tables.sql"
 )
 LEGACY_TABLES = {
     "capabilities",
