@@ -44,10 +44,14 @@ def test_legacy_table_lockdown_removes_the_role_only_policy_idempotently():
 def test_legacy_table_lockdown_does_not_revoke_service_role():
     sql = MIGRATION.read_text(encoding="utf-8")
 
-    # The migration must preserve the server-only path used by AuthAdapter
-    # and administrator recovery. It never mentions service_role in a revoke.
-    revoke_lines = [
-        line for line in sql.splitlines() if "REVOKE" in line.upper()
+    # Inspect executable SQL only; comments may legitimately describe
+    # service_role and revocations without representing a SQL statement.
+    executable_lines = [
+        line for line in sql.splitlines() if not line.lstrip().startswith("--")
     ]
+    revoke_lines = [
+        line for line in executable_lines if "REVOKE" in line.upper()
+    ]
+
     assert revoke_lines
     assert all("service_role" not in line.lower() for line in revoke_lines)
