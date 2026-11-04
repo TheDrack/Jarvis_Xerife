@@ -186,8 +186,8 @@ def test_universal_intelligence_prioritizes_live_topics_and_real_correlations():
 def test_windows_network_commands_never_create_visible_console_windows():
     local = (ROOT / "app" / "adapters" / "edge" / "jarvis_desktop_local.py").read_text(encoding="utf-8")
     network = (ROOT / "app" / "adapters" / "edge" / "network_discovery_adapter.py").read_text(encoding="utf-8")
-    assert local.count("creationflags=getattr(subprocess, \"CREATE_NO_WINDOW\", 0x08000000)") >= 2
-    assert "creationflags=getattr(subprocess, \"CREATE_NO_WINDOW\", 0x08000000)" in network
+    assert local.count("creationflags=getattr(subprocess, \"CREATE_NO_WINDOW\", 0)") >= 2
+    assert "creationflags=getattr(subprocess, \"CREATE_NO_WINDOW\", 0)" in network
 
 
 def test_camera_cards_and_registered_devices_open_contextual_inspectors():
