@@ -29,6 +29,48 @@ _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
 _ICON_PATH = _REPO_ROOT / "app" / "static" / "jarvis-icon.svg"
 _WINDOWS_ICON_PATH = _REPO_ROOT / "desktop" / "jarvis.ico"
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
+_LOCAL_INTELLIGENCE_KEYS = {
+    "JARVIS_OSIRIS_ENABLED",
+    "JARVIS_OSIRIS_API_BASE_URL",
+    "JARVIS_GEV_MCP_ENTRYPOINT",
+    "JARVIS_GEV_API_BASE_URL",
+    "JARVIS_GEV_AREA_WEST",
+    "JARVIS_GEV_AREA_SOUTH",
+    "JARVIS_GEV_AREA_EAST",
+    "JARVIS_GEV_AREA_NORTH",
+}
+
+
+def _load_local_intelligence_config(path: Path | None = None) -> int:
+    """Load allowlisted local source settings without overriding process env."""
+    if path is None:
+        local_app_data = Path(
+            os.getenv("LOCALAPPDATA") or (Path.home() / "AppData" / "Local")
+        )
+        path = local_app_data / "Jarvis_Xerife" / "intelligence.env"
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return 0
+
+    loaded = 0
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"\"", "'"}:
+            value = value[1:-1]
+        if key not in _LOCAL_INTELLIGENCE_KEYS or not value:
+            continue
+        if not os.getenv(key):
+            os.environ[key] = value
+            loaded += 1
+    return loaded
+
+
 _RFC1918 = tuple(ipaddress.ip_network(value) for value in (
     "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"
 ))
@@ -385,9 +427,11 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             if not isinstance(public_batch, IntelligenceBatch):
                 public_batch = IntelligenceBatch.model_validate(public_batch)
 
-            # OSIRIS is optional. Its adapter returns explicit NotConfigured health
-            # without making network requests when no HTTPS origin is configured.
-            if os.getenv("JARVIS_OSIRIS_API_BASE_URL", "").strip():
+            osiris_enabled = (
+                os.getenv("JARVIS_OSIRIS_ENABLED", "true").strip().lower()
+                not in {"0", "false", "no", "off", "disabled"}
+            )
+            if osiris_enabled:
                 osiris = nexus.resolve(
                     "OsirisRestAdapter",
                     hint_path="app.adapters.infrastructure.intelligence.osiris_rest_adapter.py",
@@ -398,7 +442,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 osiris_batch = IntelligenceBatch(
                     sources=tuple(
                         SourceHealth(source_id=source_id, available=False,
-                                     error_code="NotConfigured")
+                                     error_code="Disabled")
                         for source_id in (
                             "osiris_earthquakes", "osiris_fires",
                             "osiris_news", "osiris_weather",
@@ -561,6 +605,7 @@ def run_local_server(host: str = "0.0.0.0", port: int = 8766) -> tuple[Any, Any]
     import threading
     import uvicorn
 
+    _load_local_intelligence_config()
     config = _build_uvicorn_config(create_local_app(), host, port)
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, name="jarvis-local-api", daemon=True)

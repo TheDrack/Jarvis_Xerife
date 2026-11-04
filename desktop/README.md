@@ -74,10 +74,17 @@ access, use the user's approved authenticated private HTTPS route instead.
 ## Functional layers
 
 - **Intelligence:** GDELT, NASA EONET and USGS are collected only on explicit click.
-  Collection and deterministic deduplication/correlation run in the local Python
-  process. Source health and partial failures are returned; no data is fabricated.
-  OSIRIS and God's Eye View are displayed as optional integrations and are not claimed
-  connected unless their runtime probes exist.
+  OSIRIS uses the public read-only API at https://osirisai.live by default; set
+  JARVIS_OSIRIS_ENABLED=false to disable it or JARVIS_OSIRIS_API_BASE_URL to use
+  another HTTPS origin. God's Eye View connects through its local MCP STDIO server.
+  Its entrypoint, loopback API base and bounded geographic area are loaded from
+  %LOCALAPPDATA%\Jarvis_Xerife\intelligence.env; only the documented
+  JARVIS_OSIRIS_* and JARVIS_GEV_* keys are accepted, and process environment
+  variables take precedence. Collection and deterministic deduplication/correlation
+  run in the local Python process. Source health and partial failures are returned;
+  no data is fabricated. The GEV vessel query requires AISSTREAM_API_KEY in the
+  God's Eye View server environment; without it, aircraft and satellite observations
+  can still succeed and the source is reported as partially degraded.
 - **Network:** local interfaces and the OS ARP neighbour cache are read on the PC.
   The ARP view sends zero active probes. Tailscale peer state is read from the local CLI,
   so Android online/offline status is visible. Android ADB state is displayed only if
