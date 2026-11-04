@@ -1,9 +1,9 @@
 # Supabase Migration Ledger Reconciliation
 
-**Audit date:** 2026-11-03 (America/Sao_Paulo)  
-**Repository:** `TheDrack/Jarvis_Xerife`  
-**Audited base:** `origin/main` at `e50d9332`  
-**Supabase project:** `saibtpdehhprttqlgqdt` (`jarvis-xerife`)  
+**Audit date:** 2026-11-03 (America/Sao_Paulo)
+**Repository:** `TheDrack/Jarvis_Xerife`
+**Audited base:** `origin/main` at `e50d9332`
+**Supabase project:** `saibtpdehhprttqlgqdt` (`jarvis-xerife`)
 **Scope:** read-only comparison of repository migration files, remote migration ledger, and selected remote schema objects.
 
 ## Safety boundary
@@ -113,6 +113,7 @@ This confirms the worker migration `20261103184308_intelligence_recurring_worker
 2. The `google_linked_identities` duplicate could represent a duplicate application, a renamed/recreated migration, or a historical repair. The ledger alone cannot distinguish these cases.
 3. Some objects exist despite missing exact ledger counterparts. For example, `release_jarvis_agent_task` exists, while its local migration timestamp is not in the remote list. This requires definition-level comparison, not blind repair.
 4. The provider/heartbeat migration has overlapping schema evidence, but the role-aware claim logic in `202610260001_red_blue_venice_routing.sql` must not be presumed installed.
+   Read-only `pg_get_functiondef` inspection confirmed that both remote claim RPCs lack a `model_provider` predicate and any Venice/role-aware routing condition. The remote provider column/index therefore represent only partial schema overlap, not the required enforcement behavior.
 5. The worker lease and telemetry objects are absent; applying that migration is a separate production change and is outside this audit's authorization boundary.
 
 ## Recommended reconciliation procedure
