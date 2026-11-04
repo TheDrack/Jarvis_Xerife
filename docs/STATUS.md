@@ -1,7 +1,7 @@
 # JARVIS — Status do Projeto
 
 **Versão:** 2.0.0  
-**Revisão documental:** 2026-11-03
+**Revisão documental:** 2026-11-04
 **Escopo desta revisão:** alinhar catálogo de habilidades/capacidades e roadmap ao que está documentado. Não equivale a uma auditoria completa do runtime nem a uma confirmação de deploy.
 
 ## Visão geral e qualidade da evidência
@@ -24,14 +24,15 @@
 | Deploy Render | Serviço configurado para deploy por novo commit após checks; deploy pode ser sujeito a cooldown externo configurado pelo operador | Confirmar SHA do deploy e health check após a janela de cooldown; merge não é prova de deploy |
 | Governança da branch main | **Proteção ausente; issue #682 aberta** | API do GitHub confirmou `protected=false`, `protection.enabled=false` e zero rulesets. Exigir PR e o check de validação sempre executado; o workflow path-filtered da fila precisa de agregador antes de ser obrigatório globalmente. |
 
-### Evidência operacional Supabase — 2026-11-03
+### Evidência operacional Supabase — 2026-11-04
 
 - Projeto consultado em modo somente leitura: `saibtpdehhprttqlgqdt`, estado `ACTIVE_HEALTHY`.
-- O ledger remoto retornou 16 registros; o repositório contém 19 arquivos SQL em `supabase/migrations`. Há divergências entre timestamps remotos e prefixos locais; o histórico de inteligência aparece como versão remota `20261103184307`, com nome `20261103100304_intelligence_history`.
+- O ledger remoto retornou 16 registros; o repositório contém 20 arquivos SQL em `supabase/migrations`. Há divergências entre timestamps remotos e prefixos locais; o histórico de inteligência aparece como versão remota `20261103184307`, com nome `20261103100304_intelligence_history`.
 - As tabelas `public.intelligence_event_snapshots` e `public.intelligence_observation_snapshots` existem e têm RLS habilitado. As tabelas/RPCs do worker da PR #716 não foram encontradas no projeto.
 - O check `Supabase Preview` do commit `fafdd5bd50e07ad7605b60aea685e56936287d3b` falhou com `Remote migration versions not found in local migrations directory.`
-- Os advisors também apontaram a função `public.rls_auto_enable()` como `SECURITY DEFINER` executável por `anon` e `authenticated`, além de objetos legados visíveis no GraphQL. O corpo da função não foi obtido; não foi feita alteração de grants.
-- A consulta de introspecção SQL foi negada pelo conector. Portanto, grants exatos, conectividade do service role e insert/reload real continuam não verificados. Nenhuma migration, repair, DDL ou escrita de dados foi executada nesta auditoria.
+- O advisor aponta `public.rls_auto_enable()` como `SECURITY DEFINER` com EXECUTE para `PUBLIC`, `anon`, `authenticated` e `service_role`. A introspecção de 2026-11-04 confirmou que retorna `event_trigger`, está vinculada a `ensure_rls` (`ddl_command_end`), usa `search_path=pg_catalog` e executa apenas ao final de DDL compatível. `anon` e `authenticated` não possuem CREATE em `public`; não foi demonstrada invocação direta por PostgREST. O achado foi reclassificado como revisão de least privilege/ACL, issue #718; nenhum grant foi alterado.
+- A introspecção read-only de 2026-11-04 confirmou que as RPCs remotas `claim_jarvis_agent_task` e `claim_next_jarvis_agent_task` continuam sem predicado `model_provider`/regra Venice, embora a migration local `202610260001_red_blue_venice_routing.sql` contenha essa defesa. As RPCs remotas são `SECURITY DEFINER`, com ACL apenas para `postgres` e `service_role`; o risco é integridade do roteamento no worker confiável, não exposição a `anon`. Issue #723 acompanha a correção.
+- Grants exatos das tabelas de histórico, conectividade do service role e insert/reload real continuam não verificados. Nenhuma migration, repair, DDL ou escrita de dados foi executada nesta auditoria.
 
 ## Roadmap — estado conservador
 
@@ -57,6 +58,7 @@
 4. Manter o status de DockerSandbox como não comprovado em produção até haver consumidor e teste que demonstrem isolamento real.
 5. Confirmar cobertura de CapabilityAuthorizer no caminho principal de execução; a auditoria anterior encontrou lacunas.
 6. Validar multiagente ponta a ponta: dois runtimes reais, heartbeat, supervisão, renovação de lease, deduplicação e recuperação de mensagens expiradas.
+7. Fechar o guard de provider nas RPCs Supabase de claim antes de tratar o roteamento Red/Blue como garantido. A migration local `202610260001_red_blue_venice_routing.sql` contém a regra Venice, mas as definições remotas ainda não; seguir issue #723 e validar migration forward-only em preview descartável, preservando EXECUTE apenas para `service_role`.
 7. Reconciliar o ledger local/remoto do Supabase sem reaplicar DDL; verificar grants de `anon`, `authenticated` e `service_role` e testar insert/reload em ambiente controlado antes de habilitar a flag de histórico. Depois confirmar deploy, `/health` e persistência real sem executar capacidades com efeitos externos.
 8. Validar em cada harness se o catálogo e as skills são carregados no bootstrap de uma conversa nova.
 9. Proteger `main` com PR obrigatório e validação CI obrigatória, conforme issue #682; o estado atual não bloqueia push direto nem exige checks.
