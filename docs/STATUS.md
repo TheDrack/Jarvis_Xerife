@@ -23,6 +23,7 @@
 | Catálogo comum de agentes | Catálogo de skills/connectors e protocolo de memória existem; quatro skills portáteis foram localizadas no repositório | A leitura automática no início de toda conversa depende de cada host/harness e precisa ser validada por runtime |
 | Deploy Render | Serviço configurado para deploy por novo commit após checks; deploy pode ser sujeito a cooldown externo configurado pelo operador | Confirmar SHA do deploy e health check após a janela de cooldown; merge não é prova de deploy |
 | Governança da branch main | **Proteção ausente; issue #682 aberta** | API do GitHub confirmou `protected=false`, `protection.enabled=false` e zero rulesets. Exigir PR e o check de validação sempre executado; o workflow path-filtered da fila precisa de agregador antes de ser obrigatório globalmente. |
+| Segurança Supabase / RLS legado | **P1: políticas autenticadas sem isolamento por proprietário; issue #726 aberta** | Catálogos confirmam policy `ALL` com `auth.role() = 'authenticated'` em sete tabelas, grants de SELECT/INSERT/UPDATE/DELETE para `authenticated`, `public.user.hashed_password` legível/atualizável e 77 linhas em `public.interactions`. Nenhum conteúdo de linha foi lido; correção depende do modelo de ownership e deve ser testada em preview. |
 
 ### Evidência operacional Supabase — 2026-11-04
 
@@ -33,6 +34,7 @@
 - O advisor aponta `public.rls_auto_enable()` como `SECURITY DEFINER` com EXECUTE para `PUBLIC`, `anon`, `authenticated` e `service_role`. A introspecção de 2026-11-04 confirmou que retorna `event_trigger`, está vinculada a `ensure_rls` (`ddl_command_end`), usa `search_path=pg_catalog` e executa apenas ao final de DDL compatível. `anon` e `authenticated` não possuem CREATE em `public`; não foi demonstrada invocação direta por PostgREST. O achado foi reclassificado como revisão de least privilege/ACL, issue #718; nenhum grant foi alterado.
 - A introspecção read-only de 2026-11-04 confirmou que as RPCs remotas `claim_jarvis_agent_task` e `claim_next_jarvis_agent_task` continuam sem predicado `model_provider`/regra Venice, embora a migration local `202610260001_red_blue_venice_routing.sql` contenha essa defesa. As RPCs remotas são `SECURITY DEFINER`, com ACL apenas para `postgres` e `service_role`; o risco é integridade do roteamento no worker confiável, não exposição a `anon`. Issue #723 acompanha a correção.
 - Grants exatos das tabelas de histórico, conectividade do service role e insert/reload real continuam não verificados. Nenhuma migration, repair, DDL ou escrita de dados foi executada nesta auditoria.
+- A auditoria de segurança read-only encontrou sete tabelas com policy `ALL` cuja única condição é `auth.role() = 'authenticated'`; o role autenticado tem grants de CRUD. `public.user` contém uma linha e expõe `hashed_password` a SELECT/UPDATE; `public.interactions` contém 77 linhas e expõe `user_input`, `parameters` e `response_text`. Issue #726. Não foi lido conteúdo de linha nem alterado o banco.
 
 ## Roadmap — estado conservador
 
@@ -51,18 +53,19 @@
 | Trilha — Jarvis Universal Intelligence | **Coleta sob demanda e adapter append-only conectados atrás de feature flag; código do worker recorrente integrado à main pela PR #716, com migration remota pendente** | PR #702 integrou o endpoint autenticado e PR #715 conectou a persistência append-only ao endpoint. O `.env.example` mantém `JARVIS_INTELLIGENCE_HISTORY_ENABLED=false`. O projeto Supabase ativo contém as duas tabelas de histórico com RLS habilitado; o ledger remoto registra a migration de histórico na versão `20261103184307`, divergente do prefixo local `20261103100304`, e o check `Supabase Preview` falha por versões remotas ausentes no diretório local. Grants por role e insert/read real permanecem não verificados. PR #716 foi merged em 2026-11-03 (22:03 BRT) e o código do worker está na main, mas sua migration/tabelas não estão no banco remoto; a execução permanece desabilitada até reconciliação do ledger e validação de lease. Próximos critérios: reconciliar o ledger sem reaplicar DDL, confirmar grants e persistência em ambiente controlado, validar o worker/lease, depois briefing, entrega e mapa. |
 
 ## Pendências prioritárias sustentadas pela auditoria
+1. Corrigir a autorização cross-tenant nas tabelas legadas e retirar acesso cliente ao hash em `public.user`; issue #726. Definir o modelo de ownership antes de criar policies, revogar grants desnecessários e provar isolamento com dois usuários em preview/pgTAP.
 
-1. Reexecutar auditoria de capabilities e testes comportamentais; não usar os números históricos como métricas atuais.
-2. Corrigir e testar os limites de auto-evolução para pastas de infraestrutura e segurança antes de reativar mutação automática irrestrita.
-3. Integrar AdapterRegistry ao fluxo de produção e provar que o Jarvis procura implementação existente antes de gerar outra.
-4. Manter o status de DockerSandbox como não comprovado em produção até haver consumidor e teste que demonstrem isolamento real.
-5. Confirmar cobertura de CapabilityAuthorizer no caminho principal de execução; a auditoria anterior encontrou lacunas.
-6. Validar multiagente ponta a ponta: dois runtimes reais, heartbeat, supervisão, renovação de lease, deduplicação e recuperação de mensagens expiradas.
-7. Fechar o guard de provider nas RPCs Supabase de claim antes de tratar o roteamento Red/Blue como garantido. A migration local `202610260001_red_blue_venice_routing.sql` contém a regra Venice, mas as definições remotas ainda não; seguir issue #723 e validar migration forward-only em preview descartável, preservando EXECUTE apenas para `service_role`.
-8. Reconciliar o ledger local/remoto do Supabase sem reaplicar DDL; verificar grants de `anon`, `authenticated` e `service_role` e testar insert/reload em ambiente controlado antes de habilitar a flag de histórico. Depois confirmar deploy, `/health` e persistência real sem executar capacidades com efeitos externos.
-9. Validar em cada harness se o catálogo e as skills são carregados no bootstrap de uma conversa nova.
-10. Proteger `main` com PR obrigatório e validação CI obrigatória, conforme issue #682; o estado atual não bloqueia push direto nem exige checks.
-11. Após integrar o binding incremental de `ModelRegistry` → `ModelRuntimeBindings` nos três workers, avançar para a etapa global: adaptar `LLMRouter`/`AIGateway`/`ModelOrchestrator` ao port comum sem remover adapters existentes; introduzir seleção por capabilities/modalities e política de custo/latência no scheduler, com testes de concorrência, timeout, cancelamento, usage e falhas de provider.
+2. Reexecutar auditoria de capabilities e testes comportamentais; não usar os números históricos como métricas atuais.
+3. Corrigir e testar os limites de auto-evolução para pastas de infraestrutura e segurança antes de reativar mutação automática irrestrita.
+4. Integrar AdapterRegistry ao fluxo de produção e provar que o Jarvis procura implementação existente antes de gerar outra.
+5. Manter o status de DockerSandbox como não comprovado em produção até haver consumidor e teste que demonstrem isolamento real.
+6. Confirmar cobertura de CapabilityAuthorizer no caminho principal de execução; a auditoria anterior encontrou lacunas.
+7. Validar multiagente ponta a ponta: dois runtimes reais, heartbeat, supervisão, renovação de lease, deduplicação e recuperação de mensagens expiradas.
+8. Fechar o guard de provider nas RPCs Supabase de claim antes de tratar o roteamento Red/Blue como garantido. A migration local `202610260001_red_blue_venice_routing.sql` contém a regra Venice, mas as definições remotas ainda não; seguir issue #723 e validar migration forward-only em preview descartável, preservando EXECUTE apenas para `service_role`.
+9. Reconciliar o ledger local/remoto do Supabase sem reaplicar DDL; verificar grants de `anon`, `authenticated` e `service_role` e testar insert/reload em ambiente controlado antes de habilitar a flag de histórico. Depois confirmar deploy, `/health` e persistência real sem executar capacidades com efeitos externos.
+10. Validar em cada harness se o catálogo e as skills são carregados no bootstrap de uma conversa nova.
+11. Proteger `main` com PR obrigatório e validação CI obrigatória, conforme issue #682; o estado atual não bloqueia push direto nem exige checks.
+12. Após integrar o binding incremental de `ModelRegistry` → `ModelRuntimeBindings` nos três workers, avançar para a etapa global: adaptar `LLMRouter`/`AIGateway`/`ModelOrchestrator` ao port comum sem remover adapters existentes; introduzir seleção por capabilities/modalities e política de custo/latência no scheduler, com testes de concorrência, timeout, cancelamento, usage e falhas de provider.
 
 ## Documentos de referência
 
