@@ -208,3 +208,19 @@ def test_intelligence_panel_can_collect_and_display_live_correlations():
 def test_selection_inspector_is_really_hidden_without_a_selected_entity():
     assert '#selectionInspector[hidden]{display:none!important}' in HTML
     assert "inspector.hidden=true" in HTML
+
+
+def test_universal_intelligence_indexes_briefing_devices_and_cameras_as_subjects():
+    assert "state.briefing&&state.briefing.topics" in HTML
+    assert "state.devices&&state.devices.devices" in HTML
+    assert "state.cameras&&state.cameras.cameras" in HTML
+    assert "data-briefing-index" in HTML
+    assert "data-intel-device-id" in HTML
+    assert "data-intel-camera-id" in HTML
+    assert "function selectIntelSubject(kind,id)" in HTML
+
+
+def test_briefing_correlations_require_a_shared_reference_or_exact_headline():
+    assert "briefingGroups" in HTML
+    assert "item.url?'url:'" in HTML
+    assert "CANDIDATA, NÃO PROVA" in HTML

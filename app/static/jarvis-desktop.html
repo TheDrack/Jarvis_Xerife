@@ -1293,17 +1293,36 @@ function renderUniversal(){
  const security=data.security||{};
  const events=state.live.events||[];
  const observations=state.live.observations||[];
+ const briefingItems=(state.briefing&&state.briefing.topics||[]).flatMap(topic=>(topic.items||[]).slice(0,5).map(item=>({item,topic})));
  const correlations=state.live.correlations||[];
+ const briefingGroups=new Map();
+ for(const entry of briefingItems){
+  const item=entry.item||{};
+  const identity=item.url?'url:'+String(item.url).trim():'title:'+String(item.title||'').toLocaleLowerCase('pt-BR').replace(/[^\\p{L}\\p{N}]+/gu,' ').trim();
+  if(!identity||identity==='title:')continue;
+  if(!briefingGroups.has(identity))briefingGroups.set(identity,[]);
+  briefingGroups.get(identity).push(entry);
+ }
+ const briefingCorrelations=Array.from(briefingGroups.values()).filter(group=>new Set(group.map(entry=>entry.item.source||entry.topic.id)).size>1);
  const stages=pipeline.filter(item=>['implemented','migration_defined'].includes(item.state)).length;
  let html='<div class="intel-headline"><b>UNIVERSAL INTELLIGENCE</b><span>'+esc(intelStateLabel(data.overall||'partial'))+'</span></div>';
  html+='<div class="tele-foot"><span>BASE DE CONHECIMENTO ATUAL</span><span>'+events.length+' EVENTOS · '+observations.length+' ENTIDADES</span></div>';
  html+='<div class="tele-foot"><span>FONTES DISPONÍVEIS</span><span>'+esc(online)+'/'+esc(Math.max(live.length,1))+' ATIVAS</span></div>';
  html+='<div class="tele-foot"><span>ASSUNTOS DISPONÍVEIS</span><span>'+esc(events.length+observations.length)+'</span></div>';
+ const devices=(state.devices&&state.devices.devices)||[];
+ const cameras=(state.cameras&&state.cameras.cameras)||[];
  const topics=[
   ...events.slice().sort((a,b)=>String(b.observed_at||b.published_at||'').localeCompare(String(a.observed_at||a.published_at||''))).slice(0,8).map(event=>({kind:'event',id:event.event_id,label:event.title,meta:(event.source_id||'fonte')+' · '+(event.category||event.domain||'evento'),record:event})),
-  ...observations.slice().sort((a,b)=>String(b.observed_at||'').localeCompare(String(a.observed_at||''))).slice(0,8).map(item=>({kind:'observation',id:item.observation_id,label:(item.attributes||{}).callsign||(item.attributes||{}).name||item.entity_id,meta:item.entity_type+' · '+item.source_id,record:item}))
+  ...observations.slice().sort((a,b)=>String(b.observed_at||'').localeCompare(String(a.observed_at||''))).slice(0,8).map(item=>({kind:'observation',id:item.observation_id,label:(item.attributes||{}).callsign||(item.attributes||{}).name||item.entity_id,meta:item.entity_type+' · '+item.source_id,record:item})),
+  ...briefingItems.slice(0,12).map(({item,topic},index)=>({kind:'briefing',id:index,label:item.title,meta:(item.source||'notícia')+' · '+(topic.label||topic.id),record:item})),
+  ...devices.slice(0,8).map(device=>({kind:'device',id:device.id,label:device.name,meta:(device.type||'dispositivo')+' · '+(device.status||'sem status'),record:device})),
+  ...cameras.slice(0,6).map((camera,index)=>({kind:'camera',id:index,label:camera.label,meta:(camera.kind||'câmera')+' · registro local',record:camera}))
  ];
- html+=topics.length?topics.map(topic=>'<button type="button" class="row intel-topic" data-'+topic.kind+'-id="'+esc(topic.id)+'"><span class="grow"><b>'+esc(topic.label||'Assunto sem nome')+'</b><small>'+esc(topic.meta)+'</small></span><span class="pill idle">DETALHES</span></button>').join(''):'<div class="empty">Nenhum evento ou entidade foi coletado nesta sessão. Use SYNC para consultar as fontes.</div>';
+ html+='<div class="tele-foot"><span>ASSUNTOS INDEXADOS</span><span>'+topics.length+' REGISTROS · '+briefingItems.length+' NOTÍCIAS DISPONÍVEIS</span></div>';
+ html+=topics.length?topics.map(topic=>{
+  const attr=topic.kind==='event'?'data-event-id':topic.kind==='observation'?'data-observation-id':topic.kind==='briefing'?'data-briefing-index':'data-intel-'+topic.kind+'-id';
+  return '<button type="button" class="row intel-topic" '+attr+'="'+esc(topic.id)+'"><span class="grow"><b>'+esc(topic.label||'Assunto sem nome')+'</b><small>'+esc(topic.meta)+'</small></span><span class="pill idle">DETALHES</span></button>';
+ }).join(''):'<div class="empty">Nenhum assunto carregado. Atualize o briefing ou consulte as fontes.</div>';
  html+='<div class="tele-foot"><span>CORRELAÇÕES ENTRE FONTES</span><span>'+correlations.length+' CANDIDATAS</span></div>';
  if(correlations.length){
   html+=correlations.slice(0,12).map(correlation=>{
@@ -1311,8 +1330,16 @@ function renderUniversal(){
    const title=related.map(event=>event.title).join(' ↔ ');
    return '<div class="intel-correlation"><b>'+esc(title||'Grupo correlacionado')+'</b><small>'+esc(correlation.basis==='same_url'?'MESMA REFERÊNCIA':'TÍTULO/CATEGORIA E JANELA TEMPORAL')+' · '+esc(correlation.distinct_source_count)+' FONTES · CANDIDATA, NÃO PROVA</small>'+related.map(event=>'<button type="button" class="mini" data-event-id="'+esc(event.event_id)+'">'+esc(event.source_id)+'</button>').join(' ')+'</div>';
   }).join('');
- }else{
-  html+='<div class="empty">Nenhuma correlação entre fontes foi identificada na coleta atual. Isso não significa ausência de relação no mundo real; significa que ainda não há evidência suficiente nos registros carregados.</div>';
+ }
+ if(briefingCorrelations.length){
+  html+=briefingCorrelations.slice(0,8).map(group=>{
+   const title=group[0].item.title||'Referência compartilhada';
+   const sources=Array.from(new Set(group.map(entry=>entry.item.source||entry.topic.label||entry.topic.id)));
+   return '<div class="intel-correlation"><b>'+esc(title)+'</b><small>BRIEFING · MESMA REFERÊNCIA/TÍTULO · '+sources.length+' FONTES · CANDIDATA, NÃO PROVA</small><span>'+sources.map(esc).join(' · ')+'</span></div>';
+  }).join('');
+ }
+ if(!correlations.length&&!briefingCorrelations.length){
+  html+='<div class="empty">Nenhuma correlação sustentada pelos registros atuais. Os assuntos disponíveis continuam listados acima; relações não são inventadas quando não há evidência comum.</div>';
  }
  html+='<details class="intel-pipeline"><summary>MATURIDADE DO PIPELINE · '+esc(stages)+'/'+esc(pipeline.length)+' ETAPAS</summary>';
  html+=pipeline.map(stage=>'<div class="row"><div class="grow"><b>'+esc(stage.label)+'</b><small>'+esc(stage.detail||'')+'</small></div><span class="pill idle">'+esc(intelStateLabel(stage.state))+'</span></div>').join('');
@@ -1323,6 +1350,28 @@ function renderUniversal(){
  html+=limits.map(item=>'<div class="intel-note">'+esc(item)+'</div>').join('');
  $('intelBody').innerHTML=html;
  $('intelFoot').textContent='CORRELAÇÃO DETERMINÍSTICA · '+(state.live.collected_at?hhmm(state.live.collected_at):'SEM COLETA')+' · '+clockTime();
+}
+function selectIntelSubject(kind,id){
+ if(kind==='briefing'){
+  const items=(state.briefing&&state.briefing.topics||[]).flatMap(topic=>(topic.items||[]).slice(0,5).map(item=>({item,topic})));
+  const entry=items[Number(id)];
+  if(!entry)return;
+  const item=entry.item;
+  renderSelection({kind:'news',label:item.title,meta:(item.source||'notícia')+' · '+(entry.topic.label||entry.topic.id),record:Object.assign({source_id:item.source||entry.topic.id,summary:item.summary||item.description||'Manchete do briefing. Abra a fonte original para ler a reportagem completa.'},item)});
+  setFooter('INTEL · '+String(item.title||'NOTÍCIA').toUpperCase());
+  return;
+ }
+ if(kind==='device'){
+  const record=((state.devices&&state.devices.devices)||[]).find(item=>String(item.id)===String(id));
+  if(!record)return;
+  renderSelection({kind:'device',label:record.name,meta:(record.type||'dispositivo')+' · '+(record.status||'sem status'),latitude:record.located?record.latitude:undefined,longitude:record.located?record.longitude:undefined,record,copyValue:String(record.last_ip||record.id||'')});
+  return;
+ }
+ if(kind==='camera'){
+  const record=((state.cameras&&state.cameras.cameras)||[])[Number(id)];
+  if(!record)return;
+  renderSelection({kind:'camera',label:record.label,meta:(record.kind||'câmera')+' · registro local',record:Object.assign({source_id:'camera_registry',summary:record.note||'Câmera cadastrada no registro local.'},record)});
+ }
 }
 function renderSelection(mark){
  const inspector=$('selectionInspector');
@@ -1703,10 +1752,13 @@ function wire(){
   if(target)selectLiveEntity('observation',target.getAttribute('data-observation-id'));
  });
  $('intelBody').addEventListener('click',ev=>{
-  const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-event-id],[data-observation-id]'):null;
+  const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-event-id],[data-observation-id],[data-briefing-index],[data-intel-device-id],[data-intel-camera-id]'):null;
   if(!target)return;
   if(target.hasAttribute('data-event-id'))selectLiveEntity('event',target.getAttribute('data-event-id'));
-  else selectLiveEntity('observation',target.getAttribute('data-observation-id'));
+  else if(target.hasAttribute('data-observation-id'))selectLiveEntity('observation',target.getAttribute('data-observation-id'));
+  else if(target.hasAttribute('data-briefing-index'))selectIntelSubject('briefing',target.getAttribute('data-briefing-index'));
+  else if(target.hasAttribute('data-intel-device-id'))selectIntelSubject('device',target.getAttribute('data-intel-device-id'));
+  else if(target.hasAttribute('data-intel-camera-id'))selectIntelSubject('camera',target.getAttribute('data-intel-camera-id'));
  });
  $('networkBody').addEventListener('click',ev=>{
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-network-item]'):null;
@@ -1770,7 +1822,7 @@ function wire(){
   renderSelection({kind:'camera',label:camera.label,meta:String(camera.kind||'camera')+' · '+String(camera.refresh_seconds||'')+'s',record:Object.assign({source_id:'camera_registry',summary:camera.note||'Câmera cadastrada no registro local.'},camera)});
  });
  $('camerasButton').addEventListener('click',()=>{openWindow('cameraWindow');refreshCameras();});
- $('universalButton').addEventListener('click',()=>{openWindow('intelWindow');refreshIntelStatus();});
+ $('universalButton').addEventListener('click',()=>{openWindow('intelWindow');refreshIntelStatus();refreshDevices();refreshCameras();});
  $('cameraWindow').addEventListener('click',ev=>{if(ev.target===$('cameraWindow'))closeWindow('cameraWindow');});
  $('intelWindow').addEventListener('click',ev=>{if(ev.target===$('intelWindow'))closeWindow('intelWindow');});
  $('pairButton').addEventListener('click',pair);
