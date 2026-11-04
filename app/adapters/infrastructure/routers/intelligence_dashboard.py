@@ -20,6 +20,14 @@ def _configured(variable: str) -> bool:
     return bool(os.getenv(variable, "").strip())
 
 
+def _integer_setting(variable: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(os.getenv(variable, str(default)))
+    except (TypeError, ValueError):
+        return default
+    return value if minimum <= value <= maximum else default
+
+
 def _repository_root() -> Path:
     return Path(__file__).resolve().parents[4]
 
@@ -29,7 +37,12 @@ def build_intelligence_status() -> dict[str, Any]:
     root = _repository_root()
     migration = root / "supabase" / "migrations" / "20261103100304_intelligence_history.sql"
     migration_present = migration.is_file()
-    adapter_present = (root / "app" / "adapters" / "infrastructure" / "intelligence" / "supabase_intelligence_history_adapter.py").is_file()
+    adapter_present = (root / "app" / "adapters" / "infrastructure" / "intelligence" / "supabase_intelligence_history.py").is_file()
+    worker_migration = root / "supabase" / "migrations" / "20261103184308_intelligence_recurring_worker.sql"
+    worker_migration_present = worker_migration.is_file()
+    history_enabled = os.getenv("JARVIS_INTELLIGENCE_HISTORY_ENABLED", "false").strip().casefold() == "true"
+    worker_enabled = os.getenv("JARVIS_INTELLIGENCE_WORKER_ENABLED", "false").strip().casefold() == "true"
+    worker_configured = history_enabled and worker_enabled
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -86,6 +99,16 @@ def build_intelligence_status() -> dict[str, Any]:
                 "detail": "Endpoint autenticado executa fontes em paralelo e preserva sucesso parcial; ainda sem recorrência.",
             },
             {
+                "id": "recurring_collection",
+                "label": "Coleta recorrente",
+                "state": "configured_not_probed" if worker_configured else "disabled",
+                "detail": (
+                    "Duas flags habilitadas; execução real ainda depende da migration de lease/telemetria e health check."
+                    if worker_configured
+                    else "Desligada por padrão; exige habilitar histórico e worker separadamente."
+                ),
+            },
+            {
                 "id": "normalization",
                 "label": "Normalização e síntese",
                 "state": "implemented",
@@ -110,6 +133,15 @@ def build_intelligence_status() -> dict[str, Any]:
                 "detail": "Painel de acompanhamento implementado; feed e mapa dependem do coletor real.",
             },
         ],
+        "worker": {
+            "enabled_by_configuration": worker_configured,
+            "runtime": "configured_not_probed" if worker_configured else "disabled",
+            "worker_migration_file_present": worker_migration_present,
+            "interval_seconds": _integer_setting("JARVIS_INTELLIGENCE_WORKER_INTERVAL_SECONDS", 300, 60, 86400),
+            "lease_seconds": _integer_setting("JARVIS_INTELLIGENCE_WORKER_LEASE_SECONDS", 180, 30, 3600),
+            "retention_observation_days": _integer_setting("JARVIS_INTELLIGENCE_RETENTION_OBSERVATION_DAYS", 90, 1, 3650),
+            "automatic_retention_deletion": False,
+        },
         "history": {
             "migration_file_present": migration_present,
             "remote_migration_state": "unverified",

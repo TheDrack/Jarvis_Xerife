@@ -148,6 +148,7 @@ def start_cloud_service():
     # Render starts this module with `python main.py`; the serve.py startup hook
     # is not part of this production entrypoint. Start the opt-in worker here.
     worker_runtime = None
+    intelligence_worker_runtime = None
     try:
         from app.multiagent.agent_worker_runtime import start_configured_worker
 
@@ -156,14 +157,25 @@ def start_cloud_service():
         # Missing/invalid worker configuration must not take down the health API.
         logger.exception("Mini-agent runtime could not start; API remains available")
 
+    try:
+        from app.application.services.intelligence_recurring_worker import (
+            start_configured_intelligence_worker,
+        )
+
+        intelligence_worker_runtime = start_configured_intelligence_worker()
+    except Exception:
+        # The recurring intelligence worker is opt-in and must never block API health.
+        logger.exception("Universal Intelligence worker could not start; API remains available")
+
     logger.info(f"🚀 [SERVER] Uvicorn subindo em {host}:{port}")
     try:
         uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
     finally:
-        if worker_runtime is not None:
-            worker_thread, worker_stop = worker_runtime
-            worker_stop.set()
-            worker_thread.join(timeout=5)
+        for runtime in (worker_runtime, intelligence_worker_runtime):
+            if runtime is not None:
+                worker_thread, worker_stop = runtime
+                worker_stop.set()
+                worker_thread.join(timeout=5)
 
 if __name__ == "__main__":
     if is_running_on_cloud():

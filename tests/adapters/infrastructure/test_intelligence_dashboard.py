@@ -58,6 +58,29 @@ def test_status_does_not_fabricate_collection_metrics():
     assert status["data_plane"]["last_collection_at"] is None
 
 
+def test_worker_status_is_disabled_until_both_feature_flags_are_enabled(monkeypatch):
+    monkeypatch.setenv("JARVIS_INTELLIGENCE_HISTORY_ENABLED", "true")
+    monkeypatch.delenv("JARVIS_INTELLIGENCE_WORKER_ENABLED", raising=False)
+
+    status = build_intelligence_status()
+
+    assert status["worker"]["enabled_by_configuration"] is False
+    assert status["worker"]["runtime"] == "disabled"
+    assert status["worker"]["automatic_retention_deletion"] is False
+
+
+def test_worker_status_reports_configuration_without_claiming_runtime_health(monkeypatch):
+    monkeypatch.setenv("JARVIS_INTELLIGENCE_HISTORY_ENABLED", "true")
+    monkeypatch.setenv("JARVIS_INTELLIGENCE_WORKER_ENABLED", "true")
+
+    status = build_intelligence_status()
+
+    assert status["worker"]["enabled_by_configuration"] is True
+    assert status["worker"]["runtime"] == "configured_not_probed"
+    assert status["worker"]["worker_migration_file_present"] is True
+    assert status["worker"]["interval_seconds"] == 300
+
+
 def test_status_reports_history_migration_separately_from_remote_application():
     status = build_intelligence_status()
 
@@ -88,3 +111,12 @@ def test_main_hud_links_to_universal_intelligence():
     )
     assert 'href="/intelligence"' in hud
     assert "Abrir painel Universal Intelligence" in hud
+
+def test_worker_status_handles_invalid_numeric_configuration(monkeypatch):
+    monkeypatch.setenv("JARVIS_INTELLIGENCE_WORKER_INTERVAL_SECONDS", "invalid")
+    monkeypatch.setenv("JARVIS_INTELLIGENCE_WORKER_LEASE_SECONDS", "1")
+
+    status = build_intelligence_status()
+
+    assert status["worker"]["interval_seconds"] == 300
+    assert status["worker"]["lease_seconds"] == 180
