@@ -964,7 +964,7 @@ def test_tailscale_snapshot_suppresses_windows_console_window(monkeypatch):
 
     desktop_local._tailscale_snapshot()
 
-    assert seen["creationflags"] == desktop_local.subprocess.CREATE_NO_WINDOW
+    assert seen["creationflags"] == getattr(desktop_local.subprocess, "CREATE_NO_WINDOW", 0)
 
 
 def test_adb_snapshot_suppresses_windows_console_window(monkeypatch):
@@ -981,4 +981,4 @@ def test_adb_snapshot_suppresses_windows_console_window(monkeypatch):
 
     desktop_local._adb_snapshot()
 
-    assert seen["creationflags"] == desktop_local.subprocess.CREATE_NO_WINDOW
+    assert seen["creationflags"] == getattr(desktop_local.subprocess, "CREATE_NO_WINDOW", 0)

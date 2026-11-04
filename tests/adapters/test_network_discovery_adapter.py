@@ -37,7 +37,7 @@ class NetworkDiscoveryAdapterTests(unittest.TestCase):
         self.assertFalse(run.call_args.kwargs.get("shell", True))
         self.assertEqual(
             run.call_args.kwargs.get("creationflags"),
-            __import__("subprocess").CREATE_NO_WINDOW,
+            getattr(__import__("subprocess"), "CREATE_NO_WINDOW", 0),
         )
 
     @patch("app.adapters.edge.network_discovery_adapter.subprocess.run")

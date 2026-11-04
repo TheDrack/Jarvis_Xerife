@@ -129,7 +129,7 @@ def discover_devices(cidr: str) -> dict[str, Any]:
             timeout=4,
             check=False,
             shell=False,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {
