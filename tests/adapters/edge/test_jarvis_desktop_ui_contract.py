@@ -24,7 +24,7 @@ def test_navigation_controls_reference_real_targets_and_expose_current_view():
     for panel in ("events", "sources", "telemetry", "orbital"):
         assert f'data-panel="{panel}"' in HTML
         assert f'id="panel{panel.capitalize()}"' in HTML
-    assert 'id="networkWindow"' in HTML
+    assert 'id="panelNetwork"' in HTML
     assert 'aria-current="true"' in HTML
     assert "setAttribute('aria-current','true')" in HTML
     assert "removeAttribute('aria-current')" in HTML
@@ -104,3 +104,56 @@ def test_every_dom_id_used_by_the_script_exists_in_the_markup():
     assert identifiers
     for element_id in sorted(identifiers):
         assert f'id="{element_id}"' in HTML, element_id
+
+
+
+def test_workspace_adapts_in_place_instead_of_opening_a_separate_network_modal():
+    assert 'data-panel="network"' in HTML
+    assert 'id="panelNetwork"' in HTML
+    assert 'id="networkWindow"' not in HTML
+    assert "if(view==='network'){openWindow('networkWindow')" not in HTML
+    assert "panel.hidden=!visible.includes" in HTML
+
+
+def test_globe_selection_opens_a_contextual_inspector_with_an_action():
+    assert 'id="selectionInspector"' in HTML
+    assert 'id="selectionTitle"' in HTML
+    assert 'id="selectionDetail"' in HTML
+    assert 'id="selectionAction"' in HTML
+    assert "Globe.onSelect(mark=>{state.selected=mark;renderSelection(mark);renderStatus();})" in HTML
+    assert "function renderSelection(mark)" in HTML
+
+
+def test_briefing_is_compact_and_the_outer_columns_do_not_scroll():
+    assert re.search(r"\.col\{[^}]*overflow:hidden", HTML)
+    assert ".briefing-list" in HTML
+    assert ".briefing-list" in HTML
+    assert "slice(0,5)" in HTML
+    assert "overflow:hidden" in HTML
+
+
+def test_navigation_updates_the_single_workspace_and_network_is_inline():
+    assert "$('stage').setAttribute('data-view',view)" in HTML
+    assert "data-view=\"network\"" in HTML
+    assert "data-panel=\"network\"" in HTML
+    assert "openWindow('networkWindow')" not in HTML
+
+
+def test_reduced_motion_disables_persistent_scan_and_orbit_effects():
+    assert "@media(prefers-reduced-motion:reduce)" in HTML
+    assert ".globe-wrap:after" in HTML
+    assert ".reactor .sweep" in HTML
+
+
+
+def test_network_entities_are_actionable_inside_the_adaptive_workspace():
+    assert 'data-network-item' in HTML
+    assert "function selectNetworkItem(kind,index)" in HTML
+    assert "navigator.clipboard.writeText(mark.copyValue)" in HTML
+    assert "COPIAR" in HTML
+
+
+def test_network_panel_does_not_use_modal_or_navigate_away():
+    assert 'id="panelNetwork"' in HTML
+    assert 'id="networkWindow"' not in HTML
+    assert "data-network-kind" in HTML
