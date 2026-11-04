@@ -95,16 +95,60 @@ access, use the user's approved authenticated private HTTPS route instead.
 
 ## Runtime endpoints
 
-- `GET /` — single-viewport Jarvis UI
+- `GET /` — single-viewport Jarvis UI (orbital HUD)
+- `GET /static/world-land.json` — simplified land outlines used by the globe canvas
 - `GET /api/health` — local process health
 - `GET /api/bootstrap` — local address metadata; pairing secret only on loopback
 - `POST /api/pair` — exchange temporary code for a local bearer token
 - `GET /api/status` — authenticated core/client state
+- `GET /api/telemetry` — host CPU, memory, temperature (when the OS exposes it), processes and uptime
+- `GET /api/briefing` — daily headlines by topic (region, world, politics, economy, war, technology, climate) plus the local weather forecast
+- `GET /api/cameras` — operator-registered camera allowlist (never probes or opens a stream)
+
+The daily briefing reads two credential-free public sources: Google News RSS
+(pt-BR headlines per topic) and Open-Meteo (current conditions plus a three-day
+forecast). Point it at your own region with `JARVIS_BRIEFING_LABEL`,
+`JARVIS_BRIEFING_LAT`, `JARVIS_BRIEFING_LON` and `JARVIS_BRIEFING_TIMEZONE`
+(defaults: Porto Alegre, `America/Sao_Paulo`). Headlines keep their publisher
+link; nothing is rewritten and no article body is stored.
+
+Cameras are never discovered or scraped: register only public views you are
+allowed to watch in `%LOCALAPPDATA%\Jarvis_Xerife\cameras.json`.
+
+```json
+{"cameras": [{"label": "Centro", "url": "https://exemplo/camera.jpg", "kind": "snapshot", "refresh_seconds": 20}]}
+```
+
+`kind` is `snapshot` (JPEG refresh) or `video` (direct MP4/WebM URL). Only
+`http(s)` URLs without embedded credentials are accepted, up to 12 cameras;
+invalid entries are counted in `rejected` instead of being silently dropped.
+
+## Universal Intelligence
+
+The local core serves the Universal Intelligence surface natively with the same
+contract as the main API:
+
+- `GET /intelligence` — Universal Intelligence dashboard (`app/static/intelligence.html`)
+- `GET /v1/intelligence/status` — authenticated status contract (sources, pipeline, history, security)
+- `POST /v1/intelligence/collect?limit=N` — on-demand collection through the canonical collector
+
+The dashboard reads `jarvis_auth_token` from `localStorage` or falls back to the
+local `jarvis_local_access` session token, so it opens from the desktop HUD
+without a second login. The Intel window of the orbital HUD renders the same
+contract and links to the full dashboard.
 - `GET /api/intelligence/status` — source and pipeline state
 - `POST /api/intelligence/collect` — on-demand public source collection + local synthesis
+- `POST /api/intelligence/osiris` — OSIRIS routes only, with per-route health
+- `POST /api/intelligence/gods-eye` — God's Eye View MCP snapshot only, with entity counts
 - `GET /api/intelligence/latest` — latest in-memory synthesis
 - `GET /api/network/status` — interfaces, passive ARP cache, ADB and paired clients
 
+The orbital HUD renders only what these endpoints return: events and observations are plotted
+on the globe, the status line reflects the last real probe, and uncollected layers stay empty.
+OSIRIS and God's Eye can be refreshed independently so one slow or degraded provider does not
+block the other. Host telemetry reports `temperature_c: null` on Windows because psutil does not
+expose a sensor source there.
+
 The current intelligence snapshot is in-memory and is cleared when the local server exits.
-Durable history, OSIRIS/GEV live probes, Android native-app LAN transport, and Android
-UI automation remain separate integration steps.
+Durable history, Android native-app LAN transport, and Android UI automation remain separate
+integration steps.

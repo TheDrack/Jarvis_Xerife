@@ -516,3 +516,374 @@ def test_run_local_server_loads_local_intelligence_config_before_startup(monkeyp
 
     assert loaded == [True]
     assert server.started is True
+
+
+def _intel_evidence():
+    from datetime import datetime, timezone
+
+    from app.domain.intelligence.contracts import IntelligenceEvidence
+
+    return IntelligenceEvidence(
+        source_id="usgs_earthquakes",
+        source_name="USGS",
+        url="https://example.test/event",
+        collected_at=datetime.now(timezone.utc),
+        license_or_terms="public domain",
+    )
+
+
+def test_universal_intelligence_surface_served_with_local_token():
+    runtime = LocalRuntime()
+    client = _client(runtime)
+
+    page = client.get("/intelligence")
+    assert page.status_code == 200
+    assert "UNIVERSAL INTELLIGENCE" in page.text
+    assert "sessionToken" in page.text
+    assert "/api/bootstrap" in page.text
+
+    assert client.get("/v1/intelligence/status").status_code == 401
+    response = client.get(
+        "/v1/intelligence/status",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["security"]["status_endpoint_authenticated"] is True
+    assert payload["pipeline"]
+    assert payload["sources"]
+
+
+def test_universal_intelligence_collect_alias_uses_canonical_collector(monkeypatch):
+    import app.application.services.intelligence_collector as collector_module
+
+    calls = {}
+
+    class _Report:
+        def model_dump(self, mode="json"):
+            return {"events": [], "observations": [], "sources": [], "generated_at": None}
+
+    async def fake_collect(limit=50):
+        calls["limit"] = limit
+        return _Report()
+
+    monkeypatch.setattr(collector_module, "collect_live_intelligence", fake_collect)
+
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    assert client.post("/v1/intelligence/collect").status_code == 401
+
+    response = client.post(
+        "/v1/intelligence/collect?limit=7",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+    assert response.status_code == 200
+    assert calls["limit"] == 7
+    assert response.json()["report"]["events"] == []
+    assert response.json()["history"]["status"] == "disabled"
+
+    assert client.post(
+        "/v1/intelligence/collect?limit=0",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    ).status_code == 422
+
+
+def test_briefing_endpoint_requires_token_and_returns_daily_snapshot(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    assert client.get("/api/briefing").status_code == 401
+
+    monkeypatch.setattr(
+        desktop_local,
+        "build_briefing",
+        lambda: {
+            "success": True,
+            "health": "online",
+            "counts": {"topics": 7, "topics_online": 7, "items": 3},
+            "topics": [],
+            "weather": {"available": True, "current": {"temperature_c": 19.3}},
+        },
+    )
+    response = client.get(
+        "/api/briefing",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["health"] == "online"
+    assert payload["weather"]["current"]["temperature_c"] == 19.3
+
+
+def test_cameras_endpoint_requires_token_and_serves_local_registry(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    assert client.get("/api/cameras").status_code == 401
+
+    monkeypatch.setattr(
+        desktop_local,
+        "build_camera_registry",
+        lambda: {
+            "success": True,
+            "configured": True,
+            "cameras": [{"id": "centro", "label": "Centro", "url": "https://cam.example/snap.jpg",
+                         "kind": "snapshot", "refresh_seconds": 20}],
+        },
+    )
+    response = client.get(
+        "/api/cameras",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    cameras = response.json()["cameras"]
+    assert [camera["id"] for camera in cameras] == ["centro"]
+    assert cameras[0]["url"].startswith("https://")
+
+
+def test_telemetry_endpoint_requires_token_and_serves_host_metrics(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    assert client.get("/api/telemetry").status_code == 401
+
+    monkeypatch.setattr(
+        desktop_local,
+        "_telemetry_snapshot",
+        lambda: {"available": True, "cpu_percent": 12.5, "memory_percent": 48.0},
+    )
+    response = client.get(
+        "/api/telemetry",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["cpu_percent"] == 12.5
+
+
+def test_telemetry_snapshot_fails_closed_without_psutil(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setitem(sys.modules, "psutil", None)
+
+    assert desktop_local._telemetry_snapshot() == {
+        "available": False,
+        "reason": "psutil_unavailable",
+    }
+
+
+def test_osiris_endpoint_returns_route_health_and_events(monkeypatch):
+    from datetime import datetime, timezone
+
+    from app.core.nexus import nexus
+    from app.domain.intelligence.contracts import (
+        GeoPoint,
+        IntelligenceBatch,
+        IntelligenceEvent,
+        SourceHealth,
+    )
+
+    evidence = _intel_evidence()
+    event = IntelligenceEvent(
+        event_id="usgs_earthquakes:test",
+        source_id="usgs_earthquakes",
+        domain="climate_disaster",
+        category="earthquake",
+        title="Earthquake M3.0 — test area",
+        url="https://example.test/event",
+        occurred_at=datetime.now(timezone.utc),
+        location=GeoPoint(latitude=1.5, longitude=2.5),
+        evidence=evidence,
+    )
+    closed = []
+
+    class FakeOsiris:
+        def collect_events(self, limit):
+            assert limit == 20
+            return IntelligenceBatch(
+                events=(event,),
+                sources=(SourceHealth(source_id="osiris_news", available=True),),
+            )
+
+        def close(self):
+            closed.append(True)
+
+    monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "true")
+    monkeypatch.setattr(nexus, "resolve", lambda target_id, **_kwargs: FakeOsiris())
+
+    runtime = LocalRuntime()
+    response = _client(runtime).post(
+        "/api/intelligence/osiris",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["counts"] == {"events": 1, "routes_online": 1, "routes_total": 1}
+    assert payload["events"][0]["location"] == {"latitude": 1.5, "longitude": 2.5}
+    assert runtime.osiris_snapshot["counts"]["events"] == 1
+    assert closed == [True]
+
+
+def test_osiris_endpoint_reports_disabled_source_without_network(monkeypatch):
+    monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "false")
+    runtime = LocalRuntime()
+
+    response = _client(runtime).post(
+        "/api/intelligence/osiris",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["reason"] == "Disabled"
+    assert payload["counts"]["routes_online"] == 0
+    assert runtime.osiris_snapshot is None
+
+
+def test_gods_eye_endpoint_requires_configured_area(monkeypatch):
+    for name in ("WEST", "SOUTH", "EAST", "NORTH"):
+        monkeypatch.delenv(f"JARVIS_GEV_AREA_{name}", raising=False)
+    runtime = LocalRuntime()
+
+    response = _client(runtime).post(
+        "/api/intelligence/gods-eye",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["reason"] == "AreaNotConfigured"
+    assert payload["sources"][0]["available"] is False
+    assert runtime.gods_eye_snapshot is None
+
+
+def test_gods_eye_endpoint_reports_entity_counts_and_partial_health(monkeypatch):
+    from datetime import datetime, timezone
+
+    import app.adapters.infrastructure.intelligence.gods_eye_mcp_adapter as gev_module
+    from app.domain.intelligence.contracts import (
+        GeoPoint,
+        IntelligenceBatch,
+        IntelligenceObservation,
+        SourceHealth,
+    )
+
+    evidence = _intel_evidence()
+    observation = IntelligenceObservation(
+        observation_id="gods_eye_view:aircraft:1",
+        source_id="gods_eye_view",
+        entity_type="aircraft",
+        entity_id="abc123",
+        observed_at=datetime.now(timezone.utc),
+        position=GeoPoint(latitude=-23.5, longitude=-46.6),
+        attributes={"callsign": "TST123", "distance_km": 42.0},
+        evidence=(evidence,),
+    )
+    configured = {}
+
+    class FakeGev:
+        def __init__(self, **kwargs):
+            configured.update(kwargs)
+
+        async def collect_observations(self):
+            return IntelligenceBatch(
+                observations=(observation,),
+                sources=(
+                    SourceHealth(
+                        source_id="gods_eye_view",
+                        available=True,
+                        error_code="PartialFailure",
+                    ),
+                ),
+            )
+
+    monkeypatch.setattr(gev_module, "GodsEyeMcpAdapter", FakeGev)
+    monkeypatch.setenv("JARVIS_GEV_AREA_WEST", "-53.6")
+    monkeypatch.setenv("JARVIS_GEV_AREA_SOUTH", "-32.6")
+    monkeypatch.setenv("JARVIS_GEV_AREA_EAST", "-43.6")
+    monkeypatch.setenv("JARVIS_GEV_AREA_NORTH", "-22.6")
+
+    runtime = LocalRuntime()
+    response = _client(runtime).post(
+        "/api/intelligence/gods-eye",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert configured["limit"] == 50
+    assert configured["area"] == {
+        "west": -53.6, "south": -32.6, "east": -43.6, "north": -22.6,
+    }
+    assert payload["counts"] == {"aircraft": 1, "vessel": 0, "satellite": 0}
+    assert payload["error_code"] == "PartialFailure"
+    assert payload["observations"][0]["position"] == {
+        "latitude": -23.5, "longitude": -46.6,
+    }
+    assert runtime.gods_eye_snapshot["counts"]["aircraft"] == 1
+
+
+@pytest.mark.asyncio
+async def test_status_reports_independent_osiris_and_gods_eye_probes():
+    import httpx
+
+    runtime = LocalRuntime()
+    runtime.osiris_snapshot = {
+        "collected_at": "2026-11-04T10:00:00+00:00",
+        "counts": {"events": 7, "routes_online": 3, "routes_total": 4},
+    }
+    runtime.gods_eye_snapshot = {
+        "collected_at": "2026-11-04T10:01:00+00:00",
+        "available": True,
+        "error_code": "PartialFailure",
+        "counts": {"aircraft": 5, "vessel": 0, "satellite": 2},
+    }
+    transport = httpx.ASGITransport(
+        app=create_local_app(runtime),
+        client=("127.0.0.1", 54321),
+    )
+
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="http://127.0.0.1:8766",
+    ) as client:
+        response = await client.get(
+            "/api/intelligence/status",
+            headers={"Authorization": f"Bearer {runtime.token}"},
+        )
+
+    payload = response.json()
+    osiris = next(item for item in payload["sources"] if item["id"] == "osiris")
+    gods_eye = next(item for item in payload["sources"] if item["id"] == "gods_eye_view")
+    assert osiris["runtime"] == "degraded"
+    assert "3/4" in osiris["details"]
+    assert gods_eye["runtime"] == "degraded"
+    assert "5 aeronaves" in gods_eye["details"]
+    assert payload["probes"] == {
+        "osiris": "2026-11-04T10:00:00+00:00",
+        "gods_eye": "2026-11-04T10:01:00+00:00",
+    }
+
+
+def test_orbital_hud_serves_world_map_and_source_endpoints():
+    client = _client(LocalRuntime())
+    land = client.get("/static/world-land.json")
+    assert land.status_code == 200
+    assert land.headers["content-type"].startswith("application/json")
+    rings = land.json()["rings"]
+    assert rings and len(rings[0]) >= 8
+
+    html = client.get("/")
+    assert html.status_code == 200
+    assert "/static/world-land.json" in html.text
+    assert 'id="globe"' in html.text
+    assert "/api/telemetry" in html.text
+    assert "/api/intelligence/osiris" in html.text
+    assert "/api/intelligence/gods-eye" in html.text
+    assert "STANDBY" in html.text

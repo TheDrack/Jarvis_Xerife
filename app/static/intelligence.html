@@ -47,6 +47,20 @@ a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;pad
   };
   const tone=state=>['implemented','migration_defined'].includes(state)?'good':['configured_not_probed','in_progress','on_demand'].includes(state)?'warn':'off';
   const label=state=>labels[state]||String(state||'INDEFINIDO').replaceAll('_',' ').toUpperCase();
+  async function sessionToken(){
+    const stored=localStorage.getItem(TOKEN_KEY)||sessionStorage.getItem('jarvis_local_access')||'';
+    if(stored)return stored;
+    try{
+      const response=await fetch('/api/bootstrap',{cache:'no-store'});
+      if(!response.ok)return '';
+      const data=await response.json();
+      if(data&&typeof data.local_token==='string'&&data.local_token){
+        sessionStorage.setItem('jarvis_local_access',data.local_token);
+        return data.local_token;
+      }
+    }catch(_){}
+    return '';
+  }
   function showError(message){
     $('overall').textContent='API INDISPONÍVEL';$('overall').className='status-pill';
     $('headline').textContent='Não foi possível confirmar o estado';
@@ -95,7 +109,7 @@ a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;pad
     $('feed').innerHTML='<strong>Snapshot real recebido</strong><div class="rows">'+sources.map(s=>'<div class="row-item"><span>'+esc(s.source_id)+'</span><b class="'+(s.available?'':'error')+'">'+(s.available?'DISPONÍVEL':'INDISPONÍVEL · '+esc(s.error_code||'ERRO'))+'</b></div>').join('')+'</div><div class="notice">'+events.length+' eventos únicos · '+observations.length+' observações únicas · '+(report.correlations||[]).length+' correlações candidatas (não são confirmação).</div>'+(events.length?'<div class="rows">'+events.slice(0,30).map(e=>'<div class="row-item"><span>'+esc(e.title)+'<small> · '+esc(e.source_id)+' · '+esc(e.category)+'</small></span><a target="_blank" rel="noopener noreferrer" href="'+esc(e.url)+'">Fonte ↗</a></div>').join('')+'</div>':'<div class="empty">Nenhum evento retornado pelas fontes nesta coleta.</div>')+(observations.length?'<div class="rows">'+observations.slice(0,30).map(o=>'<div class="row-item"><span>'+esc(o.entity_type)+' · '+esc(o.entity_id)+'</span><b>'+esc(o.position?o.position.latitude+', '+o.position.longitude:'Sem posição')+'</b></div>').join('')+'</div>':'');
   }
   async function collect(){
-    const token=localStorage.getItem(TOKEN_KEY);
+    const token=await sessionToken();
     if(!token){showError('Sessão não encontrada. Entre pelo HUD principal e abra novamente este painel.');return;}
     $('collect').disabled=true;$('collect').textContent='Coletando…';
     try{
@@ -110,7 +124,7 @@ a{color:var(--cyan);text-decoration:none}.shell{max-width:1480px;margin:auto;pad
     finally{$('collect').disabled=false;$('collect').textContent='◎ Coletar agora';}
   }
   async function load(){
-    const token=localStorage.getItem(TOKEN_KEY);
+    const token=await sessionToken();
     if(!token){showError('Sessão não encontrada. Entre pelo HUD principal e abra novamente este painel.');return;}
     $('refresh').disabled=true;$('refresh').textContent='Consultando…';
     try{

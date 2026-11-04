@@ -10,6 +10,7 @@ import secrets
 import shutil
 import subprocess
 import time
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
+from app.adapters.edge.jarvis_daily_briefing import build_briefing, build_camera_registry
 from app.adapters.edge.network_discovery_adapter import discover_devices, network_interfaces
 from app.adapters.infrastructure.routers.intelligence_dashboard import build_intelligence_status
 from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
@@ -26,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
+_WORLD_LAND_PATH = _REPO_ROOT / "app" / "static" / "world-land.json"
 _ICON_PATH = _REPO_ROOT / "app" / "static" / "jarvis-icon.svg"
 _WINDOWS_ICON_PATH = _REPO_ROOT / "desktop" / "jarvis.ico"
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
@@ -136,6 +139,75 @@ class PairRequest(BaseModel):
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
+def _osiris_enabled() -> bool:
+    return os.getenv("JARVIS_OSIRIS_ENABLED", "true").strip().lower() not in {
+        "0", "false", "no", "off", "disabled",
+    }
+
+
+def _gev_settings() -> dict[str, Any]:
+    """Read the bounded God's Eye View area without inventing a default."""
+    raw = {
+        name: os.getenv(f"JARVIS_GEV_AREA_{name}", "").strip()
+        for name in ("WEST", "SOUTH", "EAST", "NORTH")
+    }
+    if not all(raw.values()):
+        return {"area": None, "reason": "AreaNotConfigured"}
+    try:
+        area = {name.lower(): float(value) for name, value in raw.items()}
+    except ValueError:
+        return {"area": None, "reason": "AreaInvalid"}
+    return {
+        "area": area,
+        "reason": None,
+        "api_base": os.getenv("JARVIS_GEV_API_BASE_URL", "http://127.0.0.1:4173"),
+        "entrypoint_configured": bool(os.getenv("JARVIS_GEV_MCP_ENTRYPOINT", "").strip()),
+    }
+
+
+def _telemetry_snapshot() -> dict[str, Any]:
+    """Read local host telemetry for the HUD; never fabricate missing values."""
+    try:
+        import psutil
+    except ImportError:
+        return {"available": False, "reason": "psutil_unavailable"}
+    try:
+        memory = psutil.virtual_memory()
+        process = psutil.Process()
+        temperatures: list[float] = []
+        try:
+            for entries in (psutil.sensors_temperatures() or {}).values():
+                for entry in entries:
+                    current = getattr(entry, "current", None)
+                    if current is not None:
+                        temperatures.append(float(current))
+        except (AttributeError, OSError, RuntimeError):
+            temperatures = []
+        battery: int | None = None
+        try:
+            snapshot = psutil.sensors_battery()
+            battery = None if snapshot is None else int(round(snapshot.percent))
+        except (AttributeError, OSError):
+            battery = None
+        return {
+            "available": True,
+            "cpu_percent": round(float(psutil.cpu_percent(interval=None)), 1),
+            "cpu_count": int(psutil.cpu_count(logical=True) or 1),
+            "process_cpu_percent": round(float(process.cpu_percent(interval=None)), 1),
+            "memory_percent": round(float(memory.percent), 1),
+            "memory_used_mb": int(float(memory.used) / 1_048_576),
+            "memory_total_mb": int(float(memory.total) / 1_048_576),
+            "temperature_c": round(max(temperatures), 1) if temperatures else None,
+            "battery_percent": battery,
+            "process_count": len(psutil.pids()),
+            "uptime_seconds": max(0, int(time.time() - psutil.boot_time())),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as exc:
+        logger.warning("Local telemetry unavailable (%s)", type(exc).__name__)
+        return {"available": False, "reason": type(exc).__name__}
+
+
 class LocalRuntime:
     def __init__(self) -> None:
         self.token = secrets.token_urlsafe(32)
@@ -146,6 +218,8 @@ class LocalRuntime:
         self.locked_until = 0.0
         self.clients: dict[str, float] = {}
         self.last_intelligence: dict[str, Any] | None = None
+        self.osiris_snapshot: dict[str, Any] | None = None
+        self.gods_eye_snapshot: dict[str, Any] | None = None
 
     def refresh_pairing(self) -> None:
         self.pairing_code = f"{secrets.randbelow(1_000_000):06d}"
@@ -292,6 +366,12 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="Ícone Jarvis indisponível.")
         return FileResponse(_ICON_PATH, media_type="image/svg+xml")
 
+    @app.get("/static/world-land.json", include_in_schema=False)
+    async def desktop_world_land() -> FileResponse:
+        if not _WORLD_LAND_PATH.is_file():
+            raise HTTPException(status_code=404, detail="Mapa-múndi indisponível.")
+        return FileResponse(_WORLD_LAND_PATH, media_type="application/json")
+
     @app.get("/favicon.ico", include_in_schema=False)
     async def desktop_icon_ico() -> FileResponse:
         if not _WINDOWS_ICON_PATH.is_file():
@@ -380,6 +460,49 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                     if error_code
                     else "Estado observado na última consulta MCP read-only."
                 )
+        osiris_snapshot = state.osiris_snapshot or {}
+        if osiris_snapshot:
+            osiris_source = next(
+                (item for item in payload.get("sources", []) if item.get("id") == "osiris"),
+                None,
+            )
+            if osiris_source is not None:
+                counts = osiris_snapshot.get("counts") or {}
+                online = int(counts.get("routes_online") or 0)
+                total = int(counts.get("routes_total") or 0)
+                osiris_source["runtime"] = (
+                    "healthy" if online and online == total
+                    else ("degraded" if online else "unavailable")
+                )
+                osiris_source["details"] = (
+                    f"OSIRIS: {online}/{total} rotas · "
+                    f"{int(counts.get('events') or 0)} eventos na última consulta."
+                )
+        gods_eye_snapshot = state.gods_eye_snapshot or {}
+        if gods_eye_snapshot:
+            gods_eye_source = next(
+                (item for item in payload.get("sources", []) if item.get("id") == "gods_eye_view"),
+                None,
+            )
+            if gods_eye_source is not None:
+                counts = gods_eye_snapshot.get("counts") or {}
+                available = bool(gods_eye_snapshot.get("available"))
+                error_code = gods_eye_snapshot.get("error_code")
+                gods_eye_source["runtime"] = (
+                    "degraded" if available and error_code
+                    else ("healthy" if available else "unavailable")
+                )
+                gods_eye_source["details"] = (
+                    f"God's Eye: {int(counts.get('aircraft') or 0)} aeronaves · "
+                    f"{int(counts.get('satellite') or 0)} satélites · "
+                    f"{int(counts.get('vessel') or 0)} embarcações na última consulta"
+                    + (f" ({error_code})." if error_code else ".")
+                )
+        payload["probes"] = {
+            "osiris": osiris_snapshot.get("collected_at"),
+            "gods_eye": gods_eye_snapshot.get("collected_at"),
+        }
+
         history_runtime = latest.get("history") or {}
         payload["history"]["runtime_status"] = history_runtime.get("status", "not_checked")
         payload["history"]["runtime_reason"] = history_runtime.get("reason")
@@ -427,11 +550,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             if not isinstance(public_batch, IntelligenceBatch):
                 public_batch = IntelligenceBatch.model_validate(public_batch)
 
-            osiris_enabled = (
-                os.getenv("JARVIS_OSIRIS_ENABLED", "true").strip().lower()
-                not in {"0", "false", "no", "off", "disabled"}
-            )
-            if osiris_enabled:
+            if _osiris_enabled():
                 osiris = nexus.resolve(
                     "OsirisRestAdapter",
                     hint_path="app.adapters.infrastructure.intelligence.osiris_rest_adapter.py",
@@ -450,15 +569,13 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                     )
                 )
 
-            area_names = ("WEST", "SOUTH", "EAST", "NORTH")
-            area_values = {name: os.getenv(f"JARVIS_GEV_AREA_{name}", "").strip() for name in area_names}
-            if all(area_values.values()):
+            gev_settings = _gev_settings()
+            if gev_settings["area"]:
                 try:
-                    area = {name.lower(): float(value) for name, value in area_values.items()}
                     from app.adapters.infrastructure.intelligence.gods_eye_mcp_adapter import GodsEyeMcpAdapter
                     gev = GodsEyeMcpAdapter(
-                        area=area,
-                        api_base=os.getenv("JARVIS_GEV_API_BASE_URL", "http://127.0.0.1:4173"),
+                        area=gev_settings["area"],
+                        api_base=str(gev_settings["api_base"]),
                         limit=50,
                         timeout_seconds=8,
                     )
@@ -546,6 +663,157 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             "collected_at": None,
             "history": {"status": "unavailable"},
         }
+
+    @app.get("/api/telemetry")
+    async def telemetry(_client: str = Depends(require_local_token)) -> dict[str, Any]:
+        return await _run_sync_io_off_loop(_telemetry_snapshot)
+
+    @app.get("/api/briefing")
+    async def daily_briefing(_client: str = Depends(require_local_token)) -> dict[str, Any]:
+        """Daily headlines by topic plus the local weather forecast (read-only)."""
+        return await _run_sync_io_off_loop(build_briefing)
+
+    @app.get("/api/cameras")
+    async def cameras(_client: str = Depends(require_local_token)) -> dict[str, Any]:
+        """Return the operator-registered camera allowlist without touching the streams."""
+        return await _run_sync_io_off_loop(build_camera_registry)
+
+    @app.get("/intelligence", response_class=HTMLResponse, include_in_schema=False)
+    async def universal_intelligence_page() -> HTMLResponse:
+        """Serve the Universal Intelligence dashboard from the local core."""
+        path = _REPO_ROOT / "app" / "static" / "intelligence.html"
+        if not path.is_file():
+            raise HTTPException(status_code=503, detail="Painel Universal Intelligence indisponivel.")
+        return HTMLResponse(path.read_text(encoding="utf-8"))
+
+    @app.get("/v1/intelligence/status")
+    async def universal_intelligence_status(
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Expose the canonical Universal Intelligence contract on the local core."""
+        return build_intelligence_status()
+
+    @app.post("/v1/intelligence/collect")
+    async def universal_intelligence_collect(
+        limit: int = 50,
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Alias for the canonical on-demand collector, authorised by the local token."""
+        if not 1 <= limit <= 100:
+            raise HTTPException(status_code=422, detail="limit deve estar entre 1 e 100.")
+        from app.application.services.intelligence_collector import collect_live_intelligence
+
+        try:
+            report = await collect_live_intelligence(limit=limit)
+        except Exception as exc:  # noqa: BLE001 - surfaced as an HTTP status, never faked
+            logger.warning(
+                "Universal Intelligence collection failed (%s)", type(exc).__name__
+            )
+            raise HTTPException(
+                status_code=503, detail="Coleta Universal Intelligence indisponivel."
+            ) from exc
+        return {
+            "report": report.model_dump(mode="json"),
+            "history": {"status": "disabled", "reason": "local_desktop_mode"},
+        }
+
+    @app.post("/api/intelligence/osiris")
+    async def collect_osiris(_client: str = Depends(require_local_token)) -> dict[str, Any]:
+        """Collect only the OSIRIS routes so the HUD can refresh one source."""
+        collected_at = datetime.now(timezone.utc).isoformat()
+        if not _osiris_enabled():
+            return {
+                "success": False, "available": False, "reason": "Disabled",
+                "collected_at": collected_at, "events": [], "sources": [],
+                "counts": {"events": 0, "routes_online": 0, "routes_total": 4},
+            }
+        from app.core.nexus import nexus
+        osiris = nexus.resolve(
+            "OsirisRestAdapter",
+            hint_path="app.adapters.infrastructure.intelligence.osiris_rest_adapter.py",
+            use_cache=False,
+        )
+        try:
+            if not callable(getattr(osiris, "collect_events", None)):
+                raise HTTPException(status_code=503, detail="OsirisRestAdapter indisponível no Nexus local.")
+            batch = await _run_sync_io_off_loop(osiris.collect_events, 20)
+            if not isinstance(batch, IntelligenceBatch):
+                batch = IntelligenceBatch.model_validate(batch)
+            routes = [source.model_dump(mode="json") for source in batch.sources]
+            payload = {
+                "success": True,
+                "available": sum(bool(item.get("available")) for item in routes) > 0,
+                "runtime": "local",
+                "collected_at": collected_at,
+                "events": [event.model_dump(mode="json") for event in batch.events],
+                "sources": routes,
+                "counts": {
+                    "events": len(batch.events),
+                    "routes_online": sum(bool(item.get("available")) for item in routes),
+                    "routes_total": len(routes),
+                },
+            }
+            state.osiris_snapshot = payload
+            return payload
+        finally:
+            close = getattr(osiris, "close", None)
+            if callable(close):
+                close()
+
+    @app.post("/api/intelligence/gods-eye")
+    async def collect_gods_eye(_client: str = Depends(require_local_token)) -> dict[str, Any]:
+        """Collect only the bounded God's Eye View MCP snapshot."""
+        collected_at = datetime.now(timezone.utc).isoformat()
+        settings = _gev_settings()
+        if settings["area"] is None:
+            return {
+                "success": False, "available": False, "reason": settings["reason"],
+                "collected_at": collected_at, "observations": [], "area": None,
+                "sources": [{"source_id": "gods_eye_view", "available": False,
+                             "error_code": settings["reason"]}],
+                "counts": {"aircraft": 0, "vessel": 0, "satellite": 0},
+            }
+        area = settings["area"]
+        try:
+            from app.adapters.infrastructure.intelligence.gods_eye_mcp_adapter import GodsEyeMcpAdapter
+            gev = GodsEyeMcpAdapter(
+                area=area,
+                api_base=str(settings["api_base"]),
+                limit=50,
+                timeout_seconds=8,
+            )
+            batch = await asyncio.wait_for(gev.collect_observations(), timeout=90)
+        except (ImportError, TypeError, ValueError, OSError, asyncio.TimeoutError) as exc:
+            return {
+                "success": False, "available": False, "reason": type(exc).__name__,
+                "collected_at": collected_at, "observations": [], "area": area,
+                "sources": [{"source_id": "gods_eye_view", "available": False,
+                             "error_code": type(exc).__name__}],
+                "counts": {"aircraft": 0, "vessel": 0, "satellite": 0},
+            }
+        counts = Counter(observation.entity_type for observation in batch.observations)
+        sources = [source.model_dump(mode="json") for source in batch.sources]
+        error_code = next(
+            (source.get("error_code") for source in sources if source.get("error_code")),
+            None,
+        )
+        payload = {
+            "success": bool(batch.observations) or bool(sources and sources[0].get("available")),
+            "available": bool(sources and sources[0].get("available")),
+            "error_code": error_code,
+            "runtime": "local_mcp",
+            "collected_at": collected_at,
+            "area": area,
+            "observations": [item.model_dump(mode="json") for item in batch.observations],
+            "sources": sources,
+            "counts": {
+                "aircraft": int(counts.get("aircraft", 0)),
+                "vessel": int(counts.get("vessel", 0)),
+                "satellite": int(counts.get("satellite", 0)),
+            },
+        }
+        state.gods_eye_snapshot = payload
+        return payload
 
     @app.get("/api/network/status")
     async def network_status(_client: str = Depends(require_local_token)) -> dict[str, Any]:

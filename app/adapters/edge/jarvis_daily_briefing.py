@@ -1,0 +1,518 @@
+"""Read-only daily briefing for the Jarvis Desktop HUD.
+
+Three public, credential-free sources feed the briefing:
+
+* Google News RSS (``news.google.com/rss``) for headlines by topic and for the
+  configured home region. Headlines are aggregated links; each article stays
+  under the rights of its publisher, so only title, source, time and the
+  publisher link are carried.
+* Open-Meteo (``api.open-meteo.com``) for current conditions and a three-day
+  forecast for the configured region.
+* A local allowlist file (``cameras.json``) for camera previews the operator
+  registered themselves. Nothing is scraped or probed from the network.
+
+Every entry is untrusted external data. Nothing is invented: a source that
+fails is reported with an error code and an empty list.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import time
+import unicodedata
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit
+
+import httpx
+
+NEWS_RSS_URL = "https://news.google.com/rss/search"
+WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+USER_AGENT = "Jarvis-Xerife/0.1 (local desktop briefing; read-only)"
+NEWS_TTL_SECONDS = 600.0
+WEATHER_TTL_SECONDS = 600.0
+MAX_ITEMS_PER_TOPIC = 12
+MAX_CAMERAS = 12
+
+REGION_TERMS = (
+    "Rio Grande do Sul",
+    "Santa Catarina",
+    "Parana",
+    "Porto Alegre",
+    "Caxias do Sul",
+    "Pelotas",
+    "Santa Maria",
+    "Rio Grande",
+    "Uruguaiana",
+    "Novo Hamburgo",
+    "Canoas",
+    "Passo Fundo",
+    "Bage",
+    "Santana do Livramento",
+    "Florianopolis",
+    "Joinville",
+    "Blumenau",
+    "Chapeco",
+    "Criciuma",
+    "Curitiba",
+    "Londrina",
+    "Maringa",
+    "Cascavel",
+    "Foz do Iguacu",
+)
+
+TOPICS: tuple[dict[str, str], ...] = (
+    {
+        "id": "regiao",
+        "label": "REGIÃO",
+        "query": '("Rio Grande do Sul" OR "Santa Catarina" OR "Paraná" OR "Porto Alegre"'
+        ' OR "Caxias do Sul" OR Pelotas OR "Santa Maria") when:2d',
+    },
+    {
+        "id": "mundo",
+        "label": "MUNDO",
+        "query": '("Estados Unidos" OR "União Europeia" OR ONU OR China OR Rússia'
+        ' OR "Oriente Médio" OR Argentina OR Uruguai) when:2d',
+    },
+    {
+        "id": "politica",
+        "label": "POLÍTICA",
+        "query": '(Congresso OR Senado OR "Câmara dos Deputados" OR STF OR eleição'
+        ' OR "governo federal" OR prefeitura) when:2d',
+    },
+    {
+        "id": "economia",
+        "label": "ECONOMIA",
+        "query": '(inflação OR "Banco Central" OR dólar OR Ibovespa OR agronegócio'
+        ' OR "taxa Selic" OR emprego) when:2d',
+    },
+    {
+        "id": "guerra",
+        "label": "GUERRA",
+        "query": '(guerra OR conflito OR "ataque aéreo" OR Gaza OR Ucrânia OR mísseis) when:2d',
+    },
+    {
+        "id": "tecnologia",
+        "label": "TECNOLOGIA",
+        "query": '("inteligência artificial" OR cibersegurança OR semicondutores'
+        ' OR tecnologia OR satélite) when:2d',
+    },
+    {
+        "id": "clima",
+        "label": "CLIMA",
+        "query": '(chuva OR tempestade OR frio OR geada OR "Defesa Civil"'
+        ' OR "previsão do tempo") when:2d',
+    },
+)
+
+WEATHER_CODES: dict[int, str] = {
+    0: "Céu limpo",
+    1: "Predomínio de sol",
+    2: "Parcialmente nublado",
+    3: "Nublado",
+    45: "Neblina",
+    48: "Neblina congelante",
+    51: "Garoa fraca",
+    53: "Garoa moderada",
+    55: "Garoa intensa",
+    56: "Garoa congelante",
+    57: "Garoa congelante intensa",
+    61: "Chuva fraca",
+    63: "Chuva moderada",
+    65: "Chuva forte",
+    66: "Chuva congelante",
+    67: "Chuva congelante forte",
+    71: "Neve fraca",
+    73: "Neve moderada",
+    75: "Neve forte",
+    77: "Grãos de neve",
+    80: "Pancadas fracas",
+    81: "Pancadas de chuva",
+    82: "Pancadas fortes",
+    85: "Pancadas de neve",
+    86: "Pancadas de neve fortes",
+    95: "Trovoada",
+    96: "Trovoada com granizo",
+    99: "Trovoada com granizo forte",
+}
+
+_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def weather_label(code: Any) -> str:
+    """Translate an Open-Meteo WMO code; unknown codes are reported as such."""
+    try:
+        return WEATHER_CODES.get(int(code), "Condição não catalogada")
+    except (TypeError, ValueError):
+        return "Condição não catalogada"
+
+
+def _region_settings() -> dict[str, Any]:
+    label = os.getenv("JARVIS_BRIEFING_LABEL", "").strip() or "Sul do Brasil · Porto Alegre"
+    try:
+        latitude = float(os.getenv("JARVIS_BRIEFING_LAT", "-30.03"))
+        longitude = float(os.getenv("JARVIS_BRIEFING_LON", "-51.23"))
+    except ValueError:
+        latitude, longitude = -30.03, -51.23
+    if not -90 <= latitude <= 90:
+        latitude = -30.03
+    if not -180 <= longitude <= 180:
+        longitude = -51.23
+    timezone_name = os.getenv("JARVIS_BRIEFING_TIMEZONE", "").strip() or "America/Sao_Paulo"
+    return {
+        "label": label[:80],
+        "latitude": round(latitude, 4),
+        "longitude": round(longitude, 4),
+        "timezone": timezone_name[:64],
+    }
+
+
+def _fail(exc: BaseException) -> str:
+    if isinstance(exc, httpx.TimeoutException):
+        return "timeout"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"http_{exc.response.status_code}"
+    if isinstance(exc, (ET.ParseError, ValueError)):
+        return "malformed"
+    if isinstance(exc, httpx.HTTPError):
+        return "network"
+    return type(exc).__name__
+
+
+def _normalize(text: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    return "".join(ch for ch in decomposed if ch.isalnum())
+
+
+def _iso(value: Any) -> str | None:
+    if not value:
+        return None
+    try:
+        parsed = parsedate_to_datetime(str(value))
+    except (TypeError, ValueError, IndexError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def parse_news_rss(payload: bytes, limit: int = MAX_ITEMS_PER_TOPIC) -> list[dict[str, Any]]:
+    """Parse a Google News RSS feed into bounded, deduplicated headline records."""
+    root = ET.fromstring(payload)
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for node in root.findall(".//item"):
+        title = (node.findtext("title") or "").strip()
+        link = (node.findtext("link") or "").strip()
+        source = (node.findtext("source") or "").strip()
+        if not title or not link:
+            continue
+        if source and title.endswith(f" - {source}"):
+            title = title[: -(len(source) + 3)].strip()
+        parts = urlsplit(link)
+        if parts.scheme not in {"http", "https"} or not parts.netloc or parts.username or parts.password:
+            continue
+        fingerprint = _normalize(title)
+        if not fingerprint or fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        items.append(
+            {
+                "id": hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16],
+                "title": title[:240],
+                "source": source[:80],
+                "url": link[:600],
+                "published_at": _iso(node.findtext("pubDate")),
+            }
+        )
+    items.sort(key=lambda item: item.get("published_at") or "", reverse=True)
+    return items[: max(1, min(limit, MAX_ITEMS_PER_TOPIC))]
+
+
+def _client(timeout_seconds: float = 12.0) -> httpx.Client:
+    return httpx.Client(
+        timeout=httpx.Timeout(timeout_seconds, connect=min(8.0, timeout_seconds)),
+        follow_redirects=False,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/rss+xml, application/json"},
+    )
+
+
+def _fetch_topic(topic: dict[str, str], client: httpx.Client) -> dict[str, Any]:
+    fetched_at = datetime.now(timezone.utc).isoformat()
+    params = {
+        "q": topic["query"],
+        "hl": "pt-BR",
+        "gl": "BR",
+        "ceid": "BR:pt-419",
+    }
+    try:
+        response = client.get(NEWS_RSS_URL, params=params)
+        response.raise_for_status()
+        items = parse_news_rss(response.content)
+    except Exception as exc:  # noqa: BLE001 - classified below, never swallowed silently
+        return {
+            "id": topic["id"],
+            "label": topic["label"],
+            "available": False,
+            "error": _fail(exc),
+            "items": [],
+            "fetched_at": fetched_at,
+        }
+    return {
+        "id": topic["id"],
+        "label": topic["label"],
+        "available": True,
+        "error": None,
+        "items": items,
+        "fetched_at": fetched_at,
+    }
+
+
+def _weather(client: httpx.Client, region: dict[str, Any]) -> dict[str, Any]:
+    fetched_at = datetime.now(timezone.utc).isoformat()
+    params = {
+        "latitude": region["latitude"],
+        "longitude": region["longitude"],
+        "current": "temperature_2m,relative_humidity_2m,apparent_temperature,"
+        "precipitation,weather_code,wind_speed_10m",
+        "daily": "weather_code,temperature_2m_max,temperature_2m_min,"
+        "precipitation_sum,sunrise,sunset",
+        "timezone": region["timezone"],
+        "forecast_days": 3,
+    }
+    try:
+        response = client.get(WEATHER_URL, params=params)
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("open-meteo payload is not an object")
+        current = payload.get("current") or {}
+        daily = payload.get("daily") or {}
+        dates = daily.get("time") or []
+        days: list[dict[str, Any]] = []
+        for index, date in enumerate(dates[:3]):
+            code = _at(daily.get("weather_code"), index)
+            days.append(
+                {
+                    "date": str(date)[:10],
+                    "code": code,
+                    "condition": weather_label(code),
+                    "max_c": _round(_at(daily.get("temperature_2m_max"), index)),
+                    "min_c": _round(_at(daily.get("temperature_2m_min"), index)),
+                    "rain_mm": _round(_at(daily.get("precipitation_sum"), index)),
+                    "sunrise": str(_at(daily.get("sunrise"), index) or "")[:16] or None,
+                    "sunset": str(_at(daily.get("sunset"), index) or "")[:16] or None,
+                }
+            )
+        code = current.get("weather_code")
+        return {
+            "available": bool(current),
+            "reason": None if current else "empty_response",
+            "source": "open-meteo",
+            "fetched_at": fetched_at,
+            "current": {
+                "observed_at": str(current.get("time") or "")[:16] or None,
+                "temperature_c": _round(current.get("temperature_2m")),
+                "apparent_c": _round(current.get("apparent_temperature")),
+                "humidity": _round(current.get("relative_humidity_2m")),
+                "rain_mm": _round(current.get("precipitation")),
+                "wind_kmh": _round(current.get("wind_speed_10m")),
+                "code": code,
+                "condition": weather_label(code),
+            },
+            "days": days,
+        }
+    except Exception as exc:  # noqa: BLE001 - reported to the HUD as a health code
+        return {
+            "available": False,
+            "reason": _fail(exc),
+            "source": "open-meteo",
+            "fetched_at": fetched_at,
+            "current": None,
+            "days": [],
+        }
+
+
+def _at(series: Any, index: int) -> Any:
+    if isinstance(series, list) and index < len(series):
+        return series[index]
+    return None
+
+
+def _round(value: Any) -> float | None:
+    try:
+        return round(float(value), 1)
+    except (TypeError, ValueError):
+        return None
+
+
+def _cached(key: str, ttl: float, producer) -> dict[str, Any]:
+    now = time.monotonic()
+    cached = _CACHE.get(key)
+    if cached and now - cached[0] < ttl:
+        return cached[1]
+    value = producer()
+    _CACHE[key] = (now, value)
+    return value
+
+
+def clear_cache() -> None:
+    """Drop cached briefing payloads (used by tests and by manual refresh)."""
+    _CACHE.clear()
+
+
+def build_briefing(force: bool = False) -> dict[str, Any]:
+    """Return the daily briefing snapshot, reusing a short-lived cache."""
+    if force:
+        clear_cache()
+    region = _region_settings()
+
+    def produce() -> dict[str, Any]:
+        topics: list[dict[str, Any]] = []
+        weather: dict[str, Any]
+        with _client() as client:
+            weather = _weather(client, region)
+            for topic in TOPICS:
+                topics.append(_fetch_topic(topic, client))
+        topics_online = sum(1 for topic in topics if topic["available"])
+        item_count = sum(len(topic["items"]) for topic in topics)
+        if topics_online == len(TOPICS) and weather["available"]:
+            health = "online"
+        elif topics_online or weather["available"]:
+            health = "degraded"
+        else:
+            health = "offline"
+        return {
+            "success": topics_online > 0 or weather["available"],
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "region": region,
+            "weather": {**weather, "region": region["label"]},
+            "topics": topics,
+            "counts": {
+                "topics": len(TOPICS),
+                "topics_online": topics_online,
+                "items": item_count,
+            },
+            "health": health,
+            "sources": [
+                {
+                    "id": "google_news_rss",
+                    "label": "Google Notícias · RSS público",
+                    "available": topics_online > 0,
+                    "topics_online": topics_online,
+                    "topics_total": len(TOPICS),
+                },
+                {
+                    "id": "open_meteo",
+                    "label": "Open-Meteo · previsão pública",
+                    "available": bool(weather["available"]),
+                    "error": weather.get("reason"),
+                },
+            ],
+            "notice": (
+                "Manchetes agregadas de veículos públicos; o texto completo e os direitos "
+                "pertencem a cada publicação original."
+            ),
+        }
+
+    return _cached("briefing", 0.0 if force else NEWS_TTL_SECONDS, produce)
+
+
+def cameras_file_path() -> Path:
+    configured = os.getenv("JARVIS_CAMERAS_FILE", "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    local_app_data = Path(os.getenv("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
+    return local_app_data / "Jarvis_Xerife" / "cameras.json"
+
+
+def _safe_camera_url(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate or len(candidate) > 600:
+        return None
+    parts = urlsplit(candidate)
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        return None
+    if parts.username or parts.password:
+        return None
+    return candidate
+
+
+def build_camera_registry(path: Path | None = None) -> dict[str, Any]:
+    """Load the operator's camera allowlist; never fetches or probes a stream."""
+    target = path or cameras_file_path()
+    payload: dict[str, Any] = {
+        "success": True,
+        "configured": False,
+        "path": str(target),
+        "cameras": [],
+        "rejected": 0,
+        "limits": {"max": MAX_CAMERAS, "kinds": ["snapshot", "video"], "max_refresh_seconds": 3600},
+        "hint": (
+            'Crie o arquivo com {"cameras":[{"label":"Centro",'
+            '"url":"https://exemplo/camera.jpg","kind":"snapshot"}]} para exibir '
+            "câmeras públicas que você mesmo registrou."
+        ),
+    }
+    try:
+        raw = target.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return payload
+    except OSError as exc:
+        payload.update({"success": False, "reason": type(exc).__name__})
+        return payload
+    import json
+
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        payload.update({"success": False, "reason": "invalid_json"})
+        return payload
+    entries = data.get("cameras") if isinstance(data, dict) else data
+    if not isinstance(entries, list):
+        payload.update({"success": False, "reason": "invalid_shape"})
+        return payload
+    cameras: list[dict[str, Any]] = []
+    rejected = 0
+    for entry in entries:
+        if len(cameras) >= MAX_CAMERAS or not isinstance(entry, dict):
+            rejected += 1
+            continue
+        url = _safe_camera_url(entry.get("url"))
+        label = str(entry.get("label") or "").strip()
+        if not url or not label:
+            rejected += 1
+            continue
+        kind = str(entry.get("kind") or "snapshot").strip().lower()
+        if kind not in {"snapshot", "video"}:
+            kind = "snapshot"
+        try:
+            refresh = int(entry.get("refresh_seconds") or 20)
+        except (TypeError, ValueError):
+            refresh = 20
+        refresh = max(5, min(3600, refresh))
+        cameras.append(
+            {
+                "id": str(entry.get("id") or _normalize(label))[:40] or f"cam-{len(cameras) + 1}",
+                "label": label[:60],
+                "url": url,
+                "kind": kind,
+                "refresh_seconds": refresh,
+                "note": str(entry.get("note") or "")[:120],
+            }
+        )
+    payload.update(
+        {
+            "configured": bool(cameras),
+            "cameras": cameras,
+            "rejected": rejected,
+            "loaded_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    return payload
