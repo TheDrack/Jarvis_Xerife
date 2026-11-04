@@ -948,3 +948,37 @@ def test_orbital_hud_serves_world_map_and_source_endpoints():
     assert "/api/intelligence/osiris" in html.text
     assert "/api/intelligence/gods-eye" in html.text
     assert "STANDBY" in html.text
+
+
+def test_tailscale_snapshot_suppresses_windows_console_window(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    seen = {}
+    monkeypatch.setattr(desktop_local.shutil, "which", lambda _name: "tailscale.exe")
+
+    def fake_run(*args, **kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(returncode=0, stdout='{"Self":{},"Peer":{}}')
+
+    monkeypatch.setattr(desktop_local.subprocess, "run", fake_run)
+
+    desktop_local._tailscale_snapshot()
+
+    assert seen["creationflags"] == getattr(desktop_local.subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def test_adb_snapshot_suppresses_windows_console_window(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    seen = {}
+    monkeypatch.setattr(desktop_local.shutil, "which", lambda _name: "adb.exe")
+
+    def fake_run(*args, **kwargs):
+        seen.update(kwargs)
+        return SimpleNamespace(returncode=0, stdout="List of devices attached\n")
+
+    monkeypatch.setattr(desktop_local.subprocess, "run", fake_run)
+
+    desktop_local._adb_snapshot()
+
+    assert seen["creationflags"] == getattr(desktop_local.subprocess, "CREATE_NO_WINDOW", 0)

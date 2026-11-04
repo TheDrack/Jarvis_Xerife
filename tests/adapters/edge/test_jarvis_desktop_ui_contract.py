@@ -24,7 +24,7 @@ def test_navigation_controls_reference_real_targets_and_expose_current_view():
     for panel in ("events", "sources", "telemetry", "orbital"):
         assert f'data-panel="{panel}"' in HTML
         assert f'id="panel{panel.capitalize()}"' in HTML
-    assert 'id="networkWindow"' in HTML
+    assert 'id="panelNetwork"' in HTML
     assert 'aria-current="true"' in HTML
     assert "setAttribute('aria-current','true')" in HTML
     assert "removeAttribute('aria-current')" in HTML
@@ -104,3 +104,123 @@ def test_every_dom_id_used_by_the_script_exists_in_the_markup():
     assert identifiers
     for element_id in sorted(identifiers):
         assert f'id="{element_id}"' in HTML, element_id
+
+
+
+def test_workspace_adapts_in_place_instead_of_opening_a_separate_network_modal():
+    assert 'data-panel="network"' in HTML
+    assert 'id="panelNetwork"' in HTML
+    assert 'id="networkWindow"' not in HTML
+    assert "if(view==='network'){openWindow('networkWindow')" not in HTML
+    assert "panel.hidden=!visible.includes" in HTML
+
+
+def test_globe_selection_opens_a_contextual_inspector_with_an_action():
+    assert 'id="selectionInspector"' in HTML
+    assert 'id="selectionTitle"' in HTML
+    assert 'id="selectionDetail"' in HTML
+    assert 'id="selectionAction"' in HTML
+    assert "Globe.onSelect(mark=>{state.selected=mark;renderSelection(mark);renderStatus();})" in HTML
+    assert "function renderSelection(mark)" in HTML
+
+
+def test_briefing_is_compact_and_the_outer_columns_do_not_scroll():
+    assert re.search(r"\.col\{[^}]*overflow:hidden", HTML)
+    assert ".briefing-list" in HTML
+    assert ".briefing-list" in HTML
+    assert "slice(0,5)" in HTML
+    assert "overflow:hidden" in HTML
+
+
+def test_navigation_updates_the_single_workspace_and_network_is_inline():
+    assert "$('stage').setAttribute('data-view',view)" in HTML
+    assert "data-view=\"network\"" in HTML
+    assert "data-panel=\"network\"" in HTML
+    assert "openWindow('networkWindow')" not in HTML
+
+
+def test_reduced_motion_disables_persistent_scan_and_orbit_effects():
+    assert "@media(prefers-reduced-motion:reduce)" in HTML
+    assert ".globe-wrap:after" in HTML
+    assert ".reactor .sweep" in HTML
+
+
+
+def test_network_entities_are_actionable_inside_the_adaptive_workspace():
+    assert 'data-network-item' in HTML
+    assert "function selectNetworkItem(kind,index)" in HTML
+    assert "navigator.clipboard.writeText(mark.copyValue)" in HTML
+    assert "COPIAR" in HTML
+
+
+def test_network_panel_does_not_use_modal_or_navigate_away():
+    assert 'id="panelNetwork"' in HTML
+    assert 'id="networkWindow"' not in HTML
+    assert "data-network-kind" in HTML
+
+
+def test_selected_entities_expose_rich_details_and_verified_source_links():
+    assert 'id="selectionSummary"' in HTML
+    assert 'id="selectionFacts"' in HTML
+    assert 'id="selectionSource"' in HTML
+    assert "function renderSelection(mark)" in HTML
+    assert "record.summary||record.description" in HTML
+    assert "evidence[0]" in HTML
+
+
+def test_events_and_orbital_entities_open_the_contextual_inspector():
+    assert "data-event-id" in HTML
+    assert "data-observation-id" in HTML
+    assert "selectLiveEntity(" in HTML
+    assert "Globe.onSelect(mark=>" in HTML
+
+
+def test_universal_intelligence_prioritizes_live_topics_and_real_correlations():
+    assert "state.live.correlations" in HTML
+    assert "CORRELAÇÕES ENTRE FONTES" in HTML
+    assert "ASSUNTOS DISPONÍVEIS" in HTML
+    assert "CANDIDATA, NÃO PROVA" in HTML
+    assert "MATURIDADE DO PIPELINE" in HTML
+
+
+def test_windows_network_commands_never_create_visible_console_windows():
+    local = (ROOT / "app" / "adapters" / "edge" / "jarvis_desktop_local.py").read_text(encoding="utf-8")
+    network = (ROOT / "app" / "adapters" / "edge" / "network_discovery_adapter.py").read_text(encoding="utf-8")
+    assert local.count("creationflags=getattr(subprocess, \"CREATE_NO_WINDOW\", 0)") >= 2
+    assert "creationflags=getattr(subprocess, \"CREATE_NO_WINDOW\", 0)" in network
+
+
+def test_camera_cards_and_registered_devices_open_contextual_inspectors():
+    assert "data-camera-index" in HTML
+    assert "kind:'camera'" in HTML
+    assert "kind:'device'" in HTML
+    assert "id=\"selectionFacts\"" in HTML
+    assert "id=\"selectionSource\"" in HTML
+
+
+def test_intelligence_panel_can_collect_and_display_live_correlations():
+    assert 'id="intelCollect"' in HTML
+    assert 'data-sync="all"' in HTML
+    assert "state.live.correlations" in HTML
+    assert "CORRELAÇÕES ENTRE FONTES" in HTML
+
+
+def test_selection_inspector_is_really_hidden_without_a_selected_entity():
+    assert '#selectionInspector[hidden]{display:none!important}' in HTML
+    assert "inspector.hidden=true" in HTML
+
+
+def test_universal_intelligence_indexes_briefing_devices_and_cameras_as_subjects():
+    assert "state.briefing&&state.briefing.topics" in HTML
+    assert "state.devices&&state.devices.devices" in HTML
+    assert "state.cameras&&state.cameras.cameras" in HTML
+    assert "data-briefing-index" in HTML
+    assert "data-intel-device-id" in HTML
+    assert "data-intel-camera-id" in HTML
+    assert "function selectIntelSubject(kind,id)" in HTML
+
+
+def test_briefing_correlations_require_a_shared_reference_or_exact_headline():
+    assert "briefingGroups" in HTML
+    assert "item.url?'url:'" in HTML
+    assert "CANDIDATA, NÃO PROVA" in HTML
