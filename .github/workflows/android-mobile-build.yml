@@ -141,6 +141,7 @@ jobs:
         run: |
           cp release-artifact/app-release.apk jarvis-mobile.apk
           gh release create "mobile-build-${{ github.run_number }}" jarvis-mobile.apk \
+            --repo "${{ github.repository }}" \
             --title "Jarvis Mobile (build ${{ github.run_number }})" \
             --notes "APK gerado a partir de ${{ github.sha }}." \
             --latest
