@@ -56,7 +56,7 @@ cai para a região configurada no núcleo e informa isso na tela.
 ## Testes Android
 
 `HudTargetTest` cobre a normalização do endereço do HUD (esquema ausente, HTTPS,
-caminho/consulta descartados e entradas inválidas), além da comparação exata de origem usada pela permissão de geolocalização. A compilação e a execução
+caminho/consulta descartados, esquemas não suportados e comparação exata de origem usada pela permissão de geolocalização. A compilação e a execução
 desses testes exigem Gradle e o Android SDK, que não estão disponíveis neste
 ambiente de trabalho; o workflow de CI compila o APK de debug.
 
