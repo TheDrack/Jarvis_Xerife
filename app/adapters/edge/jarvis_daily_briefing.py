@@ -32,9 +32,12 @@ import httpx
 
 NEWS_RSS_URL = "https://news.google.com/rss/search"
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+GEOCODE_URL = "https://nominatim.openstreetmap.org/reverse"
 USER_AGENT = "Jarvis-Xerife/0.1 (local desktop briefing; read-only)"
 NEWS_TTL_SECONDS = 600.0
 WEATHER_TTL_SECONDS = 600.0
+GEOCODE_TTL_SECONDS = 86400.0
+GEOCODE_MIN_INTERVAL_SECONDS = 1.1
 MAX_ITEMS_PER_TOPIC = 12
 MAX_CAMERAS = 12
 
@@ -141,6 +144,7 @@ WEATHER_CODES: dict[int, str] = {
 }
 
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_GEOCODE_CLOCK: list[float] = [0.0]
 
 
 def weather_label(code: Any) -> str:
@@ -168,7 +172,135 @@ def _region_settings() -> dict[str, Any]:
         "latitude": round(latitude, 4),
         "longitude": round(longitude, 4),
         "timezone": timezone_name[:64],
+        "source": "configured",
+        "geocoded": False,
+        "geocode_reason": "configured_region",
+        "place": None,
     }
+
+
+def geocode_enabled() -> bool:
+    """Reverse geocoding is opt-out: JARVIS_BRIEFING_GEOCODE=off keeps coordinates local."""
+    return os.getenv("JARVIS_BRIEFING_GEOCODE", "").strip().lower() not in {
+        "off",
+        "0",
+        "false",
+        "no",
+    }
+
+
+def _reverse_geocode(client: httpx.Client, latitude: float, longitude: float) -> dict[str, Any]:
+    """Name the place of a coordinate through the public OSM Nominatim service.
+
+    Only the rounded coordinate cell is cached for a day, and calls are spaced by
+    at least one second to respect the service usage policy. A failure returns a
+    reason instead of a guessed place name.
+    """
+    if not geocode_enabled():
+        return {"available": False, "reason": "disabled"}
+    key = f"geo:{round(latitude, 2)}:{round(longitude, 2)}"
+
+    def produce() -> dict[str, Any]:
+        wait = GEOCODE_MIN_INTERVAL_SECONDS - (time.monotonic() - _GEOCODE_CLOCK[0])
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            response = client.get(
+                GEOCODE_URL,
+                params={
+                    "format": "jsonv2",
+                    "lat": f"{latitude:.5f}",
+                    "lon": f"{longitude:.5f}",
+                    "zoom": 10,
+                    "addressdetails": 1,
+                    "accept-language": "pt-BR",
+                },
+                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+            )
+            _GEOCODE_CLOCK[0] = time.monotonic()
+            response.raise_for_status()
+            data = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            return {"available": False, "reason": _fail(exc)}
+        address = data.get("address") if isinstance(data, dict) else None
+        if not isinstance(address, dict):
+            return {"available": False, "reason": "no_address"}
+        city = (
+            address.get("city")
+            or address.get("town")
+            or address.get("village")
+            or address.get("municipality")
+            or address.get("suburb")
+        )
+        state = address.get("state") or address.get("region")
+        country = address.get("country")
+        if not (city or state or country):
+            return {"available": False, "reason": "no_address"}
+        return {
+            "available": True,
+            "city": city,
+            "state": state,
+            "country": country,
+        }
+
+    return _cached(key, GEOCODE_TTL_SECONDS, produce)
+
+
+def device_region(
+    latitude: Any = None,
+    longitude: Any = None,
+    client: httpx.Client | None = None,
+) -> dict[str, Any] | None:
+    """Build the briefing region from the coordinates reported by the device.
+
+    Returns ``None`` when the coordinates are missing or out of range, so the
+    caller falls back to the configured region. The weather always uses the real
+    coordinates; the place names come from reverse geocoding and are reported as
+    unavailable when that fails.
+    """
+    if latitude is None or longitude is None:
+        return None
+    try:
+        lat = float(latitude)
+        lon = float(longitude)
+    except (TypeError, ValueError):
+        return None
+    if not -90.0 <= lat <= 90.0 or not -180.0 <= lon <= 180.0:
+        return None
+    place = _reverse_geocode(client, lat, lon) if client is not None else {
+        "available": False,
+        "reason": "no_client",
+    }
+    parts = [place.get("city"), place.get("state") or place.get("country")]
+    label = " · ".join(str(part) for part in parts if part) or f"{lat:.2f}, {lon:.2f}"
+    return {
+        "label": label[:80],
+        "latitude": round(lat, 4),
+        "longitude": round(lon, 4),
+        "timezone": "auto",
+        "source": "device",
+        "geocoded": bool(place.get("available")),
+        "geocode_reason": place.get("reason"),
+        "place": {
+            "city": place.get("city"),
+            "state": place.get("state"),
+            "country": place.get("country"),
+        }
+        if place.get("available")
+        else None,
+    }
+
+
+def region_query(region: dict[str, Any]) -> str | None:
+    """Regional news query built only from the place names the device resolved."""
+    place = region.get("place")
+    if not isinstance(place, dict):
+        return None
+    terms = [str(place[key]) for key in ("city", "state", "country") if place.get(key)]
+    if not terms:
+        return None
+    quoted = " OR ".join(f'"{term}"' for term in terms[:3])
+    return f"({quoted}) when:2d"
 
 
 def _fail(exc: BaseException) -> str:
@@ -241,10 +373,14 @@ def _client(timeout_seconds: float = 12.0) -> httpx.Client:
     )
 
 
-def _fetch_topic(topic: dict[str, str], client: httpx.Client) -> dict[str, Any]:
+def _fetch_topic(
+    topic: dict[str, str],
+    client: httpx.Client,
+    query: str | None = None,
+) -> dict[str, Any]:
     fetched_at = datetime.now(timezone.utc).isoformat()
     params = {
-        "q": topic["query"],
+        "q": query or topic["query"],
         "hl": "pt-BR",
         "gl": "BR",
         "ceid": "BR:pt-419",
@@ -365,19 +501,43 @@ def clear_cache() -> None:
     _CACHE.clear()
 
 
-def build_briefing(force: bool = False) -> dict[str, Any]:
-    """Return the daily briefing snapshot, reusing a short-lived cache."""
+def build_briefing(
+    force: bool = False,
+    latitude: Any = None,
+    longitude: Any = None,
+) -> dict[str, Any]:
+    """Return the daily briefing for the caller, reusing a short-lived cache.
+
+    When the device reports coordinates, the weather uses them and the regional
+    headlines are built from the reverse-geocoded place. Without coordinates the
+    configured region is used and reported as ``source: configured``.
+    """
     if force:
         clear_cache()
-    region = _region_settings()
+    coordinates: tuple[float, float] | None = None
+    if latitude is not None and longitude is not None:
+        try:
+            coordinates = (float(latitude), float(longitude))
+        except (TypeError, ValueError):
+            coordinates = None
+    cache_cell = (
+        f"{coordinates[0]:.2f},{coordinates[1]:.2f}" if coordinates else "configured"
+    )
 
     def produce() -> dict[str, Any]:
         topics: list[dict[str, Any]] = []
         weather: dict[str, Any]
         with _client() as client:
+            region = _region_settings()
+            if coordinates is not None:
+                candidate = device_region(coordinates[0], coordinates[1], client)
+                if candidate is not None:
+                    region = candidate
+            regional = region_query(region) if region.get("source") == "device" else None
             weather = _weather(client, region)
             for topic in TOPICS:
-                topics.append(_fetch_topic(topic, client))
+                override = regional if topic["id"] == "regiao" else None
+                topics.append(_fetch_topic(topic, client, override))
         topics_online = sum(1 for topic in topics if topic["available"])
         item_count = sum(len(topic["items"]) for topic in topics)
         if topics_online == len(TOPICS) and weather["available"]:
@@ -413,13 +573,31 @@ def build_briefing(force: bool = False) -> dict[str, Any]:
                     "error": weather.get("reason"),
                 },
             ],
-            "notice": (
-                "Manchetes agregadas de veículos públicos; o texto completo e os direitos "
-                "pertencem a cada publicação original."
-            ),
+            "notice": _notice(region),
         }
 
-    return _cached("briefing", 0.0 if force else NEWS_TTL_SECONDS, produce)
+    return _cached(
+        f"briefing:{cache_cell}", 0.0 if force else NEWS_TTL_SECONDS, produce
+    )
+
+
+def _notice(region: dict[str, Any]) -> str:
+    base = (
+        "Manchetes agregadas de veículos públicos; o texto completo e os direitos "
+        "pertencem a cada publicação original."
+    )
+    if region.get("source") != "device":
+        return base + " Região configurada neste host, porque o dispositivo não informou a localização."
+    if region.get("geocoded"):
+        return base + (
+            " Clima e manchetes regionais usam a localização deste dispositivo "
+            "(nomes de lugar via Nominatim/OpenStreetMap)."
+        )
+    return base + (
+        " Clima usa a localização deste dispositivo, mas a geocodificação não respondeu "
+        "(" + str(region.get("geocode_reason") or "indisponível") + "), então as manchetes "
+        "regionais seguem os termos configurados neste host."
+    )
 
 
 def cameras_file_path() -> Path:

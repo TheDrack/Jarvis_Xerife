@@ -123,6 +123,68 @@ allowed to watch in `%LOCALAPPDATA%\Jarvis_Xerife\cameras.json`.
 `http(s)` URLs without embedded credentials are accepted, up to 12 cameras;
 invalid entries are counted in `rejected` instead of being silently dropped.
 
+## Devices on the globe
+
+`GET /api/devices` reads the `devices` table of the local SQLite registry
+(`jarvis.db`, override with `JARVIS_DEVICES_DB`) with `mode=ro`. Nothing is
+written: each row returns name, type, status, last IP, last seen and the
+coordinates the node itself reported. A device without coordinates is still
+listed with `located: false` and is not drawn — no position is inferred from
+the IP address.
+
+The HUD plots located devices as amber hexagons (bright when `online`, dim when
+`offline`) and lists them in the DISPOSITIVOS panel, where a row recenters the
+globe on that device.
+
+## Briefing anchored on the accessing device
+
+`GET /api/briefing?lat=<latitude>&lon=<longitude>` anchors the briefing on the
+device that is reading the HUD instead of the host configuration:
+
+- weather comes from Open-Meteo at those exact coordinates (`timezone=auto`);
+- the regional headline topic is rebuilt from the place names resolved for that
+  coordinate;
+- `region.source` tells the caller where the briefing came from — `device` or
+  `configured` — and `region.geocoded` tells whether the place names resolved.
+
+Place names come from the public OSM Nominatim reverse endpoint (one call per
+rounded coordinate cell, cached for a day, spaced by at least one second, always
+with the Jarvis user agent). Only the coordinates are sent; no token, device id
+or operator identity. Set `JARVIS_BRIEFING_GEOCODE=off` to keep coordinates on
+the host: the weather then still uses them, and the regional headlines stay on
+the configured terms, which the payload states explicitly.
+
+Coordinates are validated (`lat` in −90..90, `lon` in −180..180, both or
+neither) and rejected with 422 otherwise. The HUD asks the browser/WebView for
+`navigator.geolocation` on load and exposes the `LOC` button to ask again; when
+permission is denied the footer says so and the configured region is used.
+
+## Globe controls
+
+The globe rotates by drag, zooms with the mouse wheel, a two-finger pinch or the
+`+` / `−` controls, and `⤢` recenters it. The label row under the globe focuses
+an area with an animated rotation and zoom: MUNDO, the continental presets,
+REGIÃO (the briefing region, or the God's Eye box when the briefing has no
+region) and DISPOSITIVOS (centroid of the located devices). A chip is disabled
+when there is no real anchor for it, so the control never invents a target.
+
+The page keeps one type scale (`--fs-*`) and one palette (`--mint`, `--amber`,
+`--red`), two font families (monospace for readouts, sans for content), and
+shows only the panels of the selected view — BRIEFING + FONTES in the default
+CORE view.
+
+The dock is split into labelled groups that share one style: INTELIGÊNCIA
+(Core, Eventos, Fontes, Orbital, Intel), AQUI (Telemetria, Rede — this device)
+and ENCONTRADO (Disp, Cams — discovered on the network), with the collection orb
+in the middle.
+
+## HUD on Android
+
+`mobile/android` embeds this same page in a WebView (`HudScreen.kt`), so the
+desktop and the phone share a single HUD implementation. The phone only needs
+the core address (LAN or Tailscale, port 8777) and the six-digit pairing code
+shown in the HUD footer.
+
 ## Universal Intelligence
 
 The local core serves the Universal Intelligence surface natively with the same

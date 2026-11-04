@@ -588,6 +588,29 @@ def test_universal_intelligence_collect_alias_uses_canonical_collector(monkeypat
     ).status_code == 422
 
 
+def test_briefing_endpoint_binds_the_request_to_device_coordinates(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    seen: dict = {}
+
+    def fake(**kwargs):
+        seen.update(kwargs)
+        return {"success": True, "region": {"source": "device"}, "topics": [], "counts": {}}
+
+    monkeypatch.setattr(desktop_local, "build_briefing", fake)
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    headers = {"Authorization": f"Bearer {runtime.token}"}
+
+    assert client.get("/api/briefing", headers=headers).status_code == 200
+    assert seen == {"latitude": None, "longitude": None}
+
+    assert client.get("/api/briefing?lat=-25.4", headers=headers).status_code == 422
+    assert client.get("/api/briefing?lat=95&lon=-49", headers=headers).status_code == 422
+    assert client.get("/api/briefing?lat=-25.4&lon=-49.2", headers=headers).status_code == 200
+    assert seen == {"latitude": -25.4, "longitude": -49.2}
+
+
 def test_briefing_endpoint_requires_token_and_returns_daily_snapshot(monkeypatch):
     import app.adapters.edge.jarvis_desktop_local as desktop_local
 
@@ -598,7 +621,7 @@ def test_briefing_endpoint_requires_token_and_returns_daily_snapshot(monkeypatch
     monkeypatch.setattr(
         desktop_local,
         "build_briefing",
-        lambda: {
+        lambda **_kwargs: {
             "success": True,
             "health": "online",
             "counts": {"topics": 7, "topics_online": 7, "items": 3},
@@ -643,6 +666,44 @@ def test_cameras_endpoint_requires_token_and_serves_local_registry(monkeypatch):
     cameras = response.json()["cameras"]
     assert [camera["id"] for camera in cameras] == ["centro"]
     assert cameras[0]["url"].startswith("https://")
+
+
+def test_devices_endpoint_requires_token_and_plots_registered_nodes(monkeypatch, tmp_path):
+    import sqlite3
+
+    database = tmp_path / "devices.db"
+    connection = sqlite3.connect(database)
+    try:
+        connection.execute(
+            "CREATE TABLE devices (id INTEGER PRIMARY KEY, name TEXT, type TEXT, status TEXT,"
+            " lat REAL, lon REAL, last_ip TEXT, last_seen TEXT, network_type TEXT,"
+            " network_id TEXT)"
+        )
+        connection.execute(
+            "INSERT INTO devices VALUES (1,'Pixel 8','mobile','online',-30.03,-51.23,"
+            "'192.168.0.15','2026-11-01T10:20:30+00:00','wifi','casa')"
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    monkeypatch.setenv("JARVIS_DEVICES_DB", str(database))
+
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    assert client.get("/api/devices").status_code == 401
+
+    response = client.get(
+        "/api/devices",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["available"] is True
+    assert payload["total"] == 1
+    assert payload["located"] == 1
+    assert payload["devices"][0]["name"] == "Pixel 8"
+    assert payload["devices"][0]["latitude"] == pytest.approx(-30.03)
 
 
 def test_telemetry_endpoint_requires_token_and_serves_host_metrics(monkeypatch):

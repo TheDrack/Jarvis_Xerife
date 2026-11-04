@@ -176,6 +176,125 @@ def test_region_settings_fall_back_on_invalid_overrides(monkeypatch):
     assert region["label"].startswith("Sul do Brasil")
 
 
+GEOCODE = {
+    "address": {"city": "Curitiba", "state": "Paraná", "country": "Brasil"},
+    "display_name": "Curitiba, Paraná, Brasil",
+}
+
+
+def _device_handler(captured: list | None = None):
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.startswith(briefing.GEOCODE_URL):
+            if captured is not None:
+                captured.append(("geocode", url))
+            return httpx.Response(200, json=GEOCODE)
+        if captured is not None:
+            captured.append(("news" if url.startswith(briefing.NEWS_RSS_URL) else "weather", url))
+        return _handler(request)
+
+    return handler
+
+
+def _decoded(captured: list, kind: str) -> list[str]:
+    from urllib.parse import unquote
+
+    return [unquote(url) for item_kind, url in captured if item_kind == kind]
+
+
+def test_device_coordinates_drive_weather_and_regional_headlines(monkeypatch):
+    captured: list = []
+    _mock_client(monkeypatch, _device_handler(captured))
+
+    payload = briefing.build_briefing(latitude=-25.4284, longitude=-49.2733)
+
+    region = payload["region"]
+    assert region["source"] == "device"
+    assert region["geocoded"] is True
+    assert region["label"] == "Curitiba · Paraná"
+    assert region["latitude"] == pytest.approx(-25.4284)
+    assert region["longitude"] == pytest.approx(-49.2733)
+    assert region["place"] == {"city": "Curitiba", "state": "Paraná", "country": "Brasil"}
+
+    weather_url = _decoded(captured, "weather")[0]
+    assert "latitude=-25.4284" in weather_url
+    assert "longitude=-49.2733" in weather_url
+    assert "timezone=auto" in weather_url
+
+    regional = [url for url in _decoded(captured, "news") if "Curitiba" in url]
+    assert regional, "regional headlines must query the resolved place"
+    assert "Nominatim" in payload["notice"]
+
+
+def test_device_without_geocoding_keeps_the_configured_regional_terms(monkeypatch):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).startswith(briefing.GEOCODE_URL):
+            raise httpx.ConnectError("offline", request=request)
+        return _handler(request)
+
+    captured: list = []
+    _mock_client(monkeypatch, handler)
+
+    payload = briefing.build_briefing(latitude=-25.4284, longitude=-49.2733)
+
+    assert payload["region"]["source"] == "device"
+    assert payload["region"]["geocoded"] is False
+    assert payload["region"]["geocode_reason"] == "network"
+    assert payload["weather"]["available"] is True
+    assert "geocodificação não respondeu" in payload["notice"]
+
+
+def test_geocoding_can_be_disabled_without_losing_the_device_weather(monkeypatch):
+    monkeypatch.setenv("JARVIS_BRIEFING_GEOCODE", "off")
+    captured: list = []
+    _mock_client(monkeypatch, _device_handler(captured))
+
+    payload = briefing.build_briefing(latitude=-23.5505, longitude=-46.6333)
+
+    assert payload["region"]["geocode_reason"] == "disabled"
+    assert payload["region"]["geocoded"] is False
+    assert not _decoded(captured, "geocode")
+    assert payload["weather"]["available"] is True
+
+
+def test_invalid_coordinates_are_refused_instead_of_guessed():
+    assert briefing.device_region(None, None) is None
+    assert briefing.device_region("abc", 10) is None
+    assert briefing.device_region(95, 10) is None
+    assert briefing.device_region(10, 200) is None
+
+
+def test_regional_query_uses_only_resolved_place_names():
+    assert briefing.region_query({"place": None}) is None
+    assert briefing.region_query({"place": {"city": None, "state": None, "country": None}}) is None
+    assert briefing.region_query(
+        {"place": {"city": "Curitiba", "state": None, "country": "Brasil"}}
+    ) == '("Curitiba" OR "Brasil") when:2d'
+
+
+def test_briefing_cache_is_scoped_by_coordinate_cell(monkeypatch):
+    captured: list = []
+    _mock_client(monkeypatch, _device_handler(captured))
+
+    briefing.build_briefing(latitude=-25.4284, longitude=-49.2733)
+    after_first = len(captured)
+    briefing.build_briefing(latitude=-25.4284, longitude=-49.2733)
+    assert len(captured) == after_first
+
+    briefing.build_briefing(latitude=-23.5505, longitude=-46.6333)
+    assert len(captured) > after_first
+
+
+def test_configured_region_is_reported_as_configured(monkeypatch):
+    _mock_client(monkeypatch)
+
+    payload = briefing.build_briefing()
+
+    assert payload["region"]["source"] == "configured"
+    assert payload["region"]["geocoded"] is False
+    assert "Região configurada" in payload["notice"]
+
+
 def test_camera_registry_is_optional_and_validates_entries(tmp_path):
     path = tmp_path / "cameras.json"
     missing = briefing.build_camera_registry(path)

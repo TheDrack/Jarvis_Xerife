@@ -5,6 +5,7 @@ Cliente Android isolado do núcleo Jarvis. Não substitui o HUD, os conectores M
 ## Incluído
 
 - Interface nativa Jetpack Compose.
+- Aba **HUD** com a mesma página do HUD do app desktop (`app/static/jarvis-desktop.html`) em um WebView: briefing, globo com zoom e dispositivos, câmeras e Universal Intelligence. O endereço do núcleo local (LAN ou Tailscale, porta 8777) é informado pelo operador, fica salvo no dispositivo e o pareamento acontece no próprio HUD com o código de seis dígitos. O token vive no `sessionStorage` do WebView, não no armazenamento do app.
 - Login por HTTPS em POST /v1/mobile/session/login; a senha não é persistida.
 - Access token de 15 minutos e refresh token rotativo/revogável, cifrados com AES-GCM via Android Keystore.
 - TTS local em português do Brasil.
@@ -27,6 +28,35 @@ A fila é entrega eventual, não notificação instantânea: se o Android encerr
 - A fila é contingência persistente, não uma conexão contínua nem garantia de fala imediata.
 - A fala em segundo plano depende de permissão de notificação, prioridade efetiva da mensagem e das regras do Android. Se o sistema negar a execução, o app preserva a notificação em vez de contornar as restrições.
 - O evento é efêmero (expiração de dez minutos). O texto é armazenado somente no banco privado e entregue por API autenticada.
+
+## HUD no WebView e cleartext
+
+O núcleo Jarvis Desktop não expõe listener TLS: o HUD é servido em HTTP simples
+na LAN/Tailscale. Por isso o manifesto declara
+`android:networkSecurityConfig="@xml/network_security_config"` com
+`cleartextTrafficPermitted="true"` e `usesCleartextTraffic="true"`. Essa
+configuração apenas libera HTTP; as âncoras de confiança continuam sendo as do
+sistema e nenhuma validação de certificado é desativada. Se o núcleo for
+publicado atrás de um reverse proxy TLS, volte `usesCleartextTraffic` para
+`false` e remova o arquivo.
+
+O HUD é a mesma página do desktop, portanto não há segunda implementação de
+globo, briefing ou Universal Intelligence para manter em sincronia. O WebView
+depende de `javaScriptEnabled` e `domStorageEnabled` (token de sessão); não há
+ponte JavaScript exposta ao conteúdo remoto.
+
+A página pede `navigator.geolocation` para ancorar clima e manchetes regionais
+nas coordenadas do telefone. O WebView concede geolocalização apenas para a
+origem do HUD configurado (`onGeolocationPermissionsShowPrompt`) e a aba pede a
+permissão de localização do Android ao abrir; se você negar, o HUD cai para a
+região configurada no núcleo e informa isso na tela.
+
+## Testes Android
+
+`HudTargetTest` cobre a normalização do endereço do HUD (esquema ausente, HTTPS,
+caminho/consulta descartados e entradas inválidas). A compilação e a execução
+desses testes exigem Gradle e o Android SDK, que não estão disponíveis neste
+ambiente de trabalho; o workflow de CI compila o APK de debug.
 
 ## Build
 

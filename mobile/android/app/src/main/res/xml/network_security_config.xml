@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    O núcleo Jarvis Desktop serve o HUD em HTTP simples na LAN/Tailscale
+    (por exemplo http://192.168.0.15:8777) e não tem listener TLS. O WebView do
+    HUD precisa falar com esse endereço, e o Android bloqueia cleartext por
+    padrão. Este arquivo libera cleartext e mantém as âncoras de confiança do
+    sistema para HTTPS: nenhuma autoridade é adicionada e nenhuma validação de
+    certificado é desativada.
+
+    Se o núcleo for publicado atrás de um reverse proxy TLS, volte
+    android:usesCleartextTraffic para "false" e remova este arquivo.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

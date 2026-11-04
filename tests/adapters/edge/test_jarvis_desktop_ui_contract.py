@@ -72,6 +72,33 @@ def test_primary_controls_are_bound_to_real_action_handlers():
     assert "fullscreenButton.addEventListener('click',toggleFullscreen)" in HTML
 
 
+def test_globe_exposes_zoom_controls_and_area_focus_labels():
+    for element_id in ("zoomIn", "zoomOut", "zoomReset", "zoomLevel", "areaBar"):
+        assert f'id="{element_id}"' in HTML, element_id
+    assert "Globe.zoomBy(" in HTML
+    assert "Globe.focusTo(" in HTML
+    assert "focusAreaById(" in HTML
+    assert "data-area=" in HTML
+    assert "aria-pressed" in HTML
+
+
+def test_registered_devices_are_plotted_from_the_local_registry():
+    assert "api('/api/devices')" in HTML
+    assert "kind:'device'" in HTML
+    assert 'data-panel="devices"' in HTML
+    assert 'id="panelDevices"' in HTML
+    assert "locatedDevices()" in HTML
+
+
+def test_typography_shares_one_scale_and_one_palette():
+    assert "--fs-2xs:8px" in HTML
+    assert "--fs-3xl:26px" in HTML
+    assert "--sans:" in HTML
+    assert "--mono:" in HTML
+    for legacy in ("font-size:7px", "font-size:8px", "#5df2b0", "rgba(93,242,176"):
+        assert legacy not in HTML, legacy
+
+
 def test_every_dom_id_used_by_the_script_exists_in_the_markup():
     identifiers = set(re.findall(r"\$\('([A-Za-z][\w-]*)'\)", HTML))
     assert identifiers

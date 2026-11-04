@@ -15,11 +15,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from app.adapters.edge.jarvis_daily_briefing import build_briefing, build_camera_registry
+from app.adapters.edge.jarvis_device_registry import build_device_registry
 from app.adapters.edge.network_discovery_adapter import discover_devices, network_interfaces
 from app.adapters.infrastructure.routers.intelligence_dashboard import build_intelligence_status
 from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
@@ -669,14 +670,31 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         return await _run_sync_io_off_loop(_telemetry_snapshot)
 
     @app.get("/api/briefing")
-    async def daily_briefing(_client: str = Depends(require_local_token)) -> dict[str, Any]:
-        """Daily headlines by topic plus the local weather forecast (read-only)."""
-        return await _run_sync_io_off_loop(build_briefing)
+    async def daily_briefing(
+        latitude: float | None = Query(None, alias="lat"),
+        longitude: float | None = Query(None, alias="lon"),
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Daily headlines by topic plus weather, anchored on the caller's device."""
+        if (latitude is None) != (longitude is None):
+            raise HTTPException(status_code=422, detail="Informe lat e lon juntos.")
+        if latitude is not None and not -90.0 <= latitude <= 90.0:
+            raise HTTPException(status_code=422, detail="Latitude deve estar entre -90 e 90.")
+        if longitude is not None and not -180.0 <= longitude <= 180.0:
+            raise HTTPException(status_code=422, detail="Longitude deve estar entre -180 e 180.")
+        return await _run_sync_io_off_loop(
+            lambda: build_briefing(latitude=latitude, longitude=longitude)
+        )
 
     @app.get("/api/cameras")
     async def cameras(_client: str = Depends(require_local_token)) -> dict[str, Any]:
         """Return the operator-registered camera allowlist without touching the streams."""
         return await _run_sync_io_off_loop(build_camera_registry)
+
+    @app.get("/api/devices")
+    async def devices(_client: str = Depends(require_local_token)) -> dict[str, Any]:
+        """Return the registered devices (read-only) so the HUD can plot them."""
+        return await _run_sync_io_off_loop(build_device_registry)
 
     @app.get("/intelligence", response_class=HTMLResponse, include_in_schema=False)
     async def universal_intelligence_page() -> HTMLResponse:

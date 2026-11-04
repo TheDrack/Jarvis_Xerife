@@ -398,6 +398,12 @@ private fun JarvisMobileScreen(
     var chatNotice by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<JarvisStatus?>(null) }
     val context = LocalContext.current
+    var hudUrl by remember {
+        mutableStateOf(
+            context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                .getString("hud_url", "") ?: ""
+        )
+    }
     var locationSharingEnabled by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("location_sharing_enabled", false))
     }
@@ -530,15 +536,30 @@ private fun JarvisMobileScreen(
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
         Text("J.A.R.V.I.S.", style = MaterialTheme.typography.headlineLarge)
         Text("Companheiro Android", modifier = Modifier.padding(top = 4.dp))
-        if (loggedIn) {
-            Row(modifier = Modifier.padding(top = 12.dp)) {
+        Row(modifier = Modifier.padding(top = 12.dp)) {
+            if (loggedIn) {
                 Button(onClick = { tab = 0 }, enabled = tab != 0) { Text("Presença") }
                 Button(onClick = { tab = 1 }, enabled = tab != 1, modifier = Modifier.padding(start = 8.dp)) {
                     Text("Conversa")
                 }
             }
+            Button(onClick = { tab = 2 }, enabled = tab != 2, modifier = Modifier.padding(start = 8.dp)) {
+                Text("HUD")
+            }
         }
-        if (loggedIn && tab == 1) {
+        if (tab == 2) {
+            Column(modifier = Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp)) {
+                JarvisHudScreen(
+                    initialUrl = hudUrl,
+                    onUrlChange = { value ->
+                        hudUrl = value
+                        context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                            .edit().putString("hud_url", value).apply()
+                    },
+                    onClose = { tab = 0 }
+                )
+            }
+        } else if (loggedIn && tab == 1) {
             ChatPanel(
                 modifier = Modifier.fillMaxWidth().weight(1f).padding(top = 12.dp),
                 messages = messages,
