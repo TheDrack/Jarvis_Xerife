@@ -47,6 +47,7 @@ object HudTarget {
         val withScheme = when {
             trimmed.startsWith("https://", ignoreCase = true) -> trimmed
             trimmed.startsWith("http://", ignoreCase = true) -> trimmed
+            trimmed.contains("://") -> return null
             else -> "http://$trimmed"
         }
         val url = try {
@@ -60,6 +61,54 @@ object HudTarget {
         if (protocol != "http" && protocol != "https") return null
         val port = if (url.port > 0) ":${url.port}" else ""
         return "$protocol://$host$port"
+    }
+
+    /**
+     * Compares WebView origins by scheme, host and effective port.
+     *
+     * WebView geolocation permissions are origin-scoped. A string-prefix
+     * comparison can accept a different origin and must not be used here.
+     */
+    fun isSameOrigin(candidate: String?, expected: String?): Boolean {
+        if (candidate.isNullOrBlank() || expected.isNullOrBlank()) return false
+
+        val candidateUri = try {
+            java.net.URI(candidate)
+        } catch (error: Exception) {
+            return false
+        }
+        val expectedUri = try {
+            java.net.URI(expected)
+        } catch (error: Exception) {
+            return false
+        }
+
+        val candidateScheme = candidateUri.scheme?.lowercase() ?: return false
+        val expectedScheme = expectedUri.scheme?.lowercase() ?: return false
+        if (candidateScheme !in setOf("http", "https") || candidateScheme != expectedScheme) {
+            return false
+        }
+
+        if (candidateUri.rawUserInfo != null || expectedUri.rawUserInfo != null) return false
+        if (candidateUri.rawQuery != null || candidateUri.rawFragment != null) return false
+        if (expectedUri.rawQuery != null || expectedUri.rawFragment != null) return false
+        if (candidateUri.rawPath !in listOf("", "/") || expectedUri.rawPath !in listOf("", "/")) {
+            return false
+        }
+
+        val candidateHost = candidateUri.host?.lowercase() ?: return false
+        val expectedHost = expectedUri.host?.lowercase() ?: return false
+        return candidateHost == expectedHost &&
+            effectivePort(candidateUri) == effectivePort(expectedUri)
+    }
+
+    private fun effectivePort(uri: java.net.URI): Int {
+        if (uri.port >= 0) return uri.port
+        return when (uri.scheme?.lowercase()) {
+            "http" -> 80
+            "https" -> 443
+            else -> -1
+        }
     }
 }
 
@@ -155,7 +204,7 @@ fun JarvisHudScreen(
                         setBackgroundColor(Color.parseColor("#01060c"))
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
-                        settings.geolocationEnabled = true
+                        settings.setGeolocationEnabled(true)
                         settings.mediaPlaybackRequiresUserGesture = true
                         webViewClient = WebViewClient()
                         // Só o próprio HUD recebe permissão de geolocalização.
@@ -164,7 +213,7 @@ fun JarvisHudScreen(
                                 origin: String?,
                                 callback: GeolocationPermissions.Callback?
                             ) {
-                                val trusted = !origin.isNullOrBlank() && origin.startsWith(url)
+                                val trusted = HudTarget.isSameOrigin(origin, url)
                                 callback?.invoke(origin, trusted, false)
                             }
                         }
