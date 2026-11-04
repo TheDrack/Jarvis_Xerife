@@ -19,7 +19,7 @@ Do not run `supabase db push`, `supabase migration repair`, `supabase migration 
 | Local migration files on audited `main` | 20 |
 | Remote migration ledger entries | 16 |
 | Exact local/remote timestamp matches | 4 |
-| Remote duplicate name | `google_linked_identities` appears twice |
+| Remote duplicate name | `google_linked_identities` appears twice with semantically equivalent SQL |
 | Intelligence history schema tables | Both exist |
 | Intelligence worker lease/run tables | Both absent |
 | Intelligence worker RPCs | All five absent |
@@ -65,7 +65,7 @@ The following rows are **candidate semantic correspondences only**. They are not
 | `202610230003_multi_agent_message_queue.sql` | `20261024142637` | Name matches; timestamp differs |
 | `202610230004_priority_routine_scheduler.sql` | `20261024142639` | Name matches; timestamp differs |
 | `20261024200302_mobile_device_sessions.sql` | `20261024213541` | Semantic name matches; timestamp differs |
-| `20261025090000_google_linked_identities.sql` | `20261025132549` and `20261025132558` | One local file vs. two remote entries with the same name; duplicate requires investigation |
+| `20261025090000_google_linked_identities.sql` | `20261025132549` and `20261025132558` | Both remote records contain one SQL statement with the same table/index/RLS/revoke/grant operations; differences are comments/formatting. The local file is semantically equivalent to both. This is a confirmed duplicate history entry, not two distinct schema changes |
 | `202610260001_red_blue_venice_routing.sql` | None exact | No remote ledger name/version counterpart |
 | `202610260002_execution_plan_events.sql` | `20261027002723` | Name matches; timestamp differs |
 | `202610270002_execution_plan_events_append_only_grants.sql` | `20261027002743` | Name matches; timestamp differs |
@@ -110,7 +110,7 @@ This confirms the worker migration `20261103184308_intelligence_recurring_worker
 ## Why the current mismatch is hazardous
 
 1. A timestamp mismatch is a pending migration from the CLI's perspective, even if the remote schema already contains some or all of its objects.
-2. The `google_linked_identities` duplicate could represent a duplicate application, a renamed/recreated migration, or a historical repair. The ledger alone cannot distinguish these cases.
+2. The two `google_linked_identities` records contain semantically equivalent SQL: both create the same table and index, enable RLS, revoke client-role access and grant service-role access. The second record differs in comments/formatting, not in the schema operations. The duplicate is therefore confirmed as redundant migration history; its originating deployment/repair event remains unknown.
 3. Some objects exist despite missing exact ledger counterparts. For example, `release_jarvis_agent_task` exists, while its local migration timestamp is not in the remote list. This requires definition-level comparison, not blind repair.
 4. The provider/heartbeat migration has overlapping schema evidence, but the role-aware claim logic in `202610260001_red_blue_venice_routing.sql` must not be presumed installed.
    Read-only `pg_get_functiondef` inspection confirmed that both remote claim RPCs lack a `model_provider` predicate and any Venice/role-aware routing condition. The remote provider column/index therefore represent only partial schema overlap, not the required enforcement behavior.
