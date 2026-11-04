@@ -1352,6 +1352,7 @@ function renderUniversal(){
  $('intelFoot').textContent='CORRELAÇÃO DETERMINÍSTICA · '+(state.live.collected_at?hhmm(state.live.collected_at):'SEM COLETA')+' · '+clockTime();
 }
 function selectIntelSubject(kind,id){
+ closeWindow('intelWindow');
  if(kind==='briefing'){
   const items=(state.briefing&&state.briefing.topics||[]).flatMap(topic=>(topic.items||[]).slice(0,5).map(item=>({item,topic})));
   const entry=items[Number(id)];
