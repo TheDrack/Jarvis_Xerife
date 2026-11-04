@@ -124,6 +124,7 @@ def _adb_snapshot() -> dict[str, Any]:
         proc = subprocess.run(
             [adb, "devices", "-l"], capture_output=True, text=True,
             timeout=4, check=False, shell=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return {"available": True, "status": "transport_error", "error": type(exc).__name__, "devices": []}
@@ -264,6 +265,7 @@ def _tailscale_snapshot() -> dict[str, Any]:
             timeout=4,
             check=False,
             shell=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000),
         )
         if proc.returncode != 0:
             return {"available": False, "status": "command_failed", "peers": []}

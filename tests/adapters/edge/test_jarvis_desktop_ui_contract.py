@@ -157,3 +157,54 @@ def test_network_panel_does_not_use_modal_or_navigate_away():
     assert 'id="panelNetwork"' in HTML
     assert 'id="networkWindow"' not in HTML
     assert "data-network-kind" in HTML
+
+
+def test_selected_entities_expose_rich_details_and_verified_source_links():
+    assert 'id="selectionSummary"' in HTML
+    assert 'id="selectionFacts"' in HTML
+    assert 'id="selectionSource"' in HTML
+    assert "function renderSelection(mark)" in HTML
+    assert "record.summary||record.description" in HTML
+    assert "evidence[0]" in HTML
+
+
+def test_events_and_orbital_entities_open_the_contextual_inspector():
+    assert "data-event-id" in HTML
+    assert "data-observation-id" in HTML
+    assert "selectLiveEntity(" in HTML
+    assert "Globe.onSelect(mark=>" in HTML
+
+
+def test_universal_intelligence_prioritizes_live_topics_and_real_correlations():
+    assert "state.live.correlations" in HTML
+    assert "CORRELAÇÕES ENTRE FONTES" in HTML
+    assert "ASSUNTOS DISPONÍVEIS" in HTML
+    assert "CANDIDATA, NÃO PROVA" in HTML
+    assert "MATURIDADE DO PIPELINE" in HTML
+
+
+def test_windows_network_commands_never_create_visible_console_windows():
+    local = (ROOT / "app" / "adapters" / "edge" / "jarvis_desktop_local.py").read_text(encoding="utf-8")
+    network = (ROOT / "app" / "adapters" / "edge" / "network_discovery_adapter.py").read_text(encoding="utf-8")
+    assert local.count("creationflags=getattr(subprocess, \"CREATE_NO_WINDOW\", 0x08000000)") >= 2
+    assert "creationflags=getattr(subprocess, \"CREATE_NO_WINDOW\", 0x08000000)" in network
+
+
+def test_camera_cards_and_registered_devices_open_contextual_inspectors():
+    assert "data-camera-index" in HTML
+    assert "kind:'camera'" in HTML
+    assert "kind:'device'" in HTML
+    assert "id=\"selectionFacts\"" in HTML
+    assert "id=\"selectionSource\"" in HTML
+
+
+def test_intelligence_panel_can_collect_and_display_live_correlations():
+    assert 'id="intelCollect"' in HTML
+    assert 'data-sync="all"' in HTML
+    assert "state.live.correlations" in HTML
+    assert "CORRELAÇÕES ENTRE FONTES" in HTML
+
+
+def test_selection_inspector_is_really_hidden_without_a_selected_entity():
+    assert '#selectionInspector[hidden]{display:none!important}' in HTML
+    assert "inspector.hidden=true" in HTML

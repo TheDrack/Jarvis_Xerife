@@ -244,7 +244,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 }
 
 .network-target{width:100%;text-align:left;cursor:pointer;background:transparent;border:1px solid transparent;color:inherit}.network-target:hover,.network-target:focus-visible{border-color:rgba(84,215,255,.42);background:rgba(84,215,255,.07);outline:none}.network-target:active{background:rgba(84,215,255,.14)}
-/* ---- Adaptive workspace: persistent globe, contextual side surfaces ---- */
+.intel-topic{width:100%;text-align:left;cursor:pointer;background:transparent;border:1px solid transparent;color:inherit}.intel-topic:hover,.intel-topic:focus-visible{border-color:rgba(84,215,255,.42);background:rgba(84,215,255,.07);outline:none}.intel-correlation{display:grid;gap:5px;padding:8px;border-left:2px solid var(--mint);background:rgba(84,215,255,.045)}.intel-correlation b{font-size:var(--fs-sm);font-weight:500;color:#d8f3ff}.intel-correlation small{font:var(--fs-2xs)/1.5 var(--mono);color:var(--muted)}.intel-pipeline{border-top:1px solid var(--line-soft);padding-top:7px}.intel-pipeline summary{cursor:pointer;font:var(--fs-xs)/1.5 var(--mono);letter-spacing:.14em;color:var(--muted)}.intel-pipeline[open] summary{color:var(--mint)}\n/* ---- Adaptive workspace: persistent globe, contextual side surfaces ---- */
 .col-left,.col-right{height:100%;min-height:0}
 .col-left .panel,.col-right .panel{height:100%;width:100%}
 .panel[data-panel="briefing"] .panel-body{overflow:hidden}
@@ -258,7 +258,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 .stage[data-view="core"] .col-left{grid-column:1}
 .stage[data-view="core"] .col-right{grid-column:3}
 .selection-inspector{position:absolute;z-index:4;left:18px;bottom:18px;width:min(320px,calc(100% - 72px));padding:12px 13px;display:grid;gap:6px;border:1px solid rgba(84,215,255,.34);background:linear-gradient(145deg,rgba(5,24,40,.96),rgba(1,8,16,.94));box-shadow:0 16px 42px rgba(0,0,0,.42),0 0 24px rgba(84,215,255,.08);backdrop-filter:blur(12px);animation:hud-enter .2s ease both}
-.selection-inspector[hidden]{display:none}
+.selection-inspector{width:min(430px,calc(100% - 72px));max-height:min(52vh,420px);overflow:auto;overscroll-behavior:contain}.selection-summary{margin:0;color:#c7e8f5;font-size:var(--fs-sm);line-height:1.55;white-space:normal}.selection-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.selection-facts span{padding:5px 6px;border-left:1px solid var(--line);background:rgba(84,215,255,.045);font:var(--fs-2xs)/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere}.selection-facts b{display:block;color:#d9f4ff;font-weight:500}.selection-actions a{display:inline-flex;align-items:center;text-decoration:none}.selection-actions a[hidden]{display:none}@media(max-width:900px){.selection-inspector{width:min(380px,calc(100% - 48px));max-height:42vh}}\n.selection-inspector[hidden]{display:none}
 .selection-kicker{display:flex;justify-content:space-between;gap:10px;font:var(--fs-2xs)/1.4 var(--mono);letter-spacing:.16em;color:var(--mint)}
 .selection-inspector strong{font-size:var(--fs-md);font-weight:600;color:#e8faff;line-height:1.35}
 .selection-inspector small{font:var(--fs-xs)/1.5 var(--mono);color:var(--muted)}
@@ -286,6 +286,28 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 @media(prefers-reduced-motion:reduce){
  .globe-wrap:after,.reactor .r1,.reactor .r2,.reactor .sweep,.orb:after{animation:none!important}
 }
+
+.intel-topic{width:100%;text-align:left;cursor:pointer;background:transparent;border:1px solid transparent;color:inherit}
+.intel-topic:hover,.intel-topic:focus-visible{border-color:rgba(84,215,255,.42);background:rgba(84,215,255,.07);outline:none}
+.intel-correlation{display:grid;gap:5px;padding:8px;border-left:2px solid var(--mint);background:rgba(84,215,255,.045)}
+.intel-correlation b{font-size:var(--fs-sm);font-weight:500;color:#d8f3ff}
+.intel-correlation small{font:var(--fs-2xs)/1.5 var(--mono);color:var(--muted)}
+.intel-pipeline{border-top:1px solid var(--line-soft);padding-top:7px}
+.intel-pipeline summary{cursor:pointer;font:var(--fs-xs)/1.5 var(--mono);letter-spacing:.14em;color:var(--muted)}
+.intel-pipeline[open] summary{color:var(--mint)}
+.selection-inspector{width:min(430px,calc(100% - 72px));max-height:min(52vh,420px);overflow:auto;overscroll-behavior:contain}
+.selection-summary{margin:0;color:#c7e8f5;font-size:var(--fs-sm);line-height:1.55;white-space:normal}
+.selection-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.selection-facts span{padding:5px 6px;border-left:1px solid var(--line);background:rgba(84,215,255,.045);font:var(--fs-2xs)/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.selection-facts b{display:block;color:#d9f4ff;font-weight:500}
+.selection-actions a{display:inline-flex;align-items:center;text-decoration:none}
+.selection-actions a[hidden]{display:none}
+@media(max-width:900px){.selection-inspector{width:min(380px,calc(100% - 48px));max-height:42vh}}
+#selectionInspector[hidden]{display:none!important}.cam[data-camera-index]{cursor:pointer}.cam[data-camera-index]:hover{outline:1px solid var(--mint);outline-offset:2px}
+
+#selectionInspector[hidden]{display:none!important}
+.cam[data-camera-index]{cursor:pointer}
+.cam[data-camera-index]:hover{outline:1px solid var(--mint);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -305,7 +327,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
  <main class="stage" id="stage" data-view="core">
   <div class="center">
    <div class="status"><div class="rules"><i></i>◈<i></i></div><b id="statusLabel" role="status" aria-live="polite">STANDBY</b><small id="statusDetail">NÚCLEO LOCAL · AGUARDANDO PRIMEIRA LEITURA</small></div>
-   <div class="globe-wrap"><div class="reactor" aria-hidden="true"><i class="r2"></i><i class="r1"></i><i class="sweep"></i><i class="r3"></i></div><canvas id="globe" aria-label="Globo de eventos, observações e dispositivos"></canvas><div class="reticle"></div><section class="selection-inspector" id="selectionInspector" hidden aria-live="polite"><div class="selection-kicker">SELEÇÃO ATIVA <span id="selectionKind">—</span></div><strong id="selectionTitle">—</strong><small id="selectionDetail">—</small><div class="selection-actions"><button class="mini" id="selectionAction" type="button">FOCAR</button><button class="mini" id="selectionClose" type="button" aria-label="Fechar seleção">×</button></div></section><div class="globe-zoom" id="zoomLevel">100%</div><div class="globe-tools"><button type="button" id="zoomIn" aria-label="Aproximar o globo" title="Aproximar">+</button><button type="button" id="zoomOut" aria-label="Afastar o globo" title="Afastar">−</button><button type="button" id="zoomReset" aria-label="Recentralizar o globo" title="Recentralizar">⤢</button></div><div class="globe-hint">arraste · scroll ou pinça para zoom · duplo clique recentra</div></div>
+   <div class="globe-wrap"><div class="reactor" aria-hidden="true"><i class="r2"></i><i class="r1"></i><i class="sweep"></i><i class="r3"></i></div><canvas id="globe" aria-label="Globo de eventos, observações e dispositivos"></canvas><div class="reticle"></div><section class="selection-inspector" id="selectionInspector" hidden aria-live="polite"><div class="selection-kicker">SELEÇÃO ATIVA <span id="selectionKind">—</span></div><strong id="selectionTitle">—</strong><small id="selectionDetail">—</small><p id="selectionSummary" class="selection-summary"></p><div id="selectionFacts" class="selection-facts"></div><div class="selection-actions"><a class="mini" id="selectionSource" hidden target="_blank" rel="noopener noreferrer">ABRIR FONTE ↗</a><button class="mini" id="selectionAction" type="button">FOCAR</button><button class="mini" id="selectionClose" type="button" aria-label="Fechar seleção">×</button></div></section><div class="globe-zoom" id="zoomLevel">100%</div><div class="globe-tools"><button type="button" id="zoomIn" aria-label="Aproximar o globo" title="Aproximar">+</button><button type="button" id="zoomOut" aria-label="Afastar o globo" title="Afastar">−</button><button type="button" id="zoomReset" aria-label="Recentralizar o globo" title="Recentralizar">⤢</button></div><div class="globe-hint">arraste · scroll ou pinça para zoom · duplo clique recentra</div></div>
    <nav class="areas" id="areaBar" aria-label="Focar uma área no globo"></nav>
    <nav class="dock" aria-label="Seções">
     <div class="dock-group" role="group" aria-label="Inteligência">
@@ -394,7 +416,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 
 <div class="window" id="intelWindow" role="dialog" aria-modal="true" aria-labelledby="intelTitle">
  <div class="window-card">
-  <div class="window-head"><span class="badge">◈</span><span class="title" id="intelTitle">UNIVERSAL INTELLIGENCE</span><button class="mini" type="button" data-close="intelWindow">FECHAR ×</button></div>
+  <div class="window-head"><span class="badge">◈</span><span class="title" id="intelTitle">UNIVERSAL INTELLIGENCE</span><button class="mini" type="button" id="intelCollect" data-sync="all">SYNC</button><button class="mini" type="button" data-close="intelWindow">FECHAR ×</button></div>
   <div class="window-body" id="intelBody"><div class="empty">Consultando o contrato Universal Intelligence…</div></div>
   <div class="window-foot"><span id="intelFoot">CORE LOCAL · COLETA SOB DEMANDA</span><a class="mini" href="/intelligence" target="_blank" rel="noopener noreferrer">PAINEL ↗</a></div>
  </div>
@@ -430,7 +452,7 @@ const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const state={
  token:sessionStorage.getItem(TOKEN_KEY)||'',
  bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,devices:null,busy:false,view:'core',topic:'regiao',location:null,locating:false,
- live:{events:[],observations:[],sources:[],collected_at:null,area:null},
+ live:{events:[],observations:[],sources:[],correlations:[],collected_at:null,area:null},
  layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true},
  selected:null,
  history:{cpu:[],mem:[],temp:[]}
@@ -968,7 +990,7 @@ function renderEvents(){
  }
  $('eventList').innerHTML=events.map(e=>{
   const body='<div class="grow"><b>'+esc(e.title||'evento sem título')+'</b><small>'+esc((e.source_id||'fonte')+' · '+(e.category||e.domain||'evento'))+' · '+esc(hhmm(e.observed_at||e.published_at))+'</small></div><span class="pill">'+esc(String(e.source_id||'evt').slice(0,9))+'</span>';
-  return e.url?('<a class="row" href="'+esc(e.url)+'" target="_blank" rel="noopener noreferrer">'+body+'</a>'):('<div class="row">'+body+'</div>');
+  return '<button type="button" class="row intel-topic" data-event-id="'+esc(e.event_id||'')+'">'+body+'<span class="pill idle">DETALHES</span></button>';
  }).join('');
 }
 function renderOrbital(){
@@ -987,7 +1009,7 @@ function renderOrbital(){
   const alt=a.altitude_m!=null?Math.round(num(a.altitude_m))+' m':(a.group||a.destination||'—');
   const pos=o.position?num(o.position.latitude).toFixed(2)+', '+num(o.position.longitude).toFixed(2):'sem posição';
   const dist=a.distance_km!=null?Math.round(num(a.distance_km))+' km':hhmm(o.observed_at);
-  return '<div class="row"><div class="grow"><b>'+esc(name)+'</b><small>'+esc((o.entity_type||'obs')+' · '+alt+' · '+pos)+'</small></div><span class="pill">'+esc(dist)+'</span></div>';
+  return '<button type="button" class="row intel-topic" data-observation-id="'+esc(o.observation_id||'')+'"><span class="grow"><b>'+esc(name)+'</b><small>'+esc((o.entity_type||'obs')+' · '+alt+' · '+pos)+'</small></span><span class="pill">'+esc(dist)+'</span></button>';
  }).join('');
  const health=sourceHealth().gods_eye_view||{};
  if(health.error_code)html+='<div class="empty">Fonte parcial: '+esc(health.error_code)+'. Embarcações exigem AISSTREAM_API_KEY no servidor God\'s Eye View.</div>';
@@ -1132,7 +1154,7 @@ function renderCameras(){
   const media=cam.kind==='video'
    ?'<video controls muted playsinline preload="metadata" src="'+esc(cam.safe)+'"></video>'
    :'<img alt="'+esc(cam.label)+'" src="'+esc(cam.safe)+'" data-cam="'+index+'" data-src="'+esc(cam.safe)+'" data-refresh="'+esc(cam.refresh_seconds)+'" data-at="'+Date.now()+'" loading="lazy">';
-  return '<figure class="cam">'+media+'<figcaption><b>'+esc(cam.label)+'</b><small>'+esc(cam.kind==='video'?'VÍDEO':'SNAPSHOT')+' · '+esc(cam.refresh_seconds)+'s'+(cam.note?' · '+esc(cam.note):'')+'</small></figcaption></figure>';
+  return '<figure class="cam" data-camera-index="'+index+'">'+media+'<figcaption><b>'+esc(cam.label)+'</b><small>'+esc(cam.kind==='video'?'VÍDEO':'SNAPSHOT')+' · '+esc(cam.refresh_seconds)+'s'+(cam.note?' · '+esc(cam.note):'')+'</small></figcaption></figure>';
  }).join('');
  document.querySelectorAll('#cameraBody img[data-cam]').forEach(img=>{
   img.addEventListener('error',()=>{img.dataset.failed='1';img.alt='câmera indisponível nesta leitura';});
@@ -1238,7 +1260,7 @@ function renderDevices(){
  $('deviceList').innerHTML=devices.map(device=>{
   const coords=device.located?num(device.latitude).toFixed(2)+', '+num(device.longitude).toFixed(2):'sem posição';
   const body='<div class="grow"><b>'+esc(device.name)+'</b><small>'+esc(String(device.type||'dispositivo')+' · '+coords+' · '+String(device.status||'offline'))+'</small></div><span class="pill '+(device.status==='online'?'':'idle')+'">'+(device.located?'NO MAPA':'SEM GPS')+'</span>';
-  return device.located
+  return true
    ?'<button type="button" class="row device" data-device="'+esc(device.id)+'">'+body+'</button>'
    :'<div class="row device">'+body+'</div>';
  }).join('')+'<div class="tele-foot"><span>REGISTRO LOCAL</span><span>'+esc(num(data.located))+'/'+esc(num(data.total))+' COM POSIÇÃO</span></div>';
@@ -1259,7 +1281,7 @@ function intelStateLabel(value){
 function renderUniversal(){
  const data=state.intel||{};
  if(!Object.keys(data).length){
-  $('intelBody').innerHTML='<div class="empty">Universal Intelligence não consultada. Use o orb ou aguarde o ciclo automático.</div>';
+  $('intelBody').innerHTML='<div class="empty">Inteligência ainda não consultada. Execute uma coleta para correlacionar os assuntos disponíveis.</div>';
   return;
  }
  const sources=data.sources||[];
@@ -1269,20 +1291,38 @@ function renderUniversal(){
  const runtime=data.local_runtime||{};
  const history=data.history||{};
  const security=data.security||{};
+ const events=state.live.events||[];
+ const observations=state.live.observations||[];
+ const correlations=state.live.correlations||[];
  const stages=pipeline.filter(item=>['implemented','migration_defined'].includes(item.state)).length;
  let html='<div class="intel-headline"><b>UNIVERSAL INTELLIGENCE</b><span>'+esc(intelStateLabel(data.overall||'partial'))+'</span></div>';
- html+='<div class="tele-foot"><span>SNAPSHOT LOCAL</span><span>'+esc(num(runtime.event_count))+' EV · '+esc(num(runtime.observation_count))+' OBS</span></div>';
- html+='<div class="tele-foot"><span>FONTES VIVAS</span><span>'+esc(online)+'/'+esc(Math.max(live.length,1))+'</span></div>';
- html+='<div class="tele-foot"><span>PIPELINE</span><span>'+esc(stages)+'/'+esc(pipeline.length)+' ETAPAS</span></div>';
- html+=sources.map(source=>'<div class="row"><div class="grow"><b>'+esc(source.label||source.id)+'</b><small>'+esc(source.details||source.implementation||'')+'</small></div><span class="pill '+(source.runtime==='healthy'?'':'warn')+'">'+esc(intelStateLabel(source.runtime))+'</span></div>').join('');
- html+='<div class="tele-foot"><span>PIPELINE COGNITIVO</span><span>CONTRATO /v1</span></div>';
+ html+='<div class="tele-foot"><span>BASE DE CONHECIMENTO ATUAL</span><span>'+events.length+' EVENTOS · '+observations.length+' ENTIDADES</span></div>';
+ html+='<div class="tele-foot"><span>FONTES DISPONÍVEIS</span><span>'+esc(online)+'/'+esc(Math.max(live.length,1))+' ATIVAS</span></div>';
+ html+='<div class="tele-foot"><span>ASSUNTOS DISPONÍVEIS</span><span>'+esc(events.length+observations.length)+'</span></div>';
+ const topics=[
+  ...events.slice().sort((a,b)=>String(b.observed_at||b.published_at||'').localeCompare(String(a.observed_at||a.published_at||''))).slice(0,8).map(event=>({kind:'event',id:event.event_id,label:event.title,meta:(event.source_id||'fonte')+' · '+(event.category||event.domain||'evento'),record:event})),
+  ...observations.slice().sort((a,b)=>String(b.observed_at||'').localeCompare(String(a.observed_at||''))).slice(0,8).map(item=>({kind:'observation',id:item.observation_id,label:(item.attributes||{}).callsign||(item.attributes||{}).name||item.entity_id,meta:item.entity_type+' · '+item.source_id,record:item}))
+ ];
+ html+=topics.length?topics.map(topic=>'<button type="button" class="row intel-topic" data-'+topic.kind+'-id="'+esc(topic.id)+'"><span class="grow"><b>'+esc(topic.label||'Assunto sem nome')+'</b><small>'+esc(topic.meta)+'</small></span><span class="pill idle">DETALHES</span></button>').join(''):'<div class="empty">Nenhum evento ou entidade foi coletado nesta sessão. Use SYNC para consultar as fontes.</div>';
+ html+='<div class="tele-foot"><span>CORRELAÇÕES ENTRE FONTES</span><span>'+correlations.length+' CANDIDATAS</span></div>';
+ if(correlations.length){
+  html+=correlations.slice(0,12).map(correlation=>{
+   const related=(correlation.event_ids||[]).map(id=>events.find(event=>event.event_id===id)).filter(Boolean);
+   const title=related.map(event=>event.title).join(' ↔ ');
+   return '<div class="intel-correlation"><b>'+esc(title||'Grupo correlacionado')+'</b><small>'+esc(correlation.basis==='same_url'?'MESMA REFERÊNCIA':'TÍTULO/CATEGORIA E JANELA TEMPORAL')+' · '+esc(correlation.distinct_source_count)+' FONTES · CANDIDATA, NÃO PROVA</small>'+related.map(event=>'<button type="button" class="mini" data-event-id="'+esc(event.event_id)+'">'+esc(event.source_id)+'</button>').join(' ')+'</div>';
+  }).join('');
+ }else{
+  html+='<div class="empty">Nenhuma correlação entre fontes foi identificada na coleta atual. Isso não significa ausência de relação no mundo real; significa que ainda não há evidência suficiente nos registros carregados.</div>';
+ }
+ html+='<details class="intel-pipeline"><summary>MATURIDADE DO PIPELINE · '+esc(stages)+'/'+esc(pipeline.length)+' ETAPAS</summary>';
  html+=pipeline.map(stage=>'<div class="row"><div class="grow"><b>'+esc(stage.label)+'</b><small>'+esc(stage.detail||'')+'</small></div><span class="pill idle">'+esc(intelStateLabel(stage.state))+'</span></div>').join('');
+ html+='</details>';
  html+='<div class="tele-foot"><span>HISTÓRICO</span><span>'+esc(intelStateLabel(history.persistence_adapter))+'</span></div>';
- html+='<div class="intel-note">Migration no repositório: '+(history.migration_file_present?'presente':'ausente')+' · aplicação remota '+esc(intelStateLabel(history.remote_migration_state))+' · escrita em produção '+(history.production_write_performed?'sim':'não')+'. Endpoint '+ (security.status_endpoint_authenticated?'autenticado':'não confirmado')+' · credenciais de provedor no browser: '+(security.browser_receives_provider_credentials?'expostas':'não expostas')+'.</div>';
- const limits=(data.limitations||[]).slice(0,3);
- html+=limits.map(text=>'<div class="intel-note">'+esc(text)+'</div>').join('');
+ html+='<div class="intel-note">Persistência: '+esc(intelStateLabel(history.persistence_adapter))+' · migration remota '+esc(intelStateLabel(history.remote_migration_state))+' · escrita em produção '+(history.production_write_performed?'sim':'não')+'. Endpoint '+(security.status_endpoint_authenticated?'autenticado':'não confirmado')+'.</div>';
+ const limits=(data.limitations||[]).slice(0,2);
+ html+=limits.map(item=>'<div class="intel-note">'+esc(item)+'</div>').join('');
  $('intelBody').innerHTML=html;
- $('intelFoot').textContent='CORE LOCAL · COLETA SOB DEMANDA · '+clockTime();
+ $('intelFoot').textContent='CORRELAÇÃO DETERMINÍSTICA · '+(state.live.collected_at?hhmm(state.live.collected_at):'SEM COLETA')+' · '+clockTime();
 }
 function renderSelection(mark){
  const inspector=$('selectionInspector');
@@ -1293,15 +1333,59 @@ function renderSelection(mark){
  }
  state.selected=mark;
  const record=mark.record||mark.device||{};
- const kind=String(mark.kind||'alvo').replaceAll('_',' ').toUpperCase();
+ const attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
+ const evidence=Array.isArray(record.evidence)?record.evidence:[];
+ const primaryEvidence=Array.isArray(record.evidence)?record.evidence[0]:(record.evidence||null);
+ const sourceUrl=String(record.url||((primaryEvidence||{}).url)||((primaryEvidence||{}).source_url)||'');
+ const sourceName=String((primaryEvidence||{}).source_name||record.source_id||'FONTE ORIGINAL');
+ const kind=String(mark.kind||record.entity_type||record.category||'alvo').replaceAll('_',' ').toUpperCase();
  const extra=record.status||record.source_id||record.entity_type||record.category||'';
- const coords=Number.isFinite(mark.latitude)&&Number.isFinite(mark.longitude)
-  ?num(mark.latitude).toFixed(2)+', '+num(mark.longitude).toFixed(2):'posição não informada';
+ const latitude=mark.latitude??(record.location||record.position||{}).latitude;
+ const longitude=mark.longitude??(record.location||record.position||{}).longitude;
+ const coords=latitude!=null&&longitude!=null&&Number.isFinite(Number(latitude))&&Number.isFinite(Number(longitude))
+  ?Number(latitude).toFixed(3)+', '+Number(longitude).toFixed(3):'posição não informada';
+ const summary=record.summary||record.description||attributes.description||attributes.summary||'Sem resumo adicional fornecido pela fonte.';
  $('selectionKind').textContent=kind;
- $('selectionTitle').textContent=String(mark.label||'ALVO');
+ $('selectionTitle').textContent=String(mark.label||record.title||record.entity_id||'ALVO');
  $('selectionDetail').textContent=[String(mark.meta||''),String(extra||''),coords].filter(Boolean).join(' · ');
+ $('selectionSummary').textContent=String(summary);
+ const facts=[];
+ const addFact=(label,value)=>{if(value!==undefined&&value!==null&&String(value).trim()!=='')facts.push('<span>'+esc(label)+'<b>'+esc(value)+'</b></span>');};
+ addFact('FONTE',sourceName);
+ addFact('ID',record.entity_id||record.event_id||record.device_id||record.id);
+ addFact('TIPO',record.entity_type||record.category||record.type);
+ addFact('OBSERVADO',record.observed_at||record.published_at||record.last_seen);
+ addFact('ALTITUDE',attributes.altitude_m!=null?Math.round(num(attributes.altitude_m))+' m':null);
+ addFact('VELOCIDADE',attributes.speed_kts!=null?attributes.speed_kts+' kt':attributes.speed_kmh!=null?attributes.speed_kmh+' km/h':null);
+ addFact('DESTINO',attributes.destination);
+ addFact('ORIGEM',attributes.origin);
+ addFact('STATUS',record.status||attributes.status);
+ Object.entries(attributes).filter(([key,value])=>!['description','summary','callsign','name','altitude_m','speed_kts','speed_kmh','destination','origin','status'].includes(key)&&value!=null&&['string','number','boolean'].includes(typeof value)).slice(0,4).forEach(([key,value])=>addFact(key.replaceAll('_',' ').toUpperCase(),value));
+ $('selectionFacts').innerHTML=facts.join('');
+ const source=$('selectionSource');
+ source.href=/^https?:\/\//i.test(sourceUrl)?sourceUrl:'#';
+ source.hidden=!/^https?:\/\//i.test(sourceUrl);
+ source.textContent='FONTE · '+sourceName+' ↗';
  $('selectionAction').textContent=mark.copyValue?'COPIAR':'CENTRALIZAR';
+ $('selectionAction').disabled=!mark.copyValue&&!(latitude!=null&&longitude!=null&&Number.isFinite(Number(latitude))&&Number.isFinite(Number(longitude)));
  inspector.hidden=false;
+}
+function selectLiveEntity(kind,id){
+ const collection=kind==='event'?state.live.events:state.live.observations;
+ const record=(collection||[]).find(item=>(kind==='event'?item.event_id:item.observation_id)===id);
+ if(!record)return;
+ const attributes=record.attributes||{};
+ const position=record.location||record.position||{};
+ renderSelection({
+  kind:record.entity_type||record.category||kind,
+  label:record.title||attributes.callsign||attributes.name||record.entity_id,
+  meta:(record.source_id||'fonte')+' · '+(record.domain||record.category||record.entity_type||kind),
+  latitude:position.latitude,
+  longitude:position.longitude,
+  record
+ });
+ if(Number.isFinite(Number(position.latitude))&&Number.isFinite(Number(position.longitude)))Globe.focusTo(position.latitude,position.longitude,2.05);
+ setFooter('ASSUNTO · '+String(record.title||attributes.callsign||record.entity_id).toUpperCase());
 }
 function renderStatus(){
  const events=(state.live.events||[]).length;
@@ -1336,6 +1420,7 @@ function renderAll(){
  renderSources();
  renderOrbital();
  renderTelemetry();
+ renderUniversal();
  refreshGlobe();
 }
 
@@ -1359,6 +1444,7 @@ function mergePayload(payload){
   for(const s of payload.sources){if(s&&s.source_id)map.set(s.source_id,s);}
   state.live.sources=Array.from(map.values());
  }
+ if(Array.isArray(payload.correlations))state.live.correlations=payload.correlations;
  if(payload.area)state.live.area=payload.area;
  if(payload.collected_at)state.live.collected_at=payload.collected_at;
  $('updatedAt').textContent=clockTime();
@@ -1608,6 +1694,20 @@ function wire(){
  });
  $('devicesRefresh').addEventListener('click',refreshDevices);
  $('networkRefresh').addEventListener('click',refreshNetwork);
+ $('eventList').addEventListener('click',ev=>{
+  const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-event-id]'):null;
+  if(target)selectLiveEntity('event',target.getAttribute('data-event-id'));
+ });
+ $('orbitalBody').addEventListener('click',ev=>{
+  const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-observation-id]'):null;
+  if(target)selectLiveEntity('observation',target.getAttribute('data-observation-id'));
+ });
+ $('intelBody').addEventListener('click',ev=>{
+  const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-event-id],[data-observation-id]'):null;
+  if(!target)return;
+  if(target.hasAttribute('data-event-id'))selectLiveEntity('event',target.getAttribute('data-event-id'));
+  else selectLiveEntity('observation',target.getAttribute('data-observation-id'));
+ });
  $('networkBody').addEventListener('click',ev=>{
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-network-item]'):null;
   if(!target)return;
@@ -1629,11 +1729,11 @@ function wire(){
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-device]'):null;
   if(!target)return;
   const id=Number(target.getAttribute('data-device'));
-  const device=locatedDevices().find(item=>Number(item.id)===id);
+  const device=(state.devices&&state.devices.devices||[]).find(item=>Number(item.id)===id);
   if(!device)return;
-  const mark={kind:'device',label:device.name,meta:String(device.type||'dispositivo')+' · '+String(device.status||'offline'),latitude:num(device.latitude),longitude:num(device.longitude),record:device};
+  const mark={kind:'device',label:device.name,meta:String(device.type||'dispositivo')+' · '+String(device.status||'offline'),latitude:device.located?num(device.latitude):undefined,longitude:device.located?num(device.longitude):undefined,record:device,copyValue:String(device.last_ip||device.id||'')};
   renderSelection(mark);
-  Globe.focusTo(device.latitude,device.longitude,2);
+  if(device.located)Globe.focusTo(device.latitude,device.longitude,2);
   setFooter('DISPOSITIVO · '+String(device.name||'').toUpperCase());
  });
  $('engage').addEventListener('click',collectAll);
@@ -1659,6 +1759,15 @@ function wire(){
   if(!target)return;
   state.topic=target.getAttribute('data-topic');
   renderBriefing();
+ });
+ $('cameraBody').addEventListener('click',ev=>{
+  if(ev.target&&typeof ev.target.closest==='function'&&ev.target.closest('video,button,a'))return;
+  const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-camera-index]'):null;
+  if(!target)return;
+  const camera=(state.cameras&&state.cameras.cameras||[])[Number(target.getAttribute('data-camera-index'))];
+  if(!camera)return;
+  closeWindow('cameraWindow');
+  renderSelection({kind:'camera',label:camera.label,meta:String(camera.kind||'camera')+' · '+String(camera.refresh_seconds||'')+'s',record:Object.assign({source_id:'camera_registry',summary:camera.note||'Câmera cadastrada no registro local.'},camera)});
  });
  $('camerasButton').addEventListener('click',()=>{openWindow('cameraWindow');refreshCameras();});
  $('universalButton').addEventListener('click',()=>{openWindow('intelWindow');refreshIntelStatus();});
