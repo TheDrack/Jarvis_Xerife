@@ -1,5 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
 
 datas = [('app/static', 'app/static'), ('desktop', 'desktop')]
@@ -15,6 +15,9 @@ for package in ('webview', 'clr_loader', 'pythonnet'):
     datas += package_datas
     binaries += package_binaries
     hiddenimports += package_hiddenimports
+
+hiddenimports += collect_submodules('mcp.client')
+hiddenimports += collect_submodules('mcp.shared')
 
 
 a = Analysis(

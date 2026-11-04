@@ -332,3 +332,28 @@ def test_execute_reports_metadata_without_network_io():
     assert result["success"] is True
     assert result["execution_mode"] == "read_only"
     assert result["configured"] is True
+
+def test_uses_public_osiris_api_when_no_base_url_is_configured(monkeypatch):
+    monkeypatch.delenv("JARVIS_OSIRIS_API_BASE_URL", raising=False)
+    monkeypatch.delenv("JARVIS_OSIRIS_ENABLED", raising=False)
+
+    adapter = OsirisRestAdapter()
+
+    assert adapter._base_url == "https://osirisai.live"
+
+def test_osiris_base_url_can_be_overridden_by_environment(monkeypatch):
+    monkeypatch.setenv("JARVIS_OSIRIS_API_BASE_URL", "https://osiris.example.org")
+    monkeypatch.delenv("JARVIS_OSIRIS_ENABLED", raising=False)
+
+    adapter = OsirisRestAdapter()
+
+    assert adapter._base_url == "https://osiris.example.org"
+
+
+def test_osiris_can_be_explicitly_disabled(monkeypatch):
+    monkeypatch.delenv("JARVIS_OSIRIS_API_BASE_URL", raising=False)
+    monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "false")
+
+    adapter = OsirisRestAdapter()
+
+    assert adapter._base_url is None

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 import threading
 
@@ -16,6 +17,7 @@ from app.adapters.edge.jarvis_desktop_local import (
     _build_uvicorn_config,
     _host_name,
     _is_allowed_address,
+    _load_local_intelligence_config,
     _tailscale_snapshot,
     create_local_app,
 )
@@ -211,6 +213,7 @@ def test_intelligence_collection_resolves_local_services_through_nexus(monkeypat
         return services[target_id]
 
     monkeypatch.setattr(nexus, "resolve", fake_resolve)
+    monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "false")
     runtime = LocalRuntime()
     client = _client(runtime)
     response = client.post(
@@ -313,7 +316,7 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
     }
     monkeypatch.setattr(nexus, "resolve", lambda target_id, **_kwargs: services[target_id])
     monkeypatch.setattr(gev_module, "GodsEyeMcpAdapter", FakeGevAdapter)
-    monkeypatch.setenv("JARVIS_OSIRIS_API_BASE_URL", "https://osirisai.live")
+    monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "true")
     monkeypatch.setenv("JARVIS_GEV_AREA_WEST", "-80")
     monkeypatch.setenv("JARVIS_GEV_AREA_SOUTH", "-40")
     monkeypatch.setenv("JARVIS_GEV_AREA_EAST", "-79")
@@ -443,3 +446,73 @@ async def test_sync_io_cancellation_waits_before_adapter_cleanup():
 
     assert worker_finished.is_set()
     assert adapter_closed.is_set()
+
+def test_local_intelligence_config_loads_only_allowlisted_values(tmp_path, monkeypatch):
+    config = tmp_path / "intelligence.env"
+    config.write_text(
+        "# local integrations\n"
+        "JARVIS_GEV_MCP_ENTRYPOINT=C:\\tools\\gods-eye\\server\\mcp\\stdio.js\n"
+        "JARVIS_GEV_AREA_WEST=-49.0\n"
+        "JARVIS_OSIRIS_ENABLED=false\n"
+        "SUPABASE_SERVICE_ROLE_KEY=must-not-load\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("JARVIS_GEV_MCP_ENTRYPOINT", raising=False)
+    monkeypatch.delenv("JARVIS_GEV_AREA_WEST", raising=False)
+    monkeypatch.delenv("JARVIS_OSIRIS_ENABLED", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+
+    loaded = _load_local_intelligence_config(config)
+
+    assert loaded == 3
+    assert os.environ["JARVIS_GEV_MCP_ENTRYPOINT"].endswith("stdio.js")
+    assert os.environ["JARVIS_GEV_AREA_WEST"] == "-49.0"
+    assert os.environ["JARVIS_OSIRIS_ENABLED"] == "false"
+    assert "SUPABASE_SERVICE_ROLE_KEY" not in os.environ
+
+
+def test_local_intelligence_config_does_not_override_process_environment(tmp_path, monkeypatch):
+    config = tmp_path / "intelligence.env"
+    config.write_text("JARVIS_GEV_AREA_WEST=-49.0\n", encoding="utf-8")
+    monkeypatch.setenv("JARVIS_GEV_AREA_WEST", "-80.0")
+
+    _load_local_intelligence_config(config)
+
+    assert os.environ["JARVIS_GEV_AREA_WEST"] == "-80.0"
+
+
+def test_run_local_server_loads_local_intelligence_config_before_startup(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    loaded = []
+
+    class FakeServer:
+        def __init__(self, _config):
+            self.started = False
+
+        def run(self):
+            self.started = True
+
+    class FakeThread:
+        def __init__(self, target, **_kwargs):
+            self.target = target
+
+        def start(self):
+            self.target()
+
+    monkeypatch.setattr(
+        desktop_local,
+        "_load_local_intelligence_config",
+        lambda: loaded.append(True),
+    )
+    monkeypatch.setattr(threading, "Thread", FakeThread)
+    monkeypatch.setitem(
+        sys.modules,
+        "uvicorn",
+        SimpleNamespace(Config=lambda _app, **_kwargs: object(), Server=FakeServer),
+    )
+
+    server, _thread = desktop_local.run_local_server("127.0.0.1", 8766)
+
+    assert loaded == [True]
+    assert server.started is True

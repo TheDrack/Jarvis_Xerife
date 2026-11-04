@@ -26,8 +26,9 @@ from app.domain.intelligence.contracts import (
 
 logger = logging.getLogger(__name__)
 
-SOURCE_NAME = "OSIRIS Dashboard"
-SOURCE_REPOSITORY = "https://github.com/Pendia/OSIRIS-Dashboard-OSINT"
+SOURCE_NAME = "OSIRIS Intelligence"
+SOURCE_REPOSITORY = "https://github.com/simplifaisoul/osiris"
+_DEFAULT_BASE_URL = "https://osirisai.live"
 _ROUTE_SPECS = {
     "earthquakes": ("earthquakes", "osiris_earthquakes"),
     "fires": ("fires", "osiris_fires"),
@@ -149,7 +150,17 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
             or not 1024 <= max_response_bytes <= 20_000_000
         ):
             raise ValueError("max_response_bytes must be between 1024 and 20000000")
-        configured = base_url or os.getenv("JARVIS_OSIRIS_API_BASE_URL")
+        if base_url is not None:
+            configured = base_url.strip() or None
+        else:
+            enabled = os.getenv("JARVIS_OSIRIS_ENABLED", "true").strip().lower()
+            if enabled in {"0", "false", "no", "off", "disabled"}:
+                configured = None
+            else:
+                configured = (
+                    os.getenv("JARVIS_OSIRIS_API_BASE_URL", "").strip()
+                    or _DEFAULT_BASE_URL
+                )
         self._base_url = self._validate_base_url(configured) if configured else None
         self._client = client
         self._client_factory = client_factory

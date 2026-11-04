@@ -27,3 +27,12 @@ def test_windows_build_script_validates_the_packaged_executable_and_icon():
     assert "JarvisDesktop.exe" in script
     assert "_internal\\desktop\\jarvis.ico" in script
     assert "$LASTEXITCODE -ne 0" in script
+
+
+def test_windows_bundle_includes_the_mcp_sdk_required_by_gods_eye():
+    spec = (ROOT / "JarvisDesktop.spec").read_text(encoding="utf-8")
+    requirements = (ROOT / "requirements" / "desktop.txt").read_text(encoding="utf-8")
+
+    assert "mcp>=1.26,<2" in requirements
+    assert "collect_submodules('mcp.client')" in spec
+    assert "collect_submodules('mcp.shared')" in spec

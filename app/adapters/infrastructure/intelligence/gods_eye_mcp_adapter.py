@@ -183,8 +183,8 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
             raise RuntimeError("configured GEV MCP entrypoint must be an existing absolute file")
 
         # Import the optional Edge dependency only when this adapter is used.
-        from mcp import ClientSession, StdioServerParameters
-        from mcp.client.stdio import stdio_client
+        from mcp.client.session import ClientSession
+        from mcp.client.stdio import StdioServerParameters, stdio_client
 
         script = self._entrypoint.resolve()
         server = StdioServerParameters(
