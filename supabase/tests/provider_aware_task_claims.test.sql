@@ -49,10 +49,19 @@ select ok(
 );
 
 select ok(
-    not has_function_privilege('public', 'public.claim_jarvis_agent_task(text,text,integer)', 'EXECUTE')
+    not exists (
+        select 1
+        from pg_proc p
+        cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+        where p.oid in (
+            'public.claim_jarvis_agent_task(text,text,integer)'::regprocedure,
+            'public.claim_next_jarvis_agent_task(text,integer)'::regprocedure
+        )
+          and acl.grantee = 0
+          and acl.privilege_type = 'EXECUTE'
+    )
     and not has_function_privilege('anon', 'public.claim_jarvis_agent_task(text,text,integer)', 'EXECUTE')
     and not has_function_privilege('authenticated', 'public.claim_jarvis_agent_task(text,text,integer)', 'EXECUTE')
-    and not has_function_privilege('public', 'public.claim_next_jarvis_agent_task(text,integer)', 'EXECUTE')
     and not has_function_privilege('anon', 'public.claim_next_jarvis_agent_task(text,integer)', 'EXECUTE')
     and not has_function_privilege('authenticated', 'public.claim_next_jarvis_agent_task(text,integer)', 'EXECUTE'),
     'claim RPCs are not executable by public or client roles'
