@@ -47,6 +47,7 @@ object HudTarget {
         val withScheme = when {
             trimmed.startsWith("https://", ignoreCase = true) -> trimmed
             trimmed.startsWith("http://", ignoreCase = true) -> trimmed
+            trimmed.contains("://") -> return null
             else -> "http://$trimmed"
         }
         val url = try {
