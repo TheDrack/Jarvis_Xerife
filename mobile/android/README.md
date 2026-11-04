@@ -46,15 +46,17 @@ depende de `javaScriptEnabled` e `domStorageEnabled` (token de sessão); não h�
 ponte JavaScript exposta ao conteúdo remoto.
 
 A página pede `navigator.geolocation` para ancorar clima e manchetes regionais
-nas coordenadas do telefone. O WebView concede geolocalização apenas para a
-origem do HUD configurado (`onGeolocationPermissionsShowPrompt`) e a aba pede a
-permissão de localização do Android ao abrir; se você negar, o HUD cai para a
-região configurada no núcleo e informa isso na tela.
+nas coordenadas do telefone. O WebView habilita a API via
+`WebSettings.setGeolocationEnabled(true)`, mas concede permissão apenas quando
+`onGeolocationPermissionsShowPrompt` recebe esquema, host e porta efetiva
+exatamente iguais aos da origem configurada do HUD. A comparação não usa
+prefixos. A aba também pede a permissão Android ao abrir; se você negar, o HUD
+cai para a região configurada no núcleo e informa isso na tela.
 
 ## Testes Android
 
 `HudTargetTest` cobre a normalização do endereço do HUD (esquema ausente, HTTPS,
-caminho/consulta descartados e entradas inválidas). A compilação e a execução
+caminho/consulta descartados e entradas inválidas), além da comparação exata de origem usada pela permissão de geolocalização. A compilação e a execução
 desses testes exigem Gradle e o Android SDK, que não estão disponíveis neste
 ambiente de trabalho; o workflow de CI compila o APK de debug.
 
