@@ -52,18 +52,24 @@ def run_pipeline(
     pipeline_name: str,
     global_strict: bool = False,
     tool_approvals: Optional[Dict[str, Dict[str, Any]]] = None,
+    inputs: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Executa pipeline com correção de contexto para adapters.
     """
     logger.info(f"🚀 INICIANDO RUNNER: {pipeline_name}")
 
-    # CORREÇÃO: Uso de Path para garantir compatibilidade de SO
-    config_path = Path("config") / "pipelines" / f"{pipeline_name}.yml"
+    # Accept both established .yml files and canonical .yaml pipeline names.
+    pipeline_dir = Path("config") / "pipelines"
+    candidates = (
+        pipeline_dir / f"{pipeline_name}.yml",
+        pipeline_dir / f"{pipeline_name}.yaml",
+    )
+    config_path = next((path for path in candidates if path.is_file()), candidates[0])
 
-    if not config_path.exists():
+    if not config_path.is_file():
         logger.error(
-            f"❌ Pipeline '{pipeline_name}' não encontrado em {config_path}"
+            f"❌ Pipeline '{pipeline_name}' não encontrado em {pipeline_dir}"
         )
         return {
             "success": False,
@@ -88,6 +94,14 @@ def run_pipeline(
         "results": [],
         "artifacts": {},
     }
+    runtime_inputs = dict(inputs or {})
+    reserved_keys = {"pipeline", "strict", "results", "artifacts", "component_config"}
+    if reserved_keys.intersection(runtime_inputs):
+        raise ValueError(
+            f"pipeline inputs cannot override reserved keys: "
+            f"{sorted(reserved_keys.intersection(runtime_inputs))}"
+        )
+    context.update(runtime_inputs)
 
     # Executar cada componente em ordem
     failed_count = 0
@@ -252,9 +266,15 @@ def _execute_step(
         if hasattr(component, "execute") and callable(
             getattr(component, "execute", None)
         ):
-            result = component.execute(context)
+            execution_context = {
+                **context,
+                "component_config": dict(step_config_data),
+            }
+            result = component.execute(execution_context)
         elif callable(component):
-            result = component(context)
+            result = component(
+                {**context, "component_config": dict(step_config_data)}
+            )
         else:
             raise TypeError(
                 f"Componente '{component_id}' não possui método execute() e não é callable"

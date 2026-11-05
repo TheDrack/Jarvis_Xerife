@@ -48,6 +48,35 @@ class OsirisSource:
         )
 
 
+class OsirisSourceWithObservations(OsirisSource):
+    def collect_observations(self, limit: int) -> IntelligenceBatch:
+        observation = IntelligenceObservation(
+            observation_id="osiris-camera-1",
+            source_id="osiris_cctv",
+            entity_type="camera",
+            entity_id="camera-1",
+            observed_at=datetime.now(timezone.utc),
+            position=GeoPoint(latitude=-27.5, longitude=-48.5),
+            evidence=(
+                IntelligenceEvidence(
+                    source_id="osiris_cctv",
+                    source_name="OSIRIS public camera directory",
+                    url="https://osiris.example/cameras",
+                    license_or_terms="directory metadata only",
+                ),
+            ),
+        )
+        return IntelligenceBatch(
+            observations=(observation,),
+            sources=(SourceHealth(source_id="osiris_cctv", available=True),),
+        )
+
+
+class OsirisSourceWithBrokenObservations(OsirisSourceWithObservations):
+    def collect_observations(self, limit: int) -> IntelligenceBatch:
+        raise RuntimeError("private observation endpoint details")
+
+
 class GodsEyeSource:
     async def collect_observations(self) -> IntelligenceBatch:
         observation = IntelligenceObservation(
@@ -86,6 +115,7 @@ async def test_live_collector_unifies_events_and_observations_without_persistenc
     assert {source.source_id for source in report.sources} == {
         "public",
         "osiris",
+        "osiris_observations",
         "gods_eye_view",
     }
 
@@ -107,3 +137,35 @@ async def test_live_collector_preserves_partial_success_when_one_source_fails():
     assert osiris.available is False
     assert osiris.error_code == "RUNTIME_ERROR"
     assert "private upstream details" not in str(report.model_dump(mode="json"))
+
+
+@pytest.mark.asyncio
+async def test_live_collector_ingests_osiris_observations_alongside_events():
+    report = await collect_live_intelligence(
+        limit=10,
+        public_source=PublicSource(),
+        osiris_source=OsirisSourceWithObservations(),
+    )
+
+    assert any(event.source_id == "osiris" for event in report.events)
+    cameras = [item for item in report.observations if item.source_id == "osiris_cctv"]
+    assert len(cameras) == 1
+    assert cameras[0].entity_type == "camera"
+    assert cameras[0].position == GeoPoint(latitude=-27.5, longitude=-48.5)
+    assert any(source.source_id == "osiris_cctv" and source.available for source in report.sources)
+
+
+@pytest.mark.asyncio
+async def test_osiris_observation_failure_does_not_discard_successful_events():
+    report = await collect_live_intelligence(
+        limit=10,
+        public_source=PublicSource(),
+        osiris_source=OsirisSourceWithBrokenObservations(),
+    )
+
+    assert any(event.source_id == "osiris" for event in report.events)
+    assert not any(item.source_id == "osiris_cctv" for item in report.observations)
+    failed = next(source for source in report.sources if source.source_id == "osiris_observations")
+    assert failed.available is False
+    assert failed.error_code == "RUNTIME_ERROR"
+    assert "private observation endpoint details" not in str(report.model_dump(mode="json"))

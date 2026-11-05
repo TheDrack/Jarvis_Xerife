@@ -1,0 +1,21 @@
+# Geo-anchored OSINT discovery. L2 and L3 execute concurrently inside OSINTDiscoveryService.
+# Runtime input envelope: {osint: {coord, seed_ip, radius_km, layers, physical_presence}}.
+strict: true
+components:
+  osint_geo_discovery:
+    id: "osint_discovery_component"
+    hint_path: "app/application/services/osint_discovery"
+    config:
+      layers:
+        - "L1"
+        - "L2"
+        - "L3"
+      min_confidence: 0.3
+      parallel_stages:
+        - "L2"
+        - "L3"
+      fusion: "osint.fuse"
+      l2_requires_l1_cidr: true
+      l4_requires_physical_presence: true
+      active_capabilities_optional: true
+      output_contract: "list[Finding]"

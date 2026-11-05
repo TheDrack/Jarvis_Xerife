@@ -35,24 +35,30 @@
 - Architecture and integration boundary: [Universal Intelligence](../architecture/jarvis-universal-intelligence.md) and [ADR-002](../architecture/ADR-002-jarvis-universal-intelligence.md).
 - Public-source adapter: `app/adapters/infrastructure/intelligence/public_intelligence_adapter.py`, normalized contracts: `app/domain/intelligence/contracts.py`.
 - Initial read-only sources registered in Nexus/Tool Registry: GDELT DOC article search, NASA EONET open events, and USGS all-day earthquake feed. The personal/entity Eagle OSINT adapter remains separate.
-- These manifests are descriptive and the current production ToolAuthorizationPolicy is still not wired; do not claim live dispatcher execution. Source adapters are not yet scheduled, persisted, briefed, or rendered on the geospatial surface.
+- These manifests are descriptive and the current production ToolAuthorizationPolicy is still not wired; do not claim live dispatcher execution. The on-demand collector now combines public events, OSIRIS events and OSIRIS entity observations, plus optional GEV observations, with source-level partial failure reporting.
+- Append-only history adapters and a recurring worker exist, but persistence remains feature-flagged and must not be treated as production-verified: the repository's migration ledger mismatch and unavailable grant/insert-readback evidence remain unresolved. The worker must stay disabled until that database verification is complete. Briefing synthesis and geospatial presentation are separate pending increments.
 
 ## Optional God's Eye View MCP observation adapter
 
 - Adapter: `app/adapters/infrastructure/intelligence/gods_eye_mcp_adapter.py`; port: `app/application/ports/intelligence_observation_source.py`.
-- Opt-in local Edge integration only. It discovers the live MCP tool catalog and calls only allowlisted query tools with `annotations.readOnlyHint=true`; configured area is bounded to 10 degrees per side and results are capped.
-- Requires the optional Edge MCP SDK and an explicit local checkout path in `JARVIS_GEV_MCP_ENTRYPOINT`. It accepts only a loopback app origin. It is not registered in Nexus, scheduled, persisted, or live-instance verified.
-- Aircraft, vessel and satellite snapshots become provenance-preserving `IntelligenceObservation` records. The adapter does not call UI/action tools, ingest CCTV/ALPR, resolve identity across providers, or establish track continuity.
-- Unit tests use an injected fake MCP session; a live probe requires a user-configured local GEV checkout and running app.
+- Opt-in local Edge integration. It discovers the live MCP tool catalog and invokes only an explicit allowlist of query tools whose runtime schema declares `annotations.readOnlyHint=true` and is not destructive. The geographic area is bounded to 10 degrees per side; each entity class is capped.
+- The current allowlist covers `aircraft_in_area`, `vessels_in_area`, `satellites_overhead`, `find_cctv_cameras`, `find_alpr_cameras`, `find_radio_stations`, `find_infrastructure` (queried separately for datacenters and dams), and `find_military_installations`.
+- Normalized entity types include aircraft, vessel, satellite, public camera directory entry, mapped ALPR camera location, radio station, datacenter, dam and mapped military site. Static assets use the query instant as collection/observation time; this is not a claim that the asset was independently verified at that instant.
+- The ALPR catalog covers only the United States and Canada. It supplies mapped camera locations, not plate reads or people tracking. CCTV ingestion is directory metadata only. When the user selects a GEV camera marker, Jarvis calls the read-only `get_cctv_snapshot` tool on demand and sends the bounded image through an authenticated local endpoint to the existing globe media viewer. The viewer refreshes the snapshot while open; the image's current/historical provenance and credit are displayed. No snapshot is collected or persisted in the background.
+- OSIRIS camera observations with an upstream HTTP(S) `stream_url` open directly in the same viewer after explicit selection; Jarvis does not proxy those streams. Radio Browser stream URLs remain metadata during collection; selecting a radio-station observation exposes audio playback in the same viewer. Playback is user-initiated, direct from the browser, and not a background collector action.
+- `find_submarine_cables` is excluded from automatic persistence because its TeleGeography dataset is CC BY-NC-SA 3.0 and requires separate commercial-use permission. Action/app-only tools, composite briefs and tools outside the explicit allowlist are not invoked.
+- Requires the optional Edge MCP SDK, an explicit local checkout path in `JARVIS_GEV_MCP_ENTRYPOINT`, a bounded `JARVIS_GEV_AREA_*` region and a loopback GEV app origin. A configured local checkout and running app are still required for live verification.
+- Unit tests use an injected fake MCP session. Adapter implementation and tests do not prove that the user's GEV process is configured, connected, scheduled or persisted in production.
 
-## Optional OSIRIS REST event adapter
+## Optional OSIRIS REST event and observation adapter
 
 - Adapter: `app/adapters/infrastructure/intelligence/osiris_rest_adapter.py`; class: `OsirisRestAdapter`.
 - Opt-in HTTPS integration through `JARVIS_OSIRIS_API_BASE_URL` or an explicit constructor origin.
-- Calls only `/api/earthquakes`, `/api/fires`, `/api/news` and `/api/weather`; no user-controlled route, query, redirect or remote URL fetcher.
-- Each route is independently bounded to 100 records, a 4 MB streamed response and a 12-second timeout by default; source health preserves partial failures.
+- Event routes: `/api/earthquakes`, `/api/fires`, `/api/news`, `/api/weather` and `/api/gdelt`. Observation routes: `/api/flights`, `/api/maritime`, `/api/satellites` and `/api/cctv`. The adapter uses fixed routes; it does not accept user-controlled paths or redirect to arbitrary hosts.
+- Each route is independently bounded, HTTPS-only, byte-limited and time-limited; route-level source health preserves partial failures. Camera ingestion is directory metadata only; selecting a camera with a valid HTTP(S) stream URL opens it through the existing globe media viewer, directly in the user's browser and only on demand. Jarvis never proxies or probes the stream.
+- The on-demand Universal Intelligence collector invokes both `collect_events()` and `collect_observations()` independently. Failure in one group does not discard successful results from the other.
 - News country-anchor coordinates and NOAA/NWS polygon centroids are intentionally not treated as exact event coordinates. Point geometry from NASA EONET and GDACS RSS is preserved. Weather source identities remain separate for NASA EONET, NOAA/NWS and GDACS.
-- Unit tests use upstream-shaped fixtures and an injected HTTPX MockTransport. No live OSIRIS deployment is configured or verified.
+- Unit tests use upstream-shaped fixtures and an injected HTTPX MockTransport. No live OSIRIS deployment is assumed by the adapter's existence.
 
 ## Portable Jarvis skills
 

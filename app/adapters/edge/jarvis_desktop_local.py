@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import ipaddress
 import logging
@@ -10,6 +11,7 @@ import json
 import secrets
 import shutil
 import subprocess
+import threading
 import time
 from collections import Counter
 from datetime import datetime, timezone
@@ -321,6 +323,8 @@ class LocalRuntime:
         self.last_intelligence: dict[str, Any] | None = None
         self.osiris_snapshot: dict[str, Any] | None = None
         self.gods_eye_snapshot: dict[str, Any] | None = None
+        self.gev_snapshot_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+        self.gev_snapshot_cache_lock = threading.Lock()
 
     def refresh_pairing(self) -> None:
         self.pairing_code = f"{secrets.randbelow(1_000_000):06d}"
@@ -1388,6 +1392,103 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         }
         state.gods_eye_snapshot = payload
         return payload
+
+    @app.get("/api/intelligence/gods-eye/cameras/{camera_id}/snapshot")
+    async def gods_eye_camera_snapshot(
+        camera_id: str,
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Fetch one public GEV camera frame after an explicit HUD selection."""
+        normalized_id = camera_id.strip()
+        if not normalized_id or len(normalized_id) > 200:
+            raise HTTPException(status_code=422, detail="camera_id inválido.")
+
+        known_camera_ids = {
+            str(item.get("entity_id"))
+            for snapshot in (state.last_intelligence, state.gods_eye_snapshot)
+            if isinstance(snapshot, dict)
+            for item in (snapshot.get("observations") or [])
+            if isinstance(item, dict)
+            and item.get("source_id") == "gods_eye_view"
+            and item.get("entity_type") == "camera"
+            and item.get("entity_id") is not None
+        }
+        if normalized_id not in known_camera_ids:
+            raise HTTPException(
+                status_code=404,
+                detail="Câmera não encontrada na última descoberta do God's Eye View.",
+            )
+
+        now = time.monotonic()
+        cached = None
+        with state.gev_snapshot_cache_lock:
+            entry = state.gev_snapshot_cache.get(normalized_id)
+            if entry and now - entry[0] < 8:
+                cached = entry[1]
+            elif entry:
+                state.gev_snapshot_cache.pop(normalized_id, None)
+
+        if cached is None:
+            settings = _gev_settings()
+            if settings.get("area") is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Área do God's Eye View não configurada.",
+                )
+            if not settings.get("entrypoint_configured"):
+                raise HTTPException(
+                    status_code=503,
+                    detail="Servidor MCP do God's Eye View não configurado.",
+                )
+            try:
+                from app.adapters.infrastructure.intelligence.gods_eye_mcp_adapter import (
+                    GodsEyeMcpAdapter,
+                )
+
+                adapter = GodsEyeMcpAdapter(
+                    area=settings["area"],
+                    api_base=str(settings.get("api_base") or "http://127.0.0.1:4173"),
+                    limit=1,
+                    timeout_seconds=15,
+                )
+                cached = await asyncio.wait_for(
+                    adapter.get_camera_snapshot(normalized_id),
+                    timeout=25,
+                )
+                cached["collected_at"] = datetime.now(timezone.utc).isoformat()
+            except (ImportError, OSError, RuntimeError, ValueError, asyncio.TimeoutError) as exc:
+                logger.warning(
+                    "GEV camera snapshot unavailable (%s)",
+                    type(exc).__name__,
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail="Snapshot público indisponível no God's Eye View.",
+                ) from exc
+
+            with state.gev_snapshot_cache_lock:
+                state.gev_snapshot_cache[normalized_id] = (time.monotonic(), cached)
+                while len(state.gev_snapshot_cache) > 32:
+                    oldest = min(
+                        state.gev_snapshot_cache,
+                        key=lambda key: state.gev_snapshot_cache[key][0],
+                    )
+                    state.gev_snapshot_cache.pop(oldest, None)
+
+        return {
+            "success": True,
+            "camera_id": cached["camera_id"],
+            "name": cached.get("name"),
+            "city": cached.get("city"),
+            "provider": cached.get("provider"),
+            "credit": cached.get("credit"),
+            "source_kind": cached.get("source_kind"),
+            "current_view": cached.get("current_view"),
+            "mime_type": cached["mime_type"],
+            "image_base64": base64.b64encode(cached["data"]).decode("ascii"),
+            "collected_at": cached["collected_at"],
+            "cache_ttl_seconds": 8,
+        }
 
     @app.get("/api/network/status")
     async def network_status(_client: str = Depends(require_local_token)) -> dict[str, Any]:

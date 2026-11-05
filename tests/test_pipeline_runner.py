@@ -280,3 +280,53 @@ def test_tool_step_does_not_read_approval_from_yaml(pipeline_dir):
     assert captured["request"].approval_id is None
     assert captured["request"].idempotency_key is None
     assert result["status"] == "partial"
+
+
+def test_pipeline_passes_runtime_inputs_and_component_config(pipeline_dir):
+    cfg = pipeline_dir / "config" / "pipelines" / "test_inputs.yml"
+    cfg.write_text(
+        textwrap.dedent(
+            """\
+            strict: true
+            components:
+              osint_discovery:
+                id: "osint_discovery_component"
+                hint_path: "app/application/services/osint_discovery"
+                config:
+                  layers: ["L1", "L2", "L3"]
+                  min_confidence: 0.3
+            """
+        ),
+        encoding="utf-8",
+    )
+    component = MagicMock()
+    component.__is_cloud_mock__ = False
+    component.execute.return_value = {"findings": [], "source_health": {}}
+
+    with patch("app.runtime.pipeline_runner.nexus") as mock_nexus:
+        mock_nexus.resolve.return_value = component
+        original_dir = os.getcwd()
+        try:
+            os.chdir(pipeline_dir)
+            result = run_pipeline(
+                "test_inputs",
+                inputs={
+                    "osint": {
+                        "coord": {
+                            "lat": -27.1,
+                            "lon": -48.9,
+                            "accuracy_m": 10,
+                            "source": "gps",
+                        },
+                        "seed_ip": "203.0.113.8",
+                        "radius_km": 5,
+                    }
+                },
+            )
+        finally:
+            os.chdir(original_dir)
+
+    execution_context = component.execute.call_args.args[0]
+    assert execution_context["osint"]["seed_ip"] == "203.0.113.8"
+    assert execution_context["component_config"]["layers"] == ["L1", "L2", "L3"]
+    assert result["findings"] == []

@@ -612,6 +612,12 @@ registrar_visualizacao_portas(mcp, tracked_action, _portas_content)
 registrar_utilizacao_portas(mcp, tracked_action)
 registrar_observabilidade_portas(mcp, tracked_action)
 
+# Remote-capable MCP surface: passive OSINT only. Active tools live in the
+# separate local-only OSINT server and are never registered on this gateway.
+from app.adapters.edge.osint_mcp_tools import register_osint_tools
+
+register_osint_tools(mcp)
+
 
 if __name__ == "__main__":
     if _HTTP_TRANSPORT not in {"stdio", "streamable-http"}:

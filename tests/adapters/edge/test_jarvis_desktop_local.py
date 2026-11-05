@@ -1126,6 +1126,77 @@ def test_hud_version_requires_the_local_token():
     assert _client(LocalRuntime()).get("/api/hud/version").status_code == 401
 
 
+def test_gods_eye_camera_snapshot_is_authenticated_and_cached(monkeypatch):
+    import base64
+    from app.adapters.infrastructure.intelligence import gods_eye_mcp_adapter as gev_module
+
+    calls = []
+
+    class FakeGevAdapter:
+        def __init__(self, **kwargs):
+            assert kwargs["area"] == {
+                "west": -80.0,
+                "south": -40.0,
+                "east": -79.0,
+                "north": -39.0,
+            }
+            assert kwargs["limit"] == 1
+
+        async def get_camera_snapshot(self, camera_id):
+            calls.append(camera_id)
+            return {
+                "camera_id": camera_id,
+                "name": "Public camera",
+                "city": "Test City",
+                "provider": "Public feed",
+                "credit": "Public data",
+                "source_kind": "upstream-image",
+                "current_view": True,
+                "mime_type": "image/jpeg",
+                "data": b"fake-camera-frame",
+            }
+
+    monkeypatch.setattr(gev_module, "GodsEyeMcpAdapter", FakeGevAdapter)
+    monkeypatch.setenv("JARVIS_GEV_MCP_ENTRYPOINT", r"C:\Temp\gods-eye-view\server\mcp\stdio.js")
+    monkeypatch.setenv("JARVIS_GEV_AREA_WEST", "-80")
+    monkeypatch.setenv("JARVIS_GEV_AREA_SOUTH", "-40")
+    monkeypatch.setenv("JARVIS_GEV_AREA_EAST", "-79")
+    monkeypatch.setenv("JARVIS_GEV_AREA_NORTH", "-39")
+    monkeypatch.setenv("JARVIS_GEV_API_BASE_URL", "http://127.0.0.1:4173")
+
+    runtime = LocalRuntime()
+    runtime.last_intelligence = {
+        "observations": [{
+            "source_id": "gods_eye_view",
+            "entity_type": "camera",
+            "entity_id": "camera-124",
+        }]
+    }
+    client = _client(runtime)
+    headers = {"Authorization": f"Bearer {runtime.token}"}
+    path = "/api/intelligence/gods-eye/cameras/camera-124/snapshot"
+
+    first = client.get(path, headers=headers)
+    second = client.get(path, headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    payload = first.json()
+    assert payload["success"] is True
+    assert payload["mime_type"] == "image/jpeg"
+    assert base64.b64decode(payload["image_base64"]) == b"fake-camera-frame"
+    assert payload["current_view"] is True
+    assert payload["credit"] == "Public data"
+    assert second.json()["image_base64"] == payload["image_base64"]
+    assert calls == ["camera-124"]
+    assert client.get(path).status_code == 401
+    assert client.get(
+        "/api/intelligence/gods-eye/cameras/not-discovered/snapshot",
+        headers=headers,
+    ).status_code == 404
+    assert calls == ["camera-124"]
+
+
 def test_open_cameras_route_passes_coordinates_and_validates_them(monkeypatch):
     import app.adapters.edge.jarvis_desktop_local as desktop_local
 
