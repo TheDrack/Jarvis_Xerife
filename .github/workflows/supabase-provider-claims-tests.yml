@@ -40,6 +40,7 @@ jobs:
           mkdir -p "${test_dir}"
           cd "${test_dir}"
           supabase init --force
+          mkdir -p supabase/migrations supabase/tests
 
           cp "${GITHUB_WORKSPACE}/supabase/migrations/202610230002_multi_agent_control_plane.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/202610230004_priority_routine_scheduler.sql" supabase/migrations/
