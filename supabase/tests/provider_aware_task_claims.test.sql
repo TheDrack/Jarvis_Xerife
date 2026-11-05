@@ -1,7 +1,7 @@
 -- Regression tests for provider-aware multi-agent task claims.
 -- This file is executed only against an isolated local Supabase database.
 begin;
-select plan(21);
+select plan(23);
 
 select ok(
     position('lower(replace(replace(v_task.task_type' in
@@ -17,6 +17,14 @@ select ok(
         pg_get_functiondef('public.claim_next_jarvis_agent_task(text,integer)'::regprocedure)) > 0,
     'queue claims filter Red/Blue tasks by the agent provider'
 );
+select ok(
+    position('mark_stale_jarvis_agents_offline' in
+        pg_get_functiondef('public.claim_next_jarvis_agent_task(text,integer)'::regprocedure)) > 0
+    and position('last_seen_at' in
+        pg_get_functiondef('public.claim_next_jarvis_agent_task(text,integer)'::regprocedure)) > 0,
+    'queue claims reconcile stale agent heartbeats before assigning work'
+);
+
 select ok(
     position('for update of t skip locked' in
         pg_get_functiondef('public.claim_next_jarvis_agent_task(text,integer)'::regprocedure)) > 0,
@@ -39,7 +47,8 @@ select ok(
         cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
         where p.oid in (
             'public.claim_jarvis_agent_task(text,text,integer)'::regprocedure,
-            'public.claim_next_jarvis_agent_task(text,integer)'::regprocedure
+            'public.claim_next_jarvis_agent_task(text,integer)'::regprocedure,
+            'public.mark_stale_jarvis_agents_offline(integer)'::regprocedure
         )
           and acl.grantee = 0
           and acl.privilege_type = 'EXECUTE'
@@ -47,12 +56,15 @@ select ok(
     and not has_function_privilege('anon', 'public.claim_jarvis_agent_task(text,text,integer)', 'EXECUTE')
     and not has_function_privilege('authenticated', 'public.claim_jarvis_agent_task(text,text,integer)', 'EXECUTE')
     and not has_function_privilege('anon', 'public.claim_next_jarvis_agent_task(text,integer)', 'EXECUTE')
-    and not has_function_privilege('authenticated', 'public.claim_next_jarvis_agent_task(text,integer)', 'EXECUTE'),
+    and not has_function_privilege('authenticated', 'public.claim_next_jarvis_agent_task(text,integer)', 'EXECUTE')
+    and not has_function_privilege('anon', 'public.mark_stale_jarvis_agents_offline(integer)', 'EXECUTE')
+    and not has_function_privilege('authenticated', 'public.mark_stale_jarvis_agents_offline(integer)', 'EXECUTE'),
     'claim RPCs are not executable by PUBLIC or client roles'
 );
 select ok(
     has_function_privilege('service_role', 'public.claim_jarvis_agent_task(text,text,integer)', 'EXECUTE')
-    and has_function_privilege('service_role', 'public.claim_next_jarvis_agent_task(text,integer)', 'EXECUTE'),
+    and has_function_privilege('service_role', 'public.claim_next_jarvis_agent_task(text,integer)', 'EXECUTE')
+    and has_function_privilege('service_role', 'public.mark_stale_jarvis_agents_offline(integer)', 'EXECUTE'),
     'trusted service_role retains execute on both claim RPCs'
 );
 
@@ -65,7 +77,9 @@ insert into public.jarvis_agents (
     ('pgtap-queue-unknown', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'unknown', now()),
     ('pgtap-queue-venice', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'VENICE', now()),
     ('pgtap-parent-venice', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'venice', now()),
-    ('pgtap-tools-venice', 'pgtap', 'ci', '["read"]'::jsonb, 'available', 0, 2, 'venice', now());
+    ('pgtap-tools-venice', 'pgtap', 'ci', '["read"]'::jsonb, 'available', 0, 2, 'venice', now()),
+    ('pgtap-stale-venice', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'venice', now() - interval '1 hour'),
+    ('pgtap-null-heartbeat', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'venice', null);
 
 insert into public.jarvis_agent_tasks (
     task_id, objective, task_type, required_tools, status, leader_id,
@@ -89,6 +103,13 @@ insert into public.jarvis_agent_tasks (
     'pgtap-tools-task', 'required tools guard test', 'general',
     array['write'], 'ready', 'pgtap', 'pgtap-tools-venice', 100
 );
+
+insert into public.jarvis_agent_tasks (
+    task_id, objective, task_type, required_tools, status, leader_id,
+    assigned_agent_id, priority
+) values
+    ('pgtap-stale-heartbeat-task', 'stale heartbeat guard test', 'general', '{}', 'ready', 'pgtap', 'pgtap-stale-venice', 100),
+    ('pgtap-null-heartbeat-task', 'missing heartbeat guard test', 'general', '{}', 'ready', 'pgtap', 'pgtap-null-heartbeat', 100);
 
 select is(
     (select count(*)::integer from public.claim_jarvis_agent_task(
@@ -151,6 +172,14 @@ select is(
     (select count(*)::integer from public.claim_next_jarvis_agent_task('pgtap-tools-venice', 60)),
     0,
     'queue rejects tasks whose required tools are unavailable'
+);
+select ok(
+    (select count(*)::integer from public.claim_next_jarvis_agent_task('pgtap-stale-venice', 60)) = 0
+    and (select status = 'offline' from public.jarvis_agents where agent_id = 'pgtap-stale-venice')
+    and (select status = 'offline' from public.jarvis_agents where agent_id = 'pgtap-null-heartbeat')
+    and (select status = 'ready' from public.jarvis_agent_tasks where task_id = 'pgtap-stale-heartbeat-task')
+    and (select status = 'ready' from public.jarvis_agent_tasks where task_id = 'pgtap-null-heartbeat-task'),
+    'stale and missing heartbeats are reconciled offline without claiming their tasks'
 );
 
 do $lease_test$
