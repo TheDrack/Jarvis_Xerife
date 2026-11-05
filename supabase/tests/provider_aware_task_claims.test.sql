@@ -1,7 +1,7 @@
 -- Regression tests for provider-aware multi-agent task claims.
 -- This file is executed only against an isolated local Supabase database.
 begin;
-select plan(29);
+select plan(32);
 
 select ok(
     position('lower(replace(replace(v_task.task_type' in
