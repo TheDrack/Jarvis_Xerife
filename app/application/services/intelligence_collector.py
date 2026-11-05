@@ -47,6 +47,49 @@ async def _collect_sync(source: Any, method_name: str, limit: int) -> Intelligen
     return result if isinstance(result, IntelligenceBatch) else IntelligenceBatch.model_validate(result)
 
 
+async def _collect_osiris_component(
+    source: Any, method_name: str, source_id: str, limit: int
+) -> IntelligenceBatch:
+    method = getattr(source, method_name, None)
+    if not callable(method):
+        return IntelligenceBatch(
+            sources=(SourceHealth(source_id=source_id, available=False, error_code="UNSUPPORTED"),)
+        )
+    try:
+        result = await asyncio.to_thread(method, limit)
+        return result if isinstance(result, IntelligenceBatch) else IntelligenceBatch.model_validate(result)
+    except Exception as exc:
+        logger.warning("OSIRIS collection failed for %s (%s)", source_id, type(exc).__name__)
+        error_codes = {
+            RuntimeError: "RUNTIME_ERROR",
+            TimeoutError: "TIMEOUT",
+            ValueError: "INVALID_RESPONSE",
+            TypeError: "INVALID_DATA",
+        }
+        return IntelligenceBatch(
+            sources=(
+                SourceHealth(
+                    source_id=source_id,
+                    available=False,
+                    error_code=error_codes.get(type(exc), "SOURCE_ERROR"),
+                ),
+            )
+        )
+
+
+async def _collect_osiris(source: Any, limit: int) -> IntelligenceBatch:
+    """Collect OSIRIS events and entity observations as independent source groups."""
+    events_batch, observations_batch = await asyncio.gather(
+        _collect_osiris_component(source, "collect_events", "osiris", limit),
+        _collect_osiris_component(source, "collect_observations", "osiris_observations", limit),
+    )
+    return IntelligenceBatch(
+        events=events_batch.events,
+        observations=observations_batch.observations,
+        sources=events_batch.sources + observations_batch.sources,
+    )
+
+
 async def _collect_gods_eye(source: Any) -> IntelligenceBatch:
     result = await source.collect_observations()
     return result if isinstance(result, IntelligenceBatch) else IntelligenceBatch.model_validate(result)
@@ -114,7 +157,7 @@ async def collect_live_intelligence(
         ),
         guarded(
             "osiris",
-            lambda: _collect_sync(osiris_source, "collect_events", limit),
+            lambda: _collect_osiris(osiris_source, limit),
         ),
     ]
     if gods_eye_source is None:

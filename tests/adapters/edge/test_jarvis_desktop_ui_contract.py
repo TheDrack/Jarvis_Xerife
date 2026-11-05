@@ -261,6 +261,21 @@ def test_camera_window_lists_public_cameras_with_attribution():
     assert "if(cam.registry.proxyOk" not in HTML
 
 
+def test_geospatial_camera_and_radio_observations_use_the_existing_media_viewer():
+    assert "streamable=['camera','radio_station'].includes(o.entity_type)" in HTML
+    assert "gevSnapshot=o.entity_type==='camera'&&o.source_id==='gods_eye_view'" in HTML
+    assert "snapshot-api" in HTML
+    assert "const mediaType=gevSnapshot?'snapshot-api':attrs.stream_type" in HTML
+    assert "/api/intelligence/gods-eye/cameras/" in HTML
+    assert "function liveInfo(mark)" in HTML
+    assert "function openLiveMedia(info)" in HTML
+    assert "refreshSnapshot" in HTML
+    assert "liveInfo(state.selected)" in HTML
+    assert "info.type==='audio'" in HTML
+    assert "<audio controls autoplay src=" in HTML
+    assert "safeCamUrl(raw)" in HTML
+
+
 def test_hud_reports_the_served_repository_file():
     assert "api('/api/hud/version')" in HTML
     assert 'id="hudBuild"' in HTML

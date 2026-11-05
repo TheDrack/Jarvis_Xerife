@@ -466,14 +466,14 @@ const state={
  token:sessionStorage.getItem(TOKEN_KEY)||'',
  bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,openCameras:null,devices:null,busy:false,view:'core',topic:'regiao',location:null,locating:false,globeZoom:1,clusterCameras:[],
  live:{events:[],observations:[],sources:[],correlations:[],collected_at:null,area:null},
- layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true},
+ layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true,radio_station:true},
  selected:null,
  history:{cpu:[],mem:[],temp:[]}
 };
-const LAYER_OF={satellite:'satellite',aircraft:'aircraft',vessel:'vessel',camera:'camera',port:'port',chokepoint:'chokepoint',infrastructure:'infrastructure',military_site:'military_site'};
-const LABEL_KINDS=new Set(['aircraft','satellite','device','camera','vessel']);
+const LAYER_OF={satellite:'satellite',aircraft:'aircraft',vessel:'vessel',camera:'camera',alpr_camera:'camera',radio_station:'radio_station',port:'port',chokepoint:'chokepoint',datacenter:'infrastructure',dam:'infrastructure',infrastructure:'infrastructure',military_site:'military_site'};
+const LABEL_KINDS=new Set(['aircraft','satellite','device','camera','radio_station','vessel']);
 const EVENT_LAYER={earthquake:'quake',wildfire:'fire',volcano:'fire',seismic:'quake'};
-const COLORS={satellite:'#a5ecff',aircraft:'#54d7ff',vessel:'#ffb45c',quake:'#ff8f7a',fire:'#ffb347',event:'#8be3ff',camera:'#7ef0c8',port:'#ffd479',chokepoint:'#ff9f6e',infrastructure:'#c8b6ff',military_site:'#ff8fb1'};
+const COLORS={satellite:'#a5ecff',aircraft:'#54d7ff',vessel:'#ffb45c',quake:'#ff8f7a',fire:'#ffb347',event:'#8be3ff',camera:'#7ef0c8',radio_station:'#e8a6ff',port:'#ffd479',chokepoint:'#ff9f6e',infrastructure:'#c8b6ff',military_site:'#ff8fb1'};
 
 /* ---------------- API ---------------- */
 async function api(path,opts){
@@ -1111,7 +1111,12 @@ const Globe=(()=>{
    const name=attrs.callsign||attrs.name||attrs.group||o.entity_id;
    const observed=new Date(o.observed_at||0).getTime();
    const at=Number.isFinite(observed)&&observed>0?now-Math.min(11000,Math.max(0,now-observed)):now-11000;
-   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),live:o.entity_type==='camera'?{url:attrs.stream_url,type:attrs.stream_type}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
+   const streamable=['camera','radio_station'].includes(o.entity_type);
+   const gevSnapshot=o.entity_type==='camera'&&o.source_id==='gods_eye_view'&&!attrs.stream_url
+    ?new URL('/api/intelligence/gods-eye/cameras/'+encodeURIComponent(o.entity_id)+'/snapshot',location.origin).href:null;
+   const mediaUrl=attrs.stream_url||gevSnapshot;
+   const mediaType=gevSnapshot?'snapshot-api':attrs.stream_type;
+   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),live:streamable&&mediaUrl?{url:mediaUrl,type:mediaType}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
   }
   area=(payload&&payload.area)||null;
   setDeviceData((payload&&payload.devices)||[],false);
@@ -1480,31 +1485,52 @@ function liveInfo(mark){
  const raw=mark&&mark.live&&mark.live.url?mark.live.url:(attrs.stream_url||record.stream_url||record.url||'');
  const url=safeCamUrl(raw);
  if(!url)return null;
- if(!(mark.kind==='camera'||record.entity_type==='camera'||mark.live))return null;
+ const streamable=['camera','radio_station'].includes(record.entity_type)||mark.kind==='camera'||Boolean(mark.live);
+ if(!streamable)return null;
  const declared=String((mark.live&&mark.live.type)||attrs.stream_type||record.stream_type||'').toLowerCase();
  let type=declared;
- if(!['image','video','hls','iframe','mjpeg','snapshot'].includes(type)){
+ if(!['image','video','hls','iframe','mjpeg','snapshot','audio','snapshot-api'].includes(type)){
   if(/\.m3u8(\?|$)/i.test(url))type='hls';
   else if(/\.(mp4|webm)(\?|$)/i.test(url))type='video';
   else if(/\.(mjpe?g|jpe?g|png)(\?|$)/i.test(url))type='image';
   else type='iframe';
  }
  if(type==='mjpeg'||type==='snapshot')type='image';
- if(!['image','video','hls','iframe'].includes(type))type='iframe';
+ if(!['image','video','hls','iframe','audio','snapshot-api'].includes(type))type='iframe';
  return {url,type,label:mark.label||attrs.name||record.label||'CÂMERA',source:attrs.source||record.source_id||record.source||'FONTE'};
 }
-function openLiveCamera(info){
+function openLiveMedia(info){
  const url=info&&safeCamUrl(info.url);
  if(!url){setFooter('AO VIVO · URL INDISPONÍVEL');return;}
  stopLiveTimer();
  const label=String(info.label||'CÂMERA').toUpperCase();
  const source=$('liveSource');
  source.href=url;
- source.hidden=false;
- $('liveTitle').textContent=label+' · AO VIVO';
- $('liveFoot').textContent=String(info.source||'FONTE').toUpperCase()+' · '+(info.type==='image'?'SNAPSHOT ATUALIZADO':'TRANSMISSÃO');
+ source.hidden=info.type==='snapshot-api';
+ $('liveTitle').textContent=label+(info.type==='snapshot-api'?' · SNAPSHOT':' · AO VIVO');
+ $('liveFoot').textContent=String(info.source||'FONTE').toUpperCase()+' · '+(info.type==='snapshot-api'?'CONSULTANDO QUADRO':info.type==='image'?'SNAPSHOT ATUALIZADO':info.type==='audio'?'STREAM DE ÁUDIO':'TRANSMISSÃO');
  const body=$('liveBody');
- if(info.type==='image'){
+ if(info.type==='snapshot-api'){
+  body.innerHTML='<img alt="'+esc(label)+'">';
+  const refreshSnapshot=async()=>{
+   try{
+    const snapshot=await api(new URL(url).pathname);
+    if(!snapshot.success||!snapshot.image_base64)throw new Error('Snapshot sem imagem.');
+    const image=body.querySelector('img');
+    if(!image)return;
+    image.src='data:'+snapshot.mime_type+';base64,'+snapshot.image_base64;
+    const frameState=snapshot.current_view===true?'QUADRO ATUAL':snapshot.current_view===false?'IMAGEM HISTÓRICA':'ORIGEM NÃO CONFIRMADA';
+    const credit=snapshot.credit?' · '+snapshot.credit:'';
+    $('liveFoot').textContent=String(snapshot.provider||info.source||'GEV').toUpperCase()+' · '+frameState+credit;
+   }catch(error){
+    const image=body.querySelector('img');
+    if(image)image.alt='Snapshot indisponível: '+String(error.message||error);
+    $('liveFoot').textContent='GEV · SNAPSHOT INDISPONÍVEL';
+   }
+  };
+  refreshSnapshot();
+  liveTimer=setInterval(refreshSnapshot,15000);
+ }else if(info.type==='image'){
   body.innerHTML='<img alt="'+esc(label)+'" src="'+esc(url)+'">';
   liveTimer=setInterval(()=>{
    const img=body.querySelector('img');
@@ -1515,6 +1541,8 @@ function openLiveCamera(info){
   },5000);
  }else if(info.type==='video'||info.type==='hls'){
   body.innerHTML='<video controls autoplay muted playsinline src="'+esc(url)+'"></video>';
+ }else if(info.type==='audio'){
+  body.innerHTML='<audio controls autoplay src="'+esc(url)+'" style="width:100%"></audio>';
  }else{
   body.innerHTML='<iframe title="'+esc(label)+'" src="'+esc(url)+'" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="no-referrer"></iframe>';
  }
@@ -1898,7 +1926,7 @@ function renderSelection(mark){
  const liveButton=$('selectionLive');
  if(liveButton){
   liveButton.hidden=!live;
-  liveButton.textContent=live&&live.type==='image'?'SNAPSHOT':'AO VIVO';
+  liveButton.textContent=live&&live.type==='image'?'SNAPSHOT':live&&live.type==='snapshot-api'?'VER QUADRO':live&&live.type==='audio'?'OUVIR':'AO VIVO';
  }
  $('selectionAction').textContent=(isCluster||mark.kind==='device_cluster')?'APROXIMAR':(mark.copyValue?'COPIAR':'CENTRALIZAR');
  $('selectionAction').disabled=!mark.copyValue&&!(latitude!=null&&longitude!=null&&Number.isFinite(Number(latitude))&&Number.isFinite(Number(longitude)));
@@ -2276,13 +2304,13 @@ function wire(){
   selectNetworkItem(target.getAttribute('data-network-kind'),Number(target.getAttribute('data-network-index')));
  });
  $('selectionClose').addEventListener('click',()=>renderSelection(null));
- $('selectionLive').addEventListener('click',()=>{const info=liveInfo(state.selected);if(info)openLiveCamera(info);});
+ $('selectionLive').addEventListener('click',()=>{const info=liveInfo(state.selected);if(info)openLiveMedia(info);});
  $('selectionFacts').addEventListener('click',ev=>{
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-cluster-camera]'):null;
   if(!target)return;
   const camera=(state.clusterCameras||[])[Number(target.getAttribute('data-cluster-camera'))];
   const info=camera?liveInfo(camera):null;
-  if(info)openLiveCamera(info);
+  if(info)openLiveMedia(info);
  });
  $('liveWindow').addEventListener('click',ev=>{if(ev.target===$('liveWindow'))closeWindow('liveWindow');});
  $('selectionAction').addEventListener('click',()=>{
@@ -2337,7 +2365,7 @@ function wire(){
    if(item){
     const attrs=item.attributes||{};
     const info=liveInfo({kind:'camera',label:attrs.name||item.entity_id,record:item,live:{url:attrs.stream_url,type:attrs.stream_type}});
-    if(info)openLiveCamera(info);
+    if(info)openLiveMedia(info);
    }
    return;
   }
