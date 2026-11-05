@@ -1259,13 +1259,17 @@ function renderDevices(){
  }
  $('deviceList').innerHTML=devices.map(device=>{
   const coords=device.located?num(device.latitude).toFixed(2)+', '+num(device.longitude).toFixed(2):'sem posição';
-  const body='<div class="grow"><b>'+esc(device.name)+'</b><small>'+esc(String(device.type||'dispositivo')+' · '+coords+' · '+String(device.status||'offline'))+'</small></div><span class="pill '+(device.status==='online'?'':'idle')+'">'+(device.located?'NO MAPA':'SEM GPS')+'</span>';
+  const detail=[device.type||'dispositivo',device.status||'offline',device.last_ip,device.source||'registro',coords].filter(Boolean).join(' · ');
+  const badge=device.status==='online'?'ONLINE':device.status==='observed'?'OBSERVADO':String(device.status||'OFFLINE').toUpperCase();
+  const body='<div class="grow"><b>'+esc(device.name)+'</b><small>'+esc(detail)+'</small></div><span class="pill '+(device.status==='online'?'':device.status==='observed'?'warn':'idle')+'">'+esc(badge)+'</span>';
   return true
    ?'<button type="button" class="row device" data-device="'+esc(device.id)+'">'+body+'</button>'
    :'<div class="row device">'+body+'</div>';
- }).join('')+'<div class="tele-foot"><span>REGISTRO LOCAL</span><span>'+esc(num(data.located))+'/'+esc(num(data.total))+' COM POSIÇÃO</span></div>';
+ }).join('')+'<div class="tele-foot"><span>INVENTÁRIO HÍBRIDO · '+esc(num(data.registered_total??data.total))+' CADASTRADOS</span><span>'+esc(num(data.discovered_total))+' DESCOBERTOS · '+esc(data.network&&data.network.timestamp?hhmm(data.network.timestamp):'SEM SINAL DE REDE')+'</span></div>';
 }
 async function refreshDevices(){
+ if(state.refreshingDevices)return;
+ state.refreshingDevices=true;
  try{
   state.devices=await api('/api/devices');
   renderDevices();
@@ -1273,6 +1277,8 @@ async function refreshDevices(){
   refreshGlobe();
  }catch(err){
   $('deviceList').innerHTML='<div class="empty">'+esc(err.message)+'</div>';
+ }finally{
+  state.refreshingDevices=false;
  }
 }
 function intelStateLabel(value){
@@ -1410,6 +1416,9 @@ function renderSelection(mark){
  addFact('DESTINO',attributes.destination);
  addFact('ORIGEM',attributes.origin);
  addFact('STATUS',record.status||attributes.status);
+ addFact('IP',record.last_ip);
+ addFact('MAC',record.mac);
+ addFact('ORIGEM',record.source);
  Object.entries(attributes).filter(([key,value])=>!['description','summary','callsign','name','altitude_m','speed_kts','speed_kmh','destination','origin','status'].includes(key)&&value!=null&&['string','number','boolean'].includes(typeof value)).slice(0,4).forEach(([key,value])=>addFact(key.replaceAll('_',' ').toUpperCase(),value));
  $('selectionFacts').innerHTML=facts.join('');
  const source=$('selectionSource');
@@ -1669,7 +1678,7 @@ function setView(view){
  });
  if(view==='orbital')Globe.focusArea();
  if(view==='devices'){
-  if(!state.devices)refreshDevices();
+  refreshDevices();
   const anchor=deviceAnchor();
   if(anchor)Globe.focusTo(anchor.latitude,anchor.longitude,anchor.zoom);
  }
@@ -1678,7 +1687,7 @@ function setView(view){
  if(view==='events')renderEvents();
  if(view==='sources')renderSources();
  if(view==='orbital')renderOrbital();
- if(view==='devices'&&!state.devices)refreshDevices();
+
 }
 function openWindow(id){const el=$(id);if(el)el.classList.add('show');}
 function closeWindow(id){const el=$(id);if(el)el.classList.remove('show');if(id==='cameraWindow')stopCameraTimer();}
@@ -1852,7 +1861,7 @@ function startPolling(){
  setInterval(()=>{if(state.token)refreshLatest().catch(()=>{});},20000);
  setInterval(()=>{if(state.token)refreshNetwork().catch(()=>{});},30000);
  setInterval(()=>{if(state.token)refreshBriefing();},600000);
- setInterval(()=>{if(state.token)refreshDevices().catch(()=>{});},60000);
+ setInterval(()=>{if(state.token)refreshDevices().catch(()=>{});},30000);
  setInterval(()=>{if(state.token)bootstrap();},30000);
 }
 function tickClock(){$('clock').textContent=clockTime();}
