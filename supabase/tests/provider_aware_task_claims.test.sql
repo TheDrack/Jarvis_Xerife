@@ -77,9 +77,7 @@ insert into public.jarvis_agents (
     ('pgtap-queue-unknown', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'unknown', now()),
     ('pgtap-queue-venice', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'VENICE', now()),
     ('pgtap-parent-venice', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'venice', now()),
-    ('pgtap-tools-venice', 'pgtap', 'ci', '["read"]'::jsonb, 'available', 0, 2, 'venice', now()),
-    ('pgtap-stale-venice', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'venice', now() - interval '1 hour'),
-    ('pgtap-null-heartbeat', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'venice', null);
+    ('pgtap-tools-venice', 'pgtap', 'ci', '["read"]'::jsonb, 'available', 0, 2, 'venice', now());
 
 insert into public.jarvis_agent_tasks (
     task_id, objective, task_type, required_tools, status, leader_id,
@@ -104,12 +102,6 @@ insert into public.jarvis_agent_tasks (
     array['write'], 'ready', 'pgtap', 'pgtap-tools-venice', 100
 );
 
-insert into public.jarvis_agent_tasks (
-    task_id, objective, task_type, required_tools, status, leader_id,
-    assigned_agent_id, priority
-) values
-    ('pgtap-stale-heartbeat-task', 'stale heartbeat guard test', 'general', '{}', 'ready', 'pgtap', 'pgtap-stale-venice', 100),
-    ('pgtap-null-heartbeat-task', 'missing heartbeat guard test', 'general', '{}', 'ready', 'pgtap', 'pgtap-null-heartbeat', 100);
 
 select is(
     (select count(*)::integer from public.claim_jarvis_agent_task(
@@ -173,6 +165,20 @@ select is(
     0,
     'queue rejects tasks whose required tools are unavailable'
 );
+insert into public.jarvis_agents (
+    agent_id, runtime_version, environment, available_tools, status,
+    active_tasks, concurrency_limit, model_provider, last_seen_at
+) values
+    ('pgtap-stale-venice', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'venice', now() - interval '1 hour'),
+    ('pgtap-null-heartbeat', 'pgtap', 'ci', '[]'::jsonb, 'available', 0, 2, 'venice', null);
+
+insert into public.jarvis_agent_tasks (
+    task_id, objective, task_type, required_tools, status, leader_id,
+    assigned_agent_id, priority
+) values
+    ('pgtap-stale-heartbeat-task', 'stale heartbeat guard test', 'general', '{}', 'ready', 'pgtap', 'pgtap-stale-venice', 100),
+    ('pgtap-null-heartbeat-task', 'missing heartbeat guard test', 'general', '{}', 'ready', 'pgtap', 'pgtap-null-heartbeat', 100);
+
 select ok(
     (select count(*)::integer from public.claim_next_jarvis_agent_task('pgtap-stale-venice', 60)) = 0
     and (select status = 'offline' from public.jarvis_agents where agent_id = 'pgtap-stale-venice')
