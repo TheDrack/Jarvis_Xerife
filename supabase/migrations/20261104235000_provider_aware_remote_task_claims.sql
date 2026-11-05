@@ -16,7 +16,7 @@ declare
     v_agent public.jarvis_agents%rowtype;
     v_task public.jarvis_agent_tasks%rowtype;
 begin
-    if p_lease_seconds < 10 or p_lease_seconds > 3600 then
+    if p_lease_seconds is null or p_lease_seconds < 10 or p_lease_seconds > 3600 then
         raise exception 'lease duration must be between 10 and 3600 seconds';
     end if;
 
@@ -112,7 +112,7 @@ begin
     if p_agent_id is null or btrim(p_agent_id) = '' then
         raise exception 'p_agent_id must not be empty';
     end if;
-    if p_lease_seconds < 10 or p_lease_seconds > 3600 then
+    if p_lease_seconds is null or p_lease_seconds < 10 or p_lease_seconds > 3600 then
         raise exception 'lease duration must be between 10 and 3600 seconds';
     end if;
 
