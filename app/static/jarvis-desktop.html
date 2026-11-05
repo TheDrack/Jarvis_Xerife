@@ -451,6 +451,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
   <div class="pair-error" id="pairError" role="alert"></div>
  </div>
 </div>
+<script src="/static/jarvis-geospatial-layer.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -723,6 +724,13 @@ const Globe=(()=>{
    ctx.beginPath();ctx.moveTo(sx-s*0.9,sy);ctx.lineTo(sx-s*0.5,sy);ctx.moveTo(sx+s*0.5,sy);ctx.lineTo(sx+s*0.9,sy);ctx.stroke();
    ctx.fillRect(sx-s*0.5,sy-s*0.72,s,s*1.44);
    ctx.beginPath();ctx.arc(sx,sy-s*1.15,s*0.36,0,TAU);ctx.fill();
+  }else if(m.kind==='device_cluster'){
+   const count=Math.max(1,num(m.count));
+   const radius=Math.min(s*4.2,s*2.1+Math.log2(count+1)*1.5);
+   ctx.beginPath();ctx.arc(sx,sy,radius,0,TAU);ctx.fill();
+   ctx.strokeStyle='rgba(255,180,92,.95)';ctx.lineWidth=1.2;ctx.stroke();
+   ctx.fillStyle='#061522';ctx.font='600 '+Math.max(8,Math.min(11,radius*1.25))+'px "Cascadia Mono",ui-monospace,monospace';
+   ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(count),sx,sy+0.3);
   }else if(m.kind==='device'){
    ctx.lineWidth=1.3;
    ctx.beginPath();
@@ -804,6 +812,10 @@ const Globe=(()=>{
   const threshold=Math.max(14,44/zoom);
   const clusters=[],cells=new Map();
   for(const item of visible){
+   if(item.m.kind==='device'||item.m.kind==='device_cluster'){
+    clusters.push({x:item.sx,y:item.sy,sumX:item.sx,sumY:item.sy,items:[item],color:item.color});
+    continue;
+   }
    const gx=Math.floor(item.sx/threshold),gy=Math.floor(item.sy/threshold);
    let target=null,best=threshold;
    for(let dx=-1;dx<=1&&!target;dx+=1){
@@ -1101,21 +1113,30 @@ const Globe=(()=>{
    const at=Number.isFinite(observed)&&observed>0?now-Math.min(11000,Math.max(0,now-observed)):now-11000;
    marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),live:o.entity_type==='camera'?{url:attrs.stream_url,type:attrs.stream_type}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
   }
-  for(const d of (payload&&payload.devices)||[]){
-   if(!d||!d.located)continue;
-   const v=sph(num(d.longitude),num(d.latitude));
-   marks.push({
-    x:v[0],y:v[1],z:v[2],longitude:num(d.longitude),latitude:num(d.latitude),kind:'device',record:d,
-    color:d.status==='online'?'#ffb45c':'#6d97ae',
-    label:String(d.name||('dispositivo '+d.id)),
-    place:placeText(d,{},d.latitude,d.longitude),
-    meta:String((d.type||'dispositivo')+' · '+(d.status||'offline')),
-    device:d,at:0
-   });
-  }
   area=(payload&&payload.area)||null;
+  setDeviceData((payload&&payload.devices)||[],false);
   draw(performance.now());
   enrichPlaces();
+ }
+ function setDeviceData(devices,redraw=true){
+  marks=marks.filter(mark=>mark.kind!=='device'&&mark.kind!=='device_cluster');
+  const build=window.JarvisGeospatialLayer&&window.JarvisGeospatialLayer.buildDeviceMarkers;
+  if(typeof build!=='function')return;
+  for(const device of build(devices,zoom)){
+   const latitude=num(device.latitude),longitude=num(device.longitude);
+   const v=sph(longitude,latitude);
+   const cluster=device.kind==='device_cluster';
+   marks.push({
+    x:v[0],y:v[1],z:v[2],longitude,latitude,kind:device.kind,record:device,
+    color:cluster?'#ffc16f':device.status==='online'?'#ffb45c':'#6d97ae',
+    label:String(device.name||('dispositivo '+device.id)),
+    place:placeText(device,{},latitude,longitude),
+    meta:cluster?(device.count+' dispositivos · '+device.online_count+' online'):
+     String((device.type||'dispositivo')+' · '+(device.status||'offline')),
+    device,at:0
+   });
+  }
+  if(redraw)draw(performance.now());
  }
  function reset(){
   target=null;zoom=1;tilt=0.34;
@@ -1201,7 +1222,7 @@ const Globe=(()=>{
   }
  }
  function init(){loadPlaceCache();bind();resize();loadLand();requestAnimationFrame(loop);}
- return {init,setData,reset,focusArea,focusTo,zoomBy,placeFor,onSelect:fn=>{hook=fn;},onZoom:fn=>{zoomHook=fn;}};
+ return {init,setData,setDeviceData,getZoom:()=>zoom,reset,focusArea,focusTo,zoomBy,placeFor,onSelect:fn=>{hook=fn;},onZoom:fn=>{zoomHook=fn;}};
 })();
 
 /* ---------------- Panels ---------------- */
@@ -1818,7 +1839,9 @@ function renderSelection(mark){
  const longitude=mark.longitude??(record.location||record.position||{}).longitude;
  const coords=latitude!=null&&longitude!=null&&Number.isFinite(Number(latitude))&&Number.isFinite(Number(longitude))
   ?Number(latitude).toFixed(3)+', '+Number(longitude).toFixed(3):'posição não informada';
- const summary=record.summary||record.description||attributes.description||attributes.summary||'Sem resumo adicional fornecido pela fonte.';
+ const summary=mark.kind==='device_cluster'
+  ?'Agrupamento visual de ativos registrados. A posição representa o centro aproximado do grupo; não indica um único dispositivo.'
+  :record.summary||record.description||attributes.description||attributes.summary||'Sem resumo adicional fornecido pela fonte.';
  const cachedPlace=isCluster?null:(Globe.placeFor?Globe.placeFor(latitude,longitude):null);
  const placeLabel=cachedPlace&&cachedPlace.label?cachedPlace.label:mark.place;
  $('selectionKind').textContent=kind;
@@ -1854,6 +1877,15 @@ function renderSelection(mark){
  addFact('LOCAL',record.place_label||(record.place?[record.place.city,record.place.state,record.place.country].filter(Boolean).join(' · '):null));
  addFact('ENDEREÇO',cachedPlace&&cachedPlace.address?cachedPlace.address:(mark.address||record.address||attributes.address||attributes.display_name));
  addFact('POSIÇÃO',record.location_source==='ip'?'APROXIMADA POR IP':record.location_source==='gps'?'GPS DO DISPOSITIVO':null);
+ if(mark.kind==='device_cluster'){
+  addFact('DISPOSITIVOS',record.count);
+  addFact('ONLINE',record.online_count);
+  addFact('OFFLINE / OUTROS',record.offline_count);
+  (record.assets||[]).slice(0,8).forEach((asset,index)=>{
+   addFact('ATIVO '+(index+1),[asset.name||('ID '+asset.id),asset.status||'sem status',asset.last_ip||'IP não informado'].join(' · '));
+  });
+  if((record.assets_total||0)>(record.assets||[]).length)addFact('DEMAIS ATIVOS',((record.assets_total||0)-(record.assets||[]).length)+' não exibidos');
+ }
  addFact('MAGNITUDE',record.magnitude!=null?'M'+num(record.magnitude).toFixed(1):null);
  addFact('RAIO ESTIMADO',record.affected?num(record.affected.felt_radius_km)+' KM (ESTIMATIVA)':null);
  Object.entries(attributes).filter(([key,value])=>!['description','summary','callsign','name','altitude_m','speed_kts','speed_kmh','destination','origin','status'].includes(key)&&value!=null&&['string','number','boolean'].includes(typeof value)).slice(0,4).forEach(([key,value])=>addFact(key.replaceAll('_',' ').toUpperCase(),value));
@@ -1868,7 +1900,7 @@ function renderSelection(mark){
   liveButton.hidden=!live;
   liveButton.textContent=live&&live.type==='image'?'SNAPSHOT':'AO VIVO';
  }
- $('selectionAction').textContent=isCluster?'APROXIMAR':(mark.copyValue?'COPIAR':'CENTRALIZAR');
+ $('selectionAction').textContent=(isCluster||mark.kind==='device_cluster')?'APROXIMAR':(mark.copyValue?'COPIAR':'CENTRALIZAR');
  $('selectionAction').disabled=!mark.copyValue&&!(latitude!=null&&longitude!=null&&Number.isFinite(Number(latitude))&&Number.isFinite(Number(longitude)));
  inspector.hidden=false;
 }
@@ -2201,7 +2233,16 @@ function wire(){
    refreshGlobe();
   });
  });
- Globe.onZoom(value=>{state.globeZoom=value;$('zoomLevel').textContent=Math.round(value*100)+'%';});
+ let deviceLayerTimer=null;
+ Globe.onZoom(value=>{
+  state.globeZoom=value;
+  $('zoomLevel').textContent=Math.round(value*100)+'%';
+  if(deviceLayerTimer!==null)clearTimeout(deviceLayerTimer);
+  deviceLayerTimer=setTimeout(()=>{
+   deviceLayerTimer=null;
+   Globe.setDeviceData(locatedDevices());
+  },450);
+ });
  $('zoomIn').addEventListener('click',()=>Globe.zoomBy(1.15));
  $('zoomOut').addEventListener('click',()=>Globe.zoomBy(1/1.15));
  $('zoomReset').addEventListener('click',()=>Globe.reset());
@@ -2330,7 +2371,17 @@ function wire(){
   }
  });
  window.addEventListener('pywebviewready',()=>{nativeFullscreen=false;syncFullscreenControl(false);});
- Globe.onSelect(mark=>{state.selected=mark;renderSelection(mark);renderStatus();});
+ Globe.onSelect(mark=>{
+  state.selected=mark;
+  renderSelection(mark);
+  renderStatus();
+  if(mark.kind==='device_cluster'){
+   const current=Globe.getZoom();
+   const next=current<1.2?1.45:current<1.65?1.75:2.05;
+   Globe.focusTo(mark.latitude,mark.longitude,next);
+   setFooter('AGRUPAMENTO · '+mark.count+' DISPOSITIVOS · APROXIME PARA DETALHAR');
+  }
+ });
 }
 function startPolling(){
  setInterval(()=>{if(state.token)refreshStatus().catch(()=>{});},20000);
