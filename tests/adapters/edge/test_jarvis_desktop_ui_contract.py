@@ -224,3 +224,11 @@ def test_briefing_correlations_require_a_shared_reference_or_exact_headline():
     assert "briefingGroups" in HTML
     assert "item.url?'url:'" in HTML
     assert "CANDIDATA, NÃO PROVA" in HTML
+
+
+def test_device_inventory_refreshes_on_entry_and_periodically():
+    assert "if(view==='devices'){\n  refreshDevices();" in HTML
+    assert "refreshDevices().catch(()=>{});},30000);" in HTML
+    assert "data.registered_total??data.total" in HTML
+    assert "data.discovered_total" in HTML
+    assert "device.source||'registro'" in HTML

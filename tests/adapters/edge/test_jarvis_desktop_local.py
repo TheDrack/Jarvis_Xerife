@@ -454,18 +454,21 @@ def test_local_intelligence_config_loads_only_allowlisted_values(tmp_path, monke
         "JARVIS_GEV_MCP_ENTRYPOINT=C:\\tools\\gods-eye\\server\\mcp\\stdio.js\n"
         "JARVIS_GEV_AREA_WEST=-49.0\n"
         "JARVIS_OSIRIS_ENABLED=false\n"
+        "JARVIS_DEVICES_DB=C:\\data\\jarvis.db\n"
         "SUPABASE_SERVICE_ROLE_KEY=must-not-load\n",
         encoding="utf-8",
     )
     monkeypatch.delenv("JARVIS_GEV_MCP_ENTRYPOINT", raising=False)
     monkeypatch.delenv("JARVIS_GEV_AREA_WEST", raising=False)
     monkeypatch.delenv("JARVIS_OSIRIS_ENABLED", raising=False)
+    monkeypatch.delenv("JARVIS_DEVICES_DB", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
 
     loaded = _load_local_intelligence_config(config)
 
-    assert loaded == 3
+    assert loaded == 4
     assert os.environ["JARVIS_GEV_MCP_ENTRYPOINT"].endswith("stdio.js")
+    assert os.environ["JARVIS_DEVICES_DB"] == r"C:\data\jarvis.db"
     assert os.environ["JARVIS_GEV_AREA_WEST"] == "-49.0"
     assert os.environ["JARVIS_OSIRIS_ENABLED"] == "false"
     assert "SUPABASE_SERVICE_ROLE_KEY" not in os.environ
@@ -687,6 +690,17 @@ def test_devices_endpoint_requires_token_and_plots_registered_nodes(monkeypatch,
     finally:
         connection.close()
     monkeypatch.setenv("JARVIS_DEVICES_DB", str(database))
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+    monkeypatch.setattr(
+        desktop_local,
+        "_network_device_snapshot",
+        lambda _clients=None: {
+            "success": False, "interfaces": [], "neighbors": [],
+            "tailscale": {"available": False, "peers": []},
+            "android_adb": {"available": False, "devices": []},
+            "clients": [], "timestamp": None,
+        },
+    )
 
     runtime = LocalRuntime()
     client = _client(runtime)
@@ -982,3 +996,89 @@ def test_adb_snapshot_suppresses_windows_console_window(monkeypatch):
     desktop_local._adb_snapshot()
 
     assert seen["creationflags"] == desktop_local.subprocess.CREATE_NO_WINDOW
+
+
+def test_devices_endpoint_merges_registered_nodes_with_live_network_discovery(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setattr(
+        desktop_local,
+        "build_device_registry",
+        lambda _clients=None: {
+            "success": True, "available": True, "devices": [
+                {"id": 7, "name": "Aperture", "type": "server", "status": "offline",
+                 "last_ip": "100.115.33.101", "located": False,
+                 "latitude": None, "longitude": None}
+            ],
+            "total": 1, "located": 0,
+        },
+    )
+    monkeypatch.setattr(
+        desktop_local,
+        "_network_device_snapshot",
+        lambda _clients=None: {
+            "success": True,
+            "interfaces": [],
+            "neighbors": [{"ip": "10.0.0.38", "mac": "aa:bb:cc:dd:ee:ff"}],
+            "tailscale": {
+                "available": True, "status": "ready",
+                "self": {"hostname": "desktop", "addresses": ["100.114.218.33"]},
+                "peers": [{
+                    "hostname": "aperture", "os": "linux",
+                    "addresses": ["100.115.33.101"], "online": True,
+                    "last_seen": "2026-11-05T08:00:00Z",
+                }],
+            },
+            "android_adb": {"available": True, "devices": [
+                {"serial": "R58M123", "state": "device"}
+            ]},
+            "clients": [], "timestamp": "2026-11-05T08:00:00Z",
+        },
+    )
+
+    runtime = LocalRuntime()
+    response = _client(runtime).get(
+        "/api/devices",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    registered = next(item for item in payload["devices"] if item["id"] == 7)
+    assert registered["status"] == "online"
+    assert registered["name"] == "aperture"
+    assert registered["source"] == "tailscale"
+    assert any(item["source"] == "arp_cache" and item["last_ip"] == "10.0.0.38" for item in payload["devices"])
+    assert any(item["source"] == "adb" and item["name"] == "R58M123" for item in payload["devices"])
+    assert payload["registered_total"] == 1
+    assert payload["discovered_total"] == 3
+
+
+def test_devices_endpoint_keeps_registry_available_when_network_discovery_fails(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setattr(
+        desktop_local,
+        "build_device_registry",
+        lambda: {"success": True, "available": True, "devices": [
+            {"id": 3, "name": "Phone", "type": "mobile", "status": "online",
+             "last_ip": "192.168.1.20", "located": False}
+        ], "total": 1, "located": 0},
+    )
+    monkeypatch.setattr(
+        desktop_local, "_network_device_snapshot",
+        lambda _clients=None: {"success": False, "interfaces": [], "neighbors": [],
+                 "tailscale": {"available": False, "peers": []},
+                 "android_adb": {"available": False, "devices": []},
+                 "clients": [], "timestamp": None},
+    )
+    runtime = LocalRuntime()
+    response = _client(runtime).get(
+        "/api/devices",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["available"] is True
+    assert payload["total"] == 1
+    assert payload["devices"][0]["name"] == "Phone"
