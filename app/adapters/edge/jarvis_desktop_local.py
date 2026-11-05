@@ -399,13 +399,24 @@ def _network_device_snapshot(clients: list[dict[str, Any]] | None = None) -> dic
             network = ipaddress.ip_network(cidr, strict=False)
         except ValueError:
             continue
-        if isinstance(network, ipaddress.IPv4Network) and network.is_private and network.prefixlen >= 24:
-            if str(network) not in scopes:
-                scopes.append(str(network))
-                snapshot = discover_devices(str(network))
-                for device in snapshot.get("devices", []):
-                    if device.get("ip"):
-                        neighbours[device["ip"]] = device
+        if (
+            not isinstance(network, ipaddress.IPv4Network)
+            or interface.get("scope") != "private"
+            or network.prefixlen < 24
+        ):
+            continue
+        scope = str(network)
+        if scope in scopes:
+            continue
+        try:
+            snapshot = discover_devices(scope)
+        except ValueError:
+            # Keep the inventory available if interface metadata is stale or inconsistent.
+            continue
+        scopes.append(scope)
+        for device in snapshot.get("devices", []):
+            if device.get("ip"):
+                neighbours[device["ip"]] = device
     return {
         "success": bool(interfaces_result.get("success")),
         "interfaces": interfaces,
