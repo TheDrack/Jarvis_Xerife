@@ -1,7 +1,7 @@
 -- Regression tests for provider-aware multi-agent task claims.
 -- This file is executed only against an isolated local Supabase database.
 begin;
-select plan(23);
+select plan(25);
 
 select ok(
     position('lower(replace(replace(v_task.task_type' in
@@ -17,6 +17,14 @@ select ok(
         pg_get_functiondef('public.claim_next_jarvis_agent_task(text,integer)'::regprocedure)) > 0,
     'queue claims filter Red/Blue tasks by the agent provider'
 );
+select ok(
+    position('last_seen_at' in
+        pg_get_functiondef('public.claim_jarvis_agent_task(text,text,integer)'::regprocedure)) > 0
+    and position('v_heartbeat_timeout' in
+        pg_get_functiondef('public.claim_jarvis_agent_task(text,text,integer)'::regprocedure)) > 0,
+    'direct claims reject agents with stale or missing heartbeats'
+);
+
 select ok(
     position('mark_stale_jarvis_agents_offline' in
         pg_get_functiondef('public.claim_next_jarvis_agent_task(text,integer)'::regprocedure)) > 0
@@ -178,6 +186,18 @@ insert into public.jarvis_agent_tasks (
 ) values
     ('pgtap-stale-heartbeat-task', 'stale heartbeat guard test', 'general', '{}', 'ready', 'pgtap', 'pgtap-stale-venice', 100),
     ('pgtap-null-heartbeat-task', 'missing heartbeat guard test', 'general', '{}', 'ready', 'pgtap', 'pgtap-null-heartbeat', 100);
+
+select ok(
+    (select count(*)::integer from public.claim_jarvis_agent_task(
+        'pgtap-stale-heartbeat-task', 'pgtap-stale-venice', 60)) = 0
+    and (select count(*)::integer from public.claim_jarvis_agent_task(
+        'pgtap-null-heartbeat-task', 'pgtap-null-heartbeat', 60)) = 0
+    and (select status = 'available' from public.jarvis_agents where agent_id = 'pgtap-stale-venice')
+    and (select status = 'available' from public.jarvis_agents where agent_id = 'pgtap-null-heartbeat')
+    and (select status = 'ready' from public.jarvis_agent_tasks where task_id = 'pgtap-stale-heartbeat-task')
+    and (select status = 'ready' from public.jarvis_agent_tasks where task_id = 'pgtap-null-heartbeat-task'),
+    'direct claims reject stale and missing heartbeats without mutating state'
+);
 
 select ok(
     (select count(*)::integer from public.claim_next_jarvis_agent_task('pgtap-stale-venice', 60)) = 0
