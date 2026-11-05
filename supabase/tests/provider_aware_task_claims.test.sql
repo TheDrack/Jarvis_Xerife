@@ -96,11 +96,12 @@ insert into public.jarvis_agent_tasks (
     ('pgtap-queue-unknown-task', 'queue provider guard test', 'blue_team', '{}', 'ready', 'pgtap', 'pgtap-queue-unknown', 100),
     ('pgtap-queue-venice-task', 'queue provider allow test', 'Blue Team', '{}', 'ready', 'pgtap', 'pgtap-queue-venice', 100),
     ('pgtap-parent-task', 'parent dependency fixture', 'general', '{}', 'in_progress', 'pgtap', null, 100),
-    ('pgtap-child-task', 'parent dependency test', 'red_team', '{}', 'ready', 'pgtap', 'pgtap-parent-venice', 100);
+    ('pgtap-child-task', 'queue parent dependency test', 'red_team', '{}', 'ready', 'pgtap', 'pgtap-parent-venice', 100),
+    ('pgtap-direct-child-task', 'direct parent dependency test', 'red_team', '{}', 'ready', 'pgtap', 'pgtap-parent-venice', 101);
 
 update public.jarvis_agent_tasks
    set parent_task_id = 'pgtap-parent-task'
- where task_id = 'pgtap-child-task';
+ where task_id in ('pgtap-child-task', 'pgtap-direct-child-task');
 
 insert into public.jarvis_agent_tasks (
     task_id, objective, task_type, required_tools, status, leader_id,
@@ -156,6 +157,17 @@ select ok(
     'queue claim increments attempts and fencing token exactly once'
 );
 select is(
+    (select count(*)::integer from public.claim_jarvis_agent_task(
+        'pgtap-direct-child-task', 'pgtap-parent-venice', 60)),
+    0,
+    'direct claim rejects a child while its parent is incomplete'
+);
+select ok(
+    (select status = 'ready' from public.jarvis_agent_tasks where task_id = 'pgtap-direct-child-task')
+    and (select active_tasks = 0 from public.jarvis_agents where agent_id = 'pgtap-parent-venice'),
+    'rejected direct child claim leaves task and agent state unchanged'
+);
+select is(
     (select count(*)::integer from public.claim_next_jarvis_agent_task('pgtap-parent-venice', 60)),
     0,
     'queue does not claim a child while its parent is incomplete'
@@ -163,6 +175,12 @@ select is(
 update public.jarvis_agent_tasks
    set status = 'completed'
  where task_id = 'pgtap-parent-task';
+select is(
+    (select count(*)::integer from public.claim_jarvis_agent_task(
+        'pgtap-direct-child-task', 'pgtap-parent-venice', 60)),
+    1,
+    'direct claim accepts a child after its parent is completed'
+);
 select is(
     (select count(*)::integer from public.claim_next_jarvis_agent_task('pgtap-parent-venice', 60)),
     1,

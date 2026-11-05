@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "supabase/migrations/20261104235000_provider_aware_remote_task_claims.sql"
+      - "supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql"
       - "supabase/tests/provider_aware_task_claims.test.sql"
       - ".github/workflows/supabase-provider-claims-tests.yml"
   workflow_dispatch:
@@ -48,6 +49,7 @@ jobs:
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261027120000_agent_model_provider.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261028100000_agent_heartbeat_reconciliation.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261104235000_provider_aware_remote_task_claims.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/tests/provider_aware_task_claims.test.sql" supabase/tests/
 
       - name: Start isolated PostgreSQL
