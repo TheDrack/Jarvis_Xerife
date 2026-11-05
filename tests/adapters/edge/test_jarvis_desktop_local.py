@@ -1254,3 +1254,80 @@ def test_earthquake_enrichment_reports_geocode_failure_instead_of_a_place(monkey
     assert quake["place_reason"] == "timeout"
     assert quake["affected"]["estimate"] is True
 
+def test_network_device_snapshot_skips_non_rfc1918_interfaces(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    calls = []
+    monkeypatch.setattr(
+        desktop_local,
+        "network_interfaces",
+        lambda: {
+            "success": True,
+            "interfaces": [
+                {"network": "169.254.10.0/24", "scope": "link_local"},
+                {"network": "100.64.10.0/24", "scope": "overlay"},
+                {"network": "192.0.2.0/24", "scope": "public"},
+                {"network": "192.168.10.0/24", "scope": "private"},
+            ],
+        },
+    )
+
+    def fake_discover(cidr):
+        calls.append(cidr)
+        if cidr != "192.168.10.0/24":
+            raise ValueError("Somente redes RFC1918 são aceitas.")
+        return {"devices": [{"ip": "192.168.10.25", "mac": "aa:bb:cc:dd:ee:ff"}]}
+
+    monkeypatch.setattr(desktop_local, "discover_devices", fake_discover)
+    monkeypatch.setattr(
+        desktop_local, "_adb_snapshot",
+        lambda: {"available": False, "devices": []},
+    )
+    monkeypatch.setattr(
+        desktop_local, "_tailscale_snapshot",
+        lambda: {"available": False, "peers": []},
+    )
+
+    snapshot = desktop_local._network_device_snapshot()
+
+    assert calls == ["192.168.10.0/24"]
+    assert snapshot["scopes"] == ["192.168.10.0/24"]
+    assert snapshot["neighbors"] == [
+        {"ip": "192.168.10.25", "mac": "aa:bb:cc:dd:ee:ff"}
+    ]
+    assert snapshot["active_probes_sent"] == 0
+
+
+def test_network_device_snapshot_tolerates_adapter_scope_rejection(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setattr(
+        desktop_local,
+        "network_interfaces",
+        lambda: {
+            "success": True,
+            "interfaces": [
+                {"network": "192.168.10.0/24", "scope": "private"},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        desktop_local,
+        "discover_devices",
+        lambda _cidr: (_ for _ in ()).throw(ValueError("scope rejected")),
+    )
+    monkeypatch.setattr(
+        desktop_local, "_adb_snapshot",
+        lambda: {"available": False, "devices": []},
+    )
+    monkeypatch.setattr(
+        desktop_local, "_tailscale_snapshot",
+        lambda: {"available": False, "peers": []},
+    )
+
+    snapshot = desktop_local._network_device_snapshot()
+
+    assert snapshot["scopes"] == []
+    assert snapshot["neighbors"] == []
+    assert snapshot["success"] is True
+
