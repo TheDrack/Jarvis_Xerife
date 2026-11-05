@@ -1,7 +1,7 @@
 -- Regression tests for provider-aware multi-agent task claims.
 -- This file is executed only against an isolated local Supabase database.
 begin;
-select plan(19);
+select plan(21);
 
 select ok(
     position('lower(replace(replace(v_task.task_type' in
@@ -168,6 +168,38 @@ exception
 end
 $lease_test$;
 select pass('claim RPC rejects lease durations outside the supported bounds');
+
+do $direct_null_lease$
+begin
+    perform 1 from public.claim_jarvis_agent_task('missing-task', 'missing-agent', null);
+    raise exception 'test expected the direct claim to reject a NULL lease';
+exception
+    when others then
+        if sqlerrm = 'test expected the direct claim to reject a NULL lease' then
+            raise;
+        end if;
+        if sqlerrm not like 'lease duration must be between 10 and 3600 seconds%' then
+            raise;
+        end if;
+end
+$direct_null_lease$;
+select pass('direct claim rejects an explicit NULL lease duration');
+
+do $queue_null_lease$
+begin
+    perform 1 from public.claim_next_jarvis_agent_task('missing-agent', null);
+    raise exception 'test expected the queue claim to reject a NULL lease';
+exception
+    when others then
+        if sqlerrm = 'test expected the queue claim to reject a NULL lease' then
+            raise;
+        end if;
+        if sqlerrm not like 'lease duration must be between 10 and 3600 seconds%' then
+            raise;
+        end if;
+end
+$queue_null_lease$;
+select pass('queue claim rejects an explicit NULL lease duration');
 
 select * from finish();
 rollback;
