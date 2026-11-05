@@ -255,6 +255,28 @@ class TestEvolutionGatekeeperCoreProtection:
         assert "invalid_modified_path" in reason
         assert "escapes the repository" in reason
 
+    def test_rejects_symlink_loop_fail_closed(self, tmp_path):
+        root = tmp_path / "repo"
+        root.mkdir()
+        loop = root / "loop"
+        try:
+            loop.symlink_to(loop, target_is_directory=True)
+        except (OSError, NotImplementedError) as exc:
+            pytest.skip(f"directory symlinks unavailable: {exc}")
+
+        gk = EvolutionGatekeeper()
+        with patch(
+            "app.application.services.evolution_gatekeeper._repository_root",
+            return_value=root,
+        ):
+            ok, reason = gk._check_core_protection(
+                {"files_modified": ["loop/target.py"]}
+            )
+
+        assert ok is False
+        assert "invalid_modified_path" in reason
+        assert "symlink component cannot be resolved" in reason
+
 
 class TestEvolutionGatekeeperSandboxFailClosed:
     """Propostas de código não podem ser aprovadas sem validação efetiva."""

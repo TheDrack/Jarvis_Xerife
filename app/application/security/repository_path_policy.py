@@ -83,21 +83,29 @@ def resolve_repository_path(
 ) -> tuple[Path, str, str]:
     """Resolve a path and prove it remains inside the resolved repository root.
 
+    Existing symlink components are resolved strictly before the final containment
+    check; dangling links and loops fail closed. When reject_symlinks is true, any
+    symlink component is rejected (used by direct filesystem writes).
+
     Returns (absolute_resolved_path, normalized_lexical_path, resolved_relative_path).
     """
     normalized = normalize_relative_path(relative_path)
     root = Path(repository_root).resolve()
     parts = PurePosixPath(normalized).parts
 
-    if reject_symlinks:
-        current = root
-        for part in parts:
-            current = current / part
-            try:
-                if current.is_symlink():
+    current = root
+    for part in parts:
+        current = current / part
+        try:
+            if current.is_symlink():
+                if reject_symlinks:
                     raise UnsafeRepositoryPath("symlink components are forbidden for writes")
-            except OSError as exc:
-                raise UnsafeRepositoryPath("unable to inspect path component") from exc
+                try:
+                    current.resolve(strict=True)
+                except (OSError, RuntimeError) as exc:
+                    raise UnsafeRepositoryPath("symlink component cannot be resolved") from exc
+        except OSError as exc:
+            raise UnsafeRepositoryPath("unable to inspect path component") from exc
 
     candidate = root.joinpath(*parts)
     try:
