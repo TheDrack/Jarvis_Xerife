@@ -95,6 +95,44 @@ begin
 end;
 $$;
 
+-- Reconcile stale heartbeats before assigning new queue work.
+create or replace function public.mark_stale_jarvis_agents_offline(
+    p_stale_after_seconds integer default 90
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $
+declare
+    v_updated integer := 0;
+begin
+    if p_stale_after_seconds is null
+       or p_stale_after_seconds < 10
+       or p_stale_after_seconds > 3600 then
+        raise exception 'stale heartbeat threshold must be between 10 and 3600 seconds';
+    end if;
+
+    with stale_agents as (
+        select agent_id
+          from public.jarvis_agents
+         where status in ('available', 'busy', 'degraded')
+           and (last_seen_at is null
+                or last_seen_at <= now() - make_interval(secs => p_stale_after_seconds))
+         order by agent_id
+         for update skip locked
+    )
+    update public.jarvis_agents as agents
+       set status = 'offline',
+           updated_at = now()
+      from stale_agents
+     where agents.agent_id = stale_agents.agent_id;
+
+    get diagnostics v_updated = row_count;
+    return v_updated;
+end;
+$;
+
 create or replace function public.claim_next_jarvis_agent_task(
     p_agent_id text,
     p_lease_seconds integer default 90
@@ -108,6 +146,7 @@ declare
     v_task_id text;
     v_claimed public.jarvis_agent_tasks%rowtype;
     v_agent public.jarvis_agents%rowtype;
+    v_heartbeat_timeout integer;
 begin
     if p_agent_id is null or btrim(p_agent_id) = '' then
         raise exception 'p_agent_id must not be empty';
@@ -116,6 +155,10 @@ begin
         raise exception 'lease duration must be between 10 and 3600 seconds';
     end if;
 
+    -- Reconcile stale agents before locking this agent and claiming a task.
+    v_heartbeat_timeout := greatest(90, p_lease_seconds);
+    perform public.mark_stale_jarvis_agents_offline(v_heartbeat_timeout);
+
     -- Keep the established lock order: agent first, then task.
     select * into v_agent
       from public.jarvis_agents
@@ -123,6 +166,8 @@ begin
      for update;
     if not found
        or v_agent.status not in ('available', 'busy')
+       or v_agent.last_seen_at is null
+       or v_agent.last_seen_at <= now() - make_interval(secs => v_heartbeat_timeout)
        or v_agent.active_tasks >= v_agent.concurrency_limit then
         return;
     end if;
@@ -164,7 +209,9 @@ begin
 end;
 $$;
 
--- SECURITY DEFINER claim RPCs are callable only by trusted server workers.
+-- SECURITY DEFINER RPCs are callable only by trusted server workers.
+revoke all on function public.mark_stale_jarvis_agents_offline(integer) from public, anon, authenticated;
+grant execute on function public.mark_stale_jarvis_agents_offline(integer) to service_role;
 revoke all on function public.claim_jarvis_agent_task(text, text, integer) from public, anon, authenticated;
 revoke all on function public.claim_next_jarvis_agent_task(text, integer) from public, anon, authenticated;
 grant execute on function public.claim_jarvis_agent_task(text, text, integer) to service_role;
