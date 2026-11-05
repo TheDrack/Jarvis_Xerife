@@ -16,6 +16,7 @@ Architecture notes:
 
 import json
 import logging
+import ssl
 from typing import Any, Dict, List, Optional
 
 from app.core.nexus import NexusComponent
@@ -60,6 +61,10 @@ class MqttHomeAdapter(NexusComponent):
         client_id: MQTT client identifier (default: ``"jarvis_c2"``).
         dry_run: When ``True`` (default when paho-mqtt is absent), commands
             are logged but not published.
+        tls_enabled: Enable TLS with mandatory broker certificate verification.
+        tls_ca_certs: Optional PEM CA bundle; None uses the system trust store.
+        tls_certfile: Optional PEM client certificate for mutual TLS.
+        tls_keyfile: Private key paired with ``tls_certfile`` for mutual TLS.
     """
 
     def __init__(
@@ -70,7 +75,24 @@ class MqttHomeAdapter(NexusComponent):
         password: Optional[str] = None,
         client_id: str = "jarvis_c2",
         dry_run: bool = False,
+        tls_enabled: bool = False,
+        tls_ca_certs: Optional[str] = None,
+        tls_certfile: Optional[str] = None,
+        tls_keyfile: Optional[str] = None,
     ) -> None:
+        tls_options_provided = any(
+            value is not None for value in (tls_ca_certs, tls_certfile, tls_keyfile)
+        )
+        if not tls_enabled and tls_options_provided:
+            raise ValueError("TLS certificate options require tls_enabled=True.")
+        if (tls_certfile is None) != (tls_keyfile is None):
+            raise ValueError("tls_certfile and tls_keyfile must be provided together.")
+        if tls_enabled and not _MQTT_AVAILABLE and not dry_run:
+            raise RuntimeError(
+                "TLS was requested but paho-mqtt is unavailable. "
+                "Install the edge dependencies or paho-mqtt; refusing a plaintext fallback."
+            )
+
         self._host = host
         self._port = port
         self._client_id = client_id
@@ -83,6 +105,15 @@ class MqttHomeAdapter(NexusComponent):
             self._client = mqtt.Client(client_id=client_id)
             if username:
                 self._client.username_pw_set(username, password)
+            if tls_enabled:
+                # Paho defaults to system CAs when ca_certs is None. Keep
+                # certificate and hostname verification mandatory.
+                self._client.tls_set(
+                    ca_certs=tls_ca_certs,
+                    certfile=tls_certfile,
+                    keyfile=tls_keyfile,
+                    cert_reqs=ssl.CERT_REQUIRED,
+                )
             self._client.on_connect = self._on_connect
             self._client.on_disconnect = self._on_disconnect
 

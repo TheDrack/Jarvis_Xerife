@@ -120,6 +120,7 @@ The table describes integration families in the repository/installation; it does
 
 ## Relevant runbooks
 
+- [MQTT Home Adapter and TLS](../MQTT_HOME_ADAPTER.md)
 - [Context & Memory Protocol](CONTEXT_MEMORY_PROTOCOL.md)
 - [Freebuff Desktop harness install](FREEBUFF_HARNESS.md)
 - [Multi-agent platform and task protocol](../architecture/jarvis-multi-agent-platform.md)
