@@ -45,6 +45,11 @@ globo, briefing ou Universal Intelligence para manter em sincronia. O WebView
 depende de `javaScriptEnabled` e `domStorageEnabled` (token de sessão); não há
 ponte JavaScript exposta ao conteúdo remoto.
 
+A mesma página também lista as câmeras públicas próximas (TfL em Londres e os
+registros oficiais do Datumfeed nos EUA/Canadá), sempre com a atribuição de cada
+fonte, e desenha no globo o raio estimado de cada sismo recente. Câmeras do
+registro local continuam vindo de `cameras.json`.
+
 A página pede `navigator.geolocation` para ancorar clima e manchetes regionais
 nas coordenadas do telefone. O WebView habilita a API via
 `WebSettings.setGeolocationEnabled(true)`, mas concede permissão apenas quando

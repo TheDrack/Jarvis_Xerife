@@ -246,6 +246,24 @@ def _reverse_geocode(client: httpx.Client, latitude: float, longitude: float) ->
     return _cached(key, GEOCODE_TTL_SECONDS, produce)
 
 
+def reverse_place(latitude: Any, longitude: Any) -> dict[str, Any]:
+    """Resolve a coordinate to ``city``/``state``/``country`` with a one-shot client.
+
+    Shared by the briefing and by the read-only device registry so both name a
+    place the same way. A failure returns ``available: False`` plus the reason;
+    no place name is ever guessed.
+    """
+    try:
+        lat = float(latitude)
+        lon = float(longitude)
+    except (TypeError, ValueError):
+        return {"available": False, "reason": "invalid_coordinate"}
+    if not -90.0 <= lat <= 90.0 or not -180.0 <= lon <= 180.0:
+        return {"available": False, "reason": "invalid_coordinate"}
+    with httpx.Client(timeout=12.0, follow_redirects=False) as client:
+        return _reverse_geocode(client, lat, lon)
+
+
 def device_region(
     latitude: Any = None,
     longitude: Any = None,

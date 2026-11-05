@@ -231,4 +231,31 @@ def test_device_inventory_refreshes_on_entry_and_periodically():
     assert "refreshDevices().catch(()=>{});},30000);" in HTML
     assert "data.registered_total??data.total" in HTML
     assert "data.discovered_total" in HTML
-    assert "device.source||'registro'" in HTML
+    assert "device.location_source==='ip'" in HTML
+    assert "device.place_label" in HTML
+
+
+def test_earthquakes_expose_affected_regions_on_the_globe():
+    assert "quakeRings" in HTML
+    assert "function drawQuakeRegions" in HTML
+    assert "drawQuakeRegions(radius,cosR,sinR,cosT,sinT)" in HTML
+    assert "felt_radius_km" in HTML
+    assert "label:'Abalos'" in HTML
+    assert "dynamic==='quake'" in HTML
+    assert "RAIO ESTIMADO" in HTML
+    assert "place_label" in HTML
+
+
+def test_camera_window_lists_public_cameras_with_attribution():
+    assert "api('/api/cameras/open" in HTML
+    assert "function openCamerasHtml(open)" in HTML
+    assert "CÂMERAS PÚBLICAS" in HTML
+    assert "cam.attribution" in HTML
+    assert "cam.license" in HTML
+    assert "if(cam.registry.proxyOk" not in HTML
+
+
+def test_hud_reports_the_served_repository_file():
+    assert "api('/api/hud/version')" in HTML
+    assert 'id="hudBuild"' in HTML
+    assert "HUD servido do repositório" in HTML

@@ -37,7 +37,22 @@ _QUERY_SPECS = {
     "aircraft_in_area": ("aircraft", "area", "id", "last_contact"),
     "vessels_in_area": ("vessel", "area", "mmsi", "observed_at"),
     "satellites_overhead": ("satellite", "location", "norad", None),
+    # Static mapped assets: identity and position come from the provider and
+    # the observation time is the query instant, not an invented event time.
+    "find_cctv_cameras": ("camera", "area", "id", None),
+    "find_infrastructure": ("infrastructure", "area", "name", None),
+    "find_military_installations": ("military_site", "area", "name", None),
 }
+_AREA_TOOLS = frozenset(
+    {
+        "aircraft_in_area",
+        "vessels_in_area",
+        "find_cctv_cameras",
+        "find_infrastructure",
+        "find_military_installations",
+    }
+)
+_STATIC_ENTITY_TYPES = frozenset({"camera", "infrastructure", "military_site"})
 _SATELLITE_GROUPS = ("visual", "gps-ops", "glo-ops", "galileo", "geo", "starlink", "stations")
 
 
@@ -52,6 +67,17 @@ _ATTRIBUTE_KEYS = {
         "heading_deg", "distance_km",
     ),
     "satellite": ("name", "group", "elevation_deg", "azimuth_deg", "direction"),
+    "camera": (
+        "name", "city", "country", "operator", "source", "url", "type",
+        "distance_km",
+    ),
+    "infrastructure": (
+        "name", "kind", "type", "operator", "capacity", "url",
+        "distance_km",
+    ),
+    "military_site": (
+        "name", "kind", "type", "operator", "url", "distance_km",
+    ),
 }
 
 
@@ -198,7 +224,7 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
                 yield session
 
     def _tool_arguments(self, tool_name: str) -> dict[str, Any]:
-        if tool_name in {"aircraft_in_area", "vessels_in_area"}:
+        if tool_name in _AREA_TOOLS:
             return {
                 "area": {
                     "bbox": [
@@ -250,7 +276,12 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
         if not isinstance(row, dict):
             return None
         identity_field = {
-            "aircraft": "id", "vessel": "mmsi", "satellite": "norad"
+            "aircraft": "id",
+            "vessel": "mmsi",
+            "satellite": "norad",
+            "camera": "id",
+            "infrastructure": "name",
+            "military_site": "name",
         }[entity_type]
         entity_id = row.get(identity_field)
         if entity_id is None or not str(entity_id).strip():
@@ -261,6 +292,8 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
         )
         if observed_at is None and entity_type == "aircraft":
             observed_at = _parse_timestamp(data.get("observed_at"))
+        if observed_at is None and entity_type in _STATIC_ENTITY_TYPES:
+            observed_at = datetime.now(timezone.utc)
         if observed_at is None:
             return None
 
@@ -396,5 +429,8 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
                 "intelligence.observations.aircraft",
                 "intelligence.observations.vessels",
                 "intelligence.observations.satellites",
+                "intelligence.observations.cameras",
+                "intelligence.observations.infrastructure",
+                "intelligence.observations.military_sites",
             ],
         }

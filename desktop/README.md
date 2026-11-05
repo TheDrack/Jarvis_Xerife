@@ -82,9 +82,14 @@ access, use the user's approved authenticated private HTTPS route instead.
   JARVIS_OSIRIS_* and JARVIS_GEV_* keys are accepted, and process environment
   variables take precedence. Collection and deterministic deduplication/correlation
   run in the local Python process. Source health and partial failures are returned;
-  no data is fabricated. The GEV vessel query requires AISSTREAM_API_KEY in the
-  God's Eye View server environment; without it, aircraft and satellite observations
-  can still succeed and the source is reported as partially degraded.
+  no data is fabricated. OSIRIS also contributes bounded ADS-B flights, ports,
+  chokepoints and AIS vessels, CelesTrak satellites, public CCTV directory metadata
+  and the GDELT/GDACS feed; camera stream URLs remain references and are never
+  proxied or probed. God's Eye View additionally contributes allowlisted public
+  camera, infrastructure and military-installation assets when its live tool schemas
+  declare them read-only. The GEV vessel query requires AISSTREAM_API_KEY in the
+  God's Eye View server environment; without it, aircraft, satellite and asset
+  observations can still succeed and the source is reported as partially degraded.
 - **Network:** local interfaces and the OS ARP neighbour cache are read on the PC.
   The ARP view sends zero active probes. Tailscale peer state is read from the local CLI,
   so Android online/offline status is visible. Android ADB state is displayed only if
@@ -178,6 +183,56 @@ The dock is split into labelled groups that share one style: INTELIGÊNCIA
 and ENCONTRADO (Disp, Cams — discovered on the network), with the collection orb
 in the middle.
 
+### Devices: GPS, IP and place names
+
+`GET /api/devices` labels where each position came from. A node that reported
+coordinates is `location_source: "gps"` and its coordinate is reverse-geocoded
+to `city`/`state`/`country` (`place_label`, e.g. `Curitiba · Paraná · Brasil`).
+A node without GPS falls back to its last public IP through ipwho.is, marked
+`location_source: "ip"` and `approximate: true` because it points at the ISP's
+city, not the device. Private, loopback, link-local, CGNAT and Tailscale
+addresses are never sent to that service, and a failure is reported as
+`location_reason` instead of a guessed position. Set `JARVIS_IP_GEOLOCATION=off`
+to disable the IP lookup entirely.
+
+### Earthquakes: affected regions
+
+The local core enriches USGS earthquake events with an estimated affected radius
+(`felt_radius_km`, `damage_radius_km`, `method: magnitude_scaling_v1`) and, for
+the first events of each collection, the reverse-geocoded place. It is an
+estimate derived from the magnitude — not a ShakeMap — and the payload says so.
+The globe draws that radius as a translucent ring around the epicentre with the
+magnitude and the place label, the `ABALOS` chip in the area bar focuses the most
+recent one, and the EVENTS list shows `país/estado/cidade · RAIO ~N KM`.
+
+### Public cameras
+
+`GET /api/cameras` is the operator's own allowlist. `GET /api/cameras/open`
+adds public cameras near a coordinate (`lat`, `lon`, `radius_km` up to 500,
+`limit` up to 24), from two providers that permit public reuse:
+
+- **Transport for London JamCams** — keyless, official API, JPEG snapshots.
+- **Datumfeed** — aggregator of official traffic-camera registries (Caltrans,
+  Washington, Austin, Ottawa, Ontario 511, TfL, Toronto). Keyless anonymous tier;
+  `JARVIS_DATUMFEED_KEY` raises the limits. Cameras whose registry forbids
+  proxying are skipped.
+
+Each camera carries `provider`, `attribution`, `license` and, when the provider
+reports them, trust/uptime fields; the HUD prints the attribution next to the
+frame. Coverage is the providers' coverage (London plus US/Canadian registries),
+and the response says so instead of pretending global coverage. Private or
+unsecured cameras are deliberately not supported.
+
+### HUD source and the packaged app
+
+The PowerShell launcher (`scripts/start_jarvis_desktop.ps1`) starts
+`jarvis_desktop_shell`, which serves `app/static/jarvis-desktop.html` straight
+from the repository — there is a single HUD file. `GET /api/hud/version` returns
+its SHA-256, size and modification time, and the footer shows the short hash, so
+you can see which file the running window is actually rendering. A packaged
+`JarvisDesktop.exe` copies `app/static` at build time: rebuild it with
+`scripts/build_jarvis_desktop.ps1` after changing the HUD.
+
 ## HUD on Android
 
 `mobile/android` embeds this same page in a WebView (`HudScreen.kt`), so the
@@ -200,8 +255,9 @@ without a second login. The Intel window of the orbital HUD renders the same
 contract and links to the full dashboard.
 - `GET /api/intelligence/status` — source and pipeline state
 - `POST /api/intelligence/collect` — on-demand public source collection + local synthesis
-- `POST /api/intelligence/osiris` — OSIRIS routes only, with per-route health
-- `POST /api/intelligence/gods-eye` — God's Eye View MCP snapshot only, with entity counts
+- `POST /api/intelligence/osiris` — OSIRIS event and observation routes only, with per-route health
+- `POST /api/intelligence/gods-eye` — God's Eye View MCP snapshot only, with entity counts for
+  aircraft, vessels, satellites, cameras, infrastructure and military sites
 - `GET /api/intelligence/latest` — latest in-memory synthesis
 - `GET /api/network/status` — interfaces, passive ARP cache, ADB and paired clients
 

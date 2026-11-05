@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import ipaddress
 import logging
 import os
@@ -19,8 +20,18 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from app.adapters.edge.jarvis_daily_briefing import build_briefing, build_camera_registry
-from app.adapters.edge.jarvis_device_registry import build_device_registry
+from app.adapters.edge.jarvis_daily_briefing import (
+    build_briefing,
+    build_camera_registry,
+    geocode_enabled,
+    reverse_place,
+)
+from app.adapters.edge.jarvis_device_registry import (
+    build_device_registry,
+    ip_geolocation_enabled,
+    lookup_ip,
+)
+from app.adapters.edge.jarvis_open_cameras import build_open_cameras
 from app.adapters.edge.network_discovery_adapter import discover_devices, network_interfaces
 from app.adapters.infrastructure.routers.intelligence_dashboard import build_intelligence_status
 from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
@@ -44,6 +55,70 @@ _LOCAL_INTELLIGENCE_KEYS = {
     "JARVIS_GEV_AREA_NORTH",
     "JARVIS_DEVICES_DB",
 }
+
+
+EARTHQUAKE_GEOCODE_LIMIT = 6
+
+
+def earthquake_radii(magnitude: Any) -> dict[str, Any] | None:
+    """Estimate how far an earthquake was felt, from its magnitude alone.
+
+    This is a coarse magnitude-to-radius scaling (felt radius grows roughly by a
+    factor of four per magnitude unit), not a ShakeMap: it is returned with
+    ``estimate: True`` and the formula name so the HUD never presents it as a
+    measured contour.
+    """
+    try:
+        value = float(magnitude)
+    except (TypeError, ValueError):
+        return None
+    if value != value or not 0.0 <= value <= 10.0:
+        return None
+    felt = min(4000.0, 10 ** (0.6 * value - 0.8))
+    return {
+        "felt_radius_km": int(round(felt)),
+        "damage_radius_km": int(round(felt / 6.0)),
+        "estimate": True,
+        "method": "magnitude_scaling_v1",
+    }
+
+
+def _enrich_earthquakes(payload: dict[str, Any]) -> dict[str, Any]:
+    """Add place names and an estimated affected radius to earthquake events."""
+    events = payload.get("events")
+    if not isinstance(events, list):
+        return payload
+    geocoded = 0
+    for event in events:
+        if not isinstance(event, dict) or event.get("category") != "earthquake":
+            continue
+        location = event.get("location") if isinstance(event.get("location"), dict) else {}
+        try:
+            latitude = float(location.get("latitude"))
+            longitude = float(location.get("longitude"))
+        except (TypeError, ValueError):
+            continue
+        if not -90.0 <= latitude <= 90.0 or not -180.0 <= longitude <= 180.0:
+            continue
+        event["affected"] = earthquake_radii(event.get("magnitude"))
+        if geocoded >= EARTHQUAKE_GEOCODE_LIMIT or event.get("place"):
+            continue
+        place = reverse_place(latitude, longitude)
+        geocoded += 1
+        if place.get("available"):
+            event["place"] = {
+                "city": place.get("city"),
+                "state": place.get("state"),
+                "country": place.get("country"),
+            }
+            event["place_label"] = " · ".join(
+                str(event["place"][key])
+                for key in ("city", "state", "country")
+                if event["place"].get(key)
+            )
+        else:
+            event["place_reason"] = place.get("reason")
+    return payload
 
 
 def _load_local_intelligence_config(path: Path | None = None) -> int:
@@ -350,7 +425,10 @@ def _network_device_snapshot(clients: list[dict[str, Any]] | None = None) -> dic
 
 def _device_snapshot(clients: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Merge registered devices with current ARP, Tailscale, ADB and paired-client evidence."""
-    registry = build_device_registry()
+    registry = build_device_registry(
+        geocoder=reverse_place if geocode_enabled() else None,
+        ip_lookup=lookup_ip if ip_geolocation_enabled() else None,
+    )
     network = _network_device_snapshot(clients)
     devices = [dict(item) for item in registry.get("devices", [])]
     by_ip = {
@@ -747,6 +825,9 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                     use_cache=False,
                 )
                 osiris_batch = await _run_sync_io_off_loop(osiris.collect_events, 20)
+                osiris_observations = await _run_sync_io_off_loop(
+                    osiris.collect_observations, 20
+                )
             else:
                 osiris_batch = IntelligenceBatch(
                     sources=tuple(
@@ -754,10 +835,13 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                                      error_code="Disabled")
                         for source_id in (
                             "osiris_earthquakes", "osiris_fires",
-                            "osiris_news", "osiris_weather",
+                            "osiris_news", "osiris_weather", "osiris_gdelt",
+                            "osiris_flights", "osiris_maritime",
+                            "osiris_satellites", "osiris_cctv",
                         )
                     )
                 )
+                osiris_observations = IntelligenceBatch()
 
             gev_settings = _gev_settings()
             if gev_settings["area"]:
@@ -783,13 +867,19 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
 
             batch = IntelligenceBatch(
                 events=tuple(public_batch.events) + tuple(osiris_batch.events),
-                observations=tuple(public_batch.observations) + tuple(osiris_batch.observations) + tuple(gev_batch.observations),
-                sources=tuple(public_batch.sources) + tuple(osiris_batch.sources) + tuple(gev_batch.sources),
+                observations=tuple(public_batch.observations)
+                + tuple(osiris_observations.observations)
+                + tuple(gev_batch.observations),
+                sources=tuple(public_batch.sources)
+                + tuple(osiris_batch.sources)
+                + tuple(osiris_observations.sources)
+                + tuple(gev_batch.sources),
             )
             report = engine.process(batch)
             payload = report.model_dump(mode="json")
             payload["collected_at"] = datetime.now(timezone.utc).isoformat()
             payload["runtime"] = "local"
+            _enrich_earthquakes(payload)
 
             from app.adapters.infrastructure.intelligence.supabase_intelligence_history_adapter import (
                 SupabaseIntelligenceHistoryAdapter,
@@ -833,6 +923,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             if history.get("history_status") == "persisted":
                 latest = dict(state.last_intelligence or {})
                 latest.update(history)
+                _enrich_earthquakes(latest)
                 latest["unique_event_count"] = len(history["events"])
                 latest["unique_observation_count"] = len(history["observations"])
                 latest.setdefault("sources", [])
@@ -879,6 +970,46 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
     async def cameras(_client: str = Depends(require_local_token)) -> dict[str, Any]:
         """Return the operator-registered camera allowlist without touching the streams."""
         return await _run_sync_io_off_loop(build_camera_registry)
+
+    @app.get("/api/cameras/open")
+    async def open_cameras(
+        latitude: float | None = Query(None, alias="lat"),
+        longitude: float | None = Query(None, alias="lon"),
+        radius_km: float = Query(120.0, ge=10.0, le=500.0),
+        limit: int = Query(24, ge=1, le=24),
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """List public cameras near a coordinate; never scrapes private devices."""
+        if (latitude is None) != (longitude is None):
+            raise HTTPException(status_code=422, detail="Informe lat e lon juntos.")
+        if latitude is not None and not -90.0 <= latitude <= 90.0:
+            raise HTTPException(status_code=422, detail="Latitude deve estar entre -90 e 90.")
+        if longitude is not None and not -180.0 <= longitude <= 180.0:
+            raise HTTPException(status_code=422, detail="Longitude deve estar entre -180 e 180.")
+        return await _run_sync_io_off_loop(
+            lambda: build_open_cameras(
+                latitude, longitude, radius_km=radius_km, limit=limit
+            )
+        )
+
+    @app.get("/api/hud/version")
+    async def hud_version(_client: str = Depends(require_local_token)) -> dict[str, Any]:
+        """Identify the HUD file this core serves, so repo drift is visible."""
+        try:
+            raw = _HTML_PATH.read_bytes()
+        except OSError as exc:
+            raise HTTPException(status_code=503, detail="HUD indisponivel.") from exc
+        return {
+            "success": True,
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "short": hashlib.sha256(raw).hexdigest()[:8],
+            "bytes": len(raw),
+            "modified_at": datetime.fromtimestamp(
+                _HTML_PATH.stat().st_mtime, tz=timezone.utc
+            ).isoformat(),
+            "source": str(_HTML_PATH),
+            "single_source": True,
+        }
 
     @app.get("/api/devices")
     async def devices(_client: str = Depends(require_local_token)) -> dict[str, Any]:
@@ -937,8 +1068,10 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         if not _osiris_enabled():
             return {
                 "success": False, "available": False, "reason": "Disabled",
-                "collected_at": collected_at, "events": [], "sources": [],
-                "counts": {"events": 0, "routes_online": 0, "routes_total": 4},
+                "collected_at": collected_at, "events": [], "observations": [],
+                "sources": [],
+                "counts": {"events": 0, "observations": 0,
+                           "routes_online": 0, "routes_total": 9},
             }
         from app.core.nexus import nexus
         osiris = nexus.resolve(
@@ -950,18 +1083,32 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             if not callable(getattr(osiris, "collect_events", None)):
                 raise HTTPException(status_code=503, detail="OsirisRestAdapter indisponível no Nexus local.")
             batch = await _run_sync_io_off_loop(osiris.collect_events, 20)
+            observations_batch = await _run_sync_io_off_loop(
+                osiris.collect_observations, 20
+            )
             if not isinstance(batch, IntelligenceBatch):
                 batch = IntelligenceBatch.model_validate(batch)
-            routes = [source.model_dump(mode="json") for source in batch.sources]
+            if not isinstance(observations_batch, IntelligenceBatch):
+                observations_batch = IntelligenceBatch.model_validate(observations_batch)
+            routes = [
+                source.model_dump(mode="json")
+                for source in (*batch.sources, *observations_batch.sources)
+            ]
+            observations = [
+                item.model_dump(mode="json")
+                for item in observations_batch.observations
+            ]
             payload = {
                 "success": True,
                 "available": sum(bool(item.get("available")) for item in routes) > 0,
                 "runtime": "local",
                 "collected_at": collected_at,
                 "events": [event.model_dump(mode="json") for event in batch.events],
+                "observations": observations,
                 "sources": routes,
                 "counts": {
                     "events": len(batch.events),
+                    "observations": len(observations),
                     "routes_online": sum(bool(item.get("available")) for item in routes),
                     "routes_total": len(routes),
                 },
@@ -984,7 +1131,8 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 "collected_at": collected_at, "observations": [], "area": None,
                 "sources": [{"source_id": "gods_eye_view", "available": False,
                              "error_code": settings["reason"]}],
-                "counts": {"aircraft": 0, "vessel": 0, "satellite": 0},
+                "counts": {"aircraft": 0, "vessel": 0, "satellite": 0,
+                           "camera": 0, "infrastructure": 0, "military_site": 0},
             }
         area = settings["area"]
         try:
@@ -1002,7 +1150,8 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 "collected_at": collected_at, "observations": [], "area": area,
                 "sources": [{"source_id": "gods_eye_view", "available": False,
                              "error_code": type(exc).__name__}],
-                "counts": {"aircraft": 0, "vessel": 0, "satellite": 0},
+                "counts": {"aircraft": 0, "vessel": 0, "satellite": 0,
+                           "camera": 0, "infrastructure": 0, "military_site": 0},
             }
         counts = Counter(observation.entity_type for observation in batch.observations)
         sources = [source.model_dump(mode="json") for source in batch.sources]
@@ -1023,6 +1172,9 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 "aircraft": int(counts.get("aircraft", 0)),
                 "vessel": int(counts.get("vessel", 0)),
                 "satellite": int(counts.get("satellite", 0)),
+                "camera": int(counts.get("camera", 0)),
+                "infrastructure": int(counts.get("infrastructure", 0)),
+                "military_site": int(counts.get("military_site", 0)),
             },
         }
         state.gods_eye_snapshot = payload

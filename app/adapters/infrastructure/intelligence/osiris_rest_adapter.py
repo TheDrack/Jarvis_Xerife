@@ -21,6 +21,7 @@ from app.domain.intelligence.contracts import (
     IntelligenceBatch,
     IntelligenceEvent,
     IntelligenceEvidence,
+    IntelligenceObservation,
     SourceHealth,
 )
 
@@ -34,6 +35,13 @@ _ROUTE_SPECS = {
     "fires": ("fires", "osiris_fires"),
     "news": ("news", "osiris_news"),
     "weather": ("weather", "osiris_weather"),
+    "gdelt": ("gdelt", "osiris_gdelt"),
+}
+_OBSERVATION_ROUTES = {
+    "flights": "osiris_flights",
+    "maritime": "osiris_maritime",
+    "satellites": "osiris_satellites",
+    "cctv": "osiris_cctv",
 }
 _SOURCE_TERMS = {
     "usgs_earthquakes": (
@@ -59,6 +67,26 @@ _SOURCE_TERMS = {
     "gdacs": (
         "OSIRIS aggregation of GDACS disaster alerts; preserve GDACS source links "
         "and the original provider terms."
+    ),
+    "osiris_gdelt": (
+        "OSIRIS GDELT/GDACS geolocated event feed; original event links and the "
+        "upstream provider terms apply. Feed classification is not verification."
+    ),
+    "osiris_flights": (
+        "OSIRIS aggregation of public ADS-B feeds (OpenSky and community "
+        "receivers); aircraft positions are provider snapshots, not a track."
+    ),
+    "osiris_maritime": (
+        "OSIRIS maritime reference data (ports and chokepoints) plus optional AIS "
+        "observations; static reference figures remain provider estimates."
+    ),
+    "osiris_satellites": (
+        "OSIRIS aggregation of CelesTrak TLE-derived positions; orbital elements "
+        "are propagated by the provider, not independently verified here."
+    ),
+    "osiris_cctv": (
+        "OSIRIS public camera directory metadata only; stream URLs are references "
+        "to the operator's own publication and are never proxied or probed."
     ),
 }
 _USGS_FEED_URL = (
@@ -140,6 +168,7 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
         client: httpx.Client | None = None,
         timeout_seconds: float = 12.0,
         max_response_bytes: int = 4_000_000,
+        max_directory_bytes: int = 16_000_000,
         client_factory: Callable[..., httpx.Client] = httpx.Client,
     ) -> None:
         if not 0 < timeout_seconds <= 30:
@@ -150,6 +179,12 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
             or not 1024 <= max_response_bytes <= 20_000_000
         ):
             raise ValueError("max_response_bytes must be between 1024 and 20000000")
+        if (
+            isinstance(max_directory_bytes, bool)
+            or not isinstance(max_directory_bytes, int)
+            or not 1024 <= max_directory_bytes <= 64_000_000
+        ):
+            raise ValueError("max_directory_bytes must be between 1024 and 64000000")
         if base_url is not None:
             configured = base_url.strip() or None
         else:
@@ -166,6 +201,7 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
         self._client_factory = client_factory
         self._timeout = timeout_seconds
         self._max_response_bytes = max_response_bytes
+        self._max_directory_bytes = max_directory_bytes
 
     @staticmethod
     def _validate_base_url(value: str) -> str:
@@ -186,7 +222,9 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
             raise ValueError("OSIRIS base_url must not target loopback")
         return value.rstrip("/")
 
-    def _read_response(self, client: httpx.Client, url: str) -> dict[str, Any]:
+    def _read_response(
+        self, client: httpx.Client, url: str, *, limit: int
+    ) -> dict[str, Any]:
         body = bytearray()
         with client.stream(
             "GET",
@@ -201,7 +239,7 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
             response.raise_for_status()
             for chunk in response.iter_bytes():
                 body.extend(chunk)
-                if len(body) > self._max_response_bytes:
+                if len(body) > limit:
                     raise ValueError("OSIRIS response exceeds configured byte limit")
 
         payload = json.loads(body)
@@ -212,19 +250,24 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
         return payload
 
     def _get_json(self, route: str) -> dict[str, Any]:
-        if route not in _ROUTE_SPECS:
+        if route not in _ROUTE_SPECS and route not in _OBSERVATION_ROUTES:
             raise ValueError("OSIRIS route is not allowlisted")
         if self._base_url is None:
             raise RuntimeError("JARVIS_OSIRIS_API_BASE_URL is not configured")
         url = f"{self._base_url}/api/{route}"
+        limit = (
+            self._max_directory_bytes
+            if route == "cctv"
+            else self._max_response_bytes
+        )
 
         if self._client is not None:
-            return self._read_response(self._client, url)
+            return self._read_response(self._client, url, limit=limit)
         with self._client_factory(
             timeout=self._timeout,
             follow_redirects=False,
         ) as client:
-            return self._read_response(client, url)
+            return self._read_response(client, url, limit=limit)
 
     @staticmethod
     def _evidence(
@@ -541,6 +584,344 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
             )
         return events
 
+    def _observation(
+        self,
+        *,
+        source_id: str,
+        source_name: str,
+        entity_type: str,
+        entity_id: Any,
+        observed_at: datetime,
+        latitude: Any,
+        longitude: Any,
+        attributes: dict[str, Any],
+        publisher: str,
+    ) -> IntelligenceObservation | None:
+        latitude_value = _finite_number(latitude)
+        longitude_value = _finite_number(longitude)
+        if (
+            latitude_value is None
+            or longitude_value is None
+            or not -90 <= latitude_value <= 90
+            or not -180 <= longitude_value <= 180
+            or entity_id is None
+            or not str(entity_id).strip()
+        ):
+            return None
+        clean: dict[str, Any] = {}
+        for key, value in attributes.items():
+            if value is None or isinstance(value, bool):
+                clean[key] = value
+            elif isinstance(value, (int, float)):
+                clean[key] = value if math.isfinite(float(value)) else None
+            elif isinstance(value, str):
+                clean[key] = value[:1000]
+        evidence = self._evidence(
+            source_id=source_id,
+            source_name=source_name,
+            url=SOURCE_REPOSITORY,
+            publisher=publisher,
+            published_at=None,
+        )
+        digest = _digest(
+            source_id, entity_type, str(entity_id), observed_at.isoformat()
+        )
+        return IntelligenceObservation(
+            observation_id=f"{source_id}:{entity_type}:{digest}",
+            source_id=source_id,
+            entity_type=entity_type,
+            entity_id=str(entity_id)[:160],
+            observed_at=observed_at,
+            position=GeoPoint(
+                latitude=latitude_value, longitude=longitude_value
+            ),
+            attributes=clean,
+            evidence=(evidence,),
+        )
+
+    def _parse_flights(
+        self, payload: dict[str, Any], limit: int
+    ) -> list[IntelligenceObservation]:
+        observed_at = _parse_datetime(payload.get("timestamp")) or datetime.now(
+            timezone.utc
+        )
+        rows: list[tuple[str, dict[str, Any]]] = []
+        for bucket in (
+            "commercial_flights",
+            "private_flights",
+            "private_jets",
+            "military_flights",
+        ):
+            for row in payload.get(bucket) or []:
+                if isinstance(row, dict):
+                    rows.append((bucket, row))
+        observations: list[IntelligenceObservation] = []
+        for bucket, row in rows[:limit]:
+            observation = self._observation(
+                source_id="osiris_flights",
+                source_name="OSIRIS flights (ADS-B)",
+                entity_type="aircraft",
+                entity_id=row.get("icao24") or row.get("callsign"),
+                observed_at=observed_at,
+                latitude=row.get("lat"),
+                longitude=row.get("lng"),
+                attributes={
+                    "callsign": row.get("callsign"),
+                    "altitude": row.get("alt"),
+                    "altitude_field": "provider_alt (unit not stated by the route)",
+                    "heading_deg": row.get("heading"),
+                    "speed_knots": row.get("speed_knots"),
+                    "aircraft_class": bucket,
+                    "model": row.get("model"),
+                    "registration": row.get("registration"),
+                    "squawk": row.get("squawk"),
+                    "provider": payload.get("source"),
+                },
+                publisher="OpenSky Network / community ADS-B (via OSIRIS)",
+            )
+            if observation is not None:
+                observations.append(observation)
+        return observations
+
+    def _parse_maritime(
+        self, payload: dict[str, Any], limit: int
+    ) -> list[IntelligenceObservation]:
+        observed_at = _parse_datetime(payload.get("timestamp")) or datetime.now(
+            timezone.utc
+        )
+        observations: list[IntelligenceObservation] = []
+        for row in (payload.get("ports") or [])[:limit]:
+            if not isinstance(row, dict):
+                continue
+            observation = self._observation(
+                source_id="osiris_maritime",
+                source_name="OSIRIS maritime (ports)",
+                entity_type="port",
+                entity_id=row.get("name"),
+                observed_at=observed_at,
+                latitude=row.get("lat"),
+                longitude=row.get("lng"),
+                attributes={
+                    "name": row.get("name"),
+                    "country": row.get("country"),
+                    "kind": row.get("type"),
+                    "volume": row.get("volume"),
+                    "rank": row.get("rank"),
+                    "congestion": row.get("congestion"),
+                    "dwell_time": row.get("dwell_time"),
+                },
+                publisher="OSIRIS maritime reference data",
+            )
+            if observation is not None:
+                observations.append(observation)
+        for row in (payload.get("chokepoints") or [])[:limit]:
+            if not isinstance(row, dict):
+                continue
+            observation = self._observation(
+                source_id="osiris_maritime",
+                source_name="OSIRIS maritime (chokepoints)",
+                entity_type="chokepoint",
+                entity_id=row.get("name"),
+                observed_at=observed_at,
+                latitude=row.get("lat"),
+                longitude=row.get("lng"),
+                attributes={
+                    "name": row.get("name"),
+                    "traffic": row.get("traffic"),
+                    "risk": row.get("risk"),
+                },
+                publisher="OSIRIS maritime reference data",
+            )
+            if observation is not None:
+                observations.append(observation)
+        for row in (payload.get("ships") or [])[:limit]:
+            if not isinstance(row, dict):
+                continue
+            observation = self._observation(
+                source_id="osiris_maritime",
+                source_name="OSIRIS maritime (AIS)",
+                entity_type="vessel",
+                entity_id=row.get("mmsi") or row.get("name"),
+                observed_at=_parse_datetime(row.get("observed_at")) or observed_at,
+                latitude=row.get("lat"),
+                longitude=row.get("lng"),
+                attributes={
+                    "name": row.get("name"),
+                    "imo": row.get("imo"),
+                    "type": row.get("type"),
+                    "destination": row.get("destination"),
+                    "speed_knots": row.get("speed_knots"),
+                },
+                publisher="AIS (via OSIRIS)",
+            )
+            if observation is not None:
+                observations.append(observation)
+        return observations
+
+    def _parse_satellites(
+        self, payload: dict[str, Any], limit: int
+    ) -> list[IntelligenceObservation]:
+        observed_at = _parse_datetime(payload.get("timestamp")) or datetime.now(
+            timezone.utc
+        )
+        observations: list[IntelligenceObservation] = []
+        for row in (payload.get("satellites") or [])[:limit]:
+            if not isinstance(row, dict):
+                continue
+            observation = self._observation(
+                source_id="osiris_satellites",
+                source_name="OSIRIS satellites (CelesTrak TLE)",
+                entity_type="satellite",
+                entity_id=row.get("noradId") or row.get("name"),
+                observed_at=observed_at,
+                latitude=row.get("lat"),
+                longitude=row.get("lng"),
+                attributes={
+                    "name": row.get("name"),
+                    "altitude_km": row.get("alt"),
+                    "mission": row.get("mission"),
+                    "category": row.get("category"),
+                    "provider": payload.get("source"),
+                },
+                publisher="CelesTrak (via OSIRIS)",
+            )
+            if observation is not None:
+                observations.append(observation)
+        return observations
+
+    def _parse_cctv(
+        self, payload: dict[str, Any], limit: int
+    ) -> list[IntelligenceObservation]:
+        observed_at = _parse_datetime(payload.get("timestamp")) or datetime.now(
+            timezone.utc
+        )
+        observations: list[IntelligenceObservation] = []
+        for row in (payload.get("cameras") or [])[:limit]:
+            if not isinstance(row, dict):
+                continue
+            observation = self._observation(
+                source_id="osiris_cctv",
+                source_name="OSIRIS public CCTV directory",
+                entity_type="camera",
+                entity_id=row.get("id") or row.get("name"),
+                observed_at=observed_at,
+                latitude=row.get("lat"),
+                longitude=row.get("lng"),
+                attributes={
+                    "name": row.get("name"),
+                    "city": row.get("city"),
+                    "country": row.get("country"),
+                    "stream_type": row.get("stream_type"),
+                    "stream_url": row.get("stream_url"),
+                    "source": row.get("source"),
+                    "usage": "reference only; never proxied or probed by Jarvis",
+                },
+                publisher=str(row.get("source") or "public camera network")[:200],
+            )
+            if observation is not None:
+                observations.append(observation)
+        return observations
+
+    def _parse_gdelt(
+        self, payload: dict[str, Any], limit: int
+    ) -> list[IntelligenceEvent]:
+        records = payload.get("events")
+        if not isinstance(records, list):
+            raise ValueError("OSIRIS gdelt collection is malformed")
+        observed_at = _parse_datetime(payload.get("timestamp")) or datetime.now(
+            timezone.utc
+        )
+        events: list[IntelligenceEvent] = []
+        for row in records[:limit]:
+            if not isinstance(row, dict):
+                continue
+            external_id = row.get("id")
+            title = row.get("name")
+            latitude = _finite_number(row.get("lat"))
+            longitude = _finite_number(row.get("lng"))
+            if (
+                external_id is None
+                or not str(external_id).strip()
+                or not isinstance(title, str)
+                or not title.strip()
+                or latitude is None
+                or longitude is None
+                or not -90 <= latitude <= 90
+                or not -180 <= longitude <= 180
+            ):
+                continue
+            url = _https_url(row.get("url")) or "https://www.gdacs.org/"
+            evidence = self._evidence(
+                source_id="osiris_gdelt",
+                source_name="OSIRIS GDELT/GDACS feed",
+                url=url,
+                publisher=str(payload.get("source") or "GDELT")[:200],
+                published_at=observed_at,
+            )
+            events.append(
+                IntelligenceEvent(
+                    event_id=f"osiris_gdelt:{_digest(str(external_id))}",
+                    source_id="osiris_gdelt",
+                    domain="global_news",
+                    category=str(row.get("type") or "gdelt_event")[:100],
+                    title=title.strip()[:500],
+                    url=url,
+                    observed_at=observed_at,
+                    location=GeoPoint(latitude=latitude, longitude=longitude),
+                    evidence=evidence,
+                )
+            )
+        return events
+
+    def collect_observations(self, limit: int = 50) -> IntelligenceBatch:
+        """Collect moving entities and mapped assets from the OSIRIS routes."""
+        if (
+            isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or not 1 <= limit <= 100
+        ):
+            raise ValueError("limit must be an integer between 1 and 100")
+        if self._base_url is None:
+            return IntelligenceBatch(
+                sources=tuple(
+                    SourceHealth(
+                        source_id=source_id,
+                        available=False,
+                        error_code="NotConfigured",
+                    )
+                    for source_id in _OBSERVATION_ROUTES.values()
+                )
+            )
+        parsers = {
+            "flights": self._parse_flights,
+            "maritime": self._parse_maritime,
+            "satellites": self._parse_satellites,
+            "cctv": self._parse_cctv,
+        }
+        observations: list[IntelligenceObservation] = []
+        health: list[SourceHealth] = []
+        for route, source_id in _OBSERVATION_ROUTES.items():
+            try:
+                payload = self._get_json(route)
+                observations.extend(parsers[route](payload, limit))
+                health.append(SourceHealth(source_id=source_id, available=True))
+            except (httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
+                logger.warning(
+                    "OSIRIS observation route unavailable: %s (%s)",
+                    route,
+                    type(exc).__name__,
+                )
+                health.append(
+                    SourceHealth(
+                        source_id=source_id,
+                        available=False,
+                        error_code=type(exc).__name__,
+                    )
+                )
+        return IntelligenceBatch(
+            observations=tuple(observations), sources=tuple(health)
+        )
+
     def collect_events(self, limit: int = 50) -> IntelligenceBatch:
         """Collect fixed event routes independently, preserving partial successes."""
         if (
@@ -567,6 +948,7 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
             "fires": self._parse_fires,
             "news": self._parse_news,
             "weather": self._parse_weather,
+            "gdelt": self._parse_gdelt,
         }
         events: list[IntelligenceEvent] = []
         health: list[SourceHealth] = []
@@ -608,6 +990,11 @@ class OsirisRestAdapter(IntelligenceSource, NexusComponent):
                 "intelligence.events.wildfire",
                 "intelligence.news.read",
                 "intelligence.events.weather",
+                "intelligence.events.gdelt",
+                "intelligence.observations.aircraft",
+                "intelligence.observations.vessels",
+                "intelligence.observations.satellites",
+                "intelligence.observations.cameras",
             ],
         }
 

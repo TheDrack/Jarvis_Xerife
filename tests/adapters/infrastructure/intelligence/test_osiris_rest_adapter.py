@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
+from collections import Counter
+
 from app.adapters.infrastructure.intelligence.osiris_rest_adapter import OsirisRestAdapter
 
 BASE_URL = "https://osiris.example.org"
@@ -14,13 +16,19 @@ OBSERVED = "2026-11-03T09:00:00Z"
 def adapter_factory():
     clients = []
 
-    def factory(payloads, *, status_by_route=None, max_response_bytes=4_000_000):
+    def factory(
+        payloads, *, status_by_route=None, max_response_bytes=4_000_000,
+        max_directory_bytes=16_000_000,
+    ):
         def handler(request):
             assert request.url.host == "osiris.example.org"
             assert request.url.query == b""
             assert request.method == "GET"
             route = request.url.path.rsplit("/", 1)[-1]
-            assert route in {"earthquakes", "fires", "news", "weather"}
+            assert route in {
+                "earthquakes", "fires", "news", "weather", "gdelt",
+                "flights", "maritime", "satellites", "cctv",
+            }
             if status_by_route and route in status_by_route:
                 return httpx.Response(status_by_route[route], json={"error": "offline"})
             return httpx.Response(200, json=payloads[route])
@@ -31,6 +39,7 @@ def adapter_factory():
             base_url=BASE_URL,
             client=client,
             max_response_bytes=max_response_bytes,
+            max_directory_bytes=max_directory_bytes,
         )
 
     yield factory
@@ -135,6 +144,50 @@ def payloads():
                 "date": "Tue, 03 Nov 2026 08:00:00 GMT",
                 "source": "https://www.gdacs.org/event/TC-1",
                 "provider": "GDACS",
+            }],
+        },
+        "gdelt": {"timestamp": OBSERVED, "source": "GDELT", "events": []},
+        "flights": {
+            "timestamp": OBSERVED,
+            "source": "OpenSky",
+            "commercial_flights": [{
+                "callsign": "TST123", "lat": -23.5, "lng": -46.6, "alt": 30000,
+                "heading": 90, "speed_knots": 450, "icao24": "abc123",
+                "model": "A320", "registration": "PR-TST", "squawk": "1200",
+            }, {"callsign": "BAD", "lat": 200, "lng": 0}],
+            "private_flights": [], "private_jets": [], "military_flights": [],
+        },
+        "maritime": {
+            "timestamp": OBSERVED,
+            "ports": [{
+                "name": "Porto de Teste", "country": "BR", "lat": -23.9,
+                "lng": -46.3, "type": "container", "volume": 1000,
+                "rank": 10, "congestion": "low", "dwell_time": "2d",
+            }],
+            "chokepoints": [{
+                "name": "Canal de Teste", "lat": 1.0, "lng": 103.0,
+                "traffic": "high", "risk": "medium",
+            }],
+            "ships": [{
+                "mmsi": "123456789", "name": "NAVIO TESTE", "lat": -24.0,
+                "lng": -46.0, "speed_knots": 12.0,
+            }],
+        },
+        "satellites": {
+            "timestamp": OBSERVED,
+            "source": "CelesTrak",
+            "satellites": [{
+                "name": "ISS", "lat": -10.0, "lng": -50.0, "alt": 420,
+                "mission": "ISS", "category": "stations", "noradId": "25544",
+            }],
+        },
+        "cctv": {
+            "timestamp": OBSERVED,
+            "cameras": [{
+                "id": "cam-1", "lat": -23.55, "lng": -46.63,
+                "name": "Câmera Teste", "city": "São Paulo", "country": "BR",
+                "stream_url": "https://example.org/stream", "stream_type": "jpg",
+                "source": "ExampleCam",
             }],
         },
     }
@@ -293,14 +346,20 @@ def test_rejects_unbounded_limit_and_unsafe_base_url():
     adapter = OsirisRestAdapter(base_url=BASE_URL)
     with pytest.raises(ValueError):
         adapter.collect_events(limit=101)
+    with pytest.raises(ValueError):
+        adapter.collect_observations(limit=101)
 
 
 def test_missing_configuration_reports_sources_unavailable():
     batch = OsirisRestAdapter(base_url="").collect_events()
 
     assert batch.events == ()
-    assert len(batch.sources) == 4
+    assert len(batch.sources) == 5
     assert all(source.error_code == "NotConfigured" for source in batch.sources)
+    observations = OsirisRestAdapter(base_url="").collect_observations()
+    assert observations.observations == ()
+    assert len(observations.sources) == 4
+    assert all(source.error_code == "NotConfigured" for source in observations.sources)
 
 
 def test_route_level_error_payload_is_not_reported_as_empty_success(adapter_factory):
@@ -324,6 +383,72 @@ def test_response_body_is_bounded_before_json_decoding(adapter_factory):
     health = {source.source_id: source for source in batch.sources}
     assert health["osiris_news"].available is False
     assert health["osiris_news"].error_code == "ValueError"
+
+
+def test_collects_aircraft_ports_chokepoints_vessels_satellites_and_cameras(
+    adapter_factory,
+):
+    batch = adapter_factory(payloads()).collect_observations(limit=10)
+
+    kinds = Counter(item.entity_type for item in batch.observations)
+    assert kinds == {
+        "aircraft": 1,
+        "port": 1,
+        "chokepoint": 1,
+        "vessel": 1,
+        "satellite": 1,
+        "camera": 1,
+    }
+    assert all(source.available for source in batch.sources)
+    aircraft = next(item for item in batch.observations if item.entity_type == "aircraft")
+    assert aircraft.entity_id == "abc123"
+    assert aircraft.position.latitude == -23.5
+    assert aircraft.attributes["callsign"] == "TST123"
+    assert aircraft.attributes["altitude"] == 30000
+    assert aircraft.attributes["aircraft_class"] == "commercial_flights"
+    satellite = next(item for item in batch.observations if item.entity_type == "satellite")
+    assert satellite.attributes["altitude_km"] == 420
+    camera = next(item for item in batch.observations if item.entity_type == "camera")
+    assert camera.attributes["stream_url"] == "https://example.org/stream"
+    assert "never proxied" in camera.attributes["usage"]
+    assert all(
+        item.evidence[0].source_id.startswith("osiris_")
+        for item in batch.observations
+    )
+
+
+def test_gdelt_route_keeps_only_geolocated_events_with_https_evidence(
+    adapter_factory,
+):
+    data = payloads()
+    data["gdelt"]["events"] = [
+        {
+            "id": "gd-1", "lat": 10.0, "lng": 20.0, "name": "Test alert",
+            "url": "http://unsafe.example", "type": "TC",
+        },
+        {"id": "gd-2", "lat": 999, "lng": 0, "name": "Bad point"},
+    ]
+
+    batch = adapter_factory(data).collect_events()
+    gdelt = [event for event in batch.events if event.source_id == "osiris_gdelt"]
+
+    assert len(gdelt) == 1
+    assert gdelt[0].category == "TC"
+    assert str(gdelt[0].url) == "https://www.gdacs.org/"
+    assert gdelt[0].location.latitude == 10.0
+
+
+def test_camera_directory_has_its_own_byte_budget(adapter_factory):
+    data = payloads()
+    data["cctv"]["cameras"][0]["name"] = "x" * 5_000
+    adapter = adapter_factory(data, max_directory_bytes=1024)
+
+    batch = adapter.collect_observations()
+
+    health = {source.source_id: source for source in batch.sources}
+    assert health["osiris_cctv"].available is False
+    assert health["osiris_cctv"].error_code == "ValueError"
+    assert health["osiris_flights"].available is True
 
 
 def test_execute_reports_metadata_without_network_io():

@@ -108,6 +108,63 @@ async def test_collects_bounded_aircraft_vessel_and_satellite_observations():
 
 
 @pytest.mark.asyncio
+async def test_collects_static_mapped_assets_from_read_only_tools():
+    session = FakeSession(
+        [
+            tool("find_cctv_cameras", "area"),
+            tool("find_infrastructure", "area"),
+            tool("find_military_installations", "area"),
+        ],
+        {
+            "find_cctv_cameras": {
+                "source": "PublicCam",
+                "rows": [{
+                    "id": "cam-1", "name": "Praça", "city": "Teste",
+                    "lat": -27.1, "lon": -48.6, "url": "https://cam.example/1",
+                }],
+            },
+            "find_infrastructure": {
+                "source": "OSM",
+                "rows": [{
+                    "name": "Subestação Teste", "kind": "substation",
+                    "lat": -27.2, "lon": -48.5,
+                }],
+            },
+            "find_military_installations": {
+                "source": "OSM",
+                "rows": [{
+                    "name": "Base Teste", "kind": "base",
+                    "lat": -27.3, "lon": -48.4,
+                }],
+            },
+        },
+    )
+    adapter = GodsEyeMcpAdapter(
+        area={"west": -49.0, "south": -28.0, "east": -48.0, "north": -27.0},
+        session_factory=factory(session),
+        limit=5,
+    )
+
+    batch = await adapter.collect_observations()
+
+    assert {item.entity_type for item in batch.observations} == {
+        "camera", "infrastructure", "military_site"
+    }
+    assert all(item.position is not None for item in batch.observations)
+    assert all(item.observed_at.tzinfo is not None for item in batch.observations)
+    camera = next(item for item in batch.observations if item.entity_type == "camera")
+    assert camera.attributes["city"] == "Teste"
+    assert camera.attributes["url"] == "https://cam.example/1"
+    assert [name for name, _ in session.calls] == [
+        "find_cctv_cameras", "find_infrastructure", "find_military_installations"
+    ]
+    assert all(
+        arguments["area"]["bbox"] == [-49.0, -28.0, -48.0, -27.0]
+        for _, arguments in session.calls
+    )
+
+
+@pytest.mark.asyncio
 async def test_does_not_call_tools_without_read_only_annotation_or_allowlist():
     session = FakeSession(
         [

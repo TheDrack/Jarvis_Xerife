@@ -408,7 +408,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 
  <footer class="hud-foot">
   <span id="footerStatus" role="status" aria-live="polite" aria-atomic="true">LOCAL CORE · aguardando</span>
-  <div class="right"><span>PAIR <b id="pairCodeDisplay">------</b></span><span>LAN <b id="lanAddress">não detectado</b></span><span>SYNC <b id="updatedAt">--</b></span></div>
+  <div class="right"><span>PAIR <b id="pairCodeDisplay">------</b></span><span>LAN <b id="lanAddress">não detectado</b></span><span>HUD <b id="hudBuild">--</b></span><span>SYNC <b id="updatedAt">--</b></span></div>
  </footer>
 </div>
 
@@ -451,7 +451,7 @@ const hhmm=iso=>{const d=new Date(iso||'');return isNaN(d.getTime())?'--:--':d.t
 const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const state={
  token:sessionStorage.getItem(TOKEN_KEY)||'',
- bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,devices:null,busy:false,view:'core',topic:'regiao',location:null,locating:false,
+ bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,openCameras:null,devices:null,busy:false,view:'core',topic:'regiao',location:null,locating:false,
  live:{events:[],observations:[],sources:[],correlations:[],collected_at:null,area:null},
  layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true},
  selected:null,
@@ -459,7 +459,7 @@ const state={
 };
 const LAYER_OF={satellite:'satellite',aircraft:'aircraft',vessel:'vessel'};
 const EVENT_LAYER={earthquake:'quake',wildfire:'fire',volcano:'fire',seismic:'quake'};
-const COLORS={satellite:'#a5ecff',aircraft:'#54d7ff',vessel:'#ffb45c',quake:'#ff8f7a',fire:'#ffb347',event:'#8be3ff'};
+const COLORS={satellite:'#a5ecff',aircraft:'#54d7ff',vessel:'#ffb45c',quake:'#ff8f7a',fire:'#ffb347',event:'#8be3ff',camera:'#7ef0c8',port:'#ffd479',chokepoint:'#ff9f6e',infrastructure:'#c8b6ff',military_site:'#ff8fb1'};
 
 /* ---------------- API ---------------- */
 async function api(path,opts){
@@ -493,7 +493,7 @@ const Globe=(()=>{
  let pinchDist=0;
  let spin=!reduce,drag=null,idleUntil=0,lastT=0;
  let geo=null,px=null,py=null,pz=null;
- let stars=[],marks=[],area=null,hook=null,hits=[];
+ let stars=[],marks=[],area=null,hook=null,hits=[],quakeRings=[];
  const graticule=(()=>{
   const chains=[];
   for(let lon=-180;lon<180;lon+=30){const chain=[];for(let lat=-84;lat<=84;lat+=4)chain.push([lon,lat]);chains.push(chain);}
@@ -501,6 +501,7 @@ const Globe=(()=>{
   return chains;
  })();
  const sph=(lon,lat)=>{const cp=Math.cos(lat*RAD);return [cp*Math.sin(lon*RAD),Math.sin(lat*RAD),cp*Math.cos(lon*RAD)];};
+ const dest=(lat,lon,km,bearing)=>{const d=km/6371,brg=bearing*RAD,lat1=lat*RAD,lon1=lon*RAD;const lat2=Math.asin(Math.sin(lat1)*Math.cos(d)+Math.cos(lat1)*Math.sin(d)*Math.cos(brg));const lon2=lon1+Math.atan2(Math.sin(brg)*Math.sin(d)*Math.cos(lat1),Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));return [((lon2/RAD+540)%360)-180,lat2/RAD];};
  const clampZoom=value=>Math.max(0.75,Math.min(2.4,Number.isFinite(value)?value:1));
  const notifyZoom=()=>{if(typeof zoomHook==='function')zoomHook(zoom);};
  const pairDistance=()=>{
@@ -634,6 +635,41 @@ const Globe=(()=>{
   }
   ctx.setLineDash([]);
  }
+ function drawQuakeRegions(radius,cosR,sinR,cosT,sinT){
+  if(!quakeRings.length)return;
+  const total=Math.min(quakeRings.length,8);
+  const strokeRing=(ring,fill,line,dash)=>{
+   ctx.beginPath();let open=false;
+   for(const point of ring){
+    const v=sph(point[0],point[1]);
+    const x0=v[0]*cosR+v[2]*sinR,z0=v[2]*cosR-v[0]*sinR;
+    const y2=v[1]*cosT-z0*sinT,z2=v[1]*sinT+z0*cosT;
+    if(z2<=0.02){open=false;continue;}
+    const sx=cx+x0*radius,sy=cy-y2*radius;
+    if(!open){ctx.moveTo(sx,sy);open=true;}else ctx.lineTo(sx,sy);
+   }
+   ctx.closePath();
+   if(fill){ctx.fillStyle=fill;ctx.fill();}
+   ctx.setLineDash(dash);
+   ctx.strokeStyle=line;ctx.lineWidth=1;ctx.stroke();
+   ctx.setLineDash([]);
+  };
+  for(let i=0;i<total;i+=1){
+   const q=quakeRings[i];
+   strokeRing(q.ring,'rgba(255,120,96,.14)','rgba(255,150,128,.62)',[]);
+   if(q.inner&&q.inner.length)strokeRing(q.inner,null,'rgba(255,196,150,.55)',[2,3]);
+   const c=sph(q.longitude,q.latitude);
+   const cx0=c[0]*cosR+c[2]*sinR,cz0=c[2]*cosR-c[0]*sinR;
+   const cy2=c[1]*cosT-cz0*sinT,cz2=c[1]*sinT+cz0*cosT;
+   if(cz2>0.02){
+    const sx=cx+cx0*radius,sy=cy-cy2*radius;
+    const text='M'+num(q.magnitude).toFixed(1)+(q.label?' · '+q.label:'');
+    ctx.font='500 9px "Cascadia Mono",ui-monospace,monospace';
+    ctx.fillStyle='rgba(255,178,160,.95)';
+    ctx.fillText(String(text).slice(0,42),sx+7,sy-6);
+   }
+  }
+ }
  function drawMarks(radius,t,cosR,sinR,cosT,sinT){
   hits=[];
   const size=Math.max(1.6,radius/150);
@@ -721,6 +757,7 @@ const Globe=(()=>{
    drawGraticule(radius,cosR,sinR,cosT,sinT);
    drawLand(radius);
    drawArea(radius,cosR,sinR,cosT,sinT);
+   drawQuakeRegions(radius,cosR,sinR,cosT,sinT);
    drawMarks(radius,t,cosR,sinR,cosT,sinT);
   }
   drawLimb(radius);
@@ -778,6 +815,7 @@ const Globe=(()=>{
  }
  function setData(payload){
   marks=[];
+  quakeRings=[];
   const events=(payload&&payload.events)||[];
   const observations=(payload&&payload.observations)||[];
   for(const e of events){
@@ -785,6 +823,17 @@ const Globe=(()=>{
    const kind=EVENT_LAYER[e.category]||'event';
    const v=sph(num(e.location.longitude),num(e.location.latitude));
    marks.push({x:v[0],y:v[1],z:v[2],longitude:num(e.location.longitude),latitude:num(e.location.latitude),kind,label:e.title||e.category||'evento',meta:(e.source_id||'')+' · '+(e.category||''),record:e,at:new Date(e.observed_at||e.published_at||0).getTime()||0});
+   const felt=e.affected?num(e.affected.felt_radius_km):0;
+   const damage=e.affected?num(e.affected.damage_radius_km):0;
+   if(kind==='quake'&&felt>=5){
+    const ring=[],inner=[];
+    for(let s=0;s<=36;s+=1){
+     ring.push(dest(num(e.location.latitude),num(e.location.longitude),felt,s*10));
+     if(damage>0)inner.push(dest(num(e.location.latitude),num(e.location.longitude),damage,s*10));
+    }
+    const place=e.place_label||(e.place?[e.place.city,e.place.country].filter(Boolean).join(' · '):'');
+    quakeRings.push({ring,inner,latitude:num(e.location.latitude),longitude:num(e.location.longitude),magnitude:e.magnitude,label:String(place||''),radius:felt});
+   }
   }
   const now=Date.now();
   for(const o of observations){
@@ -968,14 +1017,18 @@ function renderSources(){
  const counts=countBySource();
  const observations=(state.live.observations||[]).length;
  const specs=[
-  {id:'osiris',label:'OSIRIS REST',sub:'rotas públicas read-only',action:'osiris',ids:['osiris_earthquakes','osiris_fires','osiris_news','osiris_weather']},
-  {id:'gods_eye_view',label:"GOD'S EYE VIEW",sub:'MCP local · aeronaves/satélites',action:'gev',ids:['gods_eye_view']},
+  {id:'osiris',label:'OSIRIS REST',sub:'rotas públicas · voos/mar/cams',action:'osiris',ids:['osiris_earthquakes','osiris_fires','osiris_news','osiris_weather','osiris_gdelt','osiris_flights','osiris_maritime','osiris_satellites','osiris_cctv']},
+  {id:'gods_eye_view',label:"GOD'S EYE VIEW",sub:'MCP local · tráfego e ativos mapeados',action:'gev',ids:['gods_eye_view']},
   {id:'public',label:'GDELT / EONET / USGS',sub:'coleta pública sob demanda',action:'all',ids:['gdelt','nasa_eonet','usgs_earthquakes']}
  ];
  $('sourceList').innerHTML=specs.map(spec=>{
   const st=statusFor(spec.ids);
   let signal='';
-  if(spec.id==='osiris')signal=(counts.osiris_earthquakes||0)+(counts.osiris_fires||0)+(counts.osiris_news||0)+(counts.osiris_weather||0)+' ev';
+  if(spec.id==='osiris'){
+   const events=(counts.osiris_earthquakes||0)+(counts.osiris_fires||0)+(counts.osiris_news||0)+(counts.osiris_weather||0)+(counts.osiris_gdelt||0);
+   const obs=(state.live.observations||[]).filter(item=>String(item.source_id||'').startsWith('osiris_')).length;
+   signal=events+' ev · '+obs+' obs';
+  }
   else if(spec.id==='gods_eye_view')signal=observations+' obs';
   else signal=(counts.gdelt||0)+(counts.nasa_eonet||0)+(counts.usgs_earthquakes||0)+' ev';
   const failed=spec.ids.map(id=>health[id]).filter(item=>item&&!item.available&&item.error_code).map(item=>item.error_code)[0];
@@ -989,7 +1042,9 @@ function renderEvents(){
   return;
  }
  $('eventList').innerHTML=events.map(e=>{
-  const body='<div class="grow"><b>'+esc(e.title||'evento sem título')+'</b><small>'+esc((e.source_id||'fonte')+' · '+(e.category||e.domain||'evento'))+' · '+esc(hhmm(e.observed_at||e.published_at))+'</small></div><span class="pill">'+esc(String(e.source_id||'evt').slice(0,9))+'</span>';
+  const felt=e.affected?(' · RAIO ~'+num(e.affected.felt_radius_km)+' KM'):'';
+  const place=e.place_label?(' · '+e.place_label):'';
+  const body='<div class="grow"><b>'+esc(e.title||'evento sem título')+'</b><small>'+esc((e.source_id||'fonte')+' · '+(e.category||e.domain||'evento')+' · '+hhmm(e.observed_at||e.published_at)+place+felt)+'</small></div><span class="pill">'+esc(e.category==='earthquake'?'M'+num(e.magnitude).toFixed(1):String(e.source_id||'evt').slice(0,9))+'</span>';
   return '<button type="button" class="row intel-topic" data-event-id="'+esc(e.event_id||'')+'">'+body+'<span class="pill idle">DETALHES</span></button>';
  }).join('');
 }
@@ -1099,20 +1154,21 @@ function requestLocation(){
  }
  state.locating=true;
  return new Promise(resolve=>{
+  let settled=false;
+  const settle=value=>{if(settled)return;settled=true;state.locating=false;clearTimeout(timer);resolve(value);};
+  const timer=setTimeout(()=>{setFooter('LOCALIZAÇÃO SEM RESPOSTA · REGIÃO CONFIGURADA');settle(false);},9000);
   navigator.geolocation.getCurrentPosition(
    position=>{
-    state.locating=false;
     state.location={
      latitude:position.coords.latitude,
      longitude:position.coords.longitude,
      accuracy_m:Math.round(num(position.coords.accuracy))
     };
-    resolve(true);
+    settle(true);
    },
    error=>{
-    state.locating=false;
     setFooter('LOCALIZAÇÃO NÃO DISPONÍVEL ('+String(error.message||'negada')+') · REGIÃO CONFIGURADA');
-    resolve(false);
+    settle(false);
    },
    {enableHighAccuracy:false,timeout:8000,maximumAge:600000}
   );
@@ -1140,17 +1196,47 @@ const safeCamUrl=value=>{
 };
 let cameraTimer=null;
 function stopCameraTimer(){if(cameraTimer){clearInterval(cameraTimer);cameraTimer=null;}}
+function openCamerasHtml(open){
+ if(!open)return '';
+ const cameras=(open.cameras||[]).map(item=>Object.assign({},item,{safe:safeCamUrl(item.url)})).filter(item=>item.safe);
+ const providers=(open.providers||[]).map(p=>p.label+(p.available?'':' ('+esc(p.error||'indisponível')+')')).join(' · ');
+ let html='<div class="tele-foot"><span>CÂMERAS PÚBLICAS · '+(open.located?(cameras.length+' EM '+num(open.radius_km)+' KM'):'INFORME A LOCALIZAÇÃO')+'</span><span>'+esc(providers||'SEM PROVEDOR')+'</span></div>';
+ if(!cameras.length){
+  html+='<div class="empty">'+(open.located?'Nenhuma câmera pública dos provedores integrados neste raio.':'Sem coordenadas: use LOC no briefing para listar câmeras próximas.')+'</div>';
+  return html;
+ }
+ html+=cameras.map((cam,index)=>{
+  const place=cam.place?[cam.place.city,cam.place.country].filter(Boolean).join(' · '):'';
+  const media='<img alt="'+esc(cam.label)+'" src="'+esc(cam.safe)+'" data-cam="o'+index+'" data-src="'+esc(cam.safe)+'" data-refresh="'+esc(cam.refresh_seconds)+'" data-at="'+Date.now()+'" loading="lazy">';
+  return '<figure class="cam" data-open-camera="'+index+'" title="'+esc(cam.attribution||cam.provider)+'">'+media+'<figcaption><b>'+esc(cam.label)+'</b><small>'+esc(String(cam.provider).toUpperCase()+' · '+num(cam.distance_km)+' KM'+(place?' · '+place:'')+' · '+String(cam.attribution||'')+' · '+String(cam.license||'licença não declarada'))+'</small></figcaption></figure>';
+ }).join('');
+ return html;
+}
+function osirisCamerasHtml(){
+ const cams=(state.live.observations||[]).filter(item=>item.entity_type==='camera').slice(0,12);
+ if(!cams.length)return '';
+ return '<div class="tele-foot"><span>CÂMERAS OSIRIS · METADADOS</span><span>'+cams.length+' REGISTRO(S)</span></div>'+cams.map(item=>{
+  const attrs=item.attributes||{};
+  const url=safeCamUrl(attrs.stream_url);
+  const place=[attrs.city,attrs.country].filter(Boolean).join(' · ');
+  return '<div class="row"><div class="grow"><b>'+esc(attrs.name||item.entity_id||'câmera')+'</b><small>'+esc([place,attrs.source,attrs.stream_type].filter(Boolean).join(' · '))+'</small></div>'+(url?'<a class="mini" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">ABRIR</a>':'<span class="pill idle">SEM URL</span>')+'</div>';
+ }).join('');
+}
 function renderCameras(){
  const data=state.cameras;
- if(!data){$('cameraBody').innerHTML='<div class="empty">Câmeras ainda não consultadas.</div>';return;}
- const cameras=(data.cameras||[]).map(item=>Object.assign({},item,{safe:safeCamUrl(item.url)})).filter(item=>item.safe);
- if(!cameras.length){
-  $('cameraBody').innerHTML='<div class="empty">Nenhuma câmera registrada. '+(data.hint?esc(data.hint):'')+(data.path?('<br><br>Arquivo local: '+esc(data.path)):'')+'</div>';
-  $('cameraFoot').textContent='REGISTRO LOCAL · 0 CÂMERAS';
+ const open=state.openCameras;
+ const osirisHtml=osirisCamerasHtml();
+ const osirisCount=(state.live.observations||[]).filter(item=>item.entity_type==='camera').length;
+ if(!data&&!open){$('cameraBody').innerHTML=osirisHtml+'<div class="empty">Câmeras ainda não consultadas.</div>';return;}
+ const cameras=((data&&data.cameras)||[]).map(item=>Object.assign({},item,{safe:safeCamUrl(item.url)})).filter(item=>item.safe);
+ const openCount=((open&&open.cameras)||[]).length;
+ if(!cameras.length&&!openCount){
+  $('cameraBody').innerHTML=osirisHtml+openCamerasHtml(open)+'<div class="empty">Nenhuma câmera no registro local. '+(data&&data.hint?esc(data.hint):'')+(data&&data.path?('<br><br>Arquivo local: '+esc(data.path)):'')+'</div>';
+  $('cameraFoot').textContent='CÂMERAS · '+openCount+' ABERTAS · 0 LOCAIS';
   stopCameraTimer();
   return;
  }
- $('cameraBody').innerHTML=cameras.map((cam,index)=>{
+ $('cameraBody').innerHTML=osirisHtml+openCamerasHtml(open)+(cameras.length?'<div class="tele-foot"><span>REGISTRO LOCAL</span><span>'+cameras.length+' CÂMERA(S)</span></div>':'')+cameras.map((cam,index)=>{
   const media=cam.kind==='video'
    ?'<video controls muted playsinline preload="metadata" src="'+esc(cam.safe)+'"></video>'
    :'<img alt="'+esc(cam.label)+'" src="'+esc(cam.safe)+'" data-cam="'+index+'" data-src="'+esc(cam.safe)+'" data-refresh="'+esc(cam.refresh_seconds)+'" data-at="'+Date.now()+'" loading="lazy">';
@@ -1159,7 +1245,7 @@ function renderCameras(){
  document.querySelectorAll('#cameraBody img[data-cam]').forEach(img=>{
   img.addEventListener('error',()=>{img.dataset.failed='1';img.alt='câmera indisponível nesta leitura';});
  });
- $('cameraFoot').textContent='REGISTRO LOCAL · '+cameras.length+' CÂMERA(S) · SEM SONDAGEM';
+ $('cameraFoot').textContent='CÂMERAS · '+openCount+' ABERTAS · '+cameras.length+' LOCAIS · '+osirisCount+' OSIRIS · ATRIBUIÇÃO POR FONTE';
  stopCameraTimer();
  cameraTimer=setInterval(()=>{
   const now=Date.now();
@@ -1174,9 +1260,24 @@ function renderCameras(){
   });
  },5000);
 }
+function cameraAnchor(){
+ if(state.location&&Number.isFinite(Number(state.location.latitude))){
+  return {latitude:num(state.location.latitude),longitude:num(state.location.longitude),radius:150,label:'este dispositivo'};
+ }
+ const region=state.briefing&&state.briefing.region;
+ if(region&&Number.isFinite(Number(region.latitude))&&Number.isFinite(Number(region.longitude))){
+  return {latitude:num(region.latitude),longitude:num(region.longitude),radius:150,label:region.label||'região'};
+ }
+ const device=locatedDevices()[0];
+ if(device)return {latitude:num(device.latitude),longitude:num(device.longitude),radius:150,label:device.name};
+ return null;
+}
 async function refreshCameras(){
  try{
   state.cameras=await api('/api/cameras');
+  const anchor=cameraAnchor();
+  const query=anchor?('?lat='+anchor.latitude.toFixed(4)+'&lon='+anchor.longitude.toFixed(4)+'&radius_km='+anchor.radius):'';
+  state.openCameras=await api('/api/cameras/open'+query);
   renderCameras();
   $('cameraSync').textContent='SYNC '+clockTime();
  }catch(err){
@@ -1193,6 +1294,7 @@ const AREAS=[
  {id:'africa',label:'África',latitude:2,longitude:20,zoom:1.5},
  {id:'asia',label:'Ásia',latitude:30,longitude:95,zoom:1.4},
  {id:'oceania',label:'Oceania',latitude:-26,longitude:140,zoom:1.5},
+ {id:'quake',label:'Abalos',dynamic:'quake'},
  {id:'region',label:'Região',dynamic:'region'},
  {id:'devices',label:'Dispositivos',dynamic:'devices'}
 ];
@@ -1222,6 +1324,13 @@ function areaAnchor(id){
  if(!def)return null;
  if(def.dynamic==='region')return regionAnchor();
  if(def.dynamic==='devices')return deviceAnchor();
+ if(def.dynamic==='quake'){
+  const all=(state.live.events||[]).filter(e=>e&&e.category==='earthquake'&&e.location&&Number.isFinite(Number(e.location.latitude)));
+  const quakes=all.filter(e=>num(e.magnitude)>=2.5);
+  if(!all.length)return null;
+  const latest=(quakes.length?quakes:all).slice().sort((a,b)=>String(b.observed_at||'').localeCompare(String(a.observed_at||'')))[0];
+  return {latitude:num(latest.location.latitude),longitude:num(latest.location.longitude),zoom:1.9,label:latest.place_label||(latest.place&&latest.place.country)||'abalo recente'};
+ }
  return def;
 }
 function buildAreas(){
@@ -1259,7 +1368,8 @@ function renderDevices(){
  }
  $('deviceList').innerHTML=devices.map(device=>{
   const coords=device.located?num(device.latitude).toFixed(2)+', '+num(device.longitude).toFixed(2):'sem posição';
-  const detail=[device.type||'dispositivo',device.status||'offline',device.last_ip,device.source||'registro',coords].filter(Boolean).join(' · ');
+  const origin=device.location_source==='ip'?'IP≈':device.location_source==='gps'?'GPS':'';
+  const detail=[device.type||'dispositivo',device.status||'offline',origin,device.place_label||'',device.last_ip,coords].filter(Boolean).join(' · ');
   const badge=device.status==='online'?'ONLINE':device.status==='observed'?'OBSERVADO':String(device.status||'OFFLINE').toUpperCase();
   const body='<div class="grow"><b>'+esc(device.name)+'</b><small>'+esc(detail)+'</small></div><span class="pill '+(device.status==='online'?'':device.status==='observed'?'warn':'idle')+'">'+esc(badge)+'</span>';
   return true
@@ -1419,6 +1529,10 @@ function renderSelection(mark){
  addFact('IP',record.last_ip);
  addFact('MAC',record.mac);
  addFact('ORIGEM',record.source);
+ addFact('LOCAL',record.place_label||(record.place?[record.place.city,record.place.state,record.place.country].filter(Boolean).join(' · '):null));
+ addFact('POSIÇÃO',record.location_source==='ip'?'APROXIMADA POR IP':record.location_source==='gps'?'GPS DO DISPOSITIVO':null);
+ addFact('MAGNITUDE',record.magnitude!=null?'M'+num(record.magnitude).toFixed(1):null);
+ addFact('RAIO ESTIMADO',record.affected?num(record.affected.felt_radius_km)+' KM (ESTIMATIVA)':null);
  Object.entries(attributes).filter(([key,value])=>!['description','summary','callsign','name','altitude_m','speed_kts','speed_kmh','destination','origin','status'].includes(key)&&value!=null&&['string','number','boolean'].includes(typeof value)).slice(0,4).forEach(([key,value])=>addFact(key.replaceAll('_',' ').toUpperCase(),value));
  $('selectionFacts').innerHTML=facts.join('');
  const source=$('selectionSource');
@@ -1507,6 +1621,7 @@ function mergePayload(payload){
  if(payload.area)state.live.area=payload.area;
  if(payload.collected_at)state.live.collected_at=payload.collected_at;
  $('updatedAt').textContent=clockTime();
+ buildAreas();
  renderAll();
 }
 async function refreshStatus(){
@@ -1652,10 +1767,20 @@ async function pair(){
   button.textContent='Conectar ao Jarvis';
  }
 }
+async function refreshHudVersion(){
+ try{
+  const data=await api('/api/hud/version');
+  $('hudBuild').textContent=String(data.short||'--').toUpperCase();
+  $('hudBuild').title='HUD servido do repositório: '+String(data.source||'')+' · '+String(data.modified_at||'');
+ }catch(err){
+  $('hudBuild').textContent='--';
+  $('hudBuild').title=err.message;
+ }
+}
 async function refreshAll(){
  try{
   await refreshStatus();
-  await Promise.all([refreshTelemetry(),refreshIntelStatus(),refreshNetwork(),refreshBriefing(),refreshDevices()]);
+  await Promise.all([refreshTelemetry(),refreshIntelStatus(),refreshNetwork(),refreshBriefing(),refreshDevices(),refreshHudVersion()]);
   await refreshLatest();
   buildAreas();
   $('updatedAt').textContent=clockTime();
@@ -1876,9 +2001,9 @@ setView('core');
 (async()=>{
  await bootstrap();
  if(state.token){
-  await requestLocation();
   await refreshAll();
   startPolling();
+  requestLocation().then(ok=>{if(ok)refreshBriefing().then(buildAreas).catch(()=>{});}).catch(()=>{});
  }
 })();
 })();

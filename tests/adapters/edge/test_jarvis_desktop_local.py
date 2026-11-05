@@ -274,6 +274,13 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
             calls.append("osiris_collected")
             return IntelligenceBatch(sources=(SourceHealth(source_id="osiris_earthquakes", available=True),))
 
+        def collect_observations(self, limit):
+            assert limit == 20
+            with pytest.raises(RuntimeError):
+                asyncio.get_running_loop()
+            calls.append("osiris_observations")
+            return IntelligenceBatch()
+
         def close(self):
             calls.append("osiris_closed")
 
@@ -331,8 +338,8 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
 
     assert response.status_code == 200
     assert calls == [
-        "osiris_created", "osiris_collected", "gev_created", "gev_collected",
-        "public_closed", "osiris_closed",
+        "osiris_created", "osiris_collected", "osiris_observations",
+        "gev_created", "gev_collected", "public_closed", "osiris_closed",
     ]
     assert {item["source_id"] for item in response.json()["sources"]} == {
         "public_intelligence", "osiris_earthquakes", "gods_eye_view"
@@ -785,6 +792,12 @@ def test_osiris_endpoint_returns_route_health_and_events(monkeypatch):
                 sources=(SourceHealth(source_id="osiris_news", available=True),),
             )
 
+        def collect_observations(self, limit):
+            assert limit == 20
+            return IntelligenceBatch(
+                sources=(SourceHealth(source_id="osiris_flights", available=True),),
+            )
+
         def close(self):
             closed.append(True)
 
@@ -799,8 +812,11 @@ def test_osiris_endpoint_returns_route_health_and_events(monkeypatch):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["counts"] == {"events": 1, "routes_online": 1, "routes_total": 1}
+    assert payload["counts"] == {
+        "events": 1, "observations": 0, "routes_online": 2, "routes_total": 2,
+    }
     assert payload["events"][0]["location"] == {"latitude": 1.5, "longitude": 2.5}
+    assert payload["observations"] == []
     assert runtime.osiris_snapshot["counts"]["events"] == 1
     assert closed == [True]
 
@@ -896,7 +912,10 @@ def test_gods_eye_endpoint_reports_entity_counts_and_partial_health(monkeypatch)
     assert configured["area"] == {
         "west": -53.6, "south": -32.6, "east": -43.6, "north": -22.6,
     }
-    assert payload["counts"] == {"aircraft": 1, "vessel": 0, "satellite": 0}
+    assert payload["counts"] == {
+        "aircraft": 1, "vessel": 0, "satellite": 0,
+        "camera": 0, "infrastructure": 0, "military_site": 0,
+    }
     assert payload["error_code"] == "PartialFailure"
     assert payload["observations"][0]["position"] == {
         "latitude": -23.5, "longitude": -46.6,
@@ -1004,7 +1023,7 @@ def test_devices_endpoint_merges_registered_nodes_with_live_network_discovery(mo
     monkeypatch.setattr(
         desktop_local,
         "build_device_registry",
-        lambda _clients=None: {
+        lambda **_: {
             "success": True, "available": True, "devices": [
                 {"id": 7, "name": "Aperture", "type": "server", "status": "offline",
                  "last_ip": "100.115.33.101", "located": False,
@@ -1060,7 +1079,7 @@ def test_devices_endpoint_keeps_registry_available_when_network_discovery_fails(
     monkeypatch.setattr(
         desktop_local,
         "build_device_registry",
-        lambda: {"success": True, "available": True, "devices": [
+        lambda **_: {"success": True, "available": True, "devices": [
             {"id": 3, "name": "Phone", "type": "mobile", "status": "online",
              "last_ip": "192.168.1.20", "located": False}
         ], "total": 1, "located": 0},
@@ -1082,4 +1101,126 @@ def test_devices_endpoint_keeps_registry_available_when_network_discovery_fails(
     assert payload["available"] is True
     assert payload["total"] == 1
     assert payload["devices"][0]["name"] == "Phone"
+
+
+def test_hud_version_identifies_the_served_repository_file():
+    import hashlib
+
+    runtime = LocalRuntime()
+    response = _client(runtime).get(
+        "/api/hud/version",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    raw = (Path(__file__).resolve().parents[3] / "app" / "static" / "jarvis-desktop.html").read_bytes()
+    assert payload["sha256"] == hashlib.sha256(raw).hexdigest()
+    assert payload["short"] == payload["sha256"][:8]
+    assert payload["bytes"] == len(raw)
+    assert payload["source"].endswith("jarvis-desktop.html")
+    assert payload["single_source"] is True
+
+
+def test_hud_version_requires_the_local_token():
+    assert _client(LocalRuntime()).get("/api/hud/version").status_code == 401
+
+
+def test_open_cameras_route_passes_coordinates_and_validates_them(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    seen: dict = {}
+
+    def fake(latitude, longitude, **kwargs):
+        seen.update({"latitude": latitude, "longitude": longitude, **kwargs})
+        return {"success": True, "located": latitude is not None, "cameras": []}
+
+    monkeypatch.setattr(desktop_local, "build_open_cameras", fake)
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    headers = {"Authorization": f"Bearer {runtime.token}"}
+
+    assert client.get("/api/cameras/open", headers=headers).status_code == 200
+    assert seen == {"latitude": None, "longitude": None, "radius_km": 120.0, "limit": 24}
+
+    response = client.get(
+        "/api/cameras/open?lat=-25.4284&lon=-49.2733&radius_km=200&limit=8",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert seen == {"latitude": -25.4284, "longitude": -49.2733, "radius_km": 200.0, "limit": 8}
+
+    assert client.get("/api/cameras/open?lat=-2", headers=headers).status_code == 422
+    assert client.get("/api/cameras/open?lat=95&lon=10", headers=headers).status_code == 422
+    assert client.get("/api/cameras/open?lat=1&lon=2&radius_km=900", headers=headers).status_code == 422
+    assert client.get("/api/cameras/open?lat=1&lon=2").status_code == 401
+
+
+def test_earthquake_radii_are_an_explicit_estimate():
+    from app.adapters.edge.jarvis_desktop_local import earthquake_radii
+
+    five = earthquake_radii(5.0)
+    six = earthquake_radii(6.0)
+    assert five["estimate"] is True
+    assert five["method"] == "magnitude_scaling_v1"
+    assert five["felt_radius_km"] < six["felt_radius_km"]
+    assert five["damage_radius_km"] < five["felt_radius_km"]
+    assert earthquake_radii(None) is None
+    assert earthquake_radii("forte") is None
+    assert earthquake_radii(42) is None
+
+
+def test_earthquake_enrichment_adds_place_and_radius_without_guessing(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setattr(
+        desktop_local,
+        "reverse_place",
+        lambda lat, lon: {
+            "available": True,
+            "city": "Curitiba",
+            "state": "Paraná",
+            "country": "Brasil",
+        },
+    )
+    payload = {
+        "events": [
+            {"category": "earthquake", "magnitude": 5.2,
+             "location": {"latitude": -25.42, "longitude": -49.27}},
+            {"category": "earthquake", "magnitude": 4.1,
+             "location": {"latitude": None, "longitude": None}},
+            {"category": "wildfire", "magnitude": None,
+             "location": {"latitude": -10, "longitude": -50}},
+        ]
+    }
+
+    out = desktop_local._enrich_earthquakes(payload)
+
+    quake = out["events"][0]
+    assert quake["place_label"] == "Curitiba · Paraná · Brasil"
+    assert quake["affected"]["felt_radius_km"] > 0
+    assert "place" not in out["events"][1]
+    assert "affected" not in out["events"][2]
+
+
+def test_earthquake_enrichment_reports_geocode_failure_instead_of_a_place(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setattr(
+        desktop_local,
+        "reverse_place",
+        lambda lat, lon: {"available": False, "reason": "timeout"},
+    )
+    payload = {
+        "events": [
+            {"category": "earthquake", "magnitude": 4.4,
+             "location": {"latitude": -25.42, "longitude": -49.27}}
+        ]
+    }
+
+    quake = desktop_local._enrich_earthquakes(payload)["events"][0]
+
+    assert "place" not in quake
+    assert quake["place_reason"] == "timeout"
+    assert quake["affected"]["estimate"] is True
 

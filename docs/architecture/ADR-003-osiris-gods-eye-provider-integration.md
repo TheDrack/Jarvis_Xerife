@@ -47,6 +47,8 @@ Initial candidates, subject to runtime `tools/list` schema and `readOnlyHint` ve
 
 The caller must provide bounded areas/limits where required. A truncated response is never interpreted as complete coverage. Query tools that require an API key report unavailable when that key is absent; do not silently substitute an empty dataset.
 
+**Implemented in the adapter:** `aircraft_in_area`, `vessels_in_area`, `satellites_overhead`, `find_cctv_cameras`, `find_infrastructure`, `find_military_installations`. Every call still requires a runtime `readOnlyHint` and a required `area`/`location` property. Static mapped assets use the query instant as `observed_at`; the remaining candidates stay unimplemented until a captured schema and a dedicated parser exist.
+
 ### OSIRIS REST feed routes
 
 Initial candidates, subject to endpoint-level response contract tests:
@@ -61,6 +63,8 @@ Initial candidates, subject to endpoint-level response contract tests:
 - `GET /api/cctv` (only bounded region/viewport queries; camera feed URLs are metadata, not content to proxy)
 
 Each endpoint must have a dedicated parser and a fixture based on its actual repository implementation. A non-2xx response, provider-level error field, malformed payload, stale cache marker or partial source failure must be represented explicitly in source health. A successful HTTP status with an empty array is not proof of complete coverage.
+
+**Implemented in the adapter:** `earthquakes`, `fires`, `news`, `weather` and `gdelt` as events; `flights`, `maritime`, `satellites` and `cctv` as bounded observations. `flights` preserves the provider's `alt` field verbatim and labels it as such because the route does not state a unit; `cctv` ingests directory metadata only and never proxies or probes a stream.
 
 ## Security and data governance
 
