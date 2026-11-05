@@ -130,16 +130,25 @@ invalid entries are counted in `rejected` instead of being silently dropped.
 
 ## Devices on the globe
 
-`GET /api/devices` reads the `devices` table of the local SQLite registry
-(`jarvis.db`, override with `JARVIS_DEVICES_DB`) with `mode=ro`. Nothing is
-written: each row returns name, type, status, last IP, last seen and the
-coordinates the node itself reported. A device without coordinates is still
-listed with `located: false` and is not drawn — no position is inferred from
-the IP address.
+`GET /api/devices` combines the local SQLite registry
+(`jarvis.db`, override with `JARVIS_DEVICES_DB`, opened with `mode=ro`)
+with current read-only evidence from:
+- Tailscale peer status from the local CLI;
+- the OS ARP/neighbour cache for interfaces explicitly classified as RFC1918
+  `private`, limited to /24 or narrower;
+- connected ADB devices, when ADB is installed;
+- paired desktop clients seen in the last 120 seconds.
+
+ARP entries are observations from the existing OS cache: no probes are sent,
+and an ARP entry is labelled `observed`, not confirmed `online`. Non-RFC1918
+interfaces such as link-local and CGNAT/overlay networks are not passed to the
+RFC1918-only discovery adapter. The endpoint does not write registry rows.
+Coordinates are shown only when the registered node reported them; no position
+is inferred from a private IP, ARP address or MAC address.
 
 The HUD plots located devices as amber hexagons (bright when `online`, dim when
-`offline`) and lists them in the DISPOSITIVOS panel, where a row recenters the
-globe on that device.
+`offline`) and lists all registered/discovered devices in the DISPOSITIVOS
+panel, where a row recenters the globe when coordinates are available.
 
 ## Briefing anchored on the accessing device
 
