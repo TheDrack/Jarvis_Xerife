@@ -15,10 +15,13 @@ as $$
 declare
     v_agent public.jarvis_agents%rowtype;
     v_task public.jarvis_agent_tasks%rowtype;
+    v_heartbeat_timeout integer;
 begin
     if p_lease_seconds is null or p_lease_seconds < 10 or p_lease_seconds > 3600 then
         raise exception 'lease duration must be between 10 and 3600 seconds';
     end if;
+
+    v_heartbeat_timeout := greatest(90, p_lease_seconds);
 
     select * into v_agent
       from public.jarvis_agents
@@ -27,6 +30,8 @@ begin
 
     if not found
        or v_agent.status not in ('available', 'busy')
+       or v_agent.last_seen_at is null
+       or v_agent.last_seen_at <= now() - make_interval(secs => v_heartbeat_timeout)
        or v_agent.active_tasks >= v_agent.concurrency_limit then
         return;
     end if;
