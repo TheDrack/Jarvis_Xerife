@@ -1,0 +1,63 @@
+name: Supabase provider-aware task claim tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20261104235000_provider_aware_remote_task_claims.sql"
+      - "supabase/tests/provider_aware_task_claims.test.sql"
+      - ".github/workflows/supabase-provider-claims-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-provider-claims-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pgtap:
+    name: PostgreSQL behavior tests (isolated local Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+
+      - name: Assemble isolated migration fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_dir="${RUNNER_TEMP}/jarvis-provider-claims"
+          mkdir -p "${test_dir}"
+          cd "${test_dir}"
+          supabase init --force
+
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610230002_multi_agent_control_plane.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610230004_priority_routine_scheduler.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610260001_red_blue_venice_routing.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261027120000_agent_model_provider.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261104235000_provider_aware_remote_task_claims.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/tests/provider_aware_task_claims.test.sql" supabase/tests/
+
+      - name: Start isolated PostgreSQL
+        working-directory: ${{ runner.temp }}/jarvis-provider-claims
+        run: |
+          supabase start --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Execute pgTAP behavior tests
+        working-directory: ${{ runner.temp }}/jarvis-provider-claims
+        run: supabase test db supabase/tests/provider_aware_task_claims.test.sql
+
+      - name: Stop isolated database
+        if: always()
+        working-directory: ${{ runner.temp }}/jarvis-provider-claims
+        run: supabase stop --no-backup || true
