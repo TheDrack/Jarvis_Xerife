@@ -3,10 +3,6 @@
 -- SupabaseAgentStore.claim_task calls this direct RPC and could bypass that gate.
 -- Forward-only: no existing task or agent rows are rewritten.
 
--- Reconcile production task-claim RPCs with provider-aware Red/Blue routing.
--- Preserve the live lease, fencing, concurrency, parent-task and tool checks.
--- This is forward-only: no task or agent rows are rewritten.
-
 create or replace function public.claim_jarvis_agent_task(
     p_task_id text,
     p_agent_id text,
@@ -122,7 +118,6 @@ begin
     return next v_task;
 end;
 $$;
-
 
 revoke all on function public.claim_jarvis_agent_task(text, text, integer) from public, anon, authenticated;
 grant execute on function public.claim_jarvis_agent_task(text, text, integer) to service_role;
