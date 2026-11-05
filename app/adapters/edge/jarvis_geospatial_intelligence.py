@@ -53,7 +53,7 @@ def filter_assets_by_radius(
         raise ValueError("viewport coordinates and radius are invalid")
     matches: list[dict[str, Any]] = []
     for asset in assets:
-        if not isinstance(asset, dict):
+        if not isinstance(asset, dict) or asset.get("located") is not True:
             continue
         lat = _number(asset.get("latitude"), 90.0)
         lon = _number(asset.get("longitude"), 180.0)

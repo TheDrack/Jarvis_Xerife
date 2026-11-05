@@ -120,7 +120,13 @@ def test_globe_selection_opens_a_contextual_inspector_with_an_action():
     assert 'id="selectionTitle"' in HTML
     assert 'id="selectionDetail"' in HTML
     assert 'id="selectionAction"' in HTML
-    assert "Globe.onSelect(mark=>{state.selected=mark;renderSelection(mark);renderStatus();})" in HTML
+    assert "Globe.onSelect(mark=>{" in HTML
+    assert "state.selected=mark;" in HTML
+    assert "renderSelection(mark);" in HTML
+    assert "renderStatus();" in HTML
+    assert "if(mark.kind==='device_cluster')" in HTML
+    assert "Globe.getZoom()" in HTML
+    assert "Globe.focusTo(mark.latitude,mark.longitude,next)" in HTML
     assert "function renderSelection(mark)" in HTML
 
 

@@ -1224,3 +1224,86 @@ def test_earthquake_enrichment_reports_geocode_failure_instead_of_a_place(monkey
     assert quake["place_reason"] == "timeout"
     assert quake["affected"]["estimate"] is True
 
+def test_geospatial_assets_route_filters_registered_inventory(monkeypatch, tmp_path):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setenv("JARVIS_GEOINT_DB", str(tmp_path / "geospatial.db"))
+    monkeypatch.setattr(desktop_local, "_device_snapshot", lambda clients=None: {
+        "devices": [
+            {"id": 21, "name": "GPS asset", "latitude": -23.55, "longitude": -46.63,
+             "located": True, "location_source": "gps", "approximate": False},
+            {"id": -1, "name": "Unlocated asset", "latitude": None, "longitude": None,
+             "located": False},
+        ],
+        "total": 2,
+    })
+    runtime = LocalRuntime()
+    response = _client(runtime).get(
+        "/api/geospatial/assets?latitude=-23.56&longitude=-46.64&radius_km=10",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    assert [asset["id"] for asset in response.json()["assets"]] == [21]
+    assert response.json()["count"] == 1
+
+
+def test_geospatial_watchlist_requires_registered_stable_id(monkeypatch, tmp_path):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setenv("JARVIS_GEOINT_DB", str(tmp_path / "geospatial.db"))
+    monkeypatch.setattr(desktop_local, "_device_snapshot", lambda clients=None: {
+        "devices": [{"id": -1, "name": "ephemeral", "last_ip": "192.0.2.10"}]
+    })
+    runtime = LocalRuntime()
+    response = _client(runtime).post(
+        "/api/geospatial/watchlist", json={"asset_id": -1},
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+    assert response.status_code == 422
+
+
+def test_geospatial_watchlist_adds_registered_device_and_exposes_history(monkeypatch, tmp_path):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setenv("JARVIS_GEOINT_DB", str(tmp_path / "geospatial.db"))
+    monkeypatch.setattr(desktop_local, "_device_snapshot", lambda clients=None: {
+        "devices": [{
+            "id": 21, "name": "Phone", "type": "mobile", "status": "online",
+            "last_ip": "192.0.2.21", "latitude": -23.55, "longitude": -46.63,
+            "location_source": "gps", "approximate": False,
+        }]
+    })
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    headers = {"Authorization": f"Bearer {runtime.token}"}
+
+    added = client.post("/api/geospatial/watchlist", json={"asset_id": 21}, headers=headers)
+    assert added.status_code == 201
+    assert added.json()["asset"]["asset_id"] == 21
+    assert client.get("/api/geospatial/watchlist", headers=headers).json()["count"] == 1
+    history = client.get("/api/geospatial/history/21", headers=headers)
+    assert history.status_code == 200
+    assert [item["change_type"] for item in history.json()["history"]] == ["added"]
+
+
+def test_geospatial_watchlist_rejects_unknown_assets_and_unauthorized_requests(monkeypatch, tmp_path):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setenv("JARVIS_GEOINT_DB", str(tmp_path / "geospatial.db"))
+    monkeypatch.setattr(desktop_local, "_device_snapshot", lambda clients=None: {"devices": []})
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    assert client.post("/api/geospatial/watchlist", json={"asset_id": 404},
+                       headers={"Authorization": f"Bearer {runtime.token}"}).status_code == 404
+    assert client.get("/api/geospatial/watchlist").status_code == 401
+
+
+
+def test_desktop_serves_geospatial_layer_script():
+    runtime = LocalRuntime()
+    response = _client(runtime).get("/static/jarvis-geospatial-layer.js")
+
+    assert response.status_code == 200
+    assert "buildDeviceMarkers" in response.text
+    assert "javascript" in response.headers["content-type"].lower()

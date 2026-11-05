@@ -31,6 +31,11 @@ from app.adapters.edge.jarvis_device_registry import (
     ip_geolocation_enabled,
     lookup_ip,
 )
+from app.adapters.edge.jarvis_geospatial_intelligence import (
+    MAX_VIEW_RADIUS_KM,
+    GeospatialWatchlistStore,
+    filter_assets_by_radius,
+)
 from app.adapters.edge.jarvis_open_cameras import build_open_cameras
 from app.adapters.edge.network_discovery_adapter import discover_devices, network_interfaces
 from app.adapters.infrastructure.routers.intelligence_dashboard import build_intelligence_status
@@ -41,6 +46,7 @@ logger = logging.getLogger(__name__)
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
 _WORLD_LAND_PATH = _REPO_ROOT / "app" / "static" / "world-land.json"
+_GEO_LAYER_PATH = _REPO_ROOT / "app" / "static" / "jarvis-geospatial-layer.js"
 _ICON_PATH = _REPO_ROOT / "app" / "static" / "jarvis-icon.svg"
 _WINDOWS_ICON_PATH = _REPO_ROOT / "desktop" / "jarvis.ico"
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
@@ -54,6 +60,7 @@ _LOCAL_INTELLIGENCE_KEYS = {
     "JARVIS_GEV_AREA_EAST",
     "JARVIS_GEV_AREA_NORTH",
     "JARVIS_DEVICES_DB",
+    "JARVIS_GEOINT_DB",
 }
 
 
@@ -215,6 +222,22 @@ def _adb_snapshot() -> dict[str, Any]:
 
 class PairRequest(BaseModel):
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class GeospatialWatchRequest(BaseModel):
+    asset_id: int = Field(gt=0)
+
+
+def _geospatial_store() -> GeospatialWatchlistStore:
+    configured = os.getenv("JARVIS_GEOINT_DB", "").strip()
+    if configured:
+        path = Path(configured).expanduser()
+    else:
+        local_app_data = Path(
+            os.getenv("LOCALAPPDATA") or (Path.home() / "AppData" / "Local")
+        )
+        path = local_app_data / "Jarvis_Xerife" / "geospatial_intelligence.db"
+    return GeospatialWatchlistStore(path)
 
 
 def _osiris_enabled() -> bool:
@@ -640,6 +663,12 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="Mapa-múndi indisponível.")
         return FileResponse(_WORLD_LAND_PATH, media_type="application/json")
 
+    @app.get("/static/jarvis-geospatial-layer.js", include_in_schema=False)
+    async def desktop_geospatial_layer() -> FileResponse:
+        if not _GEO_LAYER_PATH.is_file():
+            raise HTTPException(status_code=404, detail="Camada geoespacial indisponível.")
+        return FileResponse(_GEO_LAYER_PATH, media_type="application/javascript")
+
     @app.get("/favicon.ico", include_in_schema=False)
     async def desktop_icon_ico() -> FileResponse:
         if not _WINDOWS_ICON_PATH.is_file():
@@ -1021,6 +1050,131 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             if now - seen < 120
         ]
         return await _run_sync_io_off_loop(_device_snapshot, clients)
+
+    @app.get("/api/geospatial/assets")
+    async def geospatial_assets(
+        latitude: float = Query(ge=-90, le=90),
+        longitude: float = Query(ge=-180, le=180),
+        radius_km: float = Query(gt=0, le=MAX_VIEW_RADIUS_KM),
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Filter the current authorized device inventory by the map viewport."""
+        now = time.monotonic()
+        clients = [
+            {"address": address, "last_seen_seconds": max(0, int(now - seen))}
+            for address, seen in state.clients.items()
+            if now - seen < 120
+        ]
+        snapshot = await _run_sync_io_off_loop(_device_snapshot, clients)
+        assets = filter_assets_by_radius(
+            snapshot.get("devices", []),
+            latitude=latitude,
+            longitude=longitude,
+            radius_km=radius_km,
+        )
+        return {
+            "success": True,
+            "center": {"latitude": latitude, "longitude": longitude},
+            "radius_km": radius_km,
+            "count": len(assets),
+            "inventory_total": int(snapshot.get("total") or len(snapshot.get("devices", []))),
+            "assets": assets,
+            "timestamp": snapshot.get("timestamp") or datetime.now(timezone.utc).isoformat(),
+        }
+
+    @app.get("/api/geospatial/watchlist")
+    async def geospatial_watchlist(
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        assets = await _run_sync_io_off_loop(_geospatial_store().list_assets)
+        return {"success": True, "count": len(assets), "assets": assets}
+
+    @app.post("/api/geospatial/watchlist", status_code=201)
+    async def geospatial_watchlist_add(
+        payload: GeospatialWatchRequest,
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Only stable positive IDs from the current registered inventory are eligible."""
+        now = time.monotonic()
+        clients = [
+            {"address": address, "last_seen_seconds": max(0, int(now - seen))}
+            for address, seen in state.clients.items()
+            if now - seen < 120
+        ]
+        snapshot = await _run_sync_io_off_loop(_device_snapshot, clients)
+        asset = next(
+            (
+                item for item in snapshot.get("devices", [])
+                if int(item.get("id") or 0) == payload.asset_id
+            ),
+            None,
+        )
+        if asset is None or int(asset.get("id") or 0) <= 0:
+            raise HTTPException(status_code=404, detail="Dispositivo registrado não encontrado.")
+        try:
+            saved = await _run_sync_io_off_loop(_geospatial_store().add, asset)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {"success": True, "asset": saved}
+
+    @app.post("/api/geospatial/watchlist/refresh")
+    async def geospatial_watchlist_refresh(
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Reconcile selected assets against the latest local device inventory."""
+        now = time.monotonic()
+        clients = [
+            {"address": address, "last_seen_seconds": max(0, int(now - seen))}
+            for address, seen in state.clients.items()
+            if now - seen < 120
+        ]
+        snapshot = await _run_sync_io_off_loop(_device_snapshot, clients)
+        current = {
+            int(item["id"]): item
+            for item in snapshot.get("devices", [])
+            if int(item.get("id") or 0) > 0
+        }
+        store = _geospatial_store()
+        watched = await _run_sync_io_off_loop(store.list_assets)
+        observations = []
+        for entry in watched:
+            asset = current.get(int(entry["asset_id"]))
+            if asset is None:
+                continue
+            observations.append(
+                await _run_sync_io_off_loop(store.observe, asset)
+            )
+        return {
+            "success": True,
+            "checked": len(watched),
+            "observed": len(observations),
+            "changes": sum(bool(item.get("changed")) for item in observations),
+            "observations": observations,
+            "timestamp": snapshot.get("timestamp"),
+        }
+
+    @app.delete("/api/geospatial/watchlist/{asset_id}")
+    async def geospatial_watchlist_remove(
+        asset_id: int,
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        if asset_id <= 0:
+            raise HTTPException(status_code=422, detail="asset_id deve ser positivo.")
+        removed = await _run_sync_io_off_loop(_geospatial_store().remove, asset_id)
+        if not removed:
+            raise HTTPException(status_code=404, detail="Dispositivo não está na watchlist.")
+        return {"success": True, "asset_id": asset_id, "removed": True}
+
+    @app.get("/api/geospatial/history/{asset_id}")
+    async def geospatial_history(
+        asset_id: int,
+        limit: int = Query(default=100, ge=1, le=500),
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        if asset_id <= 0:
+            raise HTTPException(status_code=422, detail="asset_id deve ser positivo.")
+        history = await _run_sync_io_off_loop(_geospatial_store().history, asset_id, limit)
+        return {"success": True, "asset_id": asset_id, "count": len(history), "history": history}
 
     @app.get("/intelligence", response_class=HTMLResponse, include_in_schema=False)
     async def universal_intelligence_page() -> HTMLResponse:
