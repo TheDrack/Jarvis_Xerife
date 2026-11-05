@@ -42,6 +42,7 @@ _LOCAL_INTELLIGENCE_KEYS = {
     "JARVIS_GEV_AREA_SOUTH",
     "JARVIS_GEV_AREA_EAST",
     "JARVIS_GEV_AREA_NORTH",
+    "JARVIS_DEVICES_DB",
 }
 
 
@@ -308,6 +309,192 @@ def _tailscale_snapshot() -> dict[str, Any]:
             "addresses": [str(value) for value in (self_node.get("TailscaleIPs") or [])[:2]],
         },
         "peers": peers[:20],
+    }
+
+
+def _network_device_snapshot(clients: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Collect current read-only network evidence for the desktop device inventory."""
+    interfaces_result = network_interfaces()
+    interfaces = interfaces_result.get("interfaces", [])
+    neighbours: dict[str, dict[str, str]] = {}
+    scopes: list[str] = []
+    for interface in interfaces[:8]:
+        cidr = str(interface.get("network", ""))
+        try:
+            network = ipaddress.ip_network(cidr, strict=False)
+        except ValueError:
+            continue
+        if isinstance(network, ipaddress.IPv4Network) and network.is_private and network.prefixlen >= 24:
+            if str(network) not in scopes:
+                scopes.append(str(network))
+                snapshot = discover_devices(str(network))
+                for device in snapshot.get("devices", []):
+                    if device.get("ip"):
+                        neighbours[device["ip"]] = device
+    return {
+        "success": bool(interfaces_result.get("success")),
+        "interfaces": interfaces,
+        "neighbors": sorted(
+            neighbours.values(),
+            key=lambda item: tuple(int(part) for part in item["ip"].split(".")),
+        ),
+        "neighbor_method": "passive_arp_cache",
+        "active_probes_sent": 0,
+        "scopes": scopes,
+        "android_adb": _adb_snapshot(),
+        "tailscale": _tailscale_snapshot(),
+        "clients": clients or [],
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _device_snapshot(clients: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Merge registered devices with current ARP, Tailscale, ADB and paired-client evidence."""
+    registry = build_device_registry()
+    network = _network_device_snapshot(clients)
+    devices = [dict(item) for item in registry.get("devices", [])]
+    by_ip = {
+        str(item.get("last_ip")): item
+        for item in devices
+        if item.get("last_ip")
+    }
+    discovered = 0
+    next_id = -1
+
+    def add_or_enrich(
+        *,
+        name: str,
+        device_type: str,
+        status: str,
+        source: str,
+        address: str | None = None,
+        last_seen: str | None = None,
+        mac: str | None = None,
+        serial: str | None = None,
+    ) -> None:
+        nonlocal discovered, next_id
+        key = str(address or "").strip()
+        existing = by_ip.get(key) if key else None
+        if existing is not None:
+            existing["name"] = name or existing.get("name") or "dispositivo"
+            existing["type"] = device_type or existing.get("type") or "desconhecido"
+            existing["status"] = status
+            existing["source"] = source
+            if last_seen:
+                existing["last_seen"] = last_seen
+            if mac:
+                existing["mac"] = mac
+            if serial:
+                existing["serial"] = serial
+            return
+        item: dict[str, Any] = {
+            "id": next_id,
+            "name": name[:80] or (key or "dispositivo"),
+            "type": device_type[:32] or "desconhecido",
+            "status": status[:24],
+            "latitude": None,
+            "longitude": None,
+            "located": False,
+            "last_ip": key or None,
+            "last_seen": last_seen,
+            "network_type": "tailscale" if source == "tailscale" else "lan",
+            "network_id": None,
+            "source": source,
+        }
+        if mac:
+            item["mac"] = mac
+        if serial:
+            item["serial"] = serial
+        devices.append(item)
+        if key:
+            by_ip[key] = item
+        next_id -= 1
+        discovered += 1
+
+    tailscale = network.get("tailscale") or {}
+    self_node = tailscale.get("self") or {}
+    self_addresses = self_node.get("addresses") or []
+    self_ip = next((value for value in self_addresses if ":" not in str(value)), None)
+    if self_node.get("hostname"):
+        add_or_enrich(
+            name=str(self_node["hostname"]),
+            device_type="desktop",
+            status="online",
+            source="tailscale",
+            address=self_ip,
+        )
+    for peer in tailscale.get("peers") or []:
+        addresses = peer.get("addresses") or []
+        address = next((value for value in addresses if ":" not in str(value)), None)
+        add_or_enrich(
+            name=str(peer.get("hostname") or address or "Tailscale peer"),
+            device_type=str(peer.get("os") or "tailscale"),
+            status="online" if peer.get("online") else "offline",
+            source="tailscale",
+            address=address,
+            last_seen=peer.get("last_seen"),
+        )
+
+    for neighbor in network.get("neighbors") or []:
+        address = str(neighbor.get("ip") or "")
+        add_or_enrich(
+            name=address,
+            device_type="network",
+            status="observed",
+            source="arp_cache",
+            address=address,
+            mac=neighbor.get("mac"),
+        )
+
+    adb = network.get("android_adb") or {}
+    for item in adb.get("devices") or []:
+        serial = str(item.get("serial") or "")
+        if not serial:
+            continue
+        add_or_enrich(
+            name=serial,
+            device_type="android",
+            status="online" if item.get("state") == "device" else str(item.get("state") or "offline"),
+            source="adb",
+            serial=serial,
+        )
+
+    for client in network.get("clients") or []:
+        address = str(client.get("address") or "")
+        if not address:
+            continue
+        add_or_enrich(
+            name=address,
+            device_type="paired_client",
+            status="online",
+            source="paired_client",
+            address=address,
+            last_seen=datetime.now(timezone.utc).isoformat(),
+        )
+
+    registry_available = bool(registry.get("available"))
+    network_available = bool(
+        network.get("success")
+        or tailscale.get("available")
+        or adb.get("available")
+    )
+    return {
+        **registry,
+        "available": registry_available or network_available,
+        "success": bool(registry.get("success") or network_available),
+        "devices": devices,
+        "registered_total": len(registry.get("devices", [])),
+        "discovered_total": discovered,
+        "total": len(devices),
+        "located": sum(1 for item in devices if item.get("located")),
+        "network": {
+            "interfaces": len(network.get("interfaces") or []),
+            "neighbors": len(network.get("neighbors") or []),
+            "tailscale_peers": len(tailscale.get("peers") or []),
+            "adb_devices": len(adb.get("devices") or []),
+            "timestamp": network.get("timestamp"),
+        },
+        "timestamp": network.get("timestamp"),
     }
 
 
@@ -695,8 +882,14 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
 
     @app.get("/api/devices")
     async def devices(_client: str = Depends(require_local_token)) -> dict[str, Any]:
-        """Return the registered devices (read-only) so the HUD can plot them."""
-        return await _run_sync_io_off_loop(build_device_registry)
+        """Return registered devices merged with the current read-only network snapshot."""
+        now = time.monotonic()
+        clients = [
+            {"address": address, "last_seen_seconds": max(0, int(now - seen))}
+            for address, seen in state.clients.items()
+            if now - seen < 120
+        ]
+        return await _run_sync_io_off_loop(_device_snapshot, clients)
 
     @app.get("/intelligence", response_class=HTMLResponse, include_in_schema=False)
     async def universal_intelligence_page() -> HTMLResponse:
@@ -837,38 +1030,13 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
 
     @app.get("/api/network/status")
     async def network_status(_client: str = Depends(require_local_token)) -> dict[str, Any]:
-        interfaces_result = network_interfaces()
-        interfaces = interfaces_result.get("interfaces", [])
-        neighbours: dict[str, dict[str, str]] = {}
-        scopes: list[str] = []
-        for interface in interfaces[:8]:
-            cidr = str(interface.get("network", ""))
-            try:
-                network = ipaddress.ip_network(cidr, strict=False)
-            except ValueError:
-                continue
-            if isinstance(network, ipaddress.IPv4Network) and network.is_private and network.prefixlen >= 24:
-                if str(network) not in scopes:
-                    scopes.append(str(network))
-                    snapshot = discover_devices(str(network))
-                    for device in snapshot.get("devices", []):
-                        neighbours[device["ip"]] = device
-        return {
-            "success": bool(interfaces_result.get("success")),
-            "interfaces": interfaces,
-            "neighbors": sorted(neighbours.values(), key=lambda item: tuple(int(x) for x in item["ip"].split("."))),
-            "neighbor_method": "passive_arp_cache",
-            "active_probes_sent": 0,
-            "scopes": scopes,
-            "android_adb": _adb_snapshot(),
-            "tailscale": _tailscale_snapshot(),
-            "clients": [
-                {"address": address, "last_seen_seconds": max(0, int(time.monotonic() - seen))}
-                for address, seen in state.clients.items()
-                if time.monotonic() - seen < 120
-            ],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+        now = time.monotonic()
+        clients = [
+            {"address": address, "last_seen_seconds": max(0, int(now - seen))}
+            for address, seen in state.clients.items()
+            if now - seen < 120
+        ]
+        return await _run_sync_io_off_loop(_network_device_snapshot, clients)
 
     return app
 
