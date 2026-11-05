@@ -41,17 +41,42 @@ def test_privileged_self_healing_does_not_trigger_directly_on_pull_requests():
     assert "github.event.workflow_run.event == 'push'" in workflow
 
 
-def test_llm_generated_code_is_retested_after_provider_credentials_are_removed():
+def test_llm_generated_code_is_retested_without_provider_credentials():
     workflow = HEAL_WORKFLOW.read_text(encoding="utf-8")
 
-    unset_index = workflow.index(
-        "unset GROQ_API_KEY GEMINI_API_KEY OPENROUTER_API_KEY MISTRAL_API_KEY"
+    initial_start = workflow.index(
+        "      - name: 🧪 Testes antes da auto-cura (sem segredos)"
     )
-    final_test_index = workflow.index(
-        'uv run pytest "${PYTEST_ARGS[@]}" --json-report --json-report-file="$RUNNER_TEMP/report_final.json"'
+    healer_start = workflow.index(
+        "      - name: 🤖 Auto-cura com acesso temporário a provedores",
+        initial_start,
+    )
+    final_start = workflow.index(
+        "      - name: 🧪 Revalidação após auto-cura (sem segredos)",
+        healer_start,
+    )
+    create_pr_start = workflow.index(
+        "      - name: 🛠️ Criar branch e Pull Request da correção",
+        final_start,
     )
 
-    assert unset_index < final_test_index
+    initial_tests = workflow[initial_start:healer_start]
+    healer = workflow[healer_start:final_start]
+    final_tests = workflow[final_start:create_pr_start]
+
+    assert "uv run pytest" in initial_tests
+    assert "uv run pytest" in final_tests
+    assert "uv run pytest" not in healer
+
+    for secret_name in (
+        "GROQ_API_KEY",
+        "GEMINI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "MISTRAL_API_KEY",
+    ):
+        assert secret_name not in initial_tests
+        assert secret_name in healer
+        assert secret_name not in final_tests
 
 
 def test_auto_healing_changes_are_proposed_in_a_branch_and_never_stage_workflows():
