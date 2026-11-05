@@ -1,7 +1,7 @@
 -- Regression tests for provider-aware multi-agent task claims.
 -- This file is executed only against an isolated local Supabase database.
 begin;
-select plan(25);
+select plan(29);
 
 select ok(
     position('lower(replace(replace(v_task.task_type' in
@@ -199,13 +199,30 @@ select ok(
     'direct claims reject stale and missing heartbeats without mutating state'
 );
 
-select ok(
-    (select count(*)::integer from public.claim_next_jarvis_agent_task('pgtap-stale-venice', 60)) = 0
-    and (select status = 'offline' from public.jarvis_agents where agent_id = 'pgtap-stale-venice')
-    and (select status = 'offline' from public.jarvis_agents where agent_id = 'pgtap-null-heartbeat')
-    and (select status = 'ready' from public.jarvis_agent_tasks where task_id = 'pgtap-stale-heartbeat-task')
-    and (select status = 'ready' from public.jarvis_agent_tasks where task_id = 'pgtap-null-heartbeat-task'),
-    'stale and missing heartbeats are reconciled offline without claiming their tasks'
+select is(
+    (select count(*)::integer from public.claim_next_jarvis_agent_task('pgtap-stale-venice', 60)),
+    0,
+    'queue does not claim work for an agent with an expired heartbeat'
+);
+select is(
+    (select status from public.jarvis_agents where agent_id = 'pgtap-stale-venice'),
+    'offline',
+    'expired heartbeat transitions the stale agent to offline'
+);
+select is(
+    (select status from public.jarvis_agents where agent_id = 'pgtap-null-heartbeat'),
+    'offline',
+    'missing heartbeat transitions the agent to offline'
+);
+select is(
+    (select status from public.jarvis_agent_tasks where task_id = 'pgtap-stale-heartbeat-task'),
+    'ready',
+    'stale agent task remains available after rejected claim'
+);
+select is(
+    (select status from public.jarvis_agent_tasks where task_id = 'pgtap-null-heartbeat-task'),
+    'ready',
+    'missing-heartbeat agent task remains available after rejected claim'
 );
 
 do $lease_test$
