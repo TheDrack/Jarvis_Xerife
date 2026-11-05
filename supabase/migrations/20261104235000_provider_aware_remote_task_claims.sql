@@ -103,7 +103,7 @@ returns integer
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $
+as $heartbeat$
 declare
     v_updated integer := 0;
 begin
@@ -131,7 +131,7 @@ begin
     get diagnostics v_updated = row_count;
     return v_updated;
 end;
-$;
+$heartbeat$;
 
 create or replace function public.claim_next_jarvis_agent_task(
     p_agent_id text,
