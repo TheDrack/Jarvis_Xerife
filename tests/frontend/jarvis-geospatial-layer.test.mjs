@@ -91,4 +91,5 @@ test('desktop HUD loads the geospatial layer and debounces zoom-only rebuilds', 
   assert.match(html, /Globe\.setDeviceData\(locatedDevices\(\)\)/);
   assert.match(html, /\},450\);/);
   assert.match(html, /kind==='device_cluster'/);
+  assert.match(html, /item\.m\.kind==='device'\|\|item\.m\.kind==='device_cluster'/);
 });

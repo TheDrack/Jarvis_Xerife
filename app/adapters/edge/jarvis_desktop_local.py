@@ -422,13 +422,24 @@ def _network_device_snapshot(clients: list[dict[str, Any]] | None = None) -> dic
             network = ipaddress.ip_network(cidr, strict=False)
         except ValueError:
             continue
-        if isinstance(network, ipaddress.IPv4Network) and network.is_private and network.prefixlen >= 24:
-            if str(network) not in scopes:
-                scopes.append(str(network))
-                snapshot = discover_devices(str(network))
-                for device in snapshot.get("devices", []):
-                    if device.get("ip"):
-                        neighbours[device["ip"]] = device
+        if (
+            not isinstance(network, ipaddress.IPv4Network)
+            or interface.get("scope") != "private"
+            or network.prefixlen < 24
+        ):
+            continue
+        scope = str(network)
+        if scope in scopes:
+            continue
+        try:
+            snapshot = discover_devices(scope)
+        except ValueError:
+            # Keep the inventory available if interface metadata is stale or inconsistent.
+            continue
+        scopes.append(scope)
+        for device in snapshot.get("devices", []):
+            if device.get("ip"):
+                neighbours[device["ip"]] = device
     return {
         "success": bool(interfaces_result.get("success")),
         "interfaces": interfaces,
@@ -994,6 +1005,50 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         return await _run_sync_io_off_loop(
             lambda: build_briefing(latitude=latitude, longitude=longitude)
         )
+
+    @app.get("/api/geo/reverse")
+    async def geo_reverse(
+        latitude: float = Query(..., alias="lat", ge=-90.0, le=90.0),
+        longitude: float = Query(..., alias="lon", ge=-180.0, le=180.0),
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Name a globe coordinate without exposing the lookup to the browser."""
+        place = await _run_sync_io_off_loop(reverse_place, latitude, longitude, 16)
+        if not place.get("available"):
+            display_name = place.get("display_name")
+            if display_name:
+                return {
+                    "success": True,
+                    "available": True,
+                    "label": display_name,
+                    "display_name": display_name,
+                    "city": None,
+                    "state": None,
+                    "country": None,
+                    "road": None,
+                    "house_number": None,
+                }
+            return {
+                "success": False,
+                "available": False,
+                "reason": place.get("reason") or "unavailable",
+            }
+        label = " · ".join(
+            str(place[key])
+            for key in ("city", "state", "country")
+            if place.get(key)
+        )
+        return {
+            "success": True,
+            "available": True,
+            "label": label or place.get("display_name") or "",
+            "display_name": place.get("display_name"),
+            "city": place.get("city"),
+            "state": place.get("state"),
+            "country": place.get("country"),
+            "road": place.get("road"),
+            "house_number": place.get("house_number"),
+        }
 
     @app.get("/api/cameras")
     async def cameras(_client: str = Depends(require_local_token)) -> dict[str, Any]:

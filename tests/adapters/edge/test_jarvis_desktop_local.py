@@ -1170,6 +1170,36 @@ def test_earthquake_radii_are_an_explicit_estimate():
     assert earthquake_radii(42) is None
 
 
+def test_reverse_geocode_endpoint_returns_label_and_full_address(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setattr(
+        desktop_local,
+        "reverse_place",
+        lambda lat, lon, zoom=10: {
+            "available": True,
+            "city": "Curitiba",
+            "state": "Paraná",
+            "country": "Brasil",
+            "display_name": "Rua XV de Novembro, 100, Curitiba, Paraná, Brasil",
+        },
+    )
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    token = client.get("/api/bootstrap").json()["local_token"]
+
+    response = client.get(
+        "/api/geo/reverse?lat=-25.4284&lon=-49.2733",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["label"] == "Curitiba · Paraná · Brasil"
+    assert body["display_name"].startswith("Rua XV de Novembro")
+
+
 def test_earthquake_enrichment_adds_place_and_radius_without_guessing(monkeypatch):
     import app.adapters.edge.jarvis_desktop_local as desktop_local
 
@@ -1223,6 +1253,83 @@ def test_earthquake_enrichment_reports_geocode_failure_instead_of_a_place(monkey
     assert "place" not in quake
     assert quake["place_reason"] == "timeout"
     assert quake["affected"]["estimate"] is True
+
+def test_network_device_snapshot_skips_non_rfc1918_interfaces(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    calls = []
+    monkeypatch.setattr(
+        desktop_local,
+        "network_interfaces",
+        lambda: {
+            "success": True,
+            "interfaces": [
+                {"network": "169.254.10.0/24", "scope": "link_local"},
+                {"network": "100.64.10.0/24", "scope": "overlay"},
+                {"network": "192.0.2.0/24", "scope": "public"},
+                {"network": "192.168.10.0/24", "scope": "private"},
+            ],
+        },
+    )
+
+    def fake_discover(cidr):
+        calls.append(cidr)
+        if cidr != "192.168.10.0/24":
+            raise ValueError("Somente redes RFC1918 são aceitas.")
+        return {"devices": [{"ip": "192.168.10.25", "mac": "aa:bb:cc:dd:ee:ff"}]}
+
+    monkeypatch.setattr(desktop_local, "discover_devices", fake_discover)
+    monkeypatch.setattr(
+        desktop_local, "_adb_snapshot",
+        lambda: {"available": False, "devices": []},
+    )
+    monkeypatch.setattr(
+        desktop_local, "_tailscale_snapshot",
+        lambda: {"available": False, "peers": []},
+    )
+
+    snapshot = desktop_local._network_device_snapshot()
+
+    assert calls == ["192.168.10.0/24"]
+    assert snapshot["scopes"] == ["192.168.10.0/24"]
+    assert snapshot["neighbors"] == [
+        {"ip": "192.168.10.25", "mac": "aa:bb:cc:dd:ee:ff"}
+    ]
+    assert snapshot["active_probes_sent"] == 0
+
+
+def test_network_device_snapshot_tolerates_adapter_scope_rejection(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setattr(
+        desktop_local,
+        "network_interfaces",
+        lambda: {
+            "success": True,
+            "interfaces": [
+                {"network": "192.168.10.0/24", "scope": "private"},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        desktop_local,
+        "discover_devices",
+        lambda _cidr: (_ for _ in ()).throw(ValueError("scope rejected")),
+    )
+    monkeypatch.setattr(
+        desktop_local, "_adb_snapshot",
+        lambda: {"available": False, "devices": []},
+    )
+    monkeypatch.setattr(
+        desktop_local, "_tailscale_snapshot",
+        lambda: {"available": False, "peers": []},
+    )
+
+    snapshot = desktop_local._network_device_snapshot()
+
+    assert snapshot["scopes"] == []
+    assert snapshot["neighbors"] == []
+    assert snapshot["success"] is True
 
 def test_geospatial_assets_route_filters_registered_inventory(monkeypatch, tmp_path):
     import app.adapters.edge.jarvis_desktop_local as desktop_local

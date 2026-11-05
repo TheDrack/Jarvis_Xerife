@@ -42,7 +42,7 @@ a{color:inherit;text-decoration:none}
 .globe-wrap{position:relative;min-height:0;min-width:0;overflow:hidden}
 #globe{display:block;width:100%;height:100%;filter:drop-shadow(0 0 26px rgba(84,215,255,.16))}
 .reticle{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 50%,transparent 62%,rgba(1,6,12,.38) 100%)}
-.globe-hint{position:absolute;left:50%;bottom:2px;transform:translateX(-50%);font-size:var(--fs-2xs);letter-spacing:.2em;color:rgba(109,151,174,.65);text-transform:uppercase;white-space:nowrap}
+.globe-hint{position:absolute;left:50%;bottom:2px;transform:translateX(-50%);font-size:var(--fs-2xs);letter-spacing:.2em;color:rgba(109,151,174,.65);text-transform:uppercase;white-space:nowrap;max-width:calc(100% - 10px);overflow:hidden;text-overflow:ellipsis}
 .dock{display:flex;align-items:center;justify-content:center;gap:clamp(6px,1.4vw,16px);padding:8px 0 10px;flex-wrap:wrap}
 .dock-group{display:flex;align-items:center;gap:clamp(4px,0.9vw,10px);padding:0 clamp(4px,1vw,10px);border-left:1px solid var(--line-soft)}
 .dock-group:first-child{border-left:0;padding-left:0}
@@ -106,6 +106,10 @@ a{color:inherit;text-decoration:none}
 .window-head .title{color:#eafcff;flex:1}
 .window-body{padding:12px 13px;overflow:auto;display:grid;gap:8px;scrollbar-width:thin;scrollbar-color:rgba(84,215,255,.24) transparent}
 .window-foot{padding:8px 13px;border-top:1px solid var(--line-soft);font-size:var(--fs-2xs);letter-spacing:.16em;color:var(--muted);display:flex;justify-content:space-between;text-transform:uppercase}
+.live-card{width:min(960px,100%);max-height:min(88vh,760px)}
+.live-body{padding:0;overflow:hidden;background:#000;min-height:220px;display:grid;place-items:center}
+.live-body iframe,.live-body video,.live-body img{width:100%;height:min(64vh,560px);border:0;object-fit:contain;background:#000}
+.live-note{padding:9px 13px;font-family:var(--mono);font-size:var(--fs-2xs);line-height:1.5;letter-spacing:.08em;color:var(--muted);border-top:1px solid var(--line-soft);width:100%}
 .modal{position:fixed;inset:0;display:none;place-items:center;padding:20px;z-index:22;background:rgba(1,6,12,.86)}
 .modal.show{display:grid}
 .modal-card{width:min(420px,100%);padding:22px;border:1px solid rgba(84,215,255,.34);border-radius:2px;background:linear-gradient(160deg,rgba(6,24,40,.99),rgba(2,10,18,.99));box-shadow:0 26px 80px rgba(0,0,0,.75)}
@@ -327,7 +331,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
  <main class="stage" id="stage" data-view="core">
   <div class="center">
    <div class="status"><div class="rules"><i></i>◈<i></i></div><b id="statusLabel" role="status" aria-live="polite">STANDBY</b><small id="statusDetail">NÚCLEO LOCAL · AGUARDANDO PRIMEIRA LEITURA</small></div>
-   <div class="globe-wrap"><div class="reactor" aria-hidden="true"><i class="r2"></i><i class="r1"></i><i class="sweep"></i><i class="r3"></i></div><canvas id="globe" aria-label="Globo de eventos, observações e dispositivos"></canvas><div class="reticle"></div><section class="selection-inspector" id="selectionInspector" hidden aria-live="polite"><div class="selection-kicker">SELEÇÃO ATIVA <span id="selectionKind">—</span></div><strong id="selectionTitle">—</strong><small id="selectionDetail">—</small><p id="selectionSummary" class="selection-summary"></p><div id="selectionFacts" class="selection-facts"></div><div class="selection-actions"><a class="mini" id="selectionSource" hidden target="_blank" rel="noopener noreferrer">ABRIR FONTE ↗</a><button class="mini" id="selectionAction" type="button">FOCAR</button><button class="mini" id="selectionClose" type="button" aria-label="Fechar seleção">×</button></div></section><div class="globe-zoom" id="zoomLevel">100%</div><div class="globe-tools"><button type="button" id="zoomIn" aria-label="Aproximar o globo" title="Aproximar">+</button><button type="button" id="zoomOut" aria-label="Afastar o globo" title="Afastar">−</button><button type="button" id="zoomReset" aria-label="Recentralizar o globo" title="Recentralizar">⤢</button></div><div class="globe-hint">arraste · scroll ou pinça para zoom · duplo clique recentra</div></div>
+   <div class="globe-wrap"><div class="reactor" aria-hidden="true"><i class="r2"></i><i class="r1"></i><i class="sweep"></i><i class="r3"></i></div><canvas id="globe" aria-label="Globo de eventos, observações, câmeras, dispositivos e agrupamentos por proximidade"></canvas><div class="reticle"></div><section class="selection-inspector" id="selectionInspector" hidden aria-live="polite"><div class="selection-kicker">SELEÇÃO ATIVA <span id="selectionKind">—</span></div><strong id="selectionTitle">—</strong><small id="selectionDetail">—</small><p id="selectionSummary" class="selection-summary"></p><div id="selectionFacts" class="selection-facts"></div><div class="selection-actions"><a class="mini" id="selectionSource" hidden target="_blank" rel="noopener noreferrer">ABRIR FONTE ↗</a><button class="mini" id="selectionLive" type="button" hidden>AO VIVO</button><button class="mini" id="selectionAction" type="button">FOCAR</button><button class="mini" id="selectionClose" type="button" aria-label="Fechar seleção">×</button></div></section><div class="globe-zoom" id="zoomLevel">100%</div><div class="globe-tools"><button type="button" id="zoomIn" aria-label="Aproximar o globo" title="Aproximar">+</button><button type="button" id="zoomOut" aria-label="Afastar o globo" title="Afastar">−</button><button type="button" id="zoomReset" aria-label="Recentralizar o globo" title="Recentralizar">⤢</button></div><div class="globe-hint">arraste · scroll/pinça para zoom · clique no agrupamento aproxima</div></div>
    <nav class="areas" id="areaBar" aria-label="Focar uma área no globo"></nav>
    <nav class="dock" aria-label="Seções">
     <div class="dock-group" role="group" aria-label="Inteligência">
@@ -430,6 +434,14 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
  </div>
 </div>
 
+<div class="window" id="liveWindow" role="dialog" aria-modal="true" aria-labelledby="liveTitle">
+ <div class="window-card live-card">
+  <div class="window-head"><span class="badge">◈</span><span class="title" id="liveTitle">CÂMERA · AO VIVO</span><button class="mini" type="button" data-close="liveWindow">FECHAR ×</button></div>
+  <div class="window-body live-body" id="liveBody"><div class="empty">Selecione uma câmera com transmissão disponível.</div></div>
+  <div class="window-foot"><span id="liveFoot">FONTE · --</span><a class="mini" id="liveSource" target="_blank" rel="noopener noreferrer" hidden>ABRIR NA FONTE ↗</a></div>
+ </div>
+</div>
+
 <div class="modal" id="pairModal">
  <div class="modal-card">
   <h2>PAIR DEVICE</h2>
@@ -452,13 +464,14 @@ const hhmm=iso=>{const d=new Date(iso||'');return isNaN(d.getTime())?'--:--':d.t
 const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const state={
  token:sessionStorage.getItem(TOKEN_KEY)||'',
- bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,openCameras:null,devices:null,busy:false,view:'core',topic:'regiao',location:null,locating:false,
+ bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,openCameras:null,devices:null,busy:false,view:'core',topic:'regiao',location:null,locating:false,globeZoom:1,clusterCameras:[],
  live:{events:[],observations:[],sources:[],correlations:[],collected_at:null,area:null},
  layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true},
  selected:null,
  history:{cpu:[],mem:[],temp:[]}
 };
-const LAYER_OF={satellite:'satellite',aircraft:'aircraft',vessel:'vessel'};
+const LAYER_OF={satellite:'satellite',aircraft:'aircraft',vessel:'vessel',camera:'camera',port:'port',chokepoint:'chokepoint',infrastructure:'infrastructure',military_site:'military_site'};
+const LABEL_KINDS=new Set(['aircraft','satellite','device','camera','vessel']);
 const EVENT_LAYER={earthquake:'quake',wildfire:'fire',volcano:'fire',seismic:'quake'};
 const COLORS={satellite:'#a5ecff',aircraft:'#54d7ff',vessel:'#ffb45c',quake:'#ff8f7a',fire:'#ffb347',event:'#8be3ff',camera:'#7ef0c8',port:'#ffd479',chokepoint:'#ff9f6e',infrastructure:'#c8b6ff',military_site:'#ff8fb1'};
 
@@ -494,7 +507,12 @@ const Globe=(()=>{
  let pinchDist=0;
  let spin=!reduce,drag=null,idleUntil=0,lastT=0;
  let geo=null,px=null,py=null,pz=null;
- let stars=[],marks=[],area=null,hook=null,hits=[],quakeRings=[];
+ let stars=[],marks=[],area=null,hook=null,hits=[],quakeRings=[],labelBoxes=[];
+ let placeCache=new Map(),placeQueue=[],placeQueued=new Set(),placeRunning=false;
+ const PLACE_CACHE_KEY='jarvis_globe_places_v2';
+ const PLACE_TTL_MS=7*86400000;
+ const PLACE_MISS_TTL_MS=86400000;
+ const PLACE_PRIORITY={device:0,camera:1,port:2,chokepoint:2,military_site:2,infrastructure:2,fire:3,quake:3,event:3,vessel:4,aircraft:5,satellite:6};
  const graticule=(()=>{
   const chains=[];
   for(let lon=-180;lon<180;lon+=30){const chain=[];for(let lat=-84;lat<=84;lat+=4)chain.push([lon,lat]);chains.push(chain);}
@@ -671,9 +689,117 @@ const Globe=(()=>{
    }
   }
  }
+ function drawMarkGlyph(m,sx,sy,s,color){
+  ctx.save();
+  ctx.fillStyle=color;
+  ctx.strokeStyle=color;
+  if(m.kind==='aircraft'){
+   const heading=num((m.record&&m.record.attributes||{}).heading_deg);
+   ctx.translate(sx,sy);
+   if(Number.isFinite(heading))ctx.rotate(heading*Math.PI/180);
+   ctx.beginPath();
+   ctx.moveTo(0,-s*2.1);
+   ctx.lineTo(s*0.45,-s*0.35);
+   ctx.lineTo(s*1.95,s*0.55);
+   ctx.lineTo(s*1.95,s*0.95);
+   ctx.lineTo(s*0.42,s*0.55);
+   ctx.lineTo(s*0.5,s*1.5);
+   ctx.lineTo(s*1.0,s*1.95);
+   ctx.lineTo(s*1.0,s*2.25);
+   ctx.lineTo(0,s*1.8);
+   ctx.lineTo(-s*1.0,s*2.25);
+   ctx.lineTo(-s*1.0,s*1.95);
+   ctx.lineTo(-s*0.5,s*1.5);
+   ctx.lineTo(-s*0.42,s*0.55);
+   ctx.lineTo(-s*1.95,s*0.95);
+   ctx.lineTo(-s*1.95,s*0.55);
+   ctx.lineTo(-s*0.45,-s*0.35);
+   ctx.closePath();ctx.fill();
+  }else if(m.kind==='satellite'){
+   ctx.globalAlpha=0.55;
+   ctx.fillRect(sx-s*2.7,sy-s*0.62,s*1.8,s*1.24);
+   ctx.fillRect(sx+s*0.9,sy-s*0.62,s*1.8,s*1.24);
+   ctx.globalAlpha=1;
+   ctx.lineWidth=1;
+   ctx.beginPath();ctx.moveTo(sx-s*0.9,sy);ctx.lineTo(sx-s*0.5,sy);ctx.moveTo(sx+s*0.5,sy);ctx.lineTo(sx+s*0.9,sy);ctx.stroke();
+   ctx.fillRect(sx-s*0.5,sy-s*0.72,s,s*1.44);
+   ctx.beginPath();ctx.arc(sx,sy-s*1.15,s*0.36,0,TAU);ctx.fill();
+  }else if(m.kind==='device_cluster'){
+   const count=Math.max(1,num(m.count));
+   const radius=Math.min(s*4.2,s*2.1+Math.log2(count+1)*1.5);
+   ctx.beginPath();ctx.arc(sx,sy,radius,0,TAU);ctx.fill();
+   ctx.strokeStyle='rgba(255,180,92,.95)';ctx.lineWidth=1.2;ctx.stroke();
+   ctx.fillStyle='#061522';ctx.font='600 '+Math.max(8,Math.min(11,radius*1.25))+'px "Cascadia Mono",ui-monospace,monospace';
+   ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(count),sx,sy+0.3);
+  }else if(m.kind==='device'){
+   ctx.lineWidth=1.3;
+   ctx.beginPath();
+   if(ctx.roundRect)ctx.roundRect(sx-s*0.95,sy-s*1.5,s*1.9,s*3,s*0.38);
+   else ctx.rect(sx-s*0.95,sy-s*1.5,s*1.9,s*3);
+   ctx.globalAlpha=0.16;ctx.fill();ctx.globalAlpha=1;ctx.stroke();
+   ctx.fillRect(sx-s*0.38,sy-s*1.05,s*0.76,s*1.5);
+   ctx.beginPath();ctx.arc(sx,sy+s*1.18,Math.max(1,s*0.18),0,TAU);ctx.fill();
+  }else if(m.kind==='camera'){
+   ctx.fillRect(sx-s*1.2,sy-s*0.55,s*1.7,s*1.1);
+   ctx.beginPath();ctx.arc(sx+s*0.75,sy,s*0.42,0,TAU);ctx.fill();
+   ctx.fillStyle='rgba(2,11,20,.9)';
+   ctx.beginPath();ctx.arc(sx+s*0.75,sy,Math.max(0.6,s*0.17),0,TAU);ctx.fill();
+   ctx.strokeStyle=color;ctx.lineWidth=1.2;
+   ctx.beginPath();ctx.moveTo(sx-s*0.35,sy+s*0.55);ctx.lineTo(sx-s*0.35,sy+s*1.35);ctx.lineTo(sx+s*0.35,sy+s*1.35);ctx.stroke();
+  }else if(m.kind==='vessel'){
+   ctx.beginPath();
+   ctx.moveTo(sx-s*1.6,sy-s*0.35);ctx.lineTo(sx+s*1.6,sy-s*0.35);
+   ctx.lineTo(sx+s*0.9,sy+s*0.9);ctx.lineTo(sx-s*0.9,sy+s*0.9);ctx.closePath();ctx.fill();
+   ctx.fillRect(sx-s*0.35,sy-s*1.1,s*0.7,s*0.8);
+  }else{
+   ctx.beginPath();ctx.arc(sx,sy,Math.max(1.4,s*0.8),0,TAU);ctx.fill();
+  }
+  ctx.restore();
+ }
+ function drawMarkLabel(x,y,size,primary,secondary,color){
+  const text=String(primary||'').trim();
+  if(!text)return;
+  const sub=String(secondary||'').trim();
+  const font='500 9px "Cascadia Mono",ui-monospace,monospace';
+  const subFont='500 8px "Cascadia Mono",ui-monospace,monospace';
+  const short=value=>value.length>34?value.slice(0,33)+'…':value;
+  const shortSub=value=>value.length>42?value.slice(0,41)+'…':value;
+  ctx.save();
+  ctx.font=font;
+  const w1=ctx.measureText(short(text)).width;
+  ctx.font=subFont;
+  const w2=sub?ctx.measureText(shortSub(sub)).width:0;
+  const w=Math.max(w1,w2)+8;
+  const h=sub?24:14;
+  const clampX=value=>Math.max(3,Math.min(W-3-w,value));
+  const clampY=value=>Math.max(3,Math.min(H-3-h,value));
+  const candidates=[
+   {x:clampX(x+size+7),y:clampY(y-h/2)},
+   {x:clampX(x-size-7-w),y:clampY(y-h/2)},
+   {x:clampX(x-w/2),y:clampY(y-size-h-7)},
+   {x:clampX(x-w/2),y:clampY(y+size+7)}
+  ];
+  const free=box=>!labelBoxes.some(other=>!(box.x+w<other.x||box.x>other.x+other.w||box.y+h<other.y||box.y>other.y+other.h));
+  const chosen=candidates.find(free)||candidates[0];
+  const lx=chosen.x,ly=chosen.y;
+  labelBoxes.push({x:lx,y:ly,w,h});
+  ctx.fillStyle='rgba(1,8,15,.78)';
+  ctx.fillRect(lx,ly,w,h);
+  ctx.strokeStyle='rgba(84,215,255,.22)';ctx.lineWidth=1;ctx.strokeRect(lx+0.5,ly+0.5,w-1,h-1);
+  ctx.textAlign='left';ctx.textBaseline='middle';
+  ctx.fillStyle=color||'#dff8ff';ctx.font=font;
+  ctx.fillText(short(text),lx+4,ly+(sub?7:7));
+  if(sub){
+   ctx.fillStyle='rgba(154,196,214,.9)';ctx.font=subFont;
+   ctx.fillText(shortSub(sub),lx+4,ly+17);
+  }
+  ctx.restore();
+ }
  function drawMarks(radius,t,cosR,sinR,cosT,sinT){
   hits=[];
-  const size=Math.max(1.6,radius/150);
+  const size=Math.max(2,radius/130);
+  labelBoxes=[];
+  const visible=[];
   for(let i=0;i<marks.length;i+=1){
    const m=marks[i];
    const x0=m.x*cosR+m.z*sinR;
@@ -681,45 +807,72 @@ const Globe=(()=>{
    const y2=m.y*cosT-z0*sinT;
    const z2=m.y*sinT+z0*cosT;
    if(z2<=0.02)continue;
-   const sx=cx+x0*radius,sy=cy-y2*radius;
-   const color=m.color||COLORS[m.kind]||COLORS.event;
-   ctx.fillStyle=color;
-   if(m.kind==='satellite'){
-    ctx.fillRect(sx-size,sy-size,size*2,size*2);
-   }else if(m.kind==='device_cluster'){
-    const clusterRadius=Math.min(size*4.2,size*2.1+Math.log2(m.count+1)*1.5);
-    ctx.beginPath();ctx.arc(sx,sy,clusterRadius,0,TAU);ctx.fill();
-    ctx.strokeStyle='rgba(255,180,92,.95)';ctx.lineWidth=1.2;ctx.stroke();
-    ctx.fillStyle='#061522';
-    ctx.font='600 '+Math.max(8,Math.min(11,clusterRadius*1.25))+'px "Cascadia Mono",ui-monospace,monospace';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(String(m.count),sx,sy+0.3);
-   }else if(m.kind==='device'){
-    ctx.beginPath();
-    for(let k=0;k<6;k+=1){
-     const a=Math.PI/6+k*Math.PI/3,rr=size*2.1;
-     const gx=Math.cos(a)*rr,gy=Math.sin(a)*rr;
-     if(k===0)ctx.moveTo(sx+gx,sy+gy);else ctx.lineTo(sx+gx,sy+gy);
+   visible.push({m,sx:cx+x0*radius,sy:cy-y2*radius,color:m.color||COLORS[m.kind]||COLORS.event});
+  }
+  const threshold=Math.max(14,44/zoom);
+  const clusters=[],cells=new Map();
+  for(const item of visible){
+   if(item.m.kind==='device'||item.m.kind==='device_cluster'){
+    clusters.push({x:item.sx,y:item.sy,sumX:item.sx,sumY:item.sy,items:[item],color:item.color});
+    continue;
+   }
+   const gx=Math.floor(item.sx/threshold),gy=Math.floor(item.sy/threshold);
+   let target=null,best=threshold;
+   for(let dx=-1;dx<=1&&!target;dx+=1){
+    for(let dy=-1;dy<=1&&!target;dy+=1){
+     const bucket=cells.get((gx+dx)+','+(gy+dy));
+     if(!bucket)continue;
+     for(const candidate of bucket){
+      const d=Math.hypot(candidate.x-item.sx,candidate.y-item.sy);
+      if(d<=best){best=d;target=candidate;}
+     }
     }
-    ctx.closePath();ctx.fill();
-    ctx.strokeStyle='rgba(255,180,92,.85)';ctx.lineWidth=1;ctx.stroke();
-   }else if(m.kind==='vessel'){
-    ctx.beginPath();ctx.moveTo(sx,sy-size*1.5);ctx.lineTo(sx+size*1.3,sy);ctx.lineTo(sx,sy+size*1.5);ctx.lineTo(sx-size*1.3,sy);ctx.closePath();ctx.fill();
-   }else if(m.kind==='aircraft'){
-    ctx.beginPath();ctx.moveTo(sx,sy-size*1.6);ctx.lineTo(sx+size*1.1,sy+size*1.2);ctx.lineTo(sx-size*1.1,sy+size*1.2);ctx.closePath();ctx.fill();
+   }
+   if(!target){
+    target={x:item.sx,y:item.sy,sumX:item.sx,sumY:item.sy,items:[item],color:item.color};
+    clusters.push(target);
+    const key=gx+','+gy;
+    if(!cells.has(key))cells.set(key,[]);
+    cells.get(key).push(target);
    }else{
-    ctx.beginPath();ctx.arc(sx,sy,size,0,TAU);ctx.fill();
+    target.items.push(item);
+    target.sumX+=item.sx;target.sumY+=item.sy;
+    target.x=target.sumX/target.items.length;
+    target.y=target.sumY/target.items.length;
    }
-   const age=t-m.at;
-   if(!reduce&&Number.isFinite(age)&&age>=0&&age<12000){
-    const k=age/12000;
-    ctx.strokeStyle=color;
-    ctx.globalAlpha=0.7*(1-k);
-    ctx.lineWidth=1;
-    ctx.beginPath();ctx.arc(sx,sy,size+1+14*k,0,TAU);ctx.stroke();
-    ctx.globalAlpha=1;
+  }
+  for(const cluster of clusters){
+   const count=cluster.items.length;
+   const first=cluster.items[0];
+   if(count===1){
+    drawMarkGlyph(first.m,cluster.x,cluster.y,size,first.color);
+    if(LABEL_KINDS.has(first.m.kind))drawMarkLabel(cluster.x,cluster.y,size,first.m.place,first.m.label,first.color);
+    hits.push({x:cluster.x,y:cluster.y,m:first.m,radius:Math.max(14,size*5)});
+    const age=t-first.m.at;
+    if(!reduce&&Number.isFinite(age)&&age>=0&&age<12000){
+     const k=age/12000;
+     ctx.strokeStyle=first.color;ctx.globalAlpha=0.7*(1-k);ctx.lineWidth=1;
+     ctx.beginPath();ctx.arc(cluster.x,cluster.y,size+1+14*k,0,TAU);ctx.stroke();ctx.globalAlpha=1;
+    }
+    continue;
    }
-   hits.push({x:sx,y:sy,m});
+   const r=Math.max(7,size*2.6)+Math.min(6,Math.log2(count)*1.5);
+   ctx.beginPath();ctx.arc(cluster.x,cluster.y,r+2,0,TAU);
+   ctx.fillStyle='rgba(2,11,20,.86)';ctx.fill();
+   ctx.strokeStyle='rgba(165,236,255,.7)';ctx.lineWidth=1;ctx.stroke();
+   ctx.fillStyle='#dff8ff';ctx.font='600 '+Math.max(8,Math.min(11,size*2.6))+'px "Cascadia Mono",ui-monospace,monospace';
+   ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(count),cluster.x,cluster.y+0.5);
+   const places=Array.from(new Set(cluster.items.map(item=>item.m.place).filter(Boolean)));
+   const detail=places.length===1?places[0]:(places.length>1?places.slice(0,2).join(' · '):'proximidade');
+   drawMarkLabel(cluster.x,cluster.y,r,count+' alvos',detail,'#dff8ff');
+   const members=cluster.items.map(item=>item.m);
+   const lat=members.reduce((sum,m)=>sum+num(m.latitude),0)/count;
+   const lon=members.reduce((sum,m)=>sum+num(m.longitude),0)/count;
+   hits.push({x:cluster.x,y:cluster.y,radius:r+7,m:{
+    kind:'cluster',label:count+' alvos próximos',meta:detail,cluster:true,members,
+    latitude:lat,longitude:lon,place:detail,
+    record:{summary:members.slice(0,10).map(m=>String(m.label||'').trim()).filter(Boolean).join(' · ')}
+   }});
   }
  }
  function drawLimb(radius){
@@ -822,6 +975,111 @@ const Globe=(()=>{
    setFooter('MAPA INDISPONÍVEL · '+err.message);
   }
  }
+ function coordText(latitude,longitude){
+  const lat=Number(latitude),lon=Number(longitude);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return '';
+  return Math.abs(lat).toFixed(1)+'°'+(lat>=0?'N':'S')+' '+Math.abs(lon).toFixed(1)+'°'+(lon>=0?'E':'W');
+ }
+ function placeText(record,attributes,latitude,longitude){
+  const attrs=attributes||{};
+  const place=record&&record.place&&typeof record.place==='object'?record.place:null;
+  const direct=(record&&record.place_label)||attrs.place_label||(place?[place.city,place.state,place.country].filter(Boolean).join(' · '):'');
+  if(direct)return String(direct);
+  if(attrs.city)return [attrs.city,attrs.state,attrs.country].filter(Boolean).join(' · ');
+  if(attrs.country)return String(attrs.country);
+  if(attrs.origin||attrs.destination)return [attrs.origin,attrs.destination].filter(Boolean).join(' → ');
+  return coordText(latitude,longitude);
+ }
+ function placeKey(latitude,longitude){
+  return Number(latitude).toFixed(2)+','+Number(longitude).toFixed(2);
+ }
+ function loadPlaceCache(){
+  try{
+   const raw=JSON.parse(localStorage.getItem(PLACE_CACHE_KEY)||'{}');
+   const now=Date.now();
+   for(const [key,entry] of Object.entries(raw)){
+    if(!entry||typeof entry!=='object')continue;
+    const ttl=entry.missing?PLACE_MISS_TTL_MS:PLACE_TTL_MS;
+    if(!Number.isFinite(entry.at)||now-entry.at>ttl)continue;
+    placeCache.set(key,entry);
+   }
+  }catch(_){}
+ }
+ function savePlaceCache(){
+  try{
+   const out={};
+   let count=0;
+   for(const [key,entry] of placeCache){
+    if(count>=400)break;
+    out[key]=entry;
+    count+=1;
+   }
+   localStorage.setItem(PLACE_CACHE_KEY,JSON.stringify(out));
+  }catch(_){}
+ }
+ function applyPlace(mark,entry){
+  if(!entry)return;
+  if(entry.label)mark.place=entry.label;
+  if(entry.address)mark.address=entry.address;
+ }
+ function placeFor(latitude,longitude){
+  const lat=Number(latitude),lon=Number(longitude);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
+  return placeCache.get(placeKey(lat,lon))||null;
+ }
+ function enrichPlaces(){
+  if(!marks.length)return;
+  const groups=new Map();
+  for(const mark of marks){
+   const lat=Number(mark.latitude),lon=Number(mark.longitude);
+   if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;
+   const key=placeKey(lat,lon);
+   let group=groups.get(key);
+   if(!group){group={key,latitude:lat,longitude:lon,marks:[]};groups.set(key,group);}
+   group.marks.push(mark);
+  }
+  for(const group of groups.values()){
+   const cached=placeCache.get(group.key);
+   if(cached){group.marks.forEach(mark=>applyPlace(mark,cached));continue;}
+   if(placeQueued.has(group.key))continue;
+   placeQueued.add(group.key);
+   group.priority=Math.min(...group.marks.map(mark=>PLACE_PRIORITY[mark.kind]??9));
+   placeQueue.push(group);
+  }
+  placeQueue.sort((a,b)=>a.priority-b.priority);
+  runPlaceQueue();
+ }
+ async function runPlaceQueue(){
+  if(placeRunning||!placeQueue.length||!state.token)return;
+  placeRunning=true;
+  let failures=0;
+  while(placeQueue.length){
+   const group=placeQueue.shift();
+   try{
+    const data=await api('/api/geo/reverse?lat='+group.latitude.toFixed(5)+'&lon='+group.longitude.toFixed(5));
+    failures=0;
+    const entry=data&&data.available
+     ?{label:data.label||data.display_name||'',address:data.display_name||'',at:Date.now()}
+     :{label:'',address:'',at:Date.now(),missing:true};
+    placeCache.set(group.key,entry);
+    group.marks.forEach(mark=>applyPlace(mark,entry));
+    if(state.selected&&group.marks.includes(state.selected))renderSelection(state.selected);
+    savePlaceCache();
+    draw(performance.now());
+   }catch(_){
+    failures+=1;
+    placeQueued.delete(group.key);
+    if(failures>=3){
+     for(const pending of placeQueue)placeQueued.delete(pending.key);
+     placeQueue=[];
+     break;
+    }
+    continue;
+   }
+   placeQueued.delete(group.key);
+  }
+  placeRunning=false;
+ }
  function setData(payload){
   marks=[];
   quakeRings=[];
@@ -831,7 +1089,7 @@ const Globe=(()=>{
    if(!e||!e.location)continue;
    const kind=EVENT_LAYER[e.category]||'event';
    const v=sph(num(e.location.longitude),num(e.location.latitude));
-   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(e.location.longitude),latitude:num(e.location.latitude),kind,label:e.title||e.category||'evento',meta:(e.source_id||'')+' · '+(e.category||''),record:e,at:new Date(e.observed_at||e.published_at||0).getTime()||0});
+   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(e.location.longitude),latitude:num(e.location.latitude),kind,label:e.title||e.category||'evento',place:placeText(e,{},num(e.location.latitude),num(e.location.longitude)),meta:(e.source_id||'')+' · '+(e.category||''),record:e,at:new Date(e.observed_at||e.published_at||0).getTime()||0});
    const felt=e.affected?num(e.affected.felt_radius_km):0;
    const damage=e.affected?num(e.affected.damage_radius_km):0;
    if(kind==='quake'&&felt>=5){
@@ -853,11 +1111,12 @@ const Globe=(()=>{
    const name=attrs.callsign||attrs.name||attrs.group||o.entity_id;
    const observed=new Date(o.observed_at||0).getTime();
    const at=Number.isFinite(observed)&&observed>0?now-Math.min(11000,Math.max(0,now-observed)):now-11000;
-   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
+   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),live:o.entity_type==='camera'?{url:attrs.stream_url,type:attrs.stream_type}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
   }
   area=(payload&&payload.area)||null;
   setDeviceData((payload&&payload.devices)||[],false);
   draw(performance.now());
+  enrichPlaces();
  }
  function setDeviceData(devices,redraw=true){
   marks=marks.filter(mark=>mark.kind!=='device'&&mark.kind!=='device_cluster');
@@ -871,6 +1130,7 @@ const Globe=(()=>{
     x:v[0],y:v[1],z:v[2],longitude,latitude,kind:device.kind,record:device,
     color:cluster?'#ffc16f':device.status==='online'?'#ffb45c':'#6d97ae',
     label:String(device.name||('dispositivo '+device.id)),
+    place:placeText(device,{},latitude,longitude),
     meta:cluster?(device.count+' dispositivos · '+device.online_count+' online'):
      String((device.type||'dispositivo')+' · '+(device.status||'offline')),
     device,at:0
@@ -944,12 +1204,12 @@ const Globe=(()=>{
    drag=null;
    idleUntil=performance.now()+9000;
    if(moved>6)return;
-   let best=null,bestDist=16;
+   let best=null,bestDist=Infinity;
    const box=canvas.getBoundingClientRect();
    const x=ev.clientX-box.left,y=ev.clientY-box.top;
    for(const hit of hits){
     const d=Math.hypot(hit.x-x,hit.y-y);
-    if(d<bestDist){bestDist=d;best=hit.m;}
+    if(d<=(hit.radius||16)&&d<bestDist){bestDist=d;best=hit.m;}
    }
    if(best&&typeof hook==='function')hook(best);
   });
@@ -961,8 +1221,8 @@ const Globe=(()=>{
    window.addEventListener('resize',resize);
   }
  }
- function init(){bind();resize();loadLand();requestAnimationFrame(loop);}
- return {init,setData,setDeviceData,getZoom:()=>zoom,reset,focusArea,focusTo,zoomBy,onSelect:fn=>{hook=fn;},onZoom:fn=>{zoomHook=fn;}};
+ function init(){loadPlaceCache();bind();resize();loadLand();requestAnimationFrame(loop);}
+ return {init,setData,setDeviceData,getZoom:()=>zoom,reset,focusArea,focusTo,zoomBy,placeFor,onSelect:fn=>{hook=fn;},onZoom:fn=>{zoomHook=fn;}};
 })();
 
 /* ---------------- Panels ---------------- */
@@ -1212,6 +1472,55 @@ const safeCamUrl=value=>{
   return ['http:','https:'].includes(parsed.protocol)&&!parsed.username&&!parsed.password?parsed.href:null;
  }catch(_){return null;}
 };
+let liveTimer=null;
+function stopLiveTimer(){if(liveTimer){clearInterval(liveTimer);liveTimer=null;}}
+function liveInfo(mark){
+ const record=mark&&(mark.record||mark.device)||{};
+ const attrs=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
+ const raw=mark&&mark.live&&mark.live.url?mark.live.url:(attrs.stream_url||record.stream_url||record.url||'');
+ const url=safeCamUrl(raw);
+ if(!url)return null;
+ if(!(mark.kind==='camera'||record.entity_type==='camera'||mark.live))return null;
+ const declared=String((mark.live&&mark.live.type)||attrs.stream_type||record.stream_type||'').toLowerCase();
+ let type=declared;
+ if(!['image','video','hls','iframe','mjpeg','snapshot'].includes(type)){
+  if(/\.m3u8(\?|$)/i.test(url))type='hls';
+  else if(/\.(mp4|webm)(\?|$)/i.test(url))type='video';
+  else if(/\.(mjpe?g|jpe?g|png)(\?|$)/i.test(url))type='image';
+  else type='iframe';
+ }
+ if(type==='mjpeg'||type==='snapshot')type='image';
+ if(!['image','video','hls','iframe'].includes(type))type='iframe';
+ return {url,type,label:mark.label||attrs.name||record.label||'CÂMERA',source:attrs.source||record.source_id||record.source||'FONTE'};
+}
+function openLiveCamera(info){
+ const url=info&&safeCamUrl(info.url);
+ if(!url){setFooter('AO VIVO · URL INDISPONÍVEL');return;}
+ stopLiveTimer();
+ const label=String(info.label||'CÂMERA').toUpperCase();
+ const source=$('liveSource');
+ source.href=url;
+ source.hidden=false;
+ $('liveTitle').textContent=label+' · AO VIVO';
+ $('liveFoot').textContent=String(info.source||'FONTE').toUpperCase()+' · '+(info.type==='image'?'SNAPSHOT ATUALIZADO':'TRANSMISSÃO');
+ const body=$('liveBody');
+ if(info.type==='image'){
+  body.innerHTML='<img alt="'+esc(label)+'" src="'+esc(url)+'">';
+  liveTimer=setInterval(()=>{
+   const img=body.querySelector('img');
+   if(!img)return;
+   const next=new URL(url);
+   next.searchParams.set('_jarvis_ts',String(Date.now()));
+   img.src=next.href;
+  },5000);
+ }else if(info.type==='video'||info.type==='hls'){
+  body.innerHTML='<video controls autoplay muted playsinline src="'+esc(url)+'"></video>';
+ }else{
+  body.innerHTML='<iframe title="'+esc(label)+'" src="'+esc(url)+'" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="no-referrer"></iframe>';
+ }
+ openWindow('liveWindow');
+ setFooter('AO VIVO · '+label);
+}
 let cameraTimer=null;
 function stopCameraTimer(){if(cameraTimer){clearInterval(cameraTimer);cameraTimer=null;}}
 function openCamerasHtml(open){
@@ -1237,7 +1546,7 @@ function osirisCamerasHtml(){
   const attrs=item.attributes||{};
   const url=safeCamUrl(attrs.stream_url);
   const place=[attrs.city,attrs.country].filter(Boolean).join(' · ');
-  return '<div class="row"><div class="grow"><b>'+esc(attrs.name||item.entity_id||'câmera')+'</b><small>'+esc([place,attrs.source,attrs.stream_type].filter(Boolean).join(' · '))+'</small></div>'+(url?'<a class="mini" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">ABRIR</a>':'<span class="pill idle">SEM URL</span>')+'</div>';
+  return '<div class="row"><div class="grow"><b>'+esc(attrs.name||item.entity_id||'câmera')+'</b><small>'+esc([place,attrs.source,attrs.stream_type].filter(Boolean).join(' · '))+'</small></div>'+(url?'<button class="mini" type="button" data-live-observation="'+esc(item.observation_id)+'">AO VIVO</button>':'<span class="pill idle">SEM LIVE</span>')+'</div>';
  }).join('');
 }
 function renderCameras(){
@@ -1512,6 +1821,7 @@ function renderSelection(mark){
  const inspector=$('selectionInspector');
  if(!mark){
   state.selected=null;
+  state.clusterCameras=[];
   inspector.hidden=true;
   return;
  }
@@ -1523,6 +1833,7 @@ function renderSelection(mark){
  const sourceUrl=String(record.url||((primaryEvidence||{}).url)||((primaryEvidence||{}).source_url)||'');
  const sourceName=String((primaryEvidence||{}).source_name||record.source_id||'FONTE ORIGINAL');
  const kind=String(mark.kind||record.entity_type||record.category||'alvo').replaceAll('_',' ').toUpperCase();
+ const isCluster=Boolean(mark.cluster);
  const extra=record.status||record.source_id||record.entity_type||record.category||'';
  const latitude=mark.latitude??(record.location||record.position||{}).latitude;
  const longitude=mark.longitude??(record.location||record.position||{}).longitude;
@@ -1531,12 +1842,26 @@ function renderSelection(mark){
  const summary=mark.kind==='device_cluster'
   ?'Agrupamento visual de ativos registrados. A posição representa o centro aproximado do grupo; não indica um único dispositivo.'
   :record.summary||record.description||attributes.description||attributes.summary||'Sem resumo adicional fornecido pela fonte.';
+ const cachedPlace=isCluster?null:(Globe.placeFor?Globe.placeFor(latitude,longitude):null);
+ const placeLabel=cachedPlace&&cachedPlace.label?cachedPlace.label:mark.place;
  $('selectionKind').textContent=kind;
  $('selectionTitle').textContent=String(mark.label||record.title||record.entity_id||'ALVO');
- $('selectionDetail').textContent=[String(mark.meta||''),String(extra||''),coords].filter(Boolean).join(' · ');
- $('selectionSummary').textContent=String(summary);
+ $('selectionDetail').textContent=[String(mark.meta||''),String(extra||''),String(placeLabel||''),coords].filter(Boolean).join(' · ');
+ $('selectionSummary').textContent=isCluster
+  ? String((mark.members||[]).slice(0,12).map(item=>String(item.label||'').trim()).filter(Boolean).join(' · ')||'Alvos agrupados por proximidade.')
+  : String(summary);
  const facts=[];
  const addFact=(label,value)=>{if(value!==undefined&&value!==null&&String(value).trim()!=='')facts.push('<span>'+esc(label)+'<b>'+esc(value)+'</b></span>');};
+ if(isCluster){
+  addFact('ALVOS',(mark.members||[]).length);
+  addFact('LOCAL',mark.place);
+  state.clusterCameras=(mark.members||[]).filter(item=>item.kind==='camera'&&liveInfo(item));
+  if(state.clusterCameras.length){
+   facts.push('<span>AO VIVO<b>'+state.clusterCameras.map((item,index)=>'<button class="mini" type="button" data-cluster-camera="'+index+'">'+esc(item.label)+'</button>').join(' ')+'</b></span>');
+  }
+ }else{
+  state.clusterCameras=[];
+ }
  addFact('FONTE',sourceName);
  addFact('ID',record.entity_id||record.event_id||record.device_id||record.id);
  addFact('TIPO',record.entity_type||record.category||record.type);
@@ -1550,6 +1875,7 @@ function renderSelection(mark){
  addFact('MAC',record.mac);
  addFact('ORIGEM',record.source);
  addFact('LOCAL',record.place_label||(record.place?[record.place.city,record.place.state,record.place.country].filter(Boolean).join(' · '):null));
+ addFact('ENDEREÇO',cachedPlace&&cachedPlace.address?cachedPlace.address:(mark.address||record.address||attributes.address||attributes.display_name));
  addFact('POSIÇÃO',record.location_source==='ip'?'APROXIMADA POR IP':record.location_source==='gps'?'GPS DO DISPOSITIVO':null);
  if(mark.kind==='device_cluster'){
   addFact('DISPOSITIVOS',record.count);
@@ -1568,7 +1894,13 @@ function renderSelection(mark){
  source.href=/^https?:\/\//i.test(sourceUrl)?sourceUrl:'#';
  source.hidden=!/^https?:\/\//i.test(sourceUrl);
  source.textContent='FONTE · '+sourceName+' ↗';
- $('selectionAction').textContent=mark.copyValue?'COPIAR':'CENTRALIZAR';
+ const live=liveInfo(mark);
+ const liveButton=$('selectionLive');
+ if(liveButton){
+  liveButton.hidden=!live;
+  liveButton.textContent=live&&live.type==='image'?'SNAPSHOT':'AO VIVO';
+ }
+ $('selectionAction').textContent=(isCluster||mark.kind==='device_cluster')?'APROXIMAR':(mark.copyValue?'COPIAR':'CENTRALIZAR');
  $('selectionAction').disabled=!mark.copyValue&&!(latitude!=null&&longitude!=null&&Number.isFinite(Number(latitude))&&Number.isFinite(Number(longitude)));
  inspector.hidden=false;
 }
@@ -1844,7 +2176,12 @@ function setView(view){
 
 }
 function openWindow(id){const el=$(id);if(el)el.classList.add('show');}
-function closeWindow(id){const el=$(id);if(el)el.classList.remove('show');if(id==='cameraWindow')stopCameraTimer();}
+function closeWindow(id){
+ const el=$(id);
+ if(el)el.classList.remove('show');
+ if(id==='cameraWindow')stopCameraTimer();
+ if(id==='liveWindow'){stopLiveTimer();const body=$('liveBody');if(body)body.innerHTML='';}
+}
 
 const fullscreenButton=$('fullscreenToggle');
 let nativeFullscreen=false;
@@ -1898,6 +2235,7 @@ function wire(){
  });
  let deviceLayerTimer=null;
  Globe.onZoom(value=>{
+  state.globeZoom=value;
   $('zoomLevel').textContent=Math.round(value*100)+'%';
   if(deviceLayerTimer!==null)clearTimeout(deviceLayerTimer);
   deviceLayerTimer=setTimeout(()=>{
@@ -1938,6 +2276,15 @@ function wire(){
   selectNetworkItem(target.getAttribute('data-network-kind'),Number(target.getAttribute('data-network-index')));
  });
  $('selectionClose').addEventListener('click',()=>renderSelection(null));
+ $('selectionLive').addEventListener('click',()=>{const info=liveInfo(state.selected);if(info)openLiveCamera(info);});
+ $('selectionFacts').addEventListener('click',ev=>{
+  const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-cluster-camera]'):null;
+  if(!target)return;
+  const camera=(state.clusterCameras||[])[Number(target.getAttribute('data-cluster-camera'))];
+  const info=camera?liveInfo(camera):null;
+  if(info)openLiveCamera(info);
+ });
+ $('liveWindow').addEventListener('click',ev=>{if(ev.target===$('liveWindow'))closeWindow('liveWindow');});
  $('selectionAction').addEventListener('click',()=>{
   const mark=state.selected;
   if(!mark)return;
@@ -1946,8 +2293,8 @@ function wire(){
    navigator.clipboard.writeText(mark.copyValue).then(()=>setFooter('COPIADO · '+mark.copyValue)).catch(()=>setFooter('COPIAR · PERMISSÃO NEGADA'));
    return;
   }
-  if(Number.isFinite(mark.latitude)&&Number.isFinite(mark.longitude))Globe.focusTo(mark.latitude,mark.longitude,2.05);
-  setFooter('FOCO · '+String(mark.label||'ALVO').toUpperCase());
+  if(Number.isFinite(mark.latitude)&&Number.isFinite(mark.longitude))Globe.focusTo(mark.latitude,mark.longitude,mark.cluster?Math.min(2.4,(state.globeZoom||1)+0.55):2.05);
+  setFooter((mark.cluster?'AGRUPAMENTO · ':'FOCO · ')+String(mark.label||'ALVO').toUpperCase());
  });
  $('deviceList').addEventListener('click',ev=>{
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-device]'):null;
@@ -1983,8 +2330,17 @@ function wire(){
   if(!target)return;
   state.topic=target.getAttribute('data-topic');
   renderBriefing();
- });
- $('cameraBody').addEventListener('click',ev=>{
+ });  $('cameraBody').addEventListener('click',ev=>{
+  const liveTarget=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-live-observation]'):null;
+  if(liveTarget){
+   const item=(state.live.observations||[]).find(observation=>observation.observation_id===liveTarget.getAttribute('data-live-observation'));
+   if(item){
+    const attrs=item.attributes||{};
+    const info=liveInfo({kind:'camera',label:attrs.name||item.entity_id,record:item,live:{url:attrs.stream_url,type:attrs.stream_type}});
+    if(info)openLiveCamera(info);
+   }
+   return;
+  }
   if(ev.target&&typeof ev.target.closest==='function'&&ev.target.closest('video,button,a'))return;
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-camera-index]'):null;
   if(!target)return;
@@ -2003,6 +2359,7 @@ function wire(){
  document.addEventListener('fullscreenchange',()=>syncFullscreenControl(Boolean(document.fullscreenElement)));
  document.addEventListener('keydown',ev=>{
   if(ev.key==='F11'){ev.preventDefault();toggleFullscreen();return;}
+  if(ev.key==='Escape'&&$('liveWindow').classList.contains('show')){closeWindow('liveWindow');return;}
   if(ev.key==='Escape'&&$('cameraWindow').classList.contains('show')){closeWindow('cameraWindow');return;}
   if(ev.key==='Escape'&&$('intelWindow').classList.contains('show')){closeWindow('intelWindow');return;}
   if(ev.key==='Escape'&&nativeFullscreen){
