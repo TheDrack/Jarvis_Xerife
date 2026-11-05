@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import threading
 import time
 import unicodedata
 import xml.etree.ElementTree as ET
@@ -145,6 +146,7 @@ WEATHER_CODES: dict[int, str] = {
 
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _GEOCODE_CLOCK: list[float] = [0.0]
+_GEOCODE_LOCK = threading.Lock()
 
 
 def weather_label(code: Any) -> str:
@@ -189,7 +191,9 @@ def geocode_enabled() -> bool:
     }
 
 
-def _reverse_geocode(client: httpx.Client, latitude: float, longitude: float) -> dict[str, Any]:
+def _reverse_geocode(
+    client: httpx.Client, latitude: float, longitude: float, zoom: int = 10
+) -> dict[str, Any]:
     """Name the place of a coordinate through the public OSM Nominatim service.
 
     Only the rounded coordinate cell is cached for a day, and calls are spaced by
@@ -198,30 +202,35 @@ def _reverse_geocode(client: httpx.Client, latitude: float, longitude: float) ->
     """
     if not geocode_enabled():
         return {"available": False, "reason": "disabled"}
-    key = f"geo:{round(latitude, 2)}:{round(longitude, 2)}"
+    key = f"geo:{int(zoom)}:{round(latitude, 2)}:{round(longitude, 2)}"
 
     def produce() -> dict[str, Any]:
-        wait = GEOCODE_MIN_INTERVAL_SECONDS - (time.monotonic() - _GEOCODE_CLOCK[0])
-        if wait > 0:
-            time.sleep(wait)
-        try:
-            response = client.get(
-                GEOCODE_URL,
-                params={
-                    "format": "jsonv2",
-                    "lat": f"{latitude:.5f}",
-                    "lon": f"{longitude:.5f}",
-                    "zoom": 10,
-                    "addressdetails": 1,
-                    "accept-language": "pt-BR",
-                },
-                headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+        with _GEOCODE_LOCK:
+            wait = GEOCODE_MIN_INTERVAL_SECONDS - (
+                time.monotonic() - _GEOCODE_CLOCK[0]
             )
-            _GEOCODE_CLOCK[0] = time.monotonic()
-            response.raise_for_status()
-            data = response.json()
-        except (httpx.HTTPError, ValueError) as exc:
-            return {"available": False, "reason": _fail(exc)}
+            if wait > 0:
+                time.sleep(wait)
+            try:
+                response = client.get(
+                    GEOCODE_URL,
+                    params={
+                        "format": "jsonv2",
+                        "lat": f"{latitude:.5f}",
+                        "lon": f"{longitude:.5f}",
+                        "zoom": int(zoom),
+                        "addressdetails": 1,
+                        "accept-language": "pt-BR",
+                    },
+                    headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+                )
+                response.raise_for_status()
+                data = response.json()
+            except (httpx.HTTPError, ValueError) as exc:
+                _GEOCODE_CLOCK[0] = time.monotonic()
+                return {"available": False, "reason": _fail(exc)}
+            finally:
+                _GEOCODE_CLOCK[0] = time.monotonic()
         address = data.get("address") if isinstance(data, dict) else None
         if not isinstance(address, dict):
             return {"available": False, "reason": "no_address"}
@@ -235,18 +244,26 @@ def _reverse_geocode(client: httpx.Client, latitude: float, longitude: float) ->
         state = address.get("state") or address.get("region")
         country = address.get("country")
         if not (city or state or country):
-            return {"available": False, "reason": "no_address"}
+            return {
+                "available": False,
+                "reason": "no_address",
+                "display_name": data.get("display_name"),
+            }
         return {
             "available": True,
             "city": city,
             "state": state,
             "country": country,
+            "suburb": address.get("suburb"),
+            "road": address.get("road"),
+            "house_number": address.get("house_number"),
+            "display_name": data.get("display_name"),
         }
 
     return _cached(key, GEOCODE_TTL_SECONDS, produce)
 
 
-def reverse_place(latitude: Any, longitude: Any) -> dict[str, Any]:
+def reverse_place(latitude: Any, longitude: Any, zoom: int = 10) -> dict[str, Any]:
     """Resolve a coordinate to ``city``/``state``/``country`` with a one-shot client.
 
     Shared by the briefing and by the read-only device registry so both name a
@@ -261,7 +278,7 @@ def reverse_place(latitude: Any, longitude: Any) -> dict[str, Any]:
     if not -90.0 <= lat <= 90.0 or not -180.0 <= lon <= 180.0:
         return {"available": False, "reason": "invalid_coordinate"}
     with httpx.Client(timeout=12.0, follow_redirects=False) as client:
-        return _reverse_geocode(client, lat, lon)
+        return _reverse_geocode(client, lat, lon, zoom=zoom)
 
 
 def device_region(

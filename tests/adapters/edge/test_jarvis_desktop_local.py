@@ -1170,6 +1170,36 @@ def test_earthquake_radii_are_an_explicit_estimate():
     assert earthquake_radii(42) is None
 
 
+def test_reverse_geocode_endpoint_returns_label_and_full_address(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setattr(
+        desktop_local,
+        "reverse_place",
+        lambda lat, lon, zoom=10: {
+            "available": True,
+            "city": "Curitiba",
+            "state": "Paraná",
+            "country": "Brasil",
+            "display_name": "Rua XV de Novembro, 100, Curitiba, Paraná, Brasil",
+        },
+    )
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    token = client.get("/api/bootstrap").json()["local_token"]
+
+    response = client.get(
+        "/api/geo/reverse?lat=-25.4284&lon=-49.2733",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["label"] == "Curitiba · Paraná · Brasil"
+    assert body["display_name"].startswith("Rua XV de Novembro")
+
+
 def test_earthquake_enrichment_adds_place_and_radius_without_guessing(monkeypatch):
     import app.adapters.edge.jarvis_desktop_local as desktop_local
 
