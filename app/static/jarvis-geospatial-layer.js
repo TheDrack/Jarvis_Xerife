@@ -31,10 +31,58 @@
   }
 
   function cellSizeForZoom(zoom) {
-    if (zoom < 1.15) return 20;
-    if (zoom < 1.55) return 8;
-    if (zoom < 1.95) return 3;
+    const level = Number.isFinite(Number(zoom)) ? Number(zoom) : 1;
+    if (level < 1.15) return 20;
+    if (level < 1.55) return 8;
+    if (level < 2.8) return 1;
+    if (level < 4) return 0.25;
+    if (level < 5.5) return 0.05;
+    if (level < 7) return 0.01;
     return 0;
+  }
+
+  function placeOf(asset) {
+    const source = asset && asset.record && typeof asset.record === 'object' ? asset.record : asset || {};
+    const attributes = source.attributes && typeof source.attributes === 'object' ? source.attributes : {};
+    const place = source.place && typeof source.place === 'object' ? source.place :
+      asset && asset.place && typeof asset.place === 'object' ? asset.place : {};
+    const address = source.address && typeof source.address === 'object' ? source.address : {};
+    const read = (...values) => {
+      const value = values.find((item) => typeof item === 'string' && item.trim());
+      return value ? value.trim() : '';
+    };
+    return {
+      country: read(place.country, address.country, source.country, attributes.country),
+      state: read(place.state, place.region, address.state, address.region, source.state, attributes.state, attributes.region),
+      city: read(place.city, place.town, place.municipality, address.city, address.town, address.municipality, source.city, attributes.city, attributes.town),
+      neighbourhood: read(place.neighbourhood, place.neighborhood, place.suburb, place.district,
+        address.neighbourhood, address.neighborhood, address.suburb, address.district,
+        source.neighbourhood, source.neighborhood, attributes.neighbourhood, attributes.neighborhood,
+        attributes.suburb, attributes.district),
+    };
+  }
+
+  function generalizeRegion(assets, zoom) {
+    const members = Array.isArray(assets) ? assets : [];
+    if (!members.length) return 'Região geográfica';
+    const level = Number.isFinite(Number(zoom)) ? Number(zoom) : 1;
+    const places = members.map(placeOf);
+    const common = (field) => {
+      const values = places.map((place) => place[field]);
+      if (!values[0] || values.some((value) => value.toLocaleLowerCase() !== values[0].toLocaleLowerCase())) return '';
+      return values[0];
+    };
+    const country = common('country');
+    const state = common('state');
+    const city = common('city');
+    const neighbourhood = common('neighbourhood');
+    let fields;
+    if (level < 1.15) fields = [country];
+    else if (level < 1.55) fields = [state, country];
+    else if (level < 3.5) fields = [city, state, country];
+    else fields = [neighbourhood, city, state, country];
+    const label = fields.filter(Boolean).join(' · ');
+    return label || 'Região geográfica';
   }
 
   function buildDeviceMarkers(assets, zoom) {
@@ -46,17 +94,15 @@
       validCoordinate(asset.longitude, -180, 180) &&
       asset.id !== undefined && asset.id !== null
     );
-    const maxMarkers = 300;
+    const maxMarkers = Math.min(1800, Math.round(300 * Math.pow(Math.max(1, level), 1.25)));
     let cellSize = cellSizeForZoom(level);
 
     if (cellSize === 0 && valid.length <= maxMarkers) {
       return valid.map((asset) => Object.assign({}, asset, {
-        kind: 'device',
-        count: 1,
-        assets: [asset],
+        kind: 'device', count: 1, assets: [asset],
       }));
     }
-    if (cellSize === 0) cellSize = 0.5;
+    if (cellSize === 0) cellSize = 0.01;
 
     let cells = new Map();
     do {
@@ -78,9 +124,7 @@
     for (const [key, members] of cells) {
       if (members.length === 1) {
         markers.push(Object.assign({}, members[0], {
-          kind: 'device',
-          count: 1,
-          assets: members,
+          kind: 'device', count: 1, assets: members,
         }));
         continue;
       }
@@ -97,11 +141,12 @@
         online_count: onlineCount,
         offline_count: members.length - onlineCount,
         assets_total: members.length,
+        region: generalizeRegion(members, level),
         assets: members.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true })).slice(0, 8),
       });
     }
     return markers;
   }
 
-  return { buildDeviceMarkers, cellSizeForZoom };
+  return { buildDeviceMarkers, cellSizeForZoom, generalizeRegion };
 });
