@@ -1,15 +1,15 @@
 # JARVIS — Status do Projeto
 
 **Versão:** 2.0.0  
-**Revisão documental:** 2026-11-05
-**Escopo desta revisão:** alinhar catálogo de habilidades/capacidades e roadmap ao que está documentado. Não equivale a uma auditoria completa do runtime nem a uma confirmação de deploy.
+**Revisão documental:** 2026-11-06
+**Escopo desta revisão:** registrar o baseline inicial de C0 e atualizar evidências recentes de manutenção. Não equivale a uma auditoria completa do runtime nem a uma confirmação de deploy.
 
 ## Visão geral e qualidade da evidência
 
 | Área | Estado sustentado pelas evidências disponíveis | Limite / próxima validação |
 |---|---|---|
 | Arquitetura hexagonal e Nexus DI | Implementados e cobertos por testes segundo a auditoria de entregas | Reexecutar CI no HEAD atual antes de usar métricas antigas como estado corrente |
-| Auto-evolução e self-healing | Há motor, gatekeeper, sandbox local de evolução e workflows de recuperação | Manter mutação automática sob opt-in; revisar proteção de arquivos críticos e resultado de cada workflow |
+| Auto-evolução e self-healing | Motor, Gatekeeper, sandbox local e workflows de recuperação existem. PR #740 separou secrets de provedores dos passos pytest do Homeostase; PR #741 centralizou a política de caminhos protegidos. | EvolutionSandbox ainda executa pytest no checkout original e não aplica o candidato ao alvo; não é sandbox de execução isolada. Issue #708 permanece aberta. Manter mutação de código opt-in e sem execução privilegiada de candidato. |
 | JarvisDevAgent | Fluxo de desenvolvimento e registro de jobs existem | A auditoria identificou promessas não cumpridas: AdapterRegistry sem consumidor de produção, execução de código existente não priorizada de forma comprovada e geração automática de pipelines não entregue |
 | PipelineRunner | Runner consome pipelines YAML; a main agora inclui etapas explícitas tool_id via dispatcher pela PR #681 | Migração de todos os passos legados e validação de produção ainda pendentes |
 | Universal Toolbox | Registry versionado canônico, dispatcher fail-closed com JSON Schema, toolchains DAG, adapters Telegram/Drive/rede passiva e audit JSONL local implementados e integrados à main pela PR #681 (merge em 2026-11-02) | No HEAD da PR `8dd5cd1734a6a42a6dc208691d13a416061badee`, CI Linux/Python 3.11.17 e Windows/Python 3.12.10 aprovou a suíte completa: 2043 passed, 12 skipped em cada plataforma. Não há reviews nem threads de revisão registradas na PR #681; revisão técnica/segurança, policy host-backed, auditoria/estado distribuídos, idempotência distribuída e migração dos demais conectores permanecem pendentes. |
@@ -17,7 +17,7 @@
 | Inventário de capabilities | data/capabilities.json existe | Contagens anteriores são históricas: auditoria de 2026-10-16 encontrou 78 de 102 arquivos como stubs e nenhum teste exercitando os IDs cap_0XX/Cap0XX. Recontar e validar comportamento antes de alterar o estado de cada capability |
 | Soldier Mesh / edge | Há modelos, registry, adapters e testes relacionados | Continua parcial até existir validação ponta a ponta com dispositivos reais |
 | Otimização econômica | CostTrackerAdapter está descrito como integrado ao llm_router | ResourceOptimizer não foi encontrado pela auditoria; não marcar fase como completa |
-| Coordenação multiagente | Contratos, scheduler determinístico, protocolo de transporte, fila e workers estão no repositório | O worker Supabase de tarefas atualiza heartbeat e renova lease, com testes unitários; supervisão contínua do processo e teste ponta a ponta entre dois runtimes reais permanecem pendentes |
+| Coordenação multiagente | Contratos, scheduler determinístico, protocolo de transporte, fila e workers estão no repositório; PR #742 adicionou o guard de dependência pai também ao claim direto. | O worker Supabase atualiza heartbeat e renova lease com testes unitários; supervisão contínua e E2E entre dois runtimes independentes permanecem pendentes. |
 | Planos declarativos | Interpretador, integração no orquestrador, autorizador e adaptador de diário estão no repositório | Execução exige plano estruturado, allowlist e diário durável. Ações sensíveis permanecem bloqueadas até existir protocolo confiável de aprovação/retomada |
 | Diário de planos no Supabase | Migrações e adaptador estão no repositório; migrações de tabela e grants foram registradas no projeto Supabase nesta rodada de trabalho | Ainda é necessário confirmar insert real via adaptador no deploy atual; existência da tabela não prova integração operacional |
 | Catálogo comum de agentes | Catálogo de skills/connectors e protocolo de memória existem; quatro skills portáteis foram localizadas no repositório | A leitura automática no início de toda conversa depende de cada host/harness e precisa ser validada por runtime |
@@ -58,13 +58,13 @@ A autoevolução de capacidades segue o [Cognitive Roadmap](COGNITIVE_ROADMAP.md
 
 ## Nova trilha — Jarvis Cognitive Architecture
 
-**Estado:** planejada; nenhuma das fases cognitivas abaixo é declarada concluída por esta atualização documental.
+**Estado:** C0 em andamento; C1–C8 não são declaradas concluídas. O inventário inicial está em [COGNITIVE_BASELINE.md](COGNITIVE_BASELINE.md) e não substitui os critérios de aceitação do roadmap.
 
 O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.md). A trilha não substitui nem reconstrói Harness, Nexus, Universal Toolbox, Multi-Agent ou Universal Intelligence: ela audita e integra essas bases para formar um ciclo contínuo de percepção, modelo de mundo, memória, raciocínio, planejamento, execução supervisionada, iniciativa e aprendizado validado.
 
 | Marco | Capacidade | Estado inicial | Critério principal |
 |---|---|---|---|
-| C0 | Auditoria de capacidades e baseline comportamental | **Pendente** | Mapear consumidores, contratos, migrations, testes e evidências reais antes de criar módulos |
+| C0 | Auditoria de capacidades e baseline comportamental | **Em andamento — baseline inicial registrado** | [COGNITIVE_BASELINE.md](COGNITIVE_BASELINE.md) mapeia os principais caminhos, consumidores e testes; faltam baselines integrados e validação operacional para satisfazer todos os critérios |
 | C1 | World Model | **Auditoria necessária** | Entidades, relações, observações, proveniência, identidade conservadora e histórico temporal reconstruível |
 | C2 | Cognitive Memory | **Parcial / auditoria necessária** | Consolidar memórias episódica, semântica, procedural e prospectiva com recuperação contextual, conflitos e retenção |
 | C3 | Perception Engine | **Parcial / auditoria necessária** | Integrar fontes existentes em pipeline normalizado, resiliente, idempotente e observável |
