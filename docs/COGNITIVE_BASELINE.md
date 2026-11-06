@@ -1,0 +1,123 @@
+# Cognitive Baseline — Fase C0
+
+**Snapshot:** `main` em `00faa213ba2c3c740e0880329b7b18fd842a91f8`  
+**Auditoria:** 2026-11-06  
+**Estado:** parcial; C0 permanece aberto.  
+**Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação. Não é confirmação de deploy, conectividade de provider, persistência em produção ou execução ponta a ponta.
+
+## 1. Decisão de fase
+
+O próximo marco realmente pendente é **C0 — Auditoria de capacidades e baseline comportamental**. O roadmap exige que cada capacidade crítica tenha caminho de código, consumidor e teste identificados, com lacunas e incertezas registradas. A árvore atual contém componentes reutilizáveis, mas não demonstra ainda um ciclo cognitivo integrado.
+
+Este documento é o primeiro mapa rastreável de C0; não o conclui. Não criar um novo World Model, segundo sistema de memória, event bus ou scheduler antes de fechar a auditoria e os testes de baseline.
+
+## 2. Níveis de evidência
+
+- **Confirmado no repositório:** código, consumidor direto e teste relevante foram localizados. Isso não prova execução em produção.
+- **Parcial:** há código e algum consumidor, mas faltam testes de integração, persistência, autorização ou validação operacional.
+- **Implementado, não verificado:** há símbolo/registro/documentação, mas o consumidor comportamental ou teste específico não foi confirmado.
+- **Bloqueado:** a capacidade depende de flag, migration, policy ou ambiente que não está validado.
+- **Ausente no escopo auditado:** o contrato ou comportamento exigido não foi localizado nos caminhos examinados; não significa prova de inexistência em todo o repositório.
+
+## 3. Inventário por capacidade cognitiva
+
+| Capacidade | Implementação / contrato existente | Consumidor localizado | Testes localizados | Classificação e lacuna |
+|---|---|---|---|---|
+| Roteamento cognitivo | `app/domain/gears/cognitive_router.py`; registro no Nexus | O componente está no registro; não foi confirmado um ciclo cognitivo contínuo que o consuma | `tests/test_nexus_registry_sync.py` valida sincronização do registro | **Implementado, não verificado.** O código classifica entrada por palavras-chave ou uma chamada LiteLLM; isso é roteamento de conversa, não Reasoning Engine. Não foi localizado teste comportamental específico do roteador. |
+| Memória semântica | `app/application/services/memory_manager.py`; armazenamento em `data/jarvis_memory.json` | `AssistantService.process_command()` consulta e grava; `FieldVision` consulta soluções/contexto | `tests/application/test_memory_manager.py` | **Confirmado no repositório.** Busca por palavras-chave e limite de interações; proveniência, conflito, retenção governada e readback após reinício precisam de baseline próprio. |
+| Memória vetorial | Porta `MemoryProvider`; `app/adapters/infrastructure/vector_memory_adapter.py` | `AssistantService.process_command()` consulta últimos 30 dias e grava comando/resposta | `tests/adapters/infrastructure/test_vector_memory_adapter.py` | **Confirmado no repositório.** O adaptador local não demonstra por si só memória persistente multi-runtime nem consolidação sem perda. |
+| Memória procedural | `app/adapters/infrastructure/procedural_memory_adapter.py`; indexa ThoughtLogs bem-sucedidos | `EvolutionOrchestrator` consulta soluções conhecidas | `tests/adapters/infrastructure/test_procedural_memory_adapter.py` | **Parcial.** Há consumidor e teste; falta comprovar atualização, recuperação e validade contextual em um ciclo de evolução real. |
+| Working memory / consolidação | `WorkingMemory` e `MemoryConsolidationService` | `OverwatchDaemon` tenta consolidar periodicamente para `VectorMemoryAdapter` | Teste dedicado de ponta a ponta não confirmado nesta passagem | **Parcial.** O fluxo existe no código, mas o contrato de expiração, idempotência, falha de destino e recuperação precisa de teste comportamental. |
+| Perception / Universal Intelligence | `app/domain/intelligence/contracts.py`: `IntelligenceEvidence`, `IntelligenceEvent`, `IntelligenceObservation`, `IntelligenceBatch`, `IntelligenceReport`; `IntelligenceCollector` e `IntelligenceCore` | Desktop local, dashboard de inteligência e worker recorrente chamam `collect_live_intelligence()` | `tests/application/test_intelligence_core.py`, `test_intelligence_observations.py`, `test_intelligence_collector.py`; testes do dashboard e Desktop | **Confirmado no repositório; runtime parcial.** Há normalização, deduplicação determinística e candidatos de correlação. O histórico está atrás de feature flag e o worker recorrente depende da reconciliação de migrations. |
+| World Model | Observações geográficas e temporais existem nos contratos de inteligência | Mapas/dashboard consomem relatórios e observações; não são fonte canônica de estado | Testes de observação cobrem contratos e síntese | **Ausente no escopo auditado como modelo canônico.** Não foi localizado contrato completo para identidade de entidade, relação, afirmação de estado, evento de mudança e projeção temporal reconstruível. `IntelligenceCore` não equivale a World Model. |
+| Reasoning / reflexão | `ThoughtLogService`, `MetaReflection`, `TechnicalAnalysisService` | ThoughtLog é usado por evolução, routers e coleta de datasets; MetaReflection alimenta contexto do EvolutionOrchestrator | `tests/application/test_thought_log_service.py`, `tests/test_meta_reflection.py` | **Parcial.** Logs e análise retrospectiva existem. `TechnicalAnalysisService.execute()` retorna `not_implemented`. Não foi demonstrado pipeline Claim/Hypothesis/EvidenceLink/CounterEvidence, calibração ou abstenção. |
+| Strategic Planner | `StrategistService` gera matriz de viabilidade/RFC; `DeclarativePlanInterpreter` valida planos estruturados | Router de evolução resolve Strategist; `TaskRunner` executa planos declarativos | `tests/application/test_strategist_service.py`, `tests/test_execution_plan.py`, `tests/multiagent/test_model_plan_adapter.py`, `tests/multiagent/test_task_runner_execution_plan_integration.py` | **Parcial.** `StrategistService.execute()` ainda retorna `not_implemented`; plano declarativo não prova objetivos persistentes, decomposição durável ou replanejamento. |
+| Autonomous Executive | `TaskRunner`, scheduler, fila Supabase, workers e Universal Toolbox | Router de missões, orquestrador e workers HTTP/Supabase/supervisionados | `tests/application/test_task_runner.py`, `tests/application/test_task_runner_navigation_plan.py`, testes multiagente e de claims | **Parcial / bloqueado por integração.** Há autorização por etapa e guardas de fila, mas o Toolbox permanece fail-closed sem policy host-backed de produção; E2E entre dois runtimes independentes e verificação de efeito real permanecem pendentes. |
+| Initiative | `assistant_proactivity.py`, `assistant_curiosity.py`, `curiosity_engine.py`, health-check do AssistantService e Overwatch | Sugestões contextuais, perguntas durante conversa, health check e alertas de recursos | Testes comportamentais específicos de iniciativa contínua não confirmados nesta passagem | **Parcial.** Há proatividade e monitoramento, mas não foi demonstrado gatilho de mudança do World Model com deduplicação, orçamento, quiet hours e auditoria de decisão. |
+| Learning / Evolution | `EvolutionOrchestrator`, `EvolutionGatekeeper`, `EvolutionSandbox`, `MetaReflection` | Workflow de evolução e scripts; Gatekeeper controla propostas | `tests/application/test_evolution_orchestrator.py`, `tests/test_evolution_sandbox.py`, `tests/test_evolution_gatekeeper.py` | **Parcial / bloqueado por isolamento.** PR #741 fortaleceu caminhos protegidos. O sandbox ainda grava `proposal.py`, não aplica o candidato ao alvo e executa pytest no checkout original; issue #708 permanece aberta. |
+
+## 4. Mapa de fluxo observado
+
+```mermaid
+flowchart TD
+    SRC["Fontes públicas / OSIRIS / GEV / ambiente"] --> COL["IntelligenceCollector"]
+    COL --> CORE["IntelligenceCore"]
+    CORE --> REPORT["IntelligenceReport"]
+    REPORT --> UI["Desktop local / Dashboard"]
+    CORE -. "histórico opcional; flag e schema pendentes" .-> HIST["Supabase snapshots"]
+
+    CMD["Comando / canal"] --> AS["AssistantService"]
+    AS --> MM["MemoryManager"]
+    AS --> VM["VectorMemoryAdapter"]
+    WM["WorkingMemory"] --> CONS["MemoryConsolidationService"]
+    CONS --> VM
+    TL["ThoughtLogService"] --> PM["ProceduralMemoryAdapter"]
+    PM --> EO["EvolutionOrchestrator"]
+
+    PLAN["Plano estruturado"] --> TR["TaskRunner"]
+    TR --> AUTH["Allowlist / policy por etapa"]
+    AUTH --> TOOL["ToolDispatcher / Universal Toolbox"]
+    Q["Fila / scheduler / workers"] --> TOOL
+
+    EO --> GK["EvolutionGatekeeper"]
+    GK --> ES["EvolutionSandbox (não isolado)"]
+    ES -. "não valida o candidato real" .-> TESTS["pytest do checkout original"]
+```
+
+As linhas tracejadas representam dependências ou caminhos que não podem ser tratados como comportamento operacional concluído. A apresentação geoespacial é uma projeção; não deve ser promovida a fonte canônica do World Model.
+
+## 5. Contratos que devem ser reutilizados
+
+| Domínio | Contrato existente | Decisão para a próxima fase |
+|---|---|---|
+| Inteligência | `IntelligenceEvidence`, `IntelligenceEvent`, `IntelligenceObservation`, `IntelligenceBatch`, `IntelligenceReport` | Estender sem alterar a semântica de eventos/observações; separar identidade observada de identidade estável. |
+| Memória | `MemoryProvider`, VectorMemory, ProceduralMemory, WorkingMemory | Manter adaptadores existentes; primeiro medir persistência, recuperação, retenção, conflito e isolamento. |
+| Plano | `DeclarativePlanInterpreter`, `PlanOutcome`, TaskRunner e journal | Reutilizar o plano declarativo; não criar segundo scheduler nem converter texto livre diretamente em execução. |
+| Execução | scheduler, leases/fencing, ToolAuthorizationPolicy e Toolbox | Reutilizar; política ausente deve continuar fail-closed. |
+| Evolução | EvolutionOrchestrator, Gatekeeper e Sandbox | Reutilizar apenas após isolamento real; self-healing/PR repair permanece trilha transversal, não fase cognitiva. |
+
+Não foi justificada nesta auditoria a criação de um novo banco de grafos, event bus, scheduler ou backend de memória.
+
+## 6. Lacunas de C0 ainda abertas
+
+1. **Baseline comportamental integrado:** os testes existentes exercitam componentes separadamente; falta um teste reproduzível que estabeleça o comportamento conjunto de uma fonte → coletor → normalização/deduplicação → consumidor.
+2. **Mapa completo de consumidores e configuração:** completar flags, migrations, ACLs, entry points, processos e estado de deploy de cada componente crítico.
+3. **Memória:** provar store/readback, deduplicação, expiração, falha de backend e comportamento após reinício; distinguir memória local de compartilhada.
+4. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; registrar que o pipeline de contraditório/calibração não está demonstrado.
+5. **Planning:** provar persistência de objetivo, dependências e replanejamento; a matriz de viabilidade e o plano declarativo são capacidades diferentes.
+6. **Executive:** validar autorização no momento do dispatch, idempotência, leases, recuperação e efeito pós-ação com dois processos/runtimes independentes.
+7. **Initiative:** demonstrar gatilho independente de prompt, deduplicação, orçamento e política de notificação.
+8. **Learning:** não habilitar execução de código candidato até aplicar/testar o candidato em ambiente descartável, sem secrets, rede ou acesso ao checkout privilegiado.
+9. **Proveniência e privacidade:** mapear retenção, exclusão, isolamento por usuário/tenant e minimização para eventos, observações, memórias e logs.
+
+## 7. Próxima implementação recomendada
+
+**Concluir C0 com um conjunto pequeno de testes de baseline de integração, sem criar módulos novos.**
+
+Primeiro teste recomendado: exercitar `collect_live_intelligence()` com duas fontes controladas, uma fonte falhando parcialmente e eventos duplicados/fora de ordem; verificar que o relatório preserva proveniência, não perde a fonte saudável, deduplica deterministicamente e não promove correlação candidata a fato. O código de `IntelligenceCore` e os testes de coletor já existem; o incremento deve fixar o contrato entre eles.
+
+Em paralelo, preparar baseline de memória e autorização do plano com fakes, sem acesso a banco ou serviços externos. Só depois de C0 satisfazer seus critérios, iniciar C1 com contratos/projeções do World Model.
+
+## 8. Trilhas transversais e mudanças recentes
+
+Estas entregas são manutenção ou infraestrutura; não concluem fases cognitivas:
+
+- **PR #739:** adicionou TLS opt-in com verificação obrigatória de certificado ao `MqttHomeAdapter`; issue #705 está fechada. Nenhum broker foi validado nesta auditoria.
+- **PR #740:** separou secrets de provedores dos passos pytest do workflow Homeostase; testes antes/depois da cura não recebem essas variáveis.
+- **PR #741:** centralizou a política de caminhos protegidos para Gatekeeper/Crystallizer; não fornece isolamento de execução.
+- **PR #742:** adicionou a dependência de tarefa-pai também ao claim direto; validação SQL isolada está no workflow dedicado.
+- **PR #743:** introduziu o Cognitive Roadmap; C0 permanece pendente.
+- **PR #744:** melhorou a apresentação geoespacial; mapa continua sendo superfície de visualização, não World Model.
+
+O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos de recuperação e dispatch. Esta auditoria não o executou nem alterou seus gates. A correção automática de PR/CI e os workflows Self Healing permanecem uma trilha transversal obrigatória.
+
+## 9. Estado de verificação desta auditoria
+
+- Base inspecionada: `00faa213ba2c3c740e0880329b7b18fd842a91f8`.
+- Antes de abrir esta entrega, o endpoint de pull requests retornou zero PRs abertas; esta PR #748 é a primeira entrega deste baseline.
+- Últimos workflows de push na main consultados: Auto-Documentation #42230052100 **success**; Jarvis Task Queue Tests #42230051856 **success**.
+- Auto-Documentation #42210138290 falhou ao tentar fazer push não-fast-forward depois de a main avançar durante a execução; o workflow posterior no HEAD atual terminou em success. A evidência aponta concorrência de atualização, não falha de geração do mapa. Nenhuma alteração foi feita para mascarar o evento.
+- A suíte completa pytest não foi executada por esta auditoria; os resultados de workflows anteriores não foram reutilizados como se fossem execução deste snapshot.
+- Não houve escrita em Supabase, deploy, acesso a dispositivo, alteração de credenciais, router/firewall ou execução de código candidato.
+
+**Conclusão:** C0 está em andamento, não concluído. C1 — World Model é o próximo marco de capacidade, mas permanece bloqueado até que o baseline de C0 seja completado e testado.
