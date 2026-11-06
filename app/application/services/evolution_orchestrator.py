@@ -162,9 +162,21 @@ class EvolutionOrchestrator(NexusComponent):
         if candidate_target:
             system_ctx["target_file"] = candidate_target
 
-        # 2b. Verifica EvolutionGatekeeper antes de modificar arquivos
+        # 2b. Require a trusted target before memory lookup or LLM invocation.
+        if not candidate_target:
+            self._log_thought(
+                mission_id,
+                error_snippet,
+                "",
+                success=False,
+                notes="rejected: candidate_target_missing_before_generation",
+            )
+            return {"success": False, "reason": "candidate_target_missing"}
+
+        # Preflight must validate the exact target, not an empty file list.
         proposed = {
-            "files_modified": [],
+            "files_modified": [candidate_target],
+            "target_file": candidate_target,
             "mission_id": mission_id,
         }
         gatekeeper = self._get_gatekeeper()

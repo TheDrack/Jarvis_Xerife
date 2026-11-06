@@ -103,7 +103,10 @@ class TestEvolutionOrchestratorFailureFlow:
 
             mock_nexus.resolve.side_effect = resolve
 
-            result = orchestrator.execute({"error_snippet": "some error"})
+            result = orchestrator.execute({
+                "error_snippet": "some error",
+                "target_file": "app/example.py",
+            })
 
         assert result["success"] is False
         assert result["reason"] == "invalid_syntax"
@@ -132,7 +135,10 @@ class TestEvolutionOrchestratorProceduralMemory:
 
             mock_nexus.resolve.side_effect = resolve
 
-            result = orchestrator.execute({"error_snippet": "NullPointerError"})
+            result = orchestrator.execute({
+                "error_snippet": "NullPointerError",
+                "target_file": "app/example.py",
+            })
 
         assert result["success"] is False
         assert result["reason"] == "procedural_patch_requires_target_validation"
@@ -185,8 +191,9 @@ class TestEvolutionOrchestratorFullCycle:
         assert result["reason"] == "candidate_target_missing"
         mock_worker.submit_pull_request.assert_not_called()
 
-        # Verifica que o Gatekeeper foi consultado
-        mock_gatekeeper.approve_evolution.assert_called_once()
+        # Sem target_file confiável, Gatekeeper e LLM não devem ser chamados.
+        mock_gatekeeper.approve_evolution.assert_not_called()
+        mock_metabolism.execute.assert_not_called()
 
         # A proposta rejeitada não deve ser persistida nem publicada.
         proposals_dir = tmp_path / "proposals"
@@ -210,14 +217,14 @@ class TestEvolutionOrchestratorFullCycle:
 
             mock_nexus.resolve.side_effect = resolve
 
-            result = orchestrator.execute({})
+            result = orchestrator.execute({"target_file": "app/example.py"})
 
         assert result["success"] is False
         assert "gatekeeper_blocked" in result["reason"]
 
     def test_explicit_cap_id_skips_capability_manager(self, orchestrator, tmp_path):
         """Quando ``cap_id`` é informado, a cap explícita vence a seleção automática."""
-        valid_code = '"""Cap explícita."""\ndef run(): pass\n'
+        valid_code = "def broken(:\n    pass"
 
         mock_metabolism = MagicMock()
         mock_metabolism.execute.return_value = {"success": True, "result": f"```python\n{valid_code}```"}
@@ -247,13 +254,17 @@ class TestEvolutionOrchestratorFullCycle:
                 mock_nexus.resolve.side_effect = resolve
 
                 result = orchestrator.execute(
-                    {"cap_id": "CAP-777", "cap_title": "Explicit capability"}
+                    {
+                        "cap_id": "CAP-777",
+                        "cap_title": "Explicit capability",
+                        "target_file": "app/example.py",
+                    }
                 )
         finally:
             evo_mod._PROPOSALS_DIR = original_proposals
 
         assert result["success"] is False
-        assert result["reason"] == "candidate_target_missing"
+        assert result["reason"] == "invalid_syntax"
         assert "capability_manager" not in resolved
         # O prompt precisa carregar a capability explícita
         prompt = mock_metabolism.execute.call_args.args[0]["user_prompt"]
@@ -261,7 +272,7 @@ class TestEvolutionOrchestratorFullCycle:
 
     def test_consolidated_context_is_injected_in_prompt(self, orchestrator, tmp_path):
         """O contexto consolidado (autoconsciência) deve entrar no prompt do LLM."""
-        valid_code = '"""Com contexto."""\ndef run(): pass\n'
+        valid_code = "def broken(:\n    pass"
 
         mock_metabolism = MagicMock()
         mock_metabolism.execute.return_value = {"success": True, "result": f"```python\n{valid_code}```"}
@@ -287,22 +298,29 @@ class TestEvolutionOrchestratorFullCycle:
 
                     mock_nexus.resolve.side_effect = resolve
 
-                    result = orchestrator.execute({"error_snippet": "gap"})
+                    result = orchestrator.execute({
+                        "error_snippet": "gap",
+                        "target_file": "app/example.py",
+                    })
         finally:
             evo_mod._PROPOSALS_DIR = original_proposals
 
         assert result["success"] is False
-        assert result["reason"] == "candidate_target_missing"
+        assert result["reason"] == "invalid_syntax"
         prompt = mock_metabolism.execute.call_args.args[0]["user_prompt"]
         assert "MAPA-DO-CODEBASE-XYZ" in prompt
 
     def test_capability_selected_via_capability_manager(self, orchestrator, tmp_path):
         """Verifica que a capability-alvo é selecionada via CapabilityManager."""
-        valid_code = '"""Cap via CapabilityManager."""\ndef run(): pass\n'
+        valid_code = "def broken(:\n    pass"
 
         mock_cap_manager = MagicMock()
         mock_cap_manager.get_executable_capabilities.return_value = [
-            {"id": "CAP-042", "title": "Autonomous test capability"}
+            {
+                "id": "CAP-042",
+                "title": "Autonomous test capability",
+                "target_file": "app/example.py",
+            }
         ]
 
         mock_metabolism = MagicMock()
@@ -334,7 +352,7 @@ class TestEvolutionOrchestratorFullCycle:
             evo_mod._PROPOSALS_DIR = original_proposals
 
         assert result["success"] is False
-        assert result["reason"] == "candidate_target_missing"
+        assert result["reason"] == "invalid_syntax"
         mock_cap_manager.get_executable_capabilities.assert_called_once()
 
 
