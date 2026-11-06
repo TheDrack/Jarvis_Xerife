@@ -172,7 +172,7 @@ graph LR
     app_application_communication["<b>communication</b><br/><hr/>📄 human_intervention.py: HumanIntervention, execute"]
     class app_application_communication support
     app_application --> app_application_communication
-    app_application_services["<b>services</b><br/><hr/>📄 llm_router.py: LLMRouter, configure<br/>📄 assistant_learning.py: check_internal_solution, record_learning_interaction, infer_task_type<br/>📄 capability_manager.py: CapabilityManager, execute, implements<br/>📄 curiosity_intake.py: CuriosityIntake, configure<br/>📄 adapter_registry.py: from, CapabilityGap, ready<br/>📄 run_workflow.py: RunWorkflow, execute<br/>📄 tactical_map_service.py: TacticalMapService, execute<br/>📄 github_worker.py: GitHubWorker<br/>📄 structured_logger.py: StructuredLogger, execute<br/>📄 evolution_orchestrator.py: EvolutionOrchestrator, configure<br/>📄 device_service.py: DeviceService, execute<br/>📄 c2_orchestrator_service.py: KeepAliveProvider, start<br/>📄 device_intent_translator.py: DeviceIntentTranslator, can_execute, execute<br/>📄 surgical_edit_service.py: SurgicalEditService, apply_surgical_edit<br/>📄 intelligence_recurring_worker.py: from, IntelligenceWorkerConfig<br/>📄 meta_reflection.py: MetaReflection, configure<br/>📄 prioritizer_service.py: PrioritizerService, execute<br/>📄 capability_gap_reporter.py: CapabilityGapReporter, execute<br/>📄 extension_manager.py: ExtensionManager, execute<br/>📄 location_service.py: LocationService, execute<br/>📄 finetune_dataset_collector.py: FineTuneDatasetCollector, configure<br/>📄 capability_blueprint_service.py: CapabilityBlueprintService, execute<br/>📄 osint_discovery.py: RateLimitExceeded, InMemoryTTLCache<br/>📄 status_service.py: StatusService, get_system_report<br/>📄 browser_manager.py: PersistentBrowserManager, execute<br/>📄 serve.py: setup_telegram_webhook<br/>📄 evolution_loop.py: EvolutionLoopService, configure<br/>📄 assistant_curiosity.py: maybe_inject_curiosity_question, capture_curiosity_answer<br/>📄 human_intervention_service.py: HumanInterventionService, execute<br/>📄 technical_analysis_service.py: TechnicalAnalysisService, execute<br/>📄 assistant_lifecycle.py: health_check_loop, start_service, stop_service<br/>📄 llm_capability_prompt_builder.py: extract_keywords, search_files_by_keywords, build_analysis_prompt<br/>📄 assistant_proactivity.py: maybe_get_proactive_suggestion<br/>📄 user_communication_service.py: from, CommunicationPriority, CommunicationDecision<br/>📄 evolution_sandbox.py: EvolutionSandbox, enabled<br/>📄 model_orchestrator.py: ModelOrchestrator, configure<br/>📄 thought_log_renderer.py: ThoughtRenderer, render<br/>📄 soldier_registry.py: SoldierRegistry, execute<br/>📄 orchestrator_service.py: OrchestratorService, execute<br/>📄 llm_capability_detector.py: LLMCapabilityDetector, execute<br/>📄 main.py: notify_online, run_api, background_bootstrap<br/>📄 evolution_gatekeeper.py: EvolutionGatekeeper, configure<br/>📄 osint_fusion.py: OSINTFusion, fuse<br/>📄 assistant_nexus.py: nexus_execute, nexus_can_execute, async_process_command<br/>📄 presence_service.py: from, PresenceState, PresenceSnapshot<br/>📄 osint_adapter_setup.py: configure_osint_adapters, get_osint_registry<br/>📄 evaluate_risks_service.py: EvaluateRisksService, execute<br/>📄 scavenger_hunt.py: logger, class, ScavengerHunt<br/>📄 thought_log_service.py: ThoughtLogService, create_thought<br/>📄 strategist_service.py: BudgetExceededException, StrategistService<br/>📄 vocal_orchestration_service.py: VocalOrchestrationService<br/>📄 device_orchestrator_service.py: SoldierDB, DeviceOrchestratorService<br/>📄 interface_bridge.py: InterfaceBridge, execute<br/>📄 consolidated_context_service.py: ConsolidatedContextService, can_execute<br/>📄 finetune_trigger_service.py: FineTuneTriggerService, configure<br/>📄 curiosity_engine.py: CuriosityEngine<br/>📄 memory_manager.py: MemoryManager, execute<br/>📄 agent_task_queue_service.py: TaskQueueUnavailable, AgentTaskQueueService<br/>📄 llm_service.py: LlmService, chat<br/>📄 dependency_manager.py: DependencyManager, ensure_capability<br/>📄 assistant_service.py: AssistantService<br/>📄 auto_evolutionV2.py: AutoEvolutionServiceV2, execute<br/>📄 local_repair_agent.py: LocalRepairAgent, execute<br/>📄 field_vision.py: FieldVision<br/>📄 reconnection_briefing.py: ReconnectionBriefing, execute<br/>📄 device_location_service.py: DeviceLocationService, execute, calculate_distance<br/>📄 device_capability_service.py: DeviceLocationService, calculate_distance<br/>📄 capability_impact_analyzer.py: CapabilityImpactAnalyzer, execute<br/>📄 metabolism_core.py: MetabolismCore, execute, ask_jarvis<br/>📄 thought_log_types.py: ThoughtType<br/>📄 notification_service.py: NotificationService, execute<br/>📄 memory_consolidation_service.py: MemoryConsolidationService<br/>📄 task_runner.py: TaskRunner<br/>📄 local_bridge.py: LocalBridgeManager, execute<br/>📄 capability_detectors.py: detect_capability_inventory, detect_capability_classification, detect_existing_capabilities_recognition<br/>📄 jrvs_translator.py: JrvsTranslator, execute<br/>📄 thought_log_storage.py: ThoughtLogStorage, db<br/>📄 intelligence_core.py: IntelligenceCore, process<br/>📄 identify_mission_critical_capabilities.py: identify_mission_critical_capabilities"]
+    app_application_services["<b>services</b><br/><hr/>📄 llm_router.py: LLMRouter, configure<br/>📄 assistant_learning.py: check_internal_solution, record_learning_interaction, infer_task_type<br/>📄 capability_manager.py: CapabilityManager, execute, implements<br/>📄 graph_enrichment.py: GraphEnrichmentService, enrich_scope<br/>📄 curiosity_intake.py: CuriosityIntake, configure<br/>📄 adapter_registry.py: from, CapabilityGap, ready<br/>📄 run_workflow.py: RunWorkflow, execute<br/>📄 tactical_map_service.py: TacticalMapService, execute<br/>📄 github_worker.py: GitHubWorker<br/>📄 structured_logger.py: StructuredLogger, execute<br/>📄 evolution_orchestrator.py: EvolutionOrchestrator, configure<br/>📄 device_service.py: DeviceService, execute<br/>📄 c2_orchestrator_service.py: KeepAliveProvider, start<br/>📄 device_intent_translator.py: DeviceIntentTranslator, can_execute, execute<br/>📄 surgical_edit_service.py: SurgicalEditService, apply_surgical_edit<br/>📄 intelligence_recurring_worker.py: from, IntelligenceWorkerConfig<br/>📄 meta_reflection.py: MetaReflection, configure<br/>📄 prioritizer_service.py: PrioritizerService, execute<br/>📄 capability_gap_reporter.py: CapabilityGapReporter, execute<br/>📄 graph_retention.py: GraphRetentionService, prune_scope<br/>📄 extension_manager.py: ExtensionManager, execute<br/>📄 location_service.py: LocationService, execute<br/>📄 finetune_dataset_collector.py: FineTuneDatasetCollector, configure<br/>📄 capability_blueprint_service.py: CapabilityBlueprintService, execute<br/>📄 osint_discovery.py: RateLimitExceeded, InMemoryTTLCache<br/>📄 status_service.py: StatusService, get_system_report<br/>📄 browser_manager.py: PersistentBrowserManager, execute<br/>📄 serve.py: setup_telegram_webhook<br/>📄 evolution_loop.py: EvolutionLoopService, configure<br/>📄 assistant_curiosity.py: maybe_inject_curiosity_question, capture_curiosity_answer<br/>📄 human_intervention_service.py: HumanInterventionService, execute<br/>📄 technical_analysis_service.py: TechnicalAnalysisService, execute<br/>📄 assistant_lifecycle.py: health_check_loop, start_service, stop_service<br/>📄 llm_capability_prompt_builder.py: extract_keywords, search_files_by_keywords, build_analysis_prompt<br/>📄 assistant_proactivity.py: maybe_get_proactive_suggestion<br/>📄 user_communication_service.py: from, CommunicationPriority, CommunicationDecision<br/>📄 evolution_sandbox.py: EvolutionSandbox, enabled<br/>📄 model_orchestrator.py: ModelOrchestrator, configure<br/>📄 thought_log_renderer.py: ThoughtRenderer, render<br/>📄 soldier_registry.py: SoldierRegistry, execute<br/>📄 orchestrator_service.py: OrchestratorService, execute<br/>📄 llm_capability_detector.py: LLMCapabilityDetector, execute<br/>📄 main.py: notify_online, run_api, background_bootstrap<br/>📄 evolution_gatekeeper.py: EvolutionGatekeeper, configure<br/>📄 osint_fusion.py: OSINTFusion, fuse<br/>📄 assistant_nexus.py: nexus_execute, nexus_can_execute, async_process_command<br/>📄 presence_service.py: from, PresenceState, PresenceSnapshot<br/>📄 osint_adapter_setup.py: configure_osint_adapters, get_osint_registry<br/>📄 evaluate_risks_service.py: EvaluateRisksService, execute<br/>📄 scavenger_hunt.py: logger, class, ScavengerHunt<br/>📄 thought_log_service.py: ThoughtLogService, create_thought<br/>📄 strategist_service.py: BudgetExceededException, StrategistService<br/>📄 vocal_orchestration_service.py: VocalOrchestrationService<br/>📄 device_orchestrator_service.py: SoldierDB, DeviceOrchestratorService<br/>📄 interface_bridge.py: InterfaceBridge, execute<br/>📄 consolidated_context_service.py: ConsolidatedContextService, can_execute<br/>📄 finetune_trigger_service.py: FineTuneTriggerService, configure<br/>📄 curiosity_engine.py: CuriosityEngine<br/>📄 memory_manager.py: MemoryManager, execute<br/>📄 agent_task_queue_service.py: TaskQueueUnavailable, AgentTaskQueueService<br/>📄 llm_service.py: LlmService, chat<br/>📄 dependency_manager.py: DependencyManager, ensure_capability<br/>📄 assistant_service.py: AssistantService<br/>📄 auto_evolutionV2.py: AutoEvolutionServiceV2, execute<br/>📄 local_repair_agent.py: LocalRepairAgent, execute<br/>📄 field_vision.py: FieldVision<br/>📄 reconnection_briefing.py: ReconnectionBriefing, execute<br/>📄 device_location_service.py: DeviceLocationService, execute, calculate_distance<br/>📄 device_capability_service.py: DeviceLocationService, calculate_distance<br/>📄 capability_impact_analyzer.py: CapabilityImpactAnalyzer, execute<br/>📄 metabolism_core.py: MetabolismCore, execute, ask_jarvis<br/>📄 thought_log_types.py: ThoughtType<br/>📄 graph_expander_setup.py: configure_graph_expanders, get_graph_expander_registry<br/>📄 notification_service.py: NotificationService, execute<br/>📄 memory_consolidation_service.py: MemoryConsolidationService<br/>📄 task_runner.py: TaskRunner<br/>📄 local_bridge.py: LocalBridgeManager, execute<br/>📄 capability_detectors.py: detect_capability_inventory, detect_capability_classification, detect_existing_capabilities_recognition<br/>📄 jrvs_translator.py: JrvsTranslator, execute<br/>📄 thought_log_storage.py: ThoughtLogStorage, db<br/>📄 intelligence_core.py: IntelligenceCore, process<br/>📄 identify_mission_critical_capabilities.py: identify_mission_critical_capabilities"]
     class app_application_services support
     app_application --> app_application_services
     app_application_services_jarvis_dev_agent["<b>jarvis_dev_agent</b><br/><hr/>📄 agent.py: JarvisDevAgent, configure"]
@@ -184,7 +184,7 @@ graph LR
     app_application_privacy["<b>privacy</b><br/><hr/>📄 pii_redactor.py: PiiRedactor, execute"]
     class app_application_privacy support
     app_application --> app_application_privacy
-    app_application_ports["<b>ports</b><br/><hr/>📄 visual_navigation.py: VisualNavigationPort, execute<br/>📄 model_runtime.py: from, ModelMessage<br/>📄 intelligence_source.py: IntelligenceSource, fetch_events<br/>📄 android_navigation.py: AndroidNavigationPort, observe_screen, tap<br/>📄 web_provider.py: WebProvider, execute, open_url<br/>📄 voice_provider.py: VoiceProvider, execute, speak<br/>📄 system_controller.py: SystemController, execute_command, is_available<br/>📄 osint_provider.py: OsintProvider, search<br/>📄 history_provider.py: HistoryProvider, execute, save_interaction<br/>📄 osint_discovery.py: GeoProvider, locate, NetworkResolver<br/>📄 action_provider.py: ActionProvider, execute, type_text<br/>📄 memory_provider.py: MemoryProvider, execute, store_event<br/>📄 soldier_provider.py: SoldierProvider, execute, register_soldier<br/>📄 security_provider.py: SecurityProvider, execute, verify_password<br/>📄 intelligence_history_repository.py: IntelligenceHistoryRepository, persist<br/>📄 intelligence_observation_source.py: IntelligenceObservationSource, collect_observations<br/>📄 reward_provider.py: RewardProvider, execute, log_reward<br/>📄 tactical_command_port.py: TacticalCommandPort, execute, execute_security_payload"]
+    app_application_ports["<b>ports</b><br/><hr/>📄 visual_navigation.py: VisualNavigationPort, execute<br/>📄 model_runtime.py: from, ModelMessage<br/>📄 intelligence_source.py: IntelligenceSource, fetch_events<br/>📄 android_navigation.py: AndroidNavigationPort, observe_screen, tap<br/>📄 web_provider.py: WebProvider, execute, open_url<br/>📄 voice_provider.py: VoiceProvider, execute, speak<br/>📄 system_controller.py: SystemController, execute_command, is_available<br/>📄 osint_provider.py: OsintProvider, search<br/>📄 history_provider.py: HistoryProvider, execute, save_interaction<br/>📄 graph_store.py: from, UpsertReport, total<br/>📄 osint_discovery.py: GeoProvider, locate, NetworkResolver<br/>📄 action_provider.py: ActionProvider, execute, type_text<br/>📄 memory_provider.py: MemoryProvider, execute, store_event<br/>📄 soldier_provider.py: SoldierProvider, execute, register_soldier<br/>📄 security_provider.py: SecurityProvider, execute, verify_password<br/>📄 intelligence_history_repository.py: IntelligenceHistoryRepository, persist<br/>📄 intelligence_observation_source.py: IntelligenceObservationSource, collect_observations<br/>📄 reward_provider.py: RewardProvider, execute, log_reward<br/>📄 tactical_command_port.py: TacticalCommandPort, execute, execute_security_payload"]
     class app_application_ports port
     app_application --> app_application_ports
     app_static["<b>static</b>"]
@@ -208,6 +208,9 @@ graph LR
     app_adapters_infrastructure_secrets["<b>secrets</b><br/><hr/>📄 env_secrets_provider.py: EnvSecretsProvider, execute, get_secret"]
     class app_adapters_infrastructure_secrets adapter
     app_adapters_infrastructure --> app_adapters_infrastructure_secrets
+    app_adapters_infrastructure_graph["<b>graph</b><br/><hr/>📄 sensitive_store.py: SQLiteSensitiveStore"]
+    class app_adapters_infrastructure_graph adapter
+    app_adapters_infrastructure --> app_adapters_infrastructure_graph
     app_adapters_infrastructure_osint["<b>osint</b><br/><hr/>📄 eagle_osint_adapter.py: EagleOsintAdapter<br/>📄 censys_adapter.py: CensysAdapter, query_radius<br/>📄 ipinfo_adapter.py: IPInfoAdapter, locate<br/>📄 shodan_adapter.py: ShodanAdapter, query_radius<br/>📄 wigle_adapter.py: WigleAdapter, query_radius"]
     class app_adapters_infrastructure_osint adapter
     app_adapters_infrastructure --> app_adapters_infrastructure_osint
@@ -256,6 +259,9 @@ graph LR
     app_domain_orchestration["<b>orchestration</b><br/><hr/>📄 central_orchestrator.py: CentralOrchestrator, execute"]
     class app_domain_orchestration support
     app_domain --> app_domain_orchestration
+    app_domain_graph["<b>graph</b><br/><hr/>📄 edges.py: PivotType, edge_id, Edge<br/>📄 registry.py: from, GapReport, ready<br/>📄 confidence.py: is_strong_pivot, edge_confidence<br/>📄 nodes.py: NodeType, only_digits<br/>📄 graph.py: GraphIntegrityError, GraphDelta<br/>📄 pruner.py: PrunePolicy, ttl_for<br/>📄 sensitive_store.py: utcnow, as_utc, AccessRecord<br/>📄 resolver.py: AdapterBoundaryError<br/>📄 loop.py: from, LoopPolicy<br/>📄 fuse.py: haversine_km, Fuse<br/>📄 expander.py: from, ExpansionCost, Expansion<br/>📄 policy.py: from, GraphPolicyError, for"]
+    class app_domain_graph support
+    app_domain --> app_domain_graph
     app_domain_intelligence["<b>intelligence</b><br/><hr/>📄 osint.py: Coordinate, finite_values, NetworkRange<br/>📄 contracts.py: GeoPoint, IntelligenceEvidence, IntelligenceEvent"]
     class app_domain_intelligence support
     app_domain --> app_domain_intelligence
@@ -300,176 +306,4 @@ graph LR
     _agents_skills_jarvis-multi-agent-coordination["<b>jarvis-multi-agent-coordination</b>"]
     class _agents_skills_jarvis-multi-agent-coordination support
     _agents_skills --> _agents_skills_jarvis-multi-agent-coordination
-```
-
----
-
-## 🕸️ Domínio do Grafo OSINT (Fase 0)
-
-> Seção mantida manualmente. O diagrama acima é regenerado por
-> `scripts/autodoc.py`; esta seção descreve contratos e não é gerada.
-
-`app/domain/graph/` é a fundação do plano de execução do grafo OSINT. O grafo é
-o estado primário: adapters produzem `Node`/`Edge` normalizados, nunca
-dicionários livres.
-
-| Módulo | Contrato |
-|---|---|
-| `app/domain/graph/nodes.py` | `Node` frozen; `id = sha256(type, seletor normalizado, scope_id)`; `NodeType` com 21 tipos; `normalize_selector()` por tipo |
-| `app/domain/graph/edges.py` | `Edge` frozen com `selector_used`, `source`, `confidence`; `PivotType` (infra + identidade + BR); `Edge.derive()` calcula confiança pelo pivô |
-| `app/domain/graph/confidence.py` | `PIVOT_FACTOR` como fonte única, `edge_confidence(src, dst, pivot)`, `STRONG_PIVOTS` |
-| `app/domain/graph/policy.py` | `ScopePolicy` (escopo obrigatório, gate de pivô sensível); `SensitivityPolicy` (CPF → HMAC-SHA256) |
-
-Regras garantidas por teste:
-
-- Identidade é derivada, nunca fornecida; duas grafias do mesmo seletor
-  produzem o mesmo `id`.
-- `CPF` não existe como `NodeType`; `CPF_HASH` é `sensitive` por construção e
-  só aceita digest `sha256:`. CPF em texto claro é recusado.
-- `PERSON`/`ORG` existem no enum, mas só o `Resolver` (Fase 1) pode derivá-los.
-- `vehicle_owner` é `pivot_weak` e tem confiança limitada a `0.4`.
-- Escopo cruzado reduz a confiança pela metade; a aresta continua auditável.
-
-Validação:
-
-```bash
-pytest tests/domain/graph -v
-```
-
-Equivalente ao `pytest tests/fase_0 -v` do plano: os testes seguem a convenção
-do repositório (`tests/<camada>/...`), e os módulos vivem em
-`app/domain/graph/` em vez de `domain/graph/`, também por convenção local.
-
----
-
-## 🗄️ Grafo OSINT — Fase 1 (persistência, derivação e retenção)
-
-> Seção mantida manualmente; o diagrama acima é regenerado por
-> `scripts/autodoc.py`.
-
-| Módulo | Contrato |
-|---|---|
-| `app/domain/graph/graph.py` | `Graph` imutável e íntegro (aresta só para nó presente) com `to_json()` determinístico; `GraphDelta` para lotes parciais |
-| `app/application/ports/graph_store.py` | `GraphStorePort` + `UpsertReport(inserted, duplicates)` |
-| `app/adapters/infrastructure/graph/store.py` | `SQLiteGraphStore`: índices `(type, selector, scope_id)`, `src`, `dst`, `pivot`, `scope_id`; upsert idempotente; recusa nós sensíveis; `export_scope()` |
-| `app/domain/graph/resolver.py` | `Resolver.merge` (dedup estrutural) e `derive_person_org` (PERSON/ORG) |
-| `app/domain/graph/sensitive_store.py` | `SensitiveStore` + `InMemorySensitiveStore` com TTL curto e log de acesso |
-| `app/adapters/infrastructure/graph/sensitive_store.py` | `SQLiteSensitiveStore` em arquivo separado do grafo |
-| `app/domain/graph/pruner.py` | `PrunePolicy`/`Pruner.apply`: TTL por tipo, `min_confidence`, cofre e densidade |
-| `app/application/services/graph_retention.py` | Persiste o resultado do pruner no store |
-
-Regras garantidas por teste:
-
-- O mesmo nó inserido duas vezes não duplica (`UpsertReport.duplicates`).
-- `PERSON`/`ORG` só existem via `Resolver.derive_*`: `merge` recusa os tipos e um
-  teste varre `app/` para garantir que nenhum outro módulo os constrói.
-- O pruner move `sensitive=True` para o cofre; o store principal recusa esses nós.
-- 500 `SIGNAL` do mesmo Wi-Fi agregam em um único `SIGNAL_SET`.
-- `export_scope()` devolve JSON determinístico com `scope_id`, nós e arestas.
-- `GraphDelta`/`Graph` são determinísticos: derivar duas vezes gera os mesmos ids.
-
-Validação:
-
-```bash
-pytest tests/domain/graph tests/adapters/infrastructure/graph \
-       tests/application/test_graph_retention.py -v
-```
-
-Em Windows, quando `%TEMP%` estiver sem permissão de escrita, use
-`--basetemp=.tmp/pytest-basetemp`.
-
----
-
-## ⚙️ Grafo OSINT — Fase 2 (expanders, loop e fusão)
-
-| Módulo | Contrato |
-|---|---|
-| `app/domain/graph/expander.py` | `ExpanderSpec(name, accepts, produces, capability, cost, active, legal_gated)`, `Expansion`, protocolo `Expander` |
-| `app/domain/graph/registry.py` | `ExpanderRegistry.find_expanders(type, caps, include_legal_gated)` e `find_gap` com `available`/`missing`/`gated` |
-| `app/domain/graph/loop.py` | `EnrichmentLoop.run(seeds, graph, policy)` com `prior`, `budget`, `max_depth`, `min_confidence` e `coverage_stall` |
-| `app/domain/graph/fuse.py` | `Fuse.apply(delta, graph)`: `interest` em `{confirmed, discrepancy, novel}`, geo (haversine) e relacional |
-| `app/application/services/graph_enrichment.py` | Executa o loop por escopo, deriva `PERSON`/`ORG` e persiste o que é novo |
-
-Garantias testadas:
-
-- Um único `IP` seed gera ≥ 3 tipos de nó distintos.
-- Rodar o loop duas vezes com os mesmos seeds não adiciona nó nem aresta.
-- Capacidade ausente aparece como `missing`; implementação desligada ou
-  `legal_gated` aparece como `gated` e **não** reprova `ready`.
-- Aresta abaixo de `min_confidence` não entra no grafo e é reportada.
-- Expander que devolve `PERSON`/`ORG` falha com `AdapterBoundaryError`.
-- `Fuse` distingue evidência confirmada, pivô conflitante e localização
-  distante (> 50 km), sem mutar o grafo.
-
-Validação:
-
-```bash
-pytest tests/domain/graph tests/application/test_graph_enrichment.py -v
-```
-
----
-
-## 🌐 Grafo OSINT — Fase 3 (expanders de infraestrutura)
-
-> Seção mantida manualmente; o diagrama acima é regenerado por
-> `scripts/autodoc.py`.
-
-Os expanders vivem em `app/adapters/infrastructure/osint/expanders.py` e
-reutilizam os adapters existentes: nenhuma chamada de rede nova, nenhum rate
-limit dentro do adapter.
-
-| Expander | Aceita | Produz | Capability |
-|---|---|---|---|
-| `IPInfoExpander` | `IP` | `COORDINATE`, `ASN` (`ORG` é efeito do `Resolver`) | `osint.ip.enrich` |
-| `CensysExpander` | `COORDINATE`, `CIDR` | `HOST` | `osint.passive.geo_query` |
-| `ShodanExpander` | `COORDINATE`, `IP` | `HOST` | `osint.passive.geo_query` |
-| `WigleExpander` | `COORDINATE`, `SIGNAL` | `SIGNAL` | `osint.passive.signal_query` |
-| `AsnExpander` | `IP`, `ASN`, `ORG` | `CIDR` (`ORG` derivado) | `osint.net.resolve` |
-
-Garantias testadas:
-
-- Todo `HOST` de Censys/Shodan carrega `geo_confidence` (0.0 quando não há
-  coordenada); `IPInfoExpander` limita a 0.3 para conexão móvel ou proxy.
-- `CensysExpander` e `ShodanExpander` declaram a mesma capability, o mesmo
-  `produces` e o mesmo formato de `Expansion`: trocar um pelo outro no
-  pipeline não muda o contrato.
-- `WigleExpander` recebe centro + raio; a conversão para bbox acontece dentro
-  do `WigleAdapter`, e o teste confere `latrange1` na requisição.
-- `ExpanderRegistry.set_rate_limit(RateLimit(max_calls, period_seconds))`
-  aplica janela deslizante por capability; `RateLimitExceeded` interrompe o
-  loop com `STOP_RATE_LIMITED` e `rate_limited_capabilities` preenchido.
-- Cada expander é exercitado contra fixture JSON em `tests/fixtures/osint/`
-  com `httpx.MockTransport`, sem rede real.
-
-Validação:
-
-```bash
-pytest tests/adapters/infrastructure/osint tests/domain/graph \
-       tests/application/test_graph_enrichment.py -v
-```
-
-Pendente para a Fase 7: expor `osint.ip.enrich` como ferramenta MCP atômica
-(`osint.ip.enrich` já existe como capability, mas o servidor MCP ainda não foi
-ligado).
-
-### Composição de produção
-
-`app/application/services/graph_expander_setup.py` liga os expanders ao
-`OSINTAdapterRegistry` configurado:
-
-| Função | Papel |
-|---|---|
-| `configure_graph_expanders(registry, adapters=..., rate_limits=...)` | Registra um expander por provider disponível (`ipinfo`, `censys`, `shodan`, `wigle`) e aplica as janelas de taxa |
-| `DEFAULT_RATE_LIMITS` | 60/min para IPinfo e ASN, 6/min para consulta geográfica, 4/min para WiGLE |
-| `get_graph_expander_registry()` | Singleton process-local montado sobre `get_osint_registry()`, sem rede na construção |
-
-Expander só existe quando o provider correspondente está configurado, então
-`ExpanderRegistry.find_gap` continua sendo a fonte de verdade sobre
-capabilities ausentes. Credenciais nunca passam por este módulo: os adapters
-resolvem os valores em tempo de requisição.
-
-Validação:
-
-```bash
-pytest tests/application/test_graph_expander_setup.py -v
 ```
