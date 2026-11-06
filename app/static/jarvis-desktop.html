@@ -457,6 +457,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
  </div>
 </div>
 <script src="/static/jarvis-geospatial-layer.js"></script>
+<script src="/static/jarvis-intelligence-status.js"></script>
 <script>
 (()=>{
 'use strict';
@@ -1598,7 +1599,7 @@ function renderSources(){
   }
   else if(spec.id==='gods_eye_view')signal=observations+' obs';
   else signal=(counts.gdelt||0)+(counts.nasa_eonet||0)+(counts.usgs_earthquakes||0)+' ev';
-  const failed=spec.ids.map(id=>health[id]).filter(item=>item&&!item.available&&item.error_code).map(item=>item.error_code)[0];
+  const failed=window.JarvisIntelligenceStatus?window.JarvisIntelligenceStatus.describeSourceFailures(spec.ids,health):spec.ids.map(id=>health[id]).filter(item=>item&&!item.available&&item.error_code).map(item=>item.error_code)[0];
   return '<div class="row"><div class="grow"><b>'+esc(spec.label)+'</b><small>'+esc(failed||spec.sub)+'</small></div><span class="pill '+st.cls+'">'+st.label+'</span><button class="mini" type="button" data-sync="'+spec.action+'">'+esc(signal)+'</button></div>';
  }).join('')+(state.live.area?('<div class="tele-foot"><span>ÁREA GEV</span><span>'+esc(num(state.live.area.west).toFixed(2))+' / '+esc(num(state.live.area.south).toFixed(2))+' → '+esc(num(state.live.area.east).toFixed(2))+' / '+esc(num(state.live.area.north).toFixed(2))+'</span></div>'):'');
 }
