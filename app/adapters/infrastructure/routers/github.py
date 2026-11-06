@@ -1,4 +1,3 @@
-from app.core.nexus import nexus
 # -*- coding: utf-8 -*-
 """GitHub router: /v1/github/*, /v1/jarvis/dispatch endpoints."""
 
@@ -57,9 +56,15 @@ def create_github_router(db_adapter, get_current_user) -> APIRouter:
             elif request.operation == "submit_pr":
                 if not request.pr_title:
                     raise HTTPException(status_code=400, detail="pr_title is required")
+                if not request.paths:
+                    raise HTTPException(
+                        status_code=400, detail="paths is required for submit_pr"
+                    )
                 result = github_worker.submit_pull_request(
                     title=request.pr_title,
                     body=request.pr_body or "",
+                    branch=request.branch_name,
+                    paths=request.paths,
                 )
 
             elif request.operation == "fetch_ci_status":

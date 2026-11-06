@@ -2,8 +2,7 @@
 """Tests for GitHubWorker service"""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-import subprocess
+from unittest.mock import Mock, patch
 
 from app.application.services.github_worker import GitHubWorker
 
@@ -76,59 +75,102 @@ def test_create_feature_branch_failure(github_worker, mock_subprocess):
     assert "Branch already exists" in result["message"]
 
 
-def test_submit_pull_request_success(github_worker, mock_subprocess):
-    """Test submitting a pull request successfully"""
-    # Mock git commands success
-    mock_subprocess.side_effect = [
-        Mock(returncode=0),  # git add
-        Mock(returncode=0),  # git commit
-        Mock(returncode=0),  # git push
-        Mock(returncode=0, stdout="https://github.com/user/repo/pull/123", stderr=""),  # gh pr create
+def _prepare_pr_candidate(github_worker):
+    candidate = github_worker.repo_path / "candidate.py"
+    candidate.write_text("VALUE = True\n", encoding="utf-8")
+    return candidate
+
+
+def _successful_pr_commands(pr_result=None, push_result=None):
+    return [
+        Mock(returncode=0, stdout="feature/test-pr", stderr=""),
+        Mock(returncode=0, stdout="", stderr=""),  # no pre-staged changes
+        Mock(returncode=0, stdout="", stderr=""),  # git add explicit path
+        Mock(returncode=0, stdout="candidate.py\n", stderr=""),  # staged paths
+        Mock(returncode=0, stdout="", stderr=""),  # diff --check
+        Mock(returncode=0, stdout="", stderr=""),  # commit
+        push_result or Mock(returncode=0, stdout="", stderr=""),
+        pr_result or Mock(
+            returncode=0,
+            stdout="https://github.com/user/repo/pull/123",
+            stderr="",
+        ),
     ]
-    
+
+
+def test_submit_pull_request_success(github_worker, mock_subprocess):
+    """Only the requested file is staged and the feature branch is published."""
+    _prepare_pr_candidate(github_worker)
+    mock_subprocess.side_effect = _successful_pr_commands()
+
     result = github_worker.submit_pull_request(
         title="Test PR",
         body="Test description",
+        branch="feature/test-pr",
+        paths=["candidate.py"],
     )
-    
+
     assert result["success"] is True
-    assert "pr_url" in result
+    assert result["paths"] == ["candidate.py"]
     assert "github.com" in result["pr_url"]
+    add_call = mock_subprocess.call_args_list[2].args[0]
+    assert add_call == ["git", "add", "--", "candidate.py"]
 
 
 def test_submit_pull_request_push_failure(github_worker, mock_subprocess):
-    """Test submitting a pull request when push fails"""
-    mock_subprocess.side_effect = [
-        Mock(returncode=0),  # git add
-        Mock(returncode=0),  # git commit
-        Mock(returncode=1, stdout="", stderr="Push failed"),  # git push
-    ]
-    
+    """A failed push never proceeds to PR creation."""
+    _prepare_pr_candidate(github_worker)
+    mock_subprocess.side_effect = _successful_pr_commands(
+        push_result=Mock(returncode=1, stdout="", stderr="Push failed")
+    )
+
     result = github_worker.submit_pull_request(
         title="Test PR",
         body="Test description",
+        branch="feature/test-pr",
+        paths=["candidate.py"],
     )
-    
+
     assert result["success"] is False
     assert "Push failed" in result["message"]
+    assert mock_subprocess.call_count == 7
 
 
 def test_submit_pull_request_pr_creation_failure(github_worker, mock_subprocess):
-    """Test submitting a pull request when PR creation fails"""
-    mock_subprocess.side_effect = [
-        Mock(returncode=0),  # git add
-        Mock(returncode=0),  # git commit
-        Mock(returncode=0),  # git push
-        Mock(returncode=1, stdout="", stderr="PR creation failed"),  # gh pr create
-    ]
-    
+    """A remote branch can exist even when GitHub PR creation fails."""
+    _prepare_pr_candidate(github_worker)
+    mock_subprocess.side_effect = _successful_pr_commands(
+        pr_result=Mock(returncode=1, stdout="", stderr="PR creation failed")
+    )
+
     result = github_worker.submit_pull_request(
         title="Test PR",
         body="Test description",
+        branch="feature/test-pr",
+        paths=["candidate.py"],
     )
-    
+
     assert result["success"] is False
     assert "PR creation failed" in result["message"]
+
+
+def test_submit_pull_request_requires_explicit_paths(github_worker, mock_subprocess):
+    result = github_worker.submit_pull_request("Test PR", "Body")
+    assert result == {"success": False, "message": "explicit_file_paths_required"}
+    mock_subprocess.assert_not_called()
+
+
+def test_submit_pull_request_refuses_main(github_worker, mock_subprocess):
+    _prepare_pr_candidate(github_worker)
+    mock_subprocess.return_value = Mock(returncode=0, stdout="main", stderr="")
+
+    result = github_worker.submit_pull_request(
+        "Test PR", "Body", paths=["candidate.py"]
+    )
+
+    assert result["success"] is False
+    assert "non_default_feature_branch" in result["message"]
+    assert mock_subprocess.call_count == 1
 
 
 def test_fetch_ci_status_with_run_id(github_worker, mock_subprocess):

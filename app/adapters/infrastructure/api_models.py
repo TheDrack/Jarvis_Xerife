@@ -1,4 +1,3 @@
-from app.core.nexus import NexusComponent
 # -*- coding: utf-8 -*-
 """Pydantic models for API request/response validation"""
 
@@ -383,9 +382,15 @@ class GitHubWorkerRequest(BaseModel):
     """Request model for GitHub worker operations"""
 
     operation: str = Field(..., description="Operation: create_branch, submit_pr, fetch_ci_status")
-    branch_name: Optional[str] = Field(None, description="Branch name for create_branch")
+    branch_name: Optional[str] = Field(
+        None, description="Branch to create or expected current branch for submit_pr"
+    )
     pr_title: Optional[str] = Field(None, description="PR title for submit_pr")
     pr_body: Optional[str] = Field(None, description="PR body for submit_pr")
+    paths: list[str] = Field(
+        default_factory=list,
+        description="Explicit repository-relative file paths to stage for submit_pr",
+    )
     run_id: Optional[int] = Field(None, description="Run ID for fetch_ci_status")
 
 

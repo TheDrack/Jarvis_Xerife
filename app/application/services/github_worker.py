@@ -3,11 +3,13 @@ import json
 import logging
 import os
 import subprocess
-import urllib.error
-import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from app.application.security.repository_path_policy import (
+    UnsafeRepositoryPath,
+    resolve_repository_path,
+)
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
@@ -64,36 +66,126 @@ class GitHubWorker(NexusComponent):
         }
 
     def submit_pull_request(
-        self, title: str, body: str, branch: Optional[str] = None
+        self,
+        title: str,
+        body: str,
+        branch: Optional[str] = None,
+        paths: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
-        """Stage, commit, push and create a PR."""
-        # git add
-        r = self._run("git", "add", "-A")
-        if r.returncode != 0:
-            return {"success": False, "message": r.stderr.strip()}
+        """Commit only explicitly approved files from a non-default feature branch."""
+        if not paths or not isinstance(paths, list):
+            return {
+                "success": False,
+                "message": "explicit_file_paths_required",
+            }
 
-        # git commit
-        r = self._run("git", "commit", "-m", title)
-        if r.returncode != 0:
-            return {"success": False, "message": r.stderr.strip()}
+        normalized_paths: List[str] = []
+        try:
+            for raw_path in paths:
+                resolved, normalized, _ = resolve_repository_path(
+                    self.repo_path, raw_path, reject_symlinks=True
+                )
+                if not resolved.is_file():
+                    return {
+                        "success": False,
+                        "message": f"staged_path_not_a_file: {normalized}",
+                    }
+                normalized_paths.append(normalized)
+        except (UnsafeRepositoryPath, OSError, RuntimeError) as exc:
+            return {"success": False, "message": f"unsafe_staged_path: {exc}"}
 
-        # git push
-        r = self._run("git", "push")
-        if r.returncode != 0:
-            return {"success": False, "message": r.stderr.strip() or "Push failed"}
+        if len(set(normalized_paths)) != len(normalized_paths):
+            return {"success": False, "message": "duplicate_staged_paths"}
 
-        # gh pr create
-        r = self._run(
+        current = self._run("git", "rev-parse", "--abbrev-ref", "HEAD")
+        if current.returncode != 0:
+            return {
+                "success": False,
+                "message": current.stderr.strip() or "unable_to_resolve_current_branch",
+            }
+        current_branch = current.stdout.strip()
+        if not current_branch or current_branch in {"HEAD", "main", "master"}:
+            return {
+                "success": False,
+                "message": "pull_request_requires_non_default_feature_branch",
+            }
+        if branch and branch != current_branch:
+            return {
+                "success": False,
+                "message": f"branch_mismatch: expected={branch} current={current_branch}",
+            }
+
+        # Refuse to mix pre-existing staged work into an autonomous commit.
+        staged = self._run("git", "diff", "--cached", "--quiet")
+        if staged.returncode != 0:
+            return {
+                "success": False,
+                "message": "pre_staged_changes_detected",
+            }
+
+        added = self._run("git", "add", "--", *normalized_paths)
+        if added.returncode != 0:
+            return {
+                "success": False,
+                "message": added.stderr.strip() or "git_add_failed",
+            }
+
+        staged_names = self._run("git", "diff", "--cached", "--name-only")
+        if staged_names.returncode != 0:
+            return {
+                "success": False,
+                "message": staged_names.stderr.strip() or "unable_to_inspect_staged_diff",
+            }
+        actual_paths = {
+            item.replace("\\", "/")
+            for item in staged_names.stdout.splitlines()
+            if item.strip()
+        }
+        if not actual_paths or not actual_paths.issubset(set(normalized_paths)):
+            return {
+                "success": False,
+                "message": "staged_diff_contains_unexpected_or_no_files",
+            }
+
+        checked = self._run("git", "diff", "--cached", "--check")
+        if checked.returncode != 0:
+            return {
+                "success": False,
+                "message": checked.stderr.strip() or "staged_diff_check_failed",
+            }
+
+        committed = self._run("git", "commit", "-m", title)
+        if committed.returncode != 0:
+            return {
+                "success": False,
+                "message": committed.stderr.strip() or "git_commit_failed",
+            }
+
+        pushed = self._run("git", "push", "--set-upstream", "origin", current_branch)
+        if pushed.returncode != 0:
+            return {
+                "success": False,
+                "message": pushed.stderr.strip() or "git_push_failed",
+            }
+
+        created = self._run(
             "gh", "pr", "create",
             "--title", title,
             "--body", body,
+            "--head", current_branch,
+            "--base", "main",
         )
-        if r.returncode != 0:
-            return {"success": False, "message": r.stderr.strip() or "PR creation failed"}
+        if created.returncode != 0:
+            return {
+                "success": False,
+                "message": created.stderr.strip() or "PR creation failed",
+            }
 
-        pr_url = r.stdout.strip()
+        pr_url = created.stdout.strip()
         return {
             "success": True,
+            "branch": current_branch,
+            "paths": sorted(actual_paths),
             "pr_url": pr_url,
             "message": f"Pull request created: {pr_url}",
         }
@@ -171,7 +263,10 @@ class GitHubWorker(NexusComponent):
                 success=False,
                 error_message=logs_result["message"],
             )
-            return {"success": False, "message": f"Failed to download CI logs: {logs_result['message']}"}
+            return {
+                "success": False,
+                "message": f"Failed to download CI logs: {logs_result['message']}",
+            }
 
         logs = logs_result["logs"]
 
@@ -182,7 +277,7 @@ class GitHubWorker(NexusComponent):
         if len(failed_attempts) >= 3:
             # Escalate to human
             consolidated = "\n\n".join(
-                f"Attempt {i+1}: {t.solution_attempt}\nError: {t.error_message}"
+                f"Attempt {i + 1}: {t.solution_attempt}\nError: {t.error_message}"
                 for i, t in enumerate(failed_attempts[-3:])
             )
             thought_log_service.create_thought(
@@ -241,7 +336,10 @@ class GitHubWorker(NexusComponent):
             cwd=str(self.repo_path),
         )
         if r.returncode != 0:
-            return {"success": False, "message": f"Failed to get repository info: {r.stderr.strip()}"}
+            return {
+                "success": False,
+                "message": f"Failed to get repository info: {r.stderr.strip()}",
+            }
 
         try:
             repo_info = json.loads(r.stdout.strip())

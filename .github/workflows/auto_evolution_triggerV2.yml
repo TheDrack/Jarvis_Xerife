@@ -121,6 +121,10 @@ jobs:
               sys.exit(1)
           PYCODE
 
+      - name: 🔒 Build hardened candidate sandbox
+        if: steps.flow.outputs.action == 'evolve'
+        run: docker build --file Dockerfile.evolution-sandbox --tag jarvis-evolution-sandbox:ci .
+
       - name: 🤖 Mutação e Abertura de PR
         id: create_pr
         if: steps.flow.outputs.action == 'evolve'
@@ -128,6 +132,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GH_TOKEN: ${{ secrets.GIT_PAT }}
           EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
+          EVOLUTION_SANDBOX_IMAGE: jarvis-evolution-sandbox:ci
           PYTHONPATH: ${{ github.workspace }}
         run: |
           git config --global user.name "Jarvis-Bot"
