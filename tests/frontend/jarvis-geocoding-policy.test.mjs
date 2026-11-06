@@ -37,3 +37,15 @@ test('visible point geocoding remains bounded and reuses cached coordinates', ()
   assert.ok(html.includes('const cached=placeCache.get(key);'));
   assert.match(html, /PLACE_RETRY_AFTER/);
 });
+
+test('deduplicated reverse-geocode requests fan results out to all marker instances sharing coordinates', () => {
+  assert.match(html, /placeQueueByKey=new Map\(\)/);
+  assert.match(html, /const pending=placeQueueByKey\.get\(key\)/);
+  assert.match(html, /pending\.marks\.push\(mark\)/);
+  assert.match(html, /group\.marks\.forEach\(mark=>applyPlace\(mark,entry\)\)/);
+  assert.match(html, /placeQueueByKey\.delete\(group\.key\)/);
+});
+
+test('cluster labels are derived from cached reverse-geocoded member coordinates', () => {
+  assert.match(html, /generalizeRegionFromMembers\(members,zoom,placeFor\)/);
+});

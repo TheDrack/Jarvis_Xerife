@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import '../../app/static/jarvis-geospatial-layer.js';
 
-const { buildDeviceMarkers, cellSizeForZoom, generalizeRegion } = globalThis.JarvisGeospatialLayer;
+const { buildDeviceMarkers, cellSizeForZoom, generalizeRegion, generalizeRegionFromMembers } = globalThis.JarvisGeospatialLayer;
 
 const asset = (id, latitude, longitude, status = 'online', place = {}) => ({
   id, name: `Device ${id}`, latitude, longitude, located: true, status, place,
@@ -44,8 +44,8 @@ test('global zoom aggregates nearby assets into a bounded cluster', () => {
   assert.ok(cluster);
   assert.equal(cluster.count, 10);
   assert.equal(cluster.assets_total, 10);
-  assert.equal(cluster.assets.length, 8);
-  assert.deepEqual(cluster.assets.map((item) => item.id), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.equal(cluster.assets.length, 10);
+  assert.deepEqual(cluster.assets.map((item) => item.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   assert.equal(cluster.online_count, 9);
   assert.equal(cluster.offline_count, 1);
   assert.equal(cluster.region, 'Região geográfica');
@@ -111,7 +111,7 @@ test('desktop HUD loads the geospatial layer and debounces zoom-only rebuilds', 
   assert.match(html, /\},450\);/);
   assert.match(html, /kind==='device_cluster'/);
   assert.match(html, /item\.m\.kind==='device'\|\|item\.m\.kind==='device_cluster'/);
-  assert.match(html, /Math\.min\(8,/);
+  assert.match(html, /Math\.min\(64,/);
   assert.match(html, /generalizeRegion/);
   assert.match(html, /const size=Math\.max\(2,Math\.min\(4\.5,/);
   assert.match(html, /labelBoxes\.length>=Math\.min\(120,Math\.round\(45\+zoom\*12\)\)/);
@@ -151,4 +151,78 @@ test('HUD loads and renders administrative contours using the scale selector', a
   assert.match(html, /chooseBoundaryLayer\(zoom,viewportAreaKm2,adminBoundaries\.layers\)/);
   assert.match(html, /drawAdminBoundaryLines\(adminBoundaries\.countries/);
   assert.match(html, /drawAdminBoundaryLines\(adminBoundaries\.states/);
+});
+
+test('cluster generalization reuses reverse-geocoded addresses from every member coordinate', () => {
+  const members = [
+    { id: 'flight-1', latitude: -23.55, longitude: -46.63, record: { attributes: { callsign: 'GLO1273' } } },
+    { id: 'flight-2', latitude: -23.56, longitude: -46.64, record: { attributes: { callsign: 'AZU4120' } } },
+  ];
+  const cache = new Map([
+    ['-23.5500,-46.6300', { rawAddress: { city: 'São Paulo', state: 'São Paulo', country: 'Brasil', suburb: 'Sé' } }],
+    ['-23.5600,-46.6400', { rawAddress: { city: 'São Paulo', state: 'São Paulo', country: 'Brasil', suburb: 'República' } }],
+  ]);
+  const label = generalizeRegionFromMembers(
+    members,
+    2.05,
+    (latitude, longitude) => cache.get(Number(latitude).toFixed(4) + ',' + Number(longitude).toFixed(4)),
+  );
+  assert.equal(label, 'São Paulo · São Paulo · Brasil');
+});
+
+test('cluster generalization falls back to common administrative parents when cities differ', () => {
+  const members = [
+    { id: 'asset-1', latitude: 1, longitude: 1, record: {} },
+    { id: 'asset-2', latitude: 2, longitude: 2, record: {} },
+  ];
+  const addresses = new Map([
+    ['1.0000,1.0000', { rawAddress: { city: 'Campinas', state: 'São Paulo', country: 'Brasil' } }],
+    ['2.0000,2.0000', { rawAddress: { city: 'Santos', state: 'São Paulo', country: 'Brasil' } }],
+  ]);
+  const label = generalizeRegionFromMembers(
+    members,
+    2.05,
+    (latitude, longitude) => addresses.get(Number(latitude).toFixed(4) + ',' + Number(longitude).toFixed(4)),
+  );
+  assert.equal(label, 'São Paulo · Brasil');
+});
+
+test('screen clusters keep different entity categories independently selectable', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  assert.match(html, /const threshold=Math\.max\(8,26\/Math\.sqrt\(zoom\)\)/);
+  assert.match(html, /cells\.get\(item\.m\.kind\+':'\+/);
+  assert.match(html, /kind:'cluster',label:count\+' '\+String\(first\.m\.kind/);
+});
+
+test('orbital zoom supports street-level inspection and cluster members are individually selectable', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  assert.match(html, /Math\.min\(64,Number\.isFinite\(value\)\?value:1\)/);
+  assert.match(html, /data-cluster-member/);
+  assert.match(html, /cluster-member-list/);
+  assert.match(html, /renderSelection\(member\)/);
+  assert.match(html, /Math\.min\(64,Math\.max\(4,/);
+});
+
+test('orbital HUD exposes filters for all principal observation layers', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  for (const layer of ['satellite', 'aircraft', 'vessel', 'fire', 'quake', 'camera', 'device', 'installation', 'radio_station']) {
+    assert.match(html, new RegExp('data-layer="' + layer + '"'));
+  }
+  assert.match(html, /state\.layers\.device\?locatedDevices\(\):\[\]/);
+  assert.match(html, /return state\.layers\[layer\]!==false/);
+});
+
+test('cluster clicks open a member inspector instead of forcing an automatic zoom', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  assert.match(html, /AGRUPAMENTO ABERTO · SELECIONE UM MEMBRO OU USE APROXIMAR/);
+  assert.match(html, /if\(mark\.cluster\|\|mark\.kind==='device_cluster'\)/);
+  assert.doesNotMatch(html, /const next=current<1\.2\?1\.8:current<2\.2\?3\.2:Math\.min\(8/);
+});
+
+test('unchanged intelligence snapshots do not redraw the globe', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  assert.match(html, /if\(!uiChanged&&!globeChanged\)return/);
+  assert.match(html, /renderAll\(\{globe:globeChanged\}\)/);
+  assert.match(html, /if\(changed\)\{buildAreas\(\);if\(state\.layers\.device\)refreshGlobe\(\);\}/);
+  assert.match(html, /if\(state\.token&&!document\.hidden\)refreshLatest/);
 });
