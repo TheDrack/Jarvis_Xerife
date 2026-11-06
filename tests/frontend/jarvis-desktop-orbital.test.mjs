@@ -4,10 +4,11 @@ import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
 
-test('orbital zoom supports close inspection beyond the former 2.4x ceiling', () => {
-  assert.match(html, /Math\.min\(3\.6,/);
+test('orbital zoom supports close inspection up to 8x', () => {
+  assert.match(html, /Math\.min\(8,/);
   assert.match(html, /zoomBy\(1\.2\)/);
   assert.match(html, /zoomBy\(1\/1\.2\)/);
+  assert.match(html, /mark\.cluster\?Math\.min\(8,Math\.max\(1\.6,/);
 });
 
 test('HUD typography and globe controls are more legible', () => {
