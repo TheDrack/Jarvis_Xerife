@@ -2,7 +2,6 @@
 """Tests for EvolutionGatekeeper."""
 
 import subprocess
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -281,11 +280,21 @@ class TestEvolutionGatekeeperCoreProtection:
 class TestEvolutionGatekeeperSandboxFailClosed:
     """Propostas de código não podem ser aprovadas sem validação efetiva."""
 
+    def test_blocks_code_proposal_without_target_file(self):
+        gk = EvolutionGatekeeper()
+        ok, reason = gk._check_sandbox({"proposed_code": "print('candidate')"})
+        assert ok is False
+        assert "sandbox_target_missing" in reason
+
     def test_blocks_code_proposal_when_sandbox_unavailable(self):
         gk = EvolutionGatekeeper()
         with patch("app.application.services.evolution_gatekeeper.nexus") as mock_nexus:
             mock_nexus.resolve.return_value = None
-            ok, reason = gk._check_sandbox({"proposed_code": "print('candidate')"})
+            ok, reason = gk._check_sandbox({
+                "files_modified": ["app/application/services/candidate.py"],
+                "target_file": "app/application/services/candidate.py",
+                "proposed_code": "print('candidate')",
+            })
         assert ok is False
         assert "sandbox_unavailable" in reason
 
@@ -295,7 +304,11 @@ class TestEvolutionGatekeeperSandboxFailClosed:
         mock_sandbox.test_proposal.side_effect = RuntimeError("sandbox crashed")
         with patch("app.application.services.evolution_gatekeeper.nexus") as mock_nexus:
             mock_nexus.resolve.return_value = mock_sandbox
-            ok, reason = gk._check_sandbox({"proposed_code": "print('candidate')"})
+            ok, reason = gk._check_sandbox({
+                "files_modified": ["app/application/services/candidate.py"],
+                "target_file": "app/application/services/candidate.py",
+                "proposed_code": "print('candidate')",
+            })
         assert ok is False
         assert "sandbox_error" in reason
 

@@ -255,10 +255,21 @@ class EvolutionGatekeeper(NexusComponent):
         target_file: str = proposed_change.get("target_file", "")
 
         if not proposed_code:
-            # Sem código para testar — verificação passa
+            # Mudanças sem código (por exemplo, documentação) não executam código candidato.
             return True, "ok"
 
+        files = proposed_change.get("files_modified")
+        if not target_file or not isinstance(files, list) or not files:
+            return False, "sandbox_target_missing: code_proposal_requires_target_file"
+
         try:
+            _, target_lexical, _ = resolve_repository_path(
+                _repository_root(), target_file
+            )
+            normalized_files, path_error = _normalized_modified_paths(proposed_change)
+            if path_error or not any(item[1] == target_lexical for item in normalized_files or []):
+                return False, "sandbox_target_not_in_modified_files"
+
             sandbox = nexus.resolve("evolution_sandbox")
             if sandbox is None:
                 logger.warning("[EvolutionGatekeeper] EvolutionSandbox indisponível — proposta de código bloqueada.")

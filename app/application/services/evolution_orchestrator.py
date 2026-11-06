@@ -17,10 +17,15 @@ import ast
 import json
 import logging
 import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from app.application.security.repository_path_policy import (
+    UnsafeRepositoryPath,
+    resolve_repository_path,
+)
 from app.core.nexus import NexusComponent, nexus
 
 logger = logging.getLogger(__name__)
@@ -146,6 +151,12 @@ class EvolutionOrchestrator(NexusComponent):
                 error_snippet = f"Implementar capability {cap_id}: {cap_title}"
             system_ctx["target_capability"] = target_cap
 
+        candidate_target = str(
+            ctx.get("target_file") or (target_cap or {}).get("target_file") or ""
+        ).strip()
+        if candidate_target:
+            system_ctx["target_file"] = candidate_target
+
         # 2b. Verifica EvolutionGatekeeper antes de modificar arquivos
         proposed = {
             "files_modified": [],
@@ -164,22 +175,20 @@ class EvolutionOrchestrator(NexusComponent):
         if procedural_result:
             logger.info("[EvolutionOrchestrator] Solução encontrada na memória procedural.")
             patch_code = procedural_result.get("solution_attempt", "")
-            # Tenta aplicar a solução via crystallizer_engine
-            apply_result = self._apply_via_crystallizer(patch_code, mission_id)
+            # Memory retrieval is advisory, not authorization to mutate the repository.
+            # Procedural patches must enter the same target-bound Docker validation flow.
             self._log_thought(
                 mission_id,
                 error_snippet,
                 patch_code,
-                success=apply_result.get("success", bool(patch_code)),
-                notes="source: procedural_memory",
+                success=False,
+                notes="rejected: procedural_patch_requires_target_validation",
             )
-            # A reusable solution was found: that is the success signal.
-            # Application via the crystallizer is best-effort and reported separately.
             return {
-                "success": bool(patch_code) or apply_result.get("success", False),
+                "success": False,
+                "reason": "procedural_patch_requires_target_validation",
                 "source": "procedural_memory",
                 "patch": patch_code,
-                "apply_result": apply_result,
             }
 
         # 4. Monta prompt e envia ao LLM
@@ -190,7 +199,7 @@ class EvolutionOrchestrator(NexusComponent):
             self._log_thought(mission_id, error_snippet, "", success=False)
             return {"success": False, "reason": "llm_no_response"}
 
-        # 5. Valida sintaxe Python
+        # 5. Validate syntax and require an explicit target before any mutation.
         patch_code = self._extract_code(llm_response)
         if not self._validate_syntax(patch_code):
             logger.warning("[EvolutionOrchestrator] Patch inválido recebido do LLM.")
@@ -198,14 +207,88 @@ class EvolutionOrchestrator(NexusComponent):
             self._increment_metabolism()
             return {"success": False, "reason": "invalid_syntax", "patch": patch_code}
 
-        # 6. Salva proposta e cria PR
-        proposal_path = self._save_proposal(patch_code)
-        pr_result = self._create_pr(proposal_path, mission_id)
+        target_file = str(
+            ctx.get("target_file") or (target_cap or {}).get("target_file") or ""
+        ).strip()
+        if not target_file:
+            self._log_thought(
+                mission_id, error_snippet, patch_code, success=False,
+                notes="rejected: candidate_target_missing",
+            )
+            return {"success": False, "reason": "candidate_target_missing"}
 
-        self._log_thought(mission_id, error_snippet, patch_code, success=True, notes="source: llm")
+        # The preflight above is not candidate validation. Re-run the gate with
+        # the exact file and candidate contents so the Docker sandbox tests them.
+        gatekeeper = self._get_gatekeeper()
+        if gatekeeper is None:
+            return {"success": False, "reason": "gatekeeper_unavailable"}
+        approved, gate_reason = gatekeeper.approve_evolution(
+            {
+                "files_modified": [target_file],
+                "target_file": target_file,
+                "proposed_code": patch_code,
+                "mission_id": mission_id,
+            }
+        )
+        if not approved:
+            self._log_thought(
+                mission_id, error_snippet, patch_code, success=False,
+                notes=f"rejected: {gate_reason}",
+            )
+            return {"success": False, "reason": f"gatekeeper_blocked: {gate_reason}"}
+
+        if self.auto_apply:
+            return {"success": False, "reason": "auto_apply_not_implemented"}
+        if nexus.resolve("github_worker") is None:
+            return {"success": False, "reason": "github_worker_unavailable"}
+
+        try:
+            target_path, normalized_target, _ = resolve_repository_path(
+                Path.cwd(), target_file, reject_symlinks=True
+            )
+            if not target_path.is_file():
+                return {"success": False, "reason": "candidate_target_not_a_file"}
+
+            current_branch = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True, text=True, cwd=str(Path.cwd()), check=False,
+            )
+            if current_branch.returncode != 0:
+                return {"success": False, "reason": "git_branch_unavailable"}
+            branch_name = current_branch.stdout.strip()
+            if branch_name in {"", "HEAD", "main", "master"}:
+                return {"success": False, "reason": "feature_branch_required"}
+
+            target_status = subprocess.run(
+                ["git", "status", "--porcelain", "--", normalized_target],
+                capture_output=True, text=True, cwd=str(Path.cwd()), check=False,
+            )
+            if target_status.returncode != 0 or target_status.stdout.strip():
+                return {"success": False, "reason": "candidate_target_has_local_changes"}
+
+            tracked = subprocess.run(
+                ["git", "ls-files", "--error-unmatch", normalized_target],
+                capture_output=True, text=True, cwd=str(Path.cwd()), check=False,
+            )
+            if tracked.returncode != 0:
+                return {"success": False, "reason": "candidate_target_must_be_tracked"}
+
+            target_path.write_text(patch_code, encoding="utf-8")
+        except (UnsafeRepositoryPath, OSError, RuntimeError) as exc:
+            logger.warning("[EvolutionOrchestrator] Candidate apply blocked: %s", exc)
+            return {"success": False, "reason": f"candidate_apply_blocked: {type(exc).__name__}"}
+
+        # The publisher stages only this validated target file and refuses main.
+        proposal_path = self._save_proposal(patch_code)
+        pr_result = self._create_pr(normalized_target, mission_id)
+        self._log_thought(
+            mission_id, error_snippet, patch_code,
+            success=bool(pr_result.get("success")), notes="source: llm",
+        )
         return {
-            "success": True,
+            "success": bool(pr_result.get("success")),
             "proposal": str(proposal_path),
+            "target_file": normalized_target,
             "pr": pr_result,
             "source": "llm",
         }
@@ -294,8 +377,9 @@ class EvolutionOrchestrator(NexusComponent):
             f"Snapshot do codebase: {json.dumps(snapshot, default=str)}\n"
             f"Erro/gap identificado: {error_snippet}\n"
             f"Restrições de arquitetura:\n{arch_rules}{target}\n\n"
-            "INSTRUÇÃO: Retorne APENAS código Python válido com uma docstring "
-            "no topo explicando a mudança. Não inclua texto fora do bloco Python."
+            "INSTRUÇÃO: Retorne o conteúdo COMPLETO do arquivo-alvo informado no "
+            "estado do sistema, não um snippet. Preserve contratos e importações "
+            "existentes. Retorne APENAS código Python válido com docstring no topo."
         )
 
     def _call_llm(self, prompt: str) -> str:
@@ -347,7 +431,7 @@ class EvolutionOrchestrator(NexusComponent):
         logger.info("[EvolutionOrchestrator] Proposta salva: %s", path)
         return path
 
-    def _create_pr(self, proposal_path: Path, mission_id: str) -> Dict[str, Any]:
+    def _create_pr(self, target_file: str, mission_id: str) -> Dict[str, Any]:
         if self.auto_apply:
             logger.info("[EvolutionOrchestrator] auto_apply=True — commit direto (não implementado).")
             return {"skipped": True, "reason": "auto_apply_not_implemented"}
@@ -356,8 +440,13 @@ class EvolutionOrchestrator(NexusComponent):
             if worker is None:
                 return {"success": False, "reason": "github_worker_unavailable"}
             title = f"[JARVIS Evolution] {mission_id}"
-            body = f"Patch proposto pelo EvolutionOrchestrator para missão `{mission_id}`."
-            return worker.submit_pull_request(title, body) or {}
+            body = (
+                f"Patch validado pelo EvolutionSandbox para missão `{mission_id}`.\n\n"
+                f"**Arquivo alterado:** `{target_file}`"
+            )
+            return worker.submit_pull_request(
+                title, body, paths=[target_file]
+            ) or {}
         except Exception as exc:
             logger.error("[EvolutionOrchestrator] Falha ao criar PR: %s", exc)
             return {"success": False, "error": str(exc)}

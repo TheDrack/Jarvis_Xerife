@@ -76,9 +76,9 @@ class TestEvolutionOrchestratorSuccessFlow:
         finally:
             evo_mod._PROPOSALS_DIR = original_proposals
 
-        assert result["success"] is True
-        assert result["source"] == "llm"
-        assert "proposal" in result
+        assert result["success"] is False
+        assert result["reason"] == "candidate_target_missing"
+        mock_worker.submit_pull_request.assert_not_called()
 
 
 class TestEvolutionOrchestratorFailureFlow:
@@ -134,7 +134,8 @@ class TestEvolutionOrchestratorProceduralMemory:
 
             result = orchestrator.execute({"error_snippet": "NullPointerError"})
 
-        assert result["success"] is True
+        assert result["success"] is False
+        assert result["reason"] == "procedural_patch_requires_target_validation"
         assert result["source"] == "procedural_memory"
         mock_mem.search_solution.assert_called_once_with("NullPointerError")
 
@@ -179,19 +180,18 @@ class TestEvolutionOrchestratorFullCycle:
         finally:
             evo_mod._PROPOSALS_DIR = original_proposals
 
-        # Verifica que o ciclo foi bem-sucedido
-        assert result["success"] is True
-        assert result["source"] == "llm"
+        # A proposta sem arquivo-alvo explícito deve falhar fechada.
+        assert result["success"] is False
+        assert result["reason"] == "candidate_target_missing"
+        mock_worker.submit_pull_request.assert_not_called()
 
         # Verifica que o Gatekeeper foi consultado
         mock_gatekeeper.approve_evolution.assert_called_once()
 
-        # Verifica que a proposta foi salva em data/evolution_proposals/
+        # A proposta rejeitada não deve ser persistida nem publicada.
         proposals_dir = tmp_path / "proposals"
-        proposal_files = list(proposals_dir.glob("*.py"))
-        assert len(proposal_files) == 1
-        content = proposal_files[0].read_text(encoding="utf-8")
-        assert "evolve" in content
+        proposal_files = list(proposals_dir.glob("*.py")) if proposals_dir.exists() else []
+        assert proposal_files == []
 
     def test_gatekeeper_rejection_escalates_to_commander(self, orchestrator):
         """Quando o Gatekeeper rejeita, deve escalar para COMMANDER_NEEDED."""
@@ -252,7 +252,8 @@ class TestEvolutionOrchestratorFullCycle:
         finally:
             evo_mod._PROPOSALS_DIR = original_proposals
 
-        assert result["success"] is True
+        assert result["success"] is False
+        assert result["reason"] == "candidate_target_missing"
         assert "capability_manager" not in resolved
         # O prompt precisa carregar a capability explícita
         prompt = mock_metabolism.execute.call_args.args[0]["user_prompt"]
@@ -290,7 +291,8 @@ class TestEvolutionOrchestratorFullCycle:
         finally:
             evo_mod._PROPOSALS_DIR = original_proposals
 
-        assert result["success"] is True
+        assert result["success"] is False
+        assert result["reason"] == "candidate_target_missing"
         prompt = mock_metabolism.execute.call_args.args[0]["user_prompt"]
         assert "MAPA-DO-CODEBASE-XYZ" in prompt
 
@@ -331,7 +333,8 @@ class TestEvolutionOrchestratorFullCycle:
         finally:
             evo_mod._PROPOSALS_DIR = original_proposals
 
-        assert result["success"] is True
+        assert result["success"] is False
+        assert result["reason"] == "candidate_target_missing"
         mock_cap_manager.get_executable_capabilities.assert_called_once()
 
 
