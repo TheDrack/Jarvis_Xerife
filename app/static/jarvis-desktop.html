@@ -207,7 +207,7 @@ a{color:inherit;text-decoration:none}
 .areas button[aria-pressed="true"]{color:var(--mint);border-color:rgba(84,215,255,.45);background:rgba(84,215,255,.08)}
 .areas button:disabled{opacity:.35;cursor:not-allowed}
 /* ---- Globe zoom ---- */
-.globe-tools{position:absolute;right:4px;top:4px;z-index:3;display:grid;gap:4px}
+.globe-tools{position:absolute;right:4px;top:4px;z-index:3;display:grid;gap:4px}.globe-pan{display:grid;justify-items:center;gap:2px;padding:3px;border:1px solid rgba(84,215,255,.2);background:rgba(2,11,20,.78)}.globe-pan>div{display:flex;gap:2px}.globe-tools .globe-pan button{width:25px;height:25px;font-size:13px}
 .globe-tools button{width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--line);color:var(--mint);background:rgba(2,11,20,.74);font-family:var(--mono);font-size:var(--fs-xs);line-height:1;border-radius:var(--radius)}
 .globe-tools button:hover{border-color:var(--mint);background:rgba(84,215,255,.14)}
 .globe-zoom{position:absolute;left:4px;top:4px;z-index:3;font-family:var(--mono);font-size:var(--fs-2xs);letter-spacing:var(--ls-tight);color:var(--dim)}
@@ -262,7 +262,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 .stage[data-view="core"] .col-left{grid-column:1}
 .stage[data-view="core"] .col-right{grid-column:3}
 .selection-inspector{position:absolute;z-index:4;left:18px;bottom:18px;width:min(320px,calc(100% - 72px));padding:12px 13px;display:grid;gap:6px;border:1px solid rgba(84,215,255,.34);background:linear-gradient(145deg,rgba(5,24,40,.96),rgba(1,8,16,.94));box-shadow:0 16px 42px rgba(0,0,0,.42),0 0 24px rgba(84,215,255,.08);backdrop-filter:blur(12px);animation:hud-enter .2s ease both}
-.selection-inspector{width:min(430px,calc(100% - 72px));max-height:min(52vh,420px);overflow:auto;overscroll-behavior:contain}.selection-summary{margin:0;color:#c7e8f5;font-size:var(--fs-sm);line-height:1.55;white-space:normal}.selection-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.selection-facts-section{grid-column:1/-1;padding:4px 0 2px;border-bottom:1px solid var(--line-soft);font:600 var(--fs-2xs)/1.4 var(--mono);letter-spacing:.18em;color:var(--mint);text-transform:uppercase}.selection-facts span{padding:5px 6px;border-left:1px solid var(--line);background:rgba(84,215,255,.045);font:var(--fs-2xs)/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere}.selection-facts b{display:block;color:#d9f4ff;font-weight:500}.cluster-member-list{grid-column:1/-1;display:grid;gap:4px;max-height:220px;overflow:auto;padding-right:3px}.cluster-member{display:grid;gap:2px;width:100%;padding:7px 8px;text-align:left;border:1px solid rgba(84,215,255,.16);border-left:2px solid rgba(84,215,255,.52);background:rgba(84,215,255,.045);color:#d9f4ff;cursor:pointer}.cluster-member:hover,.cluster-member:focus-visible{border-color:rgba(84,215,255,.65);background:rgba(84,215,255,.12);outline:none}.cluster-member b{font:600 var(--fs-xs)/1.35 var(--mono)}.cluster-member small{font:var(--fs-2xs)/1.4 var(--mono);color:var(--muted)}.selection-actions a{display:inline-flex;align-items:center;text-decoration:none}.selection-actions a[hidden]{display:none}@media(max-width:900px){.selection-inspector{width:min(380px,calc(100% - 48px));max-height:42vh}}\n.selection-inspector[hidden]{display:none}
+.selection-inspector{width:min(430px,calc(100% - 72px));max-height:min(52vh,420px);overflow:auto;overscroll-behavior:contain;padding-top:46px;position:absolute}.selection-close{position:absolute;top:8px;right:8px;z-index:2;width:34px;height:34px;display:grid;place-items:center;border:1px solid rgba(84,215,255,.72);background:rgba(84,215,255,.16);color:#eafcff;font-size:20px;font-weight:700;box-shadow:0 0 14px rgba(84,215,255,.2)}.selection-close:hover{background:rgba(84,215,255,.3);color:#fff}.selection-summary{margin:0;color:#c7e8f5;font-size:var(--fs-sm);line-height:1.55;white-space:normal}.selection-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.selection-facts-section{grid-column:1/-1;padding:4px 0 2px;border-bottom:1px solid var(--line-soft);font:600 var(--fs-2xs)/1.4 var(--mono);letter-spacing:.18em;color:var(--mint);text-transform:uppercase}.selection-facts span{padding:5px 6px;border-left:1px solid var(--line);background:rgba(84,215,255,.045);font:var(--fs-2xs)/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere}.selection-facts b{display:block;color:#d9f4ff;font-weight:500}.cluster-member-list{grid-column:1/-1;display:grid;gap:4px;max-height:220px;overflow:auto;padding-right:3px}.cluster-member{display:grid;gap:2px;width:100%;padding:7px 8px;text-align:left;border:1px solid rgba(84,215,255,.16);border-left:2px solid rgba(84,215,255,.52);background:rgba(84,215,255,.045);color:#d9f4ff;cursor:pointer}.cluster-member:hover,.cluster-member:focus-visible{border-color:rgba(84,215,255,.65);background:rgba(84,215,255,.12);outline:none}.cluster-member b{font:600 var(--fs-xs)/1.35 var(--mono)}.cluster-member small{font:var(--fs-2xs)/1.4 var(--mono);color:var(--muted)}.selection-actions a{display:inline-flex;align-items:center;text-decoration:none}.selection-actions a[hidden]{display:none}@media(max-width:900px){.selection-inspector{width:min(380px,calc(100% - 48px));max-height:42vh}}\n.selection-inspector[hidden]{display:none}
 .selection-kicker{display:flex;justify-content:space-between;gap:10px;font:var(--fs-2xs)/1.4 var(--mono);letter-spacing:.16em;color:var(--mint)}
 .selection-inspector strong{font-size:var(--fs-md);font-weight:600;color:#e8faff;line-height:1.35}
 .selection-inspector small{font:var(--fs-xs)/1.5 var(--mono);color:var(--muted)}
@@ -336,7 +336,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
  <main class="stage" id="stage" data-view="core">
   <div class="center">
    <div class="status"><div class="rules"><i></i>◈<i></i></div><b id="statusLabel" role="status" aria-live="polite">STANDBY</b><small id="statusDetail">NÚCLEO LOCAL · AGUARDANDO PRIMEIRA LEITURA</small></div>
-   <div class="globe-wrap"><div class="reactor" aria-hidden="true"><i class="r2"></i><i class="r1"></i><i class="sweep"></i><i class="r3"></i></div><canvas id="globe" aria-label="Globo de eventos, observações, câmeras, dispositivos e agrupamentos por proximidade"></canvas><div class="reticle"></div><section class="selection-inspector" id="selectionInspector" hidden aria-live="polite"><div class="selection-kicker">SELEÇÃO ATIVA <span id="selectionKind">—</span></div><strong id="selectionTitle">—</strong><small id="selectionDetail">—</small><p id="selectionSummary" class="selection-summary"></p><div id="selectionFacts" class="selection-facts"></div><div class="selection-actions"><a class="mini" id="selectionSource" hidden target="_blank" rel="noopener noreferrer">ABRIR FONTE ↗</a><button class="mini" id="selectionLive" type="button" hidden>AO VIVO</button><button class="mini" id="selectionAction" type="button">FOCAR</button><button class="mini" id="selectionClose" type="button" aria-label="Fechar seleção">×</button></div></section><div class="globe-zoom" id="zoomLevel">100%</div><div class="globe-tools"><button type="button" id="zoomIn" aria-label="Aproximar o globo" title="Aproximar">+</button><button type="button" id="zoomOut" aria-label="Afastar o globo" title="Afastar">−</button><button type="button" id="zoomReset" aria-label="Recentralizar o globo" title="Recentralizar">⤢</button></div><div class="globe-hint">arraste · scroll/pinça para zoom · clique no agrupamento aproxima</div></div>
+   <div class="globe-wrap"><div class="reactor" aria-hidden="true"><i class="r2"></i><i class="r1"></i><i class="sweep"></i><i class="r3"></i></div><canvas id="globe" aria-label="Globo de eventos, observações, câmeras, dispositivos e agrupamentos por proximidade"></canvas><div class="reticle"></div><section class="selection-inspector" id="selectionInspector" hidden aria-live="polite"><button class="mini selection-close" id="selectionClose" type="button" aria-label="Fechar descrição" title="Fechar descrição">×</button><div class="selection-kicker">SELEÇÃO ATIVA <span id="selectionKind">—</span></div><strong id="selectionTitle">—</strong><small id="selectionDetail">—</small><p id="selectionSummary" class="selection-summary"></p><div id="selectionFacts" class="selection-facts"></div><div class="selection-actions"><a class="mini" id="selectionSource" hidden target="_blank" rel="noopener noreferrer">ABRIR FONTE ↗</a><button class="mini" id="selectionLive" type="button" hidden>AO VIVO</button><button class="mini" id="selectionAction" type="button">FOCAR</button></div></section><div class="globe-zoom" id="zoomLevel">100%</div><div class="globe-tools"><div class="globe-pan" role="group" aria-label="Mover o globo"><button type="button" data-pan="up" aria-label="Mover para norte">↑</button><div><button type="button" data-pan="left" aria-label="Mover para oeste">←</button><button type="button" data-pan="down" aria-label="Mover para sul">↓</button><button type="button" data-pan="right" aria-label="Mover para leste">→</button></div></div><button type="button" id="zoomIn" aria-label="Aproximar o globo" title="Aproximar">+</button><button type="button" id="zoomOut" aria-label="Afastar o globo" title="Afastar">−</button><button type="button" id="zoomReset" aria-label="Recentralizar o globo" title="Recentralizar">⤢</button></div><div class="globe-hint">arraste · scroll/pinça para zoom · clique no agrupamento aproxima</div></div>
    <nav class="areas" id="areaBar" aria-label="Focar uma área no globo"></nav>
    <nav class="dock" aria-label="Seções">
     <div class="dock-group" role="group" aria-label="Inteligência">
@@ -512,6 +512,7 @@ const Globe=(()=>{
  let pinchDist=0;
  let spin=!reduce,drag=null,idleUntil=0,lastT=0;
  let geo=null,px=null,py=null,pz=null,adminBoundaries=null;
+ let municipalityLoadPromise=null,municipalityLoadFailed=false;
  let stars=[],marks=[],area=null,hook=null,hits=[],quakeRings=[],labelBoxes=[];
  let placeCache=new Map(),placeQueue=[],placeQueueByKey=new Map(),placeRunning=false,placeScanAt=0;
  const aircraftTracks=new Map();
@@ -620,6 +621,22 @@ const Globe=(()=>{
   if(!layer)return;
   if(layer.rank>=1)drawAdminBoundaryLines(adminBoundaries.countries,radius,cosR,sinR,cosT,sinT,'rgba(165,220,255,.72)',1.05);
   if(layer.rank>=2)drawAdminBoundaryLines(adminBoundaries.states,radius,cosR,sinR,cosT,sinT,'rgba(84,215,255,.38)',0.72);
+  if(zoom>=5.5){
+   if(!adminBoundaries.municipalities){if(!municipalityLoadPromise&&!municipalityLoadFailed)loadMunicipalityBoundaries();return;}
+   if(adminBoundaries.municipalities.length)drawAdminBoundaryLines(adminBoundaries.municipalities,radius,cosR,sinR,cosT,sinT,'rgba(255,180,92,.48)',0.62);
+   if(zoom>=9&&adminBoundaries.municipalityLabels.length){
+    ctx.save();ctx.font='9px Cascadia Mono,Consolas,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    const occupied=[];
+    for(const label of adminBoundaries.municipalityLabels){
+     const v=sph(label.longitude,label.latitude),x0=v[0]*cosR+v[2]*sinR,z0=v[2]*cosR-v[0]*sinR,y2=v[1]*cosT-z0*sinT,z2=v[1]*sinT+z0*cosT;
+     if(z2<=0.12)continue;
+     const x=cx+x0*radius,y=cy-y2*radius;if(x<20||x>W-20||y<14||y>H-14)continue;
+     if(occupied.some(point=>Math.hypot(point[0]-x,point[1]-y)<38))continue;
+     occupied.push([x,y]);ctx.lineWidth=2.5;ctx.strokeStyle='rgba(1,8,16,.88)';ctx.strokeText(label.name,x,y);ctx.fillStyle='rgba(255,220,174,.96)';ctx.fillText(label.name,x,y);
+    }
+    ctx.restore();
+   }
+  }
  }
  function drawGraticule(radius,cosR,sinR,cosT,sinT){
   ctx.strokeStyle='rgba(84,215,255,.11)';ctx.lineWidth=0.7;
@@ -1053,7 +1070,7 @@ const Globe=(()=>{
    const response=await fetch('/static/world-admin-boundaries.json.gz.b64',{cache:'force-cache'});
    if(!response.ok)throw new Error('HTTP '+response.status);
    if(typeof DecompressionStream==='undefined')throw new Error('GZIP indispon?vel neste runtime');
-   const encoded=(await response.text()).replace(/\\s+/g,'');
+   const encoded=(await response.text()).replace(/\s+/g,'');
    const binary=atob(encoded),compressed=new Uint8Array(binary.length);
    for(let i=0;i<binary.length;i+=1)compressed[i]=binary.charCodeAt(i);
    const stream=new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
@@ -1065,14 +1082,42 @@ const Globe=(()=>{
    adminBoundaries={
     countries:toVectors(data.countries),
     states:toVectors(data.states),
+    municipalities:null,
+    municipalityLabels:[],
     layers:[
      {id:'continents',rank:0,meanAreaKm2:90000000},
      {id:'countries',rank:1,meanAreaKm2:2500000},
-     {id:'states',rank:2,meanAreaKm2:85000}
+     {id:'states',rank:2,meanAreaKm2:85000},
+     {id:'municipalities',rank:3,meanAreaKm2:1200}
     ]
    };
    draw(performance.now());
   }catch(error){setFooter('FRONTEIRAS ADMINISTRATIVAS INDISPON?VEIS ? '+error.message);}
+ }
+ async function loadMunicipalityBoundaries(){
+  if(municipalityLoadPromise||municipalityLoadFailed)return municipalityLoadPromise;
+  municipalityLoadPromise=(async()=>{
+   try{
+    const response=await fetch('/static/world-municipal-boundaries.json.gz.b64',{cache:'force-cache'});
+    if(!response.ok)throw new Error('HTTP '+response.status);
+    if(typeof DecompressionStream==='undefined')throw new Error('GZIP indisponível neste runtime');
+    const encoded=(await response.text()).replace(/\s+/g,'');
+    const binary=atob(encoded),compressed=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i+=1)compressed[i]=binary.charCodeAt(i);
+    const stream=new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
+    const data=await new Response(stream).json();
+    const toVectors=lines=>(Array.isArray(lines)?lines:[]).map(line=>line.map(pair=>{
+     const lon=Number(pair[0])*RAD,lat=Number(pair[1])*RAD,cp=Math.cos(lat);
+     return [cp*Math.sin(lon),Math.sin(lat),cp*Math.cos(lat)];
+    }));
+    adminBoundaries.municipalities=toVectors(data.municipalities);
+    adminBoundaries.municipalityLabels=Array.isArray(data.municipalityLabels)?data.municipalityLabels:[];
+    adminBoundaries.municipalitySource=data;
+    setFooter('MALHA MUNICIPAL IBGE 2025 · '+adminBoundaries.municipalityLabels.length+' MUNICÍPIOS · SC');
+    draw(performance.now());
+   }catch(error){municipalityLoadFailed=true;setFooter('MALHA MUNICIPAL INDISPONÍVEL · '+error.message);}
+  })();
+  return municipalityLoadPromise;
  }
  async function loadLand(){
   try{
@@ -1412,11 +1457,18 @@ const Globe=(()=>{
   notifyZoom();
   draw(performance.now());
  }
- function focusTo(latitude,longitude,zoomLevel){
-  if(!Number.isFinite(latitude)||!Number.isFinite(longitude))return false;
-  target={rot:-Number(longitude)*RAD,tilt:Math.max(-1.1,Math.min(1.1,Number(latitude)*RAD)),zoom:clampZoom(zoomLevel||1.6)};
+ function focusTo(latitude,longitude,zoomLevel=zoom){
+  if(!Number.isFinite(Number(latitude))||!Number.isFinite(Number(longitude)))return false;
+  const nextZoom=zoomLevel==null?zoom:clampZoom(Number(zoomLevel));
+  target={rot:-Number(longitude)*RAD,tilt:Math.max(-1.1,Math.min(1.1,Number(latitude)*RAD)),zoom:nextZoom};
   idleUntil=performance.now()+9000;
   return true;
+ }
+ function panBy(directionX,directionY){
+  const scale=Math.max(0.08,Math.min(1.8,1/Math.sqrt(zoom)));
+  target=null;rot-=Number(directionX||0)*0.055*scale;
+  tilt=Math.max(-1.1,Math.min(1.1,tilt-Number(directionY||0)*0.045*scale));
+  idleUntil=performance.now()+9000;draw(performance.now());
  }
  function zoomBy(factor){
   target=null;
@@ -1451,8 +1503,9 @@ const Globe=(()=>{
     return;
    }
    target=null;
-   rot-=dx*0.006;
-   tilt=Math.max(-1.1,Math.min(1.1,tilt+dy*0.004));
+   const dragScale=Math.max(0.08,Math.min(1.8,1/Math.sqrt(zoom)));
+   rot-=dx*0.006*dragScale;
+   tilt=Math.max(-1.1,Math.min(1.1,tilt-dy*0.004*dragScale));
    idleUntil=performance.now()+9000;
    draw(performance.now());
   });
@@ -1489,7 +1542,7 @@ const Globe=(()=>{
   }
  }
  function init(){loadPlaceCache();bind();resize();loadLand();loadAdminBoundaries();requestAnimationFrame(loop);}
- return {init,setData,setDeviceData,getZoom:()=>zoom,reset,focusArea,focusTo,zoomBy,placeFor,onSelect:fn=>{hook=fn;},onZoom:fn=>{zoomHook=fn;}};
+ return {init,setData,setDeviceData,getZoom:()=>zoom,reset,focusArea,focusTo,panBy,zoomBy,placeFor,onSelect:fn=>{hook=fn;},onZoom:fn=>{zoomHook=fn;}};
 })();
 
 /* ---------------- Panels ---------------- */
@@ -2246,6 +2299,13 @@ function renderSelection(mark,options={}){
  inspector.hidden=false;
  enrichPlace(mark);
  if(!options.skipRouteLookup)enrichAircraftRoute(mark);
+ focusSelection(mark);
+}
+function focusSelection(mark){
+ if(!mark)return false;const record=mark.record||mark.device||{};const position=record.location||record.position||{};
+ const latitude=mark.latitude==null?position.latitude:mark.latitude,longitude=mark.longitude==null?position.longitude:mark.longitude;
+ if(latitude==null||longitude==null||!Number.isFinite(Number(latitude))||!Number.isFinite(Number(longitude)))return false;
+ return Globe.focusTo(Number(latitude),Number(longitude));
 }
 function selectLiveEntity(kind,id){
  const collection=kind==='event'?state.live.events:state.live.observations;
@@ -2261,7 +2321,7 @@ function selectLiveEntity(kind,id){
   longitude:position.longitude,
   record
  });
- if(Number.isFinite(Number(position.latitude))&&Number.isFinite(Number(position.longitude)))Globe.focusTo(position.latitude,position.longitude,2.05);
+
  setFooter('ASSUNTO · '+String(record.title||attributes.callsign||record.entity_id).toUpperCase());
 }
 function renderStatus(){
@@ -2625,6 +2685,8 @@ function wire(){
  $('zoomIn').addEventListener('click',()=>Globe.zoomBy(1.2));
  $('zoomOut').addEventListener('click',()=>Globe.zoomBy(1/1.2));
  $('zoomReset').addEventListener('click',()=>Globe.reset());
+document.querySelectorAll('[data-pan]').forEach(button=>button.addEventListener('click',()=>{const v={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[button.getAttribute('data-pan')];if(v)Globe.panBy(v[0],v[1]);}));
+document.addEventListener('keydown',ev=>{if(ev.altKey||ev.ctrlKey||ev.metaKey||ev.shiftKey)return;if(ev.target&&/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName))return;const v={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]}[ev.key];if(!v)return;ev.preventDefault();Globe.panBy(v[0],v[1]);});
  $('areaBar').addEventListener('click',ev=>{
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-area]'):null;
   if(!target||target.disabled)return;
