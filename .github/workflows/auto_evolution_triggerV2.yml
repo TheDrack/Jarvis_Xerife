@@ -44,7 +44,6 @@ jobs:
     timeout-minutes: 35
     outputs:
       artifact_available: ${{ steps.evolve.outputs.artifact_available }}
-      mission_desc: ${{ steps.flow.outputs.mission_desc }}
     steps:
       - name: 🛰️ Checkout trusted main (read-only credentials)
         uses: actions/checkout@v5
@@ -103,14 +102,16 @@ jobs:
                   print("😴 Sem missões pendentes no momento.")
                   sys.exit(0)
 
+              cap_id = str(next_mission.get("id") or "").strip()
+              if not re.fullmatch(r"CAP-[0-9]+", cap_id):
+                  with open(github_output, "a", encoding="utf-8") as output:
+                      output.write("action=blocked\n")
+                  print("⛔ Identificador de missão ausente ou inválido; evolução bloqueada.")
+                  sys.exit(0)
+
               context = auto.get_roadmap_context(next_mission)
               with open("mission_context.txt", "w", encoding="utf-8") as file:
                   file.write(context)
-
-              with open(github_output, "a", encoding="utf-8") as output:
-                  output.write(
-                      f"mission_desc={next_mission['id']}: {next_mission['title']}\n"
-                  )
 
               target_file = str(next_mission.get("target_file") or "").strip()
               if (
@@ -125,9 +126,10 @@ jobs:
                   sys.exit(0)
 
               with open(github_output, "a", encoding="utf-8") as output:
+                  output.write(f"cap_id={cap_id}\n")
                   output.write(f"target_file={target_file}\n")
                   output.write("action=evolve\n")
-              print(f"🚀 Alvo identificado: {next_mission['id']}")
+              print(f"🚀 Alvo identificado: {cap_id}")
           except Exception as exc:
               print(f"❌ Falha no Orquestrador: {exc}")
               sys.exit(1)
@@ -145,13 +147,15 @@ jobs:
           EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
           EVOLUTION_SANDBOX_IMAGE: jarvis-evolution-sandbox:ci
           EVOLUTION_ARTIFACT_DIR: ${{ runner.temp }}/jarvis-evolution-artifacts
+          CAP_ID: ${{ steps.flow.outputs.cap_id }}
+          TARGET_FILE: ${{ steps.flow.outputs.target_file }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
           source .venv/bin/activate
           python scripts/evolve_all_pending.py \
-            --cap-id "$(echo "${{ steps.flow.outputs.mission_desc }}" | grep -oE 'CAP-[0-9]+' | head -1)" \
+            --cap-id "$CAP_ID" \
             --max-attempts 3 \
-            --target-file "${{ steps.flow.outputs.target_file }}" \
+            --target-file "$TARGET_FILE" \
             --roadmap-context "$(cat mission_context.txt)"
 
       - name: 📦 Upload validated candidate artifact
