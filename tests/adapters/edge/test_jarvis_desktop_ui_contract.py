@@ -91,7 +91,7 @@ def test_registered_devices_are_plotted_from_the_local_registry():
 
 
 def test_typography_shares_one_scale_and_one_palette():
-    assert "--fs-2xs:8px" in HTML
+    assert "--fs-2xs:9px;--fs-xs:10px;--fs-sm:11px" in HTML
     assert "--fs-3xl:26px" in HTML
     assert "--sans:" in HTML
     assert "--mono:" in HTML

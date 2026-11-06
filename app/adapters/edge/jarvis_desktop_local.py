@@ -17,8 +17,10 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+import httpx
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -163,6 +165,15 @@ def _load_local_intelligence_config(path: Path | None = None) -> int:
 _RFC1918 = tuple(ipaddress.ip_network(value) for value in (
     "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"
 ))
+
+
+def _is_loopback_host(value: str) -> bool:
+    if value.casefold() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(value).is_loopback
+    except ValueError:
+        return False
 
 
 def _is_allowed_address(value: str) -> bool:
@@ -1036,6 +1047,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 "success": False,
                 "available": False,
                 "reason": place.get("reason") or "unavailable",
+                "retry_after_seconds": place.get("retry_after_seconds"),
             }
         label = " · ".join(
             str(place[key])
@@ -1392,6 +1404,69 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         }
         state.gods_eye_snapshot = payload
         return payload
+
+    @app.get("/api/intelligence/aircraft-route")
+    async def aircraft_route(
+        callsign: str = Query(..., min_length=2, max_length=8),
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Resolve one selected aircraft callsign through the local GEV cache."""
+        normalized = callsign.strip().upper()
+        if not normalized.isalnum() or not 2 <= len(normalized) <= 8:
+            raise HTTPException(status_code=422, detail="Callsign inválido.")
+
+        settings = _gev_settings()
+        api_base = str(settings.get("api_base") or "").rstrip("/")
+        parsed = urlsplit(api_base)
+        if (
+            not settings.get("entrypoint_configured")
+            or parsed.scheme != "http"
+            or not parsed.hostname
+            or not _is_loopback_host(parsed.hostname)
+        ):
+            return {"available": False, "reason": "gev_not_configured"}
+
+        try:
+            async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:
+                response = await client.get(
+                    f"{api_base}/api/adsbdb/route/{normalized}"
+                )
+                response.raise_for_status()
+                payload = response.json()
+        except (httpx.HTTPError, ValueError):
+            return {"available": False, "reason": "route_provider_unavailable"}
+
+        if not isinstance(payload, dict) or not payload.get("found"):
+            return {"available": False, "reason": "route_not_found"}
+
+        def airport(value: Any) -> dict[str, Any] | None:
+            if not isinstance(value, dict):
+                return None
+            try:
+                latitude = float(value.get("lat"))
+                longitude = float(value.get("lon"))
+            except (TypeError, ValueError):
+                return None
+            if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+                return None
+            return {
+                "code": str(value.get("code") or "")[:12],
+                "name": str(value.get("name") or "")[:100],
+                "latitude": latitude,
+                "longitude": longitude,
+            }
+
+        origin = airport(payload.get("origin"))
+        destination = airport(payload.get("destination"))
+        if origin is None or destination is None:
+            return {"available": False, "reason": "route_coordinates_unavailable"}
+        return {
+            "available": True,
+            "airline": str(payload.get("airline") or "")[:100],
+            "origin": origin,
+            "destination": destination,
+            "provider": "adsbdb_via_gods_eye_view",
+        }
 
     @app.get("/api/intelligence/gods-eye/cameras/{camera_id}/snapshot")
     async def gods_eye_camera_snapshot(

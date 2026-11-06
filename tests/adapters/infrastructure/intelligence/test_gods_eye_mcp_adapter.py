@@ -478,7 +478,8 @@ async def test_reports_partial_failure_without_discarding_successful_observation
 
     assert len(batch.observations) == 1
     assert batch.sources[0].available is True
-    assert batch.sources[0].error_code == "PartialFailure"
+    assert batch.sources[0].error_code.startswith("PartialFailure:")
+    assert "vessels_in_area" in batch.sources[0].error_code
 
 
 def test_rejects_unbounded_or_invalid_area_and_non_loopback_api():

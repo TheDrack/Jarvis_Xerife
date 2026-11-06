@@ -333,3 +333,48 @@ def test_camera_registry_survives_invalid_json(tmp_path):
     assert registry["success"] is False
     assert registry["reason"] == "invalid_json"
     assert registry["cameras"] == []
+
+
+def test_reverse_geocode_rate_limit_uses_retry_after_without_caching_failure(monkeypatch):
+    clock = [100.0]
+    calls = []
+    monkeypatch.setattr(briefing.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(briefing.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    monkeypatch.setattr(briefing, "_GEOCODE_CLOCK", [0.0])
+    monkeypatch.setattr(briefing, "_GEOCODE_COOLDOWN_UNTIL", 0.0)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        if len(calls) == 1:
+            return httpx.Response(429, text="slow down", headers={"Retry-After": "2"})
+        return httpx.Response(200, json=GEOCODE)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    first = briefing._reverse_geocode(client, -25.4284, -49.2733, zoom=16)
+    second = briefing._reverse_geocode(client, -25.4284, -49.2733, zoom=16)
+    assert first["reason"] == "http_429"
+    assert first["retry_after_seconds"] == 2
+    assert second["reason"] == "http_429"
+    assert len(calls) == 1, "the upstream cooldown must prevent another request"
+
+    clock[0] += 2.1
+    third = briefing._reverse_geocode(client, -25.4284, -49.2733, zoom=16)
+    assert third["available"] is True
+    assert len(calls) == 2, "transient failures must not poison the coordinate cache"
+    client.close()
+
+
+def test_reverse_geocode_cache_uses_street_level_coordinate_precision(monkeypatch):
+    calls = []
+    monkeypatch.setattr(briefing.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(briefing, "_GEOCODE_CLOCK", [0.0])
+    client = httpx.Client(transport=httpx.MockTransport(
+        lambda request: (calls.append(str(request.url)) or httpx.Response(200, json=GEOCODE))
+    ))
+
+    briefing._reverse_geocode(client, -25.42841, -49.27331, zoom=16)
+    briefing._reverse_geocode(client, -25.42842, -49.27332, zoom=16)
+    briefing._reverse_geocode(client, -25.42849, -49.27339, zoom=16)
+
+    assert len(calls) == 2, "coordinates within 0.0001 degrees share a cache entry, distinct cells do not"
+    client.close()

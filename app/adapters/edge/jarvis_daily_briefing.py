@@ -38,7 +38,9 @@ USER_AGENT = "Jarvis-Xerife/0.1 (local desktop briefing; read-only)"
 NEWS_TTL_SECONDS = 600.0
 WEATHER_TTL_SECONDS = 600.0
 GEOCODE_TTL_SECONDS = 86400.0
+GEOCODE_NEGATIVE_TTL_SECONDS = 3600.0
 GEOCODE_MIN_INTERVAL_SECONDS = 1.1
+GEOCODE_RETRY_AFTER_DEFAULT_SECONDS = 60
 MAX_ITEMS_PER_TOPIC = 12
 MAX_CAMERAS = 12
 
@@ -147,6 +149,7 @@ WEATHER_CODES: dict[int, str] = {
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _GEOCODE_CLOCK: list[float] = [0.0]
 _GEOCODE_LOCK = threading.Lock()
+_GEOCODE_COOLDOWN_UNTIL = 0.0
 
 
 def weather_label(code: Any) -> str:
@@ -191,6 +194,22 @@ def geocode_enabled() -> bool:
     }
 
 
+def _retry_after_seconds(value: Any) -> int:
+    """Parse Retry-After as delta-seconds or an HTTP date, with a safe upper bound."""
+    seconds: float
+    try:
+        seconds = float(value)
+    except (TypeError, ValueError):
+        try:
+            retry_at = parsedate_to_datetime(str(value))
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=timezone.utc)
+            seconds = (retry_at - datetime.now(timezone.utc)).total_seconds()
+        except (TypeError, ValueError, IndexError, OverflowError):
+            seconds = GEOCODE_RETRY_AFTER_DEFAULT_SECONDS
+    return max(1, min(3600, int(seconds + 0.999)))
+
+
 def _reverse_geocode(
     client: httpx.Client, latitude: float, longitude: float, zoom: int = 10
 ) -> dict[str, Any]:
@@ -202,10 +221,18 @@ def _reverse_geocode(
     """
     if not geocode_enabled():
         return {"available": False, "reason": "disabled"}
-    key = f"geo:{int(zoom)}:{round(latitude, 2)}:{round(longitude, 2)}"
+    key = f"geo:{int(zoom)}:{round(latitude, 4)}:{round(longitude, 4)}"
 
     def produce() -> dict[str, Any]:
+        global _GEOCODE_COOLDOWN_UNTIL
         with _GEOCODE_LOCK:
+            now = time.monotonic()
+            if _GEOCODE_COOLDOWN_UNTIL > now:
+                return {
+                    "available": False,
+                    "reason": "http_429",
+                    "retry_after_seconds": max(1, int(_GEOCODE_COOLDOWN_UNTIL - now + 0.999)),
+                }
             wait = GEOCODE_MIN_INTERVAL_SECONDS - (
                 time.monotonic() - _GEOCODE_CLOCK[0]
             )
@@ -226,6 +253,13 @@ def _reverse_geocode(
                 )
                 response.raise_for_status()
                 data = response.json()
+            except httpx.HTTPStatusError as exc:
+                _GEOCODE_CLOCK[0] = time.monotonic()
+                if exc.response.status_code == 429:
+                    retry_after = _retry_after_seconds(exc.response.headers.get("Retry-After"))
+                    _GEOCODE_COOLDOWN_UNTIL = time.monotonic() + retry_after
+                    return {"available": False, "reason": "http_429", "retry_after_seconds": retry_after}
+                return {"available": False, "reason": _fail(exc)}
             except (httpx.HTTPError, ValueError) as exc:
                 _GEOCODE_CLOCK[0] = time.monotonic()
                 return {"available": False, "reason": _fail(exc)}
@@ -260,7 +294,23 @@ def _reverse_geocode(
             "display_name": data.get("display_name"),
         }
 
-    return _cached(key, GEOCODE_TTL_SECONDS, produce)
+    now = time.monotonic()
+    cached = _CACHE.get(key)
+    if cached:
+        value = cached[1]
+        ttl = (
+            GEOCODE_TTL_SECONDS if value.get("available")
+            else GEOCODE_NEGATIVE_TTL_SECONDS if value.get("reason") == "no_address"
+            else 0.0
+        )
+        if ttl and now - cached[0] < ttl:
+            return value
+        _CACHE.pop(key, None)
+
+    value = produce()
+    if value.get("available") or value.get("reason") == "no_address":
+        _CACHE[key] = (time.monotonic(), value)
+    return value
 
 
 def reverse_place(latitude: Any, longitude: Any, zoom: int = 10) -> dict[str, Any]:

@@ -1485,3 +1485,135 @@ def test_desktop_serves_geospatial_layer_script():
     assert response.status_code == 200
     assert "buildDeviceMarkers" in response.text
     assert "javascript" in response.headers["content-type"].lower()
+
+
+def test_reverse_geocode_endpoint_exposes_retry_after_for_transient_failures(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    monkeypatch.setattr(
+        desktop_local,
+        "reverse_place",
+        lambda lat, lon, zoom=10: {
+            "available": False,
+            "reason": "http_429",
+            "retry_after_seconds": 45,
+        },
+    )
+    client = _client(LocalRuntime())
+    token = client.get("/api/bootstrap").json()["local_token"]
+    response = client.get(
+        "/api/geo/reverse?lat=-25.4284&lon=-49.2733",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["available"] is False
+    assert response.json()["reason"] == "http_429"
+    assert response.json()["retry_after_seconds"] == 45
+
+
+def test_aircraft_route_endpoint_returns_validated_airport_coordinates(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    calls = []
+    class FakeResponse:
+        status_code = 200
+        def raise_for_status(self):
+            return None
+        def json(self):
+            return {
+                "found": True,
+                "airline": "Gol Linhas Aéreas Inteligentes",
+                "origin": {"code": "NVT", "name": "Navegantes", "lat": -26.88, "lon": -48.6514},
+                "destination": {"code": "CGH", "name": "São Paulo", "lat": -23.62611, "lon": -46.65639},
+            }
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs):
+            assert kwargs["follow_redirects"] is False
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return None
+        async def get(self, url):
+            calls.append(url)
+            return FakeResponse()
+
+    monkeypatch.setattr(desktop_local.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(desktop_local, "_gev_settings", lambda: {
+        "api_base": "http://127.0.0.1:4173", "entrypoint_configured": True,
+        "area": {"west": -49.5, "south": -28.5, "east": -48.0, "north": -27.5},
+    })
+    client = _client(LocalRuntime())
+    token = client.get("/api/bootstrap").json()["local_token"]
+
+    response = client.get(
+        "/api/intelligence/aircraft-route?callsign=GLO1273",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["origin"] == {"code": "NVT", "name": "Navegantes", "latitude": -26.88, "longitude": -48.6514}
+    assert body["destination"] == {"code": "CGH", "name": "São Paulo", "latitude": -23.62611, "longitude": -46.65639}
+    assert body["airline"] == "Gol Linhas Aéreas Inteligentes"
+    assert calls == ["http://127.0.0.1:4173/api/adsbdb/route/GLO1273"]
+
+
+def test_aircraft_route_endpoint_returns_validated_airport_coordinates(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    calls = []
+    class FakeResponse:
+        status_code = 200
+        def raise_for_status(self):
+            return None
+        def json(self):
+            return {
+                "found": True,
+                "airline": "Gol Linhas Aéreas Inteligentes",
+                "origin": {"code": "NVT", "name": "Navegantes", "lat": -26.88, "lon": -48.6514},
+                "destination": {"code": "CGH", "name": "São Paulo", "lat": -23.62611, "lon": -46.65639},
+            }
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs):
+            assert kwargs["follow_redirects"] is False
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            return None
+        async def get(self, url):
+            calls.append(url)
+            return FakeResponse()
+
+    monkeypatch.setattr(desktop_local.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(desktop_local, "_gev_settings", lambda: {
+        "api_base": "http://127.0.0.1:4173", "entrypoint_configured": True,
+        "area": {"west": -49.5, "south": -28.5, "east": -48.0, "north": -27.5},
+    })
+    client = _client(LocalRuntime())
+    token = client.get("/api/bootstrap").json()["local_token"]
+    response = client.get(
+        "/api/intelligence/aircraft-route?callsign=GLO1273",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["origin"] == {"code": "NVT", "name": "Navegantes", "latitude": -26.88, "longitude": -48.6514}
+    assert body["destination"] == {"code": "CGH", "name": "São Paulo", "latitude": -23.62611, "longitude": -46.65639}
+    assert body["airline"] == "Gol Linhas Aéreas Inteligentes"
+    assert calls == ["http://127.0.0.1:4173/api/adsbdb/route/GLO1273"]
+
+
+def test_aircraft_route_endpoint_rejects_invalid_callsigns(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+    monkeypatch.setattr(desktop_local, "_gev_settings", lambda: {"api_base": "http://127.0.0.1:4173", "entrypoint_configured": True})
+    client = _client(LocalRuntime())
+    token = client.get("/api/bootstrap").json()["local_token"]
+    response = client.get(
+        "/api/intelligence/aircraft-route?callsign=BAD-CALL",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 422
