@@ -25,8 +25,23 @@ de execução isolada:
   diferente de zero e saída vazia/não reconhecida bloqueiam a proposta sem alterar
   o baseline anterior.
 - O caminho de `EvolutionOrchestrator` faz uma verificação preliminar antes de
-  receber o código do LLM; o caminho que aplica patches da memória procedural via
-  `CrystallizerEngine` precisa de uma verificação vinculada ao código candidato.
+  receber o código do LLM; os patches da memória procedural ainda precisam de
+  validação vinculada ao código candidato, mesmo com a proteção de caminho do
+  `CrystallizerEngine`.
+
+### Proteção de caminhos de escrita
+
+`app/application/security/repository_path_policy.py` centraliza a política usada pelo
+`EvolutionGatekeeper` e pelo `CrystallizerEngine`. Ela rejeita caminhos absolutos,
+drives/UNC, `..`, aliases de nomes do Windows, escapes por symlink, diretórios
+`.frozen` e prefixos protegidos (`app/core`, `capabilities`, capabilities de domínio,
+adapters de infraestrutura e segurança). O `CrystallizerEngine` também rejeita
+componentes symlink antes da escrita e revalida o destino após criar os diretórios.
+
+Esse controle restringe o destino da escrita; não contém execução de código, não
+remove credenciais do ambiente e não elimina a janela de corrida entre validação e
+escrita. Portanto, não substitui container/VM efêmero nem os critérios de isolamento
+listados abaixo.
 
 Até esses pontos serem resolvidos, não declarar que a autoevolução de código possui
 sandbox real ou validação completa da proposta. A criação de PR para revisão humana

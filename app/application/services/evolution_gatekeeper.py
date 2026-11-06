@@ -24,18 +24,15 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.application.security.repository_path_policy import (
+    UnsafeRepositoryPath,
+    contains_frozen_directory,
+    protected_prefix_for,
+    resolve_repository_path,
+)
 from app.core.nexus import NexusComponent, nexus
 
 logger = logging.getLogger(__name__)
-
-# Arquivos de núcleo protegidos
-_PROTECTED_CORE_FILES = {
-    "app/core/nexus.py",
-    "app/core/nexus_registry.py",
-    "app/core/nexus_discovery.py",
-}
-
-_FROZEN_PREFIX = ".frozen"
 
 # Número mínimo de testes esperados (fallback se não houver histórico)
 _MIN_TESTS_FALLBACK = 0
@@ -222,21 +219,30 @@ class EvolutionGatekeeper(NexusComponent):
             return True, "ok"
 
     def _check_frozen_files(self, proposed_change: Dict[str, Any]) -> Tuple[bool, str]:
-        """(c) Verifica se nenhum arquivo modificado está em .frozen/."""
-        files: List[str] = proposed_change.get("files_modified", [])
-        for f in files:
-            normalized = Path(f).as_posix()
-            if normalized.startswith(_FROZEN_PREFIX) or f"/{_FROZEN_PREFIX}/" in normalized:
-                return False, f"frozen_file_protected: {f}"
+        """(c) Bloqueia caminhos frozen, aliases e caminhos inválidos."""
+        paths, error = _normalized_modified_paths(proposed_change)
+        if error:
+            return False, error
+
+        for original, lexical_path, resolved_path in paths:
+            if contains_frozen_directory(lexical_path) or contains_frozen_directory(resolved_path):
+                return False, f"frozen_file_protected: {original}"
         return True, "ok"
 
     def _check_core_protection(self, proposed_change: Dict[str, Any]) -> Tuple[bool, str]:
-        """(d) Bloqueia mudanças em arquivos do núcleo salvo com override."""
-        files: List[str] = proposed_change.get("files_modified", [])
-        for f in files:
-            normalized = Path(f).as_posix()
-            if normalized in _PROTECTED_CORE_FILES:
-                return False, f"core_file_protected: {f}"
+        """(d) Bloqueia prefixos críticos, traversal e aliases por symlink."""
+        paths, error = _normalized_modified_paths(proposed_change)
+        if error:
+            return False, error
+
+        for original, lexical_path, resolved_path in paths:
+            protected_path = protected_prefix_for(lexical_path) or protected_prefix_for(
+                resolved_path
+            )
+            if protected_path:
+                if protected_path == "app/core":
+                    return False, f"core_file_protected: {original}"
+                return False, f"protected_path_protected: {original} ({protected_path})"
         return True, "ok"
 
     def _check_sandbox(self, proposed_change: Dict[str, Any]) -> Tuple[bool, str]:
@@ -345,6 +351,44 @@ class EvolutionGatekeeper(NexusComponent):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _repository_root() -> Path:
+    """Retorna a raiz do checkout a partir da localização deste módulo."""
+    return Path(__file__).resolve().parents[3]
+
+
+def _normalized_modified_paths(
+    proposed_change: Dict[str, Any],
+) -> Tuple[Optional[List[Tuple[str, str, str]]], Optional[str]]:
+    """Valida paths e retorna (original, lexical, resolvido) sem sair do checkout.
+
+    Rejeita caminhos absolutos, drives Windows, NTFS alternate data streams,
+    traversal explícito e symlinks que escapem da raiz. O caminho resolvido
+    também é verificado contra os prefixos protegidos para cobrir aliases.
+    """
+    if not isinstance(proposed_change, dict):
+        return None, "invalid_modified_paths: proposed_change_must_be_a_mapping"
+
+    files = proposed_change.get("files_modified", [])
+    if not isinstance(files, list):
+        return None, "invalid_modified_paths: files_modified_must_be_a_list"
+
+    try:
+        root = _repository_root()
+    except (OSError, RuntimeError):
+        return None, "invalid_modified_paths: repository_root_unavailable"
+
+    normalized_paths: List[Tuple[str, str, str]] = []
+
+    for original in files:
+        try:
+            _, lexical_path, resolved_path = resolve_repository_path(root, original)
+        except UnsafeRepositoryPath as exc:
+            return None, f"invalid_modified_path: {exc}: {original!r}"
+        normalized_paths.append((original, lexical_path, resolved_path))
+
+    return normalized_paths, None
+
 
 def _parse_test_count(output: str) -> int:
     """Extrai número de testes coletados da saída do pytest --co -q.
