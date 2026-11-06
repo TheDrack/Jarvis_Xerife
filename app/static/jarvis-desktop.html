@@ -1007,9 +1007,14 @@ const Globe=(()=>{
  }
  async function loadAdminBoundaries(){
   try{
-   const response=await fetch('/static/world-admin-boundaries.json',{cache:'force-cache'});
+   const response=await fetch('/static/world-admin-boundaries.json.gz.b64',{cache:'force-cache'});
    if(!response.ok)throw new Error('HTTP '+response.status);
-   const data=await response.json();
+   if(typeof DecompressionStream==='undefined')throw new Error('GZIP indispon?vel neste runtime');
+   const encoded=(await response.text()).replace(/\\s+/g,'');
+   const binary=atob(encoded),compressed=new Uint8Array(binary.length);
+   for(let i=0;i<binary.length;i+=1)compressed[i]=binary.charCodeAt(i);
+   const stream=new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'));
+   const data=await new Response(stream).json();
    const toVectors=lines=>(Array.isArray(lines)?lines:[]).map(line=>line.map(pair=>{
     const lon=Number(pair[0])*RAD,lat=Number(pair[1])*RAD,cp=Math.cos(lat);
     return [cp*Math.sin(lon),Math.sin(lat),cp*Math.cos(lon)];

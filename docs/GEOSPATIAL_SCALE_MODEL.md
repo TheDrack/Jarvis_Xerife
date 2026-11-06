@@ -9,8 +9,8 @@ The orbital globe uses the visible geographic scale to choose which administrati
 - Orbital zoom maximum: 24x.
 - Device marker budget grows with zoom and is capped at 6,000 markers.
 - Country boundaries: Natural Earth admin-0 land boundary lines, 1:50m.
-- State/province boundaries: Natural Earth admin-1 boundary lines, 1:10m.
-- The compact runtime dataset is `app/static/world-admin-boundaries.json`.
+- State/province boundaries: Natural Earth admin-1 boundary lines, 1:10m, for a broad set of large countries including Brazil. Other countries currently fall back to country borders.
+- The compact runtime dataset is `app/static/world-admin-boundaries.json.gz.b64`.
 - The globe keeps the current continental appearance below the country-boundary threshold; country lines appear after zooming in, and state/province lines are selected at a finer spatial scale.
 - Boundary-layer selection compares the estimated visible area with each layer's mean feature area. It does not hard-code "city" as always smaller than "state".
 
@@ -26,7 +26,7 @@ The orbital globe uses the visible geographic scale to choose which administrati
 
 The static country/state boundary bundle is derived from Natural Earth Vector:
 - Admin-0 land boundaries (1:50m)
-- Admin-1 state/province boundaries (1:10m)
+- Admin-1 state/province boundaries (1:10m) for selected countries; it is not a complete global ADM1 coverage
 
 Natural Earth data is public domain. The bundle retains the attribution string: "Made with Natural Earth. Free vector and raster map data @ naturalearthdata.com".
 
@@ -40,4 +40,4 @@ Natural Earth is not a global municipal/neighbourhood boundary source. City, dis
 4. Simplify geometry to the current display scale and load only the viewport's region.
 5. Select the layer by feature area and visible area, so a large city and a small state can occupy comparable visual scales.
 
-geoBoundaries coverage and ADM levels vary by country; neighbourhood boundaries are not globally standardized. Missing local boundary data must fall back to the next available administrative layer, never to a fabricated outline.
+The current static ADM1 bundle covers selected countries, not every country. geoBoundaries coverage and ADM levels vary by country; neighbourhood boundaries are not globally standardized. Missing local boundary data must fall back to the next available administrative layer, never to a fabricated outline.

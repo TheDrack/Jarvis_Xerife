@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { gunzipSync } from 'node:zlib';
 import '../../app/static/jarvis-geospatial-layer.js';
 
 const { buildDeviceMarkers, cellSizeForZoom, generalizeRegion } = globalThis.JarvisGeospatialLayer;
@@ -131,10 +132,12 @@ test('administrative boundary selection follows viewport area, not administrativ
 });
 
 test('administrative boundary dataset includes attributed country and state linework', async () => {
-  const path = new URL('../../app/static/world-admin-boundaries.json', import.meta.url);
-  const data = JSON.parse(await readFile(path, 'utf8'));
+  const path = new URL('../../app/static/world-admin-boundaries.json.gz.b64', import.meta.url);
+  const encoded = (await readFile(path, 'utf8')).replace(/\\s+/g, '');
+  const data = JSON.parse(gunzipSync(Buffer.from(encoded, 'base64')).toString('utf8'));
   assert.ok(data.countries.length > 100);
   assert.ok(data.states.length > 1000);
+  assert.match(data.stateCoverage, /Selected countries/);
   assert.match(data.attribution, /Natural Earth/);
   assert.equal(data.license, 'Public domain');
 });
