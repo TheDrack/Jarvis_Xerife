@@ -28,6 +28,21 @@ Não presumir consciência, compreensão humana ou autonomia irrestrita. Cada ca
 11. **Provider-neutral:** modelos são substituíveis; nenhum raciocínio ou plano pode depender de um único fornecedor.
 12. **Incrementos pequenos:** PRs focadas, testes de regressão e CI verde; nunca enfraquecer testes ou critérios para obter aprovação.
 
+
+## 2.1 Trilha transversal permanente — manutenção e correção automática de PRs
+
+Esta trilha é independente das fases C0–C8 e permanece ativa durante todo o ciclo de vida do projeto. O Cognitive Roadmap governa a evolução de capacidades; o sistema de correção automática de PRs governa a manutenção contínua da qualidade do código e das entregas. Uma responsabilidade não substitui a outra.
+
+- Preservar os workflows de CI, self-healing e correção automática de PRs já existentes. Nenhuma fase cognitiva autoriza removê-los, desativá-los, enfraquecê-los ou reduzir sua cobertura.
+- Ao falhar um workflow, coletar logs e contexto do job, classificar a falha (código, teste, ambiente, dependência, configuração ou serviço externo), reproduzir quando viável e identificar a causa raiz.
+- Quando a correção for determinística e segura, atualizar a branch/PR que originou a falha, adicionar ou corrigir testes e reexecutar os checks. Reutilizar PR/issue equivalente; não abrir duplicatas.
+- Se a falha for transitória ou externa, registrar evidência e repetir somente conforme política de retry; não mascarar falha nem alterar testes válidos para obter status verde.
+- Manter publicação em branch/PR separada da execução candidata. Não conceder ao agente de correção permissão para aprovar, fazer merge, alterar secrets ou implantar. Merge/deploy continuam sujeitos aos gates, revisão humana e políticas do repositório.
+- Medir taxa de falhas detectadas, causas raiz, correções aceitas, regressões, retries e tempo de recuperação. Uma correção só é concluída após confirmação dos checks aplicáveis.
+- Falhas de CI que bloqueiem uma capacidade do roadmap são tratadas prioritariamente como manutenção; após restaurar a integridade da PR, a autoevolução retoma o próximo critério cognitivo pendente.
+
+A trilha transversal não conta como marco cognitivo concluído e não altera a ordem/dependências C0–C8. É requisito operacional contínuo para todas as fases.
+
 ## 3. Estado inicial: candidatos de reutilização, não capacidades certificadas
 
 A inspeção documental e a busca de símbolos na `main` identificaram componentes que devem ser auditados antes de qualquer implementação nova:
