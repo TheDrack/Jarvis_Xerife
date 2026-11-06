@@ -64,3 +64,40 @@ test('orbital inline script remains syntactically valid after aircraft-layer cha
   assert.equal(scripts.length, 1);
   assert.doesNotThrow(() => new Function(scripts[0]));
 });
+
+
+test('globe focus preserves the current zoom when selecting an entity', () => {
+  assert.match(html, /function focusTo\(latitude,longitude,zoomLevel=zoom\)/);
+  assert.match(html, /zoomLevel==null\?zoom:clampZoom\(Number\(zoomLevel\)\)/);
+  assert.match(html, /function focusSelection\(mark\)/);
+  assert.match(html, /focusSelection\(mark\);/);
+  assert.match(html, /return Globe\.focusTo\(Number\(latitude\),Number\(longitude\)\)/);
+  assert.doesNotMatch(html, /Globe\.focusTo\(position\.latitude,position\.longitude,2\.05\)/);
+});
+
+test('high-zoom globe navigation is scale-aware and supports keyboard plus directional controls', () => {
+  assert.match(html, /function panBy\(directionX,directionY\)/);
+  assert.match(html, /Math\.max\(0\.08,Math\.min\(1\.8,1\/Math\.sqrt\(zoom\)\)\)/);
+  for (const direction of ['up','left','down','right']) assert.ok(html.includes('data-pan=\"'+direction+'\"'));
+  for (const key of ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight']) assert.ok(html.includes(key));
+  assert.match(html, /rot-=Number\(directionX\|\|0\)\*0\.055\*scale/);
+  assert.match(html, /tilt-Number\(directionY\|\|0\)\*0\.045\*scale/);
+  assert.match(html, /dragScale=Math\.max\(0\.08,Math\.min\(1\.8,1\/Math\.sqrt\(zoom\)\)\)/);
+});
+
+test('selection inspector has a prominent top-right close control', () => {
+  assert.match(html, /selection-close/);
+  assert.match(html, /id=\"selectionClose\"/);
+  assert.match(html, /aria-label=\"Fechar descrição\"/);
+  assert.match(html, /\.selection-close\{position:absolute;top:8px;right:8px/);
+});
+
+test('administrative boundaries render IBGE municipality geometry and labels at close zoom', () => {
+  assert.match(html, /adminBoundaries\.municipalities=toVectors\(data\.municipalities\)/);
+  assert.match(html, /adminBoundaries\.municipalityLabels=Array\.isArray\(data\.municipalityLabels\)/);
+  assert.match(html, /if\(zoom>=5\.5\)/);
+  assert.match(html, /async function loadMunicipalityBoundaries\(\)/);
+  assert.match(html, /world-municipal-boundaries\.json\.gz\.b64/);
+  assert.match(html, /if\(zoom>=9&&adminBoundaries\.municipalityLabels\.length\)/);
+  assert.match(html, /id:'municipalities',rank:3/);
+});
