@@ -52,6 +52,32 @@
 | Trilha — Universal Toolbox / Toolchains | **Implementação integrada à main; revisão de segurança e produção pendentes** | Issue #680. Registry, dispatcher fail-closed, toolchains DAG e integração inicial do PipelineRunner foram integrados pela PR #681 em 2026-11-02. O HEAD validado `8dd5cd1734a6a42a6dc208691d13a416061badee` passou a suíte completa em Linux/Python 3.11.17 e Windows/Python 3.12.10: 2043 passed, 12 skipped em cada plataforma. A PR não tem reviews nem threads registradas. Permanecem pendentes revisão técnica/segurança, policy host-backed, estado/audit distribuídos, migração gradual e validação runtime. |
 | Trilha — Jarvis Universal Intelligence | **Coleta sob demanda e adapter append-only conectados atrás de feature flag; código do worker recorrente integrado à main pela PR #716, com migration remota pendente** | PR #702 integrou o endpoint autenticado e PR #715 conectou a persistência append-only ao endpoint. O `.env.example` mantém `JARVIS_INTELLIGENCE_HISTORY_ENABLED=false`. O projeto Supabase ativo contém as duas tabelas de histórico com RLS habilitado; o ledger remoto registra a migration de histórico na versão `20261103184307`, divergente do prefixo local `20261103100304`, e o check `Supabase Preview` falha por versões remotas ausentes no diretório local. Grants por role e insert/read real permanecem não verificados. PR #716 foi merged em 2026-11-03 (22:03 BRT) e o código do worker está na main, mas sua migration/tabelas não estão no banco remoto; a execução permanece desabilitada até reconciliação do ledger e validação de lease. Próximos critérios: reconciliar o ledger sem reaplicar DDL, confirmar grants e persistência em ambiente controlado, validar o worker/lease, depois briefing, entrega e mapa. |
 
+## Regra operacional permanente — correção automática de PRs
+
+A autoevolução de capacidades segue o [Cognitive Roadmap](COGNITIVE_ROADMAP.md), mas a correção automática de PRs/CI e os workflows Self Healing são uma trilha transversal permanente. Devem continuar ativos durante todas as fases: diagnosticar falhas por logs/causa raiz, corrigir a branch/PR correspondente quando seguro, acrescentar testes e reexecutar checks. Não desativar nem enfraquecer esses mecanismos, não duplicar PRs, não reduzir testes e não permitir merge/deploy autônomo. A publicação permanece sujeita aos gates e à revisão humana. Correção de CI é manutenção; não substitui nem conclui marco cognitivo.
+
+## Nova trilha — Jarvis Cognitive Architecture
+
+**Estado:** planejada; nenhuma das fases cognitivas abaixo é declarada concluída por esta atualização documental.
+
+O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.md). A trilha não substitui nem reconstrói Harness, Nexus, Universal Toolbox, Multi-Agent ou Universal Intelligence: ela audita e integra essas bases para formar um ciclo contínuo de percepção, modelo de mundo, memória, raciocínio, planejamento, execução supervisionada, iniciativa e aprendizado validado.
+
+| Marco | Capacidade | Estado inicial | Critério principal |
+|---|---|---|---|
+| C0 | Auditoria de capacidades e baseline comportamental | **Pendente** | Mapear consumidores, contratos, migrations, testes e evidências reais antes de criar módulos |
+| C1 | World Model | **Auditoria necessária** | Entidades, relações, observações, proveniência, identidade conservadora e histórico temporal reconstruível |
+| C2 | Cognitive Memory | **Parcial / auditoria necessária** | Consolidar memórias episódica, semântica, procedural e prospectiva com recuperação contextual, conflitos e retenção |
+| C3 | Perception Engine | **Parcial / auditoria necessária** | Integrar fontes existentes em pipeline normalizado, resiliente, idempotente e observável |
+| C4 | Reasoning Engine | **Auditoria necessária** | Hipóteses e conclusões ligadas a evidências, contraditório, calibração e abstenção |
+| C5 | Strategic Planner | **Parcial / auditoria necessária** | Objetivos persistentes, decomposição, dependências e replanejamento |
+| C6 | Autonomous Executive | **Parcial / auditoria necessária** | Execução multiagente autorizada, supervisionada, idempotente e com efeito verificado |
+| C7 | Initiative Engine | **Parcial / auditoria necessária** | Iniciativas úteis disparadas por mudanças, com deduplicação, orçamento e política |
+| C8 | Learning & Evolution Engine | **Parcial / auditoria necessária** | Melhorias avaliadas contra baseline, sem regressões, com auditoria e rollback |
+
+**Primeiro vertical slice:** mudança de estado de um dispositivo de laboratório → observação com proveniência → atualização do World Model → recuperação de memória → hipóteses com evidências → plano de investigação → consultas passivas autorizadas → verificação independente → registro do resultado. O primeiro slice não executará varreduras ativas nem ações destrutivas.
+
+**Próximo passo:** concluir C0 e especificar os contratos do World Model. Não criar um segundo sistema de memória, event bus, scheduler ou grafo antes de comprovar que os existentes não atendem ao contrato. Migrations e flags de produção permanecem fora desta atualização documental.
+
 ## Pendências prioritárias sustentadas pela auditoria
 1. Reexecutar auditoria de capabilities e testes comportamentais; não usar os números históricos como métricas atuais.
 3. Corrigir e testar os limites de auto-evolução para pastas de infraestrutura e segurança antes de reativar mutação automática irrestrita.
