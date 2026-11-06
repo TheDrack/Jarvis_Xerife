@@ -4,7 +4,15 @@ import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
 
-test('aircraft route lookup is deferred until an aircraft is selected', () => {
+test('visible aircraft routes are prefetched with a bounded queue and selection priority', () => {
+  assert.match(html, /function enrichVisibleAircraftRoutes\(visibleMarks\)/);
+  assert.match(html, /AIRCRAFT_ROUTE_QUEUE_LIMIT=18/);
+  assert.match(html, /AIRCRAFT_ROUTE_BATCH_LIMIT=6/);
+  assert.match(html, /enrichVisibleAircraftRoutes\(visible\.map\(item=>item\.m\)\)/);
+  assert.match(html, /routeBudget=Math\.min\(36/);
+});
+
+test('selected aircraft can still request its route on demand', () => {
   assert.match(html, /function enrichAircraftRoute\(mark\)/);
   assert.match(html, /api\('\/api\/intelligence\/aircraft-route\?callsign=/);
   assert.match(html, /mark\.flightRoute=/);
