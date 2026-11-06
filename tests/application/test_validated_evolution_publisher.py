@@ -228,5 +228,3 @@ class TestTrustedPublisher:
         assert not any("pytest" in str(command) or "python" in str(command) for command in calls)
         output = output_file.read_text(encoding="utf-8")
         assert "pr_number=999" in output
-
-[executed on device: DESKTOP-HPJ82UA (d504f4a4-8a27-4cc9-94f5-7abc9b926b55)]
