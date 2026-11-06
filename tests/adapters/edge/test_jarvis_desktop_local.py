@@ -973,9 +973,22 @@ def test_orbital_hud_serves_world_map_and_source_endpoints():
     rings = land.json()["rings"]
     assert rings and len(rings[0]) >= 8
 
+    boundaries = client.get("/static/world-admin-boundaries.json.gz.b64")
+    assert boundaries.status_code == 200
+    assert boundaries.headers["content-type"].startswith("text/plain")
+    import base64
+    import gzip
+    import json
+
+    boundary_data = json.loads(gzip.decompress(base64.b64decode(boundaries.text)))
+    assert boundary_data["countries"]
+    assert boundary_data["states"]
+    assert "Natural Earth" in boundary_data["attribution"]
+
     html = client.get("/")
     assert html.status_code == 200
     assert "/static/world-land.json" in html.text
+    assert "/static/world-admin-boundaries.json.gz.b64" in html.text
     assert 'id="globe"' in html.text
     assert "/api/telemetry" in html.text
     assert "/api/intelligence/osiris" in html.text

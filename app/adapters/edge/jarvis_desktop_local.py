@@ -50,6 +50,7 @@ logger = logging.getLogger(__name__)
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
 _WORLD_LAND_PATH = _REPO_ROOT / "app" / "static" / "world-land.json"
+_WORLD_ADMIN_BOUNDARIES_PATH = _REPO_ROOT / "app" / "static" / "world-admin-boundaries.json.gz.b64"
 _GEO_LAYER_PATH = _REPO_ROOT / "app" / "static" / "jarvis-geospatial-layer.js"
 _ICON_PATH = _REPO_ROOT / "app" / "static" / "jarvis-icon.svg"
 _WINDOWS_ICON_PATH = _REPO_ROOT / "desktop" / "jarvis.ico"
@@ -688,6 +689,16 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         if not _WORLD_LAND_PATH.is_file():
             raise HTTPException(status_code=404, detail="Mapa-múndi indisponível.")
         return FileResponse(_WORLD_LAND_PATH, media_type="application/json")
+
+    @app.get("/static/world-admin-boundaries.json.gz.b64", include_in_schema=False)
+    async def desktop_world_admin_boundaries() -> FileResponse:
+        if not _WORLD_ADMIN_BOUNDARIES_PATH.is_file():
+            raise HTTPException(status_code=404, detail="Fronteiras administrativas indispon?veis.")
+        return FileResponse(
+            _WORLD_ADMIN_BOUNDARIES_PATH,
+            media_type="text/plain; charset=utf-8",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
     @app.get("/static/jarvis-geospatial-layer.js", include_in_schema=False)
     async def desktop_geospatial_layer() -> FileResponse:

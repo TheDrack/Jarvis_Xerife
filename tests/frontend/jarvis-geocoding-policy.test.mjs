@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
 
-test('reverse geocoding is requested for selected points and cluster centers only', () => {
+test('reverse geocoding prioritizes visible points and selected cluster centers', () => {
   assert.doesNotMatch(html, /enrichPlaces\(\);/);
   assert.match(html, /function enrichPlace\(mark\)/);
   assert.match(html, /enrichPlace\(mark\)/);
@@ -28,4 +28,12 @@ test('transient geocoding failures are not stored as permanent missing-place res
   assert.match(html, /retry_after_seconds/);
   assert.match(html, /PLACE_RETRY_AFTER/);
   assert.match(html, /isTransientPlaceFailure/);
+});
+test('visible point geocoding remains bounded and reuses cached coordinates', () => {
+  assert.ok(html.includes("const PLACE_CACHE_KEY='jarvis_globe_places_v3';"));
+  assert.ok(html.includes('const PLACE_VISIBLE_QUEUE_LIMIT=48;'));
+  assert.ok(html.includes('enrichVisiblePlaces(visible.map(item=>item.m))'));
+  assert.ok(html.includes('const PLACE_VISIBLE_SCAN_INTERVAL_MS=750;'));
+  assert.ok(html.includes('const cached=placeCache.get(key);'));
+  assert.match(html, /PLACE_RETRY_AFTER/);
 });
