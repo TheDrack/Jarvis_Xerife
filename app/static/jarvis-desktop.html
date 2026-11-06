@@ -506,12 +506,21 @@ const Globe=(()=>{
  const pointers=new Map();
  let pinchDist=0;
  let spin=!reduce,drag=null,idleUntil=0,lastT=0;
- let geo=null,px=null,py=null,pz=null;
+ let geo=null,px=null,py=null,pz=null,adminBoundaries=null;
  let stars=[],marks=[],area=null,hook=null,hits=[],quakeRings=[],labelBoxes=[];
- let placeCache=new Map(),placeQueue=[],placeQueued=new Set(),placeRunning=false;
+ let placeCache=new Map(),placeQueue=[],placeQueued=new Set(),placeRunning=false,placeScanAt=0;
  const aircraftRouteLookups=new Set();
+ const aircraftRouteQueue=[];
+ const aircraftRouteQueued=new Set();
+ let aircraftRouteRunning=false,aircraftRouteScanAt=0;
+ const AIRCRAFT_ROUTE_QUEUE_LIMIT=18;
+ const AIRCRAFT_ROUTE_BATCH_LIMIT=6;
+ const AIRCRAFT_ROUTE_SCAN_INTERVAL_MS=2000;
  const PLACE_RETRY_AFTER=new Map();
- const PLACE_CACHE_KEY='jarvis_globe_places_v2';
+ const PLACE_CACHE_KEY='jarvis_globe_places_v3';
+ const PLACE_VISIBLE_QUEUE_LIMIT=48;
+ const PLACE_VISIBLE_BATCH_LIMIT=6;
+ const PLACE_VISIBLE_SCAN_INTERVAL_MS=750;
  const PLACE_TTL_MS=7*86400000;
  const PLACE_MISS_TTL_MS=3600000;
  const PLACE_PRIORITY={device:0,camera:1,port:2,chokepoint:2,military_site:2,infrastructure:2,fire:3,quake:3,event:3,vessel:4,aircraft:5,satellite:6};
@@ -523,7 +532,7 @@ const Globe=(()=>{
  })();
  const sph=(lon,lat)=>{const cp=Math.cos(lat*RAD);return [cp*Math.sin(lon*RAD),Math.sin(lat*RAD),cp*Math.cos(lon*RAD)];};
  const dest=(lat,lon,km,bearing)=>{const d=km/6371,brg=bearing*RAD,lat1=lat*RAD,lon1=lon*RAD;const lat2=Math.asin(Math.sin(lat1)*Math.cos(d)+Math.cos(lat1)*Math.sin(d)*Math.cos(brg));const lon2=lon1+Math.atan2(Math.sin(brg)*Math.sin(d)*Math.cos(lat1),Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));return [((lon2/RAD+540)%360)-180,lat2/RAD];};
- const clampZoom=value=>Math.max(0.75,Math.min(8,Number.isFinite(value)?value:1));
+ const clampZoom=value=>Math.max(0.75,Math.min(24,Number.isFinite(value)?value:1));
  const notifyZoom=()=>{if(typeof zoomHook==='function')zoomHook(zoom);};
  const pairDistance=()=>{
   const points=Array.from(pointers.values());
@@ -578,6 +587,32 @@ const Globe=(()=>{
    ctx.save();ctx.rotate(o[2]);ctx.beginPath();ctx.ellipse(0,0,radius*o[0],radius*o[1],0,0,TAU);ctx.stroke();ctx.restore();
   }
   ctx.restore();
+ }
+ function drawAdminBoundaryLines(lines,radius,cosR,sinR,cosT,sinT,style,width){
+  if(!Array.isArray(lines)||!lines.length)return;
+  ctx.beginPath();
+  for(const line of lines){
+   let started=false;
+   for(const point of line){
+    const x0=point[0]*cosR+point[2]*sinR;
+    const z0=point[2]*cosR-point[0]*sinR;
+    const y2=point[1]*cosT-z0*sinT;
+    const z2=point[1]*sinT+z0*cosT;
+    if(z2<=0.02){started=false;continue;}
+    const sx=cx+x0*radius,sy=cy-y2*radius;
+    if(!started){ctx.moveTo(sx,sy);started=true;}else ctx.lineTo(sx,sy);
+   }
+  }
+  ctx.strokeStyle=style;ctx.lineWidth=width;ctx.stroke();
+ }
+ function drawAdminBoundaries(radius,cosR,sinR,cosT,sinT){
+  if(!adminBoundaries||zoom<1.15)return;
+  const viewportAreaKm2=510000000/(Math.max(1,zoom*zoom)*20);
+  const layer=window.JarvisGeospatialLayer&&window.JarvisGeospatialLayer.chooseBoundaryLayer
+   ?window.JarvisGeospatialLayer.chooseBoundaryLayer(zoom,viewportAreaKm2,adminBoundaries.layers):null;
+  if(!layer)return;
+  if(layer.rank>=1)drawAdminBoundaryLines(adminBoundaries.countries,radius,cosR,sinR,cosT,sinT,'rgba(165,220,255,.72)',1.05);
+  if(layer.rank>=2)drawAdminBoundaryLines(adminBoundaries.states,radius,cosR,sinR,cosT,sinT,'rgba(84,215,255,.38)',0.72);
  }
  function drawGraticule(radius,cosR,sinR,cosT,sinT){
   ctx.strokeStyle='rgba(84,215,255,.11)';ctx.lineWidth=0.7;
@@ -802,10 +837,19 @@ const Globe=(()=>{
  function drawAircraftRoutes(radius,cosR,sinR,cosT,sinT){
    const project=(latitude,longitude)=>{const v=sph(longitude,latitude),x=v[0]*cosR+v[2]*sinR,z=v[2]*cosR-v[0]*sinR,y=v[1]*cosT-z*sinT;return {x:cx+x*radius,y:cy-y*radius,visible:v[1]*sinT+z*cosT>0.02};};
    ctx.save();ctx.setLineDash([3,5]);ctx.lineWidth=1.25;ctx.strokeStyle='rgba(84,215,255,.82)';
-   for(const mark of marks){if(mark.kind!=='aircraft'||!mark.flightRoute)continue;
+   const routeBudget=Math.min(36,Math.max(6,Math.round(6+zoom*1.25)));
+   const routeMarks=marks.filter(mark=>mark.kind==='aircraft'&&mark.flightRoute)
+    .sort((a,b)=>(a===state.selected?-1:b===state.selected?1:0)).slice(0,routeBudget);
+   for(const mark of routeMarks){
     const a=sph(mark.flightRoute.origin.longitude,mark.flightRoute.origin.latitude),b=sph(mark.flightRoute.destination.longitude,mark.flightRoute.destination.latitude),dot=Math.max(-1,Math.min(1,a[0]*b[0]+a[1]*b[1]+a[2]*b[2])),omega=Math.acos(dot);
     if(!Number.isFinite(omega)||omega<1e-6)continue;const sinOmega=Math.sin(omega);ctx.beginPath();let started=false;
     for(let step=0;step<=48;step+=1){const t=step/48,wa=Math.sin((1-t)*omega)/sinOmega,wb=Math.sin(t*omega)/sinOmega,x=wa*a[0]+wb*b[0],y=wa*a[1]+wb*b[1],z=wa*a[2]+wb*b[2],lat=Math.atan2(y,Math.hypot(x,z))/RAD,lon=Math.atan2(x,z)/RAD,point=project(lat,lon);if(!point.visible){started=false;continue;}if(!started){ctx.moveTo(point.x,point.y);started=true;}else ctx.lineTo(point.x,point.y);}ctx.stroke();
+    for(const endpoint of [mark.flightRoute.origin,mark.flightRoute.destination]){
+     const point=project(endpoint.latitude,endpoint.longitude);if(!point.visible)continue;
+     ctx.setLineDash([]);ctx.beginPath();ctx.arc(point.x,point.y,3.2,0,TAU);ctx.fillStyle='rgba(255,190,104,.98)';ctx.fill();
+     const code=String(endpoint.code||endpoint.name||'').trim();if(code){ctx.font='600 8px "Cascadia Mono",ui-monospace,monospace';ctx.fillStyle='rgba(224,245,255,.96)';ctx.fillText(code.slice(0,18),point.x+5,point.y-5);}
+     ctx.setLineDash([3,5]);
+    }
    }ctx.restore();
   }
   function drawMarks(radius,t,cosR,sinR,cosT,sinT){
@@ -823,6 +867,8 @@ const Globe=(()=>{
    if(z2<=0.02)continue;
    visible.push({m,sx:cx+x0*radius,sy:cy-y2*radius,color:m.color||COLORS[m.kind]||COLORS.event});
   }
+  enrichVisiblePlaces(visible.map(item=>item.m));
+  enrichVisibleAircraftRoutes(visible.map(item=>item.m));
   const threshold=Math.max(14,44/zoom);
   const clusters=[],cells=new Map();
   for(const item of visible){
@@ -932,6 +978,7 @@ const Globe=(()=>{
    projectAll(cosR,sinR,cosT,sinT);
    drawGraticule(radius,cosR,sinR,cosT,sinT);
    drawLand(radius);
+   drawAdminBoundaries(radius,cosR,sinR,cosT,sinT);
    drawArea(radius,cosR,sinR,cosT,sinT);
    drawQuakeRegions(radius,cosR,sinR,cosT,sinT);
    drawMarks(radius,t,cosR,sinR,cosT,sinT);
@@ -957,6 +1004,27 @@ const Globe=(()=>{
    notifyZoom();
   }else if(spin&&!drag&&t>idleUntil)rot+=0.055*dt;
   draw(t);
+ }
+ async function loadAdminBoundaries(){
+  try{
+   const response=await fetch('/static/world-admin-boundaries.json',{cache:'force-cache'});
+   if(!response.ok)throw new Error('HTTP '+response.status);
+   const data=await response.json();
+   const toVectors=lines=>(Array.isArray(lines)?lines:[]).map(line=>line.map(pair=>{
+    const lon=Number(pair[0])*RAD,lat=Number(pair[1])*RAD,cp=Math.cos(lat);
+    return [cp*Math.sin(lon),Math.sin(lat),cp*Math.cos(lon)];
+   }));
+   adminBoundaries={
+    countries:toVectors(data.countries),
+    states:toVectors(data.states),
+    layers:[
+     {id:'continents',rank:0,meanAreaKm2:90000000},
+     {id:'countries',rank:1,meanAreaKm2:2500000},
+     {id:'states',rank:2,meanAreaKm2:85000}
+    ]
+   };
+   draw(performance.now());
+  }catch(error){setFooter('FRONTEIRAS ADMINISTRATIVAS INDISPON?VEIS ? '+error.message);}
  }
  async function loadLand(){
   try{
@@ -1055,13 +1123,37 @@ const Globe=(()=>{
   const latitude=Number(mark.latitude),longitude=Number(mark.longitude);
   if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||Math.abs(latitude)>90||Math.abs(longitude)>180)return;
   const record=mark.record||mark.device||{},attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
-  if(!isCluster&&(mark.address||record.address||attributes.address||attributes.display_name))return;
+  const coordinateFallback=!mark.place||mark.place===coordText(latitude,longitude);
+  if(!isCluster&&!coordinateFallback&&(record.address||attributes.address||attributes.display_name))return;
   const key=placeKey(latitude,longitude),cached=placeCache.get(key);
   if(cached){applyPlace(mark,cached);return;}
   if(placeQueued.has(key)||(PLACE_RETRY_AFTER.get(key)||0)>Date.now())return;
   placeQueued.add(key);
   placeQueue.push({key,latitude,longitude,regionZoom:isCluster?Number(mark.zoomLevel)||1:null,marks:[mark]});
   runPlaceQueue();
+ }
+ function enrichVisiblePlaces(visibleMarks){
+  const now=Date.now();
+  if(zoom<1.4||!state.token||placeQueue.length>=PLACE_VISIBLE_QUEUE_LIMIT||now-placeScanAt<PLACE_VISIBLE_SCAN_INTERVAL_MS)return;
+  placeScanAt=now;
+  const candidates=(Array.isArray(visibleMarks)?visibleMarks:[])
+   .filter(mark=>mark&&Number.isFinite(Number(mark.latitude))&&Number.isFinite(Number(mark.longitude)))
+   .sort((a,b)=>(PLACE_PRIORITY[a.kind]??9)-(PLACE_PRIORITY[b.kind]??9));
+  let queued=0;
+  for(const mark of candidates){
+   if(queued>=PLACE_VISIBLE_BATCH_LIMIT||placeQueue.length>=PLACE_VISIBLE_QUEUE_LIMIT)break;
+   mark.zoomLevel=zoom;
+   const key=placeKey(mark.latitude,mark.longitude);
+   const cached=placeCache.get(key);
+   if(cached){applyPlace(mark,cached);continue;}
+   if(placeQueued.has(key)||(PLACE_RETRY_AFTER.get(key)||0)>Date.now())continue;
+   const coordinateFallback=!mark.place||mark.place===coordText(mark.latitude,mark.longitude);
+   const record=mark.record||mark.device||{};
+   const attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
+   const hasPlace=Boolean(mark.cluster||mark.kind==='device_cluster'||coordinateFallback||!(record.place_label||attributes.place_label||attributes.city||attributes.country));
+   if(!hasPlace)continue;
+   enrichPlace(mark);queued+=1;
+  }
  }
  async function runPlaceQueue(){
   if(placeRunning||!placeQueue.length||!state.token)return;
@@ -1081,7 +1173,7 @@ const Globe=(()=>{
      }
     }
     const entry=data&&data.available
-     ?(()=>{const generalized=group.regionZoom!==null&&window.JarvisGeospatialLayer?window.JarvisGeospatialLayer.generalizeRegion([data],group.regionZoom):'';const label=generalized&&generalized!=='Região geográfica'?generalized:(data.label||data.display_name||'');return {label,address:group.regionZoom!==null?label:(data.display_name||''),rawAddress:data.address&&typeof data.address==='object'?data.address:null,at:Date.now(),source:'nominatim',precision:group.regionZoom!==null?'regional_reverse_geocode':'reverse_geocode'};})()
+     ?(()=>{const generalized=group.regionZoom!==null&&window.JarvisGeospatialLayer?window.JarvisGeospatialLayer.generalizeRegion([data],group.regionZoom):'';const label=generalized&&generalized!=='Região geográfica'?generalized:(data.label||data.display_name||'');return {label,address:group.regionZoom!==null?label:(data.display_name||''),rawAddress:data.address&&typeof data.address==='object'?data.address:{city:data.city,state:data.state,country:data.country,suburb:data.suburb,road:data.road,house_number:data.house_number},at:Date.now(),source:'nominatim',precision:group.regionZoom!==null?'regional_reverse_geocode':'reverse_geocode'};})()
      :{label:'',address:'',at:Date.now(),missing:true,reason};
     placeCache.set(group.key,entry);
     group.marks.forEach(mark=>applyPlace(mark,entry));
@@ -1096,6 +1188,38 @@ const Globe=(()=>{
    placeQueued.delete(group.key);
   }
   placeRunning=false;
+ }
+ function enrichVisibleAircraftRoutes(visibleMarks){
+  const now=Date.now();
+  if(now-aircraftRouteScanAt<AIRCRAFT_ROUTE_SCAN_INTERVAL_MS||aircraftRouteQueue.length>=AIRCRAFT_ROUTE_QUEUE_LIMIT)return;
+  aircraftRouteScanAt=now;
+  const candidates=(Array.isArray(visibleMarks)?visibleMarks:[])
+   .filter(mark=>mark&&mark.kind==='aircraft'&&!mark.flightRoute&&mark.routeStatus!=='available'&&mark.routeStatus!=='not_found')
+   .sort((a,b)=>(a===state.selected?-1:b===state.selected?1:0));
+  let queued=0;
+  for(const mark of candidates){
+   if(queued>=AIRCRAFT_ROUTE_BATCH_LIMIT||aircraftRouteQueue.length>=AIRCRAFT_ROUTE_QUEUE_LIMIT)break;
+   const record=mark.record||{},attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
+   const callsign=String(attributes.callsign||'').trim().toUpperCase();
+   if(!/^[A-Z0-9]{2,8}$/.test(callsign)||aircraftRouteQueued.has(callsign)||aircraftRouteLookups.has(callsign))continue;
+   if(mark.routeStatus==='unavailable'&&(mark.routeRetryAt||0)>now)continue;
+   aircraftRouteQueued.add(callsign);aircraftRouteQueue.push(mark);queued+=1;
+  }
+  runAircraftRouteQueue();
+ }
+ async function runAircraftRouteQueue(){
+  if(aircraftRouteRunning)return;
+  aircraftRouteRunning=true;
+  while(aircraftRouteQueue.length){
+   const mark=aircraftRouteQueue.shift();
+   const attributes=(mark.record&&mark.record.attributes)||{};
+   const callsign=String(attributes.callsign||'').trim().toUpperCase();
+   aircraftRouteQueued.delete(callsign);
+   if(mark.flightRoute||mark.routeStatus==='not_found'||(mark.routeStatus==='unavailable'&&(mark.routeRetryAt||0)>Date.now()))continue;
+   await enrichAircraftRoute(mark);
+   if(aircraftRouteQueue.length)await new Promise(resolve=>setTimeout(resolve,350));
+  }
+  aircraftRouteRunning=false;
  }
  async function enrichAircraftRoute(mark){
   if(!mark||mark.kind!=='aircraft'||mark.flightRoute||mark.routeStatus==='available'||mark.routeStatus==='not_found')return;
@@ -1164,7 +1288,7 @@ const Globe=(()=>{
     ?new URL('/api/intelligence/gods-eye/cameras/'+encodeURIComponent(o.entity_id)+'/snapshot',location.origin).href:null;
    const mediaUrl=attrs.stream_url||gevSnapshot;
    const mediaType=gevSnapshot?'snapshot-api':attrs.stream_type;
-   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),flightRoute,live:streamable&&mediaUrl?{url:mediaUrl,type:mediaType}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
+   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),zoomLevel:zoom,flightRoute,live:streamable&&mediaUrl?{url:mediaUrl,type:mediaType}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
   }
   area=(payload&&payload.area)||null;
   setDeviceData((payload&&payload.devices)||[],false);
@@ -1273,7 +1397,7 @@ const Globe=(()=>{
    window.addEventListener('resize',resize);
   }
  }
- function init(){loadPlaceCache();bind();resize();loadLand();requestAnimationFrame(loop);}
+ function init(){loadPlaceCache();bind();resize();loadLand();loadAdminBoundaries();requestAnimationFrame(loop);}
  return {init,setData,setDeviceData,getZoom:()=>zoom,reset,focusArea,focusTo,zoomBy,placeFor,onSelect:fn=>{hook=fn;},onZoom:fn=>{zoomHook=fn;}};
 })();
 
@@ -2399,7 +2523,7 @@ function wire(){
    navigator.clipboard.writeText(mark.copyValue).then(()=>setFooter('COPIADO · '+mark.copyValue)).catch(()=>setFooter('COPIAR · PERMISSÃO NEGADA'));
    return;
   }
-  if(Number.isFinite(mark.latitude)&&Number.isFinite(mark.longitude))Globe.focusTo(mark.latitude,mark.longitude,mark.cluster?Math.min(8,Math.max(1.6,(state.globeZoom||1)+1.1)):2.05);
+  if(Number.isFinite(mark.latitude)&&Number.isFinite(mark.longitude))Globe.focusTo(mark.latitude,mark.longitude,mark.cluster?Math.min(24,Math.max(1.6,(state.globeZoom||1)+1.1)):2.05);
   setFooter((mark.cluster?'AGRUPAMENTO · ':'FOCO · ')+String(mark.label||'ALVO').toUpperCase());
  });
  $('deviceList').addEventListener('click',ev=>{

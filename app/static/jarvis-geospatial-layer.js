@@ -41,6 +41,20 @@
     return 0;
   }
 
+  function chooseBoundaryLayer(zoom, viewportAreaKm2, layers) {
+    const candidates = Array.isArray(layers)
+      ? layers.filter((layer) => layer && Number.isFinite(Number(layer.meanAreaKm2)) && Number(layer.meanAreaKm2) > 0)
+      : [];
+    if (!candidates.length || !Number.isFinite(Number(viewportAreaKm2)) || Number(viewportAreaKm2) <= 0) return null;
+    const level = Math.max(1, Number(zoom) || 1);
+    const visibleRegions = Math.min(3.5, 2.5 + level * 0.05);
+    const targetArea = Number(viewportAreaKm2) / visibleRegions;
+    return candidates.reduce((best, layer) => {
+      const score = Math.abs(Math.log(Number(layer.meanAreaKm2) / targetArea));
+      return !best || score < best.score ? { layer, score } : best;
+    }, null).layer;
+  }
+
   function placeOf(asset) {
     const source = asset && asset.record && typeof asset.record === 'object' ? asset.record : asset || {};
     const attributes = source.attributes && typeof source.attributes === 'object' ? source.attributes : {};
@@ -94,7 +108,7 @@
       validCoordinate(asset.longitude, -180, 180) &&
       asset.id !== undefined && asset.id !== null
     );
-    const maxMarkers = Math.min(1800, Math.round(300 * Math.pow(Math.max(1, level), 1.25)));
+    const maxMarkers = Math.min(6000, Math.round(300 * Math.pow(Math.max(1, level), 1.25)));
     let cellSize = cellSizeForZoom(level);
 
     if (cellSize === 0 && valid.length <= maxMarkers) {
@@ -148,5 +162,5 @@
     return markers;
   }
 
-  return { buildDeviceMarkers, cellSizeForZoom, generalizeRegion };
+  return { buildDeviceMarkers, cellSizeForZoom, generalizeRegion, chooseBoundaryLayer };
 });

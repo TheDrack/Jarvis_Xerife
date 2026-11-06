@@ -4,11 +4,11 @@ import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
 
-test('orbital zoom supports close inspection up to 8x', () => {
-  assert.match(html, /Math\.min\(8,/);
+test('orbital zoom supports close inspection up to 24x', () => {
+  assert.match(html, /Math\.min\(24,/);
   assert.match(html, /zoomBy\(1\.2\)/);
   assert.match(html, /zoomBy\(1\/1\.2\)/);
-  assert.match(html, /mark\.cluster\?Math\.min\(8,Math\.max\(1\.6,/);
+  assert.match(html, /mark\.cluster\?Math\.min\(24,Math\.max\(1\.6,/);
 });
 
 test('HUD typography and globe controls are more legible', () => {
@@ -34,4 +34,8 @@ test('selection exposes origin, destination and reverse-geocode precision', () =
   assert.match(html, /addFact\('DESTINO',attributes\.destination\)/);
   assert.match(html, /addFact\('ORIGEM',attributes\.origin\)/);
   assert.match(html, /PRECIS/);
+});
+test('aircraft routes render airport endpoints as well as the great-circle line', () => {
+  assert.ok(html.includes('for(const endpoint of [mark.flightRoute.origin,mark.flightRoute.destination])'));
+  assert.ok(html.includes('fillText(code.slice(0,18)'));
 });

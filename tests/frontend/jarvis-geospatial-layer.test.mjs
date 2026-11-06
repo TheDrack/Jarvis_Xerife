@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import '../../app/static/jarvis-geospatial-layer.js';
 
 const { buildDeviceMarkers, cellSizeForZoom, generalizeRegion } = globalThis.JarvisGeospatialLayer;
@@ -114,4 +115,37 @@ test('desktop HUD loads the geospatial layer and debounces zoom-only rebuilds', 
   assert.match(html, /const size=Math\.max\(2,Math\.min\(4\.5,/);
   assert.match(html, /labelBoxes\.length>=Math\.min\(120,Math\.round\(45\+zoom\*12\)\)/);
   assert.match(html, /if\(!chosen\)\{ctx\.restore\(\);return;\}/);
+});
+test('administrative boundary selection follows viewport area, not administrative names', () => {
+  const { chooseBoundaryLayer } = globalThis.JarvisGeospatialLayer;
+  const layers = [
+    { id: 'countries', meanAreaKm2: 2500000 },
+    { id: 'states', meanAreaKm2: 85000 },
+    { id: 'municipalities', meanAreaKm2: 1200 },
+    { id: 'neighbourhoods', meanAreaKm2: 18 },
+  ];
+  assert.equal(chooseBoundaryLayer(1, 510000000, layers).id, 'countries');
+  assert.equal(chooseBoundaryLayer(5, 90000, layers).id, 'states');
+  assert.equal(chooseBoundaryLayer(10, 1400, layers).id, 'municipalities');
+  assert.equal(chooseBoundaryLayer(18, 20, layers).id, 'neighbourhoods');
+});
+
+test('administrative boundary dataset includes attributed country and state linework', async () => {
+  const path = new URL('../../app/static/world-admin-boundaries.json', import.meta.url);
+  const data = JSON.parse(await readFile(path, 'utf8'));
+  assert.ok(data.countries.length > 100);
+  assert.ok(data.states.length > 1000);
+  assert.match(data.attribution, /Natural Earth/);
+  assert.equal(data.license, 'Public domain');
+});
+
+test('HUD loads and renders administrative contours using the scale selector', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const html = await readFile(fileURLToPath(new URL('../../app/static/jarvis-desktop.html', import.meta.url)), 'utf8');
+  assert.match(html, /world-admin-boundaries\.json/);
+  assert.match(html, /function drawAdminBoundaries\(/);
+  assert.match(html, /chooseBoundaryLayer\(zoom,viewportAreaKm2,adminBoundaries\.layers\)/);
+  assert.match(html, /drawAdminBoundaryLines\(adminBoundaries\.countries/);
+  assert.match(html, /drawAdminBoundaryLines\(adminBoundaries\.states/);
 });
