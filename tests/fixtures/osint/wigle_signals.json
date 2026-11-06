@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "results": [
+    {
+      "ssid": "LabNet",
+      "netid": "AA:BB:CC:DD:EE:FF",
+      "trilat": -27.1,
+      "trilong": -48.9,
+      "encryption": "WPA2",
+      "qos": 6
+    }
+  ]
+}

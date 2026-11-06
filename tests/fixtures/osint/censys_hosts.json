@@ -1,0 +1,28 @@
+{
+  "result": {
+    "hits": [
+      {
+        "host": {
+          "ip": "203.0.113.8",
+          "location": {
+            "coordinates": {
+              "latitude": -27.1,
+              "longitude": -48.9
+            },
+            "country": "BR"
+          },
+          "autonomous_system": {
+            "asn": 64500,
+            "organization": "Example ISP"
+          },
+          "services": [
+            {
+              "port": 443,
+              "protocol": "HTTP"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

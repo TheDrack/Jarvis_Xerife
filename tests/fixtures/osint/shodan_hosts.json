@@ -1,0 +1,26 @@
+{
+  "matches": [
+    {
+      "ip_str": "203.0.113.8",
+      "port": 443,
+      "org": "Example ISP",
+      "asn": "AS64500",
+      "location": {
+        "latitude": -27.1,
+        "longitude": -48.9,
+        "country_code": "BR"
+      }
+    },
+    {
+      "ip_str": "203.0.113.8",
+      "port": 8443,
+      "org": "Example ISP",
+      "asn": "AS64500",
+      "location": {
+        "latitude": -27.1,
+        "longitude": -48.9,
+        "country_code": "BR"
+      }
+    }
+  ]
+}

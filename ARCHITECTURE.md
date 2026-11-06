@@ -301,3 +301,175 @@ graph LR
     class _agents_skills_jarvis-multi-agent-coordination support
     _agents_skills --> _agents_skills_jarvis-multi-agent-coordination
 ```
+
+---
+
+## 🕸️ Domínio do Grafo OSINT (Fase 0)
+
+> Seção mantida manualmente. O diagrama acima é regenerado por
+> `scripts/autodoc.py`; esta seção descreve contratos e não é gerada.
+
+`app/domain/graph/` é a fundação do plano de execução do grafo OSINT. O grafo é
+o estado primário: adapters produzem `Node`/`Edge` normalizados, nunca
+dicionários livres.
+
+| Módulo | Contrato |
+|---|---|
+| `app/domain/graph/nodes.py` | `Node` frozen; `id = sha256(type, seletor normalizado, scope_id)`; `NodeType` com 21 tipos; `normalize_selector()` por tipo |
+| `app/domain/graph/edges.py` | `Edge` frozen com `selector_used`, `source`, `confidence`; `PivotType` (infra + identidade + BR); `Edge.derive()` calcula confiança pelo pivô |
+| `app/domain/graph/confidence.py` | `PIVOT_FACTOR` como fonte única, `edge_confidence(src, dst, pivot)`, `STRONG_PIVOTS` |
+| `app/domain/graph/policy.py` | `ScopePolicy` (escopo obrigatório, gate de pivô sensível); `SensitivityPolicy` (CPF → HMAC-SHA256) |
+
+Regras garantidas por teste:
+
+- Identidade é derivada, nunca fornecida; duas grafias do mesmo seletor
+  produzem o mesmo `id`.
+- `CPF` não existe como `NodeType`; `CPF_HASH` é `sensitive` por construção e
+  só aceita digest `sha256:`. CPF em texto claro é recusado.
+- `PERSON`/`ORG` existem no enum, mas só o `Resolver` (Fase 1) pode derivá-los.
+- `vehicle_owner` é `pivot_weak` e tem confiança limitada a `0.4`.
+- Escopo cruzado reduz a confiança pela metade; a aresta continua auditável.
+
+Validação:
+
+```bash
+pytest tests/domain/graph -v
+```
+
+Equivalente ao `pytest tests/fase_0 -v` do plano: os testes seguem a convenção
+do repositório (`tests/<camada>/...`), e os módulos vivem em
+`app/domain/graph/` em vez de `domain/graph/`, também por convenção local.
+
+---
+
+## 🗄️ Grafo OSINT — Fase 1 (persistência, derivação e retenção)
+
+> Seção mantida manualmente; o diagrama acima é regenerado por
+> `scripts/autodoc.py`.
+
+| Módulo | Contrato |
+|---|---|
+| `app/domain/graph/graph.py` | `Graph` imutável e íntegro (aresta só para nó presente) com `to_json()` determinístico; `GraphDelta` para lotes parciais |
+| `app/application/ports/graph_store.py` | `GraphStorePort` + `UpsertReport(inserted, duplicates)` |
+| `app/adapters/infrastructure/graph/store.py` | `SQLiteGraphStore`: índices `(type, selector, scope_id)`, `src`, `dst`, `pivot`, `scope_id`; upsert idempotente; recusa nós sensíveis; `export_scope()` |
+| `app/domain/graph/resolver.py` | `Resolver.merge` (dedup estrutural) e `derive_person_org` (PERSON/ORG) |
+| `app/domain/graph/sensitive_store.py` | `SensitiveStore` + `InMemorySensitiveStore` com TTL curto e log de acesso |
+| `app/adapters/infrastructure/graph/sensitive_store.py` | `SQLiteSensitiveStore` em arquivo separado do grafo |
+| `app/domain/graph/pruner.py` | `PrunePolicy`/`Pruner.apply`: TTL por tipo, `min_confidence`, cofre e densidade |
+| `app/application/services/graph_retention.py` | Persiste o resultado do pruner no store |
+
+Regras garantidas por teste:
+
+- O mesmo nó inserido duas vezes não duplica (`UpsertReport.duplicates`).
+- `PERSON`/`ORG` só existem via `Resolver.derive_*`: `merge` recusa os tipos e um
+  teste varre `app/` para garantir que nenhum outro módulo os constrói.
+- O pruner move `sensitive=True` para o cofre; o store principal recusa esses nós.
+- 500 `SIGNAL` do mesmo Wi-Fi agregam em um único `SIGNAL_SET`.
+- `export_scope()` devolve JSON determinístico com `scope_id`, nós e arestas.
+- `GraphDelta`/`Graph` são determinísticos: derivar duas vezes gera os mesmos ids.
+
+Validação:
+
+```bash
+pytest tests/domain/graph tests/adapters/infrastructure/graph \
+       tests/application/test_graph_retention.py -v
+```
+
+Em Windows, quando `%TEMP%` estiver sem permissão de escrita, use
+`--basetemp=.tmp/pytest-basetemp`.
+
+---
+
+## ⚙️ Grafo OSINT — Fase 2 (expanders, loop e fusão)
+
+| Módulo | Contrato |
+|---|---|
+| `app/domain/graph/expander.py` | `ExpanderSpec(name, accepts, produces, capability, cost, active, legal_gated)`, `Expansion`, protocolo `Expander` |
+| `app/domain/graph/registry.py` | `ExpanderRegistry.find_expanders(type, caps, include_legal_gated)` e `find_gap` com `available`/`missing`/`gated` |
+| `app/domain/graph/loop.py` | `EnrichmentLoop.run(seeds, graph, policy)` com `prior`, `budget`, `max_depth`, `min_confidence` e `coverage_stall` |
+| `app/domain/graph/fuse.py` | `Fuse.apply(delta, graph)`: `interest` em `{confirmed, discrepancy, novel}`, geo (haversine) e relacional |
+| `app/application/services/graph_enrichment.py` | Executa o loop por escopo, deriva `PERSON`/`ORG` e persiste o que é novo |
+
+Garantias testadas:
+
+- Um único `IP` seed gera ≥ 3 tipos de nó distintos.
+- Rodar o loop duas vezes com os mesmos seeds não adiciona nó nem aresta.
+- Capacidade ausente aparece como `missing`; implementação desligada ou
+  `legal_gated` aparece como `gated` e **não** reprova `ready`.
+- Aresta abaixo de `min_confidence` não entra no grafo e é reportada.
+- Expander que devolve `PERSON`/`ORG` falha com `AdapterBoundaryError`.
+- `Fuse` distingue evidência confirmada, pivô conflitante e localização
+  distante (> 50 km), sem mutar o grafo.
+
+Validação:
+
+```bash
+pytest tests/domain/graph tests/application/test_graph_enrichment.py -v
+```
+
+---
+
+## 🌐 Grafo OSINT — Fase 3 (expanders de infraestrutura)
+
+> Seção mantida manualmente; o diagrama acima é regenerado por
+> `scripts/autodoc.py`.
+
+Os expanders vivem em `app/adapters/infrastructure/osint/expanders.py` e
+reutilizam os adapters existentes: nenhuma chamada de rede nova, nenhum rate
+limit dentro do adapter.
+
+| Expander | Aceita | Produz | Capability |
+|---|---|---|---|
+| `IPInfoExpander` | `IP` | `COORDINATE`, `ASN` (`ORG` é efeito do `Resolver`) | `osint.ip.enrich` |
+| `CensysExpander` | `COORDINATE`, `CIDR` | `HOST` | `osint.passive.geo_query` |
+| `ShodanExpander` | `COORDINATE`, `IP` | `HOST` | `osint.passive.geo_query` |
+| `WigleExpander` | `COORDINATE`, `SIGNAL` | `SIGNAL` | `osint.passive.signal_query` |
+| `AsnExpander` | `IP`, `ASN`, `ORG` | `CIDR` (`ORG` derivado) | `osint.net.resolve` |
+
+Garantias testadas:
+
+- Todo `HOST` de Censys/Shodan carrega `geo_confidence` (0.0 quando não há
+  coordenada); `IPInfoExpander` limita a 0.3 para conexão móvel ou proxy.
+- `CensysExpander` e `ShodanExpander` declaram a mesma capability, o mesmo
+  `produces` e o mesmo formato de `Expansion`: trocar um pelo outro no
+  pipeline não muda o contrato.
+- `WigleExpander` recebe centro + raio; a conversão para bbox acontece dentro
+  do `WigleAdapter`, e o teste confere `latrange1` na requisição.
+- `ExpanderRegistry.set_rate_limit(RateLimit(max_calls, period_seconds))`
+  aplica janela deslizante por capability; `RateLimitExceeded` interrompe o
+  loop com `STOP_RATE_LIMITED` e `rate_limited_capabilities` preenchido.
+- Cada expander é exercitado contra fixture JSON em `tests/fixtures/osint/`
+  com `httpx.MockTransport`, sem rede real.
+
+Validação:
+
+```bash
+pytest tests/adapters/infrastructure/osint tests/domain/graph \
+       tests/application/test_graph_enrichment.py -v
+```
+
+Pendente para a Fase 7: expor `osint.ip.enrich` como ferramenta MCP atômica
+(`osint.ip.enrich` já existe como capability, mas o servidor MCP ainda não foi
+ligado).
+
+### Composição de produção
+
+`app/application/services/graph_expander_setup.py` liga os expanders ao
+`OSINTAdapterRegistry` configurado:
+
+| Função | Papel |
+|---|---|
+| `configure_graph_expanders(registry, adapters=..., rate_limits=...)` | Registra um expander por provider disponível (`ipinfo`, `censys`, `shodan`, `wigle`) e aplica as janelas de taxa |
+| `DEFAULT_RATE_LIMITS` | 60/min para IPinfo e ASN, 6/min para consulta geográfica, 4/min para WiGLE |
+| `get_graph_expander_registry()` | Singleton process-local montado sobre `get_osint_registry()`, sem rede na construção |
+
+Expander só existe quando o provider correspondente está configurado, então
+`ExpanderRegistry.find_gap` continua sendo a fonte de verdade sobre
+capabilities ausentes. Credenciais nunca passam por este módulo: os adapters
+resolvem os valores em tempo de requisição.
+
+Validação:
+
+```bash
+pytest tests/application/test_graph_expander_setup.py -v
+```

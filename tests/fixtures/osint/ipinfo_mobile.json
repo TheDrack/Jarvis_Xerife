@@ -1,0 +1,17 @@
+{
+  "ip": "203.0.113.10",
+  "loc": "-27.1,-48.9",
+  "country": "BR",
+  "carrier": {
+    "name": "Mobile Carrier"
+  },
+  "privacy": {
+    "proxy": true,
+    "vpn": true
+  },
+  "asn": {
+    "asn": "AS64501",
+    "name": "Mobile ISP",
+    "route": "203.0.113.0/24"
+  }
+}

@@ -9,6 +9,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Grafo OSINT — Fase 3: composição de produção (2026-11-06)
+
+- `app/application/services/graph_expander_setup.py`:
+  `configure_graph_expanders(registry, adapters=...)` monta os cinco expanders
+  a partir do `OSINTAdapterRegistry` já configurado, sem instanciar adapter,
+  ler credencial ou fazer rede. Só registra expander de provider disponível.
+- `DEFAULT_RATE_LIMITS` por capability (IPinfo/ASN 60/min, consultas
+  geográficas 6/min, WiGLE 4/min), aplicados apenas às capabilities
+  registradas; `ExpanderRegistry.rate_limit()` expõe a janela configurada.
+- `get_graph_expander_registry()`: entrada de produção preguiçosa e
+  process-local, reutilizando `get_osint_registry()` e o cache do Nexus.
+
+#### Grafo OSINT — Fase 3: expanders de infraestrutura (2026-11-06)
+
+- `app/adapters/infrastructure/osint/expanders.py`: `IPInfoExpander` (IP →
+  `COORDINATE` + `ASN`, com `geo_confidence` limitado a 0.3 para conexão móvel
+  ou proxy; `ORG` só como efeito observável derivado pelo `Resolver`),
+  `CensysExpander`/`ShodanExpander` (coordenada/CIDR → `HOST`),
+  `WigleExpander` (centro + raio → `SIGNAL`) e `AsnExpander` (IP/ASN/ORG →
+  `CIDR`). Nenhum adapter novo de rede: os expanders reutilizam `IPInfoAdapter`,
+  `CensysAdapter`, `ShodanAdapter` e `WigleAdapter`.
+- `CensysExpander` e `ShodanExpander` compartilham a capability
+  `osint.passive.geo_query` e o mesmo contrato de saída: trocar um pelo outro
+  não muda o pipeline. Todo `HOST` produzido carrega `geo_confidence`, mesmo
+  0.0 quando não há coordenada.
+- `ExpanderRegistry.set_rate_limit` com `RateLimit` (janela deslizante por
+  capability, compartilhada entre chamadas) e `RateLimitExceeded`.
+- `EnrichmentLoop` para com `STOP_RATE_LIMITED` e reporta
+  `rate_limited_capabilities`, sem descartar o grafo já construído.
+- Fixtures JSON em `tests/fixtures/osint/` e testes com `httpx.MockTransport`
+  para os cinco expanders, incluindo a equivalência Censys ↔ Shodan e a
+  conversão centro+raio → bbox dentro do adapter WiGLE.
+
+#### Grafo OSINT — Fase 2: expanders, loop e fusão (2026-11-06)
+
+- `app/domain/graph/expander.py`: `ExpanderSpec` (name, accepts, produces,
+  capability, cost, active, legal_gated), `Expansion` e o protocolo `Expander`.
+- `app/domain/graph/registry.py`: `ExpanderRegistry` com `find_expanders`
+  (tipo + capability + gate) e `find_gap`, que separa `missing` de `gated`
+  (flag desligada ou `legal_gated` não é falha; `ready` só olha `missing`).
+- `app/domain/graph/loop.py`: `EnrichmentLoop` com fila de prioridade
+  determinística (`prior`), orçamento, profundidade, `min_confidence` e
+  parada por estagnação de cobertura.
+- `app/domain/graph/fuse.py`: `Fuse.apply` marca `interest` em
+  `{confirmed, discrepancy, novel}` com regras geo (haversine, limiar de 50 km)
+  e relacionais (mesmo pivô com seletor divergente; pivô distinto corrobora).
+- `app/application/services/graph_enrichment.py`: executa o loop por escopo,
+  aplica `Resolver.derive_person_org` e persiste apenas o que é novo.
+- `Node.interest` e `Edge.interest`, persistidos no store principal e no cofre.
+
+#### Grafo OSINT — Fase 1: persistência, derivação e retenção (2026-11-06)
+
+- `app/domain/graph/graph.py`: `Graph` imutável com integridade referencial e
+  export JSON determinístico; `GraphDelta` para lotes parciais de adapter.
+- `app/application/ports/graph_store.py`: `GraphStorePort` e `UpsertReport`
+  (`inserted`/`duplicates`), mantendo o domínio independente de SQLite.
+- `app/adapters/infrastructure/graph/store.py`: `SQLiteGraphStore` com índices
+  `(type, selector, scope_id)`, `src`, `dst`, `pivot` e `scope_id`; upsert
+  idempotente; recusa nós sensíveis; exporta subgrafo por `scope_id` em JSON.
+- `app/domain/graph/resolver.py`: `Resolver.merge` (dedup estrutural e recusa de
+  `PERSON`/`ORG` vindos de adapter) e `Resolver.derive_person_org` — cluster de
+  identidade por ≥ 2 seletores ou pivô forte; `ORG` por sufixo de domínio,
+  `whois_registrant`, e-mail corporativo, ASN e razão social de CNPJ; ligação
+  `PERSON → ORG` por e-mail corporativo e `cnpj_owner`.
+- `app/domain/graph/sensitive_store.py` e
+  `app/adapters/infrastructure/graph/sensitive_store.py`: cofre separado com TTL
+  curto e log de acesso append-only que nunca registra o seletor.
+- `app/domain/graph/pruner.py`: TTL por tipo, `min_confidence`, movimentação de
+  nós sensíveis para o cofre e agregação de densidade `SIGNAL → SIGNAL_SET`.
+- `app/application/services/graph_retention.py`: aplica o `Pruner` e persiste
+  remoções e agregações no `GraphStorePort`.
+- `Node.last_seen` (retenção por TTL) e o pivô `domain_owner`, exigido pelas
+  arestas `DOMAIN → ORG` da regra de derivação de organização.
+
+#### Fundação do grafo OSINT — Fase 0 (2026-11-06)
+
+- `app/domain/graph/nodes.py`: `Node` imutável com identidade derivada
+  `sha256(type, seletor normalizado, scope_id)` e `NodeType` completo. Cada
+  tipo tem um normalizador único (e-mail lowercase, CNPJ só dígitos com
+  dígitos verificadores, domínio IDNA, BSSID hex lower, coordenada com
+  precisão fixa). `CPF` não existe como tipo; só `CPF_HASH`, sempre
+  `sensitive`, e o seletor precisa ser um digest `sha256:`.
+- `app/domain/graph/edges.py`: `Edge` imutável carregando `selector_used`,
+  `source` e `confidence`, com id derivado da evidência. `PivotType` cobre
+  infraestrutura, identidade e pivôs brasileiros; `vehicle_owner` nasce
+  `pivot_weak` com teto de confiança 0.4.
+- `app/domain/graph/confidence.py`: tabela `PIVOT_FACTOR` como fonte única de
+  confiança, `edge_confidence(src, dst, pivot)` com penalidade de escopo
+  cruzado e `STRONG_PIVOTS` (`commit_email`, `whois_registrant`, `cnpj_owner`)
+  para o `Resolver` da Fase 1.
+- `app/domain/graph/policy.py`: `ScopePolicy` (escopo obrigatório e gate de
+  pivô sensível) e `SensitivityPolicy` (HMAC-SHA256 de CPF com pepper, nó
+  `CPF_HASH` e recusa de CPF em texto claro).
+- `tests/domain/graph/`: testes de normalização por tipo, identidade
+  determinística, imutabilidade, tabela de confiança e políticas.
+
 #### Auditoria de entregas (2026-10-16)
 
 - `docs/VERIFICACAO_ENTREGAS.md`: confronta cada promessa da documentação (README,
