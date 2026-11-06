@@ -215,6 +215,48 @@
     };
   }
 
+  function aircraftHeadingDegrees(position, attributes = {}, route = null) {
+    const values = [
+      attributes.heading_deg, attributes.heading, attributes.track_deg,
+      attributes.track, attributes.true_track, attributes.course_deg, attributes.course,
+    ];
+    for (const value of values) {
+      if (value === null || value === undefined || String(value).trim() === '') continue;
+      const heading = Number(value);
+      if (Number.isFinite(heading) && heading >= 0 && heading <= 360) return heading % 360;
+    }
+    const latitude = Number(position && position.latitude);
+    const longitude = Number(position && position.longitude);
+    if (!validCoordinate(latitude, -90, 90) || !validCoordinate(longitude, -180, 180)) return null;
+    if (!route || !route.destination) return null;
+    let target = route.destination;
+    const waypoints = route.kind === 'flight_plan' && Array.isArray(route.waypoints)
+      ? route.waypoints.filter(point => validCoordinate(point.latitude, -90, 90) && validCoordinate(point.longitude, -180, 180))
+      : [];
+    if (waypoints.length > 1) {
+      const radians = Math.PI / 180;
+      const distance = point => {
+        const lat1 = latitude * radians, lat2 = Number(point.latitude) * radians;
+        const dLat = lat2 - lat1, dLon = (Number(point.longitude) - longitude) * radians;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+        return 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+      };
+      let nearest = 0;
+      for (let index = 1; index < waypoints.length; index += 1) {
+        if (distance(waypoints[index]) < distance(waypoints[nearest])) nearest = index;
+      }
+      target = waypoints[Math.min(nearest + 1, waypoints.length - 1)];
+    }
+    if (!target || !validCoordinate(target.latitude, -90, 90) || !validCoordinate(target.longitude, -180, 180)) return null;
+    const radians = Math.PI / 180;
+    const lat1 = latitude * radians, lat2 = Number(target.latitude) * radians;
+    const deltaLon = (Number(target.longitude) - longitude) * radians;
+    const y = Math.sin(deltaLon) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
+    if (Math.abs(x) < 1e-12 && Math.abs(y) < 1e-12) return null;
+    return (Math.atan2(y, x) / radians + 360) % 360;
+  }
+
   function appendAircraftTrack(tracks, observation, options = {}) {
     if (!(tracks instanceof Map)) return null;
     const identity = normalizeAircraftIdentity(observation);
@@ -284,6 +326,6 @@
   return {
     buildDeviceMarkers, clusterScreenPoints, clusterThresholdForZoom,
     generalizeRegion, generalizeRegionFromMembers, chooseBoundaryLayer,
-    normalizeAircraftIdentity, normalizeAircraftPosition, appendAircraftTrack, normalizeAircraftRoute,
+    normalizeAircraftIdentity, normalizeAircraftPosition, aircraftHeadingDegrees, appendAircraftTrack, normalizeAircraftRoute,
   };
 });

@@ -755,7 +755,10 @@ const Globe=(()=>{
   ctx.fillStyle=color;
   ctx.strokeStyle=color;
   if(m.kind==='aircraft'){
-   const heading=num((m.record&&m.record.attributes||{}).heading_deg);
+   const attributes=(m.record&&m.record.attributes)||{};
+   const layer=window.JarvisGeospatialLayer;
+   const heading=layer&&typeof layer.aircraftHeadingDegrees==='function'
+    ?layer.aircraftHeadingDegrees({latitude:m.latitude,longitude:m.longitude},attributes,m.flightRoute):num(attributes.heading_deg);
    ctx.translate(sx,sy);
    if(Number.isFinite(heading))ctx.rotate(heading*Math.PI/180);
    ctx.beginPath();

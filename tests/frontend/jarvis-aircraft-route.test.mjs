@@ -18,15 +18,23 @@ test('selected aircraft can still request its route on demand', () => {
   assert.match(html, /mark\.flightRoute=/);
 });
 
-test('selected aircraft exposes route status and airport labels', () => {
-  assert.match(html, /ORIGEM/);
-  assert.match(html, /DESTINO/);
-  assert.match(html, /ROTA/);
-  assert.match(html, /origin\.latitude/);
-  assert.match(html, /destination\.latitude/);
-  assert.match(html, /ARCO GEODÉSICO/);
-  assert.match(html, /ASSOCIAÇÃO POR CALLSIGN/);
-  assert.match(html, /selection-facts-section/);
-  assert.match(html, /PROVENIÊNCIA/);
-  assert.match(html, /LOCALIZAÇÃO/);
+test('selected aircraft exposes route status, airport labels and route geometry', () => {
+  for (const fragment of [
+    'ORIGEM',
+    'DESTINO',
+    'ESTADO DA ROTA',
+    'TIPO DE GEOMETRIA',
+    'PLANO DE VOO',
+    'ARCO ESTIMADO ENTRE AEROPORTOS',
+    'attributes.callsign',
+    'mark.flightRoute=',
+    '[route.origin,route.destination]',
+    'endpoint.latitude',
+    'endpoint.longitude',
+    'FONTE DA ROTA',
+    'TRACK OBSERVADO',
+    'RESSALVA',
+    'TRAJETÓRIA',
+    'selection-facts-section',
+  ]) assert.ok(html.includes(fragment), fragment);
 });

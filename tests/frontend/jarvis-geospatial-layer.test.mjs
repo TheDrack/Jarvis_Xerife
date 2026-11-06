@@ -323,3 +323,49 @@ test('aircraft routes distinguish confirmed flight plans from airport-pair estim
   assert.equal(planned.confirmed, true);
   assert.equal(planned.waypoints.length, 2);
 });
+
+test('aircraft heading prefers telemetry aliases and normalizes 360 degrees', () => {
+  const { aircraftHeadingDegrees } = globalThis.JarvisGeospatialLayer;
+  assert.equal(aircraftHeadingDegrees({ latitude: 0, longitude: 0 }, { heading_deg: 360 }), 0);
+  assert.equal(aircraftHeadingDegrees({ latitude: 0, longitude: 0 }, { track_deg: '91.5' }), 91.5);
+  assert.equal(aircraftHeadingDegrees({ latitude: 0, longitude: 0 }, { heading: 270 }), 270);
+});
+
+test('aircraft heading falls back to the route destination when telemetry has no heading', () => {
+  const { aircraftHeadingDegrees } = globalThis.JarvisGeospatialLayer;
+  const position = { latitude: 0, longitude: 0 };
+  assert.ok(Math.abs(aircraftHeadingDegrees(position, {}, { destination: { latitude: 0, longitude: 10 } }) - 90) < 0.001);
+  assert.ok(Math.abs(aircraftHeadingDegrees(position, {}, { destination: { latitude: -10, longitude: 0 } }) - 180) < 0.001);
+  assert.ok(Math.abs(aircraftHeadingDegrees(position, {}, { destination: { latitude: 0, longitude: -10 } }) - 270) < 0.001);
+});
+
+test('flight-plan heading targets the next waypoint after the nearest waypoint', () => {
+  const { aircraftHeadingDegrees } = globalThis.JarvisGeospatialLayer;
+  const route = {
+    kind: 'flight_plan',
+    destination: { latitude: 0, longitude: 20 },
+    waypoints: [
+      { latitude: 0, longitude: 0 },
+      { latitude: 0, longitude: 10 },
+      { latitude: 0, longitude: 20 },
+      { latitude: 10, longitude: 20 },
+    ],
+  };
+  const heading = aircraftHeadingDegrees({ latitude: 0, longitude: 9 }, {}, route);
+  assert.ok(Math.abs(heading - 90) < 0.001);
+});
+
+test('aircraft heading does not invent a direction without usable position or route', () => {
+  const { aircraftHeadingDegrees } = globalThis.JarvisGeospatialLayer;
+  assert.equal(aircraftHeadingDegrees({ latitude: 0, longitude: 0 }, {}), null);
+  assert.equal(aircraftHeadingDegrees({ latitude: 100, longitude: 0 }, {}, {
+    destination: { latitude: 0, longitude: 10 },
+  }), null);
+});
+
+test('aircraft glyph uses telemetry heading or route-derived heading for orientation', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const html = await readFile(fileURLToPath(new URL('../../app/static/jarvis-desktop.html', import.meta.url)), 'utf8');
+  assert.ok(html.includes('aircraftHeadingDegrees({latitude:m.latitude,longitude:m.longitude},attributes,m.flightRoute)'));
+});
