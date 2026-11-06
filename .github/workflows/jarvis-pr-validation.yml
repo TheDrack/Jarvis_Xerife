@@ -44,5 +44,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest 'pytest-asyncio>=0.23.0' pytest-cov pytest-mock anyio Pillow opencv-python-headless
 
+      - name: Build hardened evolution sandbox
+        run: docker build --file Dockerfile.evolution-sandbox --tag jarvis-evolution-sandbox:ci .
+
       - name: Run complete pytest suite
+        env:
+          EVOLUTION_SANDBOX_IMAGE: jarvis-evolution-sandbox:ci
         run: pytest -q
