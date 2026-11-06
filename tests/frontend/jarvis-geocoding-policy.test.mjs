@@ -4,10 +4,18 @@ import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
 
-test('reverse geocoding is requested for the selected point, not every observation', () => {
+test('reverse geocoding is requested for selected points and cluster centers only', () => {
   assert.doesNotMatch(html, /enrichPlaces\(\);/);
   assert.match(html, /function enrichPlace\(mark\)/);
   assert.match(html, /enrichPlace\(mark\)/);
+  assert.match(html, /regionZoom:isCluster\?Number\(mark\.zoomLevel\)\|\|1:null/);
+});
+
+test('cluster reverse geocoding uses a generalized administrative label, not a member address', () => {
+  assert.match(html, /regional_reverse_geocode/);
+  assert.match(html, /generalizeRegion\(\[data\],group\.regionZoom\)/);
+  assert.match(html, /address:group\.regionZoom!==null\?label/);
+  assert.match(html, /const cachedPlace=Globe\.placeFor\?Globe\.placeFor\(latitude,longitude\):null/);
 });
 
 test('reverse-geocode cache precision is sufficient to distinguish nearby street addresses', () => {
