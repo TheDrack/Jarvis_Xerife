@@ -1,9 +1,9 @@
 name: 🚀 JARVIS Integrated Evolution
 
 on:
-  workflow_dispatch:  # Execução manual somente pela main
+  workflow_dispatch:
   schedule:
-    - cron: "0 * * * *"  # Verificação horária; o gate EVOLUTION_ENABLED continua obrigatório
+    - cron: "0 * * * *"
 
 permissions:
   contents: read
@@ -23,32 +23,30 @@ jobs:
           EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
         run: |
           if [ "${EVOLUTION_ENABLED}" = "true" ]; then
-            echo "enabled=true" >> $GITHUB_OUTPUT
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
             echo "✅ Auto-evolução habilitada."
           else
-            echo "enabled=false" >> $GITHUB_OUTPUT
-            echo "⏸️  Auto-evolução pausada (EVOLUTION_ENABLED != true)."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "⏸️ Auto-evolução pausada (EVOLUTION_ENABLED != true)."
           fi
 
   evolution_cycle:
-    name: "🧬 Ciclo de Evolução"
+    name: "🧪 Geração e validação isolada"
     needs: gate
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     if: |
       github.ref == 'refs/heads/main' &&
       needs.gate.outputs.enabled == 'true' &&
       github.event_name != 'pull_request' &&
       !contains(github.event.head_commit.message, '[Auto-Evolution] DNA Mutated')
     runs-on: ubuntu-latest
+    timeout-minutes: 35
     outputs:
-      action: ${{ steps.flow.outputs.action }}
-      pr_number: ${{ steps.create_pr.outputs.pr_number }}
-      branch: ${{ steps.create_pr.outputs.branch }}
+      artifact_available: ${{ steps.evolve.outputs.artifact_available }}
       mission_desc: ${{ steps.flow.outputs.mission_desc }}
     steps:
-      - name: 🛰️ Checkout trusted main
+      - name: 🛰️ Checkout trusted main (read-only credentials)
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -61,63 +59,77 @@ jobs:
           enable-cache: true
           python-version: '3.11'
 
-      - name: 🧠 Orquestrador e Identificação de Missão
+      - name: 🧠 Orquestrador e identificação de missão
         id: flow
         env:
           EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          # Setup do ambiente isolado com UV
           uv venv --clear --python 3.11
           source .venv/bin/activate
-          uv pip install sqlmodel requests pydantic groq python-dotenv
+          uv pip install -r requirements.txt
 
           python - << 'PYCODE'
-          import os, sys, re
+          import os
+          import re
+          import sys
           from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
 
           try:
               auto = AutoEvolutionServiceV2()
-              github_output = os.environ.get('GITHUB_OUTPUT')
-
+              github_output = os.environ["GITHUB_OUTPUT"]
               last_msg = os.popen("git log -1 --pretty=%B").read()
               print(f"--- ANALISANDO DNA ---\nMsg: {last_msg.strip()}")
 
-              is_auto_evolution = bool(re.search(r'auto-evolution|mission-\d+', last_msg, re.IGNORECASE))
+              is_auto_evolution = bool(
+                  re.search(r"auto-evolution|mission-\d+", last_msg, re.IGNORECASE)
+              )
               is_sync = "Inventory Synchronized" in last_msg
 
-              # Sincronização lógica do Roadmap
               if is_auto_evolution and not is_sync:
                   print("🎯 DNA de Evolução detectado. Sincronizando inventário...")
-                  match = re.search(r'CAP-\d+', last_msg)
-                  if match:
-                      cap_id = match.group()
-                      if auto.mark_mission_as_completed(cap_id):
-                          print(f"✅ Missão {cap_id} integrada com sucesso.")
-
-                  with open(github_output, 'a') as f:
-                      f.write("action=idle\n")
+                  match = re.search(r"CAP-\d+", last_msg)
+                  if match and auto.mark_mission_as_completed(match.group()):
+                      print(f"✅ Missão {match.group()} integrada com sucesso.")
+                  with open(github_output, "a", encoding="utf-8") as output:
+                      output.write("action=idle\n")
                   sys.exit(0)
 
               print("🟢 Buscando próxima mutação na apostila de aprendizado...")
-              next_m = auto.find_next_mission()
-
-              if next_m:
-                  context = auto.get_roadmap_context(next_m)
-                  with open('mission_context.txt', 'w', encoding='utf-8') as mc:
-                      mc.write(context)
-
-                  with open(github_output, 'a', encoding='utf-8') as f:
-                      f.write("action=evolve\n")
-                      f.write(f"mission_desc={next_m['id']}: {next_m['title']}\n")
-                  print(f"🚀 Alvo identificado: {next_m['id']}")
-              else:
-                  with open(github_output, 'a') as f:
-                      f.write("action=idle\n")
+              next_mission = auto.find_next_mission()
+              if not next_mission:
+                  with open(github_output, "a", encoding="utf-8") as output:
+                      output.write("action=idle\n")
                   print("😴 Sem missões pendentes no momento.")
+                  sys.exit(0)
 
-          except Exception as e:
-              print(f"❌ Falha no Orquestrador: {e}")
+              context = auto.get_roadmap_context(next_mission)
+              with open("mission_context.txt", "w", encoding="utf-8") as file:
+                  file.write(context)
+
+              with open(github_output, "a", encoding="utf-8") as output:
+                  output.write(
+                      f"mission_desc={next_mission['id']}: {next_mission['title']}\n"
+                  )
+
+              target_file = str(next_mission.get("target_file") or "").strip()
+              if (
+                  not re.fullmatch(r"[A-Za-z0-9_./-]+", target_file)
+                  or any(part in {"", ".", ".."} for part in target_file.split("/"))
+              ):
+                  with open(github_output, "a", encoding="utf-8") as output:
+                      output.write("action=blocked\n")
+                  print(
+                      "⛔ Missão sem target_file confiável; LLM e sandbox não serão executados."
+                  )
+                  sys.exit(0)
+
+              with open(github_output, "a", encoding="utf-8") as output:
+                  output.write(f"target_file={target_file}\n")
+                  output.write("action=evolve\n")
+              print(f"🚀 Alvo identificado: {next_mission['id']}")
+          except Exception as exc:
+              print(f"❌ Falha no Orquestrador: {exc}")
               sys.exit(1)
           PYCODE
 
@@ -125,61 +137,64 @@ jobs:
         if: steps.flow.outputs.action == 'evolve'
         run: docker build --file Dockerfile.evolution-sandbox --tag jarvis-evolution-sandbox:ci .
 
-      - name: 🤖 Mutação e Abertura de PR
-        id: create_pr
+      - name: 🧬 Gerar e validar candidato (sem credenciais GitHub)
+        id: evolve
         if: steps.flow.outputs.action == 'evolve'
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GH_TOKEN: ${{ secrets.GIT_PAT }}
           EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
           EVOLUTION_SANDBOX_IMAGE: jarvis-evolution-sandbox:ci
+          EVOLUTION_ARTIFACT_DIR: ${{ runner.temp }}/jarvis-evolution-artifacts
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          git config --global user.name "Jarvis-Bot"
-          git config --global user.email "jarvis@bot.com"
-
           source .venv/bin/activate
-
-          # Criação de Branch Única
-          BRANCH_NAME="auto-evolution/mission-$(date +%s)"
-          git checkout -b "$BRANCH_NAME"
-
-          # Determina a capability-alvo a partir da missão identificada
-          MISSION_DESC="${{ steps.flow.outputs.mission_desc }}"
-          CAP_ID=$(echo "$MISSION_DESC" | grep -oE 'CAP-[0-9]+' | head -1)
-
-          if [ -z "$CAP_ID" ]; then
-            echo "❌ Não foi possível determinar a capability-alvo em: $MISSION_DESC"
-            exit 1
-          fi
-
-          # Execução do motor de evolução (EvolutionOrchestrator via Nexus)
-          if ! python scripts/evolve_all_pending.py \
-            --cap-id "$CAP_ID" \
+          python scripts/evolve_all_pending.py \
+            --cap-id "$(echo "${{ steps.flow.outputs.mission_desc }}" | grep -oE 'CAP-[0-9]+' | head -1)" \
             --max-attempts 3 \
-            --roadmap-context "$(cat mission_context.txt)"; then
-              echo "❌ Falha crítica no motor de evolução ($CAP_ID)."
-              exit 1
-          fi
+            --target-file "${{ steps.flow.outputs.target_file }}" \
+            --roadmap-context "$(cat mission_context.txt)"
 
-          # Persistência e Push via GIT_PAT
-          git add -A
-          if [ -n "$(git status --porcelain)" ]; then
-            git commit -m "[Auto-Evolution] DNA Mutated: ${{ steps.flow.outputs.mission_desc }}"
+      - name: 📦 Upload validated candidate artifact
+        if: steps.evolve.outputs.artifact_available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-evolution-candidate
+          path: ${{ runner.temp }}/jarvis-evolution-artifacts
+          if-no-files-found: error
+          retention-days: 1
 
-            # Blindagem contra erro 403
-            git remote set-url origin https://x-access-token:${{ secrets.GIT_PAT }}@github.com/${{ github.repository }}.git
-            git push origin "$BRANCH_NAME"
+  publish_candidate:
+    name: "🔐 Publicação privilegiada"
+    needs: evolution_cycle
+    if: needs.evolution_cycle.outputs.artifact_available == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      pr_number: ${{ steps.publish.outputs.pr_number }}
+      branch: ${{ steps.publish.outputs.branch }}
+    steps:
+      - name: 🛰️ Checkout trusted main
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: main
+          persist-credentials: false
 
-            echo "📢 Criando Pull Request..."
-            PR_URL=$(gh pr create \
-                         --title "🧬 Evolução: ${{ steps.flow.outputs.mission_desc }}" \
-                         --body "### 🧠 Evolução JARVIS\n**Missão:** ${{ steps.flow.outputs.mission_desc }}\n\n*Aguardando validação da Homeostase.*" \
-                         --base main --head "$BRANCH_NAME")
+      - name: 📥 Download validated artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: jarvis-evolution-candidate
+          path: ${{ runner.temp }}/jarvis-evolution-artifacts
 
-            echo "pr_number=$(echo $PR_URL | awk -F'/' '{print $6}')" >> $GITHUB_OUTPUT
-            echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          else
-            echo "⚠️ A mutação não gerou novos dados."
-            echo "action=idle" >> $GITHUB_OUTPUT
-          fi
+      - name: 🔐 Publish validated patch (candidate is never executed here)
+        id: publish
+        env:
+          GH_TOKEN: ${{ secrets.GIT_PAT }}
+          EXPECTED_EVOLUTION_SANDBOX_IMAGE: jarvis-evolution-sandbox:ci
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          python scripts/publish_validated_evolution.py \
+            --artifact-dir "${{ runner.temp }}/jarvis-evolution-artifacts"

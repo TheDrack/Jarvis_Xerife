@@ -12,6 +12,7 @@ Uso:
   python scripts/evolve_all_pending.py [--dry-run] [--limit N] [--cap-id CAP-042] [--delay 2.0]
 """
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -21,7 +22,7 @@ from typing import Dict, List, Optional, Set
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from app.utils.document_store import document_store
+from app.utils.document_store import document_store  # noqa: E402
 
 # Default priority assigned to capabilities that don't specify one
 _DEFAULT_PRIORITY = 99
@@ -34,9 +35,10 @@ _DEFAULT_PRIORITY = 99
 def _get_orchestrator():
     """Resolve o EvolutionOrchestrator via Nexus.
 
-    Nota: o antigo motor ``scripts/evolution_mutator.py`` foi removido do
-    projeto; o ``EvolutionOrchestrator`` é hoje o caminho vivo de mutação
-    (gera o patch, valida a sintaxe, salva a proposta e abre o PR).
+    Nota: o antigo motor ``scripts/evolution_mutator.py`` foi removido.
+    O ``EvolutionOrchestrator`` gera o candidato e o valida no sandbox.
+    Em workflows, exporta um artefato para publicação privilegiada; no modo
+    local legado, pode publicar pela integração GitHub com paths explícitos.
     """
     from app.core.nexus import nexus
 
@@ -51,11 +53,16 @@ def _get_orchestrator():
     return orchestrator
 
 
-def evolve(cap_id: str, roadmap_context: str = "", max_attempts: int = 3) -> bool:
-    """Evolui uma capability, tentando até *max_attempts* ciclos.
+def evolve(
+    cap_id: str,
+    roadmap_context: str = "",
+    max_attempts: int = 3,
+    target_file: Optional[str] = None,
+) -> Optional[bool]:
+    """Evolui uma capability.
 
-    Retorna True apenas quando o EvolutionOrchestrator conclui um ciclo com
-    sucesso (proposta válida gerada).
+    True = artefato validado; False = falha operacional; None = bloqueio
+    determinístico por ausência de target_file (no-op seguro, sem publicação).
     """
     orchestrator = _get_orchestrator()
     if orchestrator is None:
@@ -68,6 +75,7 @@ def evolve(cap_id: str, roadmap_context: str = "", max_attempts: int = 3) -> boo
                 "cap_id": cap_id,
                 "mission_id": cap_id,
                 "roadmap_context": roadmap_context,
+                "target_file": target_file,
             }
         ) or {}
         if result.get("success"):
@@ -76,6 +84,8 @@ def evolve(cap_id: str, roadmap_context: str = "", max_attempts: int = 3) -> boo
             return True
         reason = result.get("reason") or result.get("error") or "unknown"
         print(f"  ⚠️  Tentativa {attempt}/{attempts} falhou: {reason}")
+        if reason == "candidate_target_missing":
+            return None
     return False
 
 
@@ -149,6 +159,10 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=None, help="Máximo de caps a evoluir")
     parser.add_argument("--cap-id", help="Evolve apenas uma cap específica (ex: CAP-042)")
     parser.add_argument(
+        "--target-file",
+        help="Caminho relativo confiável do arquivo-alvo, vindo do inventário da capability",
+    )
+    parser.add_argument(
         "--delay", type=float, default=2.0, help="Segundos entre caps (padrão: 2.0)"
     )
     parser.add_argument("--max-attempts", type=int, default=3, help="Tentativas por cap")
@@ -182,19 +196,24 @@ def main() -> None:
         print("🔍 DRY-RUN — nenhuma alteração será feita:\n")
         for idx, cap in enumerate(pending_ordered, 1):
             deps = ", ".join(cap.get("depends_on", [])) or "—"
-            print(f"  {idx:3}. {cap['id']} | prioridade {cap.get('priority','?')} | deps: {deps}")
-            print(f"       {cap.get('title','')}")
+            print(
+                f"  {idx:3}. {cap['id']} | prioridade {cap.get('priority', '?')} | deps: {deps}"
+            )
+            print(f"       {cap.get('title', '')}")
         print()
         sys.exit(0)
 
-    import os
     if os.environ.get("EVOLUTION_ENABLED", "").strip().lower() != "true":
-        print("⏸️ Autoevolução pausada: defina EVOLUTION_ENABLED=true explicitamente para mutações.")
+        print(
+            "⏸️ Autoevolução pausada: defina EVOLUTION_ENABLED=true "
+            "explicitamente para mutações."
+        )
         sys.exit(2)
 
     successes = 0
     failures = 0
     failed_caps: List[str] = []
+    blocked_caps: List[str] = []
 
     for idx, cap in enumerate(pending_ordered, 1):
         cap_id = cap["id"]
@@ -202,15 +221,19 @@ def main() -> None:
         print(f"\n[{idx}/{total}] 🧬 Evoluindo {cap_id} — {title}")
 
         try:
-            success = evolve(
+            outcome = evolve(
                 cap_id=cap_id,
                 roadmap_context=args.roadmap_context or cap.get("notes", ""),
                 max_attempts=args.max_attempts,
+                target_file=args.target_file or cap.get("target_file"),
             )
-            if success:
+            if outcome is True:
                 successes += 1
                 completed_ids.add(cap_id)
-                print(f"  ✅ {cap_id} concluído.")
+                print(f"  ✅ {cap_id} validado.")
+            elif outcome is None:
+                blocked_caps.append(cap_id)
+                print(f"  ⛔ {cap_id} bloqueado: target_file confiável ausente.")
             else:
                 failures += 1
                 failed_caps.append(cap_id)
@@ -224,14 +247,29 @@ def main() -> None:
             time.sleep(args.delay)
 
     # Resumo final
-    print(f"\n{'='*50}")
-    print(f"📊 RESULTADO FINAL")
+    print(f"\n{'=' * 50}")
+    print("📊 RESULTADO FINAL")
     print(f"   Total processado : {total}")
     print(f"   ✅ Sucesso        : {successes}")
     print(f"   ❌ Falha          : {failures}")
     if failed_caps:
         print(f"   Falhas           : {', '.join(failed_caps)}")
-    print(f"{'='*50}\n")
+    if blocked_caps:
+        print(f"   Bloqueadas       : {', '.join(blocked_caps)}")
+
+    artifact_dir = os.getenv("EVOLUTION_ARTIFACT_DIR", "").strip()
+    artifact_available = bool(
+        artifact_dir and any(Path(artifact_dir).glob("*/manifest.json"))
+    )
+    github_output = os.getenv("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a", encoding="utf-8") as output:
+            output.write(
+                "artifact_available="
+                + ("true" if artifact_available else "false")
+                + chr(10)
+            )
+    print(f"{'=' * 50}\n")
 
     sys.exit(0 if failures == 0 else 1)
 
