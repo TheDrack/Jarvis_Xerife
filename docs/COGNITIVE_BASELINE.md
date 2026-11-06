@@ -114,7 +114,7 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 ## 9. Estado de verificação desta auditoria
 
 - Base inspecionada: `00faa213ba2c3c740e0880329b7b18fd842a91f8`.
-- Pull requests abertas no endpoint do repositório: nenhuma no momento da consulta.
+- Antes de abrir esta entrega, o endpoint de pull requests retornou zero PRs abertas; esta PR #748 é a primeira entrega deste baseline.
 - Últimos workflows de push na main consultados: Auto-Documentation #42230052100 **success**; Jarvis Task Queue Tests #42230051856 **success**.
 - Auto-Documentation #42210138290 falhou ao tentar fazer push não-fast-forward depois de a main avançar durante a execução; o workflow posterior no HEAD atual terminou em success. A evidência aponta concorrência de atualização, não falha de geração do mapa. Nenhuma alteração foi feita para mascarar o evento.
 - A suíte completa pytest não foi executada por esta auditoria; os resultados de workflows anteriores não foram reutilizados como se fossem execução deste snapshot.
