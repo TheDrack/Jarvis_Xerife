@@ -464,7 +464,7 @@ const hhmm=iso=>{const d=new Date(iso||'');return isNaN(d.getTime())?'--:--':d.t
 const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const state={
  token:sessionStorage.getItem(TOKEN_KEY)||'',
- bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,openCameras:null,devices:null,busy:false,view:'core',topic:'regiao',location:null,locating:false,globeZoom:1,clusterCameras:[],
+ bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,openCameras:null,devices:null,busy:false,loadingSources:false,view:'core',topic:'regiao',location:null,locating:false,globeZoom:1,clusterCameras:[],
  live:{events:[],observations:[],sources:[],correlations:[],collected_at:null,area:null},
  layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true,radio_station:true},
  selected:null,
@@ -2074,7 +2074,8 @@ async function runBusy(label,fn){
   renderStatus();
  }
 }
-async function collectAll(){
+async function collectAll({startup=false}={}){
+ if(state.loadingSources&&!startup)return;
  await runBusy('COLETANDO TODAS AS FONTES LOCAIS…',async()=>{
   const data=await api('/api/intelligence/collect',{method:'POST'});
   mergePayload(data);
@@ -2167,14 +2168,28 @@ async function refreshHudVersion(){
  }
 }
 async function refreshAll(){
+ if(state.loadingSources)return;
+ state.loadingSources=true;
+ const loaders=[
+  ['CORE',refreshStatus],
+  ['TELEMETRIA',refreshTelemetry],
+  ['INTELIGENCIA',refreshIntelStatus],
+  ['REDE',refreshNetwork],
+  ['BRIEFING',refreshBriefing],
+  ['DISPOSITIVOS',refreshDevices],
+  ['CÂMERAS',refreshCameras],
+  ['VERSÃO HUD',refreshHudVersion],
+  ['SNAPSHOT',refreshLatest],
+ ];
  try{
-  await refreshStatus();
-  await Promise.all([refreshTelemetry(),refreshIntelStatus(),refreshNetwork(),refreshBriefing(),refreshDevices(),refreshHudVersion()]);
-  await refreshLatest();
+  const results=await Promise.allSettled(loaders.map(([,load])=>load()));
   buildAreas();
   $('updatedAt').textContent=clockTime();
- }catch(err){
-  setFooter('SYNC · '+err.message);
+  await collectAll({startup:true});
+  const failed=results.flatMap((result,index)=>result.status==='rejected'?[loaders[index][0]]:[]);
+  if(failed.length)setFooter('INICIALIZAÇÃO PARCIAL · FALHA EM '+failed.join(', '));
+ }finally{
+  state.loadingSources=false;
  }
 }
 function setView(view){

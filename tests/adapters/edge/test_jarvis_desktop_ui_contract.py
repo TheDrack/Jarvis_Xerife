@@ -280,3 +280,41 @@ def test_hud_reports_the_served_repository_file():
     assert "api('/api/hud/version')" in HTML
     assert 'id="hudBuild"' in HTML
     assert "HUD servido do repositório" in HTML
+
+
+def test_startup_loads_all_source_families_and_triggers_a_fresh_collection():
+    refresh_all = re.search(
+        r"async function refreshAll\(\)\s*\{(?P<body>.*?)\n\}\nfunction setView",
+        HTML,
+        re.DOTALL,
+    )
+    assert refresh_all is not None
+    body = refresh_all.group("body")
+
+    for loader in (
+        "refreshTelemetry",
+        "refreshIntelStatus",
+        "refreshNetwork",
+        "refreshBriefing",
+        "refreshDevices",
+        "refreshCameras",
+        "refreshHudVersion",
+        "refreshLatest",
+    ):
+        assert loader in body, loader
+
+    assert "await collectAll({startup:true})" in body
+    assert "api('/api/intelligence/collect',{method:'POST'})" in HTML
+
+
+def test_initial_source_loading_is_failure_isolated():
+    refresh_all = re.search(
+        r"async function refreshAll\(\)\s*\{(?P<body>.*?)\n\}\nfunction setView",
+        HTML,
+        re.DOTALL,
+    )
+    assert refresh_all is not None
+    body = refresh_all.group("body")
+    assert "Promise.allSettled" in body
+    assert "refreshCameras" in body
+    assert "await collectAll({startup:true})" in body
