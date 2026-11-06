@@ -46,7 +46,7 @@ test('aircraft route lookups are cached and failed callsigns are retried instead
 });
 test('aircraft selection links to FlightAware without scraping or requiring its paid API', () => {
   assert.match(html, /https:\/\/pt\.flightaware\.com\/live\/flight\//);
-  assert.match(html, /FLIGHTAWARE · ABRIR VOO/);
+  assert.match(html, /INSPECIONAR NO FLIGHTAWARE/);
   assert.doesNotMatch(html, /aeroapi\.flightaware\.com/);
 });
 
@@ -100,4 +100,50 @@ test('administrative boundaries render IBGE municipality geometry and labels at 
   assert.match(html, /world-municipal-boundaries\.json\.gz\.b64/);
   assert.match(html, /if\(zoom>=9&&adminBoundaries\.municipalityLabels\.length\)/);
   assert.match(html, /id:'municipalities',rank:3/);
+});
+
+
+test('globe pointer controls distinguish single click zoom, double click inspect and right click reset', () => {
+  assert.match(html, /SINGLE_CLICK_DELAY_MS\s*=\s*220/);
+  assert.match(html, /pendingClickTimer/);
+  assert.match(html, /zoomTo\(best,64\)/);
+  assert.match(html, /canvas\.addEventListener\('contextmenu'/);
+  assert.match(html, /zoomOutMax\(/);
+  assert.match(html, /openSelection\(mark\)/);
+});
+
+test('plus and minus keys control zoom without hijacking editable fields', () => {
+  assert.match(html, /ev\.key==='\+'\|\|ev\.key==='='/);
+  assert.match(html, /ev\.key==='-'\|\|ev\.key==='Subtract'/);
+  assert.match(html, /Globe\.zoomBy\(1\.2\)/);
+  assert.match(html, /Globe\.zoomBy\(1\/1\.2\)/);
+});
+
+test('globe rotates slowly only at minimum zoom and respects reduced motion', () => {
+  assert.match(html, /zoom<=0\.66/);
+  assert.match(html, /rot\+=0\.012\*dt/);
+});
+
+test('source collection displays animated orbital rings on the active source', () => {
+  assert.match(html, /source-orbit/);
+  assert.match(html, /activeSourceAction/);
+  assert.match(html, /source-row.*is-loading/);
+  assert.match(html, /@keyframes source-orbit-spin/);
+});
+
+test('aircraft and satellites expose external inspection links and aircraft centering action', () => {
+  assert.match(html, /flightaware\.com\/live\/flight/);
+  assert.match(html, /n2yo\.com\/satellite\/\?s=/);
+  assert.match(html, /CENTRALIZAR AERONAVE/);
+});
+
+
+test('empty globe clicks resolve the visible geographic point before zooming', () => {
+  assert.match(html, /function screenToLocation\(clientX,clientY\)/);
+  assert.match(html, /focusTo\(region\.latitude,region\.longitude,64\)/);
+});
+
+
+test('aircraft external inspection falls back only to a valid ICAO24 identifier', () => {
+  assert.ok(html.includes('attributes.callsign||(/^[0-9a-f]{6}$/i.test'));
 });
