@@ -166,7 +166,7 @@ graph LR
     app_application["<b>application</b><br/><hr/>📄 return_activity_service.py: class, was_idle"]
     class app_application support
     app --> app_application
-    app_application_security["<b>security</b><br/><hr/>📄 capability_authorizer.py: CapabilityAuthorizer, can_execute"]
+    app_application_security["<b>security</b><br/><hr/>📄 repository_path_policy.py: UnsafeRepositoryPath, normalize_relative_path, validate_filename<br/>📄 capability_authorizer.py: CapabilityAuthorizer, can_execute"]
     class app_application_security support
     app_application --> app_application_security
     app_application_communication["<b>communication</b><br/><hr/>📄 human_intervention.py: HumanIntervention, execute"]
