@@ -523,7 +523,7 @@ const Globe=(()=>{
  })();
  const sph=(lon,lat)=>{const cp=Math.cos(lat*RAD);return [cp*Math.sin(lon*RAD),Math.sin(lat*RAD),cp*Math.cos(lon*RAD)];};
  const dest=(lat,lon,km,bearing)=>{const d=km/6371,brg=bearing*RAD,lat1=lat*RAD,lon1=lon*RAD;const lat2=Math.asin(Math.sin(lat1)*Math.cos(d)+Math.cos(lat1)*Math.sin(d)*Math.cos(brg));const lon2=lon1+Math.atan2(Math.sin(brg)*Math.sin(d)*Math.cos(lat1),Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));return [((lon2/RAD+540)%360)-180,lat2/RAD];};
- const clampZoom=value=>Math.max(0.75,Math.min(3.6,Number.isFinite(value)?value:1));
+ const clampZoom=value=>Math.max(0.75,Math.min(8,Number.isFinite(value)?value:1));
  const notifyZoom=()=>{if(typeof zoomHook==='function')zoomHook(zoom);};
  const pairDistance=()=>{
   const points=Array.from(pointers.values());
@@ -759,6 +759,7 @@ const Globe=(()=>{
   ctx.restore();
  }
  function drawMarkLabel(x,y,size,primary,secondary,color){
+  if(labelBoxes.length>=Math.min(120,Math.round(45+zoom*12)))return;
   const text=String(primary||'').trim();
   if(!text)return;
   const sub=String(secondary||'').trim();
@@ -782,7 +783,8 @@ const Globe=(()=>{
    {x:clampX(x-w/2),y:clampY(y+size+7)}
   ];
   const free=box=>!labelBoxes.some(other=>!(box.x+w<other.x||box.x>other.x+other.w||box.y+h<other.y||box.y>other.y+other.h));
-  const chosen=candidates.find(free)||candidates[0];
+  const chosen=candidates.find(free);
+  if(!chosen){ctx.restore();return;}
   const lx=chosen.x,ly=chosen.y;
   labelBoxes.push({x:lx,y:ly,w,h});
   ctx.fillStyle='rgba(1,8,15,.78)';
@@ -809,7 +811,7 @@ const Globe=(()=>{
   function drawMarks(radius,t,cosR,sinR,cosT,sinT){
    drawAircraftRoutes(radius,cosR,sinR,cosT,sinT);
   hits=[];
-  const size=Math.max(2,radius/130);
+  const size=Math.max(2,Math.min(4.5,radius/130));
   labelBoxes=[];
   const visible=[];
   for(let i=0;i<marks.length;i+=1){
@@ -874,14 +876,15 @@ const Globe=(()=>{
    ctx.strokeStyle='rgba(165,236,255,.7)';ctx.lineWidth=1;ctx.stroke();
    ctx.fillStyle='#dff8ff';ctx.font='600 '+Math.max(8,Math.min(11,size*2.6))+'px "Cascadia Mono",ui-monospace,monospace';
    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(count),cluster.x,cluster.y+0.5);
-   const places=Array.from(new Set(cluster.items.map(item=>item.m.place).filter(Boolean)));
-   const detail=places.length===1?places[0]:(places.length>1?places.slice(0,2).join(' · '):'proximidade');
-   drawMarkLabel(cluster.x,cluster.y,r,count+' alvos',detail,'#dff8ff');
    const members=cluster.items.map(item=>item.m);
+   const regionLayer=window.JarvisGeospatialLayer;
+   const detail=regionLayer&&typeof regionLayer.generalizeRegion==='function'
+    ?regionLayer.generalizeRegion(members.map(item=>item.record||item),zoom):'Região geográfica';
+   drawMarkLabel(cluster.x,cluster.y,r,count+' alvos',detail,'#dff8ff');
    const lat=members.reduce((sum,m)=>sum+num(m.latitude),0)/count;
    const lon=members.reduce((sum,m)=>sum+num(m.longitude),0)/count;
    hits.push({x:cluster.x,y:cluster.y,radius:r+7,m:{
-    kind:'cluster',label:count+' alvos próximos',meta:detail,cluster:true,members,
+    kind:'cluster',label:count+' alvos próximos',meta:detail,cluster:true,members,zoomLevel:zoom,
     latitude:lat,longitude:lon,place:detail,
     record:{summary:members.slice(0,10).map(m=>String(m.label||'').trim()).filter(Boolean).join(' · ')}
    }});
@@ -894,8 +897,7 @@ const Globe=(()=>{
   halo.addColorStop(1,'rgba(84,215,255,.32)');
   ctx.fillStyle=halo;
   ctx.beginPath();ctx.arc(cx,cy,radius*1.03,0,TAU);ctx.fill();
-  ctx.strokeStyle='rgba(165,236,255,.5)';
-  ctx.lineWidth=1;
+  ctx.strokeStyle='rgba(165,236,255,.5)';  ctx.lineWidth=1;
   ctx.beginPath();ctx.arc(cx,cy,radius,0,TAU);ctx.stroke();
  }
  function drawTicks(radius,t){
@@ -1031,6 +1033,10 @@ const Globe=(()=>{
  }
  function applyPlace(mark,entry){
   if(!entry)return;
+  if((mark.cluster||mark.kind==='device_cluster')&&entry.rawAddress&&window.JarvisGeospatialLayer){
+   const generalized=window.JarvisGeospatialLayer.generalizeRegion([{address:entry.rawAddress}],Number(mark.zoomLevel)||1);
+   if(generalized&&generalized!=='Região geográfica'){mark.place=generalized;mark.address=generalized;return;}
+  }
   if(entry.label)mark.place=entry.label;
   if(entry.address)mark.address=entry.address;
  }
@@ -1044,16 +1050,17 @@ const Globe=(()=>{
   return code==='http_429'||code==='network'||code==='timeout'||/^http_5\d\d$/.test(code);
  }
  function enrichPlace(mark){
-  if(!mark||!state.token||mark.cluster||mark.kind==='device_cluster')return;
+  if(!mark||!state.token)return;
+  const isCluster=Boolean(mark.cluster||mark.kind==='device_cluster');
   const latitude=Number(mark.latitude),longitude=Number(mark.longitude);
   if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||Math.abs(latitude)>90||Math.abs(longitude)>180)return;
   const record=mark.record||mark.device||{},attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
-  if(mark.address||record.address||attributes.address||attributes.display_name)return;
+  if(!isCluster&&(mark.address||record.address||attributes.address||attributes.display_name))return;
   const key=placeKey(latitude,longitude),cached=placeCache.get(key);
   if(cached){applyPlace(mark,cached);return;}
   if(placeQueued.has(key)||(PLACE_RETRY_AFTER.get(key)||0)>Date.now())return;
   placeQueued.add(key);
-  placeQueue.push({key,latitude,longitude,marks:[mark]});
+  placeQueue.push({key,latitude,longitude,regionZoom:isCluster?Number(mark.zoomLevel)||1:null,marks:[mark]});
   runPlaceQueue();
  }
  async function runPlaceQueue(){
@@ -1074,7 +1081,7 @@ const Globe=(()=>{
      }
     }
     const entry=data&&data.available
-     ?{label:data.label||data.display_name||'',address:data.display_name||'',at:Date.now(),source:'nominatim',precision:'reverse_geocode'}
+     ?(()=>{const generalized=group.regionZoom!==null&&window.JarvisGeospatialLayer?window.JarvisGeospatialLayer.generalizeRegion([data],group.regionZoom):'';const label=generalized&&generalized!=='Região geográfica'?generalized:(data.label||data.display_name||'');return {label,address:group.regionZoom!==null?label:(data.display_name||''),rawAddress:data.address&&typeof data.address==='object'?data.address:null,at:Date.now(),source:'nominatim',precision:group.regionZoom!==null?'regional_reverse_geocode':'reverse_geocode'};})()
      :{label:'',address:'',at:Date.now(),missing:true,reason};
     placeCache.set(group.key,entry);
     group.marks.forEach(mark=>applyPlace(mark,entry));
@@ -1175,10 +1182,10 @@ const Globe=(()=>{
     x:v[0],y:v[1],z:v[2],longitude,latitude,kind:device.kind,record:device,
     color:cluster?'#ffc16f':device.status==='online'?'#ffb45c':'#6d97ae',
     label:String(device.name||('dispositivo '+device.id)),
-    place:placeText(device,{},latitude,longitude),
+    place:cluster?(device.region||'Região geográfica'):placeText(device,{},latitude,longitude),
     meta:cluster?(device.count+' dispositivos · '+device.online_count+' online'):
      String((device.type||'dispositivo')+' · '+(device.status||'offline')),
-    device,at:0
+    device,zoomLevel:zoom,at:0
    });
   }
   if(redraw)draw(performance.now());
@@ -1789,8 +1796,7 @@ async function refreshDevices(){
  }
 }
 function intelStateLabel(value){
- return String(value||'INDEFINIDO').replaceAll('_',' ').toUpperCase();
-}
+ return String(value||'INDEFINIDO').replaceAll('_',' ').toUpperCase();}
 function renderUniversal(){
  const data=state.intel||{};
  if(!Object.keys(data).length){
@@ -1912,13 +1918,13 @@ function renderSelection(mark){
  const summary=mark.kind==='device_cluster'
   ?'Agrupamento visual de ativos registrados. A posição representa o centro aproximado do grupo; não indica um único dispositivo.'
   :record.summary||record.description||attributes.description||attributes.summary||'Sem resumo adicional fornecido pela fonte.';
- const cachedPlace=isCluster?null:(Globe.placeFor?Globe.placeFor(latitude,longitude):null);
+ const cachedPlace=Globe.placeFor?Globe.placeFor(latitude,longitude):null;
  const placeLabel=cachedPlace&&cachedPlace.label?cachedPlace.label:mark.place;
  $('selectionKind').textContent=kind;
  $('selectionTitle').textContent=String(mark.label||record.title||record.entity_id||'ALVO');
  $('selectionDetail').textContent=[String(mark.meta||''),String(extra||''),String(placeLabel||''),coords].filter(Boolean).join(' · ');
  $('selectionSummary').textContent=isCluster
-  ? String((mark.members||[]).slice(0,12).map(item=>String(item.label||'').trim()).filter(Boolean).join(' · ')||'Alvos agrupados por proximidade.')
+  ? String((mark.kind==='device_cluster'?Number(record.count)||0:(mark.members||[]).length)+' alvos agrupados na região '+(mark.place||'geográfica')+'. Aproxime para separar os agrupamentos e detalhar os alvos.')
   : String(summary);
  const facts=[];
  let activeFactSection='',factSectionHasValue=false;
@@ -1926,7 +1932,7 @@ function renderSelection(mark){
  const addFact=(label,value)=>{if(value===undefined||value===null||String(value).trim()==='')return;if(activeFactSection&&!factSectionHasValue){facts.push('<div class="selection-facts-section">'+esc(activeFactSection)+'</div>');factSectionHasValue=true;}facts.push('<span>'+esc(label)+'<b>'+esc(value)+'</b></span>');};
  if(isCluster){
   addSection('AGRUPAMENTO');
-  addFact('ALVOS',(mark.members||[]).length);
+  addFact('ALVOS',mark.kind==='device_cluster'?record.count:(mark.members||[]).length);
   addFact('LOCAL',mark.place);
   state.clusterCameras=(mark.members||[]).filter(item=>item.kind==='camera'&&liveInfo(item));
   if(state.clusterCameras.length){
@@ -2393,7 +2399,7 @@ function wire(){
    navigator.clipboard.writeText(mark.copyValue).then(()=>setFooter('COPIADO · '+mark.copyValue)).catch(()=>setFooter('COPIAR · PERMISSÃO NEGADA'));
    return;
   }
-  if(Number.isFinite(mark.latitude)&&Number.isFinite(mark.longitude))Globe.focusTo(mark.latitude,mark.longitude,mark.cluster?Math.min(2.4,(state.globeZoom||1)+0.55):2.05);
+  if(Number.isFinite(mark.latitude)&&Number.isFinite(mark.longitude))Globe.focusTo(mark.latitude,mark.longitude,mark.cluster?Math.min(8,Math.max(1.6,(state.globeZoom||1)+1.1)):2.05);
   setFooter((mark.cluster?'AGRUPAMENTO · ':'FOCO · ')+String(mark.label||'ALVO').toUpperCase());
  });
  $('deviceList').addEventListener('click',ev=>{
@@ -2477,7 +2483,7 @@ function wire(){
   renderStatus();
   if(mark.kind==='device_cluster'){
    const current=Globe.getZoom();
-   const next=current<1.2?1.7:current<1.8?2.35:2.9;
+   const next=current<1.2?1.8:current<2.2?3.2:Math.min(8,current<3.5?4.8:current+1.2);
    Globe.focusTo(mark.latitude,mark.longitude,next);
    setFooter('AGRUPAMENTO · '+mark.count+' DISPOSITIVOS · APROXIME PARA DETALHAR');
   }
