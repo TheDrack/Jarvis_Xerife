@@ -14,16 +14,21 @@ Pipeline interno (em sequência):
 """
 
 import ast
+import hashlib
 import json
 import logging
 import os
+import re
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from app.application.security.repository_path_policy import (
     UnsafeRepositoryPath,
+    contains_frozen_directory,
+    protected_prefix_for,
     resolve_repository_path,
 )
 from app.core.nexus import NexusComponent, nexus
@@ -157,9 +162,21 @@ class EvolutionOrchestrator(NexusComponent):
         if candidate_target:
             system_ctx["target_file"] = candidate_target
 
-        # 2b. Verifica EvolutionGatekeeper antes de modificar arquivos
+        # 2b. Require a trusted target before memory lookup or LLM invocation.
+        if not candidate_target:
+            self._log_thought(
+                mission_id,
+                error_snippet,
+                "",
+                success=False,
+                notes="rejected: candidate_target_missing_before_generation",
+            )
+            return {"success": False, "reason": "candidate_target_missing"}
+
+        # Preflight must validate the exact target, not an empty file list.
         proposed = {
-            "files_modified": [],
+            "files_modified": [candidate_target],
+            "target_file": candidate_target,
             "mission_id": mission_id,
         }
         gatekeeper = self._get_gatekeeper()
@@ -236,6 +253,55 @@ class EvolutionOrchestrator(NexusComponent):
                 notes=f"rejected: {gate_reason}",
             )
             return {"success": False, "reason": f"gatekeeper_blocked: {gate_reason}"}
+
+        artifact_dir = os.getenv("EVOLUTION_ARTIFACT_DIR", "").strip()
+        if artifact_dir:
+            try:
+                target_path, normalized_target, _ = resolve_repository_path(
+                    Path.cwd(), target_file, reject_symlinks=True
+                )
+                if not target_path.is_file():
+                    return {"success": False, "reason": "candidate_target_not_a_file"}
+                if (
+                    protected_prefix_for(normalized_target)
+                    or contains_frozen_directory(normalized_target)
+                ):
+                    return {"success": False, "reason": "candidate_target_is_protected"}
+
+                target_status = subprocess.run(
+                    ["git", "status", "--porcelain", "--", normalized_target],
+                    capture_output=True, text=True, cwd=str(Path.cwd()), check=False,
+                )
+                if target_status.returncode != 0 or target_status.stdout.strip():
+                    return {"success": False, "reason": "candidate_target_has_local_changes"}
+                tracked = subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", normalized_target],
+                    capture_output=True, text=True, cwd=str(Path.cwd()), check=False,
+                )
+                if tracked.returncode != 0:
+                    return {"success": False, "reason": "candidate_target_must_be_tracked"}
+
+                manifest_path = self._export_validated_candidate(
+                    artifact_dir, mission_id, normalized_target, patch_code
+                )
+                self._log_thought(
+                    mission_id, error_snippet, patch_code, success=True,
+                    notes="validated candidate exported for trusted publication",
+                )
+                return {
+                    "success": True,
+                    "validated": True,
+                    "publication_deferred": True,
+                    "artifact_manifest": str(manifest_path),
+                    "target_file": normalized_target,
+                    "source": "llm",
+                }
+            except (UnsafeRepositoryPath, OSError, RuntimeError, ValueError) as exc:
+                logger.warning("[EvolutionOrchestrator] Artifact export blocked: %s", exc)
+                return {
+                    "success": False,
+                    "reason": f"candidate_artifact_export_blocked: {type(exc).__name__}",
+                }
 
         if self.auto_apply:
             return {"success": False, "reason": "auto_apply_not_implemented"}
@@ -430,6 +496,83 @@ class EvolutionOrchestrator(NexusComponent):
         path.write_text(code, encoding="utf-8")
         logger.info("[EvolutionOrchestrator] Proposta salva: %s", path)
         return path
+
+    def _export_validated_candidate(
+        self,
+        artifact_dir: str,
+        mission_id: str,
+        target_file: str,
+        code: str,
+    ) -> Path:
+        """Write a validated patch artifact outside the source checkout."""
+        repository_root = Path.cwd().resolve()
+        artifact_root = Path(artifact_dir).expanduser().resolve()
+        if artifact_root == repository_root or repository_root in artifact_root.parents:
+            raise ValueError("EVOLUTION_ARTIFACT_DIR must be outside the repository")
+
+        sandbox_image = os.getenv("EVOLUTION_SANDBOX_IMAGE", "").strip()
+        if not sandbox_image:
+            raise ValueError("EVOLUTION_SANDBOX_IMAGE is required for artifact export")
+
+        digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        safe_mission = re.sub(r"[^A-Za-z0-9._-]+", "-", mission_id).strip("-")[:64]
+        safe_mission = safe_mission or "mission"
+        artifact_root.mkdir(parents=True, exist_ok=True)
+        candidate_dir = artifact_root / f"{safe_mission}-{digest[:12]}"
+        candidate_dir.mkdir(parents=True, exist_ok=True)
+        if candidate_dir.is_symlink() or candidate_dir.resolve().parent != artifact_root:
+            raise ValueError("candidate artifact directory escaped artifact root")
+
+        candidate_path = candidate_dir / "candidate.py"
+        self._atomic_write_text(candidate_path, code)
+        source_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=str(repository_root),
+            check=True,
+        ).stdout.strip()
+        manifest = {
+            "schema_version": 1,
+            "source_commit": source_commit,
+            "mission_id": mission_id,
+            "target_file": target_file,
+            "candidate_file": "candidate.py",
+            "sha256": digest,
+            "validated": True,
+            "validation_backend": "docker",
+            "sandbox_image": sandbox_image,
+            "validated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        manifest_path = candidate_dir / "manifest.json"
+        self._atomic_write_text(
+            manifest_path,
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+        )
+        return manifest_path
+
+    @staticmethod
+    def _atomic_write_text(path: Path, content: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                newline="",
+                dir=str(path.parent),
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as temporary:
+                temporary_path = Path(temporary.name)
+                temporary.write(content)
+                temporary.flush()
+                os.fsync(temporary.fileno())
+            os.replace(temporary_path, path)
+        finally:
+            if temporary_path and temporary_path.exists():
+                temporary_path.unlink(missing_ok=True)
 
     def _create_pr(self, target_file: str, mission_id: str) -> Dict[str, Any]:
         if self.auto_apply:
