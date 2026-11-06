@@ -22,12 +22,13 @@ def _checkout_steps(job):
     ]
 
 
-def test_integrated_evolution_scopes_write_permissions_to_mutation_job():
+def test_integrated_evolution_scopes_write_permissions_to_trusted_publisher():
     workflow = _load_workflow(INTEGRATED_EVOLUTION)
 
     assert workflow["permissions"] == {"contents": "read"}
     assert workflow["jobs"]["gate"]["permissions"] == {"contents": "read"}
-    assert workflow["jobs"]["evolution_cycle"]["permissions"] == {
+    assert workflow["jobs"]["evolution_cycle"]["permissions"] == {"contents": "read"}
+    assert workflow["jobs"]["publish_candidate"]["permissions"] == {
         "contents": "write",
         "pull-requests": "write",
     }
@@ -47,17 +48,24 @@ def test_integrated_evolution_dispatch_is_main_only_and_checks_out_trusted_main(
     assert "token" not in checkouts[0]["with"]
 
 
-def test_integrated_evolution_mission_discovery_does_not_receive_secrets():
+def test_integrated_evolution_separates_candidate_and_publisher_secrets():
     workflow = _load_workflow(INTEGRATED_EVOLUTION)
     cycle = workflow["jobs"]["evolution_cycle"]
     flow = next(step for step in cycle["steps"] if step.get("id") == "flow")
-    create_pr = next(step for step in cycle["steps"] if step.get("id") == "create_pr")
+    candidate = next(step for step in cycle["steps"] if step.get("id") == "evolve")
+    publisher = workflow["jobs"]["publish_candidate"]
+    publish_step = next(
+        step for step in publisher["steps"] if step.get("id") == "publish"
+    )
 
     assert "secrets." not in str(flow)
     assert "GROQ_API_KEY" not in str(flow)
     assert "GH_TOKEN" not in str(flow)
-    assert create_pr["env"]["GROQ_API_KEY"] == "${{ secrets.GROQ_API_KEY }}"
-    assert create_pr["env"]["GH_TOKEN"] == "${{ secrets.GIT_PAT }}"
+    assert candidate["env"]["GROQ_API_KEY"] == "${{ secrets.GROQ_API_KEY }}"
+    assert "GH_TOKEN" not in candidate["env"]
+    assert "GIT_PAT" not in str(cycle)
+    assert publish_step["env"]["GH_TOKEN"] == "${{ secrets.GIT_PAT }}"
+    assert "GROQ_API_KEY" not in publish_step["env"]
 
 
 def test_manual_validation_secret_bearing_job_is_main_only():
