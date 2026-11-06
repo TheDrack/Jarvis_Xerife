@@ -4,19 +4,19 @@ import { readFile } from 'node:fs/promises';
 
 const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
 
-test('reverse geocoding prioritizes visible points and selected cluster centers', () => {
+test('reverse geocoding prioritizes visible individual points and never geocodes cluster centroids', () => {
   assert.doesNotMatch(html, /enrichPlaces\(\);/);
   assert.match(html, /function enrichPlace\(mark\)/);
   assert.match(html, /enrichPlace\(mark\)/);
-  assert.match(html, /regionZoom:isCluster\?Number\(mark\.zoomLevel\)\|\|1:null/);
+  assert.match(html, /if\(!mark\|\|!state\.token\|\|mark\.cluster\|\|mark\.kind==='device_cluster'\)return/);
+  assert.match(html, /mark=>mark&&!mark\.cluster&&mark\.kind!=='device_cluster'/);
 });
 
-test('cluster reverse geocoding uses a generalized administrative label, not a member address', () => {
-  assert.match(html, /regional_reverse_geocode/);
-  assert.match(html, /generalizeRegion\(\[data\],group\.regionZoom\)/);
-  assert.match(html, /address:group\.regionZoom!==null\?label/);
+test('cluster labels use member-level administrative data instead of the centroid address', () => {
   assert.match(html, /rawAddress:data\.address/);
-  assert.match(html, /generalizeRegion\(\[\{address:entry\.rawAddress\}\],Number\(mark\.zoomLevel\)\|\|1\)/);
+  assert.match(html, /generalizeRegionFromMembers\(members,zoom,placeFor\)/);
+  assert.doesNotMatch(html, /generalizeRegion\(\[data\],group\.regionZoom\)/);
+  assert.doesNotMatch(html, /generalizeRegion\(\[\{address:entry\.rawAddress\}\]/);
   assert.match(html, /const cachedPlace=Globe\.placeFor\?Globe\.placeFor\(latitude,longitude\):null/);
 });
 

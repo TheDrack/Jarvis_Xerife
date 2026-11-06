@@ -6,8 +6,13 @@ The orbital globe uses the visible geographic scale to choose which administrati
 
 ## Current implementation
 
-- Orbital zoom maximum: 24x.
-- Device marker budget grows with zoom and is capped at 6,000 markers.
+- Orbital zoom maximum: 64x.
+- All point entities, including devices, use one screen-space clustering engine after globe projection. Geographic degree-cell clustering is not used for point rendering.
+- The cluster radius is expressed in CSS pixels and contracts with zoom: `max(8, 26 / sqrt(zoom))`, bounded by the globe's 0.75x–64x zoom range. This keeps cluster size tied to visible screen scale rather than latitude/longitude degree size.
+- Clusters remain partitioned by entity kind, so devices, cameras, aircraft, vessels and other categories are independently selectable while sharing the same clustering algorithm.
+- Device preprocessing retains every valid located device as an individual marker. Aggregation happens only after projection, so it follows the actual viewport, latitude, globe rotation and zoom instead of a fixed geographic grid.
+- Cluster labels are derived from the deepest administrative ancestor common to all members at the current zoom. If members span neighbourhoods, cities or states, the label rises to the common city, state or country; individual street addresses are never used as a cluster's regional label.
+- Cluster membership retains the original entity records and identities for the inspector; the displayed cluster center is a visual centroid, not a replacement entity.
 - Country boundaries: Natural Earth admin-0 land boundary lines, 1:50m.
 - State/province boundaries: Natural Earth admin-1 boundary lines, 1:10m, for a broad set of large countries including Brazil. Other countries currently fall back to country borders.
 - The compact runtime dataset is `app/static/world-admin-boundaries.json.gz.b64`.
