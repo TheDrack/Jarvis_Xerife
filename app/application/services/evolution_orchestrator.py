@@ -77,6 +77,8 @@ class EvolutionOrchestrator(NexusComponent):
             cap_title (str)       — título da capability-alvo explícita.
             roadmap_context (str) — contexto textual da capability (notas,
                 dependências) injetado no prompt do LLM.
+            target_file (str) — caminho relativo confiável do arquivo-alvo.
+            dry_run (bool) — valida a proposta, mas não exporta nem publica.
         """
         ctx = context or {}
         if os.environ.get("EVOLUTION_ENABLED", "").strip().lower() != "true":
@@ -115,6 +117,15 @@ class EvolutionOrchestrator(NexusComponent):
         explicit_cap_id = str(ctx.get("cap_id", "") or "")
 
         # 0. Carrega MetaReflection como self_knowledge
+        cancel_event = ctx.get("_cancel_event")
+
+        def cancellation_requested() -> bool:
+            is_set = getattr(cancel_event, "is_set", None)
+            return bool(callable(is_set) and is_set())
+
+        if cancellation_requested():
+            return {"success": False, "reason": "cancelled", "cancellation_requested": True}
+
         meta_ctx = self._load_meta_reflection()
 
         # 1. Snapshot do codebase (crystallizer)
@@ -187,6 +198,9 @@ class EvolutionOrchestrator(NexusComponent):
                 self._escalate_commander(mission_id, reason)
                 return {"success": False, "reason": f"gatekeeper_blocked: {reason}"}
 
+        if cancellation_requested():
+            return {"success": False, "reason": "cancelled", "cancellation_requested": True}
+
         # 3. Procura por solução na memória procedural
         procedural_result = self._search_procedural_memory(error_snippet)
         if procedural_result:
@@ -208,9 +222,15 @@ class EvolutionOrchestrator(NexusComponent):
                 "patch": patch_code,
             }
 
+        if cancellation_requested():
+            return {"success": False, "reason": "cancelled", "cancellation_requested": True}
+
         # 4. Monta prompt e envia ao LLM
         prompt = self._build_prompt(error_snippet, snapshot_info, system_ctx)
         llm_response = self._call_llm(prompt)
+
+        if cancellation_requested():
+            return {"success": False, "reason": "cancelled", "cancellation_requested": True}
 
         if not llm_response:
             self._log_thought(mission_id, error_snippet, "", success=False)
@@ -254,6 +274,27 @@ class EvolutionOrchestrator(NexusComponent):
             )
             return {"success": False, "reason": f"gatekeeper_blocked: {gate_reason}"}
 
+        if cancellation_requested():
+            return {"success": False, "reason": "cancelled", "cancellation_requested": True}
+
+        if ctx.get("dry_run"):
+            self._log_thought(
+                mission_id,
+                error_snippet,
+                patch_code,
+                success=True,
+                notes="dry_run: candidate validated; publication skipped",
+            )
+            return {
+                "success": True,
+                "validated": True,
+                "dry_run": True,
+                "publication_deferred": True,
+                "target_file": target_file,
+                "source": "llm",
+                "gatekeeper_result": {"approved": True, "reason": "approved"},
+            }
+
         artifact_dir = os.getenv("EVOLUTION_ARTIFACT_DIR", "").strip()
         if artifact_dir:
             try:
@@ -272,6 +313,9 @@ class EvolutionOrchestrator(NexusComponent):
                     ["git", "status", "--porcelain", "--", normalized_target],
                     capture_output=True, text=True, cwd=str(Path.cwd()), check=False,
                 )
+                if cancellation_requested():
+                    return {"success": False, "reason": "cancelled", "cancellation_requested": True}
+
                 if target_status.returncode != 0 or target_status.stdout.strip():
                     return {"success": False, "reason": "candidate_target_has_local_changes"}
                 tracked = subprocess.run(
@@ -280,6 +324,8 @@ class EvolutionOrchestrator(NexusComponent):
                 )
                 if tracked.returncode != 0:
                     return {"success": False, "reason": "candidate_target_must_be_tracked"}
+                if cancellation_requested():
+                    return {"success": False, "reason": "cancelled", "cancellation_requested": True}
 
                 manifest_path = self._export_validated_candidate(
                     artifact_dir, mission_id, normalized_target, patch_code
@@ -338,13 +384,25 @@ class EvolutionOrchestrator(NexusComponent):
             )
             if tracked.returncode != 0:
                 return {"success": False, "reason": "candidate_target_must_be_tracked"}
+            if cancellation_requested():
+                return {"success": False, "reason": "cancelled", "cancellation_requested": True}
 
+            original_content = target_path.read_bytes()
             target_path.write_text(patch_code, encoding="utf-8")
+            if cancellation_requested():
+                if target_path.read_bytes() == patch_code.encode("utf-8"):
+                    target_path.write_bytes(original_content)
+                return {"success": False, "reason": "cancelled", "cancellation_requested": True}
         except (UnsafeRepositoryPath, OSError, RuntimeError) as exc:
             logger.warning("[EvolutionOrchestrator] Candidate apply blocked: %s", exc)
             return {"success": False, "reason": f"candidate_apply_blocked: {type(exc).__name__}"}
 
         # The publisher stages only this validated target file and refuses main.
+        if cancellation_requested():
+            if target_path.read_bytes() == patch_code.encode("utf-8"):
+                target_path.write_bytes(original_content)
+            return {"success": False, "reason": "cancelled", "cancellation_requested": True}
+
         proposal_path = self._save_proposal(patch_code)
         pr_result = self._create_pr(normalized_target, mission_id)
         self._log_thought(

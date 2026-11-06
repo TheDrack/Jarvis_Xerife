@@ -1,41 +1,30 @@
-"""Security regressions for JarvisDevAgent's evolution gatekeeper dependency."""
-
-from unittest.mock import MagicMock, patch
+"""JarvisDevAgent must not retain a parallel Gatekeeper execution path."""
 
 from app.application.services.jarvis_dev_agent import JarvisDevAgent
 
 
-def test_code_proposal_is_rejected_when_gatekeeper_is_unavailable():
+def test_jarvis_dev_agent_has_no_private_gatekeeper_or_pr_pipeline():
     agent = JarvisDevAgent()
 
-    with patch("app.application.services.jarvis_dev_agent.agent.nexus") as mock_nexus:
-        mock_nexus.resolve.return_value = None
-        result = agent._run_gatekeeper("def candidate(): return True", "cap_test")
-
-    assert result == {
-        "approved": False,
-        "reason": "gatekeeper_unavailable",
-    }
-    mock_nexus.resolve.assert_called_once_with("evolution_gatekeeper")
+    assert not hasattr(agent, "_run_gatekeeper")
+    assert not hasattr(agent, "_create_pr")
+    assert not hasattr(agent, "_call_llm")
+    assert not hasattr(agent, "_save_proposal")
 
 
-def test_code_proposal_uses_gatekeeper_decision_without_override():
+def test_capability_selection_rejects_missing_or_blank_target_file(monkeypatch):
     agent = JarvisDevAgent()
-    gatekeeper = MagicMock()
-    gatekeeper.approve_evolution.return_value = (False, "sandbox_unavailable")
 
-    with patch("app.application.services.jarvis_dev_agent.agent.nexus") as mock_nexus:
-        mock_nexus.resolve.return_value = gatekeeper
-        result = agent._run_gatekeeper("def candidate(): return True", "cap_test")
+    class CapabilityManager:
+        def get_executable_capabilities(self):
+            return [
+                {"id": "missing-target"},
+                {"id": "blank-target", "target_file": "  "},
+            ]
 
-    assert result == {
-        "approved": False,
-        "reason": "sandbox_unavailable",
-    }
-    gatekeeper.approve_evolution.assert_called_once_with(
-        {
-            "files_modified": [],
-            "proposed_code": "def candidate(): return True",
-            "cap_id": "cap_test",
-        }
+    monkeypatch.setattr(
+        "app.application.services.jarvis_dev_agent.agent.nexus.resolve",
+        lambda name: CapabilityManager() if name == "capability_manager" else None,
     )
+
+    assert agent._select_capability() is None

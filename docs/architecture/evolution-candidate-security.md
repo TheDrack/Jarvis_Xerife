@@ -64,5 +64,5 @@ No publication occurs when Docker is unavailable, candidate tests fail, the targ
 - The Docker-backed sandbox and adversarial integration test are wired into PR validation.
 - The scheduled evolution workflow is split into candidate-validation and trusted-publication jobs.
 - The current pending capability inventory does not yet provide trusted `target_file` metadata. Until that mapping is populated or a trusted target resolver is implemented, scheduled evolution intentionally reports a blocked/no-op result and does not invoke the LLM.
-- `JarvisDevAgent` still needs to be routed through this same artifact contract before it can publish generated changes.
+- `JarvisDevAgent` now delegates generation and validation to `EvolutionOrchestrator`; it does not maintain a parallel LLM/Gatekeeper/GitHubWorker path. It is schedulable only when a capability has trusted `target_file` metadata and the shared orchestrator is registered. Its dry-run mode validates without publication. Timeout uses cooperative cancellation checkpoints: it prevents later publication after the active stage returns, but does not forcibly terminate an in-flight synchronous provider call.
 - Main branch protection is a repository-administration setting and is tracked separately.

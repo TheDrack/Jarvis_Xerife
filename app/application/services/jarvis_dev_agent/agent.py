@@ -1,15 +1,10 @@
 # -*- coding: utf-8 -*-
-"""JarvisDevAgent — agente autônomo de desenvolvimento do próprio JARVIS.
+"""Adaptador de jobs de desenvolvimento para o pipeline compartilhado de evolução.
 
-Encapsula o fluxo completo de desenvolvimento autônomo:
-    (a) Identifica a próxima capability via CapabilityManager.get_executable_capabilities().
-    (b) Consulta a SemanticMemory por soluções similares (few-shot context).
-    (c) Constrói prompt para o LLMRouter (task_type ``code_generation``).
-    (d) Recebe proposta de código do LLM.
-    (e) Salva a proposta em ``data/evolution_proposals/<timestamp>_dev_agent.py``.
-    (f) Submete ao EvolutionGatekeeper para aprovação.
-    (g) Se aprovado, cria PR via GitHubWorker.
-    (h) Registra o ciclo completo na SemanticMemory como ``dev_cycle``.
+O agente seleciona somente capabilities com ``target_file`` confiável, recupera
+contexto few-shot/consolidado e delega geração, Gatekeeper, sandbox e publicação
+ao EvolutionOrchestrator. Não possui caminho próprio de LLM, Gatekeeper ou PR.
+O ciclo e o resultado continuam registrados na SemanticMemory como ``dev_cycle``.
 """
 
 import json
@@ -23,7 +18,6 @@ from app.core.nexus import NexusComponent, nexus
 
 logger = logging.getLogger(__name__)
 
-_PROPOSALS_DIR = Path("data/evolution_proposals")
 _JOBS_FILE = Path("data/dev_agent_jobs.jsonl")
 _DEFAULT_TIMEOUT_SECONDS = 300  # 5 minutes
 
@@ -33,7 +27,7 @@ class JarvisDevAgent(NexusComponent):
 
     Configura via ``configure(config)``:
         max_few_shot (int, padrão 3): máximo de exemplos few-shot da SemanticMemory.
-        dry_run (bool, padrão False): se True, não cria PR nem salva proposta em disco.
+        dry_run (bool, padrão False): valida a proposta, mas não exporta artefato nem publica PR.
     """
 
     def __init__(self) -> None:
@@ -46,9 +40,11 @@ class JarvisDevAgent(NexusComponent):
         self.dry_run = bool(config.get("dry_run", self.dry_run))
 
     def can_execute(self, context: Optional[Dict[str, Any]] = None) -> bool:
-        """Retorna True se há capabilities executáveis disponíveis."""
+        """Só agenda o agente quando existe alvo confiável e pipeline compartilhado."""
         cap = self._select_capability()
-        return cap is not None
+        if cap is None:
+            return False
+        return nexus.resolve("evolution_orchestrator") is not None
 
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Executa um ciclo completo de desenvolvimento autônomo.
@@ -106,7 +102,11 @@ class JarvisDevAgent(NexusComponent):
 
         finished_at = datetime.now(tz=timezone.utc).isoformat()
         duration = _time.monotonic() - _start_mono
-        status = "success" if result.get("success") else "failed"
+        status = (
+            "timeout"
+            if result.get("reason") == "timeout"
+            else "success" if result.get("success") else "failed"
+        )
         self._update_job_entry(
             job_id=job_id,
             finished_at=finished_at,
@@ -120,77 +120,115 @@ class JarvisDevAgent(NexusComponent):
         return result
 
     def _run_with_timeout(self, ctx: Dict[str, Any], timeout_secs: int) -> Dict[str, Any]:
-        """Executa o ciclo com timeout via concurrent.futures."""
+        """Aplica timeout cooperativo e solicita cancelamento antes da publicação."""
         import concurrent.futures
+        import threading
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(self._execute_cycle, ctx)
-            try:
-                return future.result(timeout=timeout_secs)
-            except concurrent.futures.TimeoutError:
-                raise TimeoutError(f"JarvisDevAgent exceeded {timeout_secs}s timeout")
+        cancel_event = threading.Event()
+        execution_context = dict(ctx)
+        execution_context["_cancel_event"] = cancel_event
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(self._execute_cycle, execution_context)
+        timed_out = False
+        try:
+            return future.result(timeout=timeout_secs)
+        except concurrent.futures.TimeoutError:
+            timed_out = True
+            cancel_event.set()
+            future.cancel()
+            executor.shutdown(wait=False, cancel_futures=True)
+            return {
+                "success": False,
+                "reason": "timeout",
+                "cancellation_requested": True,
+            }
+        finally:
+            if not timed_out:
+                executor.shutdown(wait=True)
 
     def _execute_cycle(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
         """Lógica central do ciclo de desenvolvimento (sem timeout/audit)."""
-        # (a) Seleciona capability-alvo
+        # (a) Seleciona apenas capabilities com target_file confiável.
         cap = self._select_capability()
         if cap is None:
-            logger.info("[JarvisDevAgent] Nenhuma capability executável disponível.")
+            logger.info("[JarvisDevAgent] Nenhuma capability com alvo confiável disponível.")
             return {"success": False, "reason": "no_executable_capability"}
 
-        cap_id = cap.get("id", "UNKNOWN")
-        cap_title = cap.get("title", "")
-        logger.info("[JarvisDevAgent] Capability-alvo: %s — %s", cap_id, cap_title)
-
-        # (b) Consulta SemanticMemory por soluções similares
-        few_shot_context = self._get_few_shot_examples(cap_title)
-
-        # (c) Constrói prompt
-        prompt = self._build_prompt(cap, few_shot_context)
-
-        # (d) Chama LLMRouter para geração de código
-        llm_used, proposed_code = self._call_llm(prompt, ctx)
-        if not proposed_code:
-            self._record_cycle(cap_id, llm_used, "llm_no_response", pr_created=False)
-            return {"success": False, "reason": "llm_no_response", "capability_id": cap_id}
-
-        # (e) Salva proposta
-        proposal_path: Optional[Path] = None
-        if not self.dry_run:
-            proposal_path = self._save_proposal(proposed_code, cap_id)
-
-        # (f) Gatekeeper
-        gatekeeper_result = self._run_gatekeeper(proposed_code, cap_id)
-        if not gatekeeper_result.get("approved", False):
-            reason = gatekeeper_result.get("reason", "gatekeeper_rejected")
-            logger.warning("[JarvisDevAgent] Gatekeeper rejeitou proposta: %s", reason)
-            self._record_cycle(cap_id, llm_used, f"rejected: {reason}", pr_created=False)
+        cap_id = str(cap.get("id", "UNKNOWN"))
+        cap_title = str(cap.get("title", ""))
+        target_file = str(cap.get("target_file", "")).strip()
+        if not target_file:
             return {
                 "success": False,
-                "reason": reason,
+                "reason": "trusted_target_missing",
                 "capability_id": cap_id,
-                "gatekeeper_result": gatekeeper_result,
             }
 
-        # (g) Cria PR
-        pr_result: Dict[str, Any] = {}
-        pr_created = False
-        if not self.dry_run and proposal_path is not None:
-            pr_result = self._create_pr(proposal_path, cap_id, cap_title)
-            pr_created = pr_result.get("success", False)
+        # (b) Resolve o único pipeline autorizado para gerar, validar e publicar código.
+        orchestrator = nexus.resolve("evolution_orchestrator")
+        if orchestrator is None or not hasattr(orchestrator, "execute"):
+            return {
+                "success": False,
+                "reason": "evolution_orchestrator_unavailable",
+                "capability_id": cap_id,
+            }
 
-        # (h) Registra ciclo na SemanticMemory
-        self._record_cycle(cap_id, llm_used, "approved", pr_created=pr_created)
+        # (c) Preserva contexto de memória, codebase e roadmap sem duplicar LLM/Gatekeeper/PR.
+        few_shot_context = self._get_few_shot_examples(cap_title)
+        roadmap_context = self._build_roadmap_context(
+            cap, few_shot_context, ctx.get("roadmap_context", "")
+        )
+        mission_id = str(ctx.get("mission_id") or ctx.get("job_id") or cap_id)
+
+        result = orchestrator.execute(
+            {
+                "cap_id": cap_id,
+                "cap_title": cap_title,
+                "mission_id": mission_id,
+                "target_file": target_file,
+                "roadmap_context": roadmap_context,
+                "dry_run": self.dry_run,
+                "_cancel_event": ctx.get("_cancel_event"),
+            }
+        ) or {}
+        if not isinstance(result, dict):
+            result = {"success": False, "reason": "invalid_evolution_orchestrator_result"}
+
+        cancel_event = ctx.get("_cancel_event")
+        if callable(getattr(cancel_event, "is_set", None)) and cancel_event.is_set():
+            return {
+                "success": False,
+                "reason": "cancelled",
+                "cancellation_requested": True,
+                "capability_id": cap_id,
+            }
+
+        llm_used = str(result.get("llm_used") or result.get("source") or "evolution_orchestrator")
+        gatekeeper_result = result.get("gatekeeper_result")
+        if not isinstance(gatekeeper_result, dict):
+            gatekeeper_result = {
+                "approved": bool(result.get("validated", result.get("success"))),
+                "reason": result.get("reason") or (
+                    "approved" if result.get("success") else "rejected"
+                ),
+            }
+        pr_result = result.get("pr") if isinstance(result.get("pr"), dict) else {}
+        pr_created = bool(result.get("pr_created") or pr_result.get("success"))
+        self._record_cycle(
+            cap_id,
+            llm_used,
+            str(gatekeeper_result.get("reason", "unknown")),
+            pr_created=pr_created,
+        )
 
         return {
-            "success": True,
+            **result,
             "capability_id": cap_id,
             "capability_title": cap_title,
             "llm_used": llm_used,
             "gatekeeper_result": gatekeeper_result,
             "pr_created": pr_created,
             "pr": pr_result,
-            "proposal": str(proposal_path) if proposal_path else None,
         }
 
     # ------------------------------------------------------------------
@@ -276,7 +314,13 @@ class JarvisDevAgent(NexusComponent):
             if cap_manager is None or not hasattr(cap_manager, "get_executable_capabilities"):
                 return None
             caps: List[Dict[str, Any]] = cap_manager.get_executable_capabilities()
-            return caps[0] if caps else None
+            return next(
+                (
+                    cap for cap in caps
+                    if isinstance(cap, dict) and str(cap.get("target_file", "")).strip()
+                ),
+                None,
+            )
         except Exception as exc:
             logger.debug("[JarvisDevAgent] CapabilityManager indisponível: %s", exc)
             return None
@@ -306,107 +350,38 @@ class JarvisDevAgent(NexusComponent):
 
         return load_consolidated_context()
 
-    def _build_prompt(
-        self, cap: Dict[str, Any], few_shot: List[Dict[str, Any]]
+    def _build_roadmap_context(
+        self,
+        cap: Dict[str, Any],
+        few_shot: List[Dict[str, Any]],
+        extra_context: str = "",
     ) -> str:
-        """Constrói o prompt de geração de código para o LLM."""
+        """Combina contexto confiável sem duplicar a geração de código."""
         cap_id = cap.get("id", "UNKNOWN")
         cap_title = cap.get("title", "")
         cap_desc = cap.get("description", cap_title)
+        sections = [f"Capability: {cap_id} — {cap_title}", f"Descrição: {cap_desc}"]
 
-        few_shot_text = ""
         if few_shot:
             examples = "\n".join(
-                f"Exemplo {i + 1}: {ex.get('content', '')}" for i, ex in enumerate(few_shot)
+                f"Exemplo {index + 1}: {item.get('content', '')}"
+                for index, item in enumerate(few_shot)
             )
-            few_shot_text = f"\nExemplos de soluções anteriores:\n{examples}\n"
+            sections.append(f"Soluções anteriores validadas:\n{examples}")
 
         consolidated = self._get_consolidated_context()
-        consolidated_text = (
-            f"\nContexto consolidado do codebase:\n{consolidated}\n" if consolidated else ""
-        )
+        if consolidated:
+            sections.append(f"Contexto consolidado do codebase:\n{consolidated}")
+        if extra_context:
+            sections.append(f"Contexto adicional do roadmap:\n{extra_context}")
 
-        return (
-            "Você é o sistema de desenvolvimento autônomo do JARVIS.\n"
-            f"Tarefa: Implementar a capability {cap_id} — {cap_title}\n"
-            f"Descrição: {cap_desc}\n"
-            f"{few_shot_text}{consolidated_text}\n"
-            "INSTRUÇÃO: Retorne APENAS código Python válido como um NexusComponent completo "
-            "(herdando de NexusComponent, com métodos configure, can_execute e execute). "
-            "Não inclua texto fora do bloco Python."
-        )
+        return "\n\n".join(sections)
 
-    def _call_llm(self, prompt: str, context: Dict[str, Any]) -> tuple:
-        """Chama o LLMRouter para geração de código.
-
-        Returns:
-            Tupla (adapter_name, proposed_code_str).
-        """
-        try:
-            router = nexus.resolve("llm_router")
-            if router is None:
-                logger.warning("[JarvisDevAgent] LLMRouter indisponível.")
-                return ("none", "")
-            result = router.execute(
-                {
-                    **context,
-                    "task_type": "code_generation",
-                    "prompt": prompt,
-                    "user_prompt": prompt,
-                    "system_prompt": "Você é um engenheiro Python sênior especializado em JARVIS.",
-                    "require_json": False,
-                }
-            )
-            llm_used = result.get("routed_to", "unknown")
-            code = str(result.get("result", result.get("response", "")))
-            # Extrai bloco de código se vier em markdown fence
-            code = _extract_code_block(code)
-            return (llm_used, code)
-        except Exception as exc:
-            logger.error("[JarvisDevAgent] Falha ao chamar LLMRouter: %s", exc)
-            return ("error", "")
-
-    def _save_proposal(self, code: str, cap_id: str) -> Path:
-        """Salva a proposta de código em disco."""
-        _PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
-        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        safe_id = cap_id.replace("-", "_").lower()
-        path = _PROPOSALS_DIR / f"{ts}_{safe_id}_dev_agent.py"
-        path.write_text(code, encoding="utf-8")
-        logger.info("[JarvisDevAgent] Proposta salva: %s", path)
-        return path
-
-    def _run_gatekeeper(self, code: str, cap_id: str) -> Dict[str, Any]:
-        """Submete a proposta ao EvolutionGatekeeper."""
-        try:
-            gatekeeper = nexus.resolve("evolution_gatekeeper")
-            if gatekeeper is None:
-                # Autoevolução de código nunca pode contornar o Gatekeeper.
-                logger.error("[JarvisDevAgent] Gatekeeper indisponível — bloqueando proposta.")
-                return {"approved": False, "reason": "gatekeeper_unavailable"}
-            proposed_change = {"files_modified": [], "proposed_code": code, "cap_id": cap_id}
-            approved, reason = gatekeeper.approve_evolution(proposed_change)
-            return {"approved": approved, "reason": reason}
-        except Exception as exc:
-            logger.error("[JarvisDevAgent] Erro no Gatekeeper: %s", exc)
-            return {"approved": False, "reason": str(exc)}
-
-    def _create_pr(self, proposal_path: Path, cap_id: str, cap_title: str) -> Dict[str, Any]:
-        """Cria um PR via GitHubWorker."""
-        try:
-            worker = nexus.resolve("github_worker")
-            if worker is None:
-                return {"success": False, "reason": "github_worker_unavailable"}
-            title = f"[JarvisDevAgent] Implement {cap_id}: {cap_title}"
-            body = (
-                f"Proposta gerada autonomamente pelo JarvisDevAgent.\n\n"
-                f"**Capability:** {cap_id} — {cap_title}\n"
-                f"**Arquivo:** `{proposal_path}`\n"
-            )
-            return worker.submit_pull_request(title, body) or {}
-        except Exception as exc:
-            logger.error("[JarvisDevAgent] Falha ao criar PR: %s", exc)
-            return {"success": False, "error": str(exc)}
+    def _build_prompt(
+        self, cap: Dict[str, Any], few_shot: List[Dict[str, Any]]
+    ) -> str:
+        """Compatibilidade: retorna o contexto que agora é consumido pelo EvolutionOrchestrator."""
+        return self._build_roadmap_context(cap, few_shot)
 
     def _record_cycle(
         self,
@@ -432,16 +407,3 @@ class JarvisDevAgent(NexusComponent):
             memory.add_fact(fact_type="dev_cycle", content=content, confidence=0.8)
         except Exception as exc:
             logger.debug("[JarvisDevAgent] Falha ao registrar ciclo na SemanticMemory: %s", exc)
-
-
-def _extract_code_block(text: str) -> str:
-    """Extrai bloco de código Python de resposta com markdown fence."""
-    for fence in ("```python", "```"):
-        if fence in text:
-            parts = text.split(fence, 1)
-            if len(parts) > 1:
-                code = parts[1]
-                if "```" in code:
-                    code = code.split("```", 1)[0]
-                return code.strip()
-    return text.strip()
