@@ -178,5 +178,110 @@
     return markers;
   }
 
-  return { buildDeviceMarkers, cellSizeForZoom, generalizeRegion, generalizeRegionFromMembers, chooseBoundaryLayer };
+  function normalizeAircraftIdentity(observation) {
+    const source = observation && typeof observation === 'object' ? observation : {};
+    const attributes = source.attributes && typeof source.attributes === 'object' ? source.attributes : {};
+    const entityId = String(source.entity_id || '').trim();
+    const rawIcao = String(attributes.icao24 || attributes.icao || (/^[0-9a-f]{6}$/i.test(entityId) ? entityId : '')).trim();
+    const icao24 = /^[0-9a-f]{6}$/i.test(rawIcao) ? rawIcao.toLowerCase() : '';
+    const registration = String(attributes.registration || attributes.reg || '').trim().toUpperCase();
+    const callsign = String(attributes.callsign || attributes.flight || '').trim().toUpperCase();
+    const key = icao24 ? 'icao24:' + icao24 :
+      registration ? 'registration:' + registration :
+      callsign ? 'callsign:' + callsign :
+      entityId ? 'entity:' + String(source.source_id || 'unknown') + ':' + entityId : '';
+    return { key, icao24, registration, callsign };
+  }
+
+  function normalizeAircraftPosition(observation) {
+    const source = observation && typeof observation === 'object' ? observation : {};
+    const position = source.position && typeof source.position === 'object' ? source.position : {};
+    if (!validCoordinate(position.latitude, -90, 90) || !validCoordinate(position.longitude, -180, 180)) return null;
+    const timestamp = typeof source.observed_at === 'number'
+      ? source.observed_at < 100000000000 ? source.observed_at * 1000 : source.observed_at
+      : Date.parse(source.observed_at || '');
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return null;
+    const attributes = source.attributes && typeof source.attributes === 'object' ? source.attributes : {};
+    return {
+      timestamp,
+      latitude: Number(position.latitude),
+      longitude: Number(position.longitude),
+      altitudeFt: attributes.altitude_ft != null && Number.isFinite(Number(attributes.altitude_ft)) ? Number(attributes.altitude_ft) : null,
+      groundSpeedKnots: attributes.speed_knots != null && Number.isFinite(Number(attributes.speed_knots)) ? Number(attributes.speed_knots) : null,
+      headingDeg: attributes.heading_deg != null && Number.isFinite(Number(attributes.heading_deg)) ? Number(attributes.heading_deg) : null,
+      sourceId: String(source.source_id || ''),
+    };
+  }
+
+  function appendAircraftTrack(tracks, observation, options = {}) {
+    if (!(tracks instanceof Map)) return null;
+    const identity = normalizeAircraftIdentity(observation);
+    const position = normalizeAircraftPosition(observation);
+    if (!identity.key || !position) return null;
+    const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
+    const maxPoints = Math.max(2, Math.min(2000, Number(options.maxPoints) || 240));
+    const maxAgeMs = Math.max(60000, Number(options.maxAgeMs) || 2 * 60 * 60 * 1000);
+    let track = tracks.get(identity.key);
+    if (!track) {
+      track = { key: identity.key, ...identity, points: [] };
+      tracks.set(identity.key, track);
+    }
+    Object.assign(track, identity);
+    const duplicate = track.points.findIndex((point) =>
+      point.timestamp === position.timestamp ||
+      (Math.abs(point.timestamp - position.timestamp) <= 60000 &&
+        Math.abs(point.latitude - position.latitude) < 0.00001 &&
+        Math.abs(point.longitude - position.longitude) < 0.00001)
+    );
+    if (duplicate >= 0) {
+      track.points[duplicate] = position;
+    } else {
+      track.points.push(position);
+    }
+    track.points.sort((a, b) => a.timestamp - b.timestamp);
+    track.points = track.points
+      .filter((point) => point.timestamp >= now - maxAgeMs)
+      .slice(-maxPoints);
+    if (!track.points.length) {
+      tracks.delete(identity.key);
+      return null;
+    }
+    return track;
+  }
+
+  function normalizeAircraftRoute(route) {
+    const source = route && typeof route === 'object' ? route : {};
+    const validPoint = (point) => point && validCoordinate(
+      point.latitude !== undefined ? point.latitude : point.lat, -90, 90
+    ) && validCoordinate(
+      point.longitude !== undefined ? point.longitude : point.lon, -180, 180
+    );
+    const normalizePoint = (point) => ({
+      ident: String(point.ident || point.code || point.name || '').trim(),
+      name: String(point.name || '').trim(),
+      latitude: Number(point.latitude !== undefined ? point.latitude : point.lat),
+      longitude: Number(point.longitude !== undefined ? point.longitude : point.lon),
+    });
+    const waypoints = (Array.isArray(source.waypoints) ? source.waypoints : [])
+      .filter(validPoint).map(normalizePoint);
+    const hasFlightPlan = source.kind === 'flight_plan' && waypoints.length >= 2;
+    const origin = validPoint(source.origin) ? normalizePoint(source.origin) : waypoints[0] || null;
+    const destination = validPoint(source.destination) ? normalizePoint(source.destination) : waypoints[waypoints.length - 1] || null;
+    if (!origin || !destination) return null;
+    return {
+      kind: hasFlightPlan ? 'flight_plan' : 'airport_pair_estimate',
+      confirmed: hasFlightPlan,
+      origin,
+      destination,
+      waypoints: hasFlightPlan ? waypoints : [],
+      provider: String(source.provider || 'unknown'),
+      sourceQuality: hasFlightPlan ? 'filed_route' : 'airport_pair_only',
+    };
+  }
+
+  return {
+    buildDeviceMarkers, cellSizeForZoom, generalizeRegion, generalizeRegionFromMembers,
+    chooseBoundaryLayer, normalizeAircraftIdentity, normalizeAircraftPosition,
+    appendAircraftTrack, normalizeAircraftRoute,
+  };
 });

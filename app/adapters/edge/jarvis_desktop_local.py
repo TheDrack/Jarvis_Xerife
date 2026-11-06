@@ -1488,6 +1488,9 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             "airline": str(payload.get("airline") or "")[:100],
             "origin": origin,
             "destination": destination,
+            "route_kind": "airport_pair_estimate",
+            "waypoints": [],
+            "source_quality": "airport_pair_only",
             "provider": "adsbdb_via_gods_eye_view",
         }
 

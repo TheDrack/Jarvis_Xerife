@@ -197,3 +197,61 @@ test('installation markers retain high-priority reverse geocoding', async () => 
   assert.match(html, /PLACE_PRIORITY=\{device:0,camera:1,installation:2/);
   assert.match(html, /LABEL_KINDS=new Set\(\[[^\]]*installation/);
 });
+
+test('aircraft observations resolve a stable identity across provider-specific identifiers', () => {
+  const { normalizeAircraftIdentity } = globalThis.JarvisGeospatialLayer;
+  assert.deepEqual(normalizeAircraftIdentity({
+    entity_id: 'a1b2c3',
+    attributes: { icao24: 'A1B2C3', callsign: ' GLO1235 ', registration: 'PR-GXQ' },
+  }), {
+    key: 'icao24:a1b2c3',
+    icao24: 'a1b2c3',
+    registration: 'PR-GXQ',
+    callsign: 'GLO1235',
+  });
+  assert.equal(normalizeAircraftIdentity({
+    entity_id: 'GLO1235',
+    attributes: { callsign: 'GLO1235' },
+  }).key, 'callsign:GLO1235');
+});
+
+test('aircraft track history deduplicates positions and enforces age and point limits', () => {
+  const { appendAircraftTrack } = globalThis.JarvisGeospatialLayer;
+  const tracks = new Map();
+  const observation = (timestamp, latitude, longitude) => ({
+    entity_id: 'a1b2c3',
+    source_id: 'adsb',
+    observed_at: new Date(timestamp).toISOString(),
+    position: { latitude, longitude },
+    attributes: { icao24: 'a1b2c3', callsign: 'GLO1235', altitude_ft: 35000 },
+  });
+  appendAircraftTrack(tracks, observation(1000, -23, -46), { now: 100000, maxPoints: 2, maxAgeMs: 500000 });
+  appendAircraftTrack(tracks, observation(2000, -22.9, -45.9), { now: 100000, maxPoints: 2, maxAgeMs: 500000 });
+  appendAircraftTrack(tracks, observation(2000, -22.9, -45.9), { now: 100000, maxPoints: 2, maxAgeMs: 500000 });
+  appendAircraftTrack(tracks, observation(3000, -22.8, -45.8), { now: 100000, maxPoints: 2, maxAgeMs: 500000 });
+  const track = tracks.get('icao24:a1b2c3');
+  assert.equal(track.points.length, 2);
+  assert.equal(track.points[0].latitude, -22.9);
+  assert.equal(track.points[1].latitude, -22.8);
+  assert.equal(track.callsign, 'GLO1235');
+});
+
+test('aircraft routes distinguish confirmed flight plans from airport-pair estimates', () => {
+  const { normalizeAircraftRoute } = globalThis.JarvisGeospatialLayer;
+  const estimated = normalizeAircraftRoute({
+    origin: { code: 'REC', latitude: -8.12649, longitude: -34.9236 },
+    destination: { code: 'CGH', latitude: -23.62611, longitude: -46.65639 },
+    provider: 'adsbdb_via_gods_eye_view',
+  });
+  assert.equal(estimated.kind, 'airport_pair_estimate');
+  assert.equal(estimated.confirmed, false);
+  assert.equal(estimated.waypoints.length, 0);
+  const planned = normalizeAircraftRoute({
+    kind: 'flight_plan',
+    waypoints: [{ ident: 'REC', latitude: -8.12649, longitude: -34.9236 }, { ident: 'CGH', latitude: -23.62611, longitude: -46.65639 }],
+    provider: 'flightaware_aeroapi',
+  });
+  assert.equal(planned.kind, 'flight_plan');
+  assert.equal(planned.confirmed, true);
+  assert.equal(planned.waypoints.length, 2);
+});

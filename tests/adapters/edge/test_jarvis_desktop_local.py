@@ -1570,6 +1570,9 @@ def test_aircraft_route_endpoint_returns_validated_airport_coordinates(monkeypat
     assert body["origin"] == {"code": "NVT", "name": "Navegantes", "latitude": -26.88, "longitude": -48.6514}
     assert body["destination"] == {"code": "CGH", "name": "São Paulo", "latitude": -23.62611, "longitude": -46.65639}
     assert body["airline"] == "Gol Linhas Aéreas Inteligentes"
+    assert body["route_kind"] == "airport_pair_estimate"
+    assert body["waypoints"] == []
+    assert body["source_quality"] == "airport_pair_only"
     assert calls == ["http://127.0.0.1:4173/api/adsbdb/route/GLO1273"]
 
 
@@ -1617,6 +1620,9 @@ def test_aircraft_route_endpoint_returns_validated_airport_coordinates(monkeypat
     assert body["origin"] == {"code": "NVT", "name": "Navegantes", "latitude": -26.88, "longitude": -48.6514}
     assert body["destination"] == {"code": "CGH", "name": "São Paulo", "latitude": -23.62611, "longitude": -46.65639}
     assert body["airline"] == "Gol Linhas Aéreas Inteligentes"
+    assert body["route_kind"] == "airport_pair_estimate"
+    assert body["waypoints"] == []
+    assert body["source_quality"] == "airport_pair_only"
     assert calls == ["http://127.0.0.1:4173/api/adsbdb/route/GLO1273"]
 
 
