@@ -7,7 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="/static/jarvis-icon.svg">
 <title>J.A.R.V.I.S. · NEURAL INTERFACE</title>
 <style>
-:root{color-scheme:dark;--void:#01060c;--bg:#020b16;--ink:#e6f7ff;--muted:#6d97ae;--dim:#5d7f93;--line:rgba(86,196,255,.20);--line-soft:rgba(86,196,255,.09);--mint:#54d7ff;--mint-soft:rgba(84,215,255,.62);--amber:#ffb45c;--red:#ff6f85;--aqua:#a5ecff;--sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;--mono:"Cascadia Mono",Consolas,ui-monospace,SFMono-Regular,monospace;--fs-2xs:8px;--fs-xs:9px;--fs-sm:10px;--fs-md:11px;--fs-lg:13px;--fs-xl:15px;--fs-2xl:22px;--fs-3xl:26px;--ls:.18em;--ls-tight:.12em;--radius:2px}
+:root{color-scheme:dark;--void:#01060c;--bg:#020b16;--ink:#e6f7ff;--muted:#6d97ae;--dim:#5d7f93;--line:rgba(86,196,255,.20);--line-soft:rgba(86,196,255,.09);--mint:#54d7ff;--mint-soft:rgba(84,215,255,.62);--amber:#ffb45c;--red:#ff6f85;--aqua:#a5ecff;--sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;--mono:"Cascadia Mono",Consolas,ui-monospace,SFMono-Regular,monospace;--fs-2xs:9px;--fs-xs:10px;--fs-sm:11px;--fs-md:12px;--fs-lg:14px;--fs-xl:16px;--fs-2xl:22px;--fs-3xl:26px;--ls:.18em;--ls-tight:.12em;--radius:2px}
 *{box-sizing:border-box}
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--void);color:var(--ink);font:var(--fs-lg)/1.45 var(--sans);-webkit-font-smoothing:antialiased}
 body{background:radial-gradient(ellipse 90% 62% at 50% 44%,#06243c 0,#031321 46%,#01070e 100%)}
@@ -208,7 +208,7 @@ a{color:inherit;text-decoration:none}
 .areas button:disabled{opacity:.35;cursor:not-allowed}
 /* ---- Globe zoom ---- */
 .globe-tools{position:absolute;right:4px;top:4px;z-index:3;display:grid;gap:4px}
-.globe-tools button{width:24px;height:24px;display:grid;place-items:center;border:1px solid var(--line);color:var(--mint);background:rgba(2,11,20,.74);font-family:var(--mono);font-size:var(--fs-xs);line-height:1;border-radius:var(--radius)}
+.globe-tools button{width:30px;height:30px;display:grid;place-items:center;border:1px solid var(--line);color:var(--mint);background:rgba(2,11,20,.74);font-family:var(--mono);font-size:var(--fs-xs);line-height:1;border-radius:var(--radius)}
 .globe-tools button:hover{border-color:var(--mint);background:rgba(84,215,255,.14)}
 .globe-zoom{position:absolute;left:4px;top:4px;z-index:3;font-family:var(--mono);font-size:var(--fs-2xs);letter-spacing:var(--ls-tight);color:var(--dim)}
 /* ---- Devices ---- */
@@ -262,7 +262,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 .stage[data-view="core"] .col-left{grid-column:1}
 .stage[data-view="core"] .col-right{grid-column:3}
 .selection-inspector{position:absolute;z-index:4;left:18px;bottom:18px;width:min(320px,calc(100% - 72px));padding:12px 13px;display:grid;gap:6px;border:1px solid rgba(84,215,255,.34);background:linear-gradient(145deg,rgba(5,24,40,.96),rgba(1,8,16,.94));box-shadow:0 16px 42px rgba(0,0,0,.42),0 0 24px rgba(84,215,255,.08);backdrop-filter:blur(12px);animation:hud-enter .2s ease both}
-.selection-inspector{width:min(430px,calc(100% - 72px));max-height:min(52vh,420px);overflow:auto;overscroll-behavior:contain}.selection-summary{margin:0;color:#c7e8f5;font-size:var(--fs-sm);line-height:1.55;white-space:normal}.selection-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.selection-facts span{padding:5px 6px;border-left:1px solid var(--line);background:rgba(84,215,255,.045);font:var(--fs-2xs)/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere}.selection-facts b{display:block;color:#d9f4ff;font-weight:500}.selection-actions a{display:inline-flex;align-items:center;text-decoration:none}.selection-actions a[hidden]{display:none}@media(max-width:900px){.selection-inspector{width:min(380px,calc(100% - 48px));max-height:42vh}}\n.selection-inspector[hidden]{display:none}
+.selection-inspector{width:min(430px,calc(100% - 72px));max-height:min(52vh,420px);overflow:auto;overscroll-behavior:contain}.selection-summary{margin:0;color:#c7e8f5;font-size:var(--fs-sm);line-height:1.55;white-space:normal}.selection-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.selection-facts-section{grid-column:1/-1;padding:4px 0 2px;border-bottom:1px solid var(--line-soft);font:600 var(--fs-2xs)/1.4 var(--mono);letter-spacing:.18em;color:var(--mint);text-transform:uppercase}.selection-facts span{padding:5px 6px;border-left:1px solid var(--line);background:rgba(84,215,255,.045);font:var(--fs-2xs)/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere}.selection-facts b{display:block;color:#d9f4ff;font-weight:500}.selection-actions a{display:inline-flex;align-items:center;text-decoration:none}.selection-actions a[hidden]{display:none}@media(max-width:900px){.selection-inspector{width:min(380px,calc(100% - 48px));max-height:42vh}}\n.selection-inspector[hidden]{display:none}
 .selection-kicker{display:flex;justify-content:space-between;gap:10px;font:var(--fs-2xs)/1.4 var(--mono);letter-spacing:.16em;color:var(--mint)}
 .selection-inspector strong{font-size:var(--fs-md);font-weight:600;color:#e8faff;line-height:1.35}
 .selection-inspector small{font:var(--fs-xs)/1.5 var(--mono);color:var(--muted)}
@@ -509,9 +509,11 @@ const Globe=(()=>{
  let geo=null,px=null,py=null,pz=null;
  let stars=[],marks=[],area=null,hook=null,hits=[],quakeRings=[],labelBoxes=[];
  let placeCache=new Map(),placeQueue=[],placeQueued=new Set(),placeRunning=false;
+ const aircraftRouteLookups=new Set();
+ const PLACE_RETRY_AFTER=new Map();
  const PLACE_CACHE_KEY='jarvis_globe_places_v2';
  const PLACE_TTL_MS=7*86400000;
- const PLACE_MISS_TTL_MS=86400000;
+ const PLACE_MISS_TTL_MS=3600000;
  const PLACE_PRIORITY={device:0,camera:1,port:2,chokepoint:2,military_site:2,infrastructure:2,fire:3,quake:3,event:3,vessel:4,aircraft:5,satellite:6};
  const graticule=(()=>{
   const chains=[];
@@ -521,7 +523,7 @@ const Globe=(()=>{
  })();
  const sph=(lon,lat)=>{const cp=Math.cos(lat*RAD);return [cp*Math.sin(lon*RAD),Math.sin(lat*RAD),cp*Math.cos(lon*RAD)];};
  const dest=(lat,lon,km,bearing)=>{const d=km/6371,brg=bearing*RAD,lat1=lat*RAD,lon1=lon*RAD;const lat2=Math.asin(Math.sin(lat1)*Math.cos(d)+Math.cos(lat1)*Math.sin(d)*Math.cos(brg));const lon2=lon1+Math.atan2(Math.sin(brg)*Math.sin(d)*Math.cos(lat1),Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));return [((lon2/RAD+540)%360)-180,lat2/RAD];};
- const clampZoom=value=>Math.max(0.75,Math.min(2.4,Number.isFinite(value)?value:1));
+ const clampZoom=value=>Math.max(0.75,Math.min(3.6,Number.isFinite(value)?value:1));
  const notifyZoom=()=>{if(typeof zoomHook==='function')zoomHook(zoom);};
  const pairDistance=()=>{
   const points=Array.from(pointers.values());
@@ -795,7 +797,17 @@ const Globe=(()=>{
   }
   ctx.restore();
  }
- function drawMarks(radius,t,cosR,sinR,cosT,sinT){
+ function drawAircraftRoutes(radius,cosR,sinR,cosT,sinT){
+   const project=(latitude,longitude)=>{const v=sph(longitude,latitude),x=v[0]*cosR+v[2]*sinR,z=v[2]*cosR-v[0]*sinR,y=v[1]*cosT-z*sinT;return {x:cx+x*radius,y:cy-y*radius,visible:v[1]*sinT+z*cosT>0.02};};
+   ctx.save();ctx.setLineDash([3,5]);ctx.lineWidth=1.25;ctx.strokeStyle='rgba(84,215,255,.82)';
+   for(const mark of marks){if(mark.kind!=='aircraft'||!mark.flightRoute)continue;
+    const a=sph(mark.flightRoute.origin.longitude,mark.flightRoute.origin.latitude),b=sph(mark.flightRoute.destination.longitude,mark.flightRoute.destination.latitude),dot=Math.max(-1,Math.min(1,a[0]*b[0]+a[1]*b[1]+a[2]*b[2])),omega=Math.acos(dot);
+    if(!Number.isFinite(omega)||omega<1e-6)continue;const sinOmega=Math.sin(omega);ctx.beginPath();let started=false;
+    for(let step=0;step<=48;step+=1){const t=step/48,wa=Math.sin((1-t)*omega)/sinOmega,wb=Math.sin(t*omega)/sinOmega,x=wa*a[0]+wb*b[0],y=wa*a[1]+wb*b[1],z=wa*a[2]+wb*b[2],lat=Math.atan2(y,Math.hypot(x,z))/RAD,lon=Math.atan2(x,z)/RAD,point=project(lat,lon);if(!point.visible){started=false;continue;}if(!started){ctx.moveTo(point.x,point.y);started=true;}else ctx.lineTo(point.x,point.y);}ctx.stroke();
+   }ctx.restore();
+  }
+  function drawMarks(radius,t,cosR,sinR,cosT,sinT){
+   drawAircraftRoutes(radius,cosR,sinR,cosT,sinT);
   hits=[];
   const size=Math.max(2,radius/130);
   labelBoxes=[];
@@ -991,7 +1003,7 @@ const Globe=(()=>{
   return coordText(latitude,longitude);
  }
  function placeKey(latitude,longitude){
-  return Number(latitude).toFixed(2)+','+Number(longitude).toFixed(2);
+  return Number(latitude).toFixed(4)+','+Number(longitude).toFixed(4);
  }
  function loadPlaceCache(){
   try{
@@ -1027,58 +1039,85 @@ const Globe=(()=>{
   if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
   return placeCache.get(placeKey(lat,lon))||null;
  }
- function enrichPlaces(){
-  if(!marks.length)return;
-  const groups=new Map();
-  for(const mark of marks){
-   const lat=Number(mark.latitude),lon=Number(mark.longitude);
-   if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;
-   const key=placeKey(lat,lon);
-   let group=groups.get(key);
-   if(!group){group={key,latitude:lat,longitude:lon,marks:[]};groups.set(key,group);}
-   group.marks.push(mark);
-  }
-  for(const group of groups.values()){
-   const cached=placeCache.get(group.key);
-   if(cached){group.marks.forEach(mark=>applyPlace(mark,cached));continue;}
-   if(placeQueued.has(group.key))continue;
-   placeQueued.add(group.key);
-   group.priority=Math.min(...group.marks.map(mark=>PLACE_PRIORITY[mark.kind]??9));
-   placeQueue.push(group);
-  }
-  placeQueue.sort((a,b)=>a.priority-b.priority);
+ function isTransientPlaceFailure(reason){
+  const code=String(reason||'').toLowerCase();
+  return code==='http_429'||code==='network'||code==='timeout'||/^http_5\d\d$/.test(code);
+ }
+ function enrichPlace(mark){
+  if(!mark||!state.token||mark.cluster||mark.kind==='device_cluster')return;
+  const latitude=Number(mark.latitude),longitude=Number(mark.longitude);
+  if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||Math.abs(latitude)>90||Math.abs(longitude)>180)return;
+  const record=mark.record||mark.device||{},attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
+  if(mark.address||record.address||attributes.address||attributes.display_name)return;
+  const key=placeKey(latitude,longitude),cached=placeCache.get(key);
+  if(cached){applyPlace(mark,cached);return;}
+  if(placeQueued.has(key)||(PLACE_RETRY_AFTER.get(key)||0)>Date.now())return;
+  placeQueued.add(key);
+  placeQueue.push({key,latitude,longitude,marks:[mark]});
   runPlaceQueue();
  }
  async function runPlaceQueue(){
   if(placeRunning||!placeQueue.length||!state.token)return;
   placeRunning=true;
-  let failures=0;
   while(placeQueue.length){
    const group=placeQueue.shift();
    try{
     const data=await api('/api/geo/reverse?lat='+group.latitude.toFixed(5)+'&lon='+group.longitude.toFixed(5));
-    failures=0;
+    const reason=String(data&&data.reason||'unavailable').toLowerCase();
+    if(!data||!data.available){
+     if(isTransientPlaceFailure(reason)){
+      const fallback=reason==='http_429'?60:15;
+      const retry=Math.max(1,Math.min(3600,Number(data&&data.retry_after_seconds)||fallback));
+      PLACE_RETRY_AFTER.set(group.key,Date.now()+retry*1000);
+      placeQueued.delete(group.key);
+      break;
+     }
+    }
     const entry=data&&data.available
-     ?{label:data.label||data.display_name||'',address:data.display_name||'',at:Date.now()}
-     :{label:'',address:'',at:Date.now(),missing:true};
+     ?{label:data.label||data.display_name||'',address:data.display_name||'',at:Date.now(),source:'nominatim',precision:'reverse_geocode'}
+     :{label:'',address:'',at:Date.now(),missing:true,reason};
     placeCache.set(group.key,entry);
     group.marks.forEach(mark=>applyPlace(mark,entry));
     if(state.selected&&group.marks.includes(state.selected))renderSelection(state.selected);
     savePlaceCache();
     draw(performance.now());
    }catch(_){
-    failures+=1;
+    PLACE_RETRY_AFTER.set(group.key,Date.now()+15000);
     placeQueued.delete(group.key);
-    if(failures>=3){
-     for(const pending of placeQueue)placeQueued.delete(pending.key);
-     placeQueue=[];
-     break;
-    }
-    continue;
+    break;
    }
    placeQueued.delete(group.key);
   }
   placeRunning=false;
+ }
+ async function enrichAircraftRoute(mark){
+  if(!mark||mark.kind!=='aircraft'||mark.flightRoute||mark.routeStatus==='available'||mark.routeStatus==='not_found')return;
+  if(mark.routeStatus==='unavailable'&&(mark.routeRetryAt||0)>Date.now())return;
+  const record=mark.record||{},attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
+  const callsign=String(attributes.callsign||'').trim().toUpperCase();
+  if(!/^[A-Z0-9]{2,8}$/.test(callsign)||aircraftRouteLookups.has(callsign))return;
+  aircraftRouteLookups.add(callsign);
+  try{
+   const result=await api('/api/intelligence/aircraft-route?callsign='+encodeURIComponent(callsign));
+   if(result&&result.available&&result.origin&&result.destination){
+    const origin=result.origin,destination=result.destination;
+    mark.flightRoute={
+     origin:{latitude:Number(origin.latitude),longitude:Number(origin.longitude),code:origin.code,name:origin.name},
+     destination:{latitude:Number(destination.latitude),longitude:Number(destination.longitude),code:destination.code,name:destination.name}
+    };
+    attributes.origin=[origin.code,origin.name].filter(Boolean).join(' · ');
+    attributes.destination=[destination.code,destination.name].filter(Boolean).join(' · ');
+    attributes.airline=result.airline||null;
+    mark.routeStatus='available';
+   }else{
+    mark.routeStatus=result&&result.reason==='route_not_found'?'not_found':'unavailable';
+    if(mark.routeStatus==='unavailable')mark.routeRetryAt=Date.now()+60000;
+   }
+  }catch(_){mark.routeStatus='unavailable';mark.routeRetryAt=Date.now()+60000;}
+  finally{aircraftRouteLookups.delete(callsign);}
+  if(state.selected===mark)renderSelection(mark);
+  if(typeof renderOrbital==='function')renderOrbital();
+  draw(performance.now());
  }
  function setData(payload){
   marks=[];
@@ -1109,19 +1148,20 @@ const Globe=(()=>{
    const v=sph(num(o.position.longitude),num(o.position.latitude));
    const attrs=o.attributes||{};
    const name=attrs.callsign||attrs.name||attrs.group||o.entity_id;
-   const observed=new Date(o.observed_at||0).getTime();
+   const validEndpoint=(lat,lon)=>Number.isFinite(Number(lat))&&Number(lat)>=-90&&Number(lat)<=90&&Number.isFinite(Number(lon))&&Number(lon)>=-180&&Number(lon)<=180;
+    const flightRoute=o.entity_type==='aircraft'&&validEndpoint(attrs.origin_latitude,attrs.origin_longitude)&&validEndpoint(attrs.destination_latitude,attrs.destination_longitude)?{origin:{latitude:Number(attrs.origin_latitude),longitude:Number(attrs.origin_longitude)},destination:{latitude:Number(attrs.destination_latitude),longitude:Number(attrs.destination_longitude)}}:null;
+    const observed=new Date(o.observed_at||0).getTime();
    const at=Number.isFinite(observed)&&observed>0?now-Math.min(11000,Math.max(0,now-observed)):now-11000;
    const streamable=['camera','radio_station'].includes(o.entity_type);
    const gevSnapshot=o.entity_type==='camera'&&o.source_id==='gods_eye_view'&&!attrs.stream_url
     ?new URL('/api/intelligence/gods-eye/cameras/'+encodeURIComponent(o.entity_id)+'/snapshot',location.origin).href:null;
    const mediaUrl=attrs.stream_url||gevSnapshot;
    const mediaType=gevSnapshot?'snapshot-api':attrs.stream_type;
-   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),live:streamable&&mediaUrl?{url:mediaUrl,type:mediaType}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
+   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),flightRoute,live:streamable&&mediaUrl?{url:mediaUrl,type:mediaType}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
   }
   area=(payload&&payload.area)||null;
   setDeviceData((payload&&payload.devices)||[],false);
   draw(performance.now());
-  enrichPlaces();
  }
  function setDeviceData(devices,redraw=true){
   marks=marks.filter(mark=>mark.kind!=='device'&&mark.kind!=='device_cluster');
@@ -1345,9 +1385,11 @@ function renderOrbital(){
   const a=o.attributes||{};
   const name=a.callsign||a.name||o.entity_id;
   const alt=a.altitude_m!=null?Math.round(num(a.altitude_m))+' m':(a.group||a.destination||'—');
-  const pos=o.position?num(o.position.latitude).toFixed(2)+', '+num(o.position.longitude).toFixed(2):'sem posição';
-  const dist=a.distance_km!=null?Math.round(num(a.distance_km))+' km':hhmm(o.observed_at);
-  return '<button type="button" class="row intel-topic" data-observation-id="'+esc(o.observation_id||'')+'"><span class="grow"><b>'+esc(name)+'</b><small>'+esc((o.entity_type||'obs')+' · '+alt+' · '+pos)+'</small></span><span class="pill">'+esc(dist)+'</span></button>';
+  const cachedPlace=o.position&&Globe.placeFor?Globe.placeFor(o.position.latitude,o.position.longitude):null;
+  const pos=(cachedPlace&&cachedPlace.label)||(o.position?num(o.position.latitude).toFixed(3)+', '+num(o.position.longitude).toFixed(3):'sem coordenadas');
+  const route=o.entity_type==='aircraft'?[a.origin||a.origin_airport,a.destination||a.destination_airport].filter(Boolean).join(' -> '):'';
+   const dist=a.distance_km!=null?Math.round(num(a.distance_km))+' km':hhmm(o.observed_at);
+  return '<button type="button" class="row intel-topic" data-observation-id="'+esc(o.observation_id||'')+'"><span class="grow"><b>'+esc(name)+'</b><small>'+esc((o.entity_type||'obs')+' · '+alt+' · '+pos+(route?' · ROTA '+route:''))+'</small></span><span class="pill">'+esc(dist)+'</span></button>';
  }).join('');
  const health=sourceHealth().gods_eye_view||{};
  if(health.error_code)html+='<div class="empty">Fonte parcial: '+esc(health.error_code)+'. Embarcações exigem AISSTREAM_API_KEY no servidor God\'s Eye View.</div>';
@@ -1879,8 +1921,11 @@ function renderSelection(mark){
   ? String((mark.members||[]).slice(0,12).map(item=>String(item.label||'').trim()).filter(Boolean).join(' · ')||'Alvos agrupados por proximidade.')
   : String(summary);
  const facts=[];
- const addFact=(label,value)=>{if(value!==undefined&&value!==null&&String(value).trim()!=='')facts.push('<span>'+esc(label)+'<b>'+esc(value)+'</b></span>');};
+ let activeFactSection='',factSectionHasValue=false;
+ const addSection=label=>{activeFactSection=label;factSectionHasValue=false;};
+ const addFact=(label,value)=>{if(value===undefined||value===null||String(value).trim()==='')return;if(activeFactSection&&!factSectionHasValue){facts.push('<div class="selection-facts-section">'+esc(activeFactSection)+'</div>');factSectionHasValue=true;}facts.push('<span>'+esc(label)+'<b>'+esc(value)+'</b></span>');};
  if(isCluster){
+  addSection('AGRUPAMENTO');
   addFact('ALVOS',(mark.members||[]).length);
   addFact('LOCAL',mark.place);
   state.clusterCameras=(mark.members||[]).filter(item=>item.kind==='camera'&&liveInfo(item));
@@ -1890,33 +1935,43 @@ function renderSelection(mark){
  }else{
   state.clusterCameras=[];
  }
- addFact('FONTE',sourceName);
+ addSection('IDENTIFICAÇÃO');
  addFact('ID',record.entity_id||record.event_id||record.device_id||record.id);
  addFact('TIPO',record.entity_type||record.category||record.type);
- addFact('OBSERVADO',record.observed_at||record.published_at||record.last_seen);
- addFact('ALTITUDE',attributes.altitude_m!=null?Math.round(num(attributes.altitude_m))+' m':null);
- addFact('VELOCIDADE',attributes.speed_kts!=null?attributes.speed_kts+' kt':attributes.speed_kmh!=null?attributes.speed_kmh+' km/h':null);
- addFact('DESTINO',attributes.destination);
- addFact('ORIGEM',attributes.origin);
  addFact('STATUS',record.status||attributes.status);
- addFact('IP',record.last_ip);
- addFact('MAC',record.mac);
- addFact('ORIGEM',record.source);
+ addSection('LOCALIZAÇÃO');
  addFact('LOCAL',record.place_label||(record.place?[record.place.city,record.place.state,record.place.country].filter(Boolean).join(' · '):null));
  addFact('ENDEREÇO',cachedPlace&&cachedPlace.address?cachedPlace.address:(mark.address||record.address||attributes.address||attributes.display_name));
+ addFact('PRECISÃO LOCAL',cachedPlace&&cachedPlace.address?'ENDEREÇO OSM · REFERÊNCIA APROXIMADA':null);
  addFact('POSIÇÃO',record.location_source==='ip'?'APROXIMADA POR IP':record.location_source==='gps'?'GPS DO DISPOSITIVO':null);
+ addSection('MOVIMENTO / ROTA');
+ addFact('ALTITUDE',attributes.altitude_m!=null?Math.round(num(attributes.altitude_m))+' m':null);
+ addFact('VELOCIDADE',attributes.speed_kts!=null?attributes.speed_kts+' kt':attributes.speed_kmh!=null?attributes.speed_kmh+' km/h':null);
+ addFact('ORIGEM',attributes.origin);
+ addFact('DESTINO',attributes.destination);
+ addFact('COMPANHIA',attributes.airline);
+ addFact('ROTA',mark.kind==='aircraft'?(mark.routeStatus==='not_found'?'NÃO INFORMADA PELA FONTE':mark.routeStatus==='unavailable'?'FONTE INDISPONÍVEL':mark.routeStatus==='available'?'ASSOCIADA AO CALLSIGN':'CONSULTA SOB DEMANDA'):null);
+ addFact('FONTE DA ROTA',mark.flightRoute?'ADS-BDB / GEV':null);
+ addFact('TRAJETO',mark.flightRoute?'ARCO GEODÉSICO · NÃO É TRILHA ADS-B':null);
+ addFact('RESSALVA',mark.flightRoute?'ASSOCIAÇÃO POR CALLSIGN; NÃO CONFIRMA DESTINO EM TEMPO REAL':null);
+ addSection('REDE / INVENTÁRIO');
+ addFact('IP',record.last_ip);
+ addFact('MAC',record.mac);
  if(mark.kind==='device_cluster'){
   addFact('DISPOSITIVOS',record.count);
   addFact('ONLINE',record.online_count);
   addFact('OFFLINE / OUTROS',record.offline_count);
-  (record.assets||[]).slice(0,8).forEach((asset,index)=>{
-   addFact('ATIVO '+(index+1),[asset.name||('ID '+asset.id),asset.status||'sem status',asset.last_ip||'IP não informado'].join(' · '));
-  });
+  (record.assets||[]).slice(0,8).forEach((asset,index)=>addFact('ATIVO '+(index+1),[asset.name||('ID '+asset.id),asset.status||'sem status',asset.last_ip||'IP não informado'].join(' · ')));
   if((record.assets_total||0)>(record.assets||[]).length)addFact('DEMAIS ATIVOS',((record.assets_total||0)-(record.assets||[]).length)+' não exibidos');
  }
+ addSection('PROVENIÊNCIA');
+ addFact('FONTE',sourceName);
+ addFact('FONTE / REGISTRO',record.source);
+ addFact('OBSERVADO',record.observed_at||record.published_at||record.last_seen);
+ addSection('DADOS ADICIONAIS');
  addFact('MAGNITUDE',record.magnitude!=null?'M'+num(record.magnitude).toFixed(1):null);
  addFact('RAIO ESTIMADO',record.affected?num(record.affected.felt_radius_km)+' KM (ESTIMATIVA)':null);
- Object.entries(attributes).filter(([key,value])=>!['description','summary','callsign','name','altitude_m','speed_kts','speed_kmh','destination','origin','status'].includes(key)&&value!=null&&['string','number','boolean'].includes(typeof value)).slice(0,4).forEach(([key,value])=>addFact(key.replaceAll('_',' ').toUpperCase(),value));
+ Object.entries(attributes).filter(([key,value])=>!['description','summary','callsign','name','altitude_m','speed_kts','speed_kmh','destination','origin','origin_latitude','origin_longitude','destination_latitude','destination_longitude','airline','status'].includes(key)&&value!=null&&['string','number','boolean'].includes(typeof value)).slice(0,4).forEach(([key,value])=>addFact(key.replaceAll('_',' ').toUpperCase(),value));
  $('selectionFacts').innerHTML=facts.join('');
  const source=$('selectionSource');
  source.href=/^https?:\/\//i.test(sourceUrl)?sourceUrl:'#';
@@ -1931,6 +1986,8 @@ function renderSelection(mark){
  $('selectionAction').textContent=(isCluster||mark.kind==='device_cluster')?'APROXIMAR':(mark.copyValue?'COPIAR':'CENTRALIZAR');
  $('selectionAction').disabled=!mark.copyValue&&!(latitude!=null&&longitude!=null&&Number.isFinite(Number(latitude))&&Number.isFinite(Number(longitude)));
  inspector.hidden=false;
+ enrichPlace(mark);
+ enrichAircraftRoute(mark);
 }
 function selectLiveEntity(kind,id){
  const collection=kind==='event'?state.live.events:state.live.observations;
@@ -2286,8 +2343,8 @@ function wire(){
    Globe.setDeviceData(locatedDevices());
   },450);
  });
- $('zoomIn').addEventListener('click',()=>Globe.zoomBy(1.15));
- $('zoomOut').addEventListener('click',()=>Globe.zoomBy(1/1.15));
+ $('zoomIn').addEventListener('click',()=>Globe.zoomBy(1.2));
+ $('zoomOut').addEventListener('click',()=>Globe.zoomBy(1/1.2));
  $('zoomReset').addEventListener('click',()=>Globe.reset());
  $('areaBar').addEventListener('click',ev=>{
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-area]'):null;
@@ -2420,7 +2477,7 @@ function wire(){
   renderStatus();
   if(mark.kind==='device_cluster'){
    const current=Globe.getZoom();
-   const next=current<1.2?1.45:current<1.65?1.75:2.05;
+   const next=current<1.2?1.7:current<1.8?2.35:2.9;
    Globe.focusTo(mark.latitude,mark.longitude,next);
    setFooter('AGRUPAMENTO · '+mark.count+' DISPOSITIVOS · APROXIME PARA DETALHAR');
   }

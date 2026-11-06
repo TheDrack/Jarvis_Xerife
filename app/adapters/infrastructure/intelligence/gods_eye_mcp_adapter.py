@@ -439,6 +439,7 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
         observations_by_entity: dict[tuple[str, str], IntelligenceObservation] = {}
         succeeded = 0
         failed = 0
+        failed_tools: list[str] = []
         try:
             async with self._open_session() as session:
                 listing = await asyncio.wait_for(session.list_tools(), timeout=self._timeout)
@@ -509,6 +510,7 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
                                 succeeded += 1
                             except (asyncio.TimeoutError, RuntimeError, ValueError, TypeError):
                                 failed += 1
+                                failed_tools.append(f"{tool_name}:{group}" if group else tool_name)
                                 logger.warning(
                                     "God's Eye View query failed: %s%s",
                                     tool_name,
@@ -516,10 +518,11 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
                                 )
 
             available = succeeded > 0
+            failure_detail = ",".join(dict.fromkeys(failed_tools))
             error_code = (
-                "PartialFailure" if available and failed else
+                f"PartialFailure:{failure_detail}" if available and failed else
                 "NoReadOnlyTools" if not succeeded and not failed else
-                "SourceUnavailable" if not succeeded else
+                f"SourceUnavailable:{failure_detail}" if not succeeded else
                 None
             )
             return IntelligenceBatch(
