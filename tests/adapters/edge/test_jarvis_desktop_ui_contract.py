@@ -128,7 +128,7 @@ def test_globe_selection_opens_a_contextual_inspector_with_an_action():
     assert "AGRUPAMENTO ABERTO · SELECIONE UM MEMBRO OU USE APROXIMAR" in HTML
     assert "Globe.getZoom()" not in HTML
     assert "data-cluster-member" in HTML
-    assert "function renderSelection(mark)" in HTML
+    assert re.search(r"function renderSelection\\(mark(?:,\\s*options=\\{\\})?\\)", HTML)
 
 
 def test_briefing_is_compact_and_the_outer_columns_do_not_scroll():
@@ -170,7 +170,7 @@ def test_selected_entities_expose_rich_details_and_verified_source_links():
     assert 'id="selectionSummary"' in HTML
     assert 'id="selectionFacts"' in HTML
     assert 'id="selectionSource"' in HTML
-    assert "function renderSelection(mark)" in HTML
+    assert re.search(r"function renderSelection\\(mark(?:,\\s*options=\\{\\})?\\)", HTML)
     assert "record.summary||record.description" in HTML
     assert "evidence[0]" in HTML
 
