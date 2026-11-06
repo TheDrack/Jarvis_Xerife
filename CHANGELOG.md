@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Grafo OSINT — `osint.ip.enrich` via MCP (2026-11-06)
+
+- `app/adapters/edge/osint_mcp_tools.py`: ferramenta atômica `osint.ip.enrich`
+  que expande um IP **um salto** pelo `get_graph_expander_registry()` de
+  produção, sem cascatear para o loop e sem tocar em adapters diretamente.
+  Aceita `radius_km`, `scope_id` e um filtro opcional de `capabilities`;
+  devolve `nodes`, `edges`, quais expanders rodaram, as capabilities
+  bloqueadas por rate limit e o `gap` para nós `IP`. IP inválido é recusado
+  pela normalização do `Node`; ausência de expander retorna o gap em vez de
+  inventar capacidade.
+- `tests/adapters/edge/test_osint_mcp_tools.py`: cobre registro, expansão de
+  um salto, filtro por capability, `RateLimitExceeded` reportado sem abortar
+  o restante e o caso sem expanders.
+
 #### Grafo OSINT — Fase 3: composição de produção (2026-11-06)
 
 - `app/application/services/graph_expander_setup.py`:

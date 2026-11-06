@@ -8,15 +8,21 @@ import math
 from typing import Any, Callable
 
 from app.application.services.adapter_registry import AdapterRegistry
+from app.application.services.graph_expander_setup import get_graph_expander_registry
 from app.application.services.osint_adapter_setup import get_osint_registry
 from app.application.services.osint_discovery import OSINTDiscoveryService
+from app.domain.graph.edges import Edge
+from app.domain.graph.nodes import Node, NodeType
+from app.domain.graph.registry import RateLimitExceeded
 from app.domain.intelligence.osint import Coordinate, Host
 
 
 def register_osint_tools(mcp: Any) -> None:
     """Register only passive atomic and orchestrated OSINT tools."""
 
-    def provider(registry: AdapterRegistry, capability: str, adapter_id: str):
+    def provider(
+        registry: AdapterRegistry, capability: str, adapter_id: str
+    ) -> Any | None:
         return next(
             (
                 adapter
@@ -50,6 +56,72 @@ def register_osint_tools(mcp: Any) -> None:
             if not bindings:
                 return {"success": False, "error": "osint.net.resolve capability unavailable"}
             return {"success": True, "network": bindings[0].resolve(ip).model_dump(mode="json")}
+        except Exception as exc:
+            return failure(exc)
+
+    @mcp.tool(name="osint.ip.enrich")
+    def osint_ip_enrich(
+        ip: str,
+        radius_km: float = 5.0,
+        scope_id: str = "osint-mcp",
+        capabilities: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Expand one IP atomically through the configured graph expanders.
+
+        Only expanders that accept an ``IP`` node run; nothing cascades into a
+        loop, so the result is one hop of evidence. Rate-limited capabilities
+        are reported instead of aborting the whole enrichment.
+        """
+        try:
+            seed = Node(
+                type=NodeType.IP,
+                selector=ip,
+                scope_id=scope_id,
+                attributes={"radius_km": radius_km},
+            )
+            registry = get_graph_expander_registry()
+            expanders = registry.find_expanders(
+                NodeType.IP,
+                tuple(capabilities) if capabilities is not None else None,
+            )
+            if not expanders:
+                return {
+                    "success": False,
+                    "error": "no graph expanders available for IP nodes",
+                    "gap": registry.find_gap(node_type=NodeType.IP).as_dict(),
+                }
+
+            nodes: list[Node] = [seed]
+            edges: list[Edge] = []
+            ran: list[str] = []
+            rate_limited: list[str] = []
+            for expander in expanders:
+                try:
+                    expansion = expander.expand(seed)
+                except RateLimitExceeded as exc:
+                    rate_limited.append(exc.capability)
+                    continue
+                ran.append(expander.spec.name)
+                nodes.extend(expansion.nodes)
+                edges.extend(expansion.edges)
+
+            unique_nodes = {node.id: node for node in nodes}
+            unique_edges = {edge.id: edge for edge in edges}
+            return {
+                "success": True,
+                "seed_id": seed.id,
+                "ip": seed.selector,
+                "scope_id": seed.scope_id,
+                "expanders": ran,
+                "rate_limited": sorted(set(rate_limited)),
+                "nodes": [
+                    node.model_dump(mode="json") for node in unique_nodes.values()
+                ],
+                "edges": [
+                    edge.model_dump(mode="json") for edge in unique_edges.values()
+                ],
+                "gap": registry.find_gap(node_type=NodeType.IP).as_dict(),
+            }
         except Exception as exc:
             return failure(exc)
 
