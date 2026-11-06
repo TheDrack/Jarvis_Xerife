@@ -221,6 +221,9 @@ class TestEvolutionOrchestratorFullCycle:
 
         assert result["success"] is False
         assert "gatekeeper_blocked" in result["reason"]
+        proposed = mock_gatekeeper.approve_evolution.call_args.args[0]
+        assert proposed["files_modified"] == ["app/example.py"]
+        assert proposed["target_file"] == "app/example.py"
 
     def test_explicit_cap_id_skips_capability_manager(self, orchestrator, tmp_path):
         """Quando ``cap_id`` é informado, a cap explícita vence a seleção automática."""
