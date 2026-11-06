@@ -21,6 +21,9 @@ pyperclip>=1.8.2
 # LLM Integration (optional)
 google-genai
 
+# MQTT home broker integration
+paho-mqtt>=2.0,<3
+
 # Additional utilities
 pandas>=2.0.0
 openpyxl>=3.1.0

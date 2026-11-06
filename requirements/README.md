@@ -27,6 +27,7 @@ Edge dependencies including hardware automation:
 - pyttsx3 (text-to-speech)
 - pynput (keyboard/mouse control)
 - google-generativeai (LLM integration)
+- paho-mqtt (MQTT home broker integration)
 - pandas and openpyxl (data processing utilities)
 
 **Note**: Audio dependencies (pyaudio, pyttsx3) are **optional**. The application automatically detects when audio libraries are unavailable and gracefully disables voice features.

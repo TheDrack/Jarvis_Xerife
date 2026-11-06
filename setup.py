@@ -30,6 +30,11 @@ setup(
         "sqlmodel>=0.0.14",
     ],
     extras_require={
-        "edge": ["pyautogui", "speechrecognition", "pynput"],
+        "edge": [
+            "pyautogui",
+            "speechrecognition",
+            "pynput",
+            "paho-mqtt>=2.0,<3",
+        ],
     },
 )
