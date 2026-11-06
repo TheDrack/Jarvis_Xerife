@@ -24,8 +24,8 @@ a{color:inherit;text-decoration:none}
 .hud-meta{display:flex;align-items:center;gap:18px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .hud-meta b{color:#d3f2ff;font-weight:500}
 #svcTag{color:var(--mint)}
-.hud-actions{display:flex;align-items:center;gap:7px}
-.layer-chip{border:1px solid var(--line);padding:5px 9px;font-size:var(--fs-xs);letter-spacing:.16em;color:var(--muted);border-radius:1px;transition:color .2s,border-color .2s,background .2s}
+.hud-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap;max-width:min(58vw,760px)}
+.layer-chip{border:1px solid var(--line);padding:4px 7px;font-size:var(--fs-xs);letter-spacing:.12em;color:var(--muted);border-radius:1px;transition:color .2s,border-color .2s,background .2s}
 .layer-chip.on{color:#02121d;background:var(--mint-soft);border-color:var(--mint);font-weight:700}
 .layer-chip:hover{border-color:var(--mint);color:var(--mint)}
 .layer-chip.on:hover{color:#02121d}
@@ -262,7 +262,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 .stage[data-view="core"] .col-left{grid-column:1}
 .stage[data-view="core"] .col-right{grid-column:3}
 .selection-inspector{position:absolute;z-index:4;left:18px;bottom:18px;width:min(320px,calc(100% - 72px));padding:12px 13px;display:grid;gap:6px;border:1px solid rgba(84,215,255,.34);background:linear-gradient(145deg,rgba(5,24,40,.96),rgba(1,8,16,.94));box-shadow:0 16px 42px rgba(0,0,0,.42),0 0 24px rgba(84,215,255,.08);backdrop-filter:blur(12px);animation:hud-enter .2s ease both}
-.selection-inspector{width:min(430px,calc(100% - 72px));max-height:min(52vh,420px);overflow:auto;overscroll-behavior:contain}.selection-summary{margin:0;color:#c7e8f5;font-size:var(--fs-sm);line-height:1.55;white-space:normal}.selection-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.selection-facts-section{grid-column:1/-1;padding:4px 0 2px;border-bottom:1px solid var(--line-soft);font:600 var(--fs-2xs)/1.4 var(--mono);letter-spacing:.18em;color:var(--mint);text-transform:uppercase}.selection-facts span{padding:5px 6px;border-left:1px solid var(--line);background:rgba(84,215,255,.045);font:var(--fs-2xs)/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere}.selection-facts b{display:block;color:#d9f4ff;font-weight:500}.selection-actions a{display:inline-flex;align-items:center;text-decoration:none}.selection-actions a[hidden]{display:none}@media(max-width:900px){.selection-inspector{width:min(380px,calc(100% - 48px));max-height:42vh}}\n.selection-inspector[hidden]{display:none}
+.selection-inspector{width:min(430px,calc(100% - 72px));max-height:min(52vh,420px);overflow:auto;overscroll-behavior:contain}.selection-summary{margin:0;color:#c7e8f5;font-size:var(--fs-sm);line-height:1.55;white-space:normal}.selection-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}.selection-facts-section{grid-column:1/-1;padding:4px 0 2px;border-bottom:1px solid var(--line-soft);font:600 var(--fs-2xs)/1.4 var(--mono);letter-spacing:.18em;color:var(--mint);text-transform:uppercase}.selection-facts span{padding:5px 6px;border-left:1px solid var(--line);background:rgba(84,215,255,.045);font:var(--fs-2xs)/1.45 var(--mono);color:var(--muted);overflow-wrap:anywhere}.selection-facts b{display:block;color:#d9f4ff;font-weight:500}.cluster-member-list{grid-column:1/-1;display:grid;gap:4px;max-height:220px;overflow:auto;padding-right:3px}.cluster-member{display:grid;gap:2px;width:100%;padding:7px 8px;text-align:left;border:1px solid rgba(84,215,255,.16);border-left:2px solid rgba(84,215,255,.52);background:rgba(84,215,255,.045);color:#d9f4ff;cursor:pointer}.cluster-member:hover,.cluster-member:focus-visible{border-color:rgba(84,215,255,.65);background:rgba(84,215,255,.12);outline:none}.cluster-member b{font:600 var(--fs-xs)/1.35 var(--mono)}.cluster-member small{font:var(--fs-2xs)/1.4 var(--mono);color:var(--muted)}.selection-actions a{display:inline-flex;align-items:center;text-decoration:none}.selection-actions a[hidden]{display:none}@media(max-width:900px){.selection-inspector{width:min(380px,calc(100% - 48px));max-height:42vh}}\n.selection-inspector[hidden]{display:none}
 .selection-kicker{display:flex;justify-content:space-between;gap:10px;font:var(--fs-2xs)/1.4 var(--mono);letter-spacing:.16em;color:var(--mint)}
 .selection-inspector strong{font-size:var(--fs-md);font-weight:600;color:#e8faff;line-height:1.35}
 .selection-inspector small{font:var(--fs-xs)/1.5 var(--mono);color:var(--muted)}
@@ -320,10 +320,15 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
   <div class="brand"><span class="diamond">◈</span> J.A.R.V.I.S. <span class="slash">//</span> NEURAL INTERFACE</div>
   <div class="hud-meta"><span>HOST <b id="hostTag">--</b></span><span id="svcTag">SVC 0/0</span><span id="clock">--:--:--</span></div>
   <div class="hud-actions">
-   <button class="layer-chip on" type="button" data-layer="satellite" aria-pressed="true" title="Satélites (God's Eye)">SAT</button>
-   <button class="layer-chip on" type="button" data-layer="aircraft" aria-pressed="true" title="Aeronaves (God's Eye)">AIR</button>
+   <button class="layer-chip on" type="button" data-layer="satellite" aria-pressed="true" title="Satélites">SAT</button>
+   <button class="layer-chip on" type="button" data-layer="aircraft" aria-pressed="true" title="Aeronaves">AIR</button>
+   <button class="layer-chip on" type="button" data-layer="vessel" aria-pressed="true" title="Embarcações">SEA</button>
    <button class="layer-chip on" type="button" data-layer="fire" aria-pressed="true" title="Focos de incêndio">FIRE</button>
    <button class="layer-chip on" type="button" data-layer="quake" aria-pressed="true" title="Sismos">QUAKE</button>
+   <button class="layer-chip on" type="button" data-layer="camera" aria-pressed="true" title="Câmeras">CAM</button>
+   <button class="layer-chip on" type="button" data-layer="device" aria-pressed="true" title="Dispositivos">DEV</button>
+   <button class="layer-chip on" type="button" data-layer="installation" aria-pressed="true" title="Instalações e infraestrutura">SITE</button>
+   <button class="layer-chip on" type="button" data-layer="radio_station" aria-pressed="true" title="Estações de rádio">RAD</button>
    <button class="icon-btn" id="fullscreenToggle" type="button" aria-label="Ativar tela cheia" title="Tela cheia (F11)">⛶</button>
   </div>
  </header>
@@ -466,14 +471,14 @@ const state={
  token:sessionStorage.getItem(TOKEN_KEY)||'',
  bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,openCameras:null,devices:null,busy:false,loadingSources:false,view:'core',topic:'regiao',location:null,locating:false,globeZoom:1,clusterCameras:[],
  live:{events:[],observations:[],sources:[],correlations:[],collected_at:null,area:null},
- layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true,radio_station:true},
+ layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true,radio_station:true,camera:true,device:true,installation:true},
  selected:null,
  history:{cpu:[],mem:[],temp:[]}
 };
-const LAYER_OF={satellite:'satellite',aircraft:'aircraft',vessel:'vessel',camera:'camera',alpr_camera:'camera',radio_station:'radio_station',port:'port',chokepoint:'chokepoint',datacenter:'infrastructure',dam:'infrastructure',infrastructure:'infrastructure',military_site:'military_site'};
-const LABEL_KINDS=new Set(['aircraft','satellite','device','camera','radio_station','vessel']);
+const LAYER_OF={satellite:'satellite',aircraft:'aircraft',vessel:'vessel',camera:'camera',alpr_camera:'camera',radio_station:'radio_station',port:'installation',chokepoint:'installation',datacenter:'installation',dam:'installation',infrastructure:'installation',military_site:'installation'};
+const LABEL_KINDS=new Set(['aircraft','satellite','device','camera','radio_station','vessel','installation']);
 const EVENT_LAYER={earthquake:'quake',wildfire:'fire',volcano:'fire',seismic:'quake'};
-const COLORS={satellite:'#a5ecff',aircraft:'#54d7ff',vessel:'#ffb45c',quake:'#ff8f7a',fire:'#ffb347',event:'#8be3ff',camera:'#7ef0c8',radio_station:'#e8a6ff',port:'#ffd479',chokepoint:'#ff9f6e',infrastructure:'#c8b6ff',military_site:'#ff8fb1'};
+const COLORS={satellite:'#a5ecff',aircraft:'#54d7ff',vessel:'#ffb45c',quake:'#ff8f7a',fire:'#ffb347',event:'#8be3ff',camera:'#7ef0c8',radio_station:'#e8a6ff',port:'#ffd479',chokepoint:'#ff9f6e',infrastructure:'#c8b6ff',military_site:'#ff8fb1',installation:'#ff9f6e'};
 
 /* ---------------- API ---------------- */
 async function api(path,opts){
@@ -508,7 +513,9 @@ const Globe=(()=>{
  let spin=!reduce,drag=null,idleUntil=0,lastT=0;
  let geo=null,px=null,py=null,pz=null,adminBoundaries=null;
  let stars=[],marks=[],area=null,hook=null,hits=[],quakeRings=[],labelBoxes=[];
- let placeCache=new Map(),placeQueue=[],placeQueued=new Set(),placeRunning=false,placeScanAt=0;
+ let placeCache=new Map(),placeQueue=[],placeQueueByKey=new Map(),placeRunning=false,placeScanAt=0;
+ const aircraftTracks=new Map();
+ const aircraftRouteCache=new Map();
  const aircraftRouteLookups=new Set();
  const aircraftRouteQueue=[];
  const aircraftRouteQueued=new Set();
@@ -523,7 +530,7 @@ const Globe=(()=>{
  const PLACE_VISIBLE_SCAN_INTERVAL_MS=750;
  const PLACE_TTL_MS=7*86400000;
  const PLACE_MISS_TTL_MS=3600000;
- const PLACE_PRIORITY={device:0,camera:1,port:2,chokepoint:2,military_site:2,infrastructure:2,fire:3,quake:3,event:3,vessel:4,aircraft:5,satellite:6};
+ const PLACE_PRIORITY={device:0,camera:1,installation:2,port:2,chokepoint:2,military_site:2,infrastructure:2,fire:3,quake:3,event:3,vessel:4,aircraft:5,satellite:6};
  const graticule=(()=>{
   const chains=[];
   for(let lon=-180;lon<180;lon+=30){const chain=[];for(let lat=-84;lat<=84;lat+=4)chain.push([lon,lat]);chains.push(chain);}
@@ -532,7 +539,7 @@ const Globe=(()=>{
  })();
  const sph=(lon,lat)=>{const cp=Math.cos(lat*RAD);return [cp*Math.sin(lon*RAD),Math.sin(lat*RAD),cp*Math.cos(lon*RAD)];};
  const dest=(lat,lon,km,bearing)=>{const d=km/6371,brg=bearing*RAD,lat1=lat*RAD,lon1=lon*RAD;const lat2=Math.asin(Math.sin(lat1)*Math.cos(d)+Math.cos(lat1)*Math.sin(d)*Math.cos(brg));const lon2=lon1+Math.atan2(Math.sin(brg)*Math.sin(d)*Math.cos(lat1),Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));return [((lon2/RAD+540)%360)-180,lat2/RAD];};
- const clampZoom=value=>Math.max(0.75,Math.min(24,Number.isFinite(value)?value:1));
+ const clampZoom=value=>Math.max(0.65,Math.min(64,Number.isFinite(value)?value:1));
  const notifyZoom=()=>{if(typeof zoomHook==='function')zoomHook(zoom);};
  const pairDistance=()=>{
   const points=Array.from(pointers.values());
@@ -606,7 +613,7 @@ const Globe=(()=>{
   ctx.strokeStyle=style;ctx.lineWidth=width;ctx.stroke();
  }
  function drawAdminBoundaries(radius,cosR,sinR,cosT,sinT){
-  if(!adminBoundaries||zoom<1.15)return;
+  if(!adminBoundaries||zoom<0.65)return;
   const viewportAreaKm2=510000000/(Math.max(1,zoom*zoom)*20);
   const layer=window.JarvisGeospatialLayer&&window.JarvisGeospatialLayer.chooseBoundaryLayer
    ?window.JarvisGeospatialLayer.chooseBoundaryLayer(zoom,viewportAreaKm2,adminBoundaries.layers):null;
@@ -836,21 +843,55 @@ const Globe=(()=>{
  }
  function drawAircraftRoutes(radius,cosR,sinR,cosT,sinT){
    const project=(latitude,longitude)=>{const v=sph(longitude,latitude),x=v[0]*cosR+v[2]*sinR,z=v[2]*cosR-v[0]*sinR,y=v[1]*cosT-z*sinT;return {x:cx+x*radius,y:cy-y*radius,visible:v[1]*sinT+z*cosT>0.02};};
-   ctx.save();ctx.setLineDash([3,5]);ctx.lineWidth=1.25;ctx.strokeStyle='rgba(84,215,255,.82)';
+   const drawSegment=(start,end,steps=32)=>{
+    const a=sph(start.longitude,start.latitude),b=sph(end.longitude,end.latitude),dot=Math.max(-1,Math.min(1,a[0]*b[0]+a[1]*b[1]+a[2]*b[2])),omega=Math.acos(dot);
+    if(!Number.isFinite(omega)||omega<1e-6)return;
+    const sinOmega=Math.sin(omega);let started=false;
+    for(let step=0;step<=steps;step+=1){
+     const t=step/steps,wa=Math.sin((1-t)*omega)/sinOmega,wb=Math.sin(t*omega)/sinOmega;
+     const x=wa*a[0]+wb*b[0],y=wa*a[1]+wb*b[1],z=wa*a[2]+wb*b[2];
+     const point=project(Math.atan2(y,Math.hypot(x,z))/RAD,Math.atan2(x,z)/RAD);
+     if(!point.visible){started=false;continue;}
+     if(!started){ctx.moveTo(point.x,point.y);started=true;}else ctx.lineTo(point.x,point.y);
+    }
+   };
+   ctx.save();
+   const layer=window.JarvisGeospatialLayer;
+   const selectedIdentity=state.selected&&layer&&layer.normalizeAircraftIdentity
+    ?layer.normalizeAircraftIdentity(state.selected.record||{}).key:'';
+   const tracks=Array.from(aircraftTracks.values()).filter(track=>track.points.length>1)
+    .sort((a,b)=>(a.key===selectedIdentity?-1:b.key===selectedIdentity?1:0)).slice(0,18);
+   for(const track of tracks){
+    ctx.beginPath();ctx.setLineDash([]);ctx.lineWidth=track.key===selectedIdentity?2.4:1.45;
+    ctx.strokeStyle=track.key===selectedIdentity?'rgba(126,240,200,.98)':'rgba(126,240,200,.62)';
+    let segment=[];
+    const flush=()=>{for(let index=1;index<segment.length;index+=1){drawSegment(segment[index-1],segment[index],8);}segment=[];};
+    for(const point of track.points.slice(-120)){
+     if(segment.length&&point.timestamp-segment[segment.length-1].timestamp>300000)flush();
+     segment.push(point);
+    }
+    flush();ctx.stroke();
+   }
    const routeBudget=Math.min(36,Math.max(6,Math.round(6+zoom*1.25)));
    const routeMarks=marks.filter(mark=>mark.kind==='aircraft'&&mark.flightRoute)
     .sort((a,b)=>(a===state.selected?-1:b===state.selected?1:0)).slice(0,routeBudget);
    for(const mark of routeMarks){
-    const a=sph(mark.flightRoute.origin.longitude,mark.flightRoute.origin.latitude),b=sph(mark.flightRoute.destination.longitude,mark.flightRoute.destination.latitude),dot=Math.max(-1,Math.min(1,a[0]*b[0]+a[1]*b[1]+a[2]*b[2])),omega=Math.acos(dot);
-    if(!Number.isFinite(omega)||omega<1e-6)continue;const sinOmega=Math.sin(omega);ctx.beginPath();let started=false;
-    for(let step=0;step<=48;step+=1){const t=step/48,wa=Math.sin((1-t)*omega)/sinOmega,wb=Math.sin(t*omega)/sinOmega,x=wa*a[0]+wb*b[0],y=wa*a[1]+wb*b[1],z=wa*a[2]+wb*b[2],lat=Math.atan2(y,Math.hypot(x,z))/RAD,lon=Math.atan2(x,z)/RAD,point=project(lat,lon);if(!point.visible){started=false;continue;}if(!started){ctx.moveTo(point.x,point.y);started=true;}else ctx.lineTo(point.x,point.y);}ctx.stroke();
-    for(const endpoint of [mark.flightRoute.origin,mark.flightRoute.destination]){
+    const route=mark.flightRoute,waypoints=route.kind==='flight_plan'&&route.waypoints.length>=2
+     ?route.waypoints:[route.origin,route.destination];
+    ctx.beginPath();ctx.lineWidth=route.kind==='flight_plan'?1.8:1.25;
+    ctx.strokeStyle=route.kind==='flight_plan'?'rgba(84,169,217,.96)':'rgba(255,180,92,.9)';
+    ctx.setLineDash(route.kind==='flight_plan'?[6,4]:[2,6]);
+    for(let index=1;index<waypoints.length;index+=1)drawSegment(waypoints[index-1],waypoints[index],48);
+    ctx.stroke();
+    for(const endpoint of [route.origin,route.destination]){
      const point=project(endpoint.latitude,endpoint.longitude);if(!point.visible)continue;
-     ctx.setLineDash([]);ctx.beginPath();ctx.arc(point.x,point.y,3.2,0,TAU);ctx.fillStyle='rgba(255,190,104,.98)';ctx.fill();
-     const code=String(endpoint.code||endpoint.name||'').trim();if(code){ctx.font='600 8px "Cascadia Mono",ui-monospace,monospace';ctx.fillStyle='rgba(224,245,255,.96)';ctx.fillText(code.slice(0,18),point.x+5,point.y-5);}
-     ctx.setLineDash([3,5]);
+     ctx.setLineDash([]);ctx.beginPath();ctx.arc(point.x,point.y,3.2,0,TAU);
+     ctx.fillStyle=route.kind==='flight_plan'?'rgba(84,169,217,.98)':'rgba(255,190,104,.98)';ctx.fill();
+     const code=String(endpoint.ident||endpoint.code||endpoint.name||'').trim();
+     if(code){ctx.font='600 8px "Cascadia Mono",ui-monospace,monospace';ctx.fillStyle='rgba(224,245,255,.96)';ctx.fillText(code.slice(0,18),point.x+5,point.y-5);}
     }
-   }ctx.restore();
+   }
+   ctx.restore();
   }
   function drawMarks(radius,t,cosR,sinR,cosT,sinT){
    drawAircraftRoutes(radius,cosR,sinR,cosT,sinT);
@@ -869,7 +910,7 @@ const Globe=(()=>{
   }
   enrichVisiblePlaces(visible.map(item=>item.m));
   enrichVisibleAircraftRoutes(visible.map(item=>item.m));
-  const threshold=Math.max(14,44/zoom);
+  const threshold=Math.max(8,26/Math.sqrt(zoom));
   const clusters=[],cells=new Map();
   for(const item of visible){
    if(item.m.kind==='device'||item.m.kind==='device_cluster'){
@@ -880,7 +921,7 @@ const Globe=(()=>{
    let target=null,best=threshold;
    for(let dx=-1;dx<=1&&!target;dx+=1){
     for(let dy=-1;dy<=1&&!target;dy+=1){
-     const bucket=cells.get((gx+dx)+','+(gy+dy));
+     const bucket=cells.get(item.m.kind+':'+(gx+dx)+','+(gy+dy));
      if(!bucket)continue;
      for(const candidate of bucket){
       const d=Math.hypot(candidate.x-item.sx,candidate.y-item.sy);
@@ -891,7 +932,7 @@ const Globe=(()=>{
    if(!target){
     target={x:item.sx,y:item.sy,sumX:item.sx,sumY:item.sy,items:[item],color:item.color};
     clusters.push(target);
-    const key=gx+','+gy;
+    const key=item.m.kind+':'+gx+','+gy;
     if(!cells.has(key))cells.set(key,[]);
     cells.get(key).push(target);
    }else{
@@ -924,13 +965,15 @@ const Globe=(()=>{
    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(count),cluster.x,cluster.y+0.5);
    const members=cluster.items.map(item=>item.m);
    const regionLayer=window.JarvisGeospatialLayer;
-   const detail=regionLayer&&typeof regionLayer.generalizeRegion==='function'
-    ?regionLayer.generalizeRegion(members.map(item=>item.record||item),zoom):'Região geográfica';
-   drawMarkLabel(cluster.x,cluster.y,r,count+' alvos',detail,'#dff8ff');
+   const detail=regionLayer&&typeof regionLayer.generalizeRegionFromMembers==='function'
+    ?regionLayer.generalizeRegionFromMembers(members,zoom,placeFor)
+    :regionLayer&&typeof regionLayer.generalizeRegion==='function'
+     ?regionLayer.generalizeRegion(members.map(item=>item.record||item),zoom):'Região geográfica';
+   drawMarkLabel(cluster.x,cluster.y,r,count+' '+String(first.m.kind||'alvos').replaceAll('_',' '),detail,'#dff8ff');
    const lat=members.reduce((sum,m)=>sum+num(m.latitude),0)/count;
    const lon=members.reduce((sum,m)=>sum+num(m.longitude),0)/count;
    hits.push({x:cluster.x,y:cluster.y,radius:r+7,m:{
-    kind:'cluster',label:count+' alvos próximos',meta:detail,cluster:true,members,zoomLevel:zoom,
+    kind:'cluster',label:count+' '+String(first.m.kind||'alvos').replaceAll('_',' ')+' agrupados',meta:detail,cluster:true,members,zoomLevel:zoom,
     latitude:lat,longitude:lon,place:detail,
     record:{summary:members.slice(0,10).map(m=>String(m.label||'').trim()).filter(Boolean).join(' · ')}
    }});
@@ -1132,9 +1175,12 @@ const Globe=(()=>{
   if(!isCluster&&!coordinateFallback&&(record.address||attributes.address||attributes.display_name))return;
   const key=placeKey(latitude,longitude),cached=placeCache.get(key);
   if(cached){applyPlace(mark,cached);return;}
-  if(placeQueued.has(key)||(PLACE_RETRY_AFTER.get(key)||0)>Date.now())return;
-  placeQueued.add(key);
-  placeQueue.push({key,latitude,longitude,regionZoom:isCluster?Number(mark.zoomLevel)||1:null,marks:[mark]});
+  const pending=placeQueueByKey.get(key);
+  if(pending){if(!pending.marks.includes(mark))pending.marks.push(mark);return;}
+  if((PLACE_RETRY_AFTER.get(key)||0)>Date.now())return;
+  const group={key,latitude,longitude,regionZoom:isCluster?Number(mark.zoomLevel)||1:null,marks:[mark]};
+  placeQueueByKey.set(key,group);
+  placeQueue.push(group);
   runPlaceQueue();
  }
  function enrichVisiblePlaces(visibleMarks){
@@ -1151,7 +1197,7 @@ const Globe=(()=>{
    const key=placeKey(mark.latitude,mark.longitude);
    const cached=placeCache.get(key);
    if(cached){applyPlace(mark,cached);continue;}
-   if(placeQueued.has(key)||(PLACE_RETRY_AFTER.get(key)||0)>Date.now())continue;
+   if((PLACE_RETRY_AFTER.get(key)||0)>Date.now())continue;
    const coordinateFallback=!mark.place||mark.place===coordText(mark.latitude,mark.longitude);
    const record=mark.record||mark.device||{};
    const attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
@@ -1173,7 +1219,7 @@ const Globe=(()=>{
       const fallback=reason==='http_429'?60:15;
       const retry=Math.max(1,Math.min(3600,Number(data&&data.retry_after_seconds)||fallback));
       PLACE_RETRY_AFTER.set(group.key,Date.now()+retry*1000);
-      placeQueued.delete(group.key);
+      placeQueueByKey.delete(group.key);
       break;
      }
     }
@@ -1187,28 +1233,41 @@ const Globe=(()=>{
     draw(performance.now());
    }catch(_){
     PLACE_RETRY_AFTER.set(group.key,Date.now()+15000);
-    placeQueued.delete(group.key);
+    placeQueueByKey.delete(group.key);
     break;
    }
-   placeQueued.delete(group.key);
+   placeQueueByKey.delete(group.key);
   }
   placeRunning=false;
+ }
+ function aircraftRouteKey(record,attributes){
+  const callsign=String(attributes.callsign||'').trim().toUpperCase();
+  const identity=window.JarvisGeospatialLayer&&window.JarvisGeospatialLayer.normalizeAircraftIdentity
+   ?window.JarvisGeospatialLayer.normalizeAircraftIdentity(record||{}):null;
+  const identityKey=identity&&(identity.icao24||identity.registration)?identity.key:callsign;
+  const observed=Date.parse(record.observed_at||'');
+  const day=Number.isFinite(observed)?new Date(observed).toISOString().slice(0,10):'current';
+  return /^[A-Z0-9]{2,8}$/.test(callsign)&&identityKey?identityKey+':'+day:'';
  }
  function enrichVisibleAircraftRoutes(visibleMarks){
   const now=Date.now();
   if(now-aircraftRouteScanAt<AIRCRAFT_ROUTE_SCAN_INTERVAL_MS||aircraftRouteQueue.length>=AIRCRAFT_ROUTE_QUEUE_LIMIT)return;
   aircraftRouteScanAt=now;
   const candidates=(Array.isArray(visibleMarks)?visibleMarks:[])
-   .filter(mark=>mark&&mark.kind==='aircraft'&&!mark.flightRoute&&mark.routeStatus!=='available'&&mark.routeStatus!=='not_found')
+   .filter(mark=>mark&&mark.kind==='aircraft'&&!mark.flightRoute&&['pending','unavailable','not_found'].includes(mark.routeStatus||'pending'))
    .sort((a,b)=>(a===state.selected?-1:b===state.selected?1:0));
   let queued=0;
   for(const mark of candidates){
    if(queued>=AIRCRAFT_ROUTE_BATCH_LIMIT||aircraftRouteQueue.length>=AIRCRAFT_ROUTE_QUEUE_LIMIT)break;
    const record=mark.record||{},attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
-   const callsign=String(attributes.callsign||'').trim().toUpperCase();
-   if(!/^[A-Z0-9]{2,8}$/.test(callsign)||aircraftRouteQueued.has(callsign)||aircraftRouteLookups.has(callsign))continue;
-   if(mark.routeStatus==='unavailable'&&(mark.routeRetryAt||0)>now)continue;
-   aircraftRouteQueued.add(callsign);aircraftRouteQueue.push(mark);queued+=1;
+   const callsign=String(attributes.callsign||'').trim().toUpperCase(),cacheKey=aircraftRouteKey(record,attributes);
+   if(!/^[A-Z0-9]{2,8}$/.test(callsign)||!cacheKey||aircraftRouteQueued.has(cacheKey)||aircraftRouteLookups.has(cacheKey))continue;
+   const cached=aircraftRouteCache.get(cacheKey);
+   if(cached&&cached.expiresAt>now){
+    mark.flightRoute=cached.route;mark.routeStatus=cached.status;mark.routeRetryAt=cached.expiresAt;continue;
+   }
+   if((mark.routeRetryAt||0)>now)continue;
+   aircraftRouteQueued.add(cacheKey);aircraftRouteQueue.push(mark);queued+=1;
   }
   runAircraftRouteQueue();
  }
@@ -1217,40 +1276,50 @@ const Globe=(()=>{
   aircraftRouteRunning=true;
   while(aircraftRouteQueue.length){
    const mark=aircraftRouteQueue.shift();
-   const attributes=(mark.record&&mark.record.attributes)||{};
-   const callsign=String(attributes.callsign||'').trim().toUpperCase();
-   aircraftRouteQueued.delete(callsign);
-   if(mark.flightRoute||mark.routeStatus==='not_found'||(mark.routeStatus==='unavailable'&&(mark.routeRetryAt||0)>Date.now()))continue;
+   const attributes=(mark.record&&mark.record.attributes)||{},cacheKey=aircraftRouteKey(mark.record||{},attributes);
+   aircraftRouteQueued.delete(cacheKey);
+   if(mark.flightRoute||(mark.routeRetryAt||0)>Date.now())continue;
    await enrichAircraftRoute(mark);
    if(aircraftRouteQueue.length)await new Promise(resolve=>setTimeout(resolve,350));
   }
   aircraftRouteRunning=false;
  }
  async function enrichAircraftRoute(mark){
-  if(!mark||mark.kind!=='aircraft'||mark.flightRoute||mark.routeStatus==='available'||mark.routeStatus==='not_found')return;
-  if(mark.routeStatus==='unavailable'&&(mark.routeRetryAt||0)>Date.now())return;
+  if(!mark||mark.kind!=='aircraft'||mark.flightRoute)return;
   const record=mark.record||{},attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
-  const callsign=String(attributes.callsign||'').trim().toUpperCase();
-  if(!/^[A-Z0-9]{2,8}$/.test(callsign)||aircraftRouteLookups.has(callsign))return;
-  aircraftRouteLookups.add(callsign);
+  const callsign=String(attributes.callsign||'').trim().toUpperCase(),cacheKey=aircraftRouteKey(record,attributes);
+  if(!/^[A-Z0-9]{2,8}$/.test(callsign)||!cacheKey||aircraftRouteLookups.has(cacheKey))return;
+  const cached=aircraftRouteCache.get(cacheKey);
+  if(cached&&cached.expiresAt>Date.now()){
+   mark.flightRoute=cached.route;mark.routeStatus=cached.status;mark.routeRetryAt=cached.expiresAt;
+   if(state.selected===mark)renderSelection(mark,{skipRouteLookup:true});
+   draw(performance.now());return;
+  }
+  if((mark.routeRetryAt||0)>Date.now())return;
+  aircraftRouteLookups.add(cacheKey);mark.routeStatus='loading';
   try{
    const result=await api('/api/intelligence/aircraft-route?callsign='+encodeURIComponent(callsign));
-   if(result&&result.available&&result.origin&&result.destination){
-    const origin=result.origin,destination=result.destination;
-    mark.flightRoute={
-     origin:{latitude:Number(origin.latitude),longitude:Number(origin.longitude),code:origin.code,name:origin.name},
-     destination:{latitude:Number(destination.latitude),longitude:Number(destination.longitude),code:destination.code,name:destination.name}
-    };
-    attributes.origin=[origin.code,origin.name].filter(Boolean).join(' · ');
-    attributes.destination=[destination.code,destination.name].filter(Boolean).join(' · ');
-    attributes.airline=result.airline||null;
-    mark.routeStatus='available';
+   const layer=window.JarvisGeospatialLayer;
+   const route=result&&result.available&&layer&&layer.normalizeAircraftRoute
+    ?layer.normalizeAircraftRoute({kind:result.route_kind,origin:result.origin,destination:result.destination,waypoints:result.waypoints,provider:result.provider})
+    :null;
+   if(route){
+    mark.flightRoute=route;
+    attributes.origin=[route.origin.ident,route.origin.name].filter(Boolean).join(' · ');
+    attributes.destination=[route.destination.ident,route.destination.name].filter(Boolean).join(' · ');
+    attributes.airline=result.airline||attributes.airline||null;
+    mark.routeStatus=route.kind==='flight_plan'?'planned':'estimated';
+    mark.routeRetryAt=0;
+    aircraftRouteCache.set(cacheKey,{route,status:mark.routeStatus,expiresAt:Date.now()+30*60000});
    }else{
     mark.routeStatus=result&&result.reason==='route_not_found'?'not_found':'unavailable';
-    if(mark.routeStatus==='unavailable')mark.routeRetryAt=Date.now()+60000;
+    mark.routeRetryAt=Date.now()+(mark.routeStatus==='not_found'?10*60000:60000);
+    aircraftRouteCache.set(cacheKey,{route:null,status:mark.routeStatus,expiresAt:mark.routeRetryAt});
    }
-  }catch(_){mark.routeStatus='unavailable';mark.routeRetryAt=Date.now()+60000;}
-  finally{aircraftRouteLookups.delete(callsign);}
+  }catch(_){
+   mark.routeStatus='unavailable';mark.routeRetryAt=Date.now()+60000;
+   aircraftRouteCache.set(cacheKey,{route:null,status:mark.routeStatus,expiresAt:mark.routeRetryAt});
+  }finally{aircraftRouteLookups.delete(cacheKey);}
   if(state.selected===mark)renderSelection(mark);
   if(typeof renderOrbital==='function')renderOrbital();
   draw(performance.now());
@@ -1285,16 +1354,33 @@ const Globe=(()=>{
    const attrs=o.attributes||{};
    const name=attrs.callsign||attrs.name||attrs.group||o.entity_id;
    const validEndpoint=(lat,lon)=>Number.isFinite(Number(lat))&&Number(lat)>=-90&&Number(lat)<=90&&Number.isFinite(Number(lon))&&Number(lon)>=-180&&Number(lon)<=180;
-    const flightRoute=o.entity_type==='aircraft'&&validEndpoint(attrs.origin_latitude,attrs.origin_longitude)&&validEndpoint(attrs.destination_latitude,attrs.destination_longitude)?{origin:{latitude:Number(attrs.origin_latitude),longitude:Number(attrs.origin_longitude)},destination:{latitude:Number(attrs.destination_latitude),longitude:Number(attrs.destination_longitude)}}:null;
-    const observed=new Date(o.observed_at||0).getTime();
+   const geoLayer=window.JarvisGeospatialLayer;
+   const routeInput=o.entity_type==='aircraft'?{
+    kind:attrs.route_kind||((Array.isArray(attrs.route_waypoints)&&attrs.route_waypoints.length>1)?'flight_plan':null),
+    origin:validEndpoint(attrs.origin_latitude,attrs.origin_longitude)?{latitude:Number(attrs.origin_latitude),longitude:Number(attrs.origin_longitude),code:attrs.origin_code,name:attrs.origin}:null,
+    destination:validEndpoint(attrs.destination_latitude,attrs.destination_longitude)?{latitude:Number(attrs.destination_latitude),longitude:Number(attrs.destination_longitude),code:attrs.destination_code,name:attrs.destination}:null,
+    waypoints:attrs.route_waypoints||attrs.waypoints||[],provider:o.source_id
+   }:null;
+   const flightRoute=routeInput&&geoLayer&&geoLayer.normalizeAircraftRoute?geoLayer.normalizeAircraftRoute(routeInput):null;
+   const identity=o.entity_type==='aircraft'&&geoLayer&&geoLayer.normalizeAircraftIdentity?geoLayer.normalizeAircraftIdentity(o):null;
+   const track=o.entity_type==='aircraft'&&geoLayer&&geoLayer.appendAircraftTrack
+    ?geoLayer.appendAircraftTrack(aircraftTracks,o,{maxPoints:240,maxAgeMs:2*60*60*1000}):null;
+   const routeKey=aircraftRouteKey(o,attrs),cachedRoute=routeKey?aircraftRouteCache.get(routeKey):null;
+   const routeCacheValid=Boolean(cachedRoute&&cachedRoute.expiresAt>Date.now());
+   const resolvedRoute=flightRoute||(routeCacheValid?cachedRoute.route:null);
+   const routeStatus=resolvedRoute?(resolvedRoute.kind==='flight_plan'?'planned':'estimated')
+    :routeCacheValid?cachedRoute.status:identity&&identity.callsign?'pending':'missing_ident';
+   const routeRetryAt=routeCacheValid?cachedRoute.expiresAt:0;
+   const observed=new Date(o.observed_at||0).getTime();
    const at=Number.isFinite(observed)&&observed>0?now-Math.min(11000,Math.max(0,now-observed)):now-11000;
    const streamable=['camera','radio_station'].includes(o.entity_type);
    const gevSnapshot=o.entity_type==='camera'&&o.source_id==='gods_eye_view'&&!attrs.stream_url
     ?new URL('/api/intelligence/gods-eye/cameras/'+encodeURIComponent(o.entity_id)+'/snapshot',location.origin).href:null;
    const mediaUrl=attrs.stream_url||gevSnapshot;
    const mediaType=gevSnapshot?'snapshot-api':attrs.stream_type;
-   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),zoomLevel:zoom,flightRoute,live:streamable&&mediaUrl?{url:mediaUrl,type:mediaType}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
+   marks.push({x:v[0],y:v[1],z:v[2],longitude:num(o.position.longitude),latitude:num(o.position.latitude),kind,label:String(name),place:placeText(o,attrs,num(o.position.latitude),num(o.position.longitude)),zoomLevel:zoom,flightRoute:resolvedRoute,routeStatus,routeRetryAt,flightTrackKey:track&&track.key||null,live:streamable&&mediaUrl?{url:mediaUrl,type:mediaType}:null,meta:(o.entity_type||'')+' · '+Math.round(num(attrs.distance_km))+' km',record:o,at});
   }
+  for(const [key,track] of aircraftTracks){if(!track.points.length||now-track.points[track.points.length-1].timestamp>10*60000)aircraftTracks.delete(key);}
   area=(payload&&payload.area)||null;
   setDeviceData((payload&&payload.devices)||[],false);
   draw(performance.now());
@@ -1914,10 +2000,11 @@ async function refreshDevices(){
  if(state.refreshingDevices)return;
  state.refreshingDevices=true;
  try{
-  state.devices=await api('/api/devices');
+  const next=await api('/api/devices');
+  const changed=JSON.stringify(next)!==JSON.stringify(state.devices);
+  state.devices=next;
   renderDevices();
-  buildAreas();
-  refreshGlobe();
+  if(changed){buildAreas();if(state.layers.device)refreshGlobe();}
  }catch(err){
   $('deviceList').innerHTML='<div class="empty">'+esc(err.message)+'</div>';
  }finally{
@@ -2022,7 +2109,7 @@ function selectIntelSubject(kind,id){
   renderSelection({kind:'camera',label:record.label,meta:(record.kind||'câmera')+' · registro local',record:Object.assign({source_id:'camera_registry',summary:record.note||'Câmera cadastrada no registro local.'},record)});
  }
 }
-function renderSelection(mark){
+function renderSelection(mark,options={}){
  const inspector=$('selectionInspector');
  if(!mark){
   state.selected=null;
@@ -2035,7 +2122,8 @@ function renderSelection(mark){
  const attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
  const evidence=Array.isArray(record.evidence)?record.evidence:[];
  const primaryEvidence=Array.isArray(record.evidence)?record.evidence[0]:(record.evidence||null);
- const sourceUrl=String(record.url||((primaryEvidence||{}).url)||((primaryEvidence||{}).source_url)||'');
+ const aircraftIdent=mark.kind==='aircraft'?String(attributes.callsign||'').trim():'';
+ const sourceUrl=String(aircraftIdent?'https://pt.flightaware.com/live/flight/'+encodeURIComponent(aircraftIdent):(record.url||((primaryEvidence||{}).url)||((primaryEvidence||{}).source_url)||''));
  const sourceName=String((primaryEvidence||{}).source_name||record.source_id||'FONTE ORIGINAL');
  const kind=String(mark.kind||record.entity_type||record.category||'alvo').replaceAll('_',' ').toUpperCase();
  const isCluster=Boolean(mark.cluster);
@@ -2080,15 +2168,38 @@ function renderSelection(mark){
  addFact('PRECISÃO LOCAL',cachedPlace&&cachedPlace.address?'ENDEREÇO OSM · REFERÊNCIA APROXIMADA':null);
  addFact('POSIÇÃO',record.location_source==='ip'?'APROXIMADA POR IP':record.location_source==='gps'?'GPS DO DISPOSITIVO':null);
  addSection('MOVIMENTO / ROTA');
- addFact('ALTITUDE',attributes.altitude_m!=null?Math.round(num(attributes.altitude_m))+' m':null);
- addFact('VELOCIDADE',attributes.speed_kts!=null?attributes.speed_kts+' kt':attributes.speed_kmh!=null?attributes.speed_kmh+' km/h':null);
- addFact('ORIGEM',attributes.origin);
- addFact('DESTINO',attributes.destination);
- addFact('COMPANHIA',attributes.airline);
- addFact('ROTA',mark.kind==='aircraft'?(mark.routeStatus==='not_found'?'NÃO INFORMADA PELA FONTE':mark.routeStatus==='unavailable'?'FONTE INDISPONÍVEL':mark.routeStatus==='available'?'ASSOCIADA AO CALLSIGN':'CONSULTA SOB DEMANDA'):null);
- addFact('FONTE DA ROTA',mark.flightRoute?'ADS-BDB / GEV':null);
- addFact('TRAJETO',mark.flightRoute?'ARCO GEODÉSICO · NÃO É TRILHA ADS-B':null);
- addFact('RESSALVA',mark.flightRoute?'ASSOCIAÇÃO POR CALLSIGN; NÃO CONFIRMA DESTINO EM TEMPO REAL':null);
+ const aircraftIdentity=mark.kind==='aircraft'&&window.JarvisGeospatialLayer&&window.JarvisGeospatialLayer.normalizeAircraftIdentity?window.JarvisGeospatialLayer.normalizeAircraftIdentity(record):null;
+ const aircraftTrackKey=mark.flightTrackKey||(aircraftIdentity&&aircraftIdentity.key)||'';
+ const aircraftTrack=aircraftTrackKey?aircraftTracks.get(aircraftTrackKey):null;
+ addFact('CALLSIGN',attributes.callsign);
+ addFact('ICAO24',attributes.icao24||(/^[0-9a-f]{6}$/i.test(String(record.entity_id||''))?record.entity_id:null));
+ addFact('MATRÍCULA',attributes.registration);
+ addFact('AERONAVE',attributes.model||attributes.aircraft_type||attributes.type);
+ addFact('ALTITUDE',attributes.altitude_ft!=null?Math.round(num(attributes.altitude_ft))+' ft':attributes.altitude_m!=null?Math.round(num(attributes.altitude_m))+' m':attributes.altitude!=null?String(attributes.altitude)+' ('+(attributes.altitude_field||'unidade da fonte não informada')+')':null);
+ addFact('VELOCIDADE',attributes.speed_knots!=null?attributes.speed_knots+' kt':attributes.speed_kts!=null?attributes.speed_kts+' kt':attributes.speed_kmh!=null?attributes.speed_kmh+' km/h':null);
+ addFact('PROA / TRACK',attributes.heading_deg!=null?attributes.heading_deg+'°':attributes.heading!=null?attributes.heading+'°':null);
+ addFact('RAZÃO VERTICAL',attributes.vertical_rate_fpm!=null?attributes.vertical_rate_fpm+' ft/min':attributes.vertical_rate!=null?attributes.vertical_rate+' ft/min':null);
+ addFact('SQUAWK',attributes.squawk);
+ addFact('ORIGEM',attributes.origin||mark.flightRoute&&mark.flightRoute.origin.ident);
+ addFact('DESTINO',attributes.destination||mark.flightRoute&&mark.flightRoute.destination.ident);
+ addFact('COMPANHIA',attributes.airline||attributes.operator);
+ addFact('ESTADO DA ROTA',mark.kind==='aircraft'?({
+  planned:'PLANO DE VOO / WAYPOINTS',
+  estimated:'ESTIMATIVA · SOMENTE AEROPORTOS',
+  loading:'CONSULTANDO FONTE DE ROTA',
+  not_found:'ROTA NÃO ENCONTRADA · NOVA TENTATIVA PROGRAMADA',
+  unavailable:'PROVEDOR INDISPONÍVEL · NOVA TENTATIVA PROGRAMADA',
+  missing_ident:'SEM CALLSIGN PARA CONSULTA',
+  pending:'AGUARDANDO CONSULTA'
+ }[mark.routeStatus||'pending']):null);
+ addFact('TIPO DE GEOMETRIA',mark.flightRoute?(mark.flightRoute.kind==='flight_plan'?'PLANO DE VOO · WAYPOINTS':'ARCO ESTIMADO ENTRE AEROPORTOS'):null);
+ addFact('WAYPOINTS',mark.flightRoute&&mark.flightRoute.waypoints.length?mark.flightRoute.waypoints.length:null);
+ addFact('FONTE DA ROTA',mark.flightRoute?mark.flightRoute.provider:null);
+ addFact('TRACK OBSERVADO',aircraftTrack?aircraftTrack.points.length+' posições nesta sessão':null);
+ addFact('PRIMEIRA POSIÇÃO',aircraftTrack&&aircraftTrack.points.length?new Date(aircraftTrack.points[0].timestamp).toLocaleString() :null);
+ addFact('ÚLTIMA POSIÇÃO',aircraftTrack&&aircraftTrack.points.length?new Date(aircraftTrack.points[aircraftTrack.points.length-1].timestamp).toLocaleString():null);
+ addFact('RESSALVA',mark.flightRoute&&mark.flightRoute.kind==='airport_pair_estimate'?'AEROPORTOS ASSOCIADOS AO CALLSIGN; NÃO É PLANO ATC NEM TRAJETÓRIA REAL':null);
+ addFact('TRAJETÓRIA',aircraftTrack&&aircraftTrack.points.length>1?'LINHA CONTÍNUA · POSIÇÕES OBSERVADAS PELO JARVIS NESTA SESSÃO':null);
  addSection('REDE / INVENTÁRIO');
  addFact('IP',record.last_ip);
  addFact('MAC',record.mac);
@@ -2096,8 +2207,20 @@ function renderSelection(mark){
   addFact('DISPOSITIVOS',record.count);
   addFact('ONLINE',record.online_count);
   addFact('OFFLINE / OUTROS',record.offline_count);
-  (record.assets||[]).slice(0,8).forEach((asset,index)=>addFact('ATIVO '+(index+1),[asset.name||('ID '+asset.id),asset.status||'sem status',asset.last_ip||'IP não informado'].join(' · ')));
-  if((record.assets_total||0)>(record.assets||[]).length)addFact('DEMAIS ATIVOS',((record.assets_total||0)-(record.assets||[]).length)+' não exibidos');
+ }
+ const clusterMembers=isCluster
+  ?(mark.kind==='device_cluster'?(record.assets||[]):(mark.members||[]))
+  :[];
+ if(clusterMembers.length){
+  const rows=clusterMembers.slice(0,60).map((item,index)=>{
+   const memberRecord=item.record||item.device||item;
+   const memberKind=String(item.kind||memberRecord.entity_type||memberRecord.type||'alvo').replaceAll('_',' ');
+   const memberName=String(item.label||memberRecord.title||memberRecord.name||((memberRecord.attributes||{}).callsign)||memberRecord.entity_id||memberRecord.id||('alvo '+(index+1)));
+   const memberPlace=String(item.place||memberRecord.place_label||'localização não enriquecida');
+   return '<button class="cluster-member" type="button" data-cluster-member="'+index+'"><b>'+esc(memberName)+'</b><small>'+esc(memberKind.toUpperCase()+' · '+memberPlace)+'</small></button>';
+  }).join('');
+  facts.push('<div class="selection-facts-section">MEMBROS · SELECIONE UM ALVO</div><div class="cluster-member-list">'+rows+'</div>');
+  if(clusterMembers.length>60)facts.push('<span>LISTA<b>60 de '+clusterMembers.length+' · aproxime para reduzir a área</b></span>');
  }
  addSection('PROVENIÊNCIA');
  addFact('FONTE',sourceName);
@@ -2111,7 +2234,7 @@ function renderSelection(mark){
  const source=$('selectionSource');
  source.href=/^https?:\/\//i.test(sourceUrl)?sourceUrl:'#';
  source.hidden=!/^https?:\/\//i.test(sourceUrl);
- source.textContent='FONTE · '+sourceName+' ↗';
+ source.textContent=aircraftIdent?'FLIGHTAWARE · ABRIR VOO ↗':'FONTE · '+sourceName+' ↗';
  const live=liveInfo(mark);
  const liveButton=$('selectionLive');
  if(liveButton){
@@ -2122,7 +2245,7 @@ function renderSelection(mark){
  $('selectionAction').disabled=!mark.copyValue&&!(latitude!=null&&longitude!=null&&Number.isFinite(Number(latitude))&&Number.isFinite(Number(longitude)));
  inspector.hidden=false;
  enrichPlace(mark);
- enrichAircraftRoute(mark);
+ if(!options.skipRouteLookup)enrichAircraftRoute(mark);
 }
 function selectLiveEntity(kind,id){
  const collection=kind==='event'?state.live.events:state.live.observations;
@@ -2165,45 +2288,66 @@ function refreshGlobe(){
   if(layer==='fire')return state.layers.fire;
   return true;
  });
- const observations=(state.live.observations||[]).filter(o=>state.layers[o.entity_type]!==false);
- Globe.setData({events,observations,area:state.live.area,devices:locatedDevices()});
+ const observations=(state.live.observations||[]).filter(o=>{
+  const layer=LAYER_OF[o.entity_type]||'event';
+  return state.layers[layer]!==false;
+ });
+ Globe.setData({events,observations,area:state.live.area,devices:state.layers.device?locatedDevices():[]});
 }
-function renderAll(){
+function renderAll({globe=true}={}){
  renderStatus();
  renderEvents();
  renderSources();
  renderOrbital();
  renderTelemetry();
  renderUniversal();
- refreshGlobe();
+ if(globe)refreshGlobe();
 }
 
 /* ---------------- Data ---------------- */
 function mergePayload(payload){
  if(!payload)return;
- const events=payload.events||[];
- const observations=payload.observations||[];
- if(events.length){
-  const map=new Map((state.live.events||[]).map(e=>[e.event_id,e]));
-  for(const e of events){if(e&&e.event_id)map.set(e.event_id,e);}
-  state.live.events=Array.from(map.values()).slice(-400);
- }
- if(observations.length){
-  const map=new Map((state.live.observations||[]).map(o=>[o.observation_id,o]));
-  for(const o of observations){if(o&&o.observation_id)map.set(o.observation_id,o);}
-  state.live.observations=Array.from(map.values()).slice(-400);
- }
- if(payload.sources&&payload.sources.length){
+ let globeChanged=false,uiChanged=false;
+ const mergeCollection=(current,incoming,key)=>{
+  if(!Array.isArray(incoming)||!incoming.length)return current;
+  const map=new Map((current||[]).map(item=>[item[key],item]));
+  let changed=false;
+  for(const item of incoming){
+   if(!item||!item[key])continue;
+   const previous=map.get(item[key]);
+   if(!previous||JSON.stringify(previous)!==JSON.stringify(item)){
+    map.set(item[key],item);
+    changed=true;
+   }
+  }
+  if(!changed)return current;
+  return Array.from(map.values()).slice(-400);
+ };
+ const events=mergeCollection(state.live.events,payload.events,'event_id');
+ if(events!==state.live.events){state.live.events=events;globeChanged=true;uiChanged=true;}
+ const observations=mergeCollection(state.live.observations,payload.observations,'observation_id');
+ if(observations!==state.live.observations){state.live.observations=observations;globeChanged=true;uiChanged=true;}
+ if(Array.isArray(payload.sources)&&payload.sources.length){
   const map=new Map((state.live.sources||[]).filter(s=>s&&s.source_id).map(s=>[s.source_id,s]));
-  for(const s of payload.sources){if(s&&s.source_id)map.set(s.source_id,s);}
-  state.live.sources=Array.from(map.values());
+  let changed=false;
+  for(const source of payload.sources){
+   if(!source||!source.source_id)continue;
+   const previous=map.get(source.source_id);
+   if(!previous||JSON.stringify(previous)!==JSON.stringify(source)){map.set(source.source_id,source);changed=true;}
+  }
+  if(changed){state.live.sources=Array.from(map.values());uiChanged=true;}
  }
- if(Array.isArray(payload.correlations))state.live.correlations=payload.correlations;
- if(payload.area)state.live.area=payload.area;
- if(payload.collected_at)state.live.collected_at=payload.collected_at;
+ if(Array.isArray(payload.correlations)&&JSON.stringify(payload.correlations)!==JSON.stringify(state.live.correlations)){
+  state.live.correlations=payload.correlations;uiChanged=true;
+ }
+ if(payload.area&&JSON.stringify(payload.area)!==JSON.stringify(state.live.area)){
+  state.live.area=payload.area;globeChanged=true;uiChanged=true;
+ }
+ if(payload.collected_at&&payload.collected_at!==state.live.collected_at)state.live.collected_at=payload.collected_at;
+ if(!uiChanged&&!globeChanged)return;
  $('updatedAt').textContent=clockTime();
- buildAreas();
- renderAll();
+ if(globeChanged)buildAreas();
+ renderAll({globe:globeChanged});
 }
 async function refreshStatus(){
  const data=await api('/api/status');
@@ -2513,6 +2657,23 @@ function wire(){
  $('selectionClose').addEventListener('click',()=>renderSelection(null));
  $('selectionLive').addEventListener('click',()=>{const info=liveInfo(state.selected);if(info)openLiveMedia(info);});
  $('selectionFacts').addEventListener('click',ev=>{
+  const memberTarget=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-cluster-member]'):null;
+  if(memberTarget){
+   const cluster=state.selected;
+   const source=cluster&&cluster.kind==='device_cluster'
+    ?((cluster.record||{}).assets||[])
+    :(cluster&&cluster.members)||[];
+   const item=source[Number(memberTarget.getAttribute('data-cluster-member'))];
+   if(!item)return;
+   const record=item.record||item.device||item;
+   const member=cluster.kind==='device_cluster'
+    ?{kind:'device',label:record.name||('Dispositivo '+record.id),meta:(record.type||'dispositivo')+' · '+(record.status||'sem status'),latitude:record.located?num(record.latitude):undefined,longitude:record.located?num(record.longitude):undefined,record,copyValue:String(record.last_ip||record.id||'')}
+    :item;
+   renderSelection(member);
+   if(Number.isFinite(Number(member.latitude))&&Number.isFinite(Number(member.longitude)))Globe.focusTo(Number(member.latitude),Number(member.longitude),Math.min(64,Math.max(4,(state.globeZoom||1)*1.8)));
+   setFooter('ALVO SELECIONADO · '+String(member.label||'').toUpperCase());
+   return;
+  }
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-cluster-camera]'):null;
   if(!target)return;
   const camera=(state.clusterCameras||[])[Number(target.getAttribute('data-cluster-camera'))];
@@ -2528,7 +2689,7 @@ function wire(){
    navigator.clipboard.writeText(mark.copyValue).then(()=>setFooter('COPIADO · '+mark.copyValue)).catch(()=>setFooter('COPIAR · PERMISSÃO NEGADA'));
    return;
   }
-  if(Number.isFinite(mark.latitude)&&Number.isFinite(mark.longitude))Globe.focusTo(mark.latitude,mark.longitude,mark.cluster?Math.min(24,Math.max(1.6,(state.globeZoom||1)+1.1)):2.05);
+  if(Number.isFinite(mark.latitude)&&Number.isFinite(mark.longitude))Globe.focusTo(mark.latitude,mark.longitude,mark.cluster?Math.min(64,Math.max(2.2,(state.globeZoom||1)*1.65)):2.05);
   setFooter((mark.cluster?'AGRUPAMENTO · ':'FOCO · ')+String(mark.label||'ALVO').toUpperCase());
  });
  $('deviceList').addEventListener('click',ev=>{
@@ -2610,22 +2771,17 @@ function wire(){
   state.selected=mark;
   renderSelection(mark);
   renderStatus();
-  if(mark.kind==='device_cluster'){
-   const current=Globe.getZoom();
-   const next=current<1.2?1.8:current<2.2?3.2:Math.min(8,current<3.5?4.8:current+1.2);
-   Globe.focusTo(mark.latitude,mark.longitude,next);
-   setFooter('AGRUPAMENTO · '+mark.count+' DISPOSITIVOS · APROXIME PARA DETALHAR');
-  }
+  if(mark.cluster||mark.kind==='device_cluster')setFooter('AGRUPAMENTO ABERTO · SELECIONE UM MEMBRO OU USE APROXIMAR');
  });
 }
 function startPolling(){
  setInterval(()=>{if(state.token)refreshStatus().catch(()=>{});},20000);
  setInterval(()=>{if(state.token)refreshTelemetry();},4000);
  setInterval(()=>{if(state.token)refreshIntelStatus().catch(()=>{});},30000);
- setInterval(()=>{if(state.token)refreshLatest().catch(()=>{});},20000);
+ setInterval(()=>{if(state.token&&!document.hidden)refreshLatest().catch(()=>{});},30000);
  setInterval(()=>{if(state.token)refreshNetwork().catch(()=>{});},30000);
  setInterval(()=>{if(state.token)refreshBriefing();},600000);
- setInterval(()=>{if(state.token)refreshDevices().catch(()=>{});},30000);
+ setInterval(()=>{if(state.token&&!document.hidden)refreshDevices().catch(()=>{});},45000);
  setInterval(()=>{if(state.token)bootstrap();},30000);
 }
 function tickClock(){$('clock').textContent=clockTime();}

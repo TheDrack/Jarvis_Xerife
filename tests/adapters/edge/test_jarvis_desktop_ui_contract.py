@@ -124,10 +124,11 @@ def test_globe_selection_opens_a_contextual_inspector_with_an_action():
     assert "state.selected=mark;" in HTML
     assert "renderSelection(mark);" in HTML
     assert "renderStatus();" in HTML
-    assert "if(mark.kind==='device_cluster')" in HTML
-    assert "Globe.getZoom()" in HTML
-    assert "Globe.focusTo(mark.latitude,mark.longitude,next)" in HTML
-    assert "function renderSelection(mark)" in HTML
+    assert "if(mark.cluster||mark.kind==='device_cluster')" in HTML
+    assert "AGRUPAMENTO ABERTO · SELECIONE UM MEMBRO OU USE APROXIMAR" in HTML
+    assert "Globe.getZoom()" not in HTML
+    assert "data-cluster-member" in HTML
+    assert re.search(r"function renderSelection\(mark(?:,\s*options=\{\})?\)", HTML)
 
 
 def test_briefing_is_compact_and_the_outer_columns_do_not_scroll():
@@ -169,7 +170,7 @@ def test_selected_entities_expose_rich_details_and_verified_source_links():
     assert 'id="selectionSummary"' in HTML
     assert 'id="selectionFacts"' in HTML
     assert 'id="selectionSource"' in HTML
-    assert "function renderSelection(mark)" in HTML
+    assert re.search(r"function renderSelection\(mark(?:,\s*options=\{\})?\)", HTML)
     assert "record.summary||record.description" in HTML
     assert "evidence[0]" in HTML
 
@@ -234,7 +235,7 @@ def test_briefing_correlations_require_a_shared_reference_or_exact_headline():
 
 def test_device_inventory_refreshes_on_entry_and_periodically():
     assert "if(view==='devices'){\n  refreshDevices();" in HTML
-    assert "refreshDevices().catch(()=>{});},30000);" in HTML
+    assert "if(state.token&&!document.hidden)refreshDevices().catch(()=>{});},45000);" in HTML
     assert "data.registered_total??data.total" in HTML
     assert "data.discovered_total" in HTML
     assert "device.location_source==='ip'" in HTML

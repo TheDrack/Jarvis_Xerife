@@ -44,8 +44,8 @@ test('global zoom aggregates nearby assets into a bounded cluster', () => {
   assert.ok(cluster);
   assert.equal(cluster.count, 10);
   assert.equal(cluster.assets_total, 10);
-  assert.equal(cluster.assets.length, 8);
-  assert.deepEqual(cluster.assets.map((item) => item.id), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.equal(cluster.assets.length, 10);
+  assert.deepEqual(cluster.assets.map((item) => item.id), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
   assert.equal(cluster.online_count, 9);
   assert.equal(cluster.offline_count, 1);
   assert.equal(cluster.region, 'Região geográfica');
@@ -111,7 +111,7 @@ test('desktop HUD loads the geospatial layer and debounces zoom-only rebuilds', 
   assert.match(html, /\},450\);/);
   assert.match(html, /kind==='device_cluster'/);
   assert.match(html, /item\.m\.kind==='device'\|\|item\.m\.kind==='device_cluster'/);
-  assert.match(html, /Math\.min\(8,/);
+  assert.match(html, /Math\.min\(64,/);
   assert.match(html, /generalizeRegion/);
   assert.match(html, /const size=Math\.max\(2,Math\.min\(4\.5,/);
   assert.match(html, /labelBoxes\.length>=Math\.min\(120,Math\.round\(45\+zoom\*12\)\)/);
@@ -151,4 +151,107 @@ test('HUD loads and renders administrative contours using the scale selector', a
   assert.match(html, /chooseBoundaryLayer\(zoom,viewportAreaKm2,adminBoundaries\.layers\)/);
   assert.match(html, /drawAdminBoundaryLines\(adminBoundaries\.countries/);
   assert.match(html, /drawAdminBoundaryLines\(adminBoundaries\.states/);
+});
+test('screen clusters keep different entity categories independently selectable', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  assert.match(html, /const threshold=Math\.max\(8,26\/Math\.sqrt\(zoom\)\)/);
+  assert.match(html, /cells\.get\(item\.m\.kind\+':'\+/);
+  assert.match(html, /kind:'cluster',label:count\+' '\+String\(first\.m\.kind/);
+});
+
+test('orbital zoom supports street-level inspection and cluster members are individually selectable', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  assert.match(html, /Math\.min\(64,Number\.isFinite\(value\)\?value:1\)/);
+  assert.match(html, /data-cluster-member/);
+  assert.match(html, /cluster-member-list/);
+  assert.match(html, /renderSelection\(member\)/);
+  assert.match(html, /Math\.min\(64,Math\.max\(4,/);
+});
+
+test('orbital HUD exposes filters for all principal observation layers', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  for (const layer of ['satellite', 'aircraft', 'vessel', 'fire', 'quake', 'camera', 'device', 'installation', 'radio_station']) {
+    assert.match(html, new RegExp('data-layer="' + layer + '"'));
+  }
+  assert.match(html, /state\.layers\.device\?locatedDevices\(\):\[\]/);
+  assert.match(html, /return state\.layers\[layer\]!==false/);
+});
+
+test('cluster clicks open a member inspector instead of forcing an automatic zoom', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  assert.match(html, /AGRUPAMENTO ABERTO · SELECIONE UM MEMBRO OU USE APROXIMAR/);
+  assert.match(html, /if\(mark\.cluster\|\|mark\.kind==='device_cluster'\)/);
+  assert.doesNotMatch(html, /const next=current<1\.2\?1\.8:current<2\.2\?3\.2:Math\.min\(8/);
+});
+
+test('unchanged intelligence snapshots do not redraw the globe', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  assert.match(html, /if\(!uiChanged&&!globeChanged\)return/);
+  assert.match(html, /renderAll\(\{globe:globeChanged\}\)/);
+  assert.match(html, /if\(changed\)\{buildAreas\(\);if\(state\.layers\.device\)refreshGlobe\(\);\}/);
+  assert.match(html, /if\(state\.token&&!document\.hidden\)refreshLatest/);
+});
+
+test('installation markers retain high-priority reverse geocoding', async () => {
+  const html = await readFile(new URL('../../app/static/jarvis-desktop.html', import.meta.url), 'utf8');
+  assert.match(html, /PLACE_PRIORITY=\{device:0,camera:1,installation:2/);
+  assert.match(html, /LABEL_KINDS=new Set\(\[[^\]]*installation/);
+});
+
+test('aircraft observations resolve a stable identity across provider-specific identifiers', () => {
+  const { normalizeAircraftIdentity } = globalThis.JarvisGeospatialLayer;
+  assert.deepEqual(normalizeAircraftIdentity({
+    entity_id: 'a1b2c3',
+    attributes: { icao24: 'A1B2C3', callsign: ' GLO1235 ', registration: 'PR-GXQ' },
+  }), {
+    key: 'icao24:a1b2c3',
+    icao24: 'a1b2c3',
+    registration: 'PR-GXQ',
+    callsign: 'GLO1235',
+  });
+  assert.equal(normalizeAircraftIdentity({
+    entity_id: 'GLO1235',
+    attributes: { callsign: 'GLO1235' },
+  }).key, 'callsign:GLO1235');
+});
+
+test('aircraft track history deduplicates positions and enforces age and point limits', () => {
+  const { appendAircraftTrack } = globalThis.JarvisGeospatialLayer;
+  const tracks = new Map();
+  const observation = (timestamp, latitude, longitude) => ({
+    entity_id: 'a1b2c3',
+    source_id: 'adsb',
+    observed_at: new Date(timestamp).toISOString(),
+    position: { latitude, longitude },
+    attributes: { icao24: 'a1b2c3', callsign: 'GLO1235', altitude_ft: 35000 },
+  });
+  appendAircraftTrack(tracks, observation(1000, -23, -46), { now: 100000, maxPoints: 2, maxAgeMs: 500000 });
+  appendAircraftTrack(tracks, observation(2000, -22.9, -45.9), { now: 100000, maxPoints: 2, maxAgeMs: 500000 });
+  appendAircraftTrack(tracks, observation(2000, -22.9, -45.9), { now: 100000, maxPoints: 2, maxAgeMs: 500000 });
+  appendAircraftTrack(tracks, observation(3000, -22.8, -45.8), { now: 100000, maxPoints: 2, maxAgeMs: 500000 });
+  const track = tracks.get('icao24:a1b2c3');
+  assert.equal(track.points.length, 2);
+  assert.equal(track.points[0].latitude, -22.9);
+  assert.equal(track.points[1].latitude, -22.8);
+  assert.equal(track.callsign, 'GLO1235');
+});
+
+test('aircraft routes distinguish confirmed flight plans from airport-pair estimates', () => {
+  const { normalizeAircraftRoute } = globalThis.JarvisGeospatialLayer;
+  const estimated = normalizeAircraftRoute({
+    origin: { code: 'REC', latitude: -8.12649, longitude: -34.9236 },
+    destination: { code: 'CGH', latitude: -23.62611, longitude: -46.65639 },
+    provider: 'adsbdb_via_gods_eye_view',
+  });
+  assert.equal(estimated.kind, 'airport_pair_estimate');
+  assert.equal(estimated.confirmed, false);
+  assert.equal(estimated.waypoints.length, 0);
+  const planned = normalizeAircraftRoute({
+    kind: 'flight_plan',
+    waypoints: [{ ident: 'REC', latitude: -8.12649, longitude: -34.9236 }, { ident: 'CGH', latitude: -23.62611, longitude: -46.65639 }],
+    provider: 'flightaware_aeroapi',
+  });
+  assert.equal(planned.kind, 'flight_plan');
+  assert.equal(planned.confirmed, true);
+  assert.equal(planned.waypoints.length, 2);
 });
