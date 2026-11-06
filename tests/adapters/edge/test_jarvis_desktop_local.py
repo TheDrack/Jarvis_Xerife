@@ -1630,3 +1630,71 @@ def test_aircraft_route_endpoint_rejects_invalid_callsigns(monkeypatch):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 422
+def test_gev_settings_keeps_local_route_api_available_without_an_observation_area(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    for name in (
+        "JARVIS_GEV_AREA_WEST",
+        "JARVIS_GEV_AREA_SOUTH",
+        "JARVIS_GEV_AREA_EAST",
+        "JARVIS_GEV_AREA_NORTH",
+        "JARVIS_GEV_MCP_ENTRYPOINT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("JARVIS_GEV_API_BASE_URL", "http://127.0.0.1:4173")
+
+    settings = desktop_local._gev_settings()
+
+    assert settings["area"] is None
+    assert settings["api_base"] == "http://127.0.0.1:4173"
+    assert settings["entrypoint_configured"] is False
+
+
+def test_aircraft_route_endpoint_works_when_local_gev_rest_is_online_but_mcp_is_offline(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "found": True,
+                "airline": "Gol Linhas Aéreas Inteligentes",
+                "origin": {"code": "NVT", "name": "Navegantes", "lat": -26.88, "lon": -48.6514},
+                "destination": {"code": "CGH", "name": "São Paulo", "lat": -23.62611, "lon": -46.65639},
+            }
+
+    class FakeAsyncClient:
+        def __init__(self, **kwargs):
+            assert kwargs["follow_redirects"] is False
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def get(self, url):
+            assert url == "http://127.0.0.1:4173/api/adsbdb/route/GLO1273"
+            return FakeResponse()
+
+    monkeypatch.setattr(desktop_local.httpx, "AsyncClient", FakeAsyncClient)
+    monkeypatch.setattr(desktop_local, "_gev_settings", lambda: {
+        "api_base": "http://127.0.0.1:4173",
+        "entrypoint_configured": False,
+        "area": None,
+    })
+    client = _client(LocalRuntime())
+    token = client.get("/api/bootstrap").json()["local_token"]
+
+    response = client.get(
+        "/api/intelligence/aircraft-route?callsign=GLO1273",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["origin"]["code"] == "NVT"
+    assert body["destination"]["code"] == "CGH"

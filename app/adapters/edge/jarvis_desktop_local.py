@@ -261,22 +261,34 @@ def _osiris_enabled() -> bool:
 
 
 def _gev_settings() -> dict[str, Any]:
-    """Read the bounded God's Eye View area without inventing a default."""
+    """Read GEV's optional observation area and independent local REST endpoint."""
     raw = {
         name: os.getenv(f"JARVIS_GEV_AREA_{name}", "").strip()
         for name in ("WEST", "SOUTH", "EAST", "NORTH")
     }
+    api_base = os.getenv("JARVIS_GEV_API_BASE_URL", "http://127.0.0.1:4173")
+    entrypoint_configured = bool(os.getenv("JARVIS_GEV_MCP_ENTRYPOINT", "").strip())
     if not all(raw.values()):
-        return {"area": None, "reason": "AreaNotConfigured"}
+        return {
+            "area": None,
+            "reason": "AreaNotConfigured",
+            "api_base": api_base,
+            "entrypoint_configured": entrypoint_configured,
+        }
     try:
         area = {name.lower(): float(value) for name, value in raw.items()}
     except ValueError:
-        return {"area": None, "reason": "AreaInvalid"}
+        return {
+            "area": None,
+            "reason": "AreaInvalid",
+            "api_base": api_base,
+            "entrypoint_configured": entrypoint_configured,
+        }
     return {
         "area": area,
         "reason": None,
-        "api_base": os.getenv("JARVIS_GEV_API_BASE_URL", "http://127.0.0.1:4173"),
-        "entrypoint_configured": bool(os.getenv("JARVIS_GEV_MCP_ENTRYPOINT", "").strip()),
+        "api_base": api_base,
+        "entrypoint_configured": entrypoint_configured,
     }
 
 
@@ -1430,12 +1442,12 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         api_base = str(settings.get("api_base") or "").rstrip("/")
         parsed = urlsplit(api_base)
         if (
-            not settings.get("entrypoint_configured")
+            not api_base
             or parsed.scheme != "http"
             or not parsed.hostname
             or not _is_loopback_host(parsed.hostname)
         ):
-            return {"available": False, "reason": "gev_not_configured"}
+            return {"available": False, "reason": "gev_rest_not_configured"}
 
         try:
             async with httpx.AsyncClient(timeout=8.0, follow_redirects=False) as client:

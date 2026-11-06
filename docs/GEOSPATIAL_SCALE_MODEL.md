@@ -18,9 +18,11 @@ The orbital globe uses the visible geographic scale to choose which administrati
 
 - Visible globe points are reverse-geocoded in a bounded queue.
 - The queue is rate-limited by the existing local geocoding endpoint, reuses the browser cache, and prioritizes higher-value visible markers.
+- Pending lookups are deduplicated by coordinate and fan the resolved result out to every marker instance sharing that coordinate. Cluster labels are generalized from the cached raw administrative fields of their member coordinates; they no longer discard the enrichment and fall back to a generic region label.
 - The cache key was versioned so entries created before raw administrative fields were retained do not mask the new zoom-aware labels.
 - Aircraft route lookups are queued for visible aircraft, bounded, and rate-spaced. The renderer draws the great-circle arc and the origin/destination airport markers, with selected aircraft prioritized.
-- The route source remains the local God's Eye View / ADSBDB integration. A missing route is reported as unavailable/not found; it is never inferred from the aircraft's current position.
+- Route lookup uses the local loopback GEV REST endpoint independently of the optional GEV MCP observation connector. The observation feed still requires its configured MCP entrypoint and bounded area; a missing MCP connector must not disable route lookup when the local REST service is running.
+- A missing route is reported as unavailable/not found; it is never inferred from the aircraft's current position.
 
 ## Data provenance
 

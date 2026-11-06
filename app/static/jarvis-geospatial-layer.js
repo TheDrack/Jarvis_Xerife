@@ -99,6 +99,22 @@
     return label || 'Região geográfica';
   }
 
+  function generalizeRegionFromMembers(members, zoom, lookupPlace) {
+    const records = (Array.isArray(members) ? members : []).map((member) => {
+      const source = member && member.record && typeof member.record === 'object'
+        ? member.record
+        : member || {};
+      const cached = typeof lookupPlace === 'function'
+        ? lookupPlace(member && member.latitude, member && member.longitude)
+        : null;
+      if (cached && cached.rawAddress && typeof cached.rawAddress === 'object') {
+        return Object.assign({}, source, { address: cached.rawAddress });
+      }
+      return source;
+    });
+    return generalizeRegion(records, zoom);
+  }
+
   function buildDeviceMarkers(assets, zoom) {
     const inventory = Array.isArray(assets) ? assets : [];
     const level = Number.isFinite(Number(zoom)) ? Number(zoom) : 1;
@@ -156,11 +172,11 @@
         offline_count: members.length - onlineCount,
         assets_total: members.length,
         region: generalizeRegion(members, level),
-        assets: members.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true })).slice(0, 8),
+        assets: members.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true })),
       });
     }
     return markers;
   }
 
-  return { buildDeviceMarkers, cellSizeForZoom, generalizeRegion, chooseBoundaryLayer };
+  return { buildDeviceMarkers, cellSizeForZoom, generalizeRegion, generalizeRegionFromMembers, chooseBoundaryLayer };
 });
