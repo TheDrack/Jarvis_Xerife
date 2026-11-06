@@ -1033,6 +1033,10 @@ const Globe=(()=>{
  }
  function applyPlace(mark,entry){
   if(!entry)return;
+  if((mark.cluster||mark.kind==='device_cluster')&&entry.rawAddress&&window.JarvisGeospatialLayer){
+   const generalized=window.JarvisGeospatialLayer.generalizeRegion([{address:entry.rawAddress}],Number(mark.zoomLevel)||1);
+   if(generalized&&generalized!=='Região geográfica'){mark.place=generalized;mark.address=generalized;return;}
+  }
   if(entry.label)mark.place=entry.label;
   if(entry.address)mark.address=entry.address;
  }
@@ -1077,7 +1081,7 @@ const Globe=(()=>{
      }
     }
     const entry=data&&data.available
-     ?(()=>{const generalized=group.regionZoom!==null&&window.JarvisGeospatialLayer?window.JarvisGeospatialLayer.generalizeRegion([data],group.regionZoom):'';const label=generalized&&generalized!=='Região geográfica'?generalized:(data.label||data.display_name||'');return {label,address:group.regionZoom!==null?label:(data.display_name||''),at:Date.now(),source:'nominatim',precision:group.regionZoom!==null?'regional_reverse_geocode':'reverse_geocode'};})()
+     ?(()=>{const generalized=group.regionZoom!==null&&window.JarvisGeospatialLayer?window.JarvisGeospatialLayer.generalizeRegion([data],group.regionZoom):'';const label=generalized&&generalized!=='Região geográfica'?generalized:(data.label||data.display_name||'');return {label,address:group.regionZoom!==null?label:(data.display_name||''),rawAddress:data.address&&typeof data.address==='object'?data.address:null,at:Date.now(),source:'nominatim',precision:group.regionZoom!==null?'regional_reverse_geocode':'reverse_geocode'};})()
      :{label:'',address:'',at:Date.now(),missing:true,reason};
     placeCache.set(group.key,entry);
     group.marks.forEach(mark=>applyPlace(mark,entry));
@@ -1792,11 +1796,11 @@ async function refreshDevices(){
  }
 }
 function intelStateLabel(value){
- return String(value||'INDEFINIDO').replaceAll('_',' ').toUpperCase();
-}
+ return String(value||'INDEFINIDO').replaceAll('_',' ').toUpperCase();}
 function renderUniversal(){
  const data=state.intel||{};
- if(!Object.keys(data).length){  $('intelBody').innerHTML='<div class="empty">Inteligência ainda não consultada. Execute uma coleta para correlacionar os assuntos disponíveis.</div>';
+ if(!Object.keys(data).length){
+  $('intelBody').innerHTML='<div class="empty">Inteligência ainda não consultada. Execute uma coleta para correlacionar os assuntos disponíveis.</div>';
   return;
  }
  const sources=data.sources||[];
