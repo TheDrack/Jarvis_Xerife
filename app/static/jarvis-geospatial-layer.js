@@ -12,33 +12,82 @@
     return Number.isFinite(number) && number >= min && number <= max;
   };
 
-  function clusterCenter(assets) {
-    let x = 0;
-    let y = 0;
-    let z = 0;
-    for (const asset of assets) {
-      const latitude = asset.latitude * Math.PI / 180;
-      const longitude = asset.longitude * Math.PI / 180;
-      const cosLatitude = Math.cos(latitude);
-      x += cosLatitude * Math.sin(longitude);
-      y += Math.sin(latitude);
-      z += cosLatitude * Math.cos(longitude);
-    }
-    return {
-      latitude: Math.atan2(y, Math.hypot(x, z)) * 180 / Math.PI,
-      longitude: Math.atan2(x, z) * 180 / Math.PI,
-    };
+  function clusterThresholdForZoom(zoom) {
+    const level = Number.isFinite(Number(zoom)) ? Math.max(0.75, Math.min(64, Number(zoom))) : 1;
+    return Math.max(8, 26 / Math.sqrt(level));
   }
 
-  function cellSizeForZoom(zoom) {
-    const level = Number.isFinite(Number(zoom)) ? Number(zoom) : 1;
-    if (level < 1.15) return 20;
-    if (level < 1.55) return 8;
-    if (level < 2.8) return 1;
-    if (level < 4) return 0.25;
-    if (level < 5.5) return 0.05;
-    if (level < 7) return 0.01;
-    return 0;
+  function clusterScreenPoints(points, threshold) {
+    const source = Array.isArray(points) ? points : [];
+    const radius = Number.isFinite(Number(threshold)) ? Math.max(1, Number(threshold)) : 26;
+    const clusters = [];
+    const cells = new Map();
+
+    for (const item of source) {
+      if (!item || !item.m || !Number.isFinite(Number(item.sx)) || !Number.isFinite(Number(item.sy))) continue;
+      const kind = String(item.m.kind || 'unknown');
+      const gx = Math.floor(Number(item.sx) / radius);
+      const gy = Math.floor(Number(item.sy) / radius);
+      let target = null;
+      let bestDistance = radius;
+
+      for (let dx = -1; dx <= 1; dx += 1) {
+        for (let dy = -1; dy <= 1; dy += 1) {
+          const bucket = cells.get(kind + ':' + (gx + dx) + ',' + (gy + dy));
+          if (!bucket) continue;
+          for (const candidate of bucket) {
+            const distance = Math.hypot(candidate.x - Number(item.sx), candidate.y - Number(item.sy));
+            if (distance <= bestDistance) {
+              bestDistance = distance;
+              target = candidate;
+            }
+          }
+        }
+      }
+
+      if (!target) {
+        target = {
+          kind,
+          x: Number(item.sx),
+          y: Number(item.sy),
+          sumX: Number(item.sx),
+          sumY: Number(item.sy),
+          items: [item],
+          color: item.color,
+          bucketX: gx,
+          bucketY: gy,
+        };
+        clusters.push(target);
+        const key = kind + ':' + gx + ',' + gy;
+        if (!cells.has(key)) cells.set(key, []);
+        cells.get(key).push(target);
+        continue;
+      }
+
+      target.items.push(item);
+      target.sumX += Number(item.sx);
+      target.sumY += Number(item.sy);
+      target.x = target.sumX / target.items.length;
+      target.y = target.sumY / target.items.length;
+
+      const nextX = Math.floor(target.x / radius);
+      const nextY = Math.floor(target.y / radius);
+      if (nextX !== target.bucketX || nextY !== target.bucketY) {
+        const previousKey = kind + ':' + target.bucketX + ',' + target.bucketY;
+        const previousBucket = cells.get(previousKey);
+        if (previousBucket) {
+          const index = previousBucket.indexOf(target);
+          if (index >= 0) previousBucket.splice(index, 1);
+          if (!previousBucket.length) cells.delete(previousKey);
+        }
+        target.bucketX = nextX;
+        target.bucketY = nextY;
+        const nextKey = kind + ':' + nextX + ',' + nextY;
+        if (!cells.has(nextKey)) cells.set(nextKey, []);
+        cells.get(nextKey).push(target);
+      }
+    }
+    return clusters;
   }
 
   function chooseBoundaryLayer(zoom, viewportAreaKm2, layers) {
@@ -115,67 +164,20 @@
     return generalizeRegion(records, zoom);
   }
 
-  function buildDeviceMarkers(assets, zoom) {
+  function buildDeviceMarkers(assets) {
     const inventory = Array.isArray(assets) ? assets : [];
-    const level = Number.isFinite(Number(zoom)) ? Number(zoom) : 1;
-    const valid = inventory.filter((asset) =>
-      asset && asset.located === true &&
-      validCoordinate(asset.latitude, -90, 90) &&
-      validCoordinate(asset.longitude, -180, 180) &&
-      asset.id !== undefined && asset.id !== null
-    );
-    const maxMarkers = Math.min(6000, Math.round(300 * Math.pow(Math.max(1, level), 1.25)));
-    let cellSize = cellSizeForZoom(level);
-
-    if (cellSize === 0 && valid.length <= maxMarkers) {
-      return valid.map((asset) => Object.assign({}, asset, {
-        kind: 'device', count: 1, assets: [asset],
+    return inventory
+      .filter((asset) =>
+        asset && asset.located === true &&
+        validCoordinate(asset.latitude, -90, 90) &&
+        validCoordinate(asset.longitude, -180, 180) &&
+        asset.id !== undefined && asset.id !== null
+      )
+      .map((asset) => Object.assign({}, asset, {
+        kind: 'device',
+        count: 1,
+        assets: [asset],
       }));
-    }
-    if (cellSize === 0) cellSize = 0.01;
-
-    let cells = new Map();
-    do {
-      cells = new Map();
-      for (const asset of valid) {
-        const latitude = Number(asset.latitude);
-        const longitude = Number(asset.longitude);
-        const row = Math.floor((latitude + 90) / cellSize);
-        const column = Math.floor((longitude + 180) / cellSize);
-        const key = row + ':' + column;
-        if (!cells.has(key)) cells.set(key, []);
-        cells.get(key).push(asset);
-      }
-      if (cells.size <= maxMarkers || cellSize >= 180) break;
-      cellSize *= 2;
-    } while (true);
-
-    const markers = [];
-    for (const [key, members] of cells) {
-      if (members.length === 1) {
-        markers.push(Object.assign({}, members[0], {
-          kind: 'device', count: 1, assets: members,
-        }));
-        continue;
-      }
-      const center = clusterCenter(members);
-      const onlineCount = members.filter((item) => item.status === 'online').length;
-      markers.push({
-        id: 'cluster:' + key,
-        kind: 'device_cluster',
-        latitude: center.latitude,
-        longitude: center.longitude,
-        name: members.length + ' dispositivos',
-        label: members.length + ' dispositivos',
-        count: members.length,
-        online_count: onlineCount,
-        offline_count: members.length - onlineCount,
-        assets_total: members.length,
-        region: generalizeRegion(members, level),
-        assets: members.slice().sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { numeric: true })),
-      });
-    }
-    return markers;
   }
 
   function normalizeAircraftIdentity(observation) {
@@ -280,8 +282,8 @@
   }
 
   return {
-    buildDeviceMarkers, cellSizeForZoom, generalizeRegion, generalizeRegionFromMembers,
-    chooseBoundaryLayer, normalizeAircraftIdentity, normalizeAircraftPosition,
-    appendAircraftTrack, normalizeAircraftRoute,
+    buildDeviceMarkers, clusterScreenPoints, clusterThresholdForZoom,
+    generalizeRegion, generalizeRegionFromMembers, chooseBoundaryLayer,
+    normalizeAircraftIdentity, normalizeAircraftPosition, appendAircraftTrack, normalizeAircraftRoute,
   };
 });

@@ -927,38 +927,9 @@ const Globe=(()=>{
   }
   enrichVisiblePlaces(visible.map(item=>item.m));
   enrichVisibleAircraftRoutes(visible.map(item=>item.m));
-  const threshold=Math.max(8,26/Math.sqrt(zoom));
-  const clusters=[],cells=new Map();
-  for(const item of visible){
-   if(item.m.kind==='device'||item.m.kind==='device_cluster'){
-    clusters.push({x:item.sx,y:item.sy,sumX:item.sx,sumY:item.sy,items:[item],color:item.color});
-    continue;
-   }
-   const gx=Math.floor(item.sx/threshold),gy=Math.floor(item.sy/threshold);
-   let target=null,best=threshold;
-   for(let dx=-1;dx<=1&&!target;dx+=1){
-    for(let dy=-1;dy<=1&&!target;dy+=1){
-     const bucket=cells.get(item.m.kind+':'+(gx+dx)+','+(gy+dy));
-     if(!bucket)continue;
-     for(const candidate of bucket){
-      const d=Math.hypot(candidate.x-item.sx,candidate.y-item.sy);
-      if(d<=best){best=d;target=candidate;}
-     }
-    }
-   }
-   if(!target){
-    target={x:item.sx,y:item.sy,sumX:item.sx,sumY:item.sy,items:[item],color:item.color};
-    clusters.push(target);
-    const key=item.m.kind+':'+gx+','+gy;
-    if(!cells.has(key))cells.set(key,[]);
-    cells.get(key).push(target);
-   }else{
-    target.items.push(item);
-    target.sumX+=item.sx;target.sumY+=item.sy;
-    target.x=target.sumX/target.items.length;
-    target.y=target.sumY/target.items.length;
-   }
-  }
+  const layer=window.JarvisGeospatialLayer;
+  const threshold=layer.clusterThresholdForZoom(zoom);
+  const clusters=layer.clusterScreenPoints(visible,threshold);
   for(const cluster of clusters){
    const count=cluster.items.length;
    const first=cluster.items[0];
@@ -1193,11 +1164,7 @@ const Globe=(()=>{
   }catch(_){}
  }
  function applyPlace(mark,entry){
-  if(!entry)return;
-  if((mark.cluster||mark.kind==='device_cluster')&&entry.rawAddress&&window.JarvisGeospatialLayer){
-   const generalized=window.JarvisGeospatialLayer.generalizeRegion([{address:entry.rawAddress}],Number(mark.zoomLevel)||1);
-   if(generalized&&generalized!=='Região geográfica'){mark.place=generalized;mark.address=generalized;return;}
-  }
+  if(!entry||!mark||mark.cluster||mark.kind==='device_cluster')return;
   if(entry.label)mark.place=entry.label;
   if(entry.address)mark.address=entry.address;
  }
@@ -1211,19 +1178,18 @@ const Globe=(()=>{
   return code==='http_429'||code==='network'||code==='timeout'||/^http_5\d\d$/.test(code);
  }
  function enrichPlace(mark){
-  if(!mark||!state.token)return;
-  const isCluster=Boolean(mark.cluster||mark.kind==='device_cluster');
+  if(!mark||!state.token||mark.cluster||mark.kind==='device_cluster')return;
   const latitude=Number(mark.latitude),longitude=Number(mark.longitude);
   if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||Math.abs(latitude)>90||Math.abs(longitude)>180)return;
   const record=mark.record||mark.device||{},attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
   const coordinateFallback=!mark.place||mark.place===coordText(latitude,longitude);
-  if(!isCluster&&!coordinateFallback&&(record.address||attributes.address||attributes.display_name))return;
+  if(!coordinateFallback&&(record.address||attributes.address||attributes.display_name))return;
   const key=placeKey(latitude,longitude),cached=placeCache.get(key);
   if(cached){applyPlace(mark,cached);return;}
   const pending=placeQueueByKey.get(key);
   if(pending){if(!pending.marks.includes(mark))pending.marks.push(mark);return;}
   if((PLACE_RETRY_AFTER.get(key)||0)>Date.now())return;
-  const group={key,latitude,longitude,regionZoom:isCluster?Number(mark.zoomLevel)||1:null,marks:[mark]};
+  const group={key,latitude,longitude,marks:[mark]};
   placeQueueByKey.set(key,group);
   placeQueue.push(group);
   runPlaceQueue();
@@ -1233,7 +1199,7 @@ const Globe=(()=>{
   if(zoom<1.4||!state.token||placeQueue.length>=PLACE_VISIBLE_QUEUE_LIMIT||now-placeScanAt<PLACE_VISIBLE_SCAN_INTERVAL_MS)return;
   placeScanAt=now;
   const candidates=(Array.isArray(visibleMarks)?visibleMarks:[])
-   .filter(mark=>mark&&Number.isFinite(Number(mark.latitude))&&Number.isFinite(Number(mark.longitude)))
+   .filter(mark=>mark&&!mark.cluster&&mark.kind!=='device_cluster'&&Number.isFinite(Number(mark.latitude))&&Number.isFinite(Number(mark.longitude)))
    .sort((a,b)=>(PLACE_PRIORITY[a.kind]??9)-(PLACE_PRIORITY[b.kind]??9));
   let queued=0;
   for(const mark of candidates){
@@ -1246,7 +1212,7 @@ const Globe=(()=>{
    const coordinateFallback=!mark.place||mark.place===coordText(mark.latitude,mark.longitude);
    const record=mark.record||mark.device||{};
    const attributes=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
-   const hasPlace=Boolean(mark.cluster||mark.kind==='device_cluster'||coordinateFallback||!(record.place_label||attributes.place_label||attributes.city||attributes.country));
+   const hasPlace=Boolean(coordinateFallback||!(record.place_label||attributes.place_label||attributes.city||attributes.country));
    if(!hasPlace)continue;
    enrichPlace(mark);queued+=1;
   }
@@ -1269,7 +1235,7 @@ const Globe=(()=>{
      }
     }
     const entry=data&&data.available
-     ?(()=>{const generalized=group.regionZoom!==null&&window.JarvisGeospatialLayer?window.JarvisGeospatialLayer.generalizeRegion([data],group.regionZoom):'';const label=generalized&&generalized!=='Região geográfica'?generalized:(data.label||data.display_name||'');return {label,address:group.regionZoom!==null?label:(data.display_name||''),rawAddress:data.address&&typeof data.address==='object'?data.address:{city:data.city,state:data.state,country:data.country,suburb:data.suburb,road:data.road,house_number:data.house_number},at:Date.now(),source:'nominatim',precision:group.regionZoom!==null?'regional_reverse_geocode':'reverse_geocode'};})()
+     ?{label:data.label||data.display_name||'',address:data.display_name||'',rawAddress:data.address&&typeof data.address==='object'?data.address:{city:data.city,state:data.state,country:data.country,suburb:data.suburb,road:data.road,house_number:data.house_number},at:Date.now(),source:'nominatim',precision:'reverse_geocode'}
      :{label:'',address:'',at:Date.now(),missing:true,reason};
     placeCache.set(group.key,entry);
     group.marks.forEach(mark=>applyPlace(mark,entry));
