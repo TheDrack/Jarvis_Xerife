@@ -15,6 +15,8 @@ test('cluster reverse geocoding uses a generalized administrative label, not a m
   assert.match(html, /regional_reverse_geocode/);
   assert.match(html, /generalizeRegion\(\[data\],group\.regionZoom\)/);
   assert.match(html, /address:group\.regionZoom!==null\?label/);
+  assert.match(html, /rawAddress:data\.address/);
+  assert.match(html, /generalizeRegion\(\[\{address:entry\.rawAddress\}\],Number\(mark\.zoomLevel\)\|\|1\)/);
   assert.match(html, /const cachedPlace=Globe\.placeFor\?Globe\.placeFor\(latitude,longitude\):null/);
 });
 
