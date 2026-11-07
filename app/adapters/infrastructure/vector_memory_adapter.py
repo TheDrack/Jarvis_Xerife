@@ -70,6 +70,22 @@ def _vectorize(text: str, dim: int = _VECTOR_DIM) -> List[float]:
     return [x / magnitude for x in counts]
 
 
+def _sanitize_metadata(value: Any, sanitize: Any) -> Any:
+    """Recursively redact string values before metadata reaches durable storage."""
+    if isinstance(value, str):
+        sanitized = sanitize(value)
+        if not isinstance(sanitized, str):
+            raise RuntimeError("PII redactor returned non-text metadata")
+        return sanitized
+    if isinstance(value, dict):
+        return {key: _sanitize_metadata(item, sanitize) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_metadata(item, sanitize) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_metadata(item, sanitize) for item in value)
+    return value
+
+
 class VectorMemoryAdapter(MemoryProvider):
     """
     User-partitioned vector memory for JARVIS biographical memory.
@@ -165,7 +181,7 @@ class VectorMemoryAdapter(MemoryProvider):
         text = ctx.get("text", "")
         if not text:
             return {"success": False, "error": "Campo 'text' obrigatório no contexto."}
-        event_id = self.store_event(text, metadata=ctx.get("metadata"))
+        event_id = self.store_event(\n            text, metadata=ctx.get("metadata"), user_id=ctx.get("user_id")\n        )
         return {"success": True, "event_id": event_id}
 
     # ------------------------------------------------------------------
@@ -221,6 +237,8 @@ class VectorMemoryAdapter(MemoryProvider):
                     "metadata user_id conflicts with authenticated user_id"
                 )
             combined_metadata["user_id"] = normalized_user_id
+
+        combined_metadata = _sanitize_metadata(combined_metadata, sanitize)
 
         event = {
             "id": event_id,
