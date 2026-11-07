@@ -1,6 +1,6 @@
 # Cognitive Baseline — Fase C0
 
-**Snapshot:** `main` em `d0a396724910b0c53103da012022a6ec6103dd2b` (baseline pós-PR #757)
+**Snapshot:** `main` em `a31f5554776531c245166cb864abbf8a0eb03075` (baseline pós-PR #758)
 **Auditoria:** 2026-11-06
 **Estado:** parcial; C0 permanece aberto.
 **Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação. Não é confirmação de deploy, conectividade de provider, persistência em produção ou execução ponta a ponta.
@@ -34,7 +34,7 @@ Este documento é o primeiro mapa rastreável de C0; não o conclui. Não criar 
 | Strategic Planner | `StrategistService` gera matriz de viabilidade/RFC; `DeclarativePlanInterpreter` valida planos estruturados | Router de evolução resolve Strategist; `TaskRunner` executa planos declarativos | `tests/application/test_strategist_service.py`, `tests/test_execution_plan.py`, `tests/multiagent/test_model_plan_adapter.py`, `tests/multiagent/test_task_runner_execution_plan_integration.py` | **Parcial.** `StrategistService.execute()` ainda retorna `not_implemented`; plano declarativo não prova objetivos persistentes, decomposição durável ou replanejamento. |
 | Autonomous Executive | `TaskRunner`, scheduler, fila Supabase, workers e Universal Toolbox | Router de missões, orquestrador e workers HTTP/Supabase/supervisionados | `tests/application/test_task_runner.py`, `tests/application/test_task_runner_navigation_plan.py`, testes multiagente e de claims | **Parcial / bloqueado por integração.** Há autorização por etapa e guardas de fila, mas o Toolbox permanece fail-closed sem policy host-backed de produção; E2E entre dois runtimes independentes e verificação de efeito real permanecem pendentes. |
 | Initiative | `assistant_proactivity.py`, `assistant_curiosity.py`, `curiosity_engine.py`, health-check do AssistantService e Overwatch | Sugestões contextuais, perguntas durante conversa, health check e alertas de recursos | Testes comportamentais específicos de iniciativa contínua não confirmados nesta passagem | **Parcial.** Há proatividade e monitoramento, mas não foi demonstrado gatilho de mudança do World Model com deduplicação, orçamento, quiet hours e auditoria de decisão. |
-| Learning / Evolution | `EvolutionOrchestrator`, `EvolutionGatekeeper`, Docker-backed `EvolutionSandbox`, artifact exporter, trusted publisher, `MetaReflection` | Workflow de evolução separado em candidate-validation e trusted-publication; JarvisDevAgent está sendo integrado ao mesmo orquestrador nesta entrega | `tests/application/test_evolution_orchestrator.py`, `tests/test_evolution_sandbox.py`, `tests/test_evolution_gatekeeper.py`, testes de artifact/publisher e workflow permissions | **Parcial, com isolamento corrigido.** PR #756 executa o candidato em Docker sem rede/mounts/segredos; PR #757 separa credencial do provedor e credencial GitHub, valida artefato/digest/commit/path/staging e bloqueia antes do LLM sem `target_file`. Ainda falta mapear alvos confiáveis para capabilities pendentes; timeout é cooperativo e não mata uma chamada síncrona já em andamento. |
+| Learning / Evolution | `EvolutionOrchestrator`, `EvolutionGatekeeper`, Docker-backed `EvolutionSandbox`, artifact exporter, trusted publisher, `MetaReflection` | Workflow de evolução separado em candidate-validation e trusted-publication; JarvisDevAgent delega geração e validação ao EvolutionOrchestrator após PR #758 | `tests/application/test_evolution_orchestrator.py`, `tests/test_evolution_sandbox.py`, `tests/test_evolution_gatekeeper.py`, testes de artifact/publisher e workflow permissions | **Parcial, com isolamento corrigido.** PR #756 executa o candidato em Docker sem rede/mounts/segredos; PR #757 separa credencial do provedor e credencial GitHub, valida artefato/digest/commit/path/staging e bloqueia antes do LLM sem `target_file`. Ainda falta mapear alvos confiáveis para capabilities pendentes; timeout é cooperativo e não mata uma chamada síncrona já em andamento. |
 
 ## 4. Mapa de fluxo observado
 
@@ -113,16 +113,54 @@ Estas entregas são manutenção ou infraestrutura; não concluem fases cognitiv
 - **PR #744:** melhorou a apresentação geoespacial; mapa continua sendo superfície de visualização, não World Model.
 - **PR #756:** isolou a execução de candidatos em Docker descartável; testes adversariais verificam ausência de rede, mounts e segredos.
 - **PR #757:** separou geração/validação de publicação privilegiada, adicionou artefato com digest e publisher path-scoped; a autoevolução falha fechada sem target confiável.
-- **PR #758 (em desenvolvimento):** elimina o pipeline paralelo do JarvisDevAgent, delega ao EvolutionOrchestrator e adiciona cancelamento cooperativo.
+- **PR #758 (merged em 2026-11-07):** elimina o pipeline paralelo do JarvisDevAgent, delega ao EvolutionOrchestrator e adiciona cancelamento cooperativo. Merge commit: `a31f5554776531c245166cb864abbf8a0eb03075`.
 
 O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos de recuperação e dispatch. Esta auditoria não o executou nem alterou seus gates. A correção automática de PR/CI e os workflows Self Healing permanecem uma trilha transversal obrigatória.
 
 ## 9. Estado de verificação desta auditoria
 
-- Base inspecionada: `d0a396724910b0c53103da012022a6ec6103dd2b`.
-- PR #757 foi integrada no snapshot indicado acima; Full pytest suite #42302829847 e Jarvis Task Queue Tests #42302829787 terminaram em **success**.
-- PR #758 está em desenvolvimento; seus resultados locais focados não são tratados como CI nem como baseline completo.
-- A suíte completa deste snapshot foi executada pelo workflow de PR #757; a auditoria C0 permanece parcial porque ainda faltam os testes integrados listados na seção 6.
-- Não houve escrita em Supabase, deploy, acesso a dispositivo, alteração de credenciais, router/firewall ou execução de código candidato.
+- Base inspecionada: `a31f5554776531c245166cb864abbf8a0eb03075`, merge commit da PR #758.
+- PR #758 está merged. Workflow `Jarvis Task Queue Tests` terminou com **success**, incluindo `Run full test suite`. Build e Auto-Documentation também terminaram com **success**.
+- O check `Supabase Preview` terminou com **failure**: `Remote migration versions not found in local migrations directory.` Não é falha do pytest.
+- A auditoria remota foi somente leitura. Nenhum DDL, DML, migration repair, push, deploy, grant ou feature flag foi alterado.
+- O repositório não possui rulesets ativos. A leitura do endpoint de branch protection retorna HTTP 403 pela integração disponível; nenhuma regra foi alterada.
+- A auditoria C0 permanece parcial porque ainda faltam provas integradas listadas na seção 6.
 
-**Conclusão:** C0 está em andamento, não concluído. C1 — World Model é o próximo marco de capacidade, mas permanece bloqueado até que o baseline de C0 seja completado e testado.
+### 9.1 Snapshot operacional Supabase
+
+**Projeto:** `saibtpdehhprttqlgqdt`; estado do projeto `ACTIVE_HEALTHY`; PostgreSQL `17.6.1.063`.
+
+| Evidência remota | Resultado observado |
+|---|---:|
+| Status da branch Supabase `main` | `MIGRATIONS_FAILED` |
+| Arquivos locais em `supabase/migrations` | 25 |
+| Entradas no ledger remoto | 20 |
+| Versões com timestamp idêntico local/remoto | 5 |
+| Tabelas `intelligence_event_snapshots` | 0 linhas |
+| Tabelas `intelligence_observation_snapshots` | 0 linhas |
+| Tabela legada `jarvis_environment_observations` | 1.755 linhas |
+| Tabelas/RPCs do worker recorrente | Ausentes |
+| `jarvis_agents` com status `available` | 3 |
+| `jarvis_agents` com status `offline` | 2 |
+| Tarefas | 8 completed, 3 cancelled, 2 ready |
+| Mensagens em `jarvis_agent_messages` | 0 |
+| Definições em `jarvis_routine_definitions` | 0 |
+
+Os três registros disponíveis são `mini-freellmapi-1/2/3`, com heartbeat recente e zero tarefas ativas. Isso comprova presença registrada no control plane; não comprova dois Harness independentes concluindo um ciclo E2E.
+
+O ledger remoto contém versões que não existem como nomes de arquivo locais. Há também duas entradas remotas chamadas `google_linked_identities`. A auditoria anterior encontrou SQL semanticamente equivalente nessas duas entradas, mas não há prova suficiente para reparar o ledger por renomeação. Seis migrations locais não possuem contraparte exata no ledger, incluindo `20261103184308_intelligence_recurring_worker.sql`. Não executar `migration repair`, `db push` ou aplicar essa migration antes de reconciliar cada SQL com o schema remoto.
+
+A migration do worker recorrente cria lease, runs e cinco RPCs protegidas. Como esses objetos não existem no projeto, o worker deve permanecer desativado. As tabelas de histórico existem, mas estão vazias; a persistência de snapshots não está operacionalmente comprovada.
+
+### 9.2 Segurança e performance do banco
+
+- As 26 tabelas apontadas pelo advisor têm RLS habilitado e nenhuma policy. A consulta de privilégios não encontrou grants de tabela para `anon` ou `authenticated`; os acessos observados ficam restritos a `service_role` e ao owner. O advisor classifica isso como INFO. Não tratar ausência de policy, isoladamente, como exposição pública.
+- Advisor de performance reporta cinco foreign keys sem índice de cobertura e 33 índices ainda não utilizados. Não remover índices sem evidência de carga; avaliar os cinco índices ausentes depois da reconciliação de migrations.
+- Advisor de health não reportou findings.
+
+### 9.3 Limites de execução local
+
+- A máquina Windows conectada não possui `docker` nem `supabase` CLI disponíveis no PATH. Portanto, não foi possível executar stack Supabase local nem reproduzir E2E com banco local nesta rodada.
+- Os testes de concorrência existentes usam fila compartilhada em memória. Os testes SQL de provider/claim verificam contratos de RPC, mas não substituem teste entre dois processos Harness independentes contra banco isolado.
+
+**Conclusão:** C0 continua aberto. Universal Intelligence já possui coleta, normalização e candidatos de correlação, mas histórico persistente ainda não está provado. C1 — World Model permanece bloqueado até fechar baseline de memória, identidade, proveniência e integração operacional.
