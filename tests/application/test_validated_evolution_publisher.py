@@ -188,6 +188,25 @@ class TestTrustedPublisher:
         assert not any(command[1:3] == ["checkout", "-b"] for command in calls)
 
 
+    def test_refuses_evolution_control_plane_target_before_git_operations(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("GH_TOKEN", "publisher-token")
+        monkeypatch.setenv("EXPECTED_EVOLUTION_SANDBOX_IMAGE", "jarvis-evolution-sandbox:ci")
+        repository = tmp_path / "repository"
+        target = repository / "app" / "application" / "services" / "roadmap_mission_selector.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("ORIGINAL = True\\n", encoding="utf-8")
+        artifact_dir, _, _ = _write_artifact(
+            tmp_path,
+            target_file="app/application/services/roadmap_mission_selector.py",
+        )
+        with patch("scripts.publish_validated_evolution._run") as run:
+            with pytest.raises(PublicationError, match="target_path_is_protected"):
+                publish_artifact(artifact_dir, repository)
+        run.assert_not_called()
+
+
     def test_refuses_duplicate_open_roadmap_mission_pr_before_branch_creation(
         self, tmp_path, monkeypatch
     ):
