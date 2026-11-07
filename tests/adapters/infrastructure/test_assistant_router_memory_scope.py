@@ -55,3 +55,23 @@ def test_message_endpoint_passes_authenticated_user_id_to_assistant():
     service.async_process_command.assert_awaited_once()
     kwargs = service.async_process_command.await_args.kwargs
     assert kwargs["request_metadata"]["user_id"] == "user-bob"
+
+
+def test_history_endpoint_requires_authenticated_user_scope():
+    client, service = _app_for_user("user-charlie")
+    service.get_command_history = lambda *, limit, user_id: [
+        {
+            "command": "charlie private command",
+            "timestamp": "2026-11-06T12:00:00",
+            "success": True,
+            "message": "private response",
+        }
+    ]
+
+    response = client.get("/v1/history")
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert response.json()["commands"][0]["command"] == "charlie private command"
+    # FastAPI dependency injection must bind the authenticated principal to the history query.
+    # The lambda fails if the router omits user_id.
