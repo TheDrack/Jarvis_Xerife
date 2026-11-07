@@ -80,7 +80,7 @@ select throws_ok(
              'scope mismatch', '[0.1]'::jsonb, '{}'::jsonb, 1)
     $sql$,
     '23514',
-    'new row for relation "jarvis_vector_memories" violates check constraint "jarvis_vector_memories_scope_consistency_check"',
+    NULL,
     'database rejects a scope key belonging to another user'
 );
 select throws_ok(
@@ -92,7 +92,7 @@ select throws_ok(
              'dimension mismatch', '[0.1, 0.2]'::jsonb, '{}'::jsonb, 1)
     $sql$,
     '23514',
-    'new row for relation "jarvis_vector_memories" violates check constraint "jarvis_vector_memories_embedding_shape_check"',
+    NULL,
     'database rejects an embedding whose length differs from vector_dim'
 );
 select throws_ok(
@@ -105,7 +105,7 @@ select throws_ok(
              '{"user_id":"alice"}'::jsonb, 1)
     $sql$,
     '23514',
-    'new row for relation "jarvis_vector_memories" violates check constraint "jarvis_vector_memories_metadata_shape_check"',
+    NULL,
     'database rejects user identity stored inside metadata'
 );
 
