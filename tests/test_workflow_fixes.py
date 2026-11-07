@@ -28,8 +28,8 @@ def _roadmap_service(tmp_path, service_module):
     (root / "tests").mkdir(parents=True, exist_ok=True)
     target_file = "app/services/feature.py"
     test_file = "tests/test_feature.py"
-    (root / target_file).write_text("def feature(): return True\\n", encoding="utf-8")
-    (root / test_file).write_text("def test_feature(): assert True\\n", encoding="utf-8")
+    (root / target_file).write_text("def feature(): return True\n", encoding="utf-8")
+    (root / test_file).write_text("def test_feature(): assert True\n", encoding="utf-8")
 
     mission = {
         "id": "C0-001",
@@ -45,17 +45,17 @@ def _roadmap_service(tmp_path, service_module):
         "expected_result": "The existing consumer behavior is verified by a regression test.",
     }
     roadmap = (
-        "# Cognitive Roadmap\\n\\n"
-        "- **C0-A01:** Each critical capability has a code path, consumer, and test.\\n"
-        "<!-- JARVIS_EVOLUTION_MANIFEST_START -->\\n"
-        "```json\\n"
+        "# Cognitive Roadmap\n\n"
+        "- **C0-A01:** Each critical capability has a code path, consumer, and test.\n"
+        "<!-- JARVIS_EVOLUTION_MANIFEST_START -->\n"
+        "```json\n"
         + json.dumps({"schema_version": 1, "phase": "C0", "missions": [mission]})
-        + "\\n```\\n"
-        "<!-- JARVIS_EVOLUTION_MANIFEST_END -->\\n"
+        + "\n```\n"
+        "<!-- JARVIS_EVOLUTION_MANIFEST_END -->\n"
     )
     status = (
-        "| C0 | Audit | **Em andamento** | Baseline pending |\\n"
-        "| C1 | World Model | **Auditoria necessária** | Blocked by C0 |\\n"
+        "| C0 | Audit | **Em andamento** | Baseline pending |\n"
+        "| C1 | World Model | **Auditoria necessária** | Blocked by C0 |\n"
     )
     (root / "docs").mkdir(parents=True, exist_ok=True)
     (root / "docs" / "COGNITIVE_ROADMAP.md").write_text(roadmap, encoding="utf-8")
