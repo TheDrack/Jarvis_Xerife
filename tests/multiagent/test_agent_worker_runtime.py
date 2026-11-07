@@ -134,7 +134,7 @@ def test_runtime_prefers_bound_http_worker_when_both_backends_exist(monkeypatch)
     monkeypatch.setenv("FREELLMAPI_API_KEY", "provider-key")
     monkeypatch.setattr(
         "app.multiagent.agent_worker_runtime.PriorityQueueMiniAgent.from_env",
-        lambda agent_id=None: IdleWorker(),
+        lambda agent_id=None, worker_token=None: IdleWorker(),
     )
     monkeypatch.setattr(
         "app.multiagent.supabase_task_worker.SupabaseTaskQueueMiniAgent.from_env",
@@ -283,4 +283,64 @@ def test_runtime_fails_closed_when_worker_token_lacks_user_api_identity(monkeypa
     monkeypatch.delenv("JARVIS_TASK_QUEUE_PASSWORD", raising=False)
 
     with pytest.raises(RuntimeError, match="JARVIS_TASK_QUEUE_WORKER_TOKEN requires"):
+        start_configured_worker()
+
+
+def test_runtime_uses_distinct_worker_tokens_for_each_concurrent_slot(monkeypatch):
+    seen = []
+
+    class IdleWorker:
+        def __init__(self, agent_id):
+            self.agent_id = agent_id
+
+        def run_once(self):
+            return None
+
+    monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.setenv("JARVIS_MINI_AGENT_WORKERS", "2")
+    monkeypatch.setenv("JARVIS_AGENT_ID", "mini-freellmapi-1")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1", "token-one")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_2", "token-two")
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "provider-key")
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+
+    def build_worker(agent_id=None, worker_token=None):
+        seen.append((agent_id, worker_token))
+        return IdleWorker(agent_id)
+
+    monkeypatch.setattr(
+        "app.multiagent.agent_worker_runtime.PriorityQueueMiniAgent.from_env",
+        build_worker,
+    )
+
+    runtime = start_configured_worker()
+    assert runtime is not None
+    group, stop = runtime
+    assert sorted(seen) == [
+        ("mini-freellmapi-1", "token-one"),
+        ("mini-freellmapi-2", "token-two"),
+    ]
+    stop.set()
+    group.join(timeout=1)
+    assert not group.is_alive()
+
+
+def test_runtime_rejects_one_shared_token_for_multiple_http_slots(monkeypatch):
+    monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.setenv("JARVIS_MINI_AGENT_WORKERS", "2")
+    monkeypatch.setenv("JARVIS_AGENT_ID", "mini-freellmapi-1")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "shared-token")
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "provider-key")
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1", raising=False)
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_2", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+
+    with pytest.raises(RuntimeError, match="one dedicated worker token per agent slot"):
         start_configured_worker()
