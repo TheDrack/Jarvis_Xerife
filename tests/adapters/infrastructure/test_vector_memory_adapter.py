@@ -158,3 +158,19 @@ def test_store_event_rejects_user_id_in_untrusted_metadata(
         )
 
     assert pii_vector_adapter._events == []
+
+def test_store_event_rejects_conflicting_user_id_metadata(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    with pytest.raises(ValueError, match="conflicts with authenticated user_id"):
+        pii_vector_adapter.store_event(
+            "private event",
+            metadata={"user_id": "bob"},
+            user_id="alice",
+        )
+
+    assert pii_vector_adapter._events == []
