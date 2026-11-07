@@ -324,3 +324,33 @@ The six previously identified local files without matching remote ledger entries
 - The old unledgered worker-lease migration was removed from the pending sequence because it references the obsolete `jarvis_mobile_push_devices` table and duplicates the lease RPC. PR #763 supplies the NULL-safe renewal RPC; a separate forward-only migration now creates only the five missing indexes.
 - Reconcile and apply PR #761's fencing migration before deploying a worker that calls the three-argument ACK RPC.
 - No production DDL, DML, migration repair, grants, or deployment were performed during this revalidation.
+
+## Revalidation 2026-11-07 after PR #769 — supersedes previous ledger snapshots
+
+**Project and migration ledger**
+- Supabase project saibtpdehhprttqlgqdt reports ACTIVE_HEALTHY; branch main reports FUNCTIONS_DEPLOYED.
+- Local main contains 27 SQL migration files. The remote migration history contains 27 entries. Comparing the exact pair (version, name) yields 27/27 matches, no local-only migration, no remote-only migration, and no duplicate version.
+- The earlier 20/25 and 20/27 mismatch observations in this document are historical and are superseded by this revalidation.
+- The PR #769 vector-memory migration is present in the remote ledger. Render Jarvis-api is live on main commit e7b4efa35c8da7fa0ca4c04c7b2b7880478473c2, which includes the PR #769 merge commit 203725a7a3f47df390347482d703a2380c8f2142.
+
+**Vector-memory table security**
+- public.jarvis_vector_memories exists with RLS enabled.
+- service_role has SELECT, INSERT and DELETE; service_role does not have UPDATE.
+- anon and authenticated do not have SELECT.
+- The table currently contains 0 rows and 0 distinct scopes. Schema deployment and ACLs are verified; a production runtime insert/readback has not yet been demonstrated.
+- No direct production write was made during this audit.
+
+**Queue and worker runtime**
+- Three mini-freellmapi agents are available, provider groq, and advertise only text_reasoning. Two tasks requiring repository_read, github_read and production_read remain ready and unassigned. No claim was forced.
+- The recurring intelligence worker lease is unowned and the worker-run table contains zero rows.
+- Render application logs after the current deployment repeatedly report: Universal Intelligence recurring worker disabled by feature flags. main.py starts the supervised worker only when both JARVIS_INTELLIGENCE_WORKER_ENABLED and JARVIS_INTELLIGENCE_HISTORY_ENABLED are true.
+- No feature flags were changed and no recurring collection was started. Enabling it will cause periodic external collection and durable writes, so that production activation remains a separate authorization gate.
+
+**Tool authorization boundary**
+- ToolRegistry is a metadata registry. ToolDispatcher remains fail-closed without a production ToolAuthorizationPolicy.
+- The legacy CapabilityAuthorizer does not satisfy the host-backed contract: it accepts caller-supplied identity labels and a human_confirmed boolean rather than a trusted principal/session and request-bound approval evidence.
+- Do not add repository_read, github_read or production_read to worker heartbeats until the corresponding read-only executors and host-backed authorization path are implemented and tested.
+
+**Operational conclusion**
+- Migration-ledger reconciliation is complete at 27/27. No migration repair, db push, manual DDL, manual DML, grant change or production feature-flag change was executed during this revalidation.
+- C0 remains open because runtime capability execution, vector-memory write/readback, and a supervised recurring intelligence run are not yet production-verified.
