@@ -11,8 +11,6 @@ on:
       - "supabase/migrations/20261027165940_20261027_multi_agent_model_provider_heartbeat.sql"
       - "supabase/migrations/20261105023946_provider_aware_remote_task_claims.sql"
       - "supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql"
-      - "supabase/migrations/20261105023946_provider_aware_remote_task_claims.sql"
-      - "supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql"
       - "supabase/migrations/20261107020000_task_lease_renewal_null_duration_guard.sql"
       - "supabase/tests/task_lease_renewal.test.sql"
       - "tests/multiagent/test_supabase_task_process_e2e.py"
@@ -56,8 +54,6 @@ jobs:
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261024142635_202610230002_multi_agent_control_plane.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261024142639_202610230004_priority_routine_scheduler.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261027165940_20261027_multi_agent_model_provider_heartbeat.sql" supabase/migrations/
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105023946_provider_aware_remote_task_claims.sql" supabase/migrations/
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105023946_provider_aware_remote_task_claims.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261107020000_task_lease_renewal_null_duration_guard.sql" supabase/migrations/
