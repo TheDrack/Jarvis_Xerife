@@ -190,7 +190,6 @@ def test_manifest_with_unsupported_schema_fails_closed(tmp_path):
 
 
 def test_evolve_preserves_roadmap_criterion_in_candidate_artifact(monkeypatch):
-    from app.application.services import roadmap_mission_selector  # noqa: F401
     from scripts import evolve_all_pending
 
     class FakeOrchestrator:
