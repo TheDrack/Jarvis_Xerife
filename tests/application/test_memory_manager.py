@@ -122,3 +122,61 @@ class TestMemoryManagerExecute:
         result = memory_manager.execute({})
         assert result["success"] is True
         assert result["relevant_context"] == []
+
+
+def test_memory_manager_redacts_pii_before_persisting_user_and_assistant_text(tmp_path):
+    storage = tmp_path / "pii_memory.json"
+    manager = MemoryManager(storage_path=str(storage))
+
+    manager.store_interaction(
+        "Contact alice.smith@example.com, CPF 123.456.789-09",
+        "Use phone 48 99999-9999 for the callback.",
+    )
+
+    persisted = storage.read_text(encoding="utf-8")
+    records = json.loads(persisted)
+    assert "[EMAIL_REDACTED]" in records[0]["user"]
+    assert "[CPF_REDACTED]" in records[0]["user"]
+    assert "[PHONE_REDACTED]" in records[0]["jarvis"]
+    assert "alice.smith@example.com" not in persisted
+    assert "123.456.789-09" not in persisted
+    assert "48 99999-9999" not in persisted
+
+
+def test_memory_manager_sanitizes_legacy_file_before_returning_context(tmp_path):
+    storage = tmp_path / "legacy_memory.json"
+    storage.write_text(
+        json.dumps([{
+            "timestamp": "2026-11-01T10:00:00",
+            "user": "Email alice@example.com",
+            "jarvis": "CPF 123.456.789-09",
+        }]),
+        encoding="utf-8",
+    )
+    manager = MemoryManager(storage_path=str(storage))
+
+    context = manager.get_relevant_context("email cpf")
+
+    assert len(context) == 1
+    assert "[EMAIL_REDACTED]" in context[0]["user"]
+    assert "[CPF_REDACTED]" in context[0]["jarvis"]
+    persisted = storage.read_text(encoding="utf-8")
+    assert "alice@example.com" not in persisted
+    assert "123.456.789-09" not in persisted
+
+
+def test_memory_manager_fails_closed_when_injected_redactor_raises(tmp_path):
+    class BrokenRedactor:
+        def sanitize(self, _text):
+            raise RuntimeError("redaction unavailable")
+
+    storage = tmp_path / "blocked_memory.json"
+    manager = MemoryManager(
+        storage_path=str(storage),
+        pii_redactor=BrokenRedactor(),
+    )
+
+    with pytest.raises(RuntimeError, match="redaction unavailable"):
+        manager.store_interaction("private email alice@example.com", "response")
+
+    assert not storage.exists()
