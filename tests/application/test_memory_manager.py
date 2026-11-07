@@ -125,6 +125,7 @@ class TestMemoryManagerExecute:
 
 
 def test_memory_readback_survives_manager_recreation(tmp_path):
+    """A new manager instance must recover the previously stored interaction."""
     storage_path = str(tmp_path / "restart_memory.json")
     first_manager = MemoryManager(storage_path=storage_path)
     first_manager.store_interaction(
