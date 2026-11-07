@@ -395,7 +395,7 @@ def test_strategist_generate_rfc(strategist):
     assert "Test RFC generation" in content
     assert "ROI Score" in content
     assert "Aprovado para implementação" in content
-    assert "Aprovado por: commander" in content
+    assert "**Aprovado por:** commander" in content
     assert approval["approved_at"] in content
 
 
