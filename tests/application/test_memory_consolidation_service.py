@@ -110,3 +110,50 @@ def test_consolidation_preserves_working_memory_when_durable_store_is_unhealthy(
 
     assert consolidated == 0
     assert working_memory.size == 1
+
+def test_consolidation_preserves_authenticated_user_scope_in_vector_store():
+    store = _DurableStore()
+    working_memory = WorkingMemory()
+    working_memory.push(
+        {
+            "user_input": "private user context",
+            "response": "private assistant response",
+            "user_id": "alice",
+            "_ts": "2000-01-01T00:00:00+00:00",
+        }
+    )
+    service = MemoryConsolidationService(
+        working_memory=working_memory,
+        vector_adapter=VectorMemoryAdapter(dim=32, store=store),
+    )
+
+    consolidated = service.consolidate_memories(max_age_hours=24)
+
+    assert consolidated == 1
+    assert store.events[0]["metadata"]["user_id"] == "alice"
+    assert working_memory.size == 0
+
+
+def test_consolidation_restores_exact_original_entry_after_persistence_failure():
+    class FailingStore(_DurableStore):
+        def append(self, event, user_id=None):
+            raise RuntimeError("database unavailable")
+
+    original_entry = {
+        "user_input": "retain the original user input",
+        "response": "retain the original assistant response",
+        "user_id": "alice",
+        "custom_context": "retain custom metadata",
+        "_ts": "2000-01-01T00:00:00+00:00",
+    }
+    working_memory = WorkingMemory()
+    working_memory.push(original_entry)
+    service = MemoryConsolidationService(
+        working_memory=working_memory,
+        vector_adapter=VectorMemoryAdapter(dim=32, store=FailingStore()),
+    )
+
+    consolidated = service.consolidate_memories(max_age_hours=24)
+
+    assert consolidated == 0
+    assert working_memory.to_list() == [original_entry]
