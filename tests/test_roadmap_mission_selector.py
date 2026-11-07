@@ -127,8 +127,8 @@ def test_c1_cannot_run_while_c0_is_still_in_progress(tmp_path):
         ],
     )
     (Path(tmp_path) / "docs" / "STATUS.md").write_text(
-        "| C0 | Audit | **Em andamento** | C0 remains open |\\n"
-        "| C1 | World Model | **Em andamento** | Must wait for C0 |\\n",
+        "| C0 | Audit | **Em andamento** | C0 remains open |\n"
+        "| C1 | World Model | **Em andamento** | Must wait for C0 |\n",
         encoding="utf-8",
     )
 
