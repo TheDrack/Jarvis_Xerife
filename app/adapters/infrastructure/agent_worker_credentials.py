@@ -104,6 +104,13 @@ class AgentWorkerCredentialStore:
                 """),
                 {"agent_id": normalized_agent},
             )
+            # Serialize provisioning/revocation for this agent. The lock is
+            # scoped to one registry row, not the global credential table.
+            lock_suffix = " FOR UPDATE" if self._schema else ""
+            connection.execute(
+                text(f"SELECT agent_id FROM {agents_table} WHERE agent_id = :agent_id{lock_suffix}"),
+                {"agent_id": normalized_agent},
+            )
             # Issuing a replacement rotates the agent identity atomically.
             connection.execute(
                 text(f"""
@@ -205,6 +212,12 @@ class AgentWorkerCredentialStore:
         now = datetime.now(timezone.utc)
         credentials_table = f"{self._schema}jarvis_agent_credentials"
         with self.engine.begin() as connection:
+            agents_table = f"{self._schema}jarvis_agents"
+            lock_suffix = " FOR UPDATE" if self._schema else ""
+            connection.execute(
+                text(f"SELECT agent_id FROM {agents_table} WHERE agent_id = :agent_id{lock_suffix}"),
+                {"agent_id": normalized_agent},
+            )
             result = connection.execute(
                 text(f"""
                     UPDATE {credentials_table}
