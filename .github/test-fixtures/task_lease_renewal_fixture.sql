@@ -1,6 +1,7 @@
 -- Minimal schema fixture for the task-lease renewal migration.
 create table public.jarvis_agent_tasks (
     task_id text primary key,
+    objective text not null default 'fixture objective',
     assigned_agent_id text,
     attempt_id uuid,
     status text not null default 'ready',
