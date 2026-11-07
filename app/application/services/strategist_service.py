@@ -295,6 +295,8 @@ class StrategistService(NexusComponent):
         proposal_data = document_store.read(source_path)
         if not isinstance(proposal_data, dict) or proposal_data.get("viable") is not True:
             raise ValueError("Only viable pending proposals can be approved")
+        if proposal_data.get("proposal_id") != Path(proposal_filename).stem:
+            raise ValueError("Proposal identity does not match its filename")
         if proposal_data.get("approved") is True:
             raise ValueError("Proposal is already approved")
 
