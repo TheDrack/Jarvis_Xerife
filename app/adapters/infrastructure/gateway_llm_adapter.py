@@ -135,7 +135,11 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
         return {"success": False, "not_implemented": True}
 
-    def _interpret_sync(self, raw_input: str) -> Intent:
+    def _interpret_sync(
+        self,
+        raw_input: str,
+        user_id: Optional[str] = None,
+    ) -> Intent:
         """Synchronous interpretation calling the Gemini client directly.
 
         Avoids calling ``self.interpret()`` to prevent infinite recursion when
