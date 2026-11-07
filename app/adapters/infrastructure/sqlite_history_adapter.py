@@ -204,6 +204,12 @@ class SQLiteHistoryAdapter(HistoryProvider):
             timestamp: Timestamp of the interaction (defaults to now)
             channel: Interface channel that generated this interaction (api, telegram, etc.)
         """
+        if user_id is not None and (
+            not isinstance(user_id, str) or not user_id.strip()
+        ):
+            raise ValueError("user_id must be a non-empty string when provided")
+        if user_id is not None:
+            user_id = user_id.strip()
         try:
             with Session(self.engine) as session:
                 interaction = Interaction(
@@ -218,7 +224,12 @@ class SQLiteHistoryAdapter(HistoryProvider):
                 )
                 session.add(interaction)
                 session.commit()
-                logger.debug(f"Saved interaction: {user_input} -> {command_type} (channel={channel})")
+                logger.debug(
+                    "Saved interaction type=%s channel=%s scoped=%s",
+                    command_type,
+                    channel,
+                    user_id is not None,
+                )
         except Exception as e:
             logger.error(f"Error saving interaction: {e}")
 
@@ -410,7 +421,12 @@ class SQLiteHistoryAdapter(HistoryProvider):
                 session.add(interaction)
                 session.commit()
                 session.refresh(interaction)
-                logger.info(f"Saved pending command with ID {interaction.id}: {user_input} -> {command_type}")
+                logger.info(
+                    "Saved pending command id=%s type=%s scoped=%s",
+                    interaction.id,
+                    command_type,
+                    user_id is not None,
+                )
                 return interaction.id
         except Exception as e:
             logger.error(f"Error saving pending command: {e}")
