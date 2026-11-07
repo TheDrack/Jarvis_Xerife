@@ -1,6 +1,6 @@
 # Cognitive Baseline — Fase C0
 
-**Snapshot:** `main` em `e7b4efa35c8da7fa0ca4c04c7b2b7880478473c2` (pós-PR #769)
+**Snapshot:** `main` em `82ca2ac70f67e8418f62079f7d94e3fc8b4d1230` (pós-PR #774)
 **Auditoria:** 2026-11-07
 **Estado:** parcial; C0 permanece aberto.
 **Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação, complementada por probes remotos somente leitura. Não é confirmação de deploy completo, execução ponta a ponta ou comportamento de todos os providers.
@@ -93,7 +93,7 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 7. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; contraditório, calibração e abstenção ainda não estão demonstrados.
 8. **Planning:** provar persistência de objetivo, dependências e replanejamento; matriz de viabilidade e plano declarativo continuam sendo contratos distintos.
 9. **Initiative:** demonstrar gatilho independente de prompt, deduplicação, orçamento e política de notificação.
-10. **Learning:** isolamento Docker e publicação privilegiada estão implementados (PR #756/#757), com path policy, snapshot descartável, execução sem rede/secrets e publisher separado. Na `main` (`82ca2ac`), o workflow agendado ainda usa o selector legado e bloqueia antes de LLM/Docker porque os 102 registros de `data/capabilities.json` não têm `target_file`. **PR #775 está aberta, não merged:** substitui a seleção agendada por `RoadmapMissionSelector`, que lê `data/roadmap_missions.json`, valida heading/phase/criterion, CAP de compatibilidade, target Python existente, testes, dependências e risco. O manifesto contém zero missões aprovadas; portanto não habilita geração. O publisher também rejeita uma segunda PR aberta com o mesmo título de critério. O próximo gate é revisar o primeiro mapeamento real e fechar a proteção de colisão/retentativa antes de inserir uma missão `ready`.
+10. **Learning:** isolamento Docker e publicação privilegiada estão implementados (PR #756/#757), com path policy, snapshot descartável, execução sem rede/secrets e publisher separado. Na `main` (`82ca2ac`), o workflow agendado ainda usa o selector legado e bloqueia antes de LLM/Docker porque os 102 registros de `data/capabilities.json` não têm `target_file`. **PR #775 está aberta, não merged:** substitui a seleção agendada por `RoadmapMissionSelector`, que lê `data/roadmap_missions.json`, valida heading/phase/criterion, CAP de compatibilidade, target Python existente sob `app/`, arquivos exatos do control plane protegidos na política compartilhada, testes, dependências e risco. O manifesto contém zero missões aprovadas; portanto não habilita geração. O publisher também rejeita uma segunda PR aberta com o mesmo título de critério. O próximo gate é revisar o primeiro mapeamento real e fechar a proteção de colisão/retentativa antes de inserir uma missão `ready`.
 11. **Proveniência e privacidade:** PR #762 reduz exposição nos stores cobertos, mas não é DLP/tenant isolation completa para todos os providers, workers, logs e dados vetoriais. Retenção, exclusão verificável e proveniência continuam pendentes.
 
 ## 7. Próxima implementação recomendada
