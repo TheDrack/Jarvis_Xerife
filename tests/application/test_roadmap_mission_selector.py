@@ -29,6 +29,12 @@ def _repository(tmp_path: Path, missions=None) -> tuple[Path, dict]:
     (tmp_path / "app" / "services" / "target.py").write_text(
         "VALUE = 1\n", encoding="utf-8"
     )
+    (tmp_path / "app" / "application" / "services" / "roadmap_mission_selector.py").write_text(
+        "CONTROL_PLANE = True\n", encoding="utf-8"
+    )
+    (tmp_path / "scripts" / "evolve_all_pending.py").write_text(
+        "CONTROL_PLANE = True\n", encoding="utf-8"
+    )
     (tmp_path / "tests" / "test_target.py").write_text(
         "def test_target():\n    assert True\n", encoding="utf-8"
     )
