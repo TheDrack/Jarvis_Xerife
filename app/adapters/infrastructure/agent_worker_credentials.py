@@ -83,9 +83,10 @@ class AgentWorkerCredentialStore:
 
         capabilities = self._normalize_capabilities(available_tools)
         token = WORKER_TOKEN_PREFIX + secrets.token_urlsafe(48)
-        credential_uuid = uuid4()
-        credential_id = str(credential_uuid)
-        credential_id_value = credential_uuid if self._schema else credential_id
+        credential_id = str(uuid4())
+        credential_id_expression = (
+            "CAST(:credential_id AS uuid)" if self._schema else ":credential_id"
+        )
         capabilities_json = json.dumps(capabilities, separators=(",", ":"))
         capabilities_expression = (
             "CAST(:available_tools AS jsonb)"
@@ -127,12 +128,12 @@ class AgentWorkerCredentialStore:
                         credential_id, agent_id, principal_id, token_hash,
                         available_tools, created_at, expires_at
                     ) VALUES (
-                        :credential_id, :agent_id, :principal_id, :token_hash,
+                        {credential_id_expression}, :agent_id, :principal_id, :token_hash,
                         {capabilities_expression}, :created_at, :expires_at
                     )
                 """),
                 {
-                    "credential_id": credential_id_value,
+                    "credential_id": credential_id,
                     "agent_id": normalized_agent,
                     "principal_id": normalized_principal,
                     "token_hash": self._token_hash(token),
