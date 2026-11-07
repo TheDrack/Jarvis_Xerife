@@ -144,8 +144,8 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 ## 9. Estado de verificação desta auditoria
 
 - Base inspecionada: `e7b4efa35c8da7fa0ca4c04c7b2b7880478473c2`, main após o merge da PR #769 e a atualização automática de documentação.
-- PR #758 está merged. Workflow `Jarvis Task Queue Tests` terminou com **success**, incluindo `Run full test suite`. Build e Auto-Documentation também terminaram com **success**.
-- O check `Supabase Preview` terminou com **failure**: `Remote migration versions not found in local migrations directory.` Não é falha do pytest.
+- PR #769 está merged no commit `203725a7a3f47df390347482d703a2380c8f2142`. PR Validation, Task Queue Tests e Supabase durable vector-memory tests terminaram com **success**; a suíte completa e 16 assertions pgTAP passaram.
+- Um check histórico `Supabase Preview` falhou em um commit anterior ao PR #769 por divergência de migration. Esse estado foi supersedido: após o merge #769, o ledger remoto foi verificado com 27/27 versões e zero pendentes.
 - A auditoria remota foi somente leitura. Nenhum DDL, DML, migration repair, push, deploy, grant ou feature flag foi alterado.
 - O repositório não possui rulesets ativos. A leitura do endpoint de branch protection retorna HTTP 403 pela integração disponível; nenhuma regra foi alterada.
 - A auditoria C0 permanece parcial porque ainda faltam provas integradas listadas na seção 6.
@@ -156,11 +156,11 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 
 | Evidência remota | Resultado observado em 2026-11-07 |
 |---|---:|
-| Arquivos locais em `supabase/migrations` | 26 |
-| Entradas no ledger remoto | 26 |
-| Versões locais/remotas correspondentes | 26/26 |
+| Arquivos locais em `supabase/migrations` | 27 |
+| Entradas no ledger remoto | 27 |
+| Versões locais/remotas correspondentes | 27/27 |
 | Migrations locais pendentes | 0 |
-| Última versão | `20261107025932` |
+| Última versão | `20261107033349` (`vector_memory_store`) |
 | `jarvis_agents` | 5 linhas |
 | `jarvis_agent_tasks` | 13 linhas |
 | `jarvis_agent_attempts` | 12 linhas |
@@ -171,8 +171,9 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 | `intelligence_observation_snapshots` | 0 linhas |
 | `jarvis_mobile_device_sessions` | 48 linhas |
 | `jarvis_mobile_devices` | 1 linha |
+| `jarvis_vector_memories` | 0 linhas |
 
-As duas entradas históricas `google_linked_identities` foram preservadas separadamente. A integração GitHub–Supabase aplicou as seis migrations pendentes após o merge do PR #767; o ledger remoto agora contém todas as 26 versões. Não foi executado `db push`, `migration repair` ou DDL manual pelo ChatGPT.
+As duas entradas históricas `google_linked_identities` foram preservadas separadamente. A integração GitHub–Supabase aplicou as seis migrations pendentes após o merge do PR #767 e a migration `vector_memory_store` após o PR #769; o ledger remoto agora contém 27/27 versões. Não foi executado `db push`, `migration repair` ou DDL manual nesta auditoria.
 
 **RPCs, fencing e ACLs verificados diretamente:**
 - `claim_jarvis_agent_task` e `claim_next_jarvis_agent_task` aplicam provider policy, heartbeat, ferramentas e dependência de tarefa-pai.
@@ -180,18 +181,19 @@ As duas entradas históricas `google_linked_identities` foram preservadas separa
 - `jarvis_agent_messages.claim_token` existe; claim retorna token e ACK de três argumentos valida o token. O overload antigo de ACK de dois argumentos permanece no catálogo, mas não tem privilégio EXECUTE para nenhum desses três roles.
 - Os cinco índices de attempts, events, parent tasks e routines existem.
 - As tabelas `jarvis_intelligence_worker_lease` e `jarvis_intelligence_worker_runs` existem com RLS; as RPCs de claim/renew/release/record/metrics estão restritas a `service_role`.
+- `jarvis_vector_memories` existe com RLS ativo, zero policies e ACL service-role-only: SELECT/INSERT/DELETE permitidos, UPDATE negado; `anon` e `authenticated` não têm SELECT. Dois índices e quatro constraints foram encontrados; a tabela estava vazia.
 - `jarvis_mobile_push_devices` não existe porque a sequência histórica migrou para `jarvis_mobile_devices`; a migration de índices não referencia a tabela antiga.
 
 **Estado operacional observado:**
 - Três agentes `mini-freellmapi-1/2/3` estão online, provider `groq`, com apenas `text_reasoning` em `available_tools`.
 - Duas tarefas antigas permanecem `ready` desde 2026-10-27 e exigem `repository_read`, `github_read` e `production_read`. Nenhum agente anuncia essas capacidades; por isso nenhuma tarefa foi atribuída. O claim está bloqueando corretamente uma atribuição incompatível.
 - A lease do recurring intelligence worker está sem proprietário (`worker_id=NULL`, sem expiração) e `jarvis_intelligence_worker_runs` contém zero execuções. A infraestrutura de banco está instalada, mas o processo recorrente não está ativo.
-- Render `Jarvis-api` está `live`; o último deploy observado é o commit `cf887192`, que já contém o código de runtime das PRs #759–#764. PRs #766/#767 foram testes, migrations e documentação; não introduziram código de aplicação que exigisse novo deploy Render.
+- Render `Jarvis-api` estava `live` no último deploy observado (`cf887192`), que contém o runtime das PRs #759–#764. PR #769 introduziu alterações de aplicação; o deploy posterior não foi confirmado porque o workspace Render não foi selecionado nesta auditoria. Não inferir que a memória durável já está sendo usada por requisições live.
 
 ### 9.2 Segurança e performance do banco
 
 - As tabelas públicas verificadas têm RLS habilitado. O probe de privilégios não encontrou grants de tabela para `anon` ou `authenticated`; os acessos observados ficam restritos a `service_role` e ao owner. As entradas do advisor sem policy são INFO neste schema, não prova de exposição pública.
-- Os cinco índices de foreign keys de attempts/events/parent/routine foram criados e verificados após PR #767. Ainda há 33 índices não utilizados no advisor; não remover sem evidência de carga.
+- Os cinco índices de foreign keys de attempts/events/parent/routine foram criados e verificados após PR #767. A tabela vetorial tem dois índices próprios. Ainda há 33 índices não utilizados no advisor; não remover sem evidência de carga.
 - Advisor de health não reportou findings.
 
 ### 9.2 Segurança e performance do banco
@@ -219,7 +221,7 @@ As duas entradas históricas `google_linked_identities` foram preservadas separa
 
 ### 9.5 Reconciliação do ledger após PRs #767 e #769
 
-O SQL efetivamente registrado foi recuperado de `supabase_migrations.schema_migrations.statements`. Os 20 arquivos históricos foram reconstruídos com seus version IDs originais, preservando as duas entradas distintas `google_linked_identities`. Após o merge do PR #767, a integração aplicou seis migrations forward-only e confirmou 26/26 versões. Após o merge do PR #769, a migration `20261107033349_vector_memory_store` foi aplicada automaticamente. A consulta read-only confirmou 27 versões no ledger remoto e a tabela `public.jarvis_vector_memories`.
+O SQL efetivamente registrado foi recuperado de `supabase_migrations.schema_migrations.statements`. Os 20 arquivos históricos foram reconstruídos com seus version IDs originais, preservando as duas entradas distintas `google_linked_identities`. Após o merge do PR #767, a integração aplicou seis migrations forward-only e confirmou 26/26 versões. Após o merge do PR #769, a migration `20261107033349_vector_memory_store` foi aplicada automaticamente. A consulta read-only confirmou 27/27 versões no ledger remoto e a tabela `public.jarvis_vector_memories`.
 
 **Estado final de schema:**
 - Provider-aware claims, heartbeat reconciliation e parent-task guard estão ativos.
