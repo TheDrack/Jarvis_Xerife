@@ -238,9 +238,18 @@ class AssistantService(NexusComponent):
         Processa um texto, interpreta a intenção e executa a ação.
         Blindado contra erros de NoneType através de resolução dinâmica.
         """
+        user_id: Optional[str] = None
         try:
             request_metadata = request_metadata or {}
+            if not isinstance(request_metadata, dict):
+                raise ValueError("request_metadata must be a dictionary")
             user_id = request_metadata.get("user_id")
+            if user_id is not None and (
+                not isinstance(user_id, str) or not user_id.strip()
+            ):
+                raise ValueError("user_id must be a non-empty string when provided")
+            if user_id is not None:
+                user_id = user_id.strip()
 
             # Direct providers path (for test/injection use)
             if self._action is not None or self._web is not None or self._voice is not None:
@@ -251,7 +260,7 @@ class AssistantService(NexusComponent):
                     intent = interpreter.interpret(text, user_id=user_id)
                 else:
                     intent = interpreter.execute({"text": text, "user_id": user_id})
-                response = self._dispatch_with_providers(intent)
+                response = self._dispatch_with_providers(intent, user_id=user_id)
                 self._command_history.insert(0, {
                     "command": text,
                     "success": response.success,
@@ -329,7 +338,7 @@ class AssistantService(NexusComponent):
                 logger.debug(f"Memory context unavailable: {e}")
 
             # 3. Interpreta o comando, injetando memória de contexto quando disponível
-            interpret_ctx: Dict[str, Any] = {"text": text}
+            interpret_ctx: Dict[str, Any] = {"text": text, "user_id": user_id}
             all_context_lines = vector_context_lines + memory_context_lines
             if all_context_lines:
                 interpret_ctx["system_prompt_extra"] = (
@@ -385,7 +394,9 @@ class AssistantService(NexusComponent):
                 logger.debug(f"Failed to store in semantic memory: {e}")
 
             # 7. Persiste na memória compartilhada
-            self._save_to_hive(text, response, channel=channel)
+            self._save_to_hive(
+                text, response, channel=channel, user_id=user_id
+            )
             self._command_history.insert(0, {
                 "command": text,
                 "success": response.success,
@@ -398,7 +409,9 @@ class AssistantService(NexusComponent):
         except Exception as e:
             logger.error(f"💥 Erro ao processar comando: {e}")
             response = Response(success=False, message=f"Erro interno: {str(e)}", error=str(e))
-            self._save_to_hive(text, response, channel=channel)
+            self._save_to_hive(
+                text, response, channel=channel, user_id=user_id
+            )
             self._command_history.insert(0, {
                 "command": text,
                 "success": False,
@@ -452,7 +465,11 @@ class AssistantService(NexusComponent):
             ]
         return scoped_history[:max(0, limit)]
 
-    def _dispatch_with_providers(self, intent) -> Response:
+    def _dispatch_with_providers(
+        self,
+        intent,
+        user_id: Optional[str] = None,
+    ) -> Response:
         """Direct dispatch to injected providers based on intent command type."""
         from app.domain.models import CommandType
         cmd_type = intent.command_type
