@@ -127,7 +127,7 @@ class SupabaseVectorMemoryStore:
                         "text": row["event_text"],
                         "vector": [float(value) for value in row["embedding"]],
                         "metadata": metadata,
-                        "timestamp": self._timestamp(row["created_at"]),
+                        "timestamp": self._timestamp(row["created_at"]).isoformat(),
                     }
                 )
             if len(rows) < _PAGE_SIZE:
@@ -140,3 +140,10 @@ class SupabaseVectorMemoryStore:
             raise RuntimeError("Supabase vector-memory persistence is unavailable")
         scope_key = self._scope_key(user_id)
         self._client.table(self._table_name).delete().eq("scope_key", scope_key).execute()
+
+    def delete_all(self) -> None:
+        """Delete every partition; called only by the explicit adapter clear()."""
+        if not self.is_available:
+            raise RuntimeError("Supabase vector-memory persistence is unavailable")
+        # scope_key is constrained to non-empty values by the table check.
+        self._client.table(self._table_name).delete().neq("scope_key", "").execute()
