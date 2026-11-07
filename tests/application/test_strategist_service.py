@@ -242,6 +242,25 @@ def test_generate_rfc_requires_a_persisted_human_approval(strategist):
     assert rfc_path.exists()
 
 
+
+def test_generate_rfc_rejects_matrix_mutation_after_approval(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Immutable Approval",
+        proposal_description="The approved snapshot must be authoritative.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    pending_path = strategist.archive_proposal(matrix)
+    strategist.approve_proposal(pending_path.name, approved_by="commander")
+
+    matrix.impact.performance_gain_percent = 99.0
+
+    with pytest.raises(ValueError, match="does not match persisted approved proposal"):
+        strategist.generate_rfc(matrix)
+
+
+
 def test_strategist_execute_archives_viable_proposal_as_pending(strategist):
     result = strategist.execute(
         {
@@ -322,21 +341,6 @@ def test_strategist_generate_rfc(strategist):
     assert "ROI Score" in content
 
 
-
-
-def test_strategist_rfc_requires_explicit_human_approval(strategist):
-    matrix = strategist.generate_viability_matrix(
-        proposal_title="RFC Approval Gate",
-        proposal_description="Viable work still requires human approval.",
-        cost=CostEstimate(api_cost_usd=1.0),
-        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
-        risk=RiskEstimate(risk_level=RiskLevel.LOW),
-    )
-
-    assert matrix.is_viable()
-    assert matrix.approved is False
-    with pytest.raises(ValueError, match="explicit human approval"):
-        strategist.generate_rfc(matrix)
 
 
 def test_strategist_rfc_rejected_proposal_fails(strategist):
