@@ -11,7 +11,11 @@ create table if not exists public.jarvis_vector_memories (
     constraint jarvis_vector_memories_scope_consistency_check
         check (
             (user_id is null and scope_key = 'system')
-            or (user_id is not null and scope_key = 'user:' || user_id)
+            or (
+                user_id is not null
+                and length(btrim(user_id)) > 0
+                and scope_key = 'user:' || btrim(user_id)
+            )
         ),
     constraint jarvis_vector_memories_embedding_shape_check
         check (
