@@ -282,7 +282,7 @@ def test_runtime_fails_closed_when_worker_token_lacks_user_api_identity(monkeypa
     monkeypatch.delenv("JARVIS_TASK_QUEUE_USERNAME", raising=False)
     monkeypatch.delenv("JARVIS_TASK_QUEUE_PASSWORD", raising=False)
 
-    with pytest.raises(RuntimeError, match="one dedicated worker token per agent slot"):
+    with pytest.raises(RuntimeError, match="JARVIS_TASK_QUEUE_API_URL"):
         start_configured_worker()
 
 
