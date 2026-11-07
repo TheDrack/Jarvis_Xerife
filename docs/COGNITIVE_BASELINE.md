@@ -83,7 +83,7 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 ## 6. Lacunas de C0 ainda abertas
 
-1. **Baseline comportamental integrado:** os testes existentes exercitam componentes separadamente; falta um teste reproduzível que estabeleça o comportamento conjunto de uma fonte → coletor → normalização/deduplicação → consumidor.
+1. **Baseline comportamental integrado:** PR #759 adiciona `test_authenticated_collection_endpoint_integrates_sources_core_and_report`, que exercita fontes independentes → coletor → `IntelligenceCore` → endpoint autenticado. O teste verifica deduplicação, correlação candidata, sucesso parcial, isolamento de erros e histórico desativado. A classificação só muda após CI verde.
 2. **Mapa completo de consumidores e configuração:** completar flags, migrations, ACLs, entry points, processos e estado de deploy de cada componente crítico.
 3. **Memória:** provar store/readback, deduplicação, expiração, falha de backend e comportamento após reinício; distinguir memória local de compartilhada.
 4. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; registrar que o pipeline de contraditório/calibração não está demonstrado.
@@ -95,11 +95,11 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 ## 7. Próxima implementação recomendada
 
-**Concluir C0 com um conjunto pequeno de testes de baseline de integração, sem criar módulos novos.**
+**Concluir C0 com testes de baseline de integração, sem criar módulos novos.**
 
-Primeiro teste recomendado: exercitar `collect_live_intelligence()` com duas fontes controladas, uma fonte falhando parcialmente e eventos duplicados/fora de ordem; verificar que o relatório preserva proveniência, não perde a fonte saudável, deduplica deterministicamente e não promove correlação candidata a fato. O código de `IntelligenceCore` e os testes de coletor já existem; o incremento deve fixar o contrato entre eles.
+O primeiro teste integrado está incluído na PR #759. Ele conecta `collect_live_intelligence()` ao endpoint autenticado com duas fontes controladas e falhas parciais. CI ainda precisa confirmar o resultado.
 
-Em paralelo, preparar baseline de memória e autorização do plano com fakes, sem acesso a banco ou serviços externos. Só depois de C0 satisfazer seus critérios, iniciar C1 com contratos/projeções do World Model.
+Próximo incremento: baseline de memória e autorização do plano com fakes, sem acesso a banco ou serviços externos. Depois, provar store/readback após reinício e idempotência. Só iniciar C1 quando C0 satisfizer critérios de integração, persistência, autorização e recuperação.
 
 ## 8. Trilhas transversais e mudanças recentes
 
