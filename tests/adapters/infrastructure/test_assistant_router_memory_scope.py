@@ -59,7 +59,10 @@ def test_message_endpoint_passes_authenticated_user_id_to_assistant():
 
 def test_history_endpoint_requires_authenticated_user_scope():
     client, service = _app_for_user("user-charlie")
-    service.get_command_history = lambda *, limit, user_id: [
+    seen_user_ids = []
+    def get_user_history(*, limit, user_id):
+        seen_user_ids.append(user_id)
+        return [
         {
             "command": "charlie private command",
             "timestamp": "2026-11-06T12:00:00",
@@ -67,11 +70,11 @@ def test_history_endpoint_requires_authenticated_user_scope():
             "message": "private response",
         }
     ]
+    service.get_command_history = get_user_history
 
     response = client.get("/v1/history")
 
     assert response.status_code == 200
     assert response.json()["total"] == 1
     assert response.json()["commands"][0]["command"] == "charlie private command"
-    # FastAPI dependency injection must bind the authenticated principal to the history query.
-    # The lambda fails if the router omits user_id.
+    assert seen_user_ids == ["user-charlie"]
