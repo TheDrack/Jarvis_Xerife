@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-evolve_all_pending.py — Evolução em lote de capacidades JARVIS pendentes.
+evolve_all_pending.py — execução de uma missão do Cognitive Roadmap.
 
-Pipeline:
-  1. Carrega capabilities.jrvs e filtra as pendentes.
-  2. Ordena respeitando dependências (topological sort).
-  3. Chama o EvolutionOrchestrator (via Nexus) para cada cap.
-  4. Loga progresso e contagem de sucesso/falha ao final.
+O caminho agendado exige --mission-id e revalida a missão, fase, alvo e testes
+no manifesto de docs/COGNITIVE_ROADMAP.md. A seleção do catálogo legado exige
+o opt-in explícito --legacy-capability e nunca é usada pelo workflow agendado.
 
 Uso:
-  python scripts/evolve_all_pending.py [--dry-run] [--limit N] [--cap-id CAP-042] [--delay 2.0]
+  python scripts/evolve_all_pending.py --mission-id C0-001 [--dry-run]
+  python scripts/evolve_all_pending.py --legacy-capability [--cap-id CAP-042]
 """
 import argparse
 import os
@@ -94,7 +93,7 @@ def evolve(
 # ---------------------------------------------------------------------------
 
 def _load_capabilities(cap_path: str = "data/capabilities.jrvs") -> List[Dict]:
-    """Carrega capabilities de *cap_path* com fallback automático para .json."""
+    """Load the legacy catalog; callers must explicitly opt into this path."""
     path = Path(cap_path)
     if path.exists():
         try:
