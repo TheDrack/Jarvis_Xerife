@@ -42,7 +42,7 @@ def test_duplicate_pr_guard_runs_before_candidate_generation():
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
     assert "pull-requests: read" in workflow
-    assert "GITHUB_TOKEN: \${{ github.token }}" in workflow
+    assert "GITHUB_TOKEN: " + chr(36) + "{{ github.token }}" in workflow
     assert "find_existing_mission_pr(" in workflow
     assert "A missão já possui PR #" in workflow
     assert "Não foi possível provar ausência de PR anterior" in workflow
