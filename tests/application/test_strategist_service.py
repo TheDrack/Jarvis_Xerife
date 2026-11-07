@@ -204,6 +204,31 @@ def test_strategist_approve_proposal_records_human_decision(strategist):
     assert data["approved_at"]
 
 
+
+def test_strategist_approval_rejects_proposal_identity_mismatch(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Identity Check",
+        proposal_description="The file name and proposal identity must match.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    pending_path = strategist.archive_proposal(matrix)
+    proposal_data = document_store.read(pending_path)
+    proposal_data["proposal_id"] = "different-proposal-id"
+    document_store.write(pending_path, proposal_data)
+
+    with pytest.raises(ValueError, match="identity does not match"):
+        strategist.approve_proposal(
+            pending_path.name,
+            approved_by="commander",
+        )
+
+    assert pending_path.exists()
+    assert not list(strategist.approved_dir.glob("*.jrvs"))
+
+
+
 def test_strategist_approval_rejects_path_traversal(strategist):
     with pytest.raises(ValueError, match="Invalid proposal filename"):
         strategist.approve_proposal("../approved/other.jrvs")
