@@ -92,6 +92,17 @@ class VectorMemoryAdapter(MemoryProvider):
             self._index = None
             logger.info("ℹ️ [VectorMemory] Usando fallback puro-Python.")
 
+    def is_healthy(self) -> bool:
+        """Report storage health independently from the optional FAISS backend.
+
+        The in-memory event list is canonical in both modes. FAISS only
+        accelerates nearest-neighbour lookup; its absence must not make a
+        working pure-Python adapter unavailable to memory consolidation.
+        """
+        if self._dim <= 0 or not isinstance(self._events, list):
+            return False
+        return not _FAISS_AVAILABLE or self._index is not None
+
     def _get_pii_redactor(self):
         """Resolve Nexus redaction policy or fall back to the built-in local redactor."""
         if self._pii_redactor is None:
@@ -155,10 +166,24 @@ class VectorMemoryAdapter(MemoryProvider):
         vector = _vectorize(safe_text, self._dim)
 
         combined_metadata = dict(metadata or {})
-        if user_id is not None:
+        metadata_user_id = combined_metadata.pop("user_id", None)
+        if user_id is None:
+            if metadata_user_id is not None:
+                raise ValueError(
+                    "user_id must be supplied as a trusted argument, not metadata"
+                )
+        else:
             if not isinstance(user_id, str) or not user_id.strip():
                 raise ValueError("user_id must be a non-empty string when provided")
-            combined_metadata["user_id"] = user_id.strip()
+            normalized_user_id = user_id.strip()
+            if (
+                metadata_user_id is not None
+                and metadata_user_id != normalized_user_id
+            ):
+                raise ValueError(
+                    "metadata user_id conflicts with authenticated user_id"
+                )
+            combined_metadata["user_id"] = normalized_user_id
 
         self._events.append(
             {
