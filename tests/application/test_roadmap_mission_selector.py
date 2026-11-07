@@ -116,7 +116,7 @@ def test_priority_is_deterministic_and_dependencies_must_be_complete(tmp_path):
     selected = _selector(root).find_next_mission()
 
     assert selected is not None
-    assert selected["criterion_id"] == "C0-BASELINE-PROVENANCE"
+    assert selected["criterion_id"] == "C0-BASELINE-CORE"
 
 
 @pytest.mark.parametrize(
@@ -164,7 +164,7 @@ def test_ready_mission_with_medium_or_high_risk_is_not_selected(tmp_path):
 def test_mission_with_unfinished_dependency_is_not_selected(tmp_path):
     dependency = _mission(
         criterion_id="C0-BASELINE-DEPENDENCY",
-        status="ready",
+        status="blocked",
         priority=1,
     )
     dependent = _mission(
@@ -186,3 +186,34 @@ def test_manifest_with_unsupported_schema_fails_closed(tmp_path):
 
     with pytest.raises(RoadmapManifestError, match="schema_version_unsupported"):
         _selector(root).find_next_mission()
+
+
+
+def test_evolve_preserves_roadmap_criterion_in_candidate_artifact(monkeypatch):
+    from app.application.services import roadmap_mission_selector  # noqa: F401
+    from scripts import evolve_all_pending
+
+    class FakeOrchestrator:
+        def __init__(self):
+            self.context = None
+
+        def execute(self, context):
+            self.context = context
+            return {"success": True}
+
+    fake = FakeOrchestrator()
+    monkeypatch.setattr(evolve_all_pending, "_get_orchestrator", lambda: fake)
+
+    result = evolve_all_pending.evolve(
+        "CAP-058",
+        roadmap_context='{"criterion_id":"C0-BASELINE-PERCEPTION"}',
+        target_file="app/services/target.py",
+        mission_id="C0-BASELINE-PERCEPTION",
+        mission_title="Complete the C0 perception baseline",
+    )
+
+    assert result is True
+    assert fake.context["cap_id"] == "CAP-058"
+    assert fake.context["mission_id"] == "C0-BASELINE-PERCEPTION"
+    assert fake.context["cap_title"] == "Complete the C0 perception baseline"
+    assert fake.context["target_file"] == "app/services/target.py"
