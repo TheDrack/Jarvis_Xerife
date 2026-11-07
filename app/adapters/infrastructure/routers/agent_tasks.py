@@ -184,7 +184,7 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
             raise HTTPException(
                 status_code=401,
                 detail="Worker credential is invalid, expired, or revoked",
-                headers={"WWW-Authenticate": "Bearer"},
+                headers={"WWW-Authenticate": "JarvisWorker"},
             )
         return principal
 
