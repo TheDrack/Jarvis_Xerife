@@ -191,7 +191,7 @@ As demais divergências de timestamp têm candidatos semânticos, não equivalê
 - `claim_jarvis_agent_task` e `claim_next_jarvis_agent_task` existem.
 - `lease_expires_at` existe nas tabelas de mensagens e tarefas.
 
-Portanto, as migrations de fencing da fila de mensagens (PR #761) e de validação de duração nula da renovação de lease (PR #763) estão no Git, mas não estão aplicadas no Supabase remoto. A PR #763 não substitui a migration anterior que instala a RPC ausente. O projeto pode estar `ACTIVE_HEALTHY` enquanto a branch de migrations permanece `MIGRATIONS_FAILED`; são estados distintos.
+Portanto, as migrations de fencing da fila de mensagens (PR #761) e de validação de duração nula da renovação de lease (PR #763) estão no Git, mas não estão aplicadas no Supabase remoto. A migration da PR #763 define a RPC completa `renew_jarvis_agent_task_lease` com a validação de `NULL` e, se aplicada, cria a função ausente no schema atual. Ela ainda não foi aplicada remotamente e não instala os cinco índices/objetos adicionais da migration histórica `20261028130000_worker_lease_and_security_hardening.sql`. O projeto pode estar `ACTIVE_HEALTHY` enquanto a branch de migrations permanece `MIGRATIONS_FAILED`; são estados distintos.
 
 Nenhum DDL, DML, migration repair, grant ou deploy foi executado nesta revalidação. Não ativar o worker de mensagens/tarefas que dependa das novas assinaturas antes da reconciliação e implantação controlada do ledger.
 
