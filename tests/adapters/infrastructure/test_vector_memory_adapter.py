@@ -142,3 +142,19 @@ def test_store_event_refuses_an_invalid_registered_redactor(monkeypatch, pii_vec
         pii_vector_adapter.store_event("private email alice@example.com")
 
     assert pii_vector_adapter._events == []
+
+
+def test_store_event_rejects_user_id_in_untrusted_metadata(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    with pytest.raises(ValueError, match="trusted argument"):
+        pii_vector_adapter.store_event(
+            "private event",
+            metadata={"user_id": "alice"},
+        )
+
+    assert pii_vector_adapter._events == []
