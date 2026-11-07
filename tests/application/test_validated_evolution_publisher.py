@@ -187,6 +187,48 @@ class TestTrustedPublisher:
                 publish_artifact(artifact_dir, repository)
         assert not any(command[1:3] == ["checkout", "-b"] for command in calls)
 
+    def test_rejects_duplicate_mission_pr_before_branch_creation(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("GH_TOKEN", "publisher-token")
+        monkeypatch.setenv(
+            "EXPECTED_EVOLUTION_SANDBOX_IMAGE", "jarvis-evolution-sandbox:ci"
+        )
+        repository = tmp_path / "repository"
+        target = repository / "app" / "module.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("ORIGINAL = True\n", encoding="utf-8")
+        artifact_dir, manifest, _ = _write_artifact(tmp_path)
+        calls = []
+
+        def fake_run(command, cwd, check=True):
+            calls.append(command)
+            stdout = ""
+            if command[1:3] == ["rev-parse", "--abbrev-ref"]:
+                stdout = "main"
+            elif command[1:2] == ["rev-parse"]:
+                stdout = manifest["source_commit"]
+            elif command[1:3] == ["ls-files", "--error-unmatch"]:
+                stdout = "app/module.py"
+            elif command[:3] == ["gh", "pr", "list"]:
+                stdout = json.dumps(
+                    [
+                        {
+                            "number": 321,
+                            "title": "[JARVIS Evolution] CAP-058",
+                            "state": "MERGED",
+                        }
+                    ]
+                )
+            return subprocess.CompletedProcess(command, 0, stdout, "")
+
+        with patch("scripts.publish_validated_evolution._run", side_effect=fake_run):
+            with pytest.raises(PublicationError, match="mission_pr_already_exists:321"):
+                publish_artifact(artifact_dir, repository)
+
+        assert not any(command[1:3] == ["checkout", "-b"] for command in calls)
+        assert not any(command[:3] == ["gh", "pr", "create"] for command in calls)
+
     def test_publishes_only_the_validated_target_without_executing_it(
         self, tmp_path, monkeypatch
     ):
@@ -214,6 +256,8 @@ class TestTrustedPublisher:
                 stdout = "app/module.py"
             elif command[1:3] == ["diff", "--cached"] and command[-1] == "--name-only":
                 stdout = "app/module.py"
+            elif command[:3] == ["gh", "pr", "list"]:
+                stdout = "[]"
             elif command[:3] == ["gh", "pr", "create"]:
                 stdout = "https://github.com/TheDrack/Jarvis_Xerife/pull/999"
             return subprocess.CompletedProcess(command, 0, stdout, "")
