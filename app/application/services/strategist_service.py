@@ -264,9 +264,12 @@ class StrategistService(NexusComponent):
     def approve_proposal(
         self,
         proposal_filename: str,
-        approved_by: Optional[str] = None,
+        approved_by: str,
     ) -> Path:
-        """Promote one viable pending proposal after an authenticated human decision."""
+        """Promote one viable pending proposal with a durable human actor identity."""
+        if not isinstance(approved_by, str) or not approved_by.strip():
+            raise ValueError("approved_by must identify the authenticated human approver")
+        approved_by = approved_by.strip()
         if (
             not isinstance(proposal_filename, str)
             or not proposal_filename
@@ -291,11 +294,13 @@ class StrategistService(NexusComponent):
         if proposal_data.get("approved") is True:
             raise ValueError("Proposal is already approved")
 
+        if proposal_data.get("status") not in (None, "pending"):
+            raise ValueError("Only pending proposals can be approved")
+
         proposal_data["approved"] = True
         proposal_data["status"] = "approved"
+        proposal_data["approved_by"] = approved_by
         proposal_data["approved_at"] = datetime.now(timezone.utc).isoformat()
-        if approved_by:
-            proposal_data["approved_by"] = str(approved_by)
 
         document_store.write(destination_path, proposal_data)
         try:
@@ -320,9 +325,37 @@ class StrategistService(NexusComponent):
         Raises:
             ValueError: If matrix is not approved
         """
-        if not matrix.approved:
-            raise ValueError("Cannot generate RFC before explicit human approval")
-        
+        proposal_id = str(matrix.proposal_id or "").strip()
+        if (
+            not proposal_id
+            or Path(proposal_id).name != proposal_id
+            or "/" in proposal_id
+            or "\\" in proposal_id
+        ):
+            raise ValueError("Cannot generate RFC without a valid proposal identity")
+
+        approval_path = self.approved_dir / f"{proposal_id}.jrvs"
+        if not approval_path.is_file() or approval_path.is_symlink():
+            raise ValueError("Cannot generate RFC without persisted human approval")
+
+        approval = document_store.read(approval_path)
+        approved_by = approval.get("approved_by") if isinstance(approval, dict) else None
+        approved_at = approval.get("approved_at") if isinstance(approval, dict) else None
+        if (
+            not isinstance(approval, dict)
+            or approval.get("proposal_id") != proposal_id
+            or approval.get("proposal_title") != matrix.proposal_title
+            or approval.get("proposal_description") != matrix.proposal_description
+            or approval.get("viable") is not True
+            or approval.get("approved") is not True
+            or approval.get("status") != "approved"
+            or not isinstance(approved_by, str)
+            or not approved_by.strip()
+            or not isinstance(approved_at, str)
+            or not approved_at.strip()
+        ):
+            raise ValueError("Cannot generate RFC without persisted human approval")
+
         # Generate RFC content
         rfc_number = self._get_next_rfc_number()
         rfc_filename = f"RFC-{rfc_number:04d}.md"
