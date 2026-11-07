@@ -109,6 +109,40 @@ def _load_artifact(artifact_dir: Path) -> tuple[Dict[str, Any], bytes]:
     return manifest, payload
 
 
+def _reject_duplicate_open_mission_pr(repository_root: Path, mission_id: str) -> None:
+    """Prevent repeated scheduled runs from opening parallel PRs for one criterion."""
+    expected_title = f"[JARVIS Evolution] {mission_id}"
+    result = _run(
+        [
+            "gh",
+            "pr",
+            "list",
+            "--state",
+            "open",
+            "--base",
+            "main",
+            "--json",
+            "number,title",
+            "--limit",
+            "1000",
+        ],
+        repository_root,
+    )
+    try:
+        pull_requests = json.loads(result.stdout.strip() or "[]")
+    except json.JSONDecodeError as exc:
+        raise PublicationError("open_evolution_pr_lookup_invalid") from exc
+    if not isinstance(pull_requests, list):
+        raise PublicationError("open_evolution_pr_lookup_invalid")
+
+    for pull_request in pull_requests:
+        if not isinstance(pull_request, dict):
+            continue
+        if pull_request.get("title") == expected_title:
+            number = pull_request.get("number", "unknown")
+            raise PublicationError(f"open_evolution_pr_already_exists:{number}")
+
+
 def publish_artifact(artifact_dir: Path, repository_root: Path) -> Dict[str, str]:
     if not os.getenv("GH_TOKEN"):
         raise PublicationError("GH_TOKEN_required_in_trusted_publisher_job")
@@ -149,6 +183,8 @@ def publish_artifact(artifact_dir: Path, repository_root: Path) -> Dict[str, str
     staged = _run(["git", "diff", "--cached", "--quiet"], root, check=False)
     if staged.returncode != 0:
         raise PublicationError("pre_staged_changes_detected")
+
+    _reject_duplicate_open_mission_pr(root, manifest["mission_id"])
 
     status = _run(
         ["git", "status", "--porcelain", "--", normalized_target],
