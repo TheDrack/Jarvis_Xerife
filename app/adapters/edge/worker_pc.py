@@ -67,7 +67,15 @@ def main() -> None:
 
                     try:
                         # Execute the command
-                        response = assistant.process_command(pending_command['user_input'])
+                        request_metadata = (
+                            {"user_id": pending_command["user_id"]}
+                            if pending_command.get("user_id")
+                            else None
+                        )
+                        response = assistant.process_command(
+                            pending_command['user_input'],
+                            request_metadata=request_metadata,
+                        )
 
                         # Update status based on execution result
                         if response.success:
