@@ -324,7 +324,7 @@ def test_process_command_scopes_semantic_and_vector_memory_to_request_user():
     from unittest.mock import Mock
 
     interpreter = Mock()
-    interpreter.execute.return_value = "intent"
+    interpreter.interpret.return_value = "intent"
     processor = Mock()
     processor.execute.return_value = {"success": True, "message": "scoped response"}
     vector_memory = Mock()
@@ -347,6 +347,10 @@ def test_process_command_scopes_semantic_and_vector_memory_to_request_user():
     )
 
     assert response.success is True
+    interpreter.interpret.assert_called_once_with(
+        "private request",
+        user_id="alice",
+    )
     vector_memory.query_similar.assert_called_once_with(
         "private request",
         top_k=3,
@@ -396,3 +400,26 @@ def test_command_history_is_partitioned_by_authenticated_user():
     assert [item["command"] for item in alice_history] == ["alice secret command"]
     assert [item["command"] for item in bob_history] == ["bob secret command"]
     assert local_history == []
+
+
+
+def test_gateway_interpreter_receives_user_scope_for_history_context():
+    from unittest.mock import Mock
+
+    interpreter = Mock()
+    interpreter.interpret.return_value = "intent"
+    processor = Mock()
+    processor.execute.return_value = {"success": True, "message": "scoped"}
+
+    service = AssistantService(
+        command_interpreter=interpreter,
+        intent_processor=processor,
+    )
+    service._get_decision_engine = lambda: None
+    service._get_vector_memory = lambda: None
+    service._get_memory_manager = lambda: None
+    service._get_history_adapter = lambda: None
+
+    service.process_command("alice request", request_metadata={"user_id": "alice"})
+
+    interpreter.interpret.assert_called_once_with("alice request", user_id="alice")
