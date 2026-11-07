@@ -278,6 +278,23 @@ def test_strategist_generate_rfc(strategist):
     assert "ROI Score" in content
 
 
+
+
+def test_strategist_rfc_requires_explicit_human_approval(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="RFC Approval Gate",
+        proposal_description="Viable work still requires human approval.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+
+    assert matrix.is_viable()
+    assert matrix.approved is False
+    with pytest.raises(ValueError, match="explicit human approval"):
+        strategist.generate_rfc(matrix)
+
+
 def test_strategist_rfc_rejected_proposal_fails(strategist):
     """Test that RFC generation fails for rejected proposals"""
     cost = CostEstimate(api_cost_usd=1.0)
