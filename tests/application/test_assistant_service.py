@@ -216,7 +216,7 @@ class TestAssistantServiceWithLLM(NexusComponent):
         mock_interpreter = Mock()
         
         # Make it return an UNKNOWN intent by default
-        def create_unknown_intent(text):
+        def create_unknown_intent(text, user_id=None):
             return Intent(
                 command_type=CommandType.UNKNOWN,
                 parameters={"raw_command": text},
