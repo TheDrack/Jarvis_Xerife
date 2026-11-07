@@ -222,7 +222,15 @@ class MemoryConsolidationService(NexusComponent):
                 f"Jarvis: {response}"
             )
 
-            documents_to_embed.append({"text": semantic_text, "metadata": meta})
+            documents_to_embed.append(
+                {
+                    "text": semantic_text,
+                    "metadata": meta,
+                    # Keep the exact source entry for lossless rollback if the
+                    # durable write fails after WorkingMemory eviction.
+                    "original_entry": dict(entry),
+                }
+            )
 
         # 3. Persistência (VectorAdapter armazena)
         consolidated = 0
@@ -230,32 +238,25 @@ class MemoryConsolidationService(NexusComponent):
 
         for doc in documents_to_embed:
             try:
-                vector_adapter.store_event(text=doc["text"], metadata=doc["metadata"])
+                vector_adapter.store_event(
+                    text=doc["text"],
+                    metadata=doc["metadata"],
+                    user_id=doc["metadata"].get("user_id"),
+                )
                 consolidated += 1
             except Exception as e:
                 logger.error(f"[ConsolidationService] Falha ao gravar vetor: {e}")
-                # Guarda entrada falha para recuperação
+                # Keep the original entry intact for lossless recovery.
                 failed_entries.append(doc)
 
-        # 4. CORREÇÃO: Recuperação - devolve falhas para WorkingMemory
+        # 4. Recovery: restore the exact original entries after failed writes.
         if failed_entries:
             logger.warning(
                 f"[ConsolidationService] {len(failed_entries)} memórias falharam - "
                 "retornando para WorkingMemory (fallback)."
             )
             for doc in failed_entries:
-                # Reconstrói entrada original
-                original_entry = {
-                    "user_input": doc["metadata"].get("user_input", ""),
-                    "response": doc["metadata"].get("response", ""),
-                    "_ts": doc["metadata"].get("original_timestamp", ""),
-                    **{
-                        k: v
-                        for k, v in doc["metadata"].items()
-                        if k not in ["source", "original_timestamp"]
-                    },
-                }
-                working_memory.push(original_entry)
+                working_memory.push(doc["original_entry"])
 
         logger.info(
             f"🧠 [ConsolidationService] {consolidated}/{len(documents_to_embed)} memórias consolidadas."
