@@ -142,3 +142,53 @@ def test_worker_cannot_claim_as_another_agent(monkeypatch):
     )
 
     assert response.status_code == 403
+
+
+
+def test_worker_cannot_finish_as_another_agent(monkeypatch):
+    def finish_stub(self, *args, **kwargs):
+        raise AssertionError("impersonated finish must not reach the queue")
+
+    monkeypatch.setattr(AgentTaskQueueService, "finish", finish_stub)
+    worker = SimpleNamespace(
+        agent_id="trusted-mini-1",
+        principal_id="worker:trusted-mini-1",
+        available_tools=("text_reasoning",),
+    )
+    client = _client(monkeypatch, worker, heartbeat_stub=lambda self, **kwargs: {})
+
+    response = client.post(
+        "/v1/agent-tasks/task-1/finish",
+        json={
+            "agent_id": "victim-agent",
+            "attempt_id": "00000000-0000-0000-0000-000000000001",
+            "status": "completed",
+            "result": {},
+        },
+    )
+
+    assert response.status_code == 403
+
+
+def test_worker_cannot_release_as_another_agent(monkeypatch):
+    def release_stub(self, *args, **kwargs):
+        raise AssertionError("impersonated release must not reach the queue")
+
+    monkeypatch.setattr(AgentTaskQueueService, "release", release_stub)
+    worker = SimpleNamespace(
+        agent_id="trusted-mini-1",
+        principal_id="worker:trusted-mini-1",
+        available_tools=("text_reasoning",),
+    )
+    client = _client(monkeypatch, worker, heartbeat_stub=lambda self, **kwargs: {})
+
+    response = client.post(
+        "/v1/agent-tasks/task-1/release",
+        json={
+            "agent_id": "victim-agent",
+            "attempt_id": "00000000-0000-0000-0000-000000000001",
+            "reason": "test",
+        },
+    )
+
+    assert response.status_code == 403
