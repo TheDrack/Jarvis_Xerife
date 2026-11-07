@@ -32,7 +32,7 @@ create index if not exists jarvis_vector_memories_scope_created_idx
 alter table public.jarvis_vector_memories enable row level security;
 
 revoke all on table public.jarvis_vector_memories
-    from public, anon, authenticated;
+    from public, anon, authenticated, service_role;
 
 grant select, insert, delete on table public.jarvis_vector_memories
     to service_role;
