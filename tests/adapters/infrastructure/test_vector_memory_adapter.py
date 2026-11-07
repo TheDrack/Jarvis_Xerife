@@ -263,7 +263,7 @@ def test_vector_memory_store_failure_does_not_cache_unpersisted_event():
     assert adapter._events == []
 
 
-def test_vector_memory_durability_requires_a_healthy_persistent_store():
+def test_vector_memory_durability_requires_a_configured_persistent_store():
     durable = VectorMemoryAdapter(dim=32, store=_SharedVectorMemoryStore())
     ephemeral = VectorMemoryAdapter(dim=32, store=None)
 
@@ -292,3 +292,13 @@ def test_vector_memory_clear_without_user_id_clears_all_partitions_explicitly():
 
     assert store.events == []
     assert adapter._events == []
+
+def test_configured_but_unhealthy_vector_store_is_not_healthy():
+    class UnhealthyStore(_SharedVectorMemoryStore):
+        def is_healthy(self):
+            return False
+
+    adapter = VectorMemoryAdapter(dim=32, store=UnhealthyStore())
+
+    assert adapter.is_durable is True
+    assert adapter.is_healthy() is False
