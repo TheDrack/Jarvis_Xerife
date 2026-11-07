@@ -19,6 +19,8 @@ def _repository(tmp_path: Path, missions=None) -> tuple[Path, dict]:
     (tmp_path / "docs").mkdir()
     (tmp_path / "data").mkdir()
     (tmp_path / "app" / "services").mkdir(parents=True)
+    (tmp_path / "app" / "application" / "services").mkdir(parents=True)
+    (tmp_path / "scripts").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "docs" / "COGNITIVE_ROADMAP.md").write_text(
         "# Roadmap\n\n" + ROADMAP_HEADING + "\n\nC0 audit.\n",
@@ -128,6 +130,8 @@ def test_priority_is_deterministic_and_dependencies_must_be_complete(tmp_path):
         ({"roadmap_heading": "## Nonexistent heading"}, "mission_roadmap_heading_not_found"),
         ({"target_file": "../outside.py"}, "mission_target_path_rejected"),
         ({"target_file": "app/application/security/policy.py"}, "mission_target_file_not_eligible"),
+        ({"target_file": "app/application/services/roadmap_mission_selector.py"}, "mission_target_file_not_eligible"),
+        ({"target_file": "scripts/evolve_all_pending.py"}, "mission_target_file_not_eligible"),
         ({"tests": []}, "mission_tests_required"),
         ({"tests": ["docs/COGNITIVE_ROADMAP.md"]}, "mission_test_path_invalid"),
         ({"legacy_capability_id": "CAP-999"}, "mission_legacy_capability_id_unknown"),
