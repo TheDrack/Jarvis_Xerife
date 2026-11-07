@@ -38,7 +38,7 @@ def test_append_uses_authoritative_scope_column_and_strips_user_from_metadata():
         "timestamp": datetime(2026, 11, 7, tzinfo=timezone.utc),
     }
 
-    store.append(event)
+    store.append(event, user_id='alice')
 
     client.table.assert_called_once_with("jarvis_vector_memories")
     row = query.upsert.call_args.args[0]
