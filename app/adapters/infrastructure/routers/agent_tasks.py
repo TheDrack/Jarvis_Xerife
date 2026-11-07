@@ -1,6 +1,7 @@
 """Authenticated API for shared multi-agent task scheduling."""
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
 from typing import Any, Literal
@@ -12,6 +13,48 @@ from sqlalchemy import create_engine
 from app.application.services.agent_task_queue_service import (
     AgentTaskQueueService, TaskQueueUnavailable,
 )
+from app.core.nexus import nexus
+
+logger = logging.getLogger(__name__)
+
+
+def _emit_proactive_task_signal(
+    user: Any,
+    event_type: str,
+    *,
+    task_id: str,
+    result: dict[str, Any],
+) -> bool:
+    """Forward a grounded task event using only the authenticated owner's identity."""
+    owner_id = str(
+        getattr(user, "user_id", None) or getattr(user, "username", None) or ""
+    ).strip()
+    if not owner_id or event_type != "task_blocked":
+        return False
+
+    assistant = nexus.resolve("assistant_service")
+    handler = getattr(assistant, "on_event", None) if assistant is not None else None
+    if not callable(handler):
+        return False
+
+    details = result if isinstance(result, dict) else {}
+    payload = {
+        "user_id": owner_id,
+        "title": str(details.get("title") or f"Tarefa bloqueada: {task_id}")[:180],
+        "objective": str(details.get("objective") or details.get("description") or "")[:500],
+        "evidence_ref": f"agent-task:{task_id}"[:200],
+        "confidence": 0.95,
+        "impact": 0.75,
+        "urgency": 0.75,
+        "availability": 0.9,
+        "interruption_cost": 0.15,
+    }
+    try:
+        handler(event_type, payload)
+        return True
+    except Exception as exc:
+        logger.warning("Could not forward proactive task signal (%s)", type(exc).__name__)
+        return False
 
 
 class AgentHeartbeatRequest(BaseModel):
@@ -143,6 +186,13 @@ def create_agent_tasks_router(db_adapter, get_current_user) -> APIRouter:
             )
             if not accepted:
                 raise HTTPException(status_code=409, detail="Task ownership or attempt is stale")
+            if request.status == "blocked":
+                _emit_proactive_task_signal(
+                    _user,
+                    "task_blocked",
+                    task_id=task_id,
+                    result=request.result,
+                )
             return {"accepted": True, "task_id": task_id, "status": request.status}
         except HTTPException:
             raise
