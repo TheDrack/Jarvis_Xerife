@@ -59,6 +59,20 @@ The publisher does not execute candidate code. CI runs again against the resulti
 
 No publication occurs when Docker is unavailable, candidate tests fail, the target is absent or protected, the artifact digest is wrong, the source commit is stale, the target has local changes, the target is untracked, or the publisher cannot prove that only the target file is staged.
 
+## Strategic proposal approval boundary
+
+ROI viability is an analysis result, not authorization to execute. The `strategist_service.execute` entrypoint accepts an `evaluate_proposal` context containing `proposal_title`, `proposal_description`, and structured `cost`, `impact`, and `risk` estimates. A viable result is persisted as `pending`; a non-viable result is persisted as `rejected`. The execution entrypoint never promotes a proposal to approved.
+
+Promotion from `pending` to `approved` requires an authenticated user with a stable actor ID. The approval route fails closed when authentication is unavailable, the GitHub publisher is absent, or Nexus returns a `CloudMock`. It validates the proposal filename, identity, viability, status, and filesystem object before promotion. Symlinked pending artifacts are not listed or approved.
+
+RFC generation requires a persisted approval record with actor and timestamp. The in-memory proposal must match the persisted approved snapshot for identity, title, description, cost, impact, and risk; changing the proposal after approval cannot produce a different RFC. RFC metadata records the approving actor and timestamp.
+
+The state transition is:
+
+`evaluated → pending → approved → repository dispatch → implementation PR`
+
+Non-viable proposals transition to `rejected`. No proposal is auto-approved based on ROI, and no repository dispatch occurs before the authenticated approval step.
+
 ## Current integration status
 
 - The Docker-backed sandbox and adversarial integration test are wired into PR validation.
