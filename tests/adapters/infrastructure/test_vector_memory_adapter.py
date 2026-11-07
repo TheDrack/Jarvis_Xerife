@@ -281,3 +281,14 @@ def test_clear_only_removes_the_requested_user_partition():
 
     assert len(store.list_events(user_id="alice")) == 0
     assert len(store.list_events(user_id="bob")) == 1
+
+def test_vector_memory_clear_without_user_id_clears_all_partitions_explicitly():
+    store = _SharedVectorMemoryStore()
+    adapter = VectorMemoryAdapter(dim=32, store=store)
+    adapter.store_event("alice memory", user_id="alice")
+    adapter.store_event("system memory")
+
+    adapter.clear()
+
+    assert store.events == []
+    assert adapter._events == []
