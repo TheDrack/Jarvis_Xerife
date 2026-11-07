@@ -201,3 +201,46 @@ This section supersedes the historical object/claim observations above where the
 - PR #763 adds isolated pgTAP coverage for task lease renewal and a new forward-only migration, `20261107020000_task_lease_renewal_null_duration_guard.sql`, that explicitly rejects NULL lease duration. The historical worker-lease migration is preserved unchanged. The NULL-duration regression was reproduced before the fix; pgTAP, full pytest, and Task Queue workflows passed afterward. No production migration is applied.
 
 **Current gate:** reconcile the migration ledger and verify the missing task-lease RPC before relying on long-running task execution. Keep the recurring intelligence worker disabled until its separate migration and persistence tests pass.
+
+## Revalidation 2026-11-06 after PRs #759–#764
+
+This read-only snapshot follows the merge of PRs #759–#764. It supersedes earlier counts and function observations where they differ.
+
+**Project and migration ledger**
+- Project `saibtpdehhprttqlgqdt`: `ACTIVE_HEALTHY`, PostgreSQL `17.6.1.063`.
+- Supabase branch `main`: `MIGRATIONS_FAILED`.
+- Repository main contains 27 migration files; the remote ledger still contains 20 entries.
+- Five version timestamps match exactly. Eight local migration files have no matching remote ledger entry by name/version; the remaining differences require SQL-level reconciliation.
+- The remote ledger still contains two entries named `google_linked_identities`. Do not repair by renaming or timestamp alone.
+
+**New local migrations not applied remotely**
+- `20261107010000_multi_agent_message_claim_fencing.sql` (PR #761).
+- `20261107020000_task_lease_renewal_null_duration_guard.sql` (PR #763).
+
+The six previously identified local files without matching remote ledger entries remain:
+- `202610260001_red_blue_venice_routing.sql`
+- `20261028090000_release_failed_task_attempt.sql`
+- `20261028100000_agent_heartbeat_reconciliation.sql`
+- `20261028130000_worker_lease_and_security_hardening.sql`
+- `20261103184308_intelligence_recurring_worker.sql`
+- `20261105202000_direct_claim_parent_dependency_guard.sql`
+
+**Read-only schema probes**
+- `public.jarvis_agent_messages` has no `claim_token` column.
+- The remote `claim_jarvis_agent_message` signature remains `(p_agent_id text, p_lease_seconds integer)`.
+- The remote `ack_jarvis_agent_message` signature remains `(p_message_id uuid, p_agent_id text)`; the token-fenced three-argument overload from PR #761 is not installed.
+- `renew_jarvis_agent_task_lease` is absent. The remote task-claim RPCs `claim_jarvis_agent_task` and `claim_next_jarvis_agent_task` exist.
+- `lease_expires_at` exists on both `jarvis_agent_messages` and `jarvis_agent_tasks`.
+- Current row counts observed: 13 tasks, 12 attempts, 24 task events, 0 messages, 5 agents, 1,755 environment observations, 0 intelligence event snapshots, and 0 intelligence observation snapshots.
+
+**What the merged PRs prove**
+- PR #761's dedicated workflow starts an ephemeral local Supabase stack, runs pgTAP, and runs a leader/worker exchange in two spawned processes with independent Supabase clients. This proves the message-queue contract against an isolated database; it does not apply the migration to production or validate the task queue.
+- PR #763's forward-only migration defines the complete `renew_jarvis_agent_task_lease` RPC with explicit NULL-duration validation; applying it would create the currently absent function against the existing task/event columns. It has not been applied remotely. It does not install the five indexes or other objects from the historical worker-lease migration.
+- PR #762 adds user-scoped memory/history and fail-closed redaction in the code paths covered by its tests. It does not change the Supabase migration ledger.
+- PR #764 adds an authenticated human-approval gate for Strategist proposals. It does not change the Supabase schema.
+
+**Operational decision**
+- Do not run `migration repair`, `db push`, apply either new migration, or enable a worker that depends on the new RPC signatures until each local migration is reconciled against the actual remote schema and ledger.
+- Reconcile the historical worker-lease migration before applying PR #763's forward-only guard; the guard alone does not create the absent RPC.
+- Reconcile and apply PR #761's fencing migration before deploying a worker that calls the three-argument ACK RPC.
+- No production DDL, DML, migration repair, grants, or deployment were performed during this revalidation.

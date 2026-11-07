@@ -83,37 +83,40 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 ## 6. Lacunas de C0 ainda abertas
 
-1. **Baseline comportamental integrado:** PR #759 adiciona `test_authenticated_collection_endpoint_integrates_sources_core_and_report`, que exercita fontes independentes → coletor → `IntelligenceCore` → endpoint autenticado. O teste verifica deduplicação, correlação candidata, sucesso parcial, isolamento de erros e histórico desativado. A classificação só muda após CI verde.
+1. **Baseline comportamental integrado:** PR #759 está merged. O teste `test_authenticated_collection_endpoint_integrates_sources_core_and_report` cobre fontes independentes → coletor → `IntelligenceCore` → endpoint autenticado, incluindo deduplicação, correlação candidata, sucesso parcial, isolamento de erros e histórico desativado. Isso valida o contrato com fontes controladas, não a disponibilidade de todos os providers em produção.
 2. **Mapa completo de consumidores e configuração:** completar flags, migrations, ACLs, entry points, processos e estado de deploy de cada componente crítico.
-3. **Memória:** PR #759 adiciona readback do `MemoryManager` após recriar a instância; CI pendente. Ainda faltam deduplicação, expiração, falha de escrita, isolamento por usuário, redaction e readback durável para `VectorMemoryAdapter`/memória procedural.
-4. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; registrar que o pipeline de contraditório/calibração não está demonstrado.
+3. **Memória:** PR #759 comprova readback do `MemoryManager` após recriar a instância; PR #762 adiciona redaction e partição por usuário para memória semântica baseada em arquivo, além de escopo na história SQLite/vetorial. Ainda faltam idempotência, expiração/retention, falha de escrita validada em todos os caminhos, persistência vetorial após reinício e bootstrap/recuperação procedural.
+4. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; o pipeline de contraditório, calibração e abstenção ainda não está demonstrado.
 5. **Planning:** provar persistência de objetivo, dependências e replanejamento; a matriz de viabilidade e o plano declarativo são capacidades diferentes.
-6. **Executive:** validar autorização no momento do dispatch, idempotência, leases, recuperação e efeito pós-ação com dois processos/runtimes independentes.
+6. **Executive:** PR #761 comprova troca de mensagens entre processos independentes contra Supabase isolado e fencing de ACK. Isso não comprova o caminho de execução da fila de tarefas nem comportamento em produção. Ainda falta escolher e validar o runtime canônico.
 7. **Initiative:** demonstrar gatilho independente de prompt, deduplicação, orçamento e política de notificação.
 8. **Learning:** o isolamento Docker e a publicação privilegiada já estão implementados (PR #756/#757). O bloqueio atual é a ausência de `target_file` confiável para as capabilities pendentes e a limitação do contrato atual a um único arquivo-alvo; não ativar evolução automática para features que exijam mudanças coordenadas de código e testes até existir suporte multi-arquivo com testes correspondentes.
-9. **Proveniência e privacidade:** mapear retenção, exclusão, isolamento por usuário/tenant e minimização para eventos, observações, memórias e logs.
+9. **Proveniência e privacidade:** PR #762 reduz exposição na memória semântica e história cobertas, mas não constitui política completa de tenant para todos os providers, workers, logs e dados vetoriais. Retenção, exclusão verificável, proveniência e minimização continuam pendentes.
 
 ## 7. Próxima implementação recomendada
 
-**Manter C0 aberto até provar persistência e execução entre runtimes reais.**
+**Manter C0 aberto.** As PRs #759–#764 fecharam contratos importantes, mas não reconciliaram o estado operacional do Supabase nem concluíram o runtime autônomo.
 
-Evidências de contrato já adicionadas ou existentes:
+Evidências integradas:
 
-- **PR #759:** integra `collect_live_intelligence()` ao endpoint autenticado e adiciona readback do `MemoryManager` após reinício. O workflow de suíte completa passou no head atual; o workflow dedicado de fila foi cancelado e não é contabilizado como sucesso.
-- **Autorização de planos:** `tests/multiagent/test_task_runner_execution_plan_integration.py` cobre allow/deny, ferramenta sensível retornando `approval_required` e bloqueio quando o journal durável falha. São testes com doubles; não comprovam aprovação humana nem identidade/autorização em produção.
-- **PR #760:** corrige o health check do `VectorMemoryAdapter` para aceitar o backend puro-Python quando FAISS não está disponível. A regressão valida consolidação e busca; os workflows de suíte completa e fila passaram.
-- **PR #761:** adiciona `claim_token` por tentativa à fila de mensagens, rejeita ACK obsoleto e revoga a RPC antiga sem fencing. O pgTAP em PostgreSQL isolado e a suíte completa do workflow Task Queue passaram; o workflow `JARVIS PR Validation` foi cancelado e não é contado como sucesso. O teste de clientes usa backend determinístico em memória; não é E2E de processos nem de produção. A migration de fencing ainda não foi aplicada porque o histórico remoto/local continua divergente.
-- **PR #763:** adiciona migration forward-only para rejeitar duração `NULL` na RPC de renovação de lease, preservando a migration histórica. pgTAP isolado, suíte completa e workflow Task Queue passaram. A migration ainda não foi aplicada ao projeto remoto; o RPC continua ausente em produção até a reconciliação e implantação.
+- **PR #759 — merged:** baseline da coleta de inteligência pelo endpoint autenticado e readback do `MemoryManager` após recriar a instância. Suíte completa e workflow de fila passaram.
+- **PR #760 — merged:** `VectorMemoryAdapter.is_healthy()` reconhece o backend puro-Python quando FAISS não está disponível. Consolidação e busca cobertas; não adiciona persistência vetorial.
+- **PR #761 — merged:** fencing por `claim_token` na fila de mensagens; ACK obsoleto é rejeitado e a RPC antiga sem token perde execução para `service_role`. O workflow dedicado sobe Supabase isolado, roda pgTAP e executa `test_supabase_message_process_e2e.py` com leader e worker em processos separados, cada um com cliente próprio. O workflow Task Queue passou; o PR Validation foi cancelado e não é contado como sucesso. A migration não foi aplicada ao projeto remoto.
+- **PR #762 — merged:** redaction fail-closed de email/CPF/telefone, partição de memória semântica por identidade autenticada, escopo da história SQLite e filtragem vetorial por proprietário. PR Validation e Task Queue passaram. Não torna o vector store durável nem implementa DLP completa.
+- **PR #763 — merged:** migration forward-only para rejeitar duração `NULL` na renovação de lease de tarefa, preservando a migration histórica. pgTAP, suíte completa e Task Queue passaram. A RPC continua ausente no banco remoto porque a migration não foi aplicada.
+- **PR #764 — merged:** propostas viáveis ficam pendentes até aprovação explícita; a rota exige identidade autenticada, persiste `approved_by`/`approved_at` e o RFC verifica a aprovação persistida. PR Validation e Task Queue passaram. O teste usa dependência de identidade controlada; não é prova de integração de ponta a ponta com o provedor de identidade de produção.
 
 Pendências reais de C0:
 
-1. Provar escrita e readback de memória persistente após reinício, com idempotência.
-2. Executar dois processos/runtimes isolados contra um banco de integração isolado, sem usar o projeto de produção.
-3. Escolher e demonstrar um caminho canônico de execução: o runtime supervisionado atual inicia `SupabaseTaskQueueMiniAgent` ou `PriorityQueueMiniAgent`; a via `AgentLeader`/`AgentWorker` ainda é separada.
-4. Validar aprovação humana e autorização com identidade real, além dos doubles existentes.
-5. Fechar lease/fencing e recuperação no caminho efetivamente escolhido, incluindo a RPC de renovação de lease ausente no Supabase remoto.
+1. **Durabilidade de memória:** readback semântico em arquivo está coberto; provar idempotência, retenção/expiração e recuperação de memória vetorial/procedural após reinício.
+2. **Runtime canônico:** o supervisor atual inicia `SupabaseTaskQueueMiniAgent` ou `PriorityQueueMiniAgent`; a via `AgentLeader`/`AgentWorker` continua separada. Escolher e integrar um único caminho operacional.
+3. **Task queue E2E:** validar dois processos independentes contra banco isolado no caminho de tarefas, incluindo renovação, expiração, fencing e recuperação. O E2E da PR #761 cobre a fila de mensagens, não a fila de tarefas.
+4. **Ledger Supabase:** reconciliar versões e SQL local/remoto antes de qualquer `migration repair`, `db push` ou aplicação de migration. O branch remoto continua `MIGRATIONS_FAILED`; a RPC de renovação e a coluna/token de fencing não existem no schema remoto.
+5. **Aprovação:** integrar a identidade real e uma política explícita de quem pode aprovar; a API agora exige ator autenticado e grava auditoria, mas o teste ainda usa identidade injetada.
+6. **Privacidade:** ampliar redaction/retention/erasure e provar purge em todos os stores, incluindo vetores, ThoughtLogs e logs operacionais.
+7. **Reasoning, Planning e Initiative:** completar os contratos comportamentais listados na seção 6.
 
-Não iniciar C1 nem ativar o worker recorrente até que essas evidências e a reconciliação do ledger de migrations estejam concluídas.
+Não iniciar C1 nem ativar workers recorrentes enquanto o ledger não for reconciliado e os caminhos de execução/lease não forem validados.
 
 ## 8. Trilhas transversais e mudanças recentes
 
@@ -128,12 +131,18 @@ Estas entregas são manutenção ou infraestrutura; não concluem fases cognitiv
 - **PR #756:** isolou a execução de candidatos em Docker descartável; testes adversariais verificam ausência de rede, mounts e segredos.
 - **PR #757:** separou geração/validação de publicação privilegiada, adicionou artefato com digest e publisher path-scoped; a autoevolução falha fechada sem target confiável.
 - **PR #758 (merged em 2026-11-06, America/Sao_Paulo):** elimina o pipeline paralelo do JarvisDevAgent, delega ao EvolutionOrchestrator e adiciona cancelamento cooperativo. Merge commit: `a31f5554776531c245166cb864abbf8a0eb03075`.
+- **PR #759 (merged):** baseline integrado da coleta de inteligência e readback de memória semântica.
+- **PR #760 (merged):** health check correto para o fallback puro-Python do vector store.
+- **PR #761 (merged):** fencing por tentativa na fila de mensagens e E2E de dois processos em Supabase isolado.
+- **PR #762 (merged):** redaction fail-closed e isolamento por usuário nos caminhos de memória cobertos.
+- **PR #763 (merged):** guard forward-only para duração nula na renovação de lease de tarefa.
+- **PR #764 (merged):** gate de aprovação humana autenticada para propostas do Strategist.
 
 O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos de recuperação e dispatch. Esta auditoria não o executou nem alterou seus gates. A correção automática de PR/CI e os workflows Self Healing permanecem uma trilha transversal obrigatória.
 
 ## 9. Estado de verificação desta auditoria
 
-- Base inspecionada: `a31f5554776531c245166cb864abbf8a0eb03075`, merge commit da PR #758.
+- Base inspecionada: `a2f3d64c099ceecc72cbd45cc471c432ad06ff7b`, merge commit da PR #762, contendo as PRs #759–#764.
 - PR #758 está merged. Workflow `Jarvis Task Queue Tests` terminou com **success**, incluindo `Run full test suite`. Build e Auto-Documentation também terminaram com **success**.
 - O check `Supabase Preview` terminou com **failure**: `Remote migration versions not found in local migrations directory.` Não é falha do pytest.
 - A auditoria remota foi somente leitura. Nenhum DDL, DML, migration repair, push, deploy, grant ou feature flag foi alterado.
@@ -147,30 +156,44 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 | Evidência remota | Resultado observado |
 |---|---:|
 | Status da branch Supabase `main` | `MIGRATIONS_FAILED` |
-| Arquivos locais em `supabase/migrations` | 25 |
+| Arquivos locais em `supabase/migrations` após PRs #761/#763 | 27 |
 | Entradas no ledger remoto | 20 |
 | Versões com timestamp idêntico local/remoto | 5 |
-| Tabelas `intelligence_event_snapshots` | 0 linhas |
-| Tabelas `intelligence_observation_snapshots` | 0 linhas |
-| Tabela legada `jarvis_environment_observations` | 1.755 linhas |
-| Tabelas/RPCs do worker recorrente | Ausentes |
-| `jarvis_agents` com status `available` | 3 |
-| `jarvis_agents` com status `offline` | 2 |
-| Tarefas | 8 completed, 3 cancelled, 2 ready |
-| Mensagens em `jarvis_agent_messages` | 0 |
-| Definições em `jarvis_routine_definitions` | 0 |
+| Migrations locais sem entrada remota correspondente por nome/versão | 8 |
+| `jarvis_agents` | 5 linhas |
+| `jarvis_agent_tasks` | 13 linhas |
+| `jarvis_agent_attempts` | 12 linhas |
+| `jarvis_agent_events` | 24 linhas |
+| `jarvis_agent_messages` | 0 linhas |
+| `jarvis_environment_observations` | 1.755 linhas |
+| `intelligence_event_snapshots` | 0 linhas |
+| `intelligence_observation_snapshots` | 0 linhas |
+| `jarvis_mobile_device_sessions` | 48 linhas |
+| `jarvis_mobile_devices` | 1 linha |
 
-Os três registros disponíveis são `mini-freellmapi-1/2/3`, com heartbeat recente, provider `groq`, ferramenta `text_reasoning` e zero tarefas ativas. As duas tarefas `ready` exigem `repository_read`, `github_read` e `production_read`; nenhum agente ativo anuncia essas ferramentas. A RPC de claim corretamente não as atribui a agentes sem capacidade. Isso é uma lacuna de cobertura de capacidades, não evidência de falha do scheduler. A presença no control plane não comprova dois Harness independentes concluindo um ciclo E2E.
+O ledger remoto ainda contém duas entradas chamadas `google_linked_identities`. Seis migrations locais já estavam sem correspondência por nome/versão na auditoria anterior; as duas novas migrations locais das PRs #761 e #763 também não têm entrada remota:
+- `202610260001_red_blue_venice_routing.sql`
+- `20261028090000_release_failed_task_attempt.sql`
+- `20261028100000_agent_heartbeat_reconciliation.sql`
+- `20261028130000_worker_lease_and_security_hardening.sql`
+- `20261103184308_intelligence_recurring_worker.sql`
+- `20261105202000_direct_claim_parent_dependency_guard.sql`
+- `20261107010000_multi_agent_message_claim_fencing.sql`
+- `20261107020000_task_lease_renewal_null_duration_guard.sql`
 
-O ledger remoto contém versões que não existem como nomes de arquivo locais. Há também duas entradas remotas chamadas `google_linked_identities`. A auditoria anterior encontrou SQL semanticamente equivalente nessas duas entradas, mas não há prova suficiente para reparar o ledger por renomeação. Seis migrations locais não têm entrada remota correspondente por nome/versão: `202610260001_red_blue_venice_routing.sql`, `20261028090000_release_failed_task_attempt.sql`, `20261028100000_agent_heartbeat_reconciliation.sql`, `20261028130000_worker_lease_and_security_hardening.sql`, `20261103184308_intelligence_recurring_worker.sql` e `20261105202000_direct_claim_parent_dependency_guard.sql`. As demais divergências de timestamp têm candidatos semânticos, não equivalência SQL automaticamente comprovada. Não executar `migration repair`, `db push` ou aplicar migrations pendentes antes de reconciliar cada SQL com o schema remoto.
+As demais divergências de timestamp têm candidatos semânticos, não equivalência SQL automaticamente comprovada. Não executar `migration repair`, `db push` ou aplicar migrations pendentes antes de reconciliar cada SQL com o schema remoto.
 
-A migration do worker recorrente cria lease, runs e cinco RPCs protegidas. Como esses objetos não existem no projeto, o worker deve permanecer desativado. As tabelas de histórico existem, mas estão vazias; a persistência de snapshots não está operacionalmente comprovada.
+**RPCs e colunas verificadas diretamente no schema remoto em 2026-11-06:**
+- `claim_jarvis_agent_message(p_agent_id text, p_lease_seconds integer)` existe sem token de tentativa.
+- `ack_jarvis_agent_message(p_message_id uuid, p_agent_id text)` continua na assinatura antiga de dois argumentos.
+- `public.jarvis_agent_messages.claim_token` não existe.
+- `renew_jarvis_agent_task_lease` não existe.
+- `claim_jarvis_agent_task` e `claim_next_jarvis_agent_task` existem.
+- `lease_expires_at` existe nas tabelas de mensagens e tarefas.
 
-A RPC `mark_stale_jarvis_agents_offline` existe, e as RPCs de claim direto/por fila já aplicam filtros de provider e ferramentas; o claim por fila também chama a reconciliação de heartbeat. `release_jarvis_agent_task` existe. Porém, `renew_jarvis_agent_task_lease` está ausente no banco remoto. O `SupabaseTaskQueueMiniAgent` tenta renová-la a cada 30 segundos (lease padrão de 90 segundos); tarefas longas podem perder o lease, ser reivindicadas novamente e ter a conclusão original rejeitada pelo fencing. Não há tarefa ativa no snapshot atual. A migration local `20261028130000_worker_lease_and_security_hardening.sql` contém essa RPC e os cinco índices reportados ausentes pelo advisor, mas não está aplicada.
+Portanto, as migrations de fencing da fila de mensagens (PR #761) e de validação de duração nula da renovação de lease (PR #763) estão no Git, mas não estão aplicadas no Supabase remoto. A migration da PR #763 define a RPC completa `renew_jarvis_agent_task_lease` com a validação de `NULL` e, se aplicada, cria a função ausente no schema atual. Ela ainda não foi aplicada remotamente e não instala os cinco índices/objetos adicionais da migration histórica `20261028130000_worker_lease_and_security_hardening.sql`. O projeto pode estar `ACTIVE_HEALTHY` enquanto a branch de migrations permanece `MIGRATIONS_FAILED`; são estados distintos.
 
-A fencing migration da PR #761 protege a fila de mensagens (`jarvis_agent_messages`); ela não implementa a renovação de lease da fila de tarefas (`jarvis_agent_tasks`).
-
-A PR #763 adiciona `20261107020000_task_lease_renewal_null_duration_guard.sql`, que cria/substitui a RPC com validação explícita de `NULL`. O teste de regressão reproduziu o defeito na versão histórica e passou após a migration forward-only. Essa migration não instala os cinco índices da migration `20261028130000`; eles continuam pendentes de reconciliação. Nenhuma das duas migrations foi aplicada ao projeto remoto.
+Nenhum DDL, DML, migration repair, grant ou deploy foi executado nesta revalidação. Não ativar o worker de mensagens/tarefas que dependa das novas assinaturas antes da reconciliação e implantação controlada do ledger.
 
 ### 9.2 Segurança e performance do banco
 
@@ -180,16 +203,17 @@ A PR #763 adiciona `20261107020000_task_lease_renewal_null_duration_guard.sql`, 
 
 ### 9.3 Limites de execução local
 
-- A máquina Windows conectada não possui `docker` nem `supabase` CLI disponíveis no PATH. Portanto, não foi possível executar stack Supabase local nem reproduzir E2E com banco local nesta rodada.
-- Os testes de concorrência existentes usam fila compartilhada em memória. Os testes SQL de provider/claim verificam contratos de RPC, mas não substituem teste entre dois processos Harness independentes contra banco isolado.
+- A máquina Windows conectada não possui `docker` nem `supabase` CLI disponíveis no PATH; por isso, a stack local não foi executada nessa máquina.
+- O workflow GitHub da PR #761 executou uma stack Supabase efêmera no runner Ubuntu, rodou pgTAP e `test_supabase_message_process_e2e.py` com leader e worker em processos separados e clientes independentes. Isso comprova o contrato da fila de mensagens em banco isolado, não produção.
+- Ainda falta E2E entre processos independentes para a fila de tarefas usada pelo runtime supervisionado.
 
 ### 9.4 Memória: persistência e privacidade
 
-- `MemoryManager` grava conteúdo bruto de usuário/resposta em um arquivo global do processo. O readback após recriar a instância está coberto na PR #759, mas não há isolamento por tenant nem redaction nessa camada.
-- `VectorMemoryAdapter` mantém eventos e vetores em `_events`/FAISS na memória do processo. Não há persistência em disco ou banco; reiniciar perde o índice.
-- `ProceduralMemoryAdapter.bootstrap_from_db()` consulta ThoughtLogs bem-sucedidos, mas não foi localizado consumidor que invoque o bootstrap. O índice de soluções permanece em memória.
-- O redactor é resolvido de forma lazy. Se a resolução falhar, `store_event()` usa o texto original; portanto, a proteção é fail-open. Os padrões observados cobrem email, CPF e telefone, não uma política completa de PII.
-- `PiiRedactor` mantém seu registro de purge em memória, mas `VectorMemoryAdapter` não registra os IDs de evento nesse registro. O fluxo `purge_by_user` não comprova exclusão do vetor.
-- PR #760 corrige a rejeição do backend Python sem FAISS; ainda não torna o vector store durável.
+- `MemoryManager` sanitiza texto de usuário e resposta antes de persistir; email, CPF e telefone são redigidos. O readback após recriar o manager está coberto pela PR #759.
+- A PR #762 particiona a memória semântica por identidade autenticada, usando digest SHA-256 no nome do arquivo. Chamadas sem usuário ficam restritas ao compartimento local/sistema; registros legados globais não são copiados para partições de usuário.
+- A identidade autenticada é propagada nos caminhos de API, interpretação, histórico SQLite e worker cobertos. Histórico não escopado retorna somente registros locais; consultas vetoriais filtram pelo proprietário e rejeitam `user_id` injetado em metadata não confiável.
+- `VectorMemoryAdapter` agora falha fechado quando o redactor não está disponível e aceita o backend puro-Python sem FAISS (PR #760/#762). O store continua em memória do processo; não há save/load nem readback vetorial após reinício.
+- `ProceduralMemoryAdapter.bootstrap_from_db()` ainda não tem call site confirmado; o índice de soluções permanece volátil.
+- A redaction atual cobre padrões de email, CPF e telefone; não é uma política DLP completa. A exclusão/purge de IDs vetoriais e a retenção de ThoughtLogs/logs ainda precisam de prova ponta a ponta.
 
 **Conclusão:** C0 continua aberto. Universal Intelligence já possui coleta, normalização e candidatos de correlação, mas histórico persistente ainda não está provado. C1 — World Model permanece bloqueado até fechar baseline de memória, identidade, proveniência e integração operacional.
