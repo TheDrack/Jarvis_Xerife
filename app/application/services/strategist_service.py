@@ -8,8 +8,9 @@ but under strict cost-benefit and security filters.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.domain.models.viability import (
@@ -36,21 +37,119 @@ class BudgetExceededException(Exception):
 
 
 class StrategistService(NexusComponent):
-    def execute(self, context: dict):
-        logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
-        return {"success": False, "not_implemented": True}
-
     """
     Service for autonomous improvement proposals and RFC management.
-    
+
     Features:
     - Business case ROI analysis before implementation
-    - RFC generation for approved proposals
+    - RFC generation after explicit human approval
     - Budget tracking and caps per mission
-    - Proposal archiving (approved/rejected)
+    - Proposal staging (pending/rejected/approved)
     - Decision interface for human approval
     """
-    
+
+    def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Evaluate a proposal and stage viable work for explicit human approval."""
+        if context is not None and not isinstance(context, dict):
+            return {"success": False, "error": "invalid_context"}
+        payload = context or {}
+        action = payload.get("action", "evaluate_proposal")
+        if action != "evaluate_proposal":
+            return {"success": False, "error": "unsupported_action", "action": action}
+
+        title = payload.get("proposal_title")
+        description = payload.get("proposal_description")
+        cost_payload = payload.get("cost")
+        impact_payload = payload.get("impact")
+        risk_payload = payload.get("risk")
+        missing = []
+        for name, value in (
+            ("proposal_title", title),
+            ("proposal_description", description),
+            ("cost", cost_payload),
+            ("impact", impact_payload),
+            ("risk", risk_payload),
+        ):
+            if name in {"proposal_title", "proposal_description"}:
+                if not isinstance(value, str) or not value.strip():
+                    missing.append(name)
+            elif value is None or value == {}:
+                missing.append(name)
+        if missing:
+            return {
+                "success": False,
+                "error": "missing_proposal_fields",
+                "missing_fields": missing,
+            }
+
+        try:
+            cost = (
+                cost_payload
+                if isinstance(cost_payload, CostEstimate)
+                else CostEstimate(**cost_payload)
+            )
+            impact_data = (
+                dict(impact_payload)
+                if isinstance(impact_payload, dict)
+                else impact_payload
+            )
+            if isinstance(impact_data, dict):
+                impact_data["user_utility_level"] = ImpactLevel(
+                    impact_data.get("user_utility_level", ImpactLevel.MINIMAL)
+                )
+                impact = ImpactEstimate(**impact_data)
+            elif isinstance(impact_data, ImpactEstimate):
+                impact = impact_data
+            else:
+                raise TypeError("impact must be an ImpactEstimate or object")
+
+            risk_data = (
+                dict(risk_payload)
+                if isinstance(risk_payload, dict)
+                else risk_payload
+            )
+            if isinstance(risk_data, dict):
+                risk_data["risk_level"] = RiskLevel(
+                    risk_data.get("risk_level", RiskLevel.LOW)
+                )
+                risk = RiskEstimate(**risk_data)
+            elif isinstance(risk_data, RiskEstimate):
+                risk = risk_data
+            else:
+                raise TypeError("risk must be a RiskEstimate or object")
+
+            matrix = self.generate_viability_matrix(
+                proposal_title=str(title).strip(),
+                proposal_description=str(description).strip(),
+                cost=cost,
+                impact=impact,
+                risk=risk,
+            )
+            proposal_path = self.archive_proposal(matrix)
+        except (TypeError, ValueError) as exc:
+            return {
+                "success": False,
+                "error": "invalid_proposal",
+                "detail": str(exc),
+            }
+
+        viable = matrix.is_viable(self.min_roi_threshold)
+        return {
+            "success": True,
+            "proposal_id": matrix.proposal_id,
+            "status": "pending" if viable else "rejected",
+            "viable": viable,
+            "approved": False,
+            "approval_required": viable,
+            "roi": matrix.calculate_roi(),
+            "rejection_reason": matrix.rejection_reason,
+            "decision_prompt": (
+                self.format_decision_prompt(matrix) if viable else None
+            ),
+            "proposal_path": str(proposal_path),
+        }
+
+
     def __init__(
         self,
         proposals_dir: Optional[Path] = None,
@@ -63,7 +162,7 @@ class StrategistService(NexusComponent):
         Args:
             proposals_dir: Directory for storing proposals (default: docs/proposals)
             default_budget_cap: Default maximum spend per mission in USD
-            min_roi_threshold: Minimum ROI required for auto-approval
+            min_roi_threshold: Minimum ROI required to stage a proposal for human approval
         """
         if proposals_dir:
             self.proposals_dir = Path(proposals_dir)
@@ -71,10 +170,12 @@ class StrategistService(NexusComponent):
             # Default to docs/proposals in project root
             self.proposals_dir = Path(__file__).parent.parent.parent.parent / "docs" / "proposals"
         
+        self.pending_dir = self.proposals_dir / "pending"
         self.approved_dir = self.proposals_dir / "approved"
         self.rejected_dir = self.proposals_dir / "rejected"
         
         # Create directories if they don't exist
+        self.pending_dir.mkdir(parents=True, exist_ok=True)
         self.approved_dir.mkdir(parents=True, exist_ok=True)
         self.rejected_dir.mkdir(parents=True, exist_ok=True)
         
@@ -119,7 +220,8 @@ class StrategistService(NexusComponent):
         
         # Determine viability
         is_viable = matrix.is_viable(self.min_roi_threshold)
-        matrix.approved = is_viable
+        # Viability is an analysis result, never a human approval decision.
+        matrix.approved = False
         
         if not is_viable:
             roi = matrix.calculate_roi()
@@ -138,32 +240,93 @@ class StrategistService(NexusComponent):
         return matrix
     
     def archive_proposal(self, matrix: ViabilityMatrix) -> Path:
-        """
-        Archive a proposal to approved or rejected directory
-        
-        Args:
-            matrix: ViabilityMatrix to archive
-        
-        Returns:
-            Path to archived file
-        """
-        # Determine target directory
-        if matrix.approved:
-            target_dir = self.approved_dir
-            status = "approved"
-        else:
-            target_dir = self.rejected_dir
-            status = "rejected"
-        
-        # Create filename
-        filename = f"{matrix.proposal_id}.jrvs"
+        """Stage viable proposals as pending; archive non-viable proposals as rejected."""
+        proposal_id = str(matrix.proposal_id or "").strip()
+        if (
+            not proposal_id
+            or proposal_id in {".", ".."}
+            or Path(proposal_id).name != proposal_id
+            or "/" in proposal_id
+            or "\\" in proposal_id
+        ):
+            raise ValueError("Invalid proposal identity")
+
+        viable = matrix.is_viable(self.min_roi_threshold)
+        matrix.approved = False
+        target_dir = self.pending_dir if viable else self.rejected_dir
+        status = "pending" if viable else "rejected"
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{proposal_id}.jrvs"
         filepath = target_dir / filename
-        
-        # Save as JRVS
-        document_store.write(filepath, matrix.to_dict())
-        
-        logger.info(f"Proposal archived: {filepath} (status={status})")
+        if filepath.exists() or filepath.is_symlink():
+            raise FileExistsError(f"Proposal already exists: {filename}")
+        proposal_data = matrix.to_dict()
+        proposal_data.update(
+            {
+                "viable": viable,
+                "approved": False,
+                "status": status,
+            }
+        )
+        document_store.write(filepath, proposal_data)
+
+        logger.info("Proposal archived: %s (status=%s)", filepath, status)
         return filepath
+
+    def approve_proposal(
+        self,
+        proposal_filename: str,
+        approved_by: Optional[str] = None,
+    ) -> Path:
+        """Promote one viable pending proposal with a durable human actor identity."""
+        if (
+            not isinstance(proposal_filename, str)
+            or not proposal_filename
+            or Path(proposal_filename).name != proposal_filename
+            or "/" in proposal_filename
+            or "\\" in proposal_filename
+            or not proposal_filename.endswith(".jrvs")
+        ):
+            raise ValueError("Invalid proposal filename")
+
+        if not isinstance(approved_by, str) or not approved_by.strip():
+            raise ValueError("approved_by must identify the authenticated human approver")
+        approved_by = approved_by.strip()
+
+        source_path = self.pending_dir / proposal_filename
+        if source_path.is_symlink() or not source_path.is_file():
+            raise FileNotFoundError(f"Pending proposal not found: {proposal_filename}")
+
+        destination_path = self.approved_dir / proposal_filename
+        if destination_path.exists() or destination_path.is_symlink():
+            raise FileExistsError(f"Proposal already approved: {proposal_filename}")
+
+        proposal_data = document_store.read(source_path)
+        if not isinstance(proposal_data, dict) or proposal_data.get("viable") is not True:
+            raise ValueError("Only viable pending proposals can be approved")
+        if proposal_data.get("proposal_id") != Path(proposal_filename).stem:
+            raise ValueError("Proposal identity does not match its filename")
+        if proposal_data.get("approved") is True:
+            raise ValueError("Proposal is already approved")
+
+        if proposal_data.get("status") not in (None, "pending"):
+            raise ValueError("Only pending proposals can be approved")
+
+        proposal_data["approved"] = True
+        proposal_data["status"] = "approved"
+        proposal_data["approved_by"] = approved_by
+        proposal_data["approved_at"] = datetime.now(timezone.utc).isoformat()
+
+        document_store.write(destination_path, proposal_data)
+        try:
+            source_path.unlink()
+        except OSError:
+            destination_path.unlink(missing_ok=True)
+            raise
+
+        logger.info("Proposal approved: %s", destination_path)
+        return destination_path
     
     def generate_rfc(self, matrix: ViabilityMatrix) -> Path:
         """
@@ -178,15 +341,52 @@ class StrategistService(NexusComponent):
         Raises:
             ValueError: If matrix is not approved
         """
-        if not matrix.approved:
-            raise ValueError("Cannot generate RFC for rejected proposal")
-        
+        proposal_id = str(matrix.proposal_id or "").strip()
+        if (
+            not proposal_id
+            or Path(proposal_id).name != proposal_id
+            or "/" in proposal_id
+            or "\\" in proposal_id
+        ):
+            raise ValueError("Cannot generate RFC without a valid proposal identity")
+
+        approval_path = self.approved_dir / f"{proposal_id}.jrvs"
+        if not approval_path.is_file() or approval_path.is_symlink():
+            raise ValueError("Cannot generate RFC without persisted human approval")
+
+        approval = document_store.read(approval_path)
+        approved_by = approval.get("approved_by") if isinstance(approval, dict) else None
+        approved_at = approval.get("approved_at") if isinstance(approval, dict) else None
+        if (
+            not isinstance(approval, dict)
+            or approval.get("proposal_id") != proposal_id
+            or approval.get("proposal_title") != matrix.proposal_title
+            or approval.get("proposal_description") != matrix.proposal_description
+            or approval.get("viable") is not True
+            or approval.get("approved") is not True
+            or approval.get("status") != "approved"
+            or not isinstance(approved_by, str)
+            or not approved_by.strip()
+            or not isinstance(approved_at, str)
+            or not approved_at.strip()
+        ):
+            raise ValueError("Cannot generate RFC without persisted human approval")
+
+        matrix_snapshot = matrix.to_dict()
+        if any(
+            approval.get(field) != matrix_snapshot.get(field)
+            for field in ("cost", "impact", "risk")
+        ):
+            raise ValueError(
+                "Cannot generate RFC: matrix does not match persisted approved proposal"
+            )
+
         # Generate RFC content
         rfc_number = self._get_next_rfc_number()
         rfc_filename = f"RFC-{rfc_number:04d}.md"
         rfc_path = self.proposals_dir / rfc_filename
         
-        rfc_content = self._format_rfc(matrix, rfc_number)
+        rfc_content = self._format_rfc(matrix, rfc_number, approved_by, approved_at)
         
         # Write RFC file
         with open(rfc_path, 'w', encoding='utf-8') as f:
@@ -229,7 +429,9 @@ class StrategistService(NexusComponent):
         if matrix.risk.mitigation_strategy:
             prompt += f"  - Mitigação: {matrix.risk.mitigation_strategy}\n"
         
-        prompt += f"\n**Recomendação:** {'✅ APROVAR' if matrix.approved else '❌ REJEITAR'}"
+        viable = matrix.is_viable(self.min_roi_threshold)
+        recommendation = '✅ APROVAR (aguardando decisão humana)' if viable else '❌ REJEITAR'
+        prompt += f"\n**Recomendação:** {recommendation}"
         
         if matrix.rejection_reason:
             prompt += f" - {matrix.rejection_reason}"
@@ -308,8 +510,8 @@ class StrategistService(NexusComponent):
         # Remove special characters
         proposal_id = ''.join(c for c in proposal_id if c.isalnum() or c == '-')
         # Add timestamp for uniqueness
-        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-        return f"{proposal_id}-{timestamp}"
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
+        return f"{proposal_id}-{timestamp}-{uuid4().hex[:8]}"
     
     def _get_next_rfc_number(self) -> int:
         """Get the next available RFC number"""
@@ -330,11 +532,17 @@ class StrategistService(NexusComponent):
         
         return max(numbers) + 1 if numbers else 1
     
-    def _format_rfc(self, matrix: ViabilityMatrix, rfc_number: int) -> str:
+    def _format_rfc(
+        self,
+        matrix: ViabilityMatrix,
+        rfc_number: int,
+        approved_by: str,
+        approved_at: str,
+    ) -> str:
         """Format RFC markdown content"""
         rfc_content = f"""# RFC-{rfc_number:04d}: {matrix.proposal_title}
 
-**Status:** Proposto  
+**Status:** Aprovado para implementação  
 **Data:** {matrix.created_at.strftime('%Y-%m-%d')}  
 **Autor:** Jarvis (Xerife Strategist)  
 **ROI Score:** {matrix.calculate_roi():.2f}
@@ -400,8 +608,8 @@ _[A ser preenchido durante a discussão]_
 
 ## Decisão
 
-**Aprovado por:** _[Aguardando aprovação do Comandante]_  
-**Data da Decisão:** _[Pendente]_
+**Aprovado por:** {approved_by}  
+**Data da Decisão:** {approved_at}
 
 ## Referências
 

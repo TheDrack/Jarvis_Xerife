@@ -9,7 +9,9 @@ from .transport import AgentMessage
 class AcknowledgingConnector(Protocol):
     def send(self, message: AgentMessage) -> str: ...
     def receive(self, agent_id: str, *, timeout_seconds: float = 0) -> AgentMessage | None: ...
-    def acknowledge(self, message_id: str, agent_id: str) -> bool: ...
+    def acknowledge(
+        self, message_id: str, agent_id: str, *, claim_token: str | None = None
+    ) -> bool: ...
 
 
 class StopSignal(Protocol):
@@ -63,7 +65,9 @@ class AgentWorker:
             )
             self.connector.send(response)
 
-        if not self.connector.acknowledge(message.message_id, self.agent_id):
+        if not self.connector.acknowledge(
+            message.message_id, self.agent_id, claim_token=message.claim_token
+        ):
             raise RuntimeError("message acknowledgement rejected; claim may have expired")
         return True
 

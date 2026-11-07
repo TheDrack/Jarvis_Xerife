@@ -1,9 +1,9 @@
 # Cognitive Baseline — Fase C0
 
-**Snapshot:** `main` em `d0a396724910b0c53103da012022a6ec6103dd2b` (baseline pós-PR #757)
+**Snapshot:** `main` em `a31f5554776531c245166cb864abbf8a0eb03075` (baseline pós-PR #758)
 **Auditoria:** 2026-11-06
 **Estado:** parcial; C0 permanece aberto.
-**Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação. Não é confirmação de deploy, conectividade de provider, persistência em produção ou execução ponta a ponta.
+**Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação, complementada por probes remotos somente leitura. Não é confirmação de deploy completo, execução ponta a ponta ou comportamento de todos os providers.
 
 ## 1. Decisão de fase
 
@@ -24,17 +24,17 @@ Este documento é o primeiro mapa rastreável de C0; não o conclui. Não criar 
 | Capacidade | Implementação / contrato existente | Consumidor localizado | Testes localizados | Classificação e lacuna |
 |---|---|---|---|---|
 | Roteamento cognitivo | `app/domain/gears/cognitive_router.py`; registro no Nexus | O componente está no registro; não foi confirmado um ciclo cognitivo contínuo que o consuma | `tests/test_nexus_registry_sync.py` valida sincronização do registro | **Implementado, não verificado.** O código classifica entrada por palavras-chave ou uma chamada LiteLLM; isso é roteamento de conversa, não Reasoning Engine. Não foi localizado teste comportamental específico do roteador. |
-| Memória semântica | `app/application/services/memory_manager.py`; armazenamento em `data/jarvis_memory.json` | `AssistantService.process_command()` consulta e grava; `FieldVision` consulta soluções/contexto | `tests/application/test_memory_manager.py` | **Confirmado no repositório.** Busca por palavras-chave e limite de interações; proveniência, conflito, retenção governada e readback após reinício precisam de baseline próprio. |
-| Memória vetorial | Porta `MemoryProvider`; `app/adapters/infrastructure/vector_memory_adapter.py` | `AssistantService.process_command()` consulta últimos 30 dias e grava comando/resposta | `tests/adapters/infrastructure/test_vector_memory_adapter.py` | **Confirmado no repositório.** O adaptador local não demonstra por si só memória persistente multi-runtime nem consolidação sem perda. |
-| Memória procedural | `app/adapters/infrastructure/procedural_memory_adapter.py`; indexa ThoughtLogs bem-sucedidos | `EvolutionOrchestrator` consulta soluções conhecidas | `tests/adapters/infrastructure/test_procedural_memory_adapter.py` | **Parcial.** Há consumidor e teste; falta comprovar atualização, recuperação e validade contextual em um ciclo de evolução real. |
-| Working memory / consolidação | `WorkingMemory` e `MemoryConsolidationService` | `OverwatchDaemon` tenta consolidar periodicamente para `VectorMemoryAdapter` | Teste dedicado de ponta a ponta não confirmado nesta passagem | **Parcial.** O fluxo existe no código, mas o contrato de expiração, idempotência, falha de destino e recuperação precisa de teste comportamental. |
+| Memória semântica | `app/application/services/memory_manager.py`; armazenamento via `DocumentStore` em `data/jarvis_memory.json` | `AssistantService.process_command()` consulta e grava; `FieldVision` consulta soluções/contexto | `tests/application/test_memory_manager.py`; PR #759 adiciona readback após recriar o manager | **Persistência local confirmada por arquivo; isolamento por usuário, redaction, proveniência, retenção governada e falha de escrita continuam sem contrato suficiente.** Busca é por substring/token, não semântica vetorial. |
+| Memória vetorial | Porta `MemoryProvider`; `app/adapters/infrastructure/vector_memory_adapter.py` | `AssistantService.process_command()` consulta últimos 30 dias e grava comando/resposta | `tests/adapters/infrastructure/test_vector_memory_adapter.py` | **Process-local, não durável.** `_events` e FAISS ficam em RAM; não há save/load nem readback após reinício. Se o PII redactor não resolver, o adapter armazena o texto original. |
+| Memória procedural | `app/adapters/infrastructure/procedural_memory_adapter.py`; indexa ThoughtLogs bem-sucedidos | `EvolutionOrchestrator` consulta soluções conhecidas | `tests/adapters/infrastructure/test_procedural_memory_adapter.py` | **Parcial/bloqueado.** `bootstrap_from_db()` existe, mas não foi encontrado call site; o índice é RAM e pode iniciar vazio. O consumer apenas consulta soluções. |
+| Working memory / consolidação | `WorkingMemory` e `MemoryConsolidationService` | `OverwatchDaemon` tenta consolidar periodicamente para `VectorMemoryAdapter` | PR #760 adiciona teste de consolidação no fallback sem FAISS | **Parcial.** `WorkingMemory` é volátil; o destino vetorial também é RAM. PR #760 adiciona health check explícito para o fallback Python; CI ainda precisa validar. Falta persistência durável e prova de recuperação após reinício. |
 | Perception / Universal Intelligence | `app/domain/intelligence/contracts.py`: `IntelligenceEvidence`, `IntelligenceEvent`, `IntelligenceObservation`, `IntelligenceBatch`, `IntelligenceReport`; `IntelligenceCollector` e `IntelligenceCore` | Desktop local, dashboard de inteligência e worker recorrente chamam `collect_live_intelligence()` | `tests/application/test_intelligence_core.py`, `test_intelligence_observations.py`, `test_intelligence_collector.py`; testes do dashboard e Desktop | **Confirmado no repositório; runtime parcial.** Há normalização, deduplicação determinística e candidatos de correlação. O histórico está atrás de feature flag e o worker recorrente depende da reconciliação de migrations. |
 | World Model | Observações geográficas e temporais existem nos contratos de inteligência | Mapas/dashboard consomem relatórios e observações; não são fonte canônica de estado | Testes de observação cobrem contratos e síntese | **Ausente no escopo auditado como modelo canônico.** Não foi localizado contrato completo para identidade de entidade, relação, afirmação de estado, evento de mudança e projeção temporal reconstruível. `IntelligenceCore` não equivale a World Model. |
 | Reasoning / reflexão | `ThoughtLogService`, `MetaReflection`, `TechnicalAnalysisService` | ThoughtLog é usado por evolução, routers e coleta de datasets; MetaReflection alimenta contexto do EvolutionOrchestrator | `tests/application/test_thought_log_service.py`, `tests/test_meta_reflection.py` | **Parcial.** Logs e análise retrospectiva existem. `TechnicalAnalysisService.execute()` retorna `not_implemented`. Não foi demonstrado pipeline Claim/Hypothesis/EvidenceLink/CounterEvidence, calibração ou abstenção. |
 | Strategic Planner | `StrategistService` gera matriz de viabilidade/RFC; `DeclarativePlanInterpreter` valida planos estruturados | Router de evolução resolve Strategist; `TaskRunner` executa planos declarativos | `tests/application/test_strategist_service.py`, `tests/test_execution_plan.py`, `tests/multiagent/test_model_plan_adapter.py`, `tests/multiagent/test_task_runner_execution_plan_integration.py` | **Parcial.** `StrategistService.execute()` ainda retorna `not_implemented`; plano declarativo não prova objetivos persistentes, decomposição durável ou replanejamento. |
 | Autonomous Executive | `TaskRunner`, scheduler, fila Supabase, workers e Universal Toolbox | Router de missões, orquestrador e workers HTTP/Supabase/supervisionados | `tests/application/test_task_runner.py`, `tests/application/test_task_runner_navigation_plan.py`, testes multiagente e de claims | **Parcial / bloqueado por integração.** Há autorização por etapa e guardas de fila, mas o Toolbox permanece fail-closed sem policy host-backed de produção; E2E entre dois runtimes independentes e verificação de efeito real permanecem pendentes. |
 | Initiative | `assistant_proactivity.py`, `assistant_curiosity.py`, `curiosity_engine.py`, health-check do AssistantService e Overwatch | Sugestões contextuais, perguntas durante conversa, health check e alertas de recursos | Testes comportamentais específicos de iniciativa contínua não confirmados nesta passagem | **Parcial.** Há proatividade e monitoramento, mas não foi demonstrado gatilho de mudança do World Model com deduplicação, orçamento, quiet hours e auditoria de decisão. |
-| Learning / Evolution | `EvolutionOrchestrator`, `EvolutionGatekeeper`, Docker-backed `EvolutionSandbox`, artifact exporter, trusted publisher, `MetaReflection` | Workflow de evolução separado em candidate-validation e trusted-publication; JarvisDevAgent está sendo integrado ao mesmo orquestrador nesta entrega | `tests/application/test_evolution_orchestrator.py`, `tests/test_evolution_sandbox.py`, `tests/test_evolution_gatekeeper.py`, testes de artifact/publisher e workflow permissions | **Parcial, com isolamento corrigido.** PR #756 executa o candidato em Docker sem rede/mounts/segredos; PR #757 separa credencial do provedor e credencial GitHub, valida artefato/digest/commit/path/staging e bloqueia antes do LLM sem `target_file`. Ainda falta mapear alvos confiáveis para capabilities pendentes; timeout é cooperativo e não mata uma chamada síncrona já em andamento. |
+| Learning / Evolution | `EvolutionOrchestrator`, `EvolutionGatekeeper`, Docker-backed `EvolutionSandbox`, artifact exporter, trusted publisher, `MetaReflection` | Workflow de evolução separado em candidate-validation e trusted-publication; JarvisDevAgent delega geração e validação ao EvolutionOrchestrator após PR #758 | `tests/application/test_evolution_orchestrator.py`, `tests/test_evolution_sandbox.py`, `tests/test_evolution_gatekeeper.py`, testes de artifact/publisher e workflow permissions | **Parcial, com isolamento corrigido.** PR #756 executa o candidato em Docker sem rede/mounts/segredos; PR #757 separa credencial do provedor e credencial GitHub, valida artefato/digest/commit/path/staging e bloqueia antes do LLM sem `target_file`. Ainda falta mapear alvos confiáveis para capabilities pendentes; timeout é cooperativo e não mata uma chamada síncrona já em andamento. |
 
 ## 4. Mapa de fluxo observado
 
@@ -83,9 +83,9 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 ## 6. Lacunas de C0 ainda abertas
 
-1. **Baseline comportamental integrado:** os testes existentes exercitam componentes separadamente; falta um teste reproduzível que estabeleça o comportamento conjunto de uma fonte → coletor → normalização/deduplicação → consumidor.
+1. **Baseline comportamental integrado:** PR #759 adiciona `test_authenticated_collection_endpoint_integrates_sources_core_and_report`, que exercita fontes independentes → coletor → `IntelligenceCore` → endpoint autenticado. O teste verifica deduplicação, correlação candidata, sucesso parcial, isolamento de erros e histórico desativado. A classificação só muda após CI verde.
 2. **Mapa completo de consumidores e configuração:** completar flags, migrations, ACLs, entry points, processos e estado de deploy de cada componente crítico.
-3. **Memória:** provar store/readback, deduplicação, expiração, falha de backend e comportamento após reinício; distinguir memória local de compartilhada.
+3. **Memória:** PR #759 adiciona readback do `MemoryManager` após recriar a instância; CI pendente. Ainda faltam deduplicação, expiração, falha de escrita, isolamento por usuário, redaction e readback durável para `VectorMemoryAdapter`/memória procedural.
 4. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; registrar que o pipeline de contraditório/calibração não está demonstrado.
 5. **Planning:** provar persistência de objetivo, dependências e replanejamento; a matriz de viabilidade e o plano declarativo são capacidades diferentes.
 6. **Executive:** validar autorização no momento do dispatch, idempotência, leases, recuperação e efeito pós-ação com dois processos/runtimes independentes.
@@ -95,11 +95,25 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 ## 7. Próxima implementação recomendada
 
-**Concluir C0 com um conjunto pequeno de testes de baseline de integração, sem criar módulos novos.**
+**Manter C0 aberto até provar persistência e execução entre runtimes reais.**
 
-Primeiro teste recomendado: exercitar `collect_live_intelligence()` com duas fontes controladas, uma fonte falhando parcialmente e eventos duplicados/fora de ordem; verificar que o relatório preserva proveniência, não perde a fonte saudável, deduplica deterministicamente e não promove correlação candidata a fato. O código de `IntelligenceCore` e os testes de coletor já existem; o incremento deve fixar o contrato entre eles.
+Evidências de contrato já adicionadas ou existentes:
 
-Em paralelo, preparar baseline de memória e autorização do plano com fakes, sem acesso a banco ou serviços externos. Só depois de C0 satisfazer seus critérios, iniciar C1 com contratos/projeções do World Model.
+- **PR #759:** integra `collect_live_intelligence()` ao endpoint autenticado e adiciona readback do `MemoryManager` após reinício. O workflow de suíte completa passou no head atual; o workflow dedicado de fila foi cancelado e não é contabilizado como sucesso.
+- **Autorização de planos:** `tests/multiagent/test_task_runner_execution_plan_integration.py` cobre allow/deny, ferramenta sensível retornando `approval_required` e bloqueio quando o journal durável falha. São testes com doubles; não comprovam aprovação humana nem identidade/autorização em produção.
+- **PR #760:** corrige o health check do `VectorMemoryAdapter` para aceitar o backend puro-Python quando FAISS não está disponível. A regressão valida consolidação e busca; os workflows de suíte completa e fila passaram.
+- **PR #761:** adiciona `claim_token` por tentativa à fila de mensagens, rejeita ACK obsoleto e revoga a RPC antiga sem fencing. O pgTAP em PostgreSQL isolado e a suíte completa do workflow Task Queue passaram; o workflow `JARVIS PR Validation` foi cancelado e não é contado como sucesso. O teste de clientes usa backend determinístico em memória; não é E2E de processos nem de produção. A migration de fencing ainda não foi aplicada porque o histórico remoto/local continua divergente.
+- **PR #763:** adiciona migration forward-only para rejeitar duração `NULL` na RPC de renovação de lease, preservando a migration histórica. pgTAP isolado, suíte completa e workflow Task Queue passaram. A migration ainda não foi aplicada ao projeto remoto; o RPC continua ausente em produção até a reconciliação e implantação.
+
+Pendências reais de C0:
+
+1. Provar escrita e readback de memória persistente após reinício, com idempotência.
+2. Executar dois processos/runtimes isolados contra um banco de integração isolado, sem usar o projeto de produção.
+3. Escolher e demonstrar um caminho canônico de execução: o runtime supervisionado atual inicia `SupabaseTaskQueueMiniAgent` ou `PriorityQueueMiniAgent`; a via `AgentLeader`/`AgentWorker` ainda é separada.
+4. Validar aprovação humana e autorização com identidade real, além dos doubles existentes.
+5. Fechar lease/fencing e recuperação no caminho efetivamente escolhido, incluindo a RPC de renovação de lease ausente no Supabase remoto.
+
+Não iniciar C1 nem ativar o worker recorrente até que essas evidências e a reconciliação do ledger de migrations estejam concluídas.
 
 ## 8. Trilhas transversais e mudanças recentes
 
@@ -113,16 +127,69 @@ Estas entregas são manutenção ou infraestrutura; não concluem fases cognitiv
 - **PR #744:** melhorou a apresentação geoespacial; mapa continua sendo superfície de visualização, não World Model.
 - **PR #756:** isolou a execução de candidatos em Docker descartável; testes adversariais verificam ausência de rede, mounts e segredos.
 - **PR #757:** separou geração/validação de publicação privilegiada, adicionou artefato com digest e publisher path-scoped; a autoevolução falha fechada sem target confiável.
-- **PR #758 (em desenvolvimento):** elimina o pipeline paralelo do JarvisDevAgent, delega ao EvolutionOrchestrator e adiciona cancelamento cooperativo.
+- **PR #758 (merged em 2026-11-06, America/Sao_Paulo):** elimina o pipeline paralelo do JarvisDevAgent, delega ao EvolutionOrchestrator e adiciona cancelamento cooperativo. Merge commit: `a31f5554776531c245166cb864abbf8a0eb03075`.
 
 O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos de recuperação e dispatch. Esta auditoria não o executou nem alterou seus gates. A correção automática de PR/CI e os workflows Self Healing permanecem uma trilha transversal obrigatória.
 
 ## 9. Estado de verificação desta auditoria
 
-- Base inspecionada: `d0a396724910b0c53103da012022a6ec6103dd2b`.
-- PR #757 foi integrada no snapshot indicado acima; Full pytest suite #42302829847 e Jarvis Task Queue Tests #42302829787 terminaram em **success**.
-- PR #758 está em desenvolvimento; seus resultados locais focados não são tratados como CI nem como baseline completo.
-- A suíte completa deste snapshot foi executada pelo workflow de PR #757; a auditoria C0 permanece parcial porque ainda faltam os testes integrados listados na seção 6.
-- Não houve escrita em Supabase, deploy, acesso a dispositivo, alteração de credenciais, router/firewall ou execução de código candidato.
+- Base inspecionada: `a31f5554776531c245166cb864abbf8a0eb03075`, merge commit da PR #758.
+- PR #758 está merged. Workflow `Jarvis Task Queue Tests` terminou com **success**, incluindo `Run full test suite`. Build e Auto-Documentation também terminaram com **success**.
+- O check `Supabase Preview` terminou com **failure**: `Remote migration versions not found in local migrations directory.` Não é falha do pytest.
+- A auditoria remota foi somente leitura. Nenhum DDL, DML, migration repair, push, deploy, grant ou feature flag foi alterado.
+- O repositório não possui rulesets ativos. A leitura do endpoint de branch protection retorna HTTP 403 pela integração disponível; nenhuma regra foi alterada.
+- A auditoria C0 permanece parcial porque ainda faltam provas integradas listadas na seção 6.
 
-**Conclusão:** C0 está em andamento, não concluído. C1 — World Model é o próximo marco de capacidade, mas permanece bloqueado até que o baseline de C0 seja completado e testado.
+### 9.1 Snapshot operacional Supabase
+
+**Projeto:** `saibtpdehhprttqlgqdt`; estado do projeto `ACTIVE_HEALTHY`; PostgreSQL `17.6.1.063`.
+
+| Evidência remota | Resultado observado |
+|---|---:|
+| Status da branch Supabase `main` | `MIGRATIONS_FAILED` |
+| Arquivos locais em `supabase/migrations` | 25 |
+| Entradas no ledger remoto | 20 |
+| Versões com timestamp idêntico local/remoto | 5 |
+| Tabelas `intelligence_event_snapshots` | 0 linhas |
+| Tabelas `intelligence_observation_snapshots` | 0 linhas |
+| Tabela legada `jarvis_environment_observations` | 1.755 linhas |
+| Tabelas/RPCs do worker recorrente | Ausentes |
+| `jarvis_agents` com status `available` | 3 |
+| `jarvis_agents` com status `offline` | 2 |
+| Tarefas | 8 completed, 3 cancelled, 2 ready |
+| Mensagens em `jarvis_agent_messages` | 0 |
+| Definições em `jarvis_routine_definitions` | 0 |
+
+Os três registros disponíveis são `mini-freellmapi-1/2/3`, com heartbeat recente, provider `groq`, ferramenta `text_reasoning` e zero tarefas ativas. As duas tarefas `ready` exigem `repository_read`, `github_read` e `production_read`; nenhum agente ativo anuncia essas ferramentas. A RPC de claim corretamente não as atribui a agentes sem capacidade. Isso é uma lacuna de cobertura de capacidades, não evidência de falha do scheduler. A presença no control plane não comprova dois Harness independentes concluindo um ciclo E2E.
+
+O ledger remoto contém versões que não existem como nomes de arquivo locais. Há também duas entradas remotas chamadas `google_linked_identities`. A auditoria anterior encontrou SQL semanticamente equivalente nessas duas entradas, mas não há prova suficiente para reparar o ledger por renomeação. Seis migrations locais não têm entrada remota correspondente por nome/versão: `202610260001_red_blue_venice_routing.sql`, `20261028090000_release_failed_task_attempt.sql`, `20261028100000_agent_heartbeat_reconciliation.sql`, `20261028130000_worker_lease_and_security_hardening.sql`, `20261103184308_intelligence_recurring_worker.sql` e `20261105202000_direct_claim_parent_dependency_guard.sql`. As demais divergências de timestamp têm candidatos semânticos, não equivalência SQL automaticamente comprovada. Não executar `migration repair`, `db push` ou aplicar migrations pendentes antes de reconciliar cada SQL com o schema remoto.
+
+A migration do worker recorrente cria lease, runs e cinco RPCs protegidas. Como esses objetos não existem no projeto, o worker deve permanecer desativado. As tabelas de histórico existem, mas estão vazias; a persistência de snapshots não está operacionalmente comprovada.
+
+A RPC `mark_stale_jarvis_agents_offline` existe, e as RPCs de claim direto/por fila já aplicam filtros de provider e ferramentas; o claim por fila também chama a reconciliação de heartbeat. `release_jarvis_agent_task` existe. Porém, `renew_jarvis_agent_task_lease` está ausente no banco remoto. O `SupabaseTaskQueueMiniAgent` tenta renová-la a cada 30 segundos (lease padrão de 90 segundos); tarefas longas podem perder o lease, ser reivindicadas novamente e ter a conclusão original rejeitada pelo fencing. Não há tarefa ativa no snapshot atual. A migration local `20261028130000_worker_lease_and_security_hardening.sql` contém essa RPC e os cinco índices reportados ausentes pelo advisor, mas não está aplicada.
+
+A fencing migration da PR #761 protege a fila de mensagens (`jarvis_agent_messages`); ela não implementa a renovação de lease da fila de tarefas (`jarvis_agent_tasks`).
+
+A PR #763 adiciona `20261107020000_task_lease_renewal_null_duration_guard.sql`, que cria/substitui a RPC com validação explícita de `NULL`. O teste de regressão reproduziu o defeito na versão histórica e passou após a migration forward-only. Essa migration não instala os cinco índices da migration `20261028130000`; eles continuam pendentes de reconciliação. Nenhuma das duas migrations foi aplicada ao projeto remoto.
+
+### 9.2 Segurança e performance do banco
+
+- As 26 tabelas apontadas pelo advisor têm RLS habilitado e nenhuma policy. A consulta de privilégios não encontrou grants de tabela para `anon` ou `authenticated`; os acessos observados ficam restritos a `service_role` e ao owner. O advisor classifica isso como INFO. Não tratar ausência de policy, isoladamente, como exposição pública.
+- Advisor de performance reporta cinco foreign keys sem índice de cobertura e 33 índices ainda não utilizados. Não remover índices sem evidência de carga; avaliar os cinco índices ausentes depois da reconciliação de migrations.
+- Advisor de health não reportou findings.
+
+### 9.3 Limites de execução local
+
+- A máquina Windows conectada não possui `docker` nem `supabase` CLI disponíveis no PATH. Portanto, não foi possível executar stack Supabase local nem reproduzir E2E com banco local nesta rodada.
+- Os testes de concorrência existentes usam fila compartilhada em memória. Os testes SQL de provider/claim verificam contratos de RPC, mas não substituem teste entre dois processos Harness independentes contra banco isolado.
+
+### 9.4 Memória: persistência e privacidade
+
+- `MemoryManager` grava conteúdo bruto de usuário/resposta em um arquivo global do processo. O readback após recriar a instância está coberto na PR #759, mas não há isolamento por tenant nem redaction nessa camada.
+- `VectorMemoryAdapter` mantém eventos e vetores em `_events`/FAISS na memória do processo. Não há persistência em disco ou banco; reiniciar perde o índice.
+- `ProceduralMemoryAdapter.bootstrap_from_db()` consulta ThoughtLogs bem-sucedidos, mas não foi localizado consumidor que invoque o bootstrap. O índice de soluções permanece em memória.
+- O redactor é resolvido de forma lazy. Se a resolução falhar, `store_event()` usa o texto original; portanto, a proteção é fail-open. Os padrões observados cobrem email, CPF e telefone, não uma política completa de PII.
+- `PiiRedactor` mantém seu registro de purge em memória, mas `VectorMemoryAdapter` não registra os IDs de evento nesse registro. O fluxo `purge_by_user` não comprova exclusão do vetor.
+- PR #760 corrige a rejeição do backend Python sem FAISS; ainda não torna o vector store durável.
+
+**Conclusão:** C0 continua aberto. Universal Intelligence já possui coleta, normalização e candidatos de correlação, mas histórico persistente ainda não está provado. C1 — World Model permanece bloqueado até fechar baseline de memória, identidade, proveniência e integração operacional.

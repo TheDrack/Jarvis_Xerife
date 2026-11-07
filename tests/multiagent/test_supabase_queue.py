@@ -84,12 +84,15 @@ def test_receive_claims_and_reconstructs_message():
         "status": "claimed",
         "claimed_by": "worker-a",
         "delivery_attempts": 1,
+        "claim_token": "00000000-0000-0000-0000-000000000010",
     }]
     connector = SupabaseQueueConnector(client, lease_seconds=45)
 
     received = connector.receive("worker-a")
 
     assert received == original
+    assert received.claim_token == "00000000-0000-0000-0000-000000000010"
+    assert "claim_token" not in received.to_dict()
     assert client.rpc_calls[0] == (
         "claim_jarvis_agent_message",
         {"p_agent_id": "worker-a", "p_lease_seconds": 45},
@@ -118,10 +121,31 @@ def test_receive_validates_identity_and_timeout():
 
 def test_acknowledge_calls_owned_message_rpc():
     client = FakeClient()
+    original = make_message()
+    client.claim_result = [{
+        **original.to_dict(),
+        "claim_token": "00000000-0000-0000-0000-000000000011",
+    }]
+    connector = SupabaseQueueConnector(client)
+    received = connector.receive("worker-a")
+
+    assert received is not None
+    assert connector.acknowledge(
+        received.message_id, "worker-a", claim_token=received.claim_token
+    ) is True
+    assert client.rpc_calls[-1] == (
+        "ack_jarvis_agent_message",
+        {
+            "p_message_id": received.message_id,
+            "p_agent_id": "worker-a",
+            "p_claim_token": "00000000-0000-0000-0000-000000000011",
+        },
+    )
+
+
+def test_acknowledge_without_claim_token_fails_closed():
+    client = FakeClient()
     connector = SupabaseQueueConnector(client)
 
-    assert connector.acknowledge("message-id", "worker-a") is True
-    assert client.rpc_calls == [(
-        "ack_jarvis_agent_message",
-        {"p_message_id": "message-id", "p_agent_id": "worker-a"},
-    )]
+    assert connector.acknowledge("message-id", "worker-a") is False
+    assert client.rpc_calls == []

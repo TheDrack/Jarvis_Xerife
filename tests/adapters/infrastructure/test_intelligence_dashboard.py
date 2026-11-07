@@ -120,3 +120,102 @@ def test_worker_status_handles_invalid_numeric_configuration(monkeypatch):
 
     assert status["worker"]["interval_seconds"] == 300
     assert status["worker"]["lease_seconds"] == 180
+
+
+def test_authenticated_collection_endpoint_integrates_sources_core_and_report(
+    monkeypatch,
+):
+    from datetime import datetime, timezone
+
+    from app.application.services.intelligence_collector import (
+        collect_live_intelligence,
+    )
+    from app.domain.intelligence.contracts import (
+        IntelligenceBatch,
+        IntelligenceEvidence,
+        IntelligenceEvent,
+        SourceHealth,
+    )
+
+    monkeypatch.setenv("JARVIS_INTELLIGENCE_HISTORY_ENABLED", "false")
+    observed_at = datetime(2026, 11, 6, 12, 0, tzinfo=timezone.utc)
+
+    def event(event_id, source_id):
+        url = "https://publisher.example/shared-story"
+        evidence = IntelligenceEvidence(
+            source_id=source_id,
+            source_name=source_id,
+            url=url,
+            collected_at=observed_at,
+            license_or_terms="test terms",
+        )
+        return IntelligenceEvent(
+            event_id=event_id,
+            source_id=source_id,
+            domain="science",
+            category="news",
+            title="Shared intelligence report",
+            url=url,
+            observed_at=observed_at,
+            evidence=evidence,
+        )
+
+    class PublicSource:
+        def collect_public_events(self, limit):
+            assert limit == 10
+            duplicate = event("public-1", "gdelt")
+            return IntelligenceBatch(
+                events=(duplicate, duplicate),
+                sources=(SourceHealth(source_id="gdelt", available=True),),
+            )
+
+    class OsirisSource:
+        def collect_events(self, limit):
+            return IntelligenceBatch(
+                events=(event("osiris-1", "osiris"),),
+                sources=(SourceHealth(source_id="osiris", available=True),),
+            )
+
+        def collect_observations(self, limit):
+            raise RuntimeError("private OSIRIS endpoint detail")
+
+    class BrokenGodsEyeSource:
+        async def collect_observations(self):
+            raise TimeoutError("private GEV endpoint detail")
+
+    async def integrated_collector(limit):
+        return await collect_live_intelligence(
+            limit=limit,
+            public_source=PublicSource(),
+            osiris_source=OsirisSource(),
+            gods_eye_source=BrokenGodsEyeSource(),
+        )
+
+    response = _client(collector=integrated_collector).post(
+        "/v1/intelligence/collect?limit=10"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    report = payload["report"]
+    assert report["input_event_count"] == 3
+    assert report["unique_event_count"] == 2
+    assert report["duplicate_event_count"] == 1
+    assert len(report["correlations"]) == 1
+    assert report["correlations"][0]["basis"] == "same_url"
+    assert report["correlations"][0]["status"] == "candidate"
+    assert {item["source_id"] for item in report["events"]} == {
+        "gdelt",
+        "osiris",
+    }
+    source_health = {item["source_id"]: item for item in report["sources"]}
+    assert source_health["gdelt"]["available"] is True
+    assert source_health["osiris"]["available"] is True
+    assert source_health["osiris_observations"]["available"] is False
+    assert source_health["gods_eye_view"]["available"] is False
+    assert payload["history"] == {
+        "status": "disabled",
+        "reason": "feature_flag_disabled",
+    }
+    assert "private OSIRIS endpoint detail" not in response.text
+    assert "private GEV endpoint detail" not in response.text
