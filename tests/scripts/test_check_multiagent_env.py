@@ -24,6 +24,8 @@ CONFIGURED_VARS = (
     "JARVIS_TASK_QUEUE_API_URL",
     "JARVIS_TASK_QUEUE_API_TOKEN",
     "JARVIS_TASK_QUEUE_WORKER_TOKEN",
+    "JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1",
+    "JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_2",
     "JARVIS_TASK_QUEUE_USERNAME",
     "JARVIS_TASK_QUEUE_PASSWORD",
     "FREELLMAPI_API_KEY",
@@ -144,3 +146,37 @@ def test_http_worker_identity_is_preferred_over_legacy_service_role(clean_env, c
 
     assert report["groups"]["queue_access"] == "http_worker_token"
     assert report["groups"]["queue_access_is_legacy"] is False
+
+
+
+def test_multi_slot_http_runtime_requires_one_token_per_agent(clean_env, capsys):
+    clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    clean_env.setenv("JARVIS_MINI_AGENT_WORKERS", "2")
+    clean_env.setenv("JARVIS_AGENT_ID", "mini-freellmapi-1")
+    clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
+    clean_env.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
+    clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "shared-token")
+    clean_env.setenv("GROQ_API_KEY", "groq-value")
+
+    report, _ = run_cli(capsys)
+
+    assert report["verdict"] == "blocked"
+    assert report["groups"]["queue_access"] == "missing"
+
+
+def test_multi_slot_http_runtime_accepts_distinct_agent_tokens(clean_env, capsys):
+    clean_env.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    clean_env.setenv("JARVIS_MINI_AGENT_WORKERS", "2")
+    clean_env.setenv("JARVIS_AGENT_ID", "mini-freellmapi-1")
+    clean_env.setenv("JARVIS_TASK_QUEUE_API_URL", "https://queue.example")
+    clean_env.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
+    clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1", "token-one")
+    clean_env.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_2", "token-two")
+    clean_env.setenv("GROQ_API_KEY", "groq-value")
+
+    report, _ = run_cli(capsys)
+
+    assert report["verdict"] == "ready"
+    assert report["groups"]["queue_access"] == "http_worker_token"
+    assert report["variables"]["JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1"] is True
+    assert report["variables"]["JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_2"] is True
