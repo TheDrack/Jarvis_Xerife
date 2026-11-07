@@ -111,6 +111,7 @@ def test_consolidation_preserves_working_memory_when_durable_store_is_unhealthy(
     assert consolidated == 0
     assert working_memory.size == 1
 
+
 def test_consolidation_preserves_authenticated_user_scope_in_vector_store():
     store = _DurableStore()
     working_memory = WorkingMemory()
