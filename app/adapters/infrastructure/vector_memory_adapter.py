@@ -181,7 +181,9 @@ class VectorMemoryAdapter(MemoryProvider):
         text = ctx.get("text", "")
         if not text:
             return {"success": False, "error": "Campo 'text' obrigatório no contexto."}
-        event_id = self.store_event(\n            text, metadata=ctx.get("metadata"), user_id=ctx.get("user_id")\n        )
+        event_id = self.store_event(
+            text, metadata=ctx.get("metadata"), user_id=ctx.get("user_id")
+        )
         return {"success": True, "event_id": event_id}
 
     # ------------------------------------------------------------------
