@@ -107,6 +107,17 @@ def test_viability_matrix_approval_logic():
     assert not security_matrix.is_viable()
 
 
+
+def test_strategist_proposal_ids_do_not_collide_for_same_title(strategist):
+    first = strategist._generate_proposal_id("Repeated Proposal")
+    second = strategist._generate_proposal_id("Repeated Proposal")
+
+    assert first != second
+    assert first.startswith("repeated-proposal-")
+    assert second.startswith("repeated-proposal-")
+
+
+
 def test_strategist_generate_viability_matrix(strategist):
     """Test viability matrix generation"""
     cost = CostEstimate(api_cost_usd=2.0, code_complexity="moderate")
