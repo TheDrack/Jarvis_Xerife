@@ -33,7 +33,7 @@ Issue or rotate a text-only worker credential:
 python scripts/manage_agent_worker_credentials.py issue --agent-id mini-freellmapi-1
 ```
 
-The command prints the raw token once. Store it in the matching worker's secret environment as `JARVIS_TASK_QUEUE_WORKER_TOKEN`; do not commit it, put it in a prompt, or copy it into logs. The worker also needs the existing API caller identity: `JARVIS_TASK_QUEUE_API_TOKEN` (user JWT) or `JARVIS_TASK_QUEUE_USERNAME` plus `JARVIS_TASK_QUEUE_PASSWORD`, and `JARVIS_TASK_QUEUE_API_URL`.
+The command prints the raw token once. Store it in the matching worker's secret environment as `JARVIS_TASK_QUEUE_WORKER_TOKEN`; do not commit it, put it in a prompt, or copy it into logs. The worker also needs the existing API caller identity: `JARVIS_TASK_QUEUE_API_TOKEN` (user JWT) or `JARVIS_TASK_QUEUE_USERNAME` plus `JARVIS_TASK_QUEUE_PASSWORD`, and `JARVIS_TASK_QUEUE_API_URL`. Store the token in the exact per-agent variable printed by the CLI (for example `JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1`). The global `JARVIS_TASK_QUEUE_WORKER_TOKEN` is accepted only when the runtime has one slot. Multiple slots require one distinct token per generated `agent_id`; a shared token is rejected.
 
 Revoke every active credential for an agent:
 
