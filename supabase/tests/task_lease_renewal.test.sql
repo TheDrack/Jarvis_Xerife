@@ -41,6 +41,16 @@ insert into public.jarvis_agent_tasks (
     now() + interval '60 seconds'
 );
 
+insert into public.jarvis_agent_attempts (
+    attempt_id, task_id, agent_id, assigned_role, status
+) values (
+    '11111111-1111-4111-8111-111111111111',
+    'lease-renewal-test',
+    'lease-worker',
+    'worker',
+    'in_progress'
+);
+
 do $null_lease$
 begin
     perform public.renew_jarvis_agent_task_lease(
