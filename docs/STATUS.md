@@ -2,7 +2,7 @@
 
 **Versão:** 2.0.0  
 **Revisão documental:** 2026-11-07
-**Escopo desta revisão:** atualizar C0 após PR #769, revalidar o ledger Supabase 27/27, segurança da memória vetorial e estado real dos workers/capabilities em produção.
+**Escopo desta revisão:** reconciliar C0 após os merges das PRs #770 e #773, registrar a evidência de CI da identidade individual de workers e distinguir código merged de rollout operacional.
 
 ## Visão geral e qualidade da evidência
 
@@ -18,7 +18,7 @@
 | Inventário de capabilities | data/capabilities.json existe | Contagens anteriores são históricas: auditoria de 2026-10-16 encontrou 78 de 102 arquivos como stubs e nenhum teste exercitando os IDs cap_0XX/Cap0XX. Recontar e validar comportamento antes de alterar o estado de cada capability |
 | Soldier Mesh / edge | Há modelos, registry, adapters e testes relacionados | Continua parcial até existir validação ponta a ponta com dispositivos reais |
 | Otimização econômica | CostTrackerAdapter está descrito como integrado ao llm_router | ResourceOptimizer não foi encontrado pela auditoria; não marcar fase como completa |
-| Coordenação multiagente | Contratos, scheduler, transporte, fila e workers integrados. PR #761 valida message fencing em dois processos; PR #766 valida task claim/renew/execute/complete em dois processos independentes contra Supabase isolado. A branch de identidade adiciona credencial opaca por agente, revogação/rotação, autenticação dupla na API HTTP e grants de capability definidos no servidor. | O caminho HTTP exige JWT do chamador + `X-Jarvis-Worker-Token`; a capability inicial continua limitada a `text_reasoning`. A migration de credenciais ainda não foi aplicada. O worker Supabase com service-role permanece fallback legado sem identidade individual; ownership de tarefas, attestation dinâmica e ToolAuthorizationPolicy host-backed continuam pendentes. |
+| Coordenação multiagente | Contratos, scheduler, transporte, fila e workers integrados. PR #761 valida message fencing em dois processos; PR #766 valida task claim/renew/execute/complete em dois processos independentes contra Supabase isolado. PR #773 foi merged com credencial opaca por agente, rotação/revogação, autenticação dupla HTTP e grants server-side. | Os workflows da PR #773 passaram: 2.717 passed/14 skipped em Linux e 2.716 passed/15 skipped em Windows; testes direcionados da fila 8/8. O caminho HTTP exige JWT + `X-Jarvis-Worker-Token` e concede apenas `text_reasoning`. A migration está na main, mas não no ledger remoto; não há tokens provisionados. O worker Supabase service-role permanece fallback legado. Ownership de tarefas, attestation dinâmica, executores reais e ToolAuthorizationPolicy host-backed continuam pendentes. |
 | Planos declarativos | Interpretador, integração no orquestrador, autorizador e adaptador de diário estão no repositório | Execução exige plano estruturado, allowlist e diário durável. Ações sensíveis permanecem bloqueadas até existir protocolo confiável de aprovação/retomada |
 | Diário de planos no Supabase | Migrações e grants registrados; ledger 27/27 e projeto ACTIVE_HEALTHY | Insert/readback pelo adaptador em runtime ainda precisa de prova; existência de tabela não comprova integração operacional |
 | Catálogo comum de agentes | Catálogo de skills/connectors e protocolo de memória existem; quatro skills portáteis foram localizadas no repositório | A leitura automática no início de toda conversa depende de cada host/harness e precisa ser validada por runtime |
@@ -30,14 +30,14 @@
 
 - Projeto `saibtpdehhprttqlgqdt`: `ACTIVE_HEALTHY`; branch `main`: `FUNCTIONS_DEPLOYED`; preview `ACTIVE_HEALTHY`.
 - Ledger remoto: 27 migrations; diretório local `main`: 27 arquivos; versões correspondentes 27/27; zero pendentes; última versão `20261107033349`.
-- A branch de implementação de identidade acrescenta `20261107183000_agent_worker_credentials.sql`; essa migration é local à branch e ainda não está no ledger remoto. O snapshot 27/27 acima continua sendo o estado da main auditada, não inclui a migration nova. Não aplicar manualmente.
+- A migration `20261107183000_agent_worker_credentials.sql` foi integrada à main pela PR #773. O ledger remoto continua no snapshot anterior de 27 versões e não inclui essa migration. Nenhuma aplicação manual foi feita; aguardar o fluxo normal de integração e revalidar o ledger após o merge.
 - Após o merge do PR #767, a integração GitHub–Supabase aplicou as seis migrations forward-only; após o PR #769, aplicou a migration da memória vetorial. Nenhum `db push`, `migration repair` ou DDL/DML manual foi executado nesta sessão.
 - Fencing de mensagens ativo: `claim_token` presente e ACK de três argumentos disponível para `service_role`. O overload legado de dois argumentos permanece no catálogo, mas não possui EXECUTE para `service_role`, `anon` ou `authenticated`.
 - RPCs de claim direto/provider-aware, renovação NULL-safe de lease, release de tentativa e recurring intelligence worker presentes. Os cinco índices de attempts/events/parent/routine estão presentes.
 - Três agentes `mini-freellmapi` online, provider `groq`, capabilities `text_reasoning` apenas. Duas tarefas `ready` exigem `repository_read`, `github_read`, `production_read`; nenhum agente possui essas capabilities, então não há claim. Não adicionar capabilities sem executor e policy reais.
 - A lease do recurring intelligence worker está livre (`worker_id=NULL`) e o histórico de runs contém zero execuções. Logs do Render após o deploy atual confirmam que o worker é desabilitado por feature flags. O código é iniciado em thread supervisionada pelo `main.py` quando ambas as flags estão habilitadas; nenhuma flag foi alterada.
 - Render `Jarvis-api` permanece `live` no commit `e7b4efa35c8da7fa0ca4c04c7b2b7880478473c2`, deploy concluído às 13:37:49 UTC em 2026-11-07; esse deploy inclui o merge da PR #769.
-- A próxima entrega de C0 é integrar executores reais ao heartbeat e ao ToolDispatcher, com policy host-backed, principal/sessão confiáveis, scope e aprovação. Depois ligar os conectores read-only autorizados e revalidar as duas tarefas prontas sem forçar claim. A memória vetorial ainda precisa de insert/readback real; o worker recorrente exige autorização operacional separada. Não ampliar capabilities nem ativar coleta recorrente por inferência.
+- A próxima entrega prioritária de C0 é persistir owner/creator da tarefa a partir do usuário autenticado no enqueue e propagar esse vínculo aos eventos de conclusão/bloqueio; hoje a fila é global e a PR #770 usa o chamador autenticado, não um owner persistido. Em seguida, integrar executores reais ao heartbeat/ToolDispatcher e registrar ToolAuthorizationPolicy host-backed com principal, sessão, scope e aprovação. A migration de identidade individual deve entrar pelo fluxo normal; só depois provisionar tokens no secret store aprovado e validar HTTP em runtime. A memória vetorial ainda precisa de insert/readback real; o worker recorrente exige autorização operacional separada. Não ampliar capabilities nem ativar coleta recorrente por inferência.
 
 ### Evidência histórica Supabase — 2026-11-05 (superseded)
 
@@ -78,7 +78,7 @@ O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.
 
 | Marco | Capacidade | Estado inicial | Critério principal |
 |---|---|---|---|
-| C0 | Auditoria de capacidades e baseline comportamental | **Em andamento — baseline e primeira fatia de identidade em revisão** | [COGNITIVE_BASELINE.md](COGNITIVE_BASELINE.md) mapeia os caminhos; a implementação em branch adiciona credenciais individuais e grants server-side no caminho HTTP. Permanecem o worker service-role legado, ownership, attestation dinâmica, policy host-backed e validação operacional. |
+| C0 | Auditoria de capacidades e baseline comportamental | **Em andamento — identidade individual merged e validada em CI; runtime ainda não verificado** | [COGNITIVE_BASELINE.md](COGNITIVE_BASELINE.md) registra a PR #773 merged, autenticação dupla HTTP e grant server-side limitado a text_reasoning. A migration está na main, mas fora do ledger Supabase; não há tokens provisionados. Permanecem ownership persistido, ToolAuthorizationPolicy host-backed, executores reais, migração do fallback service-role e validação operacional. |
 | C1 | World Model | **Auditoria necessária** | Entidades, relações, observações, proveniência, identidade conservadora e histórico temporal reconstruível |
 | C2 | Cognitive Memory | **Parcial / auditoria necessária** | Consolidar memórias episódica, semântica, procedural e prospectiva com recuperação contextual, conflitos e retenção |
 | C3 | Perception Engine | **Parcial / auditoria necessária** | Integrar fontes existentes em pipeline normalizado, resiliente, idempotente e observável |
@@ -94,6 +94,7 @@ O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.
 
 ## Pendências prioritárias sustentadas pela auditoria
 1. Reexecutar auditoria de capabilities e testes comportamentais; não usar os números históricos como métricas atuais.
+2. Persistir owner/creator nas tarefas da fila e propagar o proprietário autenticado aos eventos de iniciativa; cobrir isolamento, tarefas legadas e atribuição correta de task_blocked.
 3. Corrigir e testar os limites de auto-evolução para pastas de infraestrutura e segurança antes de reativar mutação automática irrestrita.
 4. Integrar AdapterRegistry ao fluxo de produção e provar que o Jarvis procura implementação existente antes de gerar outra.
 5. Manter o status de DockerSandbox como não comprovado em produção até haver consumidor e teste que demonstrem isolamento real.
@@ -104,6 +105,14 @@ O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.
 10. Validar em cada harness se o catálogo e as skills são carregados no bootstrap de uma conversa nova.
 11. Proteger `main` com PR obrigatório e validação CI obrigatória, conforme issue #682; o estado atual não bloqueia push direto nem exige checks.
 12. Após integrar o binding incremental de `ModelRegistry` → `ModelRuntimeBindings` nos três workers, avançar para a etapa global: adaptar `LLMRouter`/`AIGateway`/`ModelOrchestrator` ao port comum sem remover adapters existentes; introduzir seleção por capabilities/modalities e política de custo/latência no scheduler, com testes de concorrência, timeout, cancelamento, usage e falhas de provider.
+
+### Evidência de CI — identidade individual de workers (PR #773)
+
+- PR #773 merged em 2026-11-07 no commit 4f35eac4a425bd508f0e156637f35a9f9e0f01b3.
+- Task Queue Tests run 42403685896 (#777): success; testes direcionados 8 passed; suíte completa Windows/Python 3.12.10: 2.716 passed, 15 skipped, 80 warnings.
+- JARVIS PR Validation run 42403685897 (#434): success; teste frontend geospatial e build Docker do sandbox passaram; suíte completa Linux/Python 3.11.18: 2.717 passed, 14 skipped, 8 warnings.
+- O bot de revisão Codex não concluiu a revisão por limite de uso; não há review formal registrada. Os checks de CI verdes não substituem revisão independente.
+- O commit de documentação mais recente consultado é 1ad74752a6393cb8f0de3614d74be0994ece940b e contém [skip ci]; não há run associado a esse commit, sem indicação de falha.
 
 ## Documentos de referência
 
