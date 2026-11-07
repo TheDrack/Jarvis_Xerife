@@ -85,3 +85,26 @@ def test_consolidation_preserves_working_memory_without_durable_vector_store():
 
     assert consolidated == 0
     assert working_memory.size == 1
+
+def test_consolidation_preserves_working_memory_when_durable_store_is_unhealthy():
+    class UnhealthyStore(_DurableStore):
+        def is_healthy(self):
+            return False
+
+    working_memory = WorkingMemory()
+    working_memory.push(
+        {
+            "user_input": "keep this while Supabase is unavailable",
+            "response": "Do not evict this item.",
+            "_ts": "2000-01-01T00:00:00+00:00",
+        }
+    )
+    service = MemoryConsolidationService(
+        working_memory=working_memory,
+        vector_adapter=VectorMemoryAdapter(dim=32, store=UnhealthyStore()),
+    )
+
+    consolidated = service.consolidate_memories(max_age_hours=24)
+
+    assert consolidated == 0
+    assert working_memory.size == 1
