@@ -182,6 +182,33 @@ def publish_artifact(artifact_dir: Path, repository_root: Path) -> Dict[str, str
         "it does not execute candidate code."
     )
 
+    existing_prs_result = _run(
+        [
+            "gh", "pr", "list",
+            "--state", "all",
+            "--search", f"in:title {manifest['mission_id']}",
+            "--json", "number,title,state",
+            "--limit", "100",
+        ],
+        root,
+    )
+    try:
+        existing_prs = json.loads(existing_prs_result.stdout or "[]")
+    except json.JSONDecodeError as exc:
+        raise PublicationError("existing_mission_pr_query_invalid") from exc
+    if not isinstance(existing_prs, list):
+        raise PublicationError("existing_mission_pr_query_invalid")
+    duplicate = next(
+        (item for item in existing_prs if item.get("title") == title),
+        None,
+    )
+    if duplicate:
+        raise PublicationError(
+            "mission_pr_already_exists:"
+            f"{duplicate.get('number', 'unknown')}:"
+            f"{duplicate.get('state', 'unknown')}"
+        )
+
     _run(["gh", "auth", "setup-git"], root)
     _run(["git", "checkout", "-b", branch], root)
     _atomic_write(target_path, payload)
