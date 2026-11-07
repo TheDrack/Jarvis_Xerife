@@ -11,6 +11,8 @@ on:
       - "app/application/services/memory_consolidation_service.py"
       - "app/application/ports/vector_memory_store.py"
       - "tests/adapters/infrastructure/test_supabase_vector_memory_store.py"
+      - "tests/adapters/infrastructure/test_vector_memory_adapter.py"
+      - "tests/application/test_memory_consolidation_service.py"
       - ".github/workflows/supabase-vector-memory-tests.yml"
   workflow_dispatch:
 
