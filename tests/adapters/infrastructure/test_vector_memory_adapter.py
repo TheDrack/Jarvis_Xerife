@@ -200,6 +200,9 @@ class _SharedVectorMemoryStore:
             if event.get("metadata", {}).get("user_id") != user_id
         ]
 
+    def delete_all(self):
+        self.events.clear()
+
 
 def test_vector_memory_readback_survives_adapter_recreation():
     shared_events = []
