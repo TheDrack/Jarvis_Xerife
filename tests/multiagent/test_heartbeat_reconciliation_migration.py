@@ -1,12 +1,12 @@
 from pathlib import Path
 
 
-def test_heartbeat_reconciliation_migration_rejects_stale_agents_safely():
+def test_provider_claim_migration_reconciles_stale_agents_safely():
     migration = (
         Path(__file__).resolve().parents[2]
         / "supabase"
         / "migrations"
-        / "20261028100000_agent_heartbeat_reconciliation.sql"
+        / "20261105023946_provider_aware_remote_task_claims.sql"
     )
     sql = migration.read_text(encoding="utf-8").lower()
 
