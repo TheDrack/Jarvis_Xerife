@@ -315,9 +315,13 @@ class SQLiteHistoryAdapter(HistoryProvider):
             logger.error(f"Error getting hive history: {e}")
             return []
 
-    def get_most_frequent_commands(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_most_frequent_commands(
+        self,
+        limit: int = 10,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
-        Get the most frequently used commands using SQL aggregation
+        Get command frequency for one user using SQL aggregation
 
         Args:
             limit: Maximum number of commands to return
@@ -325,12 +329,20 @@ class SQLiteHistoryAdapter(HistoryProvider):
         Returns:
             List of command types with their frequency counts
         """
+        if user_id is not None and (not isinstance(user_id, str) or not user_id.strip()):
+            raise ValueError("user_id must be a non-empty string when provided")
         try:
             with Session(self.engine) as session:
-                # Use SQL aggregation to count command types
-                statement = (
-                    select(Interaction.command_type, func.count(Interaction.command_type).label("count"))
-                    .group_by(Interaction.command_type)
+                # Aggregate within one user partition; None means local/unscoped.
+                statement = select(
+                    Interaction.command_type,
+                    func.count(Interaction.command_type).label("count"),
+                )
+                if user_id is None:
+                    statement = statement.where(Interaction.user_id.is_(None))
+                else:
+                    statement = statement.where(Interaction.user_id == user_id.strip())
+                statement = statement.group_by(Interaction.command_type)
                     .order_by(func.count(Interaction.command_type).desc())
                     .limit(limit)
                 )
@@ -344,13 +356,20 @@ class SQLiteHistoryAdapter(HistoryProvider):
             logger.error(f"Error getting most frequent commands: {e}")
             return []
 
-    def clear_history(self) -> None:
-        """Clear all command history"""
+    def clear_history(self, user_id: Optional[str] = None) -> None:
+        """Clear only the selected user partition (None means local/unscoped)."""
+        if user_id is not None and (not isinstance(user_id, str) or not user_id.strip()):
+            raise ValueError("user_id must be a non-empty string when provided")
         try:
             with Session(self.engine) as session:
-                session.exec(delete(Interaction))
+                statement = delete(Interaction)
+                if user_id is None:
+                    statement = statement.where(Interaction.user_id.is_(None))
+                else:
+                    statement = statement.where(Interaction.user_id == user_id.strip())
+                session.exec(statement)
                 session.commit()
-                logger.info("Cleared all command history")
+                logger.info("Cleared command history for scoped user=%s", user_id is not None)
         except Exception as e:
             logger.error(f"Error clearing history: {e}")
 
@@ -359,6 +378,7 @@ class SQLiteHistoryAdapter(HistoryProvider):
         user_input: str,
         command_type: str,
         parameters: Dict[str, Any],
+        user_id: Optional[str] = None,
     ) -> Optional[int]:
         """
         Save a command with pending status to the database
@@ -371,6 +391,8 @@ class SQLiteHistoryAdapter(HistoryProvider):
         Returns:
             ID of the created interaction, or None if failed
         """
+        if user_id is not None and (not isinstance(user_id, str) or not user_id.strip()):
+            raise ValueError("user_id must be a non-empty string when provided")
         try:
             with Session(self.engine) as session:
                 interaction = Interaction(
