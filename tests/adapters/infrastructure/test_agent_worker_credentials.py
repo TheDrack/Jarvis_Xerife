@@ -43,7 +43,8 @@ def test_issue_stores_only_a_hash_and_registers_the_agent():
     expires_at = datetime.now(timezone.utc) + timedelta(hours=2)
     with engine.begin() as connection:
         connection.execute(
-            text("insert into jarvis_agents (agent_id, runtime_version, status, available_tools) values ('mini-worker-1', 'legacy', 'available', '[\"shell_execute\"]')")
+            text("""insert into jarvis_agents (agent_id, runtime_version, status, available_tools)
+                   values ('mini-worker-1', 'legacy', 'available', '["shell_execute"]')""")
         )
 
     token = store.issue(
