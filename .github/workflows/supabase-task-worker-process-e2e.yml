@@ -12,6 +12,8 @@ on:
       - "supabase/migrations/20261105023946_provider_aware_remote_task_claims.sql"
       - "supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql"
       - "supabase/migrations/20261107020000_task_lease_renewal_null_duration_guard.sql"
+      - "supabase/migrations/20261107025840_release_failed_task_attempt.sql"
+      - "supabase/tests/release_failed_task_attempt.test.sql"
       - "supabase/tests/task_lease_renewal.test.sql"
       - "tests/multiagent/test_supabase_task_process_e2e.py"
       - "requirements/dev.txt"
@@ -57,7 +59,9 @@ jobs:
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105023946_provider_aware_remote_task_claims.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261107020000_task_lease_renewal_null_duration_guard.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261107025840_release_failed_task_attempt.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/tests/task_lease_renewal.test.sql" supabase/tests/
+          cp "${GITHUB_WORKSPACE}/supabase/tests/release_failed_task_attempt.test.sql" supabase/tests/
 
       - name: Start isolated Supabase
         working-directory: ${{ runner.temp }}/jarvis-task-worker-process
@@ -67,6 +71,10 @@ jobs:
       - name: Verify lease renewal SQL contract
         working-directory: ${{ runner.temp }}/jarvis-task-worker-process
         run: supabase test db supabase/tests/task_lease_renewal.test.sql
+
+      - name: Execute failed-attempt release pgTAP tests
+        working-directory: ${{ runner.temp }}/jarvis-task-worker-process
+        run: supabase test db supabase/tests/release_failed_task_attempt.test.sql
 
       - name: Export isolated API credentials
         working-directory: ${{ runner.temp }}/jarvis-task-worker-process
