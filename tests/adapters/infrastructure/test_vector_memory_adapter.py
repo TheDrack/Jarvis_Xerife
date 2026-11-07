@@ -311,7 +311,10 @@ def test_configured_but_unhealthy_vector_store_is_not_healthy():
     assert adapter.is_durable is True
     assert adapter.is_healthy() is False
 
-def test_store_event_redacts_pii_inside_nested_metadata(monkeypatch, pii_vector_adapter):
+
+def test_store_event_redacts_pii_inside_nested_metadata(
+    monkeypatch, pii_vector_adapter
+):
     from app.core.nexus import nexus
 
     monkeypatch.setattr(nexus, "resolve", lambda _name: None)
@@ -342,6 +345,7 @@ def test_execute_preserves_trusted_user_scope_from_context(
 
     assert result["success"] is True
     assert pii_vector_adapter._events[0]["metadata"]["user_id"] == "alice"
+
 
 def test_email_shaped_user_id_is_preserved_while_metadata_pii_is_redacted(
     monkeypatch, pii_vector_adapter
