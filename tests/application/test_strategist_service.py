@@ -319,6 +319,24 @@ def test_strategist_execute_archives_viable_proposal_as_pending(strategist):
     assert "Posso prosseguir" in result["decision_prompt"]
 
 
+
+def test_strategist_archive_rejects_path_traversal_identity(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Unsafe Identity",
+        proposal_description="The proposal identity must not control filesystem paths.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    matrix.proposal_id = "../../outside"
+
+    with pytest.raises(ValueError, match="Invalid proposal identity"):
+        strategist.archive_proposal(matrix)
+
+    assert not (strategist.proposals_dir.parent / "outside.jrvs").exists()
+
+
+
 def test_strategist_archive_rejected_proposal(strategist):
     """Test archiving rejected proposal"""
     # Create proposal with critical risk
