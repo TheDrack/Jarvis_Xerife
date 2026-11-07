@@ -224,7 +224,7 @@ class VectorMemoryAdapter(MemoryProvider):
         # Persist before updating the in-memory cache. A failed cloud write
         # must not look like a successful durable memory operation.
         if self._store is not None:
-            self._store.append(event)
+            self._store.append(event, user_id=combined_metadata.get('user_id'))
 
         self._events.append(event)
 
