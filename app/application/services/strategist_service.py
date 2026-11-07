@@ -36,8 +36,21 @@ class BudgetExceededException(Exception):
 
 
 class StrategistService(NexusComponent):
+    """
+    Service for autonomous improvement proposals and RFC management.
+
+    Features:
+    - Business case ROI analysis before implementation
+    - RFC generation after explicit human approval
+    - Budget tracking and caps per mission
+    - Proposal staging (pending/rejected/approved)
+    - Decision interface for human approval
+    """
+
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Evaluate a proposal and stage viable work for explicit human approval."""
+        if context is not None and not isinstance(context, dict):
+            return {"success": False, "error": "invalid_context"}
         payload = context or {}
         action = payload.get("action", "evaluate_proposal")
         if action != "evaluate_proposal":
@@ -129,21 +142,13 @@ class StrategistService(NexusComponent):
             "approval_required": viable,
             "roi": matrix.calculate_roi(),
             "rejection_reason": matrix.rejection_reason,
-            "decision_prompt": self.format_decision_prompt(matrix) if viable else None,
+            "decision_prompt": (
+                self.format_decision_prompt(matrix) if viable else None
+            ),
             "proposal_path": str(proposal_path),
         }
 
-    """
-    Service for autonomous improvement proposals and RFC management.
-    
-    Features:
-    - Business case ROI analysis before implementation
-    - RFC generation for approved proposals
-    - Budget tracking and caps per mission
-    - Proposal archiving (approved/rejected)
-    - Decision interface for human approval
-    """
-    
+
     def __init__(
         self,
         proposals_dir: Optional[Path] = None,
