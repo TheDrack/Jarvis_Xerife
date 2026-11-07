@@ -186,3 +186,40 @@ def test_priority_worker_can_login_and_refresh_expired_jwt():
     assert calls[1] == ("/token", None)
     assert calls[2] == ("/v1/agents/heartbeat", "Bearer fresh-jwt")
     assert worker.api_token == "fresh-jwt"
+
+
+
+def test_from_env_resolves_slot_specific_worker_credential(monkeypatch):
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
+    monkeypatch.setenv("JARVIS_MINI_AGENT_WORKERS", "2")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_2", "slot-two-token")
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "provider-key")
+    monkeypatch.setattr(
+        "app.multiagent.priority_queue_mini_agent.FreeLLMAPIClient.from_env",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        "app.multiagent.priority_queue_mini_agent.create_registered_model_handler",
+        lambda *args, **kwargs: lambda task: {},
+    )
+    monkeypatch.setattr(
+        "app.multiagent.priority_queue_mini_agent.configured_provider_id",
+        lambda: "groq",
+    )
+
+    worker = PriorityQueueMiniAgent.from_env(agent_id="mini-freellmapi-2")
+
+    assert worker.worker_token == "slot-two-token"
+
+
+def test_from_env_does_not_reuse_global_token_for_multiple_slots(monkeypatch):
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
+    monkeypatch.setenv("JARVIS_MINI_AGENT_WORKERS", "2")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "shared-token")
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1", raising=False)
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "provider-key")
+
+    with pytest.raises(RuntimeError, match="JARVIS_TASK_QUEUE_WORKER_TOKEN"):
+        PriorityQueueMiniAgent.from_env(agent_id="mini-freellmapi-1")
