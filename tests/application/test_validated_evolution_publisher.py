@@ -196,7 +196,7 @@ class TestTrustedPublisher:
         repository = tmp_path / "repository"
         target = repository / "app" / "application" / "services" / "roadmap_mission_selector.py"
         target.parent.mkdir(parents=True)
-        target.write_text("ORIGINAL = True\\n", encoding="utf-8")
+        target.write_text("ORIGINAL = True\n", encoding="utf-8")
         artifact_dir, _, _ = _write_artifact(
             tmp_path,
             target_file="app/application/services/roadmap_mission_selector.py",
