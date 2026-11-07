@@ -22,7 +22,7 @@ _MANIFEST_START = "<!-- JARVIS_EVOLUTION_MANIFEST_START -->"
 _MANIFEST_END = "<!-- JARVIS_EVOLUTION_MANIFEST_END -->"
 _MANIFEST_PATTERN = re.compile(
     re.escape(_MANIFEST_START)
-    + r"\s*\x60\x60\x60json\s*(\{.*?\})\s*\x60\x60\x60\s*"
+    + r"\s*\x60\x60\x60json\s*(.*?)\s*\x60\x60\x60\s*"
     + re.escape(_MANIFEST_END),
     re.DOTALL,
 )
@@ -329,7 +329,7 @@ class AutoEvolutionServiceV2(NexusComponent):
         if not ready:
             return self._blocked_mission("no_ready_roadmap_mission", phase)
 
-        ready.sort(key=lambda item: item.get("priority", 99))
+        ready.sort(\n            key=lambda item: (\n                item.get("priority", 99)\n                if type(item.get("priority", 99)) is int\n                and item.get("priority", 99) >= 0\n                else 99\n            )\n        )
         for mission in ready:
             validated, error = self._validate_roadmap_mission(
                 mission, phase, roadmap_text, manifest_match
