@@ -180,3 +180,45 @@ def test_memory_manager_fails_closed_when_injected_redactor_raises(tmp_path):
         manager.store_interaction("private email alice@example.com", "response")
 
     assert not storage.exists()
+
+
+
+def test_file_memory_is_partitioned_by_authenticated_user(tmp_path):
+    manager = MemoryManager(storage_path=str(tmp_path / "memory.json"))
+
+    manager.store_interaction(
+        "private project aurora alice",
+        "alice response",
+        user_id="alice",
+    )
+    manager.store_interaction(
+        "private project borealis bob",
+        "bob response",
+        user_id="bob",
+    )
+
+    alice = manager.get_relevant_context("private project aurora", user_id="alice")
+    bob = manager.get_relevant_context("private project borealis", user_id="bob")
+
+    assert len(alice) == 1
+    assert alice[0]["user"] == "private project aurora alice"
+    assert len(bob) == 1
+    assert bob[0]["user"] == "private project borealis bob"
+    assert manager.get_relevant_context("private project", user_id=None) == []
+
+
+def test_scoped_memory_never_falls_back_to_legacy_unscoped_file(tmp_path):
+    manager = MemoryManager(storage_path=str(tmp_path / "memory.json"))
+    manager.store_interaction("legacy private project", "legacy response")
+
+    assert manager.get_relevant_context("legacy private project", user_id="alice") == []
+
+
+def test_user_scoped_memory_paths_do_not_expose_user_identifiers(tmp_path):
+    manager = MemoryManager(storage_path=str(tmp_path / "memory.json"))
+    manager.store_interaction("private memory marker", "response", user_id="alice@example.com")
+
+    scoped_files = list((tmp_path / "memory.json.users").glob("*.json"))
+    assert len(scoped_files) == 1
+    assert "alice@example.com" not in scoped_files[0].name
+    assert not (tmp_path / "memory.json").exists()
