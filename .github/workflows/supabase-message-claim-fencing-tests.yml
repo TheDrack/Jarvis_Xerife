@@ -54,7 +54,7 @@ jobs:
       - name: Start isolated PostgreSQL
         working-directory: ${{ runner.temp }}/jarvis-message-claim-fencing
         run: |
-          supabase start --exclude gotrue,realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          supabase start --exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
       - name: Execute pgTAP behavior tests
         working-directory: ${{ runner.temp }}/jarvis-message-claim-fencing
