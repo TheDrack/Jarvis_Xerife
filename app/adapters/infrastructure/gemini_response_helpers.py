@@ -22,12 +22,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def build_context_message(history_provider) -> str:
+def build_context_message(history_provider, user_id=None) -> str:
     """Build context message from the last 3 commands in history.
 
     Args:
-        history_provider: An object with a ``get_recent_history(limit)`` method,
+        history_provider: An object with a ``get_recent_history(limit, user_id)`` method,
             or ``None`` if history is unavailable.
+        user_id: Authenticated owner identifier; None selects local/unscoped history.
 
     Returns:
         Formatted context string or empty string if no history.
@@ -36,7 +37,10 @@ def build_context_message(history_provider) -> str:
         return ""
 
     try:
-        recent_history = history_provider.get_recent_history(limit=3)
+        recent_history = history_provider.get_recent_history(
+            limit=3,
+            user_id=user_id,
+        )
         if not recent_history:
             return ""
 
