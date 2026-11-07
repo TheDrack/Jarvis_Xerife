@@ -23,9 +23,10 @@ select ok(
 );
 
 insert into public.jarvis_agent_tasks (
-    task_id, assigned_agent_id, attempt_id, status, lease_expires_at
+    task_id, objective, assigned_agent_id, attempt_id, status, lease_expires_at
 ) values (
     'lease-renewal-test',
+    'Verify lease renewal ownership and expiry',
     'lease-worker',
     '11111111-1111-4111-8111-111111111111',
     'in_progress',
