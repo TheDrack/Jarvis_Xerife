@@ -198,6 +198,50 @@ def test_strategist_approval_rejects_path_traversal(strategist):
         strategist.approve_proposal("../approved/other.jrvs")
 
 
+
+def test_strategist_approval_requires_a_nonempty_human_identity(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Actor Required",
+        proposal_description="Approval must be attributable.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    pending_path = strategist.archive_proposal(matrix)
+
+    with pytest.raises(ValueError, match="approved_by"):
+        strategist.approve_proposal(pending_path.name)
+
+    with pytest.raises(ValueError, match="approved_by"):
+        strategist.approve_proposal(pending_path.name, approved_by="  ")
+
+    assert pending_path.exists()
+    assert not list(strategist.approved_dir.glob("*.jrvs"))
+
+
+def test_generate_rfc_requires_a_persisted_human_approval(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Persisted Approval",
+        proposal_description="An in-memory boolean is not an approval record.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    matrix.approved = True
+
+    with pytest.raises(ValueError, match="persisted human approval"):
+        strategist.generate_rfc(matrix)
+
+    pending_path = strategist.archive_proposal(matrix)
+    strategist.approve_proposal(pending_path.name, approved_by="commander")
+
+    # The persisted approval record is authoritative; a mutable in-memory
+    # boolean does not have to be set by the caller.
+    matrix.approved = False
+    rfc_path = strategist.generate_rfc(matrix)
+    assert rfc_path.exists()
+
+
 def test_strategist_execute_archives_viable_proposal_as_pending(strategist):
     result = strategist.execute(
         {
@@ -262,8 +306,8 @@ def test_strategist_generate_rfc(strategist):
         risk=risk,
     )
     
-    # Simulate the explicit human approval required before RFC generation.
-    matrix.approved = True
+    pending_path = strategist.archive_proposal(matrix)
+    strategist.approve_proposal(pending_path.name, approved_by="commander")
     rfc_path = strategist.generate_rfc(matrix)
     
     # Verify file exists
