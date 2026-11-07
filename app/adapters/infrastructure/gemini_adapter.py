@@ -396,7 +396,9 @@ class LLMCommandAdapter(GitHubIssueMixin):
         """Build conversation context using only the active user's history."""
         return build_context_message(self.history_provider, user_id=user_id)
 
-    def generate_conversational_response(self, user_input: str) -> str:
+    def generate_conversational_response(
+        self, user_input: str, user_id: Optional[str] = None
+    ) -> str:
         """
         Generate a conversational response for unknown commands or greetings.
 
