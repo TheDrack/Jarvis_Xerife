@@ -106,7 +106,10 @@ class VectorMemoryAdapter(MemoryProvider):
         else:
             self._store: Optional[VectorMemoryStore] = store
 
-        if _FAISS_AVAILABLE:
+        if self._store is not None:
+            self._index = None
+            logger.info("☁️ [VectorMemory] Persistência Supabase habilitada.")
+        elif _FAISS_AVAILABLE:
             self._index = faiss.IndexFlatL2(dim)
             logger.info("✅ [VectorMemory] Índice FAISS inicializado (dim=%d).", dim)
         else:
@@ -122,6 +125,11 @@ class VectorMemoryAdapter(MemoryProvider):
         """
         if self._dim <= 0 or not isinstance(self._events, list):
             return False
+        if self._store is not None:
+            try:
+                return bool(self._store.is_healthy())
+            except Exception:
+                return False
         return not _FAISS_AVAILABLE or self._index is not None
 
     @property
@@ -229,11 +237,11 @@ class VectorMemoryAdapter(MemoryProvider):
         if self._store is not None:
             self._store.append(event, user_id=combined_metadata.get('user_id'))
 
-        self._events.append(event)
-
-        if _FAISS_AVAILABLE and self._index is not None:
-            vec_np = np.array([vector], dtype=np.float32)
-            self._index.add(vec_np)
+        if self._store is None:
+            self._events.append(event)
+            if _FAISS_AVAILABLE and self._index is not None:
+                vec_np = np.array([vector], dtype=np.float32)
+                self._index.add(vec_np)
 
         logger.debug("🧠 [VectorMemory] Evento armazenado: %s (total=%d)", event_id, len(self._events))
         return event_id
