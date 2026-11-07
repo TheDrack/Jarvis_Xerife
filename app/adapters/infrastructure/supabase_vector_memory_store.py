@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import logging
+import math
 from typing import Any, Dict, List, Optional
 
 from app.adapters.infrastructure.supabase_client import get_supabase_admin_client
@@ -87,11 +88,16 @@ class SupabaseVectorMemoryStore:
         if not isinstance(vector, list) or not vector:
             raise ValueError("vector-memory embedding must be a non-empty list")
         normalized_vector = [float(value) for value in vector]
+        if not all(math.isfinite(value) for value in normalized_vector):
+            raise ValueError("vector-memory embedding values must be finite numbers")
+        event_text = event.get("text")
+        if not isinstance(event_text, str) or not event_text.strip():
+            raise ValueError("vector-memory event text must be non-empty")
         row = {
             "id": str(event["id"]),
             "user_id": user_id,
             "scope_key": self._scope_key(user_id),
-            "event_text": str(event["text"]),
+            "event_text": event_text,
             "embedding": normalized_vector,
             "metadata": metadata,
             "vector_dim": len(normalized_vector),
