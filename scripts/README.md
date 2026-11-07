@@ -302,7 +302,7 @@ jobs:
 |--------|-----------|
 | `jarvis_healer.py` | Auto-cura a partir de relatórios/logs de pytest (`--report`, `--log`, `--production-log`, `--workflow-log`, `--dry-run`) |
 | `metabolism_analyzer.py` | Classifica a mutação (intent/impacto/estratégia) e escreve os outputs do workflow em `$GITHUB_OUTPUT` |
-| `evolve_all_pending.py` | Evolui capabilities pendentes em lote via `EvolutionOrchestrator` (`--dry-run`, `--limit`, `--cap-id`, `--delay`, `--max-attempts`, `--roadmap-context`) |
+| `evolve_all_pending.py` | Executa uma missão validada do Cognitive Roadmap via `--mission-id`; o catálogo antigo exige opt-in explícito `--legacy-capability` (`--cap-id`) |
 | `validate_architecture.py` | Valida camadas, ports, adapters e o container DI (marca a camada edge como skip quando as dependências de hardware não estão instaladas) |
 | `validate_self_awareness.py` | Valida a autoconsciência via Long Context (snapshot consolidado, serviço, registry do Nexus e consumidores) |
 | `overwatch_daemon.py` | Daemon do Proactive Core (CPU/RAM, inatividade, contexto) |
