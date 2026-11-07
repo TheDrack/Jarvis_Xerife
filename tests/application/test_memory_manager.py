@@ -122,3 +122,24 @@ class TestMemoryManagerExecute:
         result = memory_manager.execute({})
         assert result["success"] is True
         assert result["relevant_context"] == []
+
+
+def test_memory_readback_survives_manager_recreation(tmp_path):
+    """A new manager instance must recover the previously stored interaction."""
+    storage_path = str(tmp_path / "restart_memory.json")
+    first_manager = MemoryManager(storage_path=storage_path)
+    first_manager.store_interaction(
+        "configure the Jarvis network connector",
+        "Use the authenticated connector and verify its health.",
+    )
+
+    restarted_manager = MemoryManager(storage_path=storage_path)
+    recovered = restarted_manager.get_relevant_context(
+        "Jarvis network connector"
+    )
+
+    assert len(recovered) == 1
+    assert recovered[0]["user"] == "configure the Jarvis network connector"
+    assert recovered[0]["jarvis"] == (
+        "Use the authenticated connector and verify its health."
+    )
