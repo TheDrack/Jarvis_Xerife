@@ -92,6 +92,17 @@ class VectorMemoryAdapter(MemoryProvider):
             self._index = None
             logger.info("ℹ️ [VectorMemory] Usando fallback puro-Python.")
 
+    def is_healthy(self) -> bool:
+        """Report storage health independently from the optional FAISS backend.
+
+        The in-memory event list is the canonical store in both modes. FAISS
+        only accelerates nearest-neighbour lookup; its absence must not make a
+        working pure-Python adapter look unavailable to memory consolidation.
+        """
+        if self._dim <= 0 or not isinstance(self._events, list):
+            return False
+        return not _FAISS_AVAILABLE or self._index is not None
+
     def _get_pii_redactor(self):
         """Resolve PiiRedactor via Nexus (lazy loading)."""
         if self._pii_redactor is None:
