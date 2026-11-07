@@ -82,6 +82,39 @@ def test_approval_route_records_authenticated_user_and_dispatches_audit_data(
     assert worker.events[0][1]["approved_at"] == approval["approved_at"]
 
 
+
+def test_approval_route_does_not_promote_when_github_publisher_is_unavailable(
+    monkeypatch, tmp_path
+):
+    service = StrategistService(proposals_dir=tmp_path)
+    pending_path = _pending_proposal(service)
+    monkeypatch.setattr(
+        "app.application.services.strategist_service.StrategistService",
+        lambda: service,
+    )
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    def authenticated_user():
+        return User(username="commander", user_id="user-123")
+
+    app = FastAPI()
+    app.include_router(
+        create_evolution_router(
+            db_adapter=SimpleNamespace(engine=None),
+            get_current_user=authenticated_user,
+        )
+    )
+
+    response = TestClient(app).post(
+        f"/v1/proposals/{pending_path.name}/approve"
+    )
+
+    assert response.status_code == 503
+    assert pending_path.exists()
+    assert not (service.approved_dir / pending_path.name).exists()
+
+
+
 def test_approval_route_fails_closed_without_authentication_dependency(monkeypatch):
     def forbidden_service_construction():
         raise AssertionError("approval service must not be called without auth")
