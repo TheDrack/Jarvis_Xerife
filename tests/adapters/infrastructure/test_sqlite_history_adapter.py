@@ -604,3 +604,20 @@ def test_history_schema_migration_adds_user_id_column(tmp_path):
         user_id="alice",
     )
     assert [row["user_input"] for row in adapter.get_recent_history(user_id="alice")] == ["owned"]
+
+
+
+def test_pending_command_keeps_owner_for_worker_execution(adapter):
+    command_id = adapter.save_pending_command(
+        user_input="alice private queued task",
+        command_type="chat",
+        parameters={"intent": "chat"},
+        user_id="alice",
+    )
+
+    assert command_id is not None
+    pending = adapter.get_next_pending_command()
+
+    assert pending is not None
+    assert pending["id"] == command_id
+    assert pending["user_id"] == "alice"
