@@ -1,7 +1,7 @@
 # Cognitive Baseline — Fase C0
 
-**Snapshot:** `main` em `a31f5554776531c245166cb864abbf8a0eb03075` (baseline pós-PR #758)
-**Auditoria:** 2026-11-06
+**Snapshot:** `main` em `e7b4efa35c8da7fa0ca4c04c7b2b7880478473c2` (pós-PR #769)
+**Auditoria:** 2026-11-07
 **Estado:** parcial; C0 permanece aberto.
 **Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação, complementada por probes remotos somente leitura. Não é confirmação de deploy completo, execução ponta a ponta ou comportamento de todos os providers.
 
@@ -24,11 +24,11 @@ Este documento é o primeiro mapa rastreável de C0; não o conclui. Não criar 
 | Capacidade | Implementação / contrato existente | Consumidor localizado | Testes localizados | Classificação e lacuna |
 |---|---|---|---|---|
 | Roteamento cognitivo | `app/domain/gears/cognitive_router.py`; registro no Nexus | O componente está no registro; não foi confirmado um ciclo cognitivo contínuo que o consuma | `tests/test_nexus_registry_sync.py` valida sincronização do registro | **Implementado, não verificado.** O código classifica entrada por palavras-chave ou uma chamada LiteLLM; isso é roteamento de conversa, não Reasoning Engine. Não foi localizado teste comportamental específico do roteador. |
-| Memória semântica | `app/application/services/memory_manager.py`; armazenamento via `DocumentStore` em `data/jarvis_memory.json` | `AssistantService.process_command()` consulta e grava; `FieldVision` consulta soluções/contexto | `tests/application/test_memory_manager.py`; PR #759 adiciona readback após recriar o manager | **Persistência local confirmada por arquivo; isolamento por usuário, redaction, proveniência, retenção governada e falha de escrita continuam sem contrato suficiente.** Busca é por substring/token, não semântica vetorial. |
-| Memória vetorial | Porta `MemoryProvider`; `app/adapters/infrastructure/vector_memory_adapter.py` | `AssistantService.process_command()` consulta últimos 30 dias e grava comando/resposta | `tests/adapters/infrastructure/test_vector_memory_adapter.py` | **Process-local, não durável.** `_events` e FAISS ficam em RAM; não há save/load nem readback após reinício. Se o PII redactor não resolver, o adapter armazena o texto original. |
+| Memória semântica | `app/application/services/memory_manager.py`; armazenamento via `DocumentStore` em `data/jarvis_memory.json` | `AssistantService.process_command()` consulta e grava; `FieldVision` consulta soluções/contexto | PRs #759/#762; testes de redaction, isolamento e readback após recriar o manager | **Persistência local confirmada por arquivo e escopo/redaction nos caminhos cobertos.** Proveniência, retenção governada, exclusão verificável e busca semântica continuam incompletas; busca atual é por substring/token. |
+| Memória vetorial | Porta `MemoryProvider`; `VectorMemoryAdapter`; `SupabaseVectorMemoryStore` atrás de `VectorMemoryStore` | `AssistantService`/`MemoryConsolidationService` usam o adapter; leitura e escrita remotas são condicionadas a `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` | 38 testes direcionados no PR #769; 16 pgTAP isolados; CI completa aprovada | **Backend durável implementado e migration implantada.** Particionamento por usuário, redaction recursiva de metadata, readback após reinício e bloqueio de consolidação sem persistência saudável estão cobertos. A tabela de produção existe, mas contém 0 linhas; insert/readback real do runtime ainda não foi comprovado. Sem service-role, o adapter mantém fallback volátil. |
 | Memória procedural | `app/adapters/infrastructure/procedural_memory_adapter.py`; indexa ThoughtLogs bem-sucedidos | `EvolutionOrchestrator` consulta soluções conhecidas | `tests/adapters/infrastructure/test_procedural_memory_adapter.py` | **Parcial/bloqueado.** `bootstrap_from_db()` existe, mas não foi encontrado call site; o índice é RAM e pode iniciar vazio. O consumer apenas consulta soluções. |
-| Working memory / consolidação | `WorkingMemory` e `MemoryConsolidationService` | `OverwatchDaemon` tenta consolidar periodicamente para `VectorMemoryAdapter` | PR #760 adiciona teste de consolidação no fallback sem FAISS | **Parcial.** `WorkingMemory` é volátil; o destino vetorial também é RAM. PR #760 adiciona health check explícito para o fallback Python; CI ainda precisa validar. Falta persistência durável e prova de recuperação após reinício. |
-| Perception / Universal Intelligence | `app/domain/intelligence/contracts.py`: `IntelligenceEvidence`, `IntelligenceEvent`, `IntelligenceObservation`, `IntelligenceBatch`, `IntelligenceReport`; `IntelligenceCollector` e `IntelligenceCore` | Desktop local, dashboard de inteligência e worker recorrente chamam `collect_live_intelligence()` | `tests/application/test_intelligence_core.py`, `test_intelligence_observations.py`, `test_intelligence_collector.py`; testes do dashboard e Desktop | **Confirmado no repositório; runtime parcial.** Há normalização, deduplicação determinística e candidatos de correlação. O histórico está atrás de feature flag e o worker recorrente depende da reconciliação de migrations. |
+| Working memory / consolidação | `WorkingMemory` e `MemoryConsolidationService` | `OverwatchDaemon` tenta consolidar periodicamente para `VectorMemoryAdapter` | PRs #760 e #769; testes de falha de persistência e recuperação integral da entrada original | **Parcial.** `WorkingMemory` continua volátil, mas o destino vetorial agora pode ser durável. A consolidação não remove entradas enquanto o backend não estiver configurado/saudável e restaura a entrada original integral se a gravação falhar. Ainda falta provar escrita/readback real em produção. |
+| Perception / Universal Intelligence | `app/domain/intelligence/contracts.py`; `IntelligenceCollector`, `IntelligenceCore`, history adapter e `IntelligenceRecurringWorker` | Desktop local, dashboard e worker opt-in em `main.py` | Testes de core/collector/observations; pgTAP de lease; testes do worker recorrente | **Schema implantado; worker de produção desabilitado por feature flags.** O Render registra explicitamente `Universal Intelligence recurring worker disabled by feature flags`; a lease está livre e há zero runs. Não confundir código e RPCs presentes com coleta recorrente ativa. |
 | World Model | Observações geográficas e temporais existem nos contratos de inteligência | Mapas/dashboard consomem relatórios e observações; não são fonte canônica de estado | Testes de observação cobrem contratos e síntese | **Ausente no escopo auditado como modelo canônico.** Não foi localizado contrato completo para identidade de entidade, relação, afirmação de estado, evento de mudança e projeção temporal reconstruível. `IntelligenceCore` não equivale a World Model. |
 | Reasoning / reflexão | `ThoughtLogService`, `MetaReflection`, `TechnicalAnalysisService` | ThoughtLog é usado por evolução, routers e coleta de datasets; MetaReflection alimenta contexto do EvolutionOrchestrator | `tests/application/test_thought_log_service.py`, `tests/test_meta_reflection.py` | **Parcial.** Logs e análise retrospectiva existem. `TechnicalAnalysisService.execute()` retorna `not_implemented`. Não foi demonstrado pipeline Claim/Hypothesis/EvidenceLink/CounterEvidence, calibração ou abstenção. |
 | Strategic Planner | `StrategistService` gera matriz de viabilidade/RFC; `DeclarativePlanInterpreter` valida planos estruturados | Router de evolução resolve Strategist; `TaskRunner` executa planos declarativos | `tests/application/test_strategist_service.py`, `tests/test_execution_plan.py`, `tests/multiagent/test_model_plan_adapter.py`, `tests/multiagent/test_task_runner_execution_plan_integration.py` | **Parcial.** `StrategistService.execute()` ainda retorna `not_implemented`; plano declarativo não prova objetivos persistentes, decomposição durável ou replanejamento. |
@@ -84,10 +84,10 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 ## 6. Lacunas de C0 ainda abertas
 
 1. **Baseline comportamental integrado:** PR #759 cobre fontes → coletor → `IntelligenceCore` → endpoint autenticado, com deduplicação, correlação candidata, sucesso parcial e isolamento de erros. O contrato está testado com fontes controladas; disponibilidade de todos os providers em produção ainda exige validação.
-2. **Memória:** PR #759 comprova readback do `MemoryManager` após recriar a instância; PR #762 adiciona redaction fail-closed e escopo por usuário nos caminhos cobertos. O vector store continua em memória do processo; faltam persistência/readback vetorial após reinício, idempotência, retention/erasure verificáveis e bootstrap procedural.
+2. **Memória:** PR #759 comprova readback do `MemoryManager`; PR #762 adiciona redaction fail-closed e escopo por usuário; PR #769 adiciona persistência vetorial Supabase, readback entre processos e rollback lossless da consolidação. A tabela de produção está implantada, mas permanece vazia; falta comprovar um insert/readback real do runtime, idempotência, retention/erasure verificáveis e bootstrap procedural.
 3. **Executive / task queue:** PR #761 valida fencing de mensagens em dois processos independentes; PR #766 valida claim → renew → execute → complete de tarefa em dois processos independentes contra Supabase isolado. Isso prova o contrato de banco, não a execução de tarefas reais no runtime de produção. Três mini-agentes Groq estão online, mas anunciam apenas `text_reasoning`; as duas tarefas prontas exigem `repository_read`, `github_read` e `production_read`. O claim está corretamente bloqueado por incompatibilidade de capacidades.
 4. **Leases e recuperação:** PR #763 e #767 instalaram a RPC NULL-safe, fencing e os cinco índices. Os contratos pgTAP passaram. Ainda falta executar uma tarefa real de ponta a ponta no runtime após registrar ferramentas compatíveis e verificar recuperação após expiração de lease.
-5. **Recurring intelligence worker:** tabelas e RPCs foram implantadas e têm RLS. A lease está sem proprietário e existem zero registros de execução; o processo recorrente ainda não foi ativado nem validado operacionalmente.
+5. **Recurring intelligence worker:** tabelas e RPCs foram implantadas e têm RLS/ACL restrita. O Jarvis-api Render está live, mas seus logs mostram que o worker é desabilitado por feature flags; a lease está sem proprietário e existem zero registros de execução. A ativação continua pendente de autorização operacional e validação de uma execução controlada.
 6. **Aprovação:** PR #764 exige ator autenticado e persiste `approved_by`/`approved_at`. Falta integrar o provedor real de identidade e política de autorização de produção; o teste atual usa identidade injetada.
 7. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; contraditório, calibração e abstenção ainda não estão demonstrados.
 8. **Planning:** provar persistência de objetivo, dependências e replanejamento; matriz de viabilidade e plano declarativo continuam sendo contratos distintos.
@@ -108,7 +108,8 @@ Evidências integradas:
 - **PR #764 — merged:** gate de aprovação humana autenticada para propostas do Strategist.
 - **PR #765 — merged:** atualização documental do C0 após PRs #759–#764.
 - **PR #766 — merged:** E2E real da fila de tarefas em dois processos independentes; pgTAP, renovação, completion e eventos persistidos.
-- **PR #767 — merged:** reconstrução exata das 20 migrations históricas, seis migrations forward-only e reconciliação automática do ledger após merge. Supabase agora registra 26/26 versões e está `ACTIVE_HEALTHY`.
+- **PR #767 — merged:** reconciliação do ledger histórico e migrations forward-only; Supabase passou a registrar 26/26 versões.
+- **PR #769 — merged:** memória vetorial durável Supabase, isolamento por usuário, redaction recursiva de metadata, readback persistente e consolidação com recuperação lossless. CI, 38 testes direcionados e 16 pgTAP passaram.
 
 Próxima sequência:
 1. Integrar o registry real de ferramentas ao heartbeat/upsert do agente; nunca anunciar capability sem executor funcional.
@@ -212,13 +213,13 @@ As duas entradas históricas `google_linked_identities` foram preservadas separa
 - `MemoryManager` sanitiza texto de usuário e resposta antes de persistir; email, CPF e telefone são redigidos. O readback após recriar o manager está coberto pela PR #759.
 - A PR #762 particiona a memória semântica por identidade autenticada, usando digest SHA-256 no nome do arquivo. Chamadas sem usuário ficam restritas ao compartimento local/sistema; registros legados globais não são copiados para partições de usuário.
 - A identidade autenticada é propagada nos caminhos de API, interpretação, histórico SQLite e worker cobertos. Histórico não escopado retorna somente registros locais; consultas vetoriais filtram pelo proprietário e rejeitam `user_id` injetado em metadata não confiável.
-- `VectorMemoryAdapter` agora falha fechado quando o redactor não está disponível e aceita o backend puro-Python sem FAISS (PR #760/#762). O store continua em memória do processo; não há save/load nem readback vetorial após reinício.
+- `VectorMemoryAdapter` agora usa `SupabaseVectorMemoryStore` quando o admin client está configurado; sem ele, mantém fallback volátil. A tabela remota está implantada e protegida, mas a contagem atual é zero, então a integração de escrita/readback do runtime ainda não foi demonstrada.
 - `ProceduralMemoryAdapter.bootstrap_from_db()` ainda não tem call site confirmado; o índice de soluções permanece volátil.
 - A redaction atual cobre padrões de email, CPF e telefone; não é uma política DLP completa. A exclusão/purge de IDs vetoriais e a retenção de ThoughtLogs/logs ainda precisam de prova ponta a ponta.
 
 ### 9.5 Reconciliação do ledger após merge do PR #767
 
-O SQL efetivamente registrado foi recuperado de `supabase_migrations.schema_migrations.statements`. Os 20 arquivos históricos foram reconstruídos com seus version IDs originais, preservando as duas entradas distintas `google_linked_identities`. Após o merge, a integração GitHub–Supabase aplicou as seis migrations forward-only. A verificação posterior confirmou 26/26 versões no ledger remoto, 26/26 arquivos locais correspondentes e zero migrations pendentes.
+O SQL efetivamente registrado foi recuperado de `supabase_migrations.schema_migrations.statements`. Os 20 arquivos históricos foram reconstruídos com seus version IDs originais, preservando as duas entradas distintas `google_linked_identities`. Após o merge, a integração GitHub–Supabase aplicou as seis migrations forward-only. A verificação posterior confirmou 26/26 versões no ledger remoto, 26/26 arquivos locais correspondentes e zero migrations pendentes. A revalidação posterior à PR #769 elevou o estado para 27/27; ver seção 9.6.
 
 **Estado final de schema:**
 - Provider-aware claims, heartbeat reconciliation e parent-task guard estão ativos.
@@ -233,3 +234,34 @@ O SQL efetivamente registrado foi recuperado de `supabase_migrations.schema_migr
 Nenhum DDL/DML manual, `db push`, `migration repair`, grant ou deploy manual foi executado. As migrations foram aplicadas pela integração GitHub–Supabase após o merge do PR #767.
 
 **Conclusão:** C0 continua aberto. Universal Intelligence já possui coleta, normalização e candidatos de correlação, mas histórico persistente ainda não está provado. C1 — World Model permanece bloqueado até fechar baseline de memória, identidade, proveniência e integração operacional.
+
+### 9.6 Revalidação 2026-11-07 após PR #769
+
+Esta seção supersede as contagens anteriores de migrations e o diagnóstico de memória vetorial.
+
+**Repositório e deploy**
+- main auditada em e7b4efa35c8da7fa0ca4c04c7b2b7880478473c2; PR #769 foi merged no commit 203725a7a3f47df390347482d703a2380c8f2142.
+- Render Jarvis-api está live no commit e7b4efa35c8da7fa0ca4c04c7b2b7880478473c2, com deploy concluído às 13:37:49 UTC de 2026-11-07. O deploy inclui a implementação de memória vetorial da PR #769.
+
+**Supabase — ledger e memória vetorial**
+- Projeto saibtpdehhprttqlgqdt: ACTIVE_HEALTHY; branch main: FUNCTIONS_DEPLOYED.
+- supabase/migrations contém 27 arquivos SQL e list_migrations retorna 27 versões remotas. Comparação por par version + name: 27/27 correspondentes, nenhuma migration local ausente, nenhuma remota ausente e nenhuma versão duplicada.
+- public.jarvis_vector_memories existe com RLS habilitado. service_role tem SELECT/INSERT/DELETE e não tem UPDATE; anon e authenticated não têm SELECT. A tabela contém 0 linhas e 0 scopes; portanto o schema e os grants estão comprovados, mas ainda não há prova de persistência real de memória pelo runtime.
+- A migration da memória vetorial foi aplicada pela integração GitHub–Supabase após o merge. Nenhum db push, migration repair, DDL ou DML manual foi executado nesta revalidação.
+
+**Multiagente e capabilities**
+- Três agentes mini-freellmapi-1/2/3 estão available, provider groq, com available_tools=[text_reasoning], active_tasks=0.
+- Duas tarefas permanecem ready e requerem repository_read, github_read, production_read; não há agente que anuncie essas capabilities e nenhuma tarefa foi forçada a claim.
+- ToolRegistry continua sendo metadata-only; ToolDispatcher falha fechado sem ToolAuthorizationPolicy host-backed de produção. A CapabilityAuthorizer legada não satisfaz o contrato de principal/sessão autenticados nem de aprovação vinculada à requisição. Não anunciar ferramentas externas até existir executor funcional e policy confiável.
+
+**Universal Intelligence recorrente**
+- A migration e as RPCs de lease/run estão presentes. jarvis_intelligence_worker_lease está sem proprietário e jarvis_intelligence_worker_runs contém 0 execuções.
+- O Render Jarvis-api tem um único serviço web; os logs de 2026-11-07 registram repetidamente Universal Intelligence recurring worker disabled by feature flags, inclusive após o deploy atual. O código inicia o worker supervisionado em main.py apenas quando JARVIS_INTELLIGENCE_WORKER_ENABLED=true e JARVIS_INTELLIGENCE_HISTORY_ENABLED=true.
+- Não foram alteradas flags nem iniciada coleta recorrente. A ativação requer decisão explícita porque passará a coletar e persistir dados continuamente.
+
+**Próximos gates de C0**
+1. Integrar um registro de executores reais ao heartbeat; capability só pode ser anunciada quando houver executor invocável e policy de autorização host-backed.
+2. Ligar repository_read, github_read e production_read a adaptadores read-only autorizados; então revalidar as duas tarefas prontas sem forçar claim.
+3. Comprovar insert/readback real de memória vetorial por service role, mantendo a tabela inacessível a roles de cliente.
+4. Obter autorização operacional para habilitar o worker recorrente e executar uma primeira coleta supervisionada; verificar lease, run record, persistência e liberação.
+5. Manter C0 aberto até que os baselines comportamentais estejam comprovados. C1 — World Model não começa antes disso.
