@@ -310,3 +310,35 @@ def test_configured_but_unhealthy_vector_store_is_not_healthy():
 
     assert adapter.is_durable is True
     assert adapter.is_healthy() is False
+
+def test_store_event_redacts_pii_inside_nested_metadata(monkeypatch, pii_vector_adapter):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    pii_vector_adapter.store_event(
+        "safe event text",
+        metadata={
+            "contact": "alice.smith@example.com",
+            "details": ["CPF 123.456.789-09"],
+        },
+    )
+
+    stored_metadata = pii_vector_adapter._events[0]["metadata"]
+    assert stored_metadata["contact"] == "[EMAIL_REDACTED]"
+    assert stored_metadata["details"] == ["CPF [CPF_REDACTED]"]
+
+
+def test_execute_preserves_trusted_user_scope_from_context(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    result = pii_vector_adapter.execute(
+        {"text": "user-scoped event", "user_id": "alice"}
+    )
+
+    assert result["success"] is True
+    assert pii_vector_adapter._events[0]["metadata"]["user_id"] == "alice"
