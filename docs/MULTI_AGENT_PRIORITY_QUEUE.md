@@ -25,7 +25,13 @@ Para configurar e operar o conjunto (migrações, variáveis, concorrência, rel
 - `POST /v1/agent-tasks/{task_id}/release` (devolve a tentativa falha à fila sem esperar o lease; 409 quando a tentativa não é mais do agente)
 - `POST /v1/routines` (cria/atualiza definição; não executa agendador por si só)
 
-Todas as rotas usam a dependência de autenticação existente. A fila requer PostgreSQL; SQLite retorna HTTP 503 em vez de fingir que a fila compartilhada está disponível.
+Todas as rotas exigem o JWT do principal que chama a API. Heartbeat, claim, finish e release também exigem `X-Jarvis-Worker-Token`: o token identifica um único agente, o `agent_id` do corpo deve corresponder ao registro e `available_tools` é carregado do grant no servidor (o valor enviado pelo worker é ignorado). Tokens ausentes, inválidos, expirados ou revogados são rejeitados; divergência de agente retorna 403.
+
+O token do worker é separado do JWT do usuário. Ele é aleatório, armazenado somente como hash, expira em até 90 dias e pode ser revogado. O provisioning é feito por `scripts/manage_agent_worker_credentials.py`; veja [guia de uso](MULTI_AGENT_USAGE.md). A allowlist inicial de grants contém somente `text_reasoning`. Cada `agent_id` usa uma
+credencial individual; múltiplos slots não compartilham o mesmo token. O token global
+é permitido apenas para um único slot.
+
+A fila requer PostgreSQL; SQLite retorna HTTP 503 em vez de fingir que a fila compartilhada está disponível. O worker Supabase que usa diretamente `SUPABASE_SERVICE_ROLE_KEY` continua como fallback legado e ainda não aplica esta fronteira de identidade.
 
 ## Semântica e limites
 

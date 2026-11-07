@@ -12,6 +12,16 @@ No manual DDL/DML, `db push`, `migration repair`, grants, or deployment command 
 
 The historical sections below preserve the earlier 2026-11-03 and 2026-11-06 audit snapshots. They are not the current state; the post-merge status below supersedes them.
 
+## Subsequent branch-local migration — not applied
+
+The worker-identity implementation branch adds
+`20261107183000_agent_worker_credentials.sql`. This file is not part of the 27/27
+main-branch snapshot above and has not been applied to the remote Supabase project.
+Until the PR is merged and the GitHub–Supabase integration reports the result, the
+expected branch comparison is 28 local files versus 27 remote versions. Do not run
+`db push`, `migration repair`, or manual DDL to force this migration. Reconcile the
+ledger only after observing the integration's actual result.
+
 ## Current executive result — post PR #767 merge
 
 | Evidence | Current result |

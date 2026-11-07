@@ -22,18 +22,18 @@ import argparse
 import json
 import os
 import platform
+import re
 import urllib.error
 import urllib.request
 
-QUEUE_ACCESS = {
-    "supabase_native": ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"),
-    "http_token": ("JARVIS_TASK_QUEUE_API_URL", "JARVIS_TASK_QUEUE_API_TOKEN"),
-    "http_password": (
-        "JARVIS_TASK_QUEUE_API_URL",
-        "JARVIS_TASK_QUEUE_USERNAME",
-        "JARVIS_TASK_QUEUE_PASSWORD",
-    ),
-}
+LEGACY_QUEUE_ACCESS = ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY")
+QUEUE_API_KEYS = (
+    "JARVIS_TASK_QUEUE_API_URL",
+    "JARVIS_TASK_QUEUE_API_TOKEN",
+    "JARVIS_TASK_QUEUE_USERNAME",
+    "JARVIS_TASK_QUEUE_PASSWORD",
+    "JARVIS_TASK_QUEUE_WORKER_TOKEN",
+)
 INFERENCE_KEYS = ("FREELLMAPI_API_KEY", "GROQ_API_KEY", "VENICE_API_KEY")
 OPTIONAL = (
     "JARVIS_AGENT_ID",
@@ -65,12 +65,83 @@ def http_probe(url: str, *, method: str = "GET", body: bytes | None = None, time
         return {"status": None, "error": f"{type(exc).__name__}: {exc}"}
 
 
+def _worker_agent_ids() -> list[str]:
+    base = os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1").strip() or "mini-freellmapi-1"
+    try:
+        slots = int(os.getenv("JARVIS_MINI_AGENT_WORKERS", "1"))
+    except ValueError:
+        slots = 1
+    slots = max(1, min(8, slots))
+    if slots == 1:
+        return [base]
+    if base.endswith("-1"):
+        prefix = base[:-1]
+        return [base, *(f"{prefix}{index}" for index in range(2, slots + 1))]
+    return [f"{base}-{index}" for index in range(1, slots + 1)]
+
+
+def _worker_token_env_name(agent_id: str) -> str:
+    normalized = re.sub(r"[^A-Za-z0-9]+", "_", agent_id.strip()).strip("_").upper()
+    return f"JARVIS_TASK_QUEUE_WORKER_TOKEN_{normalized}"
+
+
+def _queue_variable_names() -> tuple[str, ...]:
+    expected = [_worker_token_env_name(agent_id) for agent_id in _worker_agent_ids()]
+    discovered = [
+        name for name in os.environ
+        if name.startswith("JARVIS_TASK_QUEUE_WORKER_TOKEN_")
+    ]
+    return tuple(dict.fromkeys((*QUEUE_API_KEYS, *LEGACY_QUEUE_ACCESS, *expected, *discovered)))
+
+
 def queue_group() -> tuple[str, dict[str, bool]]:
-    for name, keys in QUEUE_ACCESS.items():
-        state = presence(keys)
-        if all(state.values()):
-            return name, state
-    return "missing", {key: False for keys in QUEUE_ACCESS.values() for key in keys}
+    agent_ids = _worker_agent_ids()
+    worker_tokens = {
+        agent_id: (
+            os.getenv(_worker_token_env_name(agent_id), "").strip()
+            or (
+                os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
+                if len(agent_ids) == 1
+                else ""
+            )
+        )
+        for agent_id in agent_ids
+    }
+    worker_token_configured = bool(
+        os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
+        or any(
+            os.getenv(name, "").strip()
+            for name in os.environ
+            if name.startswith("JARVIS_TASK_QUEUE_WORKER_TOKEN_")
+        )
+    )
+    has_caller = bool(
+        os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
+        or (
+            os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip()
+            and os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "").strip()
+        )
+    )
+    http_ready = bool(
+        os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
+        and all(worker_tokens.values())
+        and has_caller
+    )
+    if http_ready:
+        mode = (
+            "http_worker_token"
+            if os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
+            else "http_worker_password"
+        )
+        return mode, presence(_queue_variable_names())
+    if worker_token_configured:
+        # Once individual identity is configured, do not silently fall back to
+        # the shared service-role path when one slot is missing its credential.
+        return "missing", presence(_queue_variable_names())
+    legacy = presence(LEGACY_QUEUE_ACCESS)
+    if all(legacy.values()):
+        return "supabase_native_legacy", presence(_queue_variable_names())
+    return "missing", presence(_queue_variable_names())
 
 
 def main() -> int:
@@ -85,13 +156,19 @@ def main() -> int:
     }
 
     enabled = os.getenv("JARVIS_MINI_AGENT_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
-    access_mode, access_state = queue_group()
+    access_mode, _access_state = queue_group()
     inference = presence(INFERENCE_KEYS)
 
-    report["variables"] = {**access_state, **inference, **presence(OPTIONAL)}
+    all_queue_variables = _queue_variable_names()
+    report["variables"] = {
+        **presence(all_queue_variables),
+        **inference,
+        **presence(OPTIONAL),
+    }
     report["opt_in_enabled"] = enabled
     report["groups"] = {
         "queue_access": access_mode if access_mode != "missing" else "missing",
+        "queue_access_is_legacy": access_mode == "supabase_native_legacy",
         "inference_credential": sorted(key for key, ok in inference.items() if ok) or "missing",
         "worker_opt_in": "enabled" if enabled else "disabled",
     }
@@ -101,8 +178,10 @@ def main() -> int:
         blockers.append("JARVIS_MINI_AGENT_ENABLED is not enabled in this environment")
     if access_mode == "missing":
         blockers.append(
-            "no queue access configured: set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY, or "
-            "JARVIS_TASK_QUEUE_API_URL with a token or username/password"
+            "no queue access configured: set JARVIS_TASK_QUEUE_API_URL, "
+            "JARVIS_TASK_QUEUE_WORKER_TOKEN, and either JARVIS_TASK_QUEUE_API_TOKEN "
+            "or JARVIS_TASK_QUEUE_USERNAME/JARVIS_TASK_QUEUE_PASSWORD; the legacy "
+            "Supabase service-role path is reported separately"
         )
     if not any(inference.values()):
         blockers.append(
@@ -127,6 +206,7 @@ def main() -> int:
 
     report["limitations"] = [
         "Presence only: this checker never reads or prints variable values.",
+        "The Supabase service-role path is a legacy fallback and does not bind a request to an individual worker credential.",
         "A ready verdict means the runtime can start here; it does not prove the queue migrations "
         "are applied to the target database or that a worker is currently heartbeating.",
         "Tasks requiring repository, shell, browser or production-diagnostic tools cannot be claimed "

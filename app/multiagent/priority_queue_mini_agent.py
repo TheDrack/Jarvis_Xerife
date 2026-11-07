@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from app.adapters.infrastructure.agent_worker_credentials import worker_token_env_name
+
 from .freellmapi_client import FreeLLMAPIClient, configured_provider_id
 from .freellmapi_handler import FreeLLMAgentHandler
 from .model_runtime_factory import create_registered_model_handler
@@ -27,6 +29,7 @@ class PriorityQueueMiniAgent:
         *,
         api_base_url: str,
         api_token: str = "",
+        worker_token: str,
         agent_id: str,
         handler: FreeLLMAgentHandler,
         lease_seconds: int = 90,
@@ -36,14 +39,20 @@ class PriorityQueueMiniAgent:
     ) -> None:
         has_token = bool(api_token.strip())
         has_credentials = bool(username and username.strip() and password)
-        if not api_base_url.strip() or not agent_id.strip() or not (has_token or has_credentials):
+        if (
+            not api_base_url.strip()
+            or not agent_id.strip()
+            or not worker_token.strip()
+            or not (has_token or has_credentials)
+        ):
             raise ValueError(
-                "api_base_url, agent_id, and either api_token or username/password are required"
+                "api_base_url, agent_id, worker_token, and either api_token or username/password are required"
             )
         if not 10 <= lease_seconds <= 3600:
             raise ValueError("lease_seconds must be between 10 and 3600")
         self.api_base_url = api_base_url.rstrip("/")
         self.api_token = api_token
+        self.worker_token = worker_token
         self.username = username
         self.password = password
         self.agent_id = agent_id
@@ -52,20 +61,35 @@ class PriorityQueueMiniAgent:
         self._client = client
 
     @classmethod
-    def from_env(cls, agent_id: str | None = None) -> "PriorityQueueMiniAgent":
+    def from_env(
+        cls,
+        agent_id: str | None = None,
+        worker_token: str | None = None,
+    ) -> "PriorityQueueMiniAgent":
         api_token = os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
         api_base_url = os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
         username = os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip() or None
         password = os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "") or None
         agent_id = (agent_id or os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1")).strip()
+        if worker_token is None:
+            specific_token = os.getenv(worker_token_env_name(agent_id), "").strip()
+            try:
+                configured_slots = max(1, min(8, int(os.getenv("JARVIS_MINI_AGENT_WORKERS", "1"))))
+            except ValueError:
+                configured_slots = 1
+            global_token = os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
+            worker_token = specific_token or (global_token if configured_slots == 1 else "")
         if not api_base_url or not (api_token or (username and password)):
             raise RuntimeError(
                 "Set JARVIS_TASK_QUEUE_API_URL and either JARVIS_TASK_QUEUE_API_TOKEN "
                 "or both JARVIS_TASK_QUEUE_USERNAME/JARVIS_TASK_QUEUE_PASSWORD."
             )
+        if not worker_token:
+            raise RuntimeError("Set JARVIS_TASK_QUEUE_WORKER_TOKEN for this agent identity.")
         return cls(
             api_base_url=api_base_url,
             api_token=api_token,
+            worker_token=worker_token,
             username=username,
             password=password,
             agent_id=agent_id,
@@ -81,6 +105,7 @@ class PriorityQueueMiniAgent:
         client = self._client or httpx.Client(timeout=15.0)
         headers = {
             "Authorization": f"Bearer {self.api_token}",
+            "X-Jarvis-Worker-Token": self.worker_token,
             "Content-Type": "application/json",
             "Accept": "application/json",
         }

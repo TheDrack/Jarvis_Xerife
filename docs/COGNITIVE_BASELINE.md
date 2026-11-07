@@ -265,3 +265,24 @@ Esta seção supersede as contagens anteriores de migrations e o diagnóstico de
 3. Comprovar insert/readback real de memória vetorial por service role, mantendo a tabela inacessível a roles de cliente.
 4. Obter autorização operacional para habilitar o worker recorrente e executar uma primeira coleta supervisionada; verificar lease, run record, persistência e liberação.
 5. Manter C0 aberto até que os baselines comportamentais estejam comprovados. C1 — World Model não começa antes disso.
+
+
+### 9.7 Identidade individual de workers — primeira fatia de C0
+
+A branch de implementação adiciona um caminho autenticado para workers HTTP:
+
+- `jarvis_agent_credentials` armazena somente SHA-256 do token opaco, `agent_id`, principal, grant de capabilities, expiração, último uso e revogação. A tabela tem RLS e ACL restrita a `service_role`.
+- `scripts/manage_agent_worker_credentials.py` provisiona/rotaciona ou revoga credenciais por agente. O token bruto é exibido uma vez; reemissão revoga a credencial anterior e o prazo máximo é 90 dias. Provisionamento redefine o agente para offline e substitui capabilities antigas; revogação também marca offline e limpa o grant.
+- Heartbeat, claim, finish e release exigem o JWT do chamador e `X-Jarvis-Worker-Token`. O agente declarado no corpo precisa corresponder ao principal autenticado.
+- O heartbeat ignora `available_tools` enviado pelo cliente e grava somente o grant armazenado no servidor. A allowlist inicial é exclusivamente `text_reasoning`.
+- `PriorityQueueMiniAgent` envia as duas identidades separadamente. O runtime prefere HTTP quando a credencial individual está configurada, exige um token diferente para cada slot concorrente e falha fechado quando a configuração está incompleta.
+
+**Limites ainda abertos:**
+
+- A migration `20261107183000_agent_worker_credentials.sql` existe apenas na branch; não foi aplicada ao Supabase e não há credenciais provisionadas em produção.
+- O worker Supabase que usa diretamente `SUPABASE_SERVICE_ROLE_KEY` continua como fallback legado e não passa pela identidade individual HTTP.
+- O grant provisionado é server-side, mas ainda não é attestation dinâmica de executor. Só `text_reasoning` pode ser concedido.
+- Ownership/creator de tarefas continua separado como próxima mudança; o principal do worker não substitui o dono da tarefa.
+- `ToolAuthorizationPolicy` host-backed ainda não está implementada/registrada em produção; o dispatcher deve continuar fail-closed.
+
+Os testes da branch cobrem hash-only, rotação, expiração, revogação, capabilities não permitidas, heartbeat sem spoofing, impersonation em heartbeat/claim e seleção/falha do runtime. O merge e a integração da migration ainda dependem de CI e do fluxo normal de publicação. C0 permanece aberto; C1 não começa.

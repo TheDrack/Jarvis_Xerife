@@ -10,7 +10,7 @@ from app.application.services.agent_task_queue_service import (
 )
 
 
-def build_client(monkeypatch, release_stub):
+def build_client(monkeypatch, release_stub, agent_id="mini-1"):
     """Router wired to a fake Postgres adapter; the RPC call itself is stubbed."""
     monkeypatch.delenv("JARVIS_TASK_QUEUE_DATABASE_URL", raising=False)
     monkeypatch.delenv("DATABASE_URL", raising=False)
@@ -19,7 +19,15 @@ def build_client(monkeypatch, release_stub):
     adapter = SimpleNamespace(engine=SimpleNamespace(dialect=SimpleNamespace(name="postgresql")))
     app = FastAPI()
     app.include_router(
-        create_agent_tasks_router(adapter, lambda: SimpleNamespace(id="test-user"))
+        create_agent_tasks_router(
+            adapter,
+            lambda: SimpleNamespace(id="test-user", user_id="test-user"),
+            get_current_worker=lambda: SimpleNamespace(
+                agent_id=agent_id,
+                principal_id=f"worker:{agent_id}",
+                available_tools=("text_reasoning",),
+            ),
+        )
     )
     return TestClient(app)
 
@@ -55,7 +63,7 @@ def test_stale_or_foreign_attempt_is_a_conflict_not_a_silent_success(monkeypatch
     def release_stub(self, *args, **kwargs):
         return False
 
-    client = build_client(monkeypatch, release_stub)
+    client = build_client(monkeypatch, release_stub, agent_id="mini-2")
     response = client.post(
         "/v1/agent-tasks/task-9/release",
         json={

@@ -17,10 +17,14 @@ falhas e diagnóstico. O desenho da fila está em
   `JARVIS_MINI_AGENT_ENABLED=true`. Cada thread tem identidade própria, anuncia apenas
   `text_reasoning`, reivindica uma tarefa por vez e devolve o resultado ligado ao
   `attempt_id`.
-- **Dois backends de fila**, escolhidos automaticamente:
-  1. **Supabase nativo** quando `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` existem —
-     chama as RPCs diretamente, sem senha extra de worker.
-  2. **HTTP autenticado** caso contrário — usa a API com token ou usuário/senha.
+- **Dois backends de fila**, escolhidos nesta ordem:
+  1. **HTTP com identidade individual** quando API URL, JWT de usuário (ou usuário/senha) e
+     `JARVIS_TASK_QUEUE_WORKER_TOKEN` estão configurados. O JWT autentica o chamador; o token
+     opaco identifica o worker e vincula `agent_id` e capabilities concedidas no servidor.
+  2. **Supabase nativo legado** quando não há token de worker e existe
+     `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`. Usa RPCs diretamente com uma credencial
+     administrativa compartilhada; o runtime emite warning. Esse caminho não comprova
+     identidade individual e ainda precisa ser migrado.
 
 ## Pré-requisitos
 
@@ -41,6 +45,7 @@ Aplique nesta ordem, no banco compartilhado. Nada é aplicado automaticamente pe
 | `202610230004_priority_routine_scheduler.sql` | `jarvis_routine_definitions`; `claim_next_jarvis_agent_task`, `recover_expired_jarvis_agent_tasks` |
 | `20261027120000_agent_model_provider.sql` | coluna `jarvis_agents.model_provider` (heartbeat/roteamento Red/Blue) |
 | `20261028090000_release_failed_task_attempt.sql` | `release_jarvis_agent_task` (devolve a tentativa falha sem esperar o lease) |
+| `20261107183000_agent_worker_credentials.sql` | `jarvis_agent_credentials`, com hash do token, capability grant, expiração, revogação, RLS e ACL service-role-only |
 
 ```bash
 supabase link --project-ref <ref>
@@ -69,7 +74,8 @@ Nomes e presença; nunca valores em log, commit ou chat.
 | Variável | Uso |
 |---|---|
 | `JARVIS_TASK_QUEUE_API_URL` | base da API, por exemplo `https://jarvis-api-c47i.onrender.com` |
-| `JARVIS_TASK_QUEUE_API_TOKEN` **ou** `JARVIS_TASK_QUEUE_USERNAME` + `JARVIS_TASK_QUEUE_PASSWORD` | autenticação; com usuário/senha o worker obtém o JWT em `/token` e renova após `401` |
+| `JARVIS_TASK_QUEUE_API_TOKEN` **ou** `JARVIS_TASK_QUEUE_USERNAME` + `JARVIS_TASK_QUEUE_PASSWORD` | JWT do principal que chama a API; com usuário/senha o worker obtém o JWT em `/token` e renova após `401` |
+| `JARVIS_TASK_QUEUE_WORKER_TOKEN` | credencial opaca individual do agente; obrigatória no backend HTTP |
 
 **Inferência**
 
@@ -86,6 +92,34 @@ Nomes e presença; nunca valores em log, commit ou chat.
 | `JARVIS_MINI_AGENT_WORKERS` | `1` | 1–8; valores inválidos são limitados e registrados |
 | `JARVIS_TASK_QUEUE_LEASE_SECONDS` | `90` | 10–3600 |
 
+## 2.1 Provisionar identidade individual do worker
+
+Depois que a migration `20261107183000_agent_worker_credentials.sql` estiver aplicada
+pelo fluxo normal de integração, em um ambiente administrativo confiável:
+
+```powershell
+python scripts\\manage_agent_worker_credentials.py issue --agent-id mini-freellmapi-1
+```
+
+O comando mostra o token uma única vez e informa o nome exato da variável individual,
+por exemplo `JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1`. Guarde-o no secret store
+do processo daquele agente; nunca o grave no repositório ou em logs. Reemitir um token
+para o mesmo `agent_id` revoga o anterior.
+
+Para um único slot, também é aceito o nome global `JARVIS_TASK_QUEUE_WORKER_TOKEN`.
+Para múltiplos slots, configure uma credencial distinta para cada `agent_id` gerado.
+O runtime não reutiliza um token global entre agentes e falha fechado se faltar qualquer
+credencial individual.
+
+Para revogar todas as credenciais ativas de um agente:
+
+```powershell
+python scripts\\manage_agent_worker_credentials.py revoke --agent-id mini-freellmapi-1
+```
+
+O grant inicial é somente `text_reasoning`. A CLI não aceita capabilities fora da allowlist.
+Provisionar credenciais não aplica migration nem altera variáveis de produção.
+
 ## 3. Subir API e workers
 
 ```bash
@@ -99,7 +133,7 @@ e **não derruba a API**. No desligamento, o mesmo sinal para todas as threads.
 Logs que confirmam o caminho escolhido:
 
 ```text
-Mini-agent runtime using configured Supabase queue backend
+Mini-agent runtime using legacy Supabase service-role queue access; per-agent worker identity is not enforced on this path
 Supervised mini-agent runtime started with 3 worker(s): mini-freellmapi-1, mini-freellmapi-2, mini-freellmapi-3
 ```
 
@@ -215,7 +249,8 @@ lease foi recuperado. Os slots são threads do mesmo processo — não há autos
   externas, e não pode afirmar que usou ferramentas sem evidência no payload.
 - Tarefas de auditoria, otimização ou produção exigem um runtime com as ferramentas
   correspondentes e credenciais de menor privilégio.
-- `SUPABASE_SERVICE_ROLE_KEY` e chaves de provedor ficam apenas no servidor; tokens JWT de
-  worker expiram e devem ser renovados pelo fluxo usuário/senha.
+- `SUPABASE_SERVICE_ROLE_KEY` e chaves de provedor ficam apenas no servidor. O worker HTTP
+  usa JWT de chamador e credencial opaca individual; o service-role direto é fallback legado,
+  não uma identidade individual.
 - A fila não instala cron: `schedule` em `/v1/routines` é metadado declarativo; a demanda só
   nasce quando o endpoint de trigger é chamado com um `run_key` estável.
