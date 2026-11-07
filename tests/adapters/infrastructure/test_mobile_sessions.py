@@ -253,7 +253,7 @@ def test_refresh_rotation_migration_qualifies_family_id_output_column():
         Path(__file__).resolve().parents[3]
         / "supabase"
         / "migrations"
-        / "20261029170000_fix_mobile_session_rotation_ambiguity.sql"
+        / "20261029163837_fix_mobile_session_rotation_ambiguity.sql"
     )
     sql = migration.read_text(encoding="utf-8")
 
