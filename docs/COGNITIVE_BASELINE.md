@@ -146,7 +146,7 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 | Mensagens em `jarvis_agent_messages` | 0 |
 | Definições em `jarvis_routine_definitions` | 0 |
 
-Os três registros disponíveis são `mini-freellmapi-1/2/3`, com heartbeat recente e zero tarefas ativas. Isso comprova presença registrada no control plane; não comprova dois Harness independentes concluindo um ciclo E2E.
+Os três registros disponíveis são `mini-freellmapi-1/2/3`, com heartbeat recente, provider `groq`, ferramenta `text_reasoning` e zero tarefas ativas. As duas tarefas `ready` exigem `repository_read`, `github_read` e `production_read`; nenhum agente ativo anuncia essas ferramentas. A RPC de claim corretamente não as atribui a agentes sem capacidade. Isso é uma lacuna de cobertura de capacidades, não evidência de falha do scheduler. A presença no control plane não comprova dois Harness independentes concluindo um ciclo E2E.
 
 O ledger remoto contém versões que não existem como nomes de arquivo locais. Há também duas entradas remotas chamadas `google_linked_identities`. A auditoria anterior encontrou SQL semanticamente equivalente nessas duas entradas, mas não há prova suficiente para reparar o ledger por renomeação. Seis migrations locais não possuem contraparte exata no ledger, incluindo `20261103184308_intelligence_recurring_worker.sql`. Não executar `migration repair`, `db push` ou aplicar essa migration antes de reconciliar cada SQL com o schema remoto.
 
