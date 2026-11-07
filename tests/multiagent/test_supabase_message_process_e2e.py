@@ -79,7 +79,6 @@ def test_leader_and_worker_exchange_messages_across_real_processes_and_postgrest
     from app.multiagent import (
         AgentLeader,
         AgentProfile,
-        AgentMessage,
         SupabaseQueueConnector,
         TaskSpec,
     )
