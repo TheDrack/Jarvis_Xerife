@@ -20,6 +20,8 @@ class AgentMessage:
     payload: Mapping[str, Any] = field(default_factory=dict)
     correlation_id: str | None = None
     protocol_version: str = "1.0"
+    # Delivery metadata belongs to the transport lease, not the wire envelope.
+    claim_token: str | None = field(default=None, compare=False, repr=False)
 
     @classmethod
     def create(
