@@ -187,7 +187,7 @@ def main() -> None:
 
     if args.mission_id and not re.fullmatch(r"C[0-8]-[A-Z0-9]+(?:-[A-Z0-9]+)*", args.mission_id):
         parser.error("--mission-id must be a valid Cognitive Roadmap criterion ID")
-    if args.mission_title and ("\\n" in args.mission_title or "\\r" in args.mission_title):
+    if args.mission_title and ("\n" in args.mission_title or "\\r" in args.mission_title):
         parser.error("--mission-title must be a single line")
 
     all_caps = _load_capabilities()
