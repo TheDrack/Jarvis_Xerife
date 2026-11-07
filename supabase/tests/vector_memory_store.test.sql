@@ -72,36 +72,36 @@ select ok(
 );
 
 select throws_ok(
-    $
+    $sql$
         insert into public.jarvis_vector_memories
             (id, user_id, scope_key, event_text, embedding, metadata, vector_dim)
         values
             ('00000000-0000-0000-0000-000000000001', 'alice', 'user:bob',
              'scope mismatch', '[0.1]'::jsonb, '{}'::jsonb, 1)
-    $,
+    $sql$,
     '23514',
     'database rejects a scope key belonging to another user'
 );
 select throws_ok(
-    $
+    $sql$
         insert into public.jarvis_vector_memories
             (id, user_id, scope_key, event_text, embedding, metadata, vector_dim)
         values
             ('00000000-0000-0000-0000-000000000002', null, 'system',
              'dimension mismatch', '[0.1, 0.2]'::jsonb, '{}'::jsonb, 1)
-    $,
+    $sql$,
     '23514',
     'database rejects an embedding whose length differs from vector_dim'
 );
 select throws_ok(
-    $
+    $sql$
         insert into public.jarvis_vector_memories
             (id, user_id, scope_key, event_text, embedding, metadata, vector_dim)
         values
             ('00000000-0000-0000-0000-000000000003', null, 'system',
              'metadata owner override', '[0.1]'::jsonb,
              '{"user_id":"alice"}'::jsonb, 1)
-    $,
+    $sql$,
     '23514',
     'database rejects user identity stored inside metadata'
 );
