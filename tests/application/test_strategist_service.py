@@ -389,7 +389,7 @@ def test_strategist_generate_rfc(strategist):
     assert rfc_path.suffix == ".md"
     
     # Verify content
-    content = rfc_path.read_text()
+    content = rfc_path.read_text(encoding="utf-8")
     approval = document_store.read(strategist.approved_dir / pending_path.name)
     assert "RFC Test" in content
     assert "Test RFC generation" in content
