@@ -117,3 +117,15 @@ class TestCommandInterpreter(NexusComponent):
 
         assert intent.command_type == CommandType.REPORT_ISSUE
         assert intent.parameters["issue_description"] == "sobre a lentidão no Groq"
+
+
+
+def test_execute_forwards_authenticated_user_id_to_interpretation():
+    from unittest.mock import Mock
+
+    interpreter = CommandInterpreter(wake_word="xerife")
+    interpreter.interpret = Mock()
+
+    interpreter.execute({"text": "remember this", "user_id": "alice"})
+
+    interpreter.interpret.assert_called_once_with("remember this", user_id="alice")
