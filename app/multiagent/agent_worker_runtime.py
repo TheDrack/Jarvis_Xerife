@@ -13,6 +13,8 @@ import threading
 import time
 from typing import Any, Callable
 
+from app.adapters.infrastructure.agent_worker_credentials import worker_token_env_name
+
 from .priority_queue_mini_agent import PriorityQueueMiniAgent
 
 logger = logging.getLogger(__name__)
@@ -144,12 +146,29 @@ def start_configured_worker() -> tuple[WorkerGroup, threading.Event] | None:
         os.getenv("SUPABASE_URL", "").strip()
         and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
     )
+    allow_global_worker_token = len(agent_ids) == 1
+    worker_tokens = {
+        agent_id: (
+            os.getenv(worker_token_env_name(agent_id), "").strip()
+            or (
+                os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
+                if allow_global_worker_token
+                else ""
+            )
+        )
+        for agent_id in agent_ids
+    }
     worker_token_configured = bool(
         os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
+        or any(
+            name.startswith("JARVIS_TASK_QUEUE_WORKER_TOKEN_")
+            and os.getenv(name, "").strip()
+            for name in os.environ
+        )
     )
     has_worker_api = bool(
         os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
-        and worker_token_configured
+        and all(worker_tokens.values())
         and (
             os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
             or (
@@ -160,14 +179,19 @@ def start_configured_worker() -> tuple[WorkerGroup, threading.Event] | None:
     )
     if worker_token_configured and not has_worker_api:
         raise RuntimeError(
-            "JARVIS_TASK_QUEUE_WORKER_TOKEN requires JARVIS_TASK_QUEUE_API_URL "
-            "and an API JWT or username/password caller identity."
+            "Per-agent HTTP workers require JARVIS_TASK_QUEUE_API_URL, a caller JWT "
+            "or username/password, and one dedicated worker token per agent slot. "
+            "The global JARVIS_TASK_QUEUE_WORKER_TOKEN is valid only for a single slot."
         )
 
     if has_worker_api:
         logger.info("Mini-agent runtime using per-agent authenticated HTTP queue backend")
         workers = [
-            PriorityQueueMiniAgent.from_env(agent_id=agent_id) for agent_id in agent_ids
+            PriorityQueueMiniAgent.from_env(
+                agent_id=agent_id,
+                worker_token=worker_tokens[agent_id],
+            )
+            for agent_id in agent_ids
         ]
     elif has_supabase_admin:
         logger.warning(
