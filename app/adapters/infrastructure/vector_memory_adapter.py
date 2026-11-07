@@ -93,13 +93,16 @@ class VectorMemoryAdapter(MemoryProvider):
             logger.info("ℹ️ [VectorMemory] Usando fallback puro-Python.")
 
     def _get_pii_redactor(self):
-        """Resolve PiiRedactor via Nexus (lazy loading)."""
+        """Resolve Nexus redaction policy or fall back to the built-in local redactor."""
         if self._pii_redactor is None:
             try:
                 from app.core.nexus import nexus
                 self._pii_redactor = nexus.resolve("pii_redactor")
             except Exception as exc:  # pragma: no cover
-                logger.warning("⚠️ [VectorMemory] PiiRedactor indisponível: %s", exc)
+                logger.warning("⚠️ [VectorMemory] Nexus PiiRedactor indisponível: %s", exc)
+            if self._pii_redactor is None:
+                from app.application.privacy.pii_redactor import PiiRedactor
+                self._pii_redactor = PiiRedactor()
         return self._pii_redactor
 
     # ------------------------------------------------------------------
@@ -134,14 +137,18 @@ class VectorMemoryAdapter(MemoryProvider):
             user_id:   Optional user identifier — stored in metadata so that
                        queries can be filtered per-user.
         """
-        # Sanitize PII before indexing (mandatory: no raw PII in the vector index)
+        # Sanitization is mandatory: never persist raw text when redaction is unavailable.
         pii_redactor = self._get_pii_redactor()
-        if pii_redactor is not None and hasattr(pii_redactor, "sanitize"):
-            safe_text = pii_redactor.sanitize(text)
-            if safe_text != text:
-                logger.debug("🛡️ [VectorMemory] PII redactada antes de indexar.")
-        else:
-            safe_text = text
+        sanitize = getattr(pii_redactor, "sanitize", None)
+        if not callable(sanitize):
+            raise RuntimeError(
+                "PII redactor is unavailable; refusing to store raw vector memory"
+            )
+        safe_text = sanitize(text)
+        if not isinstance(safe_text, str):
+            raise RuntimeError("PII redactor returned a non-text result")
+        if safe_text != text:
+            logger.debug("🛡️ [VectorMemory] PII redactada antes de indexar.")
 
         event_id = str(uuid.uuid4())
         ts = timestamp or datetime.now(tz=timezone.utc)
