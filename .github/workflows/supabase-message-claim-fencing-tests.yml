@@ -47,7 +47,7 @@ jobs:
           cd "${test_dir}"
           supabase init --force
           mkdir -p supabase/migrations supabase/tests
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610230003_multi_agent_message_queue.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261024142637_202610230003_multi_agent_message_queue.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261107010000_multi_agent_message_claim_fencing.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/tests/message_claim_fencing.test.sql" supabase/tests/
 
