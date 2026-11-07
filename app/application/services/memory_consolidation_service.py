@@ -60,6 +60,26 @@ class MemoryConsolidationService(NexusComponent):
             logger.warning("[ConsolidationService] VectorAdapter não resolvido.")
             return False
         
+        # A working in-memory fallback is not enough for consolidation:
+        # only evict short-term memory when the destination is durable.
+        if hasattr(vector_adapter, "is_durable"):
+            try:
+                durable = vector_adapter.is_durable
+                if callable(durable):
+                    durable = durable()
+                if not durable:
+                    logger.warning(
+                        "[ConsolidationService] VectorMemory sem persistência durável; "
+                        "mantendo dados na WorkingMemory."
+                    )
+                    return False
+            except Exception as exc:
+                logger.warning(
+                    "[ConsolidationService] Não foi possível confirmar durabilidade: %s",
+                    exc,
+                )
+                return False
+
         # Método 1: Check explícito is_healthy()
         if hasattr(vector_adapter, "is_healthy"):
             try:
