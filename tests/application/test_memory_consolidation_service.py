@@ -11,6 +11,7 @@ from app.domain.memory.working_memory import WorkingMemory
 def test_consolidation_accepts_vector_adapter_without_faiss(monkeypatch):
     monkeypatch.setattr(vector_memory_module, "_FAISS_AVAILABLE", False)
     vector_adapter = VectorMemoryAdapter(dim=32)
+    assert vector_adapter.is_healthy() is True
     working_memory = WorkingMemory()
     working_memory.push(
         {
