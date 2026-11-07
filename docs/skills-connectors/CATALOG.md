@@ -36,7 +36,7 @@
 - Public-source adapter: `app/adapters/infrastructure/intelligence/public_intelligence_adapter.py`, normalized contracts: `app/domain/intelligence/contracts.py`.
 - Initial read-only sources registered in Nexus/Tool Registry: GDELT DOC article search, NASA EONET open events, and USGS all-day earthquake feed. The personal/entity Eagle OSINT adapter remains separate.
 - These manifests are descriptive and the current production ToolAuthorizationPolicy is still not wired; do not claim live dispatcher execution. The on-demand collector now combines public events, OSIRIS events and OSIRIS entity observations, plus optional GEV observations, with source-level partial failure reporting.
-- Append-only history adapters and a recurring worker exist, but persistence remains feature-flagged and must not be treated as production-verified: the repository's migration ledger mismatch and unavailable grant/insert-readback evidence remain unresolved. The worker must stay disabled until that database verification is complete. Briefing synthesis and geospatial presentation are separate pending increments.
+- Append-only history and recurring-worker schema/RPCs are deployed after PR #767; local migrations and the remote ledger match 26/26 versions. The recurring process is still inactive: the lease has no owner and the run table has zero rows. Keep the worker disabled until a supervised process/scheduler is wired and a controlled run plus insert/readback is verified. Briefing synthesis and geospatial presentation remain separate increments.
 
 ## Optional God's Eye View MCP observation adapter
 
@@ -81,7 +81,7 @@ A skill is portable operating guidance, not a connector or a grant of permission
 | Runtime service operations | Render connector; service/deploy/log/metrics APIs | Identify exact workspace/service. Check deploy SHA and health after deployment. Never assume merge means production deploy completed; respect configured cooldown. |
 | Shared database and state | Supabase connector; migrations; queue and journal adapters | Confirm project and migration state before writes. Use least privilege and RLS. Never put service-role keys in prompts, client code, logs, or docs. |
 | Declarative execution plans | app/multiagent/execution_plan.py, TaskRunner, orchestrator integration, Supabase plan journal | Only explicit structured result.plan is executable; natural-language text is not auto-converted. Host allowlist/policy and durable journal are required; sensitive capabilities remain blocked pending trusted approval/resume. |
-| Multi-agent coordination | app/multiagent/, task/message contracts, scheduler, Supabase queue connector, worker primitive | Leader assigns task-scoped roles to eligible agents; roles are not permanent. Delivery is at-least-once, so consumers must deduplicate and external effects should be idempotent. Worker primitive is not proof of a fully supervised production mesh. |
+| Multi-agent coordination | app/multiagent/, task/message contracts, scheduler, Supabase queue connector, worker primitive | PR #761 and #766 prove message/task queue contracts in isolated Supabase with independent processes; fencing, lease renewal, release and supporting indexes are deployed. The three production FreeLLMAPI agents are text-only (`text_reasoning`) and correctly leave tasks requiring repository/GitHub/production tools unclaimed. The task worker does not have a production ToolAuthorizationPolicy or those tool adapters; this is a capability boundary, not a reason to overstate `available_tools`. |
 | Capability discovery | Nexus DI/discovery, AdapterRegistry, data/capabilities.json, capability detector and gap-reporting services | Resolve the current component through Nexus or inspect live registry. Inventory metadata can be stale and capability files may be stubs; verify implementation and tests before claiming a behavior is complete. |
 | Self-healing and recovery | scripts/jarvis_healer.py, CI workflows, recovery history subsystem | Preserve failure evidence; verify tests and health after repair. Rollback must be verified and must not overwrite concurrent changes. |
 | Auto-evolution / code generation | JarvisDevAgent adapter, EvolutionOrchestrator, EvolutionGatekeeper, Docker-backed EvolutionSandbox, candidate artifact handoff, trusted publisher workflow | JarvisDevAgent selects only capabilities with trusted `target_file` metadata and delegates to EvolutionOrchestrator; it has no separate LLM/Gatekeeper/PR path. Its dry-run mode validates without publishing; timeout requests cooperative cancellation between pipeline stages but cannot forcibly terminate an in-flight synchronous provider call. Candidate code is tested in a no-network, no-host-mount, non-root Docker workspace with resource limits. Scheduled evolution separates candidate validation (provider key only) from trusted publication (GitHub token only); the publisher verifies artifact digest, source commit, target path, and protected prefixes, and never executes candidate code. Missions without trusted `target_file` metadata are blocked before LLM invocation; target mapping remains an explicit prerequisite. See [Evolution Candidate Security](../architecture/evolution-candidate-security.md). |
@@ -131,6 +131,15 @@ The table describes integration families in the repository/installation; it does
 - [Declarative execution plans](../architecture/declarative-execution-plans.md)
 - [Project status and roadmap](../STATUS.md)
 - [Delivery audit: promises vs. implementation](../VERIFICACAO_ENTREGAS.md)
+
+## Current runtime capability boundary — 2026-11-07
+
+- Supabase migration ledger: 26/26 local/remote versions, zero pending; project `ACTIVE_HEALTHY`, branch `FUNCTIONS_DEPLOYED`.
+- Three `mini-freellmapi` workers heartbeat with provider `groq` and advertise only `text_reasoning`.
+- Two existing ready tasks require `repository_read`, `github_read`, and `production_read`; no online agent advertises those capabilities, so no claim occurs.
+- `ToolRegistry` is metadata-only. `ToolDispatcher` fails closed without a host-backed `ToolAuthorizationPolicy`. No production principal/session resolver or approval verifier is registered.
+- Therefore GitHub, Supabase, Render, browser, shell, and repository operations are not capabilities of the FreeLLMAPI mini-agents merely because those connectors exist in the ChatGPT host or catalog.
+- Do not add capability strings to worker heartbeats until the corresponding executor and policy are wired and tested. The next integration must pass the task/attempt identity, authenticated principal, exact tool/version/capability/scope, and approval evidence into the dispatcher.
 
 ## Security and correctness
 
