@@ -8,6 +8,7 @@ from app.core.nexus import NexusComponent
 from app.domain.models import CommandType, Intent
 from app.core.config import settings
 import logging
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +68,12 @@ class CommandInterpreter(NexusComponent):
             return self.interpret("")
             
         text = context.get("text", "")
-        return self.interpret(text)
+        user_id = context.get("user_id")
+        return self.interpret(text, user_id=user_id)
 
-    def interpret(self, raw_input: str) -> Intent:
+    def interpret(
+        self, raw_input: str, user_id: Optional[str] = None
+    ) -> Intent:
         """
         Converte entrada bruta em um objeto Intent estruturado.
         """

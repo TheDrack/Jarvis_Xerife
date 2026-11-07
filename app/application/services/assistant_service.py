@@ -170,18 +170,26 @@ class AssistantService(NexusComponent):
         except Exception as exc:
             logger.debug(f"📨 [HealthCheck] Falha ao enviar notificação: {exc}")
 
-    def _get_hive_context(self, limit: int = 5) -> List[Dict[str, Any]]:
-        """Recupera o histórico recente de TODOS os canais (hive mind)."""
+    def _get_hive_context(
+        self, limit: int = 5, user_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve cross-channel context only from the selected user partition."""
         try:
             adapter = self._get_history_adapter()
             if adapter and hasattr(adapter, "get_recent_hive_history"):
-                return adapter.get_recent_hive_history(limit=limit)
+                return adapter.get_recent_hive_history(limit=limit, user_id=user_id)
         except Exception as e:
             logger.debug(f"Hive context unavailable: {e}")
         return []
 
-    def _save_to_hive(self, user_input: str, response: Response, channel: str = "api") -> None:
-        """Persiste a interação no banco compartilhado (hive mind)."""
+    def _save_to_hive(
+        self,
+        user_input: str,
+        response: Response,
+        channel: str = "api",
+        user_id: Optional[str] = None,
+    ) -> None:
+        """Persist the interaction only in the selected user's hive partition."""
         try:
             adapter = self._get_history_adapter()
             if adapter and hasattr(adapter, "save_interaction"):
@@ -200,6 +208,7 @@ class AssistantService(NexusComponent):
                     success=response.success,
                     response_text=response.message,
                     channel=channel,
+                    user_id=user_id,
                 )
         except Exception as e:
             logger.debug(f"Failed to save to hive memory: {e}")
@@ -210,7 +219,14 @@ class AssistantService(NexusComponent):
             return {"success": False, "error": "Nenhum comando fornecido."}
 
         channel = context.get("channel", "api")
-        return self.process_command(context["command"], channel=channel)
+        request_metadata = {}
+        if context.get("user_id") is not None:
+            request_metadata["user_id"] = context["user_id"]
+        return self.process_command(
+            context["command"],
+            channel=channel,
+            request_metadata=request_metadata or None,
+        )
 
     def process_command(
         self,
@@ -222,24 +238,37 @@ class AssistantService(NexusComponent):
         Processa um texto, interpreta a intenção e executa a ação.
         Blindado contra erros de NoneType através de resolução dinâmica.
         """
+        user_id: Optional[str] = None
         try:
+            request_metadata = request_metadata or {}
+            if not isinstance(request_metadata, dict):
+                raise ValueError("request_metadata must be a dictionary")
+            user_id = request_metadata.get("user_id")
+            if user_id is not None and (
+                not isinstance(user_id, str) or not user_id.strip()
+            ):
+                raise ValueError("user_id must be a non-empty string when provided")
+            if user_id is not None:
+                user_id = user_id.strip()
+
             # Direct providers path (for test/injection use)
             if self._action is not None or self._web is not None or self._voice is not None:
                 interpreter = self._get_interpreter()
                 if not interpreter:
                     return Response(success=False, message="Interpreter unavailable", error="INIT_FAILURE")
                 if hasattr(interpreter, "interpret"):
-                    intent = interpreter.interpret(text)
+                    intent = interpreter.interpret(text, user_id=user_id)
                 else:
-                    intent = interpreter.execute({"text": text})
-                response = self._dispatch_with_providers(intent)
+                    intent = interpreter.execute({"text": text, "user_id": user_id})
+                response = self._dispatch_with_providers(intent, user_id=user_id)
                 self._command_history.insert(0, {
                     "command": text,
                     "success": response.success,
                     "timestamp": _dt.now().isoformat(),
                     "message": response.message or "",
+                    "user_id": user_id,
                 })
-                self._save_to_hive(text, response, channel=channel)
+                self._save_to_hive(text, response, channel=channel, user_id=user_id)
                 return response
 
             logger.info(f"🎙️ [{channel.upper()}] Processando: {text}")
@@ -278,7 +307,9 @@ class AssistantService(NexusComponent):
             try:
                 vec_mem = self._get_vector_memory()
                 if vec_mem is not None:
-                    similar = vec_mem.query_similar(text, top_k=3, days_back=30)
+                    similar = vec_mem.query_similar(
+                        text, top_k=3, days_back=30, user_id=user_id
+                    )
                     if similar:
                         vector_context_lines = [
                             f"- [{ev.get('timestamp', '')}] {ev.get('text', '')} (score={ev.get('score', 0):.2f})"
@@ -295,7 +326,7 @@ class AssistantService(NexusComponent):
             memory_context_lines: List[str] = []
             try:
                 memory_manager = self._get_memory_manager()
-                relevant = memory_manager.get_relevant_context(text)
+                relevant = memory_manager.get_relevant_context(text, user_id=user_id)
                 if relevant:
                     memory_context_lines = [
                         f"- [{item.get('timestamp', '')}] Usuário: {item.get('user', '')} | "
@@ -307,7 +338,7 @@ class AssistantService(NexusComponent):
                 logger.debug(f"Memory context unavailable: {e}")
 
             # 3. Interpreta o comando, injetando memória de contexto quando disponível
-            interpret_ctx: Dict[str, Any] = {"text": text}
+            interpret_ctx: Dict[str, Any] = {"text": text, "user_id": user_id}
             all_context_lines = vector_context_lines + memory_context_lines
             if all_context_lines:
                 interpret_ctx["system_prompt_extra"] = (
@@ -343,10 +374,12 @@ class AssistantService(NexusComponent):
                     vec_mem.store_event(
                         text,
                         metadata={"role": "user", "channel": channel},
+                        user_id=user_id,
                     )
                     vec_mem.store_event(
                         response.message,
                         metadata={"role": "assistant", "channel": channel},
+                        user_id=user_id,
                     )
                     logger.debug("🧠 [VECTOR_MEMORY] Comando e resposta vetorizados e armazenados.")
             except Exception as e:
@@ -354,29 +387,37 @@ class AssistantService(NexusComponent):
 
             # 6b. Persiste na memória semântica de longo prazo
             try:
-                self._get_memory_manager().store_interaction(text, response.message)
+                self._get_memory_manager().store_interaction(
+                    text, response.message, user_id=user_id
+                )
             except Exception as e:
                 logger.debug(f"Failed to store in semantic memory: {e}")
 
             # 7. Persiste na memória compartilhada
-            self._save_to_hive(text, response, channel=channel)
+            self._save_to_hive(
+                text, response, channel=channel, user_id=user_id
+            )
             self._command_history.insert(0, {
                 "command": text,
                 "success": response.success,
                 "timestamp": _dt.now().isoformat(),
                 "message": response.message or "",
+                "user_id": user_id,
             })
             return response
 
         except Exception as e:
             logger.error(f"💥 Erro ao processar comando: {e}")
             response = Response(success=False, message=f"Erro interno: {str(e)}", error=str(e))
-            self._save_to_hive(text, response, channel=channel)
+            self._save_to_hive(
+                text, response, channel=channel, user_id=user_id
+            )
             self._command_history.insert(0, {
                 "command": text,
                 "success": False,
                 "timestamp": _dt.now().isoformat(),
                 "message": response.message or "",
+                "user_id": user_id,
             })
             return response
 
@@ -400,11 +441,35 @@ class AssistantService(NexusComponent):
         """Stop the assistant service."""
         self.is_running = False
 
-    def get_command_history(self, limit: int = 5) -> List[Dict[str, Any]]:
-        """Return the most recent command history entries."""
-        return self._command_history[:limit]
+    def get_command_history(
+        self,
+        limit: int = 5,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return only the requesting user's history; None is local/system scope."""
+        if user_id is not None and (
+            not isinstance(user_id, str) or not user_id.strip()
+        ):
+            raise ValueError("user_id must be a non-empty string when provided")
 
-    def _dispatch_with_providers(self, intent) -> Response:
+        if user_id is None:
+            scoped_history = [
+                item for item in self._command_history
+                if item.get("user_id") is None
+            ]
+        else:
+            normalized_user_id = user_id.strip()
+            scoped_history = [
+                item for item in self._command_history
+                if item.get("user_id") == normalized_user_id
+            ]
+        return scoped_history[:max(0, limit)]
+
+    def _dispatch_with_providers(
+        self,
+        intent,
+        user_id: Optional[str] = None,
+    ) -> Response:
         """Direct dispatch to injected providers based on intent command type."""
         from app.domain.models import CommandType
         cmd_type = intent.command_type
@@ -453,7 +518,9 @@ class AssistantService(NexusComponent):
                 interpreter = self._interpreter
                 if hasattr(interpreter, "generate_conversational_response"):
                     try:
-                        response_text = interpreter.generate_conversational_response(intent.raw_input)
+                        response_text = interpreter.generate_conversational_response(
+                            intent.raw_input, user_id=user_id
+                        )
                         return Response(success=True, message=response_text, data={"command_type": "chat"})
                     except Exception:
                         pass

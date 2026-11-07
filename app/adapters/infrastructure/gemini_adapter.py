@@ -87,7 +87,7 @@ class LLMCommandAdapter(GitHubIssueMixin):
 
         logger.info(f"Initialized LLMCommandAdapter with model {self.model_name}")
 
-    def interpret(self, raw_input: str) -> Intent:
+    def interpret(self, raw_input: str, user_id: Optional[str] = None) -> Intent:
         """
         Interpret a raw text command into a structured Intent using asyncio.
         This is a synchronous wrapper around the async interpretation.
@@ -103,12 +103,16 @@ class LLMCommandAdapter(GitHubIssueMixin):
             # If there's a running event loop, avoid nested loop issues
             asyncio.get_running_loop()
             logger.warning("Event loop already running, using sync fallback")
-            return self._interpret_sync(raw_input)
+            return self._interpret_sync(raw_input, user_id=user_id)
         except RuntimeError:
             # No running event loop in this thread; safe to create one
-            return asyncio.run(self.interpret_async(raw_input))
+            return asyncio.run(self.interpret_async(raw_input, user_id=user_id))
 
-    async def interpret_async(self, raw_input: str) -> Intent:
+    async def interpret_async(
+        self,
+        raw_input: str,
+        user_id: Optional[str] = None,
+    ) -> Intent:
         """
         Async interpretation of raw text command into a structured Intent.
 
@@ -135,7 +139,7 @@ class LLMCommandAdapter(GitHubIssueMixin):
 
         try:
             # Add context from recent history if available
-            context_message = self._build_context_message()
+            context_message = self._build_context_message(user_id=user_id)
             full_message = (
                 f"{context_message}\n\n{command}" if context_message else command
             )
@@ -223,7 +227,11 @@ class LLMCommandAdapter(GitHubIssueMixin):
                 confidence=0.0,
             )
 
-    def _interpret_sync(self, raw_input: str) -> Intent:
+    def _interpret_sync(
+        self,
+        raw_input: str,
+        user_id: Optional[str] = None,
+    ) -> Intent:
         """
         Synchronous fallback for interpretation when async is not available.
 
@@ -250,7 +258,7 @@ class LLMCommandAdapter(GitHubIssueMixin):
 
         try:
             # Add context from recent history if available
-            context_message = self._build_context_message()
+            context_message = self._build_context_message(user_id=user_id)
             full_message = (
                 f"{context_message}\n\n{command}" if context_message else command
             )
@@ -384,11 +392,13 @@ class LLMCommandAdapter(GitHubIssueMixin):
         command = raw_input.lower().strip()
         return any(keyword in command for keyword in cancel_keywords)
 
-    def _build_context_message(self) -> str:
-        """Delegate to module-level helper in gemini_response_helpers."""
-        return build_context_message(self.history_provider)
+    def _build_context_message(self, user_id: Optional[str] = None) -> str:
+        """Build conversation context using only the active user's history."""
+        return build_context_message(self.history_provider, user_id=user_id)
 
-    def generate_conversational_response(self, user_input: str) -> str:
+    def generate_conversational_response(
+        self, user_input: str, user_id: Optional[str] = None
+    ) -> str:
         """
         Generate a conversational response for unknown commands or greetings.
 

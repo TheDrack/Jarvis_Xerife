@@ -135,7 +135,11 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         logger.debug("[NEXUS] %s.execute() aguardando implementação.", self.__class__.__name__)
         return {"success": False, "not_implemented": True}
 
-    def _interpret_sync(self, raw_input: str) -> Intent:
+    def _interpret_sync(
+        self,
+        raw_input: str,
+        user_id: Optional[str] = None,
+    ) -> Intent:
         """Synchronous interpretation calling the Gemini client directly.
 
         Avoids calling ``self.interpret()`` to prevent infinite recursion when
@@ -154,7 +158,7 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         if self.gemini_adapter is not None:
             sync_fn = getattr(self.gemini_adapter, "_interpret_sync", None)
             if sync_fn is not None:
-                return sync_fn(raw_input)
+                return sync_fn(raw_input, user_id=user_id)
 
         # Fallback: return unknown intent when no synchronous path is available.
         command = raw_input.lower().strip()
@@ -168,7 +172,7 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
             confidence=0.0,
         )
 
-    def interpret(self, raw_input: str) -> Intent:
+    def interpret(self, raw_input: str, user_id: Optional[str] = None) -> Intent:
         """
         Interpret a raw text command into a structured Intent.
         
@@ -182,11 +186,11 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
             Intent object with command type and parameters
         """
         if self.llm_interpreter:
-            return self.llm_interpreter.interpret(raw_input)
+            return self.llm_interpreter.interpret(raw_input, user_id=user_id)
         
         # Fallback to Gemini adapter for interpretation if available
         if self.gemini_adapter:
-            return self.gemini_adapter.interpret(raw_input)
+            return self.gemini_adapter.interpret(raw_input, user_id=user_id)
         
         # Fallback: return unknown intent
         logger.warning("No adapter available for interpretation")
@@ -197,7 +201,9 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
             confidence=0.0,
         )
 
-    async def interpret_async(self, raw_input: str) -> Intent:
+    async def interpret_async(
+        self, raw_input: str, user_id: Optional[str] = None
+    ) -> Intent:
         """
         Async interpretation of a raw text command into a structured Intent.
         
@@ -208,13 +214,15 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
             Intent object with command type and parameters
         """
         if self.llm_interpreter:
-            return await self.llm_interpreter.interpret_async(raw_input)
+            return await self.llm_interpreter.interpret_async(raw_input, user_id=user_id)
         
         if self.gemini_adapter:
             interpret_async = getattr(self.gemini_adapter, "interpret_async", None)
             if interpret_async and asyncio.iscoroutinefunction(interpret_async):
-                return await interpret_async(raw_input)
-            return await asyncio.to_thread(self.gemini_adapter.interpret, raw_input)
+                return await interpret_async(raw_input, user_id=user_id)
+            return await asyncio.to_thread(
+                self.gemini_adapter.interpret, raw_input, user_id=user_id
+            )
         
         logger.warning("No adapter available for async interpretation")
         return Intent(
@@ -252,7 +260,9 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         command = raw_input.lower().strip()
         return any(keyword in command for keyword in cancel_keywords)
     
-    async def generate_conversational_response(self, user_input: str) -> str:
+    async def generate_conversational_response(
+        self, user_input: str, user_id: Optional[str] = None
+    ) -> str:
         """
         Generate a conversational response using AI Gateway.
         
@@ -280,7 +290,7 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
                 return "Olá! Como posso ajudar?"
             
             # Build context from history if available
-            context_message = self._build_context_message()
+            context_message = self._build_context_message(user_id=user_id)
             
             # Prepare messages for AI Gateway
             messages = []
@@ -379,7 +389,7 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         
         return None
     
-    def _build_context_message(self) -> str:
+    def _build_context_message(self, user_id: Optional[str] = None) -> str:
         """
         Build context message from the last 3 commands in history.
         
@@ -391,7 +401,9 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         
         try:
             # Get last 3 commands from history
-            recent_history = self.history_provider.get_recent_history(limit=3)
+            recent_history = self.history_provider.get_recent_history(
+                limit=3, user_id=user_id
+            )
             if not recent_history:
                 return ""
             

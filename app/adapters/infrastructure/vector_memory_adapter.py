@@ -95,22 +95,25 @@ class VectorMemoryAdapter(MemoryProvider):
     def is_healthy(self) -> bool:
         """Report storage health independently from the optional FAISS backend.
 
-        The in-memory event list is the canonical store in both modes. FAISS
-        only accelerates nearest-neighbour lookup; its absence must not make a
-        working pure-Python adapter look unavailable to memory consolidation.
+        The in-memory event list is canonical in both modes. FAISS only
+        accelerates nearest-neighbour lookup; its absence must not make a
+        working pure-Python adapter unavailable to memory consolidation.
         """
         if self._dim <= 0 or not isinstance(self._events, list):
             return False
         return not _FAISS_AVAILABLE or self._index is not None
 
     def _get_pii_redactor(self):
-        """Resolve PiiRedactor via Nexus (lazy loading)."""
+        """Resolve Nexus redaction policy or fall back to the built-in local redactor."""
         if self._pii_redactor is None:
             try:
                 from app.core.nexus import nexus
                 self._pii_redactor = nexus.resolve("pii_redactor")
             except Exception as exc:  # pragma: no cover
-                logger.warning("⚠️ [VectorMemory] PiiRedactor indisponível: %s", exc)
+                logger.warning("⚠️ [VectorMemory] Nexus PiiRedactor indisponível: %s", exc)
+            if self._pii_redactor is None:
+                from app.application.privacy.pii_redactor import PiiRedactor
+                self._pii_redactor = PiiRedactor()
         return self._pii_redactor
 
     # ------------------------------------------------------------------
@@ -145,22 +148,42 @@ class VectorMemoryAdapter(MemoryProvider):
             user_id:   Optional user identifier — stored in metadata so that
                        queries can be filtered per-user.
         """
-        # Sanitize PII before indexing (mandatory: no raw PII in the vector index)
+        # Sanitization is mandatory: never persist raw text when redaction is unavailable.
         pii_redactor = self._get_pii_redactor()
-        if pii_redactor is not None and hasattr(pii_redactor, "sanitize"):
-            safe_text = pii_redactor.sanitize(text)
-            if safe_text != text:
-                logger.debug("🛡️ [VectorMemory] PII redactada antes de indexar.")
-        else:
-            safe_text = text
+        sanitize = getattr(pii_redactor, "sanitize", None)
+        if not callable(sanitize):
+            raise RuntimeError(
+                "PII redactor is unavailable; refusing to store raw vector memory"
+            )
+        safe_text = sanitize(text)
+        if not isinstance(safe_text, str):
+            raise RuntimeError("PII redactor returned a non-text result")
+        if safe_text != text:
+            logger.debug("🛡️ [VectorMemory] PII redactada antes de indexar.")
 
         event_id = str(uuid.uuid4())
         ts = timestamp or datetime.now(tz=timezone.utc)
         vector = _vectorize(safe_text, self._dim)
 
-        combined_metadata = metadata or {}
-        if user_id:
-            combined_metadata = {**combined_metadata, "user_id": user_id}
+        combined_metadata = dict(metadata or {})
+        metadata_user_id = combined_metadata.pop("user_id", None)
+        if user_id is None:
+            if metadata_user_id is not None:
+                raise ValueError(
+                    "user_id must be supplied as a trusted argument, not metadata"
+                )
+        else:
+            if not isinstance(user_id, str) or not user_id.strip():
+                raise ValueError("user_id must be a non-empty string when provided")
+            normalized_user_id = user_id.strip()
+            if (
+                metadata_user_id is not None
+                and metadata_user_id != normalized_user_id
+            ):
+                raise ValueError(
+                    "metadata user_id conflicts with authenticated user_id"
+                )
+            combined_metadata["user_id"] = normalized_user_id
 
         self._events.append(
             {
@@ -203,18 +226,32 @@ class VectorMemoryAdapter(MemoryProvider):
         if cutoff_ts:
             candidates = [e for e in self._events if e["timestamp"] >= cutoff_ts]
 
-        # Filter by user_id when provided (biographical memory is per-user)
-        if user_id:
+        # Unscoped callers may read only local/system records, never user data.
+        if user_id is None:
             candidates = [
                 e for e in candidates
-                if e.get("metadata", {}).get("user_id") == user_id
+                if e.get("metadata", {}).get("user_id") is None
+            ]
+        else:
+            if not isinstance(user_id, str) or not user_id.strip():
+                raise ValueError("user_id must be a non-empty string when provided")
+            normalized_user_id = user_id.strip()
+            candidates = [
+                e for e in candidates
+                if e.get("metadata", {}).get("user_id") == normalized_user_id
             ]
 
         if not candidates:
             return []
 
-        if _FAISS_AVAILABLE and self._index is not None and days_back is None and not user_id:
-            # Fast path: use FAISS index (no date/user filter, searches the full index)
+        if (
+            _FAISS_AVAILABLE
+            and self._index is not None
+            and days_back is None
+            and user_id is None
+            and len(candidates) == len(self._events)
+        ):
+            # FAISS can only search the full index when every event is unscoped.
             q_np = np.array([query_vector], dtype=np.float32)
             k = min(top_k, len(self._events))
             distances, indices = self._index.search(q_np, k)

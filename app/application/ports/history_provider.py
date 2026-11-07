@@ -26,6 +26,7 @@ class HistoryProvider(NexusComponent, ABC):
         success: bool,
         response_text: str,
         timestamp: Optional[datetime] = None,
+        user_id: Optional[str] = None,
     ) -> None:
         """
         Save a command interaction to the history
@@ -41,7 +42,11 @@ class HistoryProvider(NexusComponent, ABC):
         pass
 
     @abstractmethod
-    def get_recent_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent_history(
+        self,
+        limit: int = 10,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Get recent command history
 
@@ -54,7 +59,11 @@ class HistoryProvider(NexusComponent, ABC):
         pass
 
     @abstractmethod
-    def get_most_frequent_commands(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_most_frequent_commands(
+        self,
+        limit: int = 10,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Get the most frequently used commands using SQL aggregation
 
@@ -67,6 +76,6 @@ class HistoryProvider(NexusComponent, ABC):
         pass
 
     @abstractmethod
-    def clear_history(self) -> None:
+    def clear_history(self, user_id: Optional[str] = None) -> None:
         """Clear all command history"""
         pass

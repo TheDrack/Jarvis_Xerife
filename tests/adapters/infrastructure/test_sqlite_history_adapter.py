@@ -12,6 +12,12 @@ from app.adapters.infrastructure.sqlite_history_adapter import (
 )
 
 
+@pytest.fixture
+def isolated_adapter():
+    """Module-level fixture for the user-scope integration tests below the test class."""
+    return SQLiteHistoryAdapter(database_url="sqlite:///:memory:")
+
+
 class TestSQLiteHistoryAdapter(NexusComponent):
 
     def execute(self, context: dict):
@@ -505,3 +511,119 @@ class TestHiveMindMemory:
         )
         history = adapter.get_recent_history(limit=1)
         assert history[0]["channel"] == "telegram"
+
+
+
+def test_recent_history_is_partitioned_by_user(isolated_adapter):
+    isolated_adapter.save_interaction(
+        user_input="alice private query",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="alice private answer",
+        user_id="alice",
+    )
+    isolated_adapter.save_interaction(
+        user_input="bob private query",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="bob private answer",
+        user_id="bob",
+    )
+    isolated_adapter.save_interaction(
+        user_input="local command",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="local answer",
+    )
+
+    alice = isolated_adapter.get_recent_history(limit=10, user_id="alice")
+    bob = isolated_adapter.get_recent_history(limit=10, user_id="bob")
+    local = isolated_adapter.get_recent_history(limit=10)
+
+    assert [item["user_input"] for item in alice] == ["alice private query"]
+    assert [item["user_input"] for item in bob] == ["bob private query"]
+    assert [item["user_input"] for item in local] == ["local command"]
+
+
+def test_hive_history_is_partitioned_by_user(isolated_adapter):
+    isolated_adapter.save_interaction(
+        user_input="alice hive query",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="alice hive answer",
+        channel="api",
+        user_id="alice",
+    )
+    isolated_adapter.save_interaction(
+        user_input="bob hive query",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="bob hive answer",
+        channel="telegram",
+        user_id="bob",
+    )
+
+    alice = isolated_adapter.get_recent_hive_history(limit=10, user_id="alice")
+    bob = isolated_adapter.get_recent_hive_history(limit=10, user_id="bob")
+
+    assert [item["user_input"] for item in alice] == ["alice hive query"]
+    assert [item["user_input"] for item in bob] == ["bob hive query"]
+
+
+def test_history_schema_migration_adds_user_id_column(tmp_path):
+    from sqlalchemy import create_engine, inspect, text
+
+    database = tmp_path / "history-without-user-id.db"
+    url = f"sqlite:///{database}"
+    engine = create_engine(url, echo=False)
+    with engine.begin() as connection:
+        connection.execute(text(
+            """CREATE TABLE interactions (
+                id INTEGER PRIMARY KEY,
+                timestamp DATETIME NOT NULL,
+                user_input VARCHAR NOT NULL,
+                command_type VARCHAR NOT NULL,
+                parameters VARCHAR NOT NULL DEFAULT '{}',
+                success BOOLEAN NOT NULL DEFAULT 0,
+                response_text VARCHAR NOT NULL DEFAULT '',
+                status VARCHAR NOT NULL DEFAULT 'pending',
+                processed_at DATETIME,
+                channel VARCHAR NOT NULL DEFAULT 'api'
+            )"""
+        ))
+    engine.dispose()
+
+    adapter = SQLiteHistoryAdapter(database_url=url)
+    columns = {column["name"] for column in inspect(adapter.engine).get_columns("interactions")}
+    assert "user_id" in columns
+    adapter.save_interaction(
+        user_input="owned",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="scoped",
+        user_id="alice",
+    )
+    assert [row["user_input"] for row in adapter.get_recent_history(user_id="alice")] == ["owned"]
+
+
+
+def test_pending_command_keeps_owner_for_worker_execution(isolated_adapter):
+    command_id = isolated_adapter.save_pending_command(
+        user_input="alice private queued task",
+        command_type="chat",
+        parameters={"intent": "chat"},
+        user_id="alice",
+    )
+
+    assert command_id is not None
+    pending = isolated_adapter.get_next_pending_command()
+
+    assert pending is not None
+    assert pending["id"] == command_id
+    assert pending["user_id"] == "alice"

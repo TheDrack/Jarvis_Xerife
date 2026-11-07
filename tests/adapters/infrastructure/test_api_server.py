@@ -274,20 +274,23 @@ class TestAPIServer(NexusComponent):
         assert data["wake_word"] == "xerife"
         assert data["language"] == "pt-BR"
 
-    def test_get_history_empty(self, client):
+    def test_get_history_empty(self, client, auth_token):
         """Test history endpoint with no commands"""
         test_client, service = client
 
         service.get_command_history.return_value = []
 
-        response = test_client.get("/v1/history")
+        response = test_client.get(
+            "/v1/history",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
 
         assert response.status_code == 200
         data = response.json()
         assert data["commands"] == []
         assert data["total"] == 0
 
-    def test_get_history_with_commands(self, client):
+    def test_get_history_with_commands(self, client, auth_token):
         """Test history endpoint with commands"""
         test_client, service = client
 
@@ -306,7 +309,10 @@ class TestAPIServer(NexusComponent):
             },
         ]
 
-        response = test_client.get("/v1/history")
+        response = test_client.get(
+            "/v1/history",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -315,7 +321,7 @@ class TestAPIServer(NexusComponent):
         assert data["commands"][0]["command"] == "escreva hello"
         assert data["commands"][1]["command"] == "aperte enter"
 
-    def test_get_history_with_limit(self, client):
+    def test_get_history_with_limit(self, client, auth_token):
         """Test history endpoint with limit parameter"""
         test_client, service = client
 
@@ -328,22 +334,32 @@ class TestAPIServer(NexusComponent):
             },
         ]
 
-        response = test_client.get("/v1/history?limit=10")
+        response = test_client.get(
+            "/v1/history?limit=10",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
 
         assert response.status_code == 200
-        service.get_command_history.assert_called_once_with(limit=10)
+        service.get_command_history.assert_called_once_with(
+            limit=10, user_id="admin"
+        )
 
-    def test_get_history_limit_validation(self, client):
+    def test_get_history_limit_validation(self, client, auth_token):
         """Test history endpoint limit is capped"""
         test_client, service = client
 
         service.get_command_history.return_value = []
 
         # Should cap at 50
-        response = test_client.get("/v1/history?limit=100")
+        response = test_client.get(
+            "/v1/history?limit=100",
+            headers={"Authorization": f"Bearer {auth_token}"},
+        )
 
         assert response.status_code == 200
-        service.get_command_history.assert_called_once_with(limit=50)
+        service.get_command_history.assert_called_once_with(
+            limit=50, user_id="admin"
+        )
 
     def test_api_documentation(self, client):
         """Test that API documentation is available"""

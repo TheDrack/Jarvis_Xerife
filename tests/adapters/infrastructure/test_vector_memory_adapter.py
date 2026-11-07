@@ -103,3 +103,74 @@ class TestVectorMemoryAdapter:
         adapter.store_event("salvar metadata", metadata={"role": "user"})
         results = adapter.query_similar("salvar metadata", top_k=1, days_back=None)
         assert results[0]["metadata"] == {"role": "user"}
+
+
+@pytest.fixture
+def pii_vector_adapter():
+    import app.adapters.infrastructure.vector_memory_adapter as mod
+
+    original = mod._FAISS_AVAILABLE
+    mod._FAISS_AVAILABLE = False
+    adapter = VectorMemoryAdapter(dim=64)
+    adapter._index = None
+    yield adapter
+    mod._FAISS_AVAILABLE = original
+
+
+def test_store_event_uses_local_redactor_when_nexus_redactor_is_missing(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    pii_vector_adapter.store_event("Contact alice.smith@example.com, CPF 123.456.789-09")
+
+    stored_text = pii_vector_adapter._events[0]["text"]
+    assert "[EMAIL_REDACTED]" in stored_text
+    assert "[CPF_REDACTED]" in stored_text
+    assert "alice.smith@example.com" not in stored_text
+    assert "123.456.789-09" not in stored_text
+
+
+def test_store_event_refuses_an_invalid_registered_redactor(monkeypatch, pii_vector_adapter):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: object())
+
+    with pytest.raises(RuntimeError, match="PII redactor is unavailable"):
+        pii_vector_adapter.store_event("private email alice@example.com")
+
+    assert pii_vector_adapter._events == []
+
+
+def test_store_event_rejects_user_id_in_untrusted_metadata(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    with pytest.raises(ValueError, match="trusted argument"):
+        pii_vector_adapter.store_event(
+            "private event",
+            metadata={"user_id": "alice"},
+        )
+
+    assert pii_vector_adapter._events == []
+
+def test_store_event_rejects_conflicting_user_id_metadata(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    with pytest.raises(ValueError, match="conflicts with authenticated user_id"):
+        pii_vector_adapter.store_event(
+            "private event",
+            metadata={"user_id": "bob"},
+            user_id="alice",
+        )
+
+    assert pii_vector_adapter._events == []

@@ -216,7 +216,7 @@ class TestAssistantServiceWithLLM(NexusComponent):
         mock_interpreter = Mock()
         
         # Make it return an UNKNOWN intent by default
-        def create_unknown_intent(text):
+        def create_unknown_intent(text, user_id=None):
             return Intent(
                 command_type=CommandType.UNKNOWN,
                 parameters={"raw_command": text},
@@ -317,3 +317,85 @@ class TestAssistantServiceWithLLM(NexusComponent):
         assert len(history) == 1
         assert history[0]["command"] == "oi, tudo bem?"
         assert history[0]["success"] is True
+
+
+
+def test_process_command_scopes_semantic_and_vector_memory_to_request_user():
+    from unittest.mock import Mock
+
+    interpreter = Mock()
+    interpreter.interpret.return_value = "intent"
+    processor = Mock()
+    processor.execute.return_value = {"success": True, "message": "scoped response"}
+    vector_memory = Mock()
+    vector_memory.query_similar.return_value = []
+    memory_manager = Mock()
+    memory_manager.get_relevant_context.return_value = []
+
+    service = AssistantService(
+        command_interpreter=interpreter,
+        intent_processor=processor,
+    )
+    service._get_decision_engine = lambda: None
+    service._get_vector_memory = lambda: vector_memory
+    service._get_memory_manager = lambda: memory_manager
+    service._get_history_adapter = lambda: None
+
+    response = service.process_command(
+        "private request",
+        request_metadata={"user_id": "alice"},
+    )
+
+    assert response.success is True
+    interpreter.execute.assert_called_once()
+    assert interpreter.execute.call_args.args[0]["user_id"] == "alice"
+    interpreter.interpret.assert_not_called()
+    vector_memory.query_similar.assert_called_once_with(
+        "private request",
+        top_k=3,
+        days_back=30,
+        user_id="alice",
+    )
+    assert vector_memory.store_event.call_count == 2
+    assert all(call.kwargs["user_id"] == "alice" for call in vector_memory.store_event.call_args_list)
+    memory_manager.get_relevant_context.assert_called_once_with(
+        "private request",
+        user_id="alice",
+    )
+    memory_manager.store_interaction.assert_called_once_with(
+        "private request",
+        "scoped response",
+        user_id="alice",
+    )
+
+
+
+def test_command_history_is_partitioned_by_authenticated_user():
+    from unittest.mock import Mock
+
+    interpreter = Mock()
+    interpreter.execute.return_value = "intent"
+    processor = Mock()
+    processor.execute.side_effect = [
+        {"success": True, "message": "alice response"},
+        {"success": True, "message": "bob response"},
+    ]
+    service = AssistantService(
+        command_interpreter=interpreter,
+        intent_processor=processor,
+    )
+    service._get_decision_engine = lambda: None
+    service._get_vector_memory = lambda: None
+    service._get_memory_manager = lambda: None
+    service._get_history_adapter = lambda: None
+
+    service.process_command("alice secret command", request_metadata={"user_id": "alice"})
+    service.process_command("bob secret command", request_metadata={"user_id": "bob"})
+
+    alice_history = service.get_command_history(user_id="alice")
+    bob_history = service.get_command_history(user_id="bob")
+    local_history = service.get_command_history()
+
+    assert [item["command"] for item in alice_history] == ["alice secret command"]
+    assert [item["command"] for item in bob_history] == ["bob secret command"]
+    assert local_history == []

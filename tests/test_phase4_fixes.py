@@ -70,7 +70,7 @@ class TestGatewayLLMAdapterInterpretSync:
             adapter.wake_word = "xerife"
 
         result = adapter._interpret_sync("type hello")
-        mock_gemini._interpret_sync.assert_called_once_with("type hello")
+        mock_gemini._interpret_sync.assert_called_once_with("type hello", user_id=None)
         assert result.command_type == CommandType.TYPE_TEXT
 
 
