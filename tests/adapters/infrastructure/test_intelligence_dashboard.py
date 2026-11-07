@@ -127,7 +127,9 @@ def test_authenticated_collection_endpoint_integrates_sources_core_and_report(
 ):
     from datetime import datetime, timezone
 
-    from app.application.services.intelligence_collector import (\n        collect_live_intelligence,\n    )
+    from app.application.services.intelligence_collector import (
+        collect_live_intelligence,
+    )
     from app.domain.intelligence.contracts import (
         IntelligenceBatch,
         IntelligenceEvidence,
