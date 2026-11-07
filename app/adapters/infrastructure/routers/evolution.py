@@ -131,7 +131,34 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
 
         return StrategistService()
 
-    _auth_deps: List[Any] = [Depends(get_current_user)] if get_current_user else []
+    if get_current_user is None:
+        async def _require_authenticated_user() -> Any:
+            raise HTTPException(
+                status_code=503,
+                detail="Proposal approval requires an authentication dependency",
+            )
+    else:
+        async def _require_authenticated_user(
+            current_user: Any = Depends(get_current_user),
+        ) -> Any:
+            return current_user
+
+    _auth_deps: List[Any] = [Depends(_require_authenticated_user)]
+
+    def _authenticated_actor_id(current_user: Any) -> str:
+        if isinstance(current_user, dict):
+            identity = current_user.get("user_id") or current_user.get("username")
+        else:
+            identity = getattr(current_user, "user_id", None) or getattr(
+                current_user, "username", None
+            )
+        normalized = str(identity or "").strip()
+        if not normalized:
+            raise HTTPException(
+                status_code=401,
+                detail="Authenticated user has no stable identity",
+            )
+        return normalized
 
     @router.get(
         "/v1/proposals/pending",
@@ -162,11 +189,14 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
     @router.post(
         "/v1/proposals/{proposal_id}/approve",
         response_model=Dict[str, Any],
-        dependencies=_auth_deps,
     )
-    async def approve_proposal(proposal_id: str) -> Dict[str, Any]:
-        """Approve a pending proposal and trigger its implementation via GitHub dispatch."""
+    async def approve_proposal(
+        proposal_id: str,
+        current_user: Any = Depends(_require_authenticated_user),
+    ) -> Dict[str, Any]:
+        """Approve a pending proposal with the authenticated actor and audit trail."""
         try:
+            approved_by = _authenticated_actor_id(current_user)
             strategist = _get_strategist()
             github_worker = nexus.resolve("github_worker")
             if github_worker is None:
@@ -175,14 +205,23 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
                     detail="GitHub publisher is unavailable; proposal was not approved.",
                 )
 
-            destination = strategist.approve_proposal(proposal_id)
+            destination = strategist.approve_proposal(
+                proposal_id,
+                approved_by=approved_by,
+            )
             approved_data = document_store.read(destination)
-            logger.info("Proposal '%s' explicitly approved and promoted.", proposal_id)
+            approved_at = approved_data["approved_at"]
+            logger.info(
+                "Proposal '%s' approved by authenticated actor '%s'.",
+                proposal_id,
+                approved_by,
+            )
             dispatch_ok = github_worker.trigger_repository_dispatch(
                 event_type="implement_proposal",
                 client_payload={
                     "proposal_id": proposal_id,
-                    "approved_at": approved_data.get("approved_at"),
+                    "approved_by": approved_by,
+                    "approved_at": approved_at,
                 },
             )
 
@@ -195,6 +234,8 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
                 "success": True,
                 "proposal_id": proposal_id,
                 "status": "approved",
+                "approved_by": approved_by,
+                "approved_at": approved_at,
                 "dispatch_triggered": dispatch_ok,
             }
         except FileNotFoundError as e:
