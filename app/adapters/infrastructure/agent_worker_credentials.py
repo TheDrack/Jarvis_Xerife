@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -18,6 +19,14 @@ from sqlalchemy import text
 
 WORKER_TOKEN_PREFIX = "jarvisw_"
 SUPPORTED_WORKER_CAPABILITIES = frozenset({"text_reasoning"})
+
+
+def worker_token_env_name(agent_id: str) -> str:
+    """Return the dedicated secret variable name for one stable agent ID."""
+    normalized = re.sub(r"[^A-Za-z0-9]+", "_", str(agent_id).strip()).strip("_").upper()
+    if not normalized:
+        raise ValueError("agent_id must contain at least one alphanumeric character")
+    return f"JARVIS_TASK_QUEUE_WORKER_TOKEN_{normalized}"
 
 
 @dataclass(frozen=True)
