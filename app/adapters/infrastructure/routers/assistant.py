@@ -192,11 +192,15 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
         """
         try:
             logger.info(f"User '{current_user.username}' creating task: {request.command}")
-            intent = assistant_service.interpreter.interpret(request.command)
+            authenticated_user_id = _authenticated_user_id(current_user)
+            intent = assistant_service.interpreter.interpret(
+                request.command, user_id=authenticated_user_id
+            )
             task_id = db_adapter.save_pending_command(
                 user_input=request.command,
                 command_type=intent.command_type.value,
                 parameters=intent.parameters,
+                user_id=authenticated_user_id,
             )
             if task_id is None:
                 raise HTTPException(status_code=500, detail="Failed to create task in database")
