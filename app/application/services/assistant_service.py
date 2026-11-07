@@ -210,7 +210,14 @@ class AssistantService(NexusComponent):
             return {"success": False, "error": "Nenhum comando fornecido."}
 
         channel = context.get("channel", "api")
-        return self.process_command(context["command"], channel=channel)
+        request_metadata = {}
+        if context.get("user_id") is not None:
+            request_metadata["user_id"] = context["user_id"]
+        return self.process_command(
+            context["command"],
+            channel=channel,
+            request_metadata=request_metadata or None,
+        )
 
     def process_command(
         self,
@@ -223,6 +230,9 @@ class AssistantService(NexusComponent):
         Blindado contra erros de NoneType através de resolução dinâmica.
         """
         try:
+            request_metadata = request_metadata or {}
+            user_id = request_metadata.get("user_id")
+
             # Direct providers path (for test/injection use)
             if self._action is not None or self._web is not None or self._voice is not None:
                 interpreter = self._get_interpreter()
@@ -278,7 +288,9 @@ class AssistantService(NexusComponent):
             try:
                 vec_mem = self._get_vector_memory()
                 if vec_mem is not None:
-                    similar = vec_mem.query_similar(text, top_k=3, days_back=30)
+                    similar = vec_mem.query_similar(
+                        text, top_k=3, days_back=30, user_id=user_id
+                    )
                     if similar:
                         vector_context_lines = [
                             f"- [{ev.get('timestamp', '')}] {ev.get('text', '')} (score={ev.get('score', 0):.2f})"
@@ -295,7 +307,7 @@ class AssistantService(NexusComponent):
             memory_context_lines: List[str] = []
             try:
                 memory_manager = self._get_memory_manager()
-                relevant = memory_manager.get_relevant_context(text)
+                relevant = memory_manager.get_relevant_context(text, user_id=user_id)
                 if relevant:
                     memory_context_lines = [
                         f"- [{item.get('timestamp', '')}] Usuário: {item.get('user', '')} | "
@@ -343,10 +355,12 @@ class AssistantService(NexusComponent):
                     vec_mem.store_event(
                         text,
                         metadata={"role": "user", "channel": channel},
+                        user_id=user_id,
                     )
                     vec_mem.store_event(
                         response.message,
                         metadata={"role": "assistant", "channel": channel},
+                        user_id=user_id,
                     )
                     logger.debug("🧠 [VECTOR_MEMORY] Comando e resposta vetorizados e armazenados.")
             except Exception as e:
@@ -354,7 +368,9 @@ class AssistantService(NexusComponent):
 
             # 6b. Persiste na memória semântica de longo prazo
             try:
-                self._get_memory_manager().store_interaction(text, response.message)
+                self._get_memory_manager().store_interaction(
+                    text, response.message, user_id=user_id
+                )
             except Exception as e:
                 logger.debug(f"Failed to store in semantic memory: {e}")
 
