@@ -174,6 +174,8 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
                 return []
             proposals: List[Dict[str, Any]] = []
             for proposal_file in sorted(pending_dir.glob("*.jrvs")):
+                if proposal_file.is_symlink() or not proposal_file.is_file():
+                    continue
                 try:
                     data: Dict[str, Any] = document_store.read(proposal_file)
                     data["filename"] = proposal_file.name
