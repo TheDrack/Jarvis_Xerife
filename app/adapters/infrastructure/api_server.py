@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime as _datetime, timezone as _timezone
 from pathlib import Path
 
@@ -84,6 +86,25 @@ def create_api_server(
         "syntaxHighlight.theme": "monokai",
     }
 
+    # The proactive monitor is user-scoped and proposal-only; it does not execute tools.
+    start_proactive_monitor = getattr(assistant_service, "start_proactive_monitor", None)
+    stop_proactive_monitor = getattr(assistant_service, "stop_proactive_monitor", None)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        if callable(start_proactive_monitor):
+            start_proactive_monitor()
+        try:
+            yield
+        finally:
+            if callable(stop_proactive_monitor):
+                pending = stop_proactive_monitor()
+                if asyncio.isfuture(pending) or asyncio.iscoroutine(pending):
+                    try:
+                        await pending
+                    except asyncio.CancelledError:
+                        pass
+
     app = FastAPI(
         title=settings.app_name + " API",
         version=settings.version,
@@ -91,22 +112,8 @@ def create_api_server(
         swagger_ui_parameters=swagger_ui_parameters,
         docs_url=None,
         redoc_url=None,
+        lifespan=lifespan,
     )
-    # The proactive monitor is user-scoped and proposal-only; it does not execute tools.
-    start_proactive_monitor = getattr(assistant_service, "start_proactive_monitor", None)
-    stop_proactive_monitor = getattr(assistant_service, "stop_proactive_monitor", None)
-    add_event_handler = getattr(app, "add_event_handler", None)
-    if callable(add_event_handler):
-        if callable(start_proactive_monitor):
-            async def _start_proactive_monitor() -> None:
-                start_proactive_monitor()
-
-            add_event_handler("startup", _start_proactive_monitor)
-        if callable(stop_proactive_monitor):
-            async def _stop_proactive_monitor() -> None:
-                stop_proactive_monitor()
-
-            add_event_handler("shutdown", _stop_proactive_monitor)
 
     limiter = Limiter(key_func=get_remote_address)
     app.state.limiter = limiter
