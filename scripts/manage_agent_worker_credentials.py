@@ -22,6 +22,7 @@ from sqlalchemy import create_engine
 from app.adapters.infrastructure.agent_worker_credentials import (
     AgentWorkerCredentialStore,
     SUPPORTED_WORKER_CAPABILITIES,
+    worker_token_env_name,
 )
 
 
@@ -80,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
                 available_tools=capabilities,
                 expires_at=datetime.now(timezone.utc) + timedelta(hours=args.expires_hours),
             )
-            print("Credential issued. Copy this value to JARVIS_TASK_QUEUE_WORKER_TOKEN:")
+            print(f"Credential issued. Store this value in {worker_token_env_name(args.agent_id)}:")
             print(token)
             print("This token is shown only once. Reissuing revokes the previous active token.")
             return 0
