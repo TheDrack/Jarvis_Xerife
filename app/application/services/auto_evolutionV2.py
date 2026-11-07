@@ -153,7 +153,11 @@ class AutoEvolutionServiceV2(NexusComponent):
         except json.JSONDecodeError:
             return None, roadmap_text, match, "roadmap_manifest_invalid_json"
 
-        if not isinstance(manifest, dict) or manifest.get("schema_version") != 1:
+        if (
+            not isinstance(manifest, dict)
+            or type(manifest.get("schema_version")) is not int
+            or manifest.get("schema_version") != 1
+        ):
             return None, roadmap_text, match, "roadmap_manifest_schema_invalid"
         if not isinstance(manifest.get("missions"), list):
             return None, roadmap_text, match, "roadmap_manifest_missions_invalid"
@@ -161,21 +165,30 @@ class AutoEvolutionServiceV2(NexusComponent):
         return manifest, roadmap_text, match, None
 
     def _phase_is_active(self, phase: str) -> bool:
-        """STATUS.md, not the mission manifest, decides which phase may run."""
+        """Only the first incomplete roadmap phase may be selected."""
         status_file = self._repository_path(self.status_path)
         try:
             lines = status_file.read_text(encoding="utf-8").splitlines()
         except OSError:
             return False
 
+        phase_states = {}
         for line in lines:
             stripped = line.strip()
             if not stripped.startswith("|"):
                 continue
             cells = [cell.strip() for cell in stripped.strip("|").split("|")]
-            if len(cells) < 3 or cells[0] != phase:
+            if len(cells) >= 3 and _PHASE_PATTERN.fullmatch(cells[0]):
+                phase_states[cells[0]] = cells[2].replace("*", "").casefold()
+
+        for index in range(9):
+            current_phase = f"C{index}"
+            state = phase_states.get(current_phase)
+            if state is None:
+                return False
+            if state.startswith(("concluído", "concluido", "complete", "completed")):
                 continue
-            return "em andamento" in cells[2].casefold()
+            return current_phase == phase and "em andamento" in state
         return False
 
     def _blocked_mission(self, reason: str, phase: Optional[str] = None) -> Dict:
