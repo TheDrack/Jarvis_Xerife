@@ -99,10 +99,10 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 Evidências de contrato já adicionadas ou existentes:
 
-- **PR #759:** integra `collect_live_intelligence()` ao endpoint autenticado com fontes controladas, deduplicação, correlação candidata e falhas parciais. Os workflows de suíte completa e fila passaram.
+- **PR #759:** integra `collect_live_intelligence()` ao endpoint autenticado e adiciona readback do `MemoryManager` após reinício. O workflow de suíte completa passou no head atual; o workflow dedicado de fila foi cancelado e não é contabilizado como sucesso.
 - **Autorização de planos:** `tests/multiagent/test_task_runner_execution_plan_integration.py` cobre allow/deny, ferramenta sensível retornando `approval_required` e bloqueio quando o journal durável falha. São testes com doubles; não comprovam aprovação humana nem identidade/autorização em produção.
 - **PR #760:** corrige o health check do `VectorMemoryAdapter` para aceitar o backend puro-Python quando FAISS não está disponível. A regressão valida consolidação e busca; os workflows de suíte completa e fila passaram.
-- **PR #761:** verifica dispatch, consumo, resposta correlacionada, ACK e redelivery após expiração do lease com clientes independentes. Também adiciona `claim_token` por tentativa, rejeita ACK obsoleto e revoga a RPC antiga sem fencing. O backend de teste é determinístico em memória; não é Supabase E2E e não prova que o runtime de produção inicia esse caminho. A migration de fencing ainda não foi aplicada porque o histórico remoto/local continua divergente.
+- **PR #761:** adiciona `claim_token` por tentativa à fila de mensagens, rejeita ACK obsoleto e revoga a RPC antiga sem fencing. O pgTAP em PostgreSQL isolado passou; os workflows Python ainda estão em validação. O teste de clientes usa backend determinístico em memória; não é E2E de processos nem de produção. A migration de fencing ainda não foi aplicada porque o histórico remoto/local continua divergente.
 
 Pendências reais de C0:
 
@@ -110,7 +110,7 @@ Pendências reais de C0:
 2. Executar dois processos/runtimes isolados contra um banco de integração isolado, sem usar o projeto de produção.
 3. Escolher e demonstrar um caminho canônico de execução: o runtime supervisionado atual inicia `SupabaseTaskQueueMiniAgent` ou `PriorityQueueMiniAgent`; a via `AgentLeader`/`AgentWorker` ainda é separada.
 4. Validar aprovação humana e autorização com identidade real, além dos doubles existentes.
-5. Fechar lease/fencing e recuperação no caminho efetivamente escolhido.
+5. Fechar lease/fencing e recuperação no caminho efetivamente escolhido, incluindo a RPC de renovação de lease ausente no Supabase remoto.
 
 Não iniciar C1 nem ativar o worker recorrente até que essas evidências e a reconciliação do ledger de migrations estejam concluídas.
 
@@ -164,6 +164,10 @@ Os três registros disponíveis são `mini-freellmapi-1/2/3`, com heartbeat rece
 O ledger remoto contém versões que não existem como nomes de arquivo locais. Há também duas entradas remotas chamadas `google_linked_identities`. A auditoria anterior encontrou SQL semanticamente equivalente nessas duas entradas, mas não há prova suficiente para reparar o ledger por renomeação. Seis migrations locais não têm entrada remota correspondente por nome/versão: `202610260001_red_blue_venice_routing.sql`, `20261028090000_release_failed_task_attempt.sql`, `20261028100000_agent_heartbeat_reconciliation.sql`, `20261028130000_worker_lease_and_security_hardening.sql`, `20261103184308_intelligence_recurring_worker.sql` e `20261105202000_direct_claim_parent_dependency_guard.sql`. As demais divergências de timestamp têm candidatos semânticos, não equivalência SQL automaticamente comprovada. Não executar `migration repair`, `db push` ou aplicar migrations pendentes antes de reconciliar cada SQL com o schema remoto.
 
 A migration do worker recorrente cria lease, runs e cinco RPCs protegidas. Como esses objetos não existem no projeto, o worker deve permanecer desativado. As tabelas de histórico existem, mas estão vazias; a persistência de snapshots não está operacionalmente comprovada.
+
+A RPC `mark_stale_jarvis_agents_offline` existe, e as RPCs de claim direto/por fila já aplicam filtros de provider e ferramentas; o claim por fila também chama a reconciliação de heartbeat. `release_jarvis_agent_task` existe. Porém, `renew_jarvis_agent_task_lease` está ausente no banco remoto. O `SupabaseTaskQueueMiniAgent` tenta renová-la a cada 30 segundos (lease padrão de 90 segundos); tarefas longas podem perder o lease, ser reivindicadas novamente e ter a conclusão original rejeitada pelo fencing. Não há tarefa ativa no snapshot atual. A migration local `20261028130000_worker_lease_and_security_hardening.sql` contém essa RPC e os cinco índices reportados ausentes pelo advisor, mas não está aplicada.
+
+A fencing migration da PR #761 protege a fila de mensagens (`jarvis_agent_messages`); ela não implementa a renovação de lease da fila de tarefas (`jarvis_agent_tasks`).
 
 ### 9.2 Segurança e performance do banco
 
