@@ -179,7 +179,7 @@ class MemoryConsolidationService(NexusComponent):
         working_memory = self._get_working_memory()
         vector_adapter = self._get_vector_adapter()
 
-        if not working_memory or not vector_adapter:
+        if working_memory is None or vector_adapter is None:
             logger.warning("[ConsolidationService] Dependências não disponíveis.")
             return 0
 
