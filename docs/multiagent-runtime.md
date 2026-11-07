@@ -6,14 +6,34 @@ End-to-end setup — migrations, environment groups, running several slots, enqu
 
 ## Enable the bounded FreeLLMAPI worker
 
-The preferred production path uses the existing server-only Supabase admin client and calls the queue's atomic claim/finish RPCs directly. Configure these variables in the environment that runs `serve.py`:
+The runtime prefers the authenticated HTTP queue path when an API caller identity and
+individual worker credentials are configured. Set:
 
 - `JARVIS_MINI_AGENT_ENABLED=true` — explicit opt-in.
-- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` — shared queue access; the service-role key must remain server-side.
-- One inference credential: `FREELLMAPI_API_KEY`, `GROQ_API_KEY`, or `VENICE_API_KEY`. The fallback order prefers Groq before Venice so Venice capacity can remain available for explicitly routed Red/Blue tasks.
-- Optional `FREELLMAPI_BASE_URL`, `FREELLMAPI_MODEL`, `FREELLMAPI_TIMEOUT_SECONDS`, `JARVIS_AGENT_ID`, `JARVIS_MINI_AGENT_WORKERS`, and `JARVIS_TASK_QUEUE_LEASE_SECONDS`.
+- `JARVIS_TASK_QUEUE_API_URL` — Jarvis API base URL.
+- `JARVIS_TASK_QUEUE_API_TOKEN` (user JWT) or both `JARVIS_TASK_QUEUE_USERNAME` and
+  `JARVIS_TASK_QUEUE_PASSWORD` — authenticated API caller.
+- `JARVIS_TASK_QUEUE_WORKER_TOKEN_<AGENT_ID>` — opaque credential for each worker slot.
+  The suffix is the agent ID uppercased, with non-alphanumeric characters replaced by
+  underscores. For one slot only, the global `JARVIS_TASK_QUEUE_WORKER_TOKEN` is also
+  accepted.
+- One inference credential: `FREELLMAPI_API_KEY`, `GROQ_API_KEY`, or `VENICE_API_KEY`.
+  The fallback order prefers Groq before Venice so Venice capacity can remain available
+  for explicitly routed Red/Blue tasks.
+- Optional `FREELLMAPI_BASE_URL`, `FREELLMAPI_MODEL`, `FREELLMAPI_TIMEOUT_SECONDS`,
+  `JARVIS_AGENT_ID`, `JARVIS_MINI_AGENT_WORKERS`, and
+  `JARVIS_TASK_QUEUE_LEASE_SECONDS`.
 
-An authenticated HTTP fallback is also supported with `JARVIS_TASK_QUEUE_API_URL` and either `JARVIS_TASK_QUEUE_API_TOKEN` or both `JARVIS_TASK_QUEUE_USERNAME` and `JARVIS_TASK_QUEUE_PASSWORD`. Never commit tokens, passwords, service-role keys, or provider API keys. The worker advertises only `text_reasoning`; it must not be assigned tasks requiring repository access, shell execution, browser use, or other tools. Tool-capable agents need their own registered runtime and least-privilege credentials.
+The API caller JWT and worker token are separate identities. Heartbeat, claim, finish,
+and release require both; the body `agent_id` must match the worker credential, and
+heartbeat capabilities are loaded from the server-side grant rather than the request.
+The initial allowlist is only `text_reasoning`.
+
+The direct Supabase path using `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` remains
+a legacy fallback only when no worker token is configured. It logs a warning and does
+not enforce individual worker identity. Never commit tokens, passwords, service-role
+keys, or provider API keys. Tool-capable agents need their own registered runtime and
+least-privilege credentials.
 
 ## Running several agents at once
 
@@ -23,7 +43,8 @@ workers in the same process. Each slot registers its own identity derived from
 identities are what make execution concurrent — the claim RPC keeps one in-flight task
 per agent while its `concurrency_limit` is 1, so reusing one ID would serialize the
 slots. All slots share a single shutdown signal, and each still advertises only
-`text_reasoning`.
+`text_reasoning`. In HTTP identity mode, every slot must have a distinct token in
+its per-agent environment variable; one global token is never reused across slots.
 
 ## Supervision behavior
 
@@ -42,9 +63,10 @@ The checker reports variable presence (never values), the configuration groups t
 satisfied, and — with `--probe` — API health plus the refusal of an unauthenticated claim.
 The suite covers the worker loop, its bounded backoff, stale-completion rejection, and
 concurrent execution of several agents over one shared queue
-(`tests/multiagent/test_multi_agent_concurrent_execution.py`). A `ready` verdict means the
-runtime can start here; it does not prove that migrations 202610230002–202610230004 are
-applied to the target database, nor that a worker is currently heartbeating.
+(`tests/multiagent/test_multi_agent_concurrent_execution.py`). A `ready` verdict means the runtime configuration is complete; it does not prove that
+the worker credential migration is applied to the target database, that credentials
+have been provisioned in the deployment secret store, or that a worker is currently
+heartbeating.
 
 ## Production verification
 
