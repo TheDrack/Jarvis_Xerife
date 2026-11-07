@@ -153,7 +153,8 @@ class RoadmapMissionSelector:
         if normalized_target != resolved_target:
             raise RoadmapManifestError("mission_target_path_alias_rejected")
         if (
-            target_path.suffix.casefold() != ".py"
+            not normalized_target.startswith("app/")
+            or target_path.suffix.casefold() != ".py"
             or not target_path.is_file()
             or protected_prefix_for(normalized_target)
             or contains_frozen_directory(normalized_target)
