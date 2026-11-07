@@ -3,7 +3,7 @@
 **Snapshot:** `main` em `a31f5554776531c245166cb864abbf8a0eb03075` (baseline pós-PR #758)
 **Auditoria:** 2026-11-06
 **Estado:** parcial; C0 permanece aberto.
-**Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação. Não é confirmação de deploy, conectividade de provider, persistência em produção ou execução ponta a ponta.
+**Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação, complementada por probes remotos somente leitura. Não é confirmação de deploy completo, execução ponta a ponta ou comportamento de todos os providers.
 
 ## 1. Decisão de fase
 
@@ -113,7 +113,7 @@ Estas entregas são manutenção ou infraestrutura; não concluem fases cognitiv
 - **PR #744:** melhorou a apresentação geoespacial; mapa continua sendo superfície de visualização, não World Model.
 - **PR #756:** isolou a execução de candidatos em Docker descartável; testes adversariais verificam ausência de rede, mounts e segredos.
 - **PR #757:** separou geração/validação de publicação privilegiada, adicionou artefato com digest e publisher path-scoped; a autoevolução falha fechada sem target confiável.
-- **PR #758 (merged em 2026-11-07):** elimina o pipeline paralelo do JarvisDevAgent, delega ao EvolutionOrchestrator e adiciona cancelamento cooperativo. Merge commit: `a31f5554776531c245166cb864abbf8a0eb03075`.
+- **PR #758 (merged em 2026-11-06, America/Sao_Paulo):** elimina o pipeline paralelo do JarvisDevAgent, delega ao EvolutionOrchestrator e adiciona cancelamento cooperativo. Merge commit: `a31f5554776531c245166cb864abbf8a0eb03075`.
 
 O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos de recuperação e dispatch. Esta auditoria não o executou nem alterou seus gates. A correção automática de PR/CI e os workflows Self Healing permanecem uma trilha transversal obrigatória.
 
