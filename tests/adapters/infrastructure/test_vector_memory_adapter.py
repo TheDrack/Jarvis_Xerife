@@ -342,3 +342,21 @@ def test_execute_preserves_trusted_user_scope_from_context(
 
     assert result["success"] is True
     assert pii_vector_adapter._events[0]["metadata"]["user_id"] == "alice"
+
+def test_email_shaped_user_id_is_preserved_while_metadata_pii_is_redacted(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    store = _SharedVectorMemoryStore()
+    adapter = VectorMemoryAdapter(dim=32, store=store)
+    adapter.store_event(
+        "safe event text",
+        metadata={"contact": "alice.smith@example.com"},
+        user_id="alice.smith@example.com",
+    )
+
+    assert store.events[0]["metadata"]["user_id"] == "alice.smith@example.com"
+    assert store.events[0]["metadata"]["contact"] == "[EMAIL_REDACTED]"
