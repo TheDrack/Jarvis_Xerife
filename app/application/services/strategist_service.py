@@ -241,13 +241,23 @@ class StrategistService(NexusComponent):
     
     def archive_proposal(self, matrix: ViabilityMatrix) -> Path:
         """Stage viable proposals as pending; archive non-viable proposals as rejected."""
+        proposal_id = str(matrix.proposal_id or "").strip()
+        if (
+            not proposal_id
+            or proposal_id in {".", ".."}
+            or Path(proposal_id).name != proposal_id
+            or "/" in proposal_id
+            or "\\" in proposal_id
+        ):
+            raise ValueError("Invalid proposal identity")
+
         viable = matrix.is_viable(self.min_roi_threshold)
         matrix.approved = False
         target_dir = self.pending_dir if viable else self.rejected_dir
         status = "pending" if viable else "rejected"
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        filename = f"{matrix.proposal_id}.jrvs"
+        filename = f"{proposal_id}.jrvs"
         filepath = target_dir / filename
         if filepath.exists() or filepath.is_symlink():
             raise FileExistsError(f"Proposal already exists: {filename}")
