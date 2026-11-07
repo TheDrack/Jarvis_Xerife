@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Vector Memory Adapter - FAISS-based local biographical memory for JARVIS.
+"""Vector Memory Adapter - user-scoped semantic memory with durable Supabase storage when configured.
 
 Stores and queries events (user commands + LLM responses) as dense vectors
 using a TF-IDF-inspired bag-of-words encoding so that the adapter works fully
@@ -20,6 +20,10 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.application.ports.memory_provider import MemoryProvider
+from app.application.ports.vector_memory_store import VectorMemoryStore
+from app.adapters.infrastructure.supabase_vector_memory_store import (
+    SupabaseVectorMemoryStore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,7 @@ except ImportError:  # pragma: no cover
     )
 
 _VECTOR_DIM = 256  # dimensionality of the bag-of-words projection
+_AUTO_STORE = object()
 
 
 def _tokenize(text: str) -> List[str]:
@@ -65,13 +70,30 @@ def _vectorize(text: str, dim: int = _VECTOR_DIM) -> List[float]:
     return [x / magnitude for x in counts]
 
 
+def _sanitize_metadata(value: Any, sanitize: Any) -> Any:
+    """Recursively redact string values before metadata reaches durable storage."""
+    if isinstance(value, str):
+        sanitized = sanitize(value)
+        if not isinstance(sanitized, str):
+            raise RuntimeError("PII redactor returned non-text metadata")
+        return sanitized
+    if isinstance(value, dict):
+        return {key: _sanitize_metadata(item, sanitize) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_metadata(item, sanitize) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_metadata(item, sanitize) for item in value)
+    return value
+
+
 class VectorMemoryAdapter(MemoryProvider):
     """
-    Local vector store for JARVIS biographical memory.
+    User-partitioned vector memory for JARVIS biographical memory.
 
-    Uses FAISS (if available) for efficient approximate-nearest-neighbour
-    search, otherwise falls back to brute-force cosine similarity over an
-    in-memory list.
+    Supabase service-role storage is used when configured. Without it, the
+    adapter remains usable as an ephemeral in-memory fallback; consolidation
+    separately checks ``is_durable`` before evicting working memory.
+    FAISS accelerates only the in-memory fallback.
 
     Integrates with :class:`~app.application.privacy.pii_redactor.PiiRedactor`
     via ``nexus.resolve("pii_redactor")`` to sanitize all text before indexing.
@@ -80,12 +102,32 @@ class VectorMemoryAdapter(MemoryProvider):
         dim: Dimensionality of the internal vectors (default: 256).
     """
 
-    def __init__(self, dim: int = _VECTOR_DIM) -> None:
+    def __init__(
+        self,
+        dim: int = _VECTOR_DIM,
+        store: Any = _AUTO_STORE,
+    ) -> None:
         self._dim = dim
         self._events: List[Dict[str, Any]] = []
         self._pii_redactor = None  # resolved lazily via Nexus
+        self._store: Optional[VectorMemoryStore] = None
+        if store is _AUTO_STORE:
+            try:
+                candidate = SupabaseVectorMemoryStore()
+                self._store = candidate if candidate.is_available else None
+            except Exception as exc:
+                logger.warning(
+                    "[VectorMemory] Supabase persistence unavailable; using volatile fallback: %s",
+                    exc,
+                )
+                self._store = None
+        else:
+            self._store: Optional[VectorMemoryStore] = store
 
-        if _FAISS_AVAILABLE:
+        if self._store is not None:
+            self._index = None
+            logger.info("☁️ [VectorMemory] Persistência Supabase habilitada.")
+        elif _FAISS_AVAILABLE:
             self._index = faiss.IndexFlatL2(dim)
             logger.info("✅ [VectorMemory] Índice FAISS inicializado (dim=%d).", dim)
         else:
@@ -93,26 +135,40 @@ class VectorMemoryAdapter(MemoryProvider):
             logger.info("ℹ️ [VectorMemory] Usando fallback puro-Python.")
 
     def is_healthy(self) -> bool:
-        """Report storage health independently from the optional FAISS backend.
+        """Report adapter availability independently from persistence durability.
 
-        The in-memory event list is canonical in both modes. FAISS only
-        accelerates nearest-neighbour lookup; its absence must not make a
-        working pure-Python adapter unavailable to memory consolidation.
+        FAISS is optional; the pure-Python fallback remains healthy. The
+        consolidation service separately requires ``is_durable`` before it
+        removes anything from short-term memory.
         """
         if self._dim <= 0 or not isinstance(self._events, list):
             return False
+        if self._store is not None:
+            try:
+                return bool(self._store.is_healthy())
+            except Exception:
+                return False
         return not _FAISS_AVAILABLE or self._index is not None
+
+    @property
+    def is_durable(self) -> bool:
+        """Whether a durable persistence backend is configured."""
+        return self._store is not None
 
     def _get_pii_redactor(self):
         """Resolve Nexus redaction policy or fall back to the built-in local redactor."""
         if self._pii_redactor is None:
             try:
                 from app.core.nexus import nexus
+
                 self._pii_redactor = nexus.resolve("pii_redactor")
             except Exception as exc:  # pragma: no cover
-                logger.warning("⚠️ [VectorMemory] Nexus PiiRedactor indisponível: %s", exc)
+                logger.warning(
+                    "⚠️ [VectorMemory] Nexus PiiRedactor indisponível: %s", exc
+                )
             if self._pii_redactor is None:
                 from app.application.privacy.pii_redactor import PiiRedactor
+
                 self._pii_redactor = PiiRedactor()
         return self._pii_redactor
 
@@ -125,7 +181,11 @@ class VectorMemoryAdapter(MemoryProvider):
         text = ctx.get("text", "")
         if not text:
             return {"success": False, "error": "Campo 'text' obrigatório no contexto."}
-        event_id = self.store_event(text, metadata=ctx.get("metadata"))
+        event_id = self.store_event(
+            text,
+            metadata=ctx.get("metadata"),
+            user_id=ctx.get("user_id"),
+        )
         return {"success": True, "event_id": event_id}
 
     # ------------------------------------------------------------------
@@ -145,8 +205,8 @@ class VectorMemoryAdapter(MemoryProvider):
             text:      Raw text to store.
             metadata:  Optional extra metadata dict.
             timestamp: Optional explicit event timestamp (defaults to now).
-            user_id:   Optional user identifier — stored in metadata so that
-                       queries can be filtered per-user.
+            user_id:   Trusted user identifier — stored in a dedicated database
+                       column and used to enforce per-user query partitions.
         """
         # Sanitization is mandatory: never persist raw text when redaction is unavailable.
         pii_redactor = self._get_pii_redactor()
@@ -176,30 +236,43 @@ class VectorMemoryAdapter(MemoryProvider):
             if not isinstance(user_id, str) or not user_id.strip():
                 raise ValueError("user_id must be a non-empty string when provided")
             normalized_user_id = user_id.strip()
-            if (
-                metadata_user_id is not None
-                and metadata_user_id != normalized_user_id
-            ):
+            if metadata_user_id is not None and metadata_user_id != normalized_user_id:
                 raise ValueError(
                     "metadata user_id conflicts with authenticated user_id"
                 )
             combined_metadata["user_id"] = normalized_user_id
 
-        self._events.append(
-            {
-                "id": event_id,
-                "text": safe_text,
-                "vector": vector,
-                "metadata": combined_metadata,
-                "timestamp": ts.isoformat(),
-            }
+        # The trusted owner identifier is an authorization key, not free-form
+        # metadata. Preserve it exactly while redacting every other metadata value.
+        trusted_user_id = combined_metadata.pop("user_id", None)
+        combined_metadata = _sanitize_metadata(combined_metadata, sanitize)
+        if trusted_user_id is not None:
+            combined_metadata["user_id"] = trusted_user_id
+
+        event = {
+            "id": event_id,
+            "text": safe_text,
+            "vector": vector,
+            "metadata": combined_metadata,
+            "timestamp": ts.isoformat(),
+        }
+
+        # Persist before updating the in-memory cache. A failed cloud write
+        # must not look like a successful durable memory operation.
+        if self._store is not None:
+            self._store.append(event, user_id=combined_metadata.get("user_id"))
+
+        if self._store is None:
+            self._events.append(event)
+            if _FAISS_AVAILABLE and self._index is not None:
+                vec_np = np.array([vector], dtype=np.float32)
+                self._index.add(vec_np)
+
+        logger.debug(
+            "🧠 [VectorMemory] Evento armazenado: %s (total=%d)",
+            event_id,
+            len(self._events),
         )
-
-        if _FAISS_AVAILABLE and self._index is not None:
-            vec_np = np.array([vector], dtype=np.float32)
-            self._index.add(vec_np)
-
-        logger.debug("🧠 [VectorMemory] Evento armazenado: %s (total=%d)", event_id, len(self._events))
         return event_id
 
     def query_similar(
@@ -209,8 +282,18 @@ class VectorMemoryAdapter(MemoryProvider):
         days_back: Optional[int] = 30,
         user_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Return the *top_k* most similar stored events."""
-        if not self._events:
+        """Return the *top_k* most similar stored events in one user scope."""
+        if top_k <= 0:
+            return []
+
+        if self._store is not None:
+            candidates = self._store.list_events(
+                user_id=user_id,
+                days_back=days_back,
+            )
+        else:
+            candidates = self._events
+        if not candidates:
             return []
 
         query_vector = _vectorize(query_text, self._dim)
@@ -218,26 +301,29 @@ class VectorMemoryAdapter(MemoryProvider):
 
         if days_back is not None:
             from datetime import timedelta
+
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days_back)
             cutoff_ts = cutoff.isoformat()
 
-        # Filter by date first (cheap)
-        candidates = self._events
+        # Filter by date first (cheap); the Supabase store also applies this
+        # predicate server-side, while the local fallback applies it here.
         if cutoff_ts:
-            candidates = [e for e in self._events if e["timestamp"] >= cutoff_ts]
+            candidates = [
+                e for e in candidates if str(e.get("timestamp", "")) >= cutoff_ts
+            ]
 
         # Unscoped callers may read only local/system records, never user data.
         if user_id is None:
             candidates = [
-                e for e in candidates
-                if e.get("metadata", {}).get("user_id") is None
+                e for e in candidates if e.get("metadata", {}).get("user_id") is None
             ]
         else:
             if not isinstance(user_id, str) or not user_id.strip():
                 raise ValueError("user_id must be a non-empty string when provided")
             normalized_user_id = user_id.strip()
             candidates = [
-                e for e in candidates
+                e
+                for e in candidates
                 if e.get("metadata", {}).get("user_id") == normalized_user_id
             ]
 
@@ -245,7 +331,8 @@ class VectorMemoryAdapter(MemoryProvider):
             return []
 
         if (
-            _FAISS_AVAILABLE
+            self._store is None
+            and _FAISS_AVAILABLE
             and self._index is not None
             and days_back is None
             and user_id is None
@@ -270,10 +357,7 @@ class VectorMemoryAdapter(MemoryProvider):
             dot = sum(x * y for x, y in zip(a, b))
             return dot  # vectors are already L2-normalised → dot == cosine
 
-        scored = [
-            (e, _cosine(query_vector, e["vector"]))
-            for e in candidates
-        ]
+        scored = [(e, _cosine(query_vector, e["vector"])) for e in candidates]
         scored.sort(key=lambda t: t[1], reverse=True)
 
         results = []
@@ -284,22 +368,62 @@ class VectorMemoryAdapter(MemoryProvider):
             results.append(ev)
 
         return results
-        
-    def get_recent_entries(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """
-        CORREÇÃO: Retorna as entradas mais recentes.
-        Usado pela consolidação semântica para ejetar dados ao Córtex.
-        """
-        if not self._events:
-            return []
-            
-        # Ordena as entradas por timestamp em ordem decrescente (mais novas primeiro)
-        sorted_events = sorted(self._events, key=lambda x: x.get("timestamp", ""), reverse=True)
-        return sorted_events[:limit]
 
-    def clear(self) -> None:
-        """Remove all stored events."""
-        self._events.clear()
+    def get_recent_entries(
+        self,
+        limit: int = 100,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return recent entries from one user partition (system by default)."""
+        if limit <= 0:
+            return []
+        if self._store is not None:
+            events = self._store.list_events(user_id=user_id, days_back=None)
+        else:
+            if user_id is None:
+                events = [
+                    event
+                    for event in self._events
+                    if event.get("metadata", {}).get("user_id") is None
+                ]
+            else:
+                if not isinstance(user_id, str) or not user_id.strip():
+                    raise ValueError("user_id must be a non-empty string when provided")
+                events = [
+                    event
+                    for event in self._events
+                    if event.get("metadata", {}).get("user_id") == user_id.strip()
+                ]
+        return sorted(
+            events,
+            key=lambda event: str(event.get("timestamp", "")),
+            reverse=True,
+        )[:limit]
+
+    def clear(self, user_id: Optional[str] = None) -> None:
+        """Clear all partitions, or only the explicitly requested user partition."""
+        if user_id is not None:
+            if not isinstance(user_id, str) or not user_id.strip():
+                raise ValueError("user_id must be a non-empty string when provided")
+            normalized_user_id = user_id.strip()
+            if self._store is not None:
+                self._store.delete_events(user_id=normalized_user_id)
+            self._events = [
+                event
+                for event in self._events
+                if event.get("metadata", {}).get("user_id") != normalized_user_id
+            ]
+        else:
+            if self._store is not None:
+                self._store.delete_all()
+            self._events.clear()
+
         if _FAISS_AVAILABLE and self._index is not None:
             self._index.reset()
+            if self._events:
+                self._index.add(
+                    np.array(
+                        [event["vector"] for event in self._events], dtype=np.float32
+                    )
+                )
         logger.info("🗑️ [VectorMemory] Memória vetorial limpa.")
