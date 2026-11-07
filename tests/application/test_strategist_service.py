@@ -260,7 +260,8 @@ def test_strategist_generate_rfc(strategist):
         risk=risk,
     )
     
-    # Generate RFC
+    # Simulate the explicit human approval required before RFC generation.
+    matrix.approved = True
     rfc_path = strategist.generate_rfc(matrix)
     
     # Verify file exists
