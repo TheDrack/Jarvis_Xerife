@@ -3,7 +3,6 @@ from app.core.nexus import nexus
 """Evolution router: /v1/status/evolution, /v1/evolution/* endpoints."""
 
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -169,8 +168,6 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
         """Approve a pending proposal and trigger its implementation via GitHub dispatch."""
         try:
             strategist = _get_strategist()
-            from app.application.services.github_worker import GitHubWorker
-
             github_worker = nexus.resolve("github_worker")
             if github_worker is None:
                 raise HTTPException(
