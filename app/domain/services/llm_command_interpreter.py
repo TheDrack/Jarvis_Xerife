@@ -47,7 +47,9 @@ class LLMCommandInterpreter(NexusComponent):
         if not self.ai_gateway:
             logger.warning("No AI Gateway provided, will use keyword-based fallback")
 
-    async def interpret_async(self, raw_input: str) -> Intent:
+    async def interpret_async(
+        self, raw_input: str, user_id: Optional[str] = None
+    ) -> Intent:
         """
         Interpret a raw text command into a structured Intent using LLM
         
@@ -77,7 +79,7 @@ class LLMCommandInterpreter(NexusComponent):
         
         # Fallback to keyword-based interpretation
         if self._fallback_interpreter:
-            return self._fallback_interpreter.interpret(raw_input)
+            return self._fallback_interpreter.interpret(raw_input, user_id=user_id)
         
         # Ultimate fallback: return UNKNOWN
         return Intent(
@@ -87,7 +89,7 @@ class LLMCommandInterpreter(NexusComponent):
             confidence=0.5,
         )
 
-    def interpret(self, raw_input: str) -> Intent:
+    def interpret(self, raw_input: str, user_id: Optional[str] = None) -> Intent:
         """
         Synchronous version that uses fallback interpreter
         
@@ -106,13 +108,13 @@ class LLMCommandInterpreter(NexusComponent):
                 return self._fallback_interpretation(raw_input)
             except RuntimeError:
                 try:
-                    return asyncio.run(self.interpret_async(raw_input))
+                    return asyncio.run(self.interpret_async(raw_input, user_id=user_id))
                 except Exception as e:
                     logger.error(f"Sync LLM interpretation failed: {e}. Using fallback.", exc_info=True)
                     return self._fallback_interpretation(raw_input)
         
         if self._fallback_interpreter:
-            return self._fallback_interpreter.interpret(raw_input)
+            return self._fallback_interpreter.interpret(raw_input, user_id=user_id)
         
         # If no fallback, return UNKNOWN
         command = raw_input.lower().strip()
@@ -281,7 +283,7 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
     def _fallback_interpretation(self, raw_input: str) -> Intent:
         """Fallback when LLM fails"""
         if self._fallback_interpreter:
-            return self._fallback_interpreter.interpret(raw_input)
+            return self._fallback_interpreter.interpret(raw_input, user_id=user_id)
         
         # Ultimate fallback: return UNKNOWN
         normalized_command = raw_input.lower().strip()
