@@ -12,7 +12,7 @@ def test_evolution_batch_script_requires_explicit_opt_in():
     env["PYTHONIOENCODING"] = "utf-8"
     env["PYTHONUTF8"] = "1"
     result = subprocess.run(
-        [sys.executable, str(root / "scripts" / "evolve_all_pending.py"), "--cap-id", "CAP-001"],
+        [sys.executable, str(root / "scripts" / "evolve_all_pending.py"), "--legacy-capability", "--cap-id", "CAP-001"],
         cwd=root,
         env=env,
         capture_output=True,
