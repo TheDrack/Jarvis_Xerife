@@ -83,40 +83,40 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 ## 6. Lacunas de C0 ainda abertas
 
-1. **Baseline comportamental integrado:** PR #759 está merged. O teste `test_authenticated_collection_endpoint_integrates_sources_core_and_report` cobre fontes independentes → coletor → `IntelligenceCore` → endpoint autenticado, incluindo deduplicação, correlação candidata, sucesso parcial, isolamento de erros e histórico desativado. Isso valida o contrato com fontes controladas, não a disponibilidade de todos os providers em produção.
-2. **Mapa completo de consumidores e configuração:** completar flags, migrations, ACLs, entry points, processos e estado de deploy de cada componente crítico.
-3. **Memória:** PR #759 comprova readback do `MemoryManager` após recriar a instância; PR #762 adiciona redaction e partição por usuário para memória semântica baseada em arquivo, além de escopo na história SQLite/vetorial. Ainda faltam idempotência, expiração/retention, falha de escrita validada em todos os caminhos, persistência vetorial após reinício e bootstrap/recuperação procedural.
-4. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; o pipeline de contraditório, calibração e abstenção ainda não está demonstrado.
-5. **Planning:** provar persistência de objetivo, dependências e replanejamento; a matriz de viabilidade e o plano declarativo são capacidades diferentes.
-6. **Executive:** PR #761 comprova troca de mensagens entre processos independentes contra Supabase isolado e fencing de ACK. Isso não comprova o caminho de execução da fila de tarefas nem comportamento em produção. Ainda falta escolher e validar o runtime canônico.
-7. **Initiative:** demonstrar gatilho independente de prompt, deduplicação, orçamento e política de notificação.
-8. **Learning:** o isolamento Docker e a publicação privilegiada já estão implementados (PR #756/#757). O bloqueio atual é a ausência de `target_file` confiável para as capabilities pendentes e a limitação do contrato atual a um único arquivo-alvo; não ativar evolução automática para features que exijam mudanças coordenadas de código e testes até existir suporte multi-arquivo com testes correspondentes.
-9. **Proveniência e privacidade:** PR #762 reduz exposição na memória semântica e história cobertas, mas não constitui política completa de tenant para todos os providers, workers, logs e dados vetoriais. Retenção, exclusão verificável, proveniência e minimização continuam pendentes.
+1. **Baseline comportamental integrado:** PR #759 cobre fontes → coletor → `IntelligenceCore` → endpoint autenticado, com deduplicação, correlação candidata, sucesso parcial e isolamento de erros. O contrato está testado com fontes controladas; disponibilidade de todos os providers em produção ainda exige validação.
+2. **Memória:** PR #759 comprova readback do `MemoryManager` após recriar a instância; PR #762 adiciona redaction fail-closed e escopo por usuário nos caminhos cobertos. O vector store continua em memória do processo; faltam persistência/readback vetorial após reinício, idempotência, retention/erasure verificáveis e bootstrap procedural.
+3. **Executive / task queue:** PR #761 valida fencing de mensagens em dois processos independentes; PR #766 valida claim → renew → execute → complete de tarefa em dois processos independentes contra Supabase isolado. Isso prova o contrato de banco, não a execução de tarefas reais no runtime de produção. Três mini-agentes Groq estão online, mas anunciam apenas `text_reasoning`; as duas tarefas prontas exigem `repository_read`, `github_read` e `production_read`. O claim está corretamente bloqueado por incompatibilidade de capacidades.
+4. **Leases e recuperação:** PR #763 e #767 instalaram a RPC NULL-safe, fencing e os cinco índices. Os contratos pgTAP passaram. Ainda falta executar uma tarefa real de ponta a ponta no runtime após registrar ferramentas compatíveis e verificar recuperação após expiração de lease.
+5. **Recurring intelligence worker:** tabelas e RPCs foram implantadas e têm RLS. A lease está sem proprietário e existem zero registros de execução; o processo recorrente ainda não foi ativado nem validado operacionalmente.
+6. **Aprovação:** PR #764 exige ator autenticado e persiste `approved_by`/`approved_at`. Falta integrar o provedor real de identidade e política de autorização de produção; o teste atual usa identidade injetada.
+7. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; contraditório, calibração e abstenção ainda não estão demonstrados.
+8. **Planning:** provar persistência de objetivo, dependências e replanejamento; matriz de viabilidade e plano declarativo continuam sendo contratos distintos.
+9. **Initiative:** demonstrar gatilho independente de prompt, deduplicação, orçamento e política de notificação.
+10. **Learning:** isolamento Docker e publicação privilegiada estão implementados (PR #756/#757). O bloqueio é a ausência de `target_file` confiável para capabilities pendentes e o contrato limitado a um arquivo-alvo; não ativar evolução automática multi-arquivo antes de suportar e testar mudanças coordenadas.
+11. **Proveniência e privacidade:** PR #762 reduz exposição nos stores cobertos, mas não é DLP/tenant isolation completa para todos os providers, workers, logs e dados vetoriais. Retenção, exclusão verificável e proveniência continuam pendentes.
 
 ## 7. Próxima implementação recomendada
 
-**Manter C0 aberto.** As PRs #759–#764 fecharam contratos importantes, mas não reconciliaram o estado operacional do Supabase nem concluíram o runtime autônomo.
+**Manter C0 aberto.** As PRs #759–#767 fecharam contratos de coleta, memória, aprovação, fencing e migrações. A camada de banco está reconciliada; o bloqueio agora é a integração entre capacidades anunciadas pelos agentes e ferramentas realmente executáveis.
 
 Evidências integradas:
+- **PR #759 — merged:** baseline da coleta de inteligência e readback do `MemoryManager`.
+- **PR #760 — merged:** health check do vector store mantém fallback puro-Python sem FAISS.
+- **PR #761 — merged:** fencing por `claim_token`; E2E de leader/worker em processos independentes.
+- **PR #762 — merged:** redaction fail-closed e escopo por usuário na memória/histórico cobertos.
+- **PR #763 — merged:** RPC de renovação de lease com validação explícita de duração nula.
+- **PR #764 — merged:** gate de aprovação humana autenticada para propostas do Strategist.
+- **PR #765 — merged:** atualização documental do C0 após PRs #759–#764.
+- **PR #766 — merged:** E2E real da fila de tarefas em dois processos independentes; pgTAP, renovação, completion e eventos persistidos.
+- **PR #767 — merged:** reconstrução exata das 20 migrations históricas, seis migrations forward-only e reconciliação automática do ledger após merge. Supabase agora registra 26/26 versões e está `ACTIVE_HEALTHY`.
 
-- **PR #759 — merged:** baseline da coleta de inteligência pelo endpoint autenticado e readback do `MemoryManager` após recriar a instância. Suíte completa e workflow de fila passaram.
-- **PR #760 — merged:** `VectorMemoryAdapter.is_healthy()` reconhece o backend puro-Python quando FAISS não está disponível. Consolidação e busca cobertas; não adiciona persistência vetorial.
-- **PR #761 — merged:** fencing por `claim_token` na fila de mensagens; ACK obsoleto é rejeitado e a RPC antiga sem token perde execução para `service_role`. O workflow dedicado sobe Supabase isolado, roda pgTAP e executa `test_supabase_message_process_e2e.py` com leader e worker em processos separados, cada um com cliente próprio. O workflow Task Queue passou; o PR Validation foi cancelado e não é contado como sucesso. A migration não foi aplicada ao projeto remoto.
-- **PR #762 — merged:** redaction fail-closed de email/CPF/telefone, partição de memória semântica por identidade autenticada, escopo da história SQLite e filtragem vetorial por proprietário. PR Validation e Task Queue passaram. Não torna o vector store durável nem implementa DLP completa.
-- **PR #763 — merged:** migration forward-only para rejeitar duração `NULL` na renovação de lease de tarefa, preservando a migration histórica. pgTAP, suíte completa e Task Queue passaram. A RPC continua ausente no banco remoto porque a migration não foi aplicada.
-- **PR #764 — merged:** propostas viáveis ficam pendentes até aprovação explícita; a rota exige identidade autenticada, persiste `approved_by`/`approved_at` e o RFC verifica a aprovação persistida. PR Validation e Task Queue passaram. O teste usa dependência de identidade controlada; não é prova de integração de ponta a ponta com o provedor de identidade de produção.
-
-Pendências reais de C0:
-
-1. **Durabilidade de memória:** readback semântico em arquivo está coberto; provar idempotência, retenção/expiração e recuperação de memória vetorial/procedural após reinício.
-2. **Runtime canônico:** o supervisor atual inicia `SupabaseTaskQueueMiniAgent` ou `PriorityQueueMiniAgent`; a via `AgentLeader`/`AgentWorker` continua separada. Escolher e integrar um único caminho operacional.
-3. **Task queue E2E:** validar dois processos independentes contra banco isolado no caminho de tarefas, incluindo renovação, expiração, fencing e recuperação. O E2E da PR #761 cobre a fila de mensagens, não a fila de tarefas.
-4. **Ledger Supabase:** reconciliar versões e SQL local/remoto antes de qualquer `migration repair`, `db push` ou aplicação de migration. O branch remoto continua `MIGRATIONS_FAILED`; a RPC de renovação e a coluna/token de fencing não existem no schema remoto.
-5. **Aprovação:** integrar a identidade real e uma política explícita de quem pode aprovar; a API agora exige ator autenticado e grava auditoria, mas o teste ainda usa identidade injetada.
-6. **Privacidade:** ampliar redaction/retention/erasure e provar purge em todos os stores, incluindo vetores, ThoughtLogs e logs operacionais.
-7. **Reasoning, Planning e Initiative:** completar os contratos comportamentais listados na seção 6.
-
-Não iniciar C1 nem ativar workers recorrentes enquanto o ledger não for reconciliado e os caminhos de execução/lease não forem validados.
+Próxima sequência:
+1. Integrar o registry real de ferramentas ao heartbeat/upsert do agente; nunca anunciar capability sem executor funcional.
+2. Implementar/ligar `repository_read`, `github_read` e `production_read` aos conectores autorizados ou encaminhar essas tarefas para agentes que já possuam tais ferramentas.
+3. Revalidar as duas tarefas prontas sem forçar claim; executar uma tarefa controlada após a compatibilidade de capabilities estar comprovada.
+4. Configurar o processo recorrente de inteligência e comprovar claim de lease, execução, persistência de run e liberação.
+5. Completar durabilidade vetorial/procedural, retention/erasure e proveniência.
+6. Só então fechar C0 e iniciar C1 — World Model.
 
 ## 8. Trilhas transversais e mudanças recentes
 
@@ -151,15 +151,15 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 
 ### 9.1 Snapshot operacional Supabase
 
-**Projeto:** `saibtpdehhprttqlgqdt`; estado do projeto `ACTIVE_HEALTHY`; PostgreSQL `17.6.1.063`.
+**Projeto:** `saibtpdehhprttqlgqdt`; estado `ACTIVE_HEALTHY`; PostgreSQL `17.6.1.063`. **Branch Supabase `main`:** `FUNCTIONS_DEPLOYED`; preview `ACTIVE_HEALTHY`.
 
-| Evidência remota | Resultado observado |
+| Evidência remota | Resultado observado em 2026-11-07 |
 |---|---:|
-| Status da branch Supabase `main` | `MIGRATIONS_FAILED` |
-| Arquivos locais em `supabase/migrations` após reconciliação do ledger | 26 |
-| Entradas no ledger remoto | 20 |
-| Versões remotas restauradas com prefixo exato no repositório | 20 |
-| Migrations locais pendentes após o último version remoto | 6 |
+| Arquivos locais em `supabase/migrations` | 26 |
+| Entradas no ledger remoto | 26 |
+| Versões locais/remotas correspondentes | 26/26 |
+| Migrations locais pendentes | 0 |
+| Última versão | `20261107025932` |
 | `jarvis_agents` | 5 linhas |
 | `jarvis_agent_tasks` | 13 linhas |
 | `jarvis_agent_attempts` | 12 linhas |
@@ -171,41 +171,41 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 | `jarvis_mobile_device_sessions` | 48 linhas |
 | `jarvis_mobile_devices` | 1 linha |
 
-O ledger remoto ainda contém duas entradas chamadas `google_linked_identities`; ambas foram restauradas separadamente com seus version IDs originais, sem deduplicação. As 20 versões remotas agora têm arquivos locais com o prefixo exato. Restam seis migrations locais pendentes, todas com versões posteriores ao último registro remoto:
-- `20261105202000_direct_claim_parent_dependency_guard.sql`
-- `20261107010000_multi_agent_message_claim_fencing.sql`
-- `20261107020000_task_lease_renewal_null_duration_guard.sql`
-- `20261107025840_release_failed_task_attempt.sql`
-- `20261107025853_worker_lease_supporting_indexes.sql`
-- `20261107025932_intelligence_recurring_worker.sql`
+As duas entradas históricas `google_linked_identities` foram preservadas separadamente. A integração GitHub–Supabase aplicou as seis migrations pendentes após o merge do PR #767; o ledger remoto agora contém todas as 26 versões. Não foi executado `db push`, `migration repair` ou DDL manual pelo ChatGPT.
 
-A migration antiga `20261028130000_worker_lease_and_security_hardening.sql` foi retirada do conjunto pendente: além de duplicar a RPC de lease corrigida pela PR #763, ela referenciava `jarvis_mobile_push_devices`, tabela removida pela migration posterior `mobile_native_event_queue`. Seus cinco índices foram isolados numa migration forward-only que não referencia a tabela obsoleta. A migration de Red/Blue e a migration de heartbeat também foram removidas como duplicatas/supersedidas pelas versões históricas restauradas e pela migration remota de provider-aware claims.
+**RPCs, fencing e ACLs verificados diretamente:**
+- `claim_jarvis_agent_task` e `claim_next_jarvis_agent_task` aplicam provider policy, heartbeat, ferramentas e dependência de tarefa-pai.
+- `renew_jarvis_agent_task_lease` e `release_jarvis_agent_task` existem e são executáveis por `service_role`; não por `anon` ou `authenticated`.
+- `jarvis_agent_messages.claim_token` existe; claim retorna token e ACK de três argumentos valida o token. O overload antigo de ACK de dois argumentos permanece no catálogo, mas não tem privilégio EXECUTE para nenhum desses três roles.
+- Os cinco índices de attempts, events, parent tasks e routines existem.
+- As tabelas `jarvis_intelligence_worker_lease` e `jarvis_intelligence_worker_runs` existem com RLS; as RPCs de claim/renew/release/record/metrics estão restritas a `service_role`.
+- `jarvis_mobile_push_devices` não existe porque a sequência histórica migrou para `jarvis_mobile_devices`; a migration de índices não referencia a tabela antiga.
 
-Não executar `migration repair`, `db push` ou aplicar migrations pendentes até a validação do PR de reconciliação e revisão da ordem final.
-
-**RPCs e colunas verificadas diretamente no schema remoto em 2026-11-06:**
-- `claim_jarvis_agent_message(p_agent_id text, p_lease_seconds integer)` existe sem token de tentativa.
-- `ack_jarvis_agent_message(p_message_id uuid, p_agent_id text)` continua na assinatura antiga de dois argumentos.
-- `public.jarvis_agent_messages.claim_token` não existe.
-- `renew_jarvis_agent_task_lease` não existe.
-- `claim_jarvis_agent_task` e `claim_next_jarvis_agent_task` existem.
-- `lease_expires_at` existe nas tabelas de mensagens e tarefas.
-
-Portanto, as migrations de fencing da fila de mensagens (PR #761) e de validação de duração nula da renovação de lease (PR #763) estão no Git, mas não estão aplicadas no Supabase remoto. A migration da PR #763 define a RPC completa `renew_jarvis_agent_task_lease` com a validação de `NULL` e, se aplicada, cria a função ausente no schema atual. Ela ainda não foi aplicada remotamente e não instala os cinco índices/objetos adicionais da migration histórica `20261028130000_worker_lease_and_security_hardening.sql`. O projeto pode estar `ACTIVE_HEALTHY` enquanto a branch de migrations permanece `MIGRATIONS_FAILED`; são estados distintos.
-
-Nenhum DDL, DML, migration repair, grant ou deploy foi executado nesta revalidação. Não ativar o worker de mensagens/tarefas que dependa das novas assinaturas antes da reconciliação e implantação controlada do ledger.
+**Estado operacional observado:**
+- Três agentes `mini-freellmapi-1/2/3` estão online, provider `groq`, com apenas `text_reasoning` em `available_tools`.
+- Duas tarefas antigas permanecem `ready` desde 2026-10-27 e exigem `repository_read`, `github_read` e `production_read`. Nenhum agente anuncia essas capacidades; por isso nenhuma tarefa foi atribuída. O claim está bloqueando corretamente uma atribuição incompatível.
+- A lease do recurring intelligence worker está sem proprietário (`worker_id=NULL`, sem expiração) e `jarvis_intelligence_worker_runs` contém zero execuções. A infraestrutura de banco está instalada, mas o processo recorrente não está ativo.
+- Render `Jarvis-api` está `live`; o último deploy observado é o commit `cf887192`, que já contém o código de runtime das PRs #759–#764. PRs #766/#767 foram testes, migrations e documentação; não introduziram código de aplicação que exigisse novo deploy Render.
 
 ### 9.2 Segurança e performance do banco
 
-- As 26 tabelas apontadas pelo advisor têm RLS habilitado e nenhuma policy. A consulta de privilégios não encontrou grants de tabela para `anon` ou `authenticated`; os acessos observados ficam restritos a `service_role` e ao owner. O advisor classifica isso como INFO. Não tratar ausência de policy, isoladamente, como exposição pública.
-- Advisor de performance reporta cinco foreign keys sem índice de cobertura e 33 índices ainda não utilizados. Não remover índices sem evidência de carga; avaliar os cinco índices ausentes depois da reconciliação de migrations.
+- As tabelas públicas verificadas têm RLS habilitado. O probe de privilégios não encontrou grants de tabela para `anon` ou `authenticated`; os acessos observados ficam restritos a `service_role` e ao owner. As entradas do advisor sem policy são INFO neste schema, não prova de exposição pública.
+- Os cinco índices de foreign keys de attempts/events/parent/routine foram criados e verificados após PR #767. Ainda há 33 índices não utilizados no advisor; não remover sem evidência de carga.
 - Advisor de health não reportou findings.
 
-### 9.3 Limites de execução local
+### 9.2 Segurança e performance do banco
 
-- A máquina Windows conectada não possui `docker` nem `supabase` CLI disponíveis no PATH; por isso, a stack local não foi executada nessa máquina.
-- O workflow GitHub da PR #761 executou uma stack Supabase efêmera no runner Ubuntu, rodou pgTAP e `test_supabase_message_process_e2e.py` com leader e worker em processos separados e clientes independentes. Isso comprova o contrato da fila de mensagens em banco isolado, não produção.
-- Ainda falta E2E entre processos independentes para a fila de tarefas usada pelo runtime supervisionado.
+- As tabelas públicas verificadas têm RLS habilitado. A consulta de privilégios não encontrou grants de tabela para `anon` ou `authenticated`; os acessos observados ficam restritos a `service_role` e ao owner. As entradas do advisor sem policy são INFO neste schema, não prova de exposição pública.
+- Os cinco índices de foreign keys para attempts/events/parent/routine foram criados e verificados após PR #767. Ainda há 33 índices não utilizados no advisor; não remover sem evidência de carga.
+- Advisor de health não reportou findings.
+
+### 9.3 Limites de execução local e E2E
+
+- A máquina Windows conectada não possui `docker` nem Supabase CLI global no PATH; a stack local não foi executada nela.
+- **PR #761:** workflow efêmero Supabase, pgTAP e leader/worker de mensagens em processos independentes com clientes próprios.
+- **PR #766:** workflow efêmero Supabase, pgTAP e `SupabaseTaskQueueMiniAgent` em processo filho com cliente independente. O pai enfileira; o filho faz heartbeat, claim, renew, execução e completion; o pai verifica task, attempt e eventos persistidos.
+- **PR #767:** pgTAP isolado para provider-aware claim, message fencing, lease renewal, release de tentativa falha, cinco índices, recurring intelligence worker, RLS e ACLs. PR Validation e Task Queue também passaram.
+- Esses testes comprovam contratos em banco isolado. Em produção, os agentes heartbeat estão online, mas as tarefas existentes não são reivindicadas porque as capabilities exigidas não estão registradas nos agentes. Não interpretar E2E isolado como prova de autonomia de produção.
 
 ### 9.4 Memória: persistência e privacidade
 
@@ -216,21 +216,20 @@ Nenhum DDL, DML, migration repair, grant ou deploy foi executado nesta revalida�
 - `ProceduralMemoryAdapter.bootstrap_from_db()` ainda não tem call site confirmado; o índice de soluções permanece volátil.
 - A redaction atual cobre padrões de email, CPF e telefone; não é uma política DLP completa. A exclusão/purge de IDs vetoriais e a retenção de ThoughtLogs/logs ainda precisam de prova ponta a ponta.
 
-### 9.5 Reconciliação do ledger em 2026-11-07
+### 9.5 Reconciliação do ledger após merge do PR #767
 
-A coluna `supabase_migrations.schema_migrations.statements` foi consultada em modo somente leitura. Ela contém o SQL efetivamente registrado para cada versão remota. Os 20 arquivos históricos foram reconstruídos a partir desses statements, preservando inclusive as duas entradas distintas `google_linked_identities`. Verificação local do branch de reconciliação: 20/20 versões remotas presentes, 26 arquivos locais no total e seis migrations pendentes acima do maior version remoto.
+O SQL efetivamente registrado foi recuperado de `supabase_migrations.schema_migrations.statements`. Os 20 arquivos históricos foram reconstruídos com seus version IDs originais, preservando as duas entradas distintas `google_linked_identities`. Após o merge, a integração GitHub–Supabase aplicou as seis migrations forward-only. A verificação posterior confirmou 26/26 versões no ledger remoto, 26/26 arquivos locais correspondentes e zero migrations pendentes.
 
-**Estado de schema confirmado:**
-- `model_provider`, `mark_stale_jarvis_agents_offline` e o roteamento provider-aware estão presentes; a migration histórica remota `20261027165940` foi restaurada no repositório.
-- `release_jarvis_agent_task` já existe no banco remoto; sua migration local foi rebaseada para registrar a definição no histórico sem alterar a semântica.
-- A RPC de claim da fila já respeita dependência de tarefa-pai; a RPC de claim direto ainda não. A migration `20261105202000` permanece pendente.
-- `jarvis_mobile_push_devices` não existe; a sequência histórica cria essa tabela e depois a migration de fila nativa a remove, criando `jarvis_mobile_devices`. A antiga migration de hardening não podia ser reaplicada depois dessa transição.
-- Os cinco índices de recuperação/lookup de attempts, events, parent tasks e routines não existem. A migration `20261107025853` agora cria apenas esses índices.
-- `renew_jarvis_agent_task_lease` não existe no remoto; `20261107020000` continua pendente.
-- `jarvis_agent_messages.claim_token` não existe e o ACK remoto continua na assinatura antiga de dois argumentos; `20261107010000` continua pendente.
-- As tabelas/RPCs do recurring intelligence worker não existem; `20261107025932` continua pendente e ainda precisa de validação isolada.
-- O estado remoto da branch Supabase permanece `MIGRATIONS_FAILED`. Restaurar os arquivos locais corrige a ausência de versões no repositório, mas não altera o ledger remoto.
+**Estado final de schema:**
+- Provider-aware claims, heartbeat reconciliation e parent-task guard estão ativos.
+- Fencing de mensagens está ativo: coluna `claim_token`, claim que retorna token e ACK de três argumentos. O ACK legado de dois argumentos continua no catálogo, mas está sem EXECUTE para service_role/anon/authenticated.
+- Renovação NULL-safe de lease e release de tentativa falha estão presentes.
+- Cinco índices de worker lease estão presentes.
+- Tabelas e RPCs do recurring intelligence worker estão presentes e protegidas por RLS/ACL de service role.
+- Projeto `ACTIVE_HEALTHY`, branch `FUNCTIONS_DEPLOYED`.
 
-Nenhum DDL, DML, `migration repair`, `db push`, grant ou deploy foi executado.
+**Limite operacional:** o schema do recurring intelligence worker está implantado, mas nenhuma execução foi registrada e a lease permanece livre. Os mini-agentes Groq estão online, mas só anunciam `text_reasoning`; as duas tarefas prontas exigem capabilities adicionais. Não ampliar `available_tools` sem executores reais e não ativar o worker recorrente até integrar seu processo/scheduler e validar uma execução controlada.
+
+Nenhum DDL/DML manual, `db push`, `migration repair`, grant ou deploy manual foi executado. As migrations foram aplicadas pela integração GitHub–Supabase após o merge do PR #767.
 
 **Conclusão:** C0 continua aberto. Universal Intelligence já possui coleta, normalização e candidatos de correlação, mas histórico persistente ainda não está provado. C1 — World Model permanece bloqueado até fechar baseline de memória, identidade, proveniência e integração operacional.
