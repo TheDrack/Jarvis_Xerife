@@ -105,7 +105,7 @@ class LLMCommandInterpreter(NexusComponent):
             try:
                 asyncio.get_running_loop()
                 logger.warning("Event loop already running, using keyword fallback for sync interpret")
-                return self._fallback_interpretation(raw_input)
+                return self._fallback_interpretation(raw_input, user_id=user_id)
             except RuntimeError:
                 try:
                     return asyncio.run(self.interpret_async(raw_input, user_id=user_id))
@@ -280,7 +280,11 @@ Seja preciso e confiante. Se não tiver certeza, use confidence < 0.7."""
             logger.error(f"Response was: {response_text}")
             return self._fallback_interpretation(raw_input)
 
-    def _fallback_interpretation(self, raw_input: str) -> Intent:
+    def _fallback_interpretation(
+        self,
+        raw_input: str,
+        user_id: Optional[str] = None,
+    ) -> Intent:
         """Fallback when LLM fails"""
         if self._fallback_interpreter:
             return self._fallback_interpreter.interpret(raw_input, user_id=user_id)
