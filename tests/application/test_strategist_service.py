@@ -127,6 +127,7 @@ def test_strategist_generate_viability_matrix(strategist):
     assert matrix.proposal_title == "Test Feature"
     assert matrix.proposal_id.startswith("test-feature-")
     assert matrix.calculate_roi() > 0
+    assert matrix.approved is False
 
 
 def test_strategist_archive_proposal(strategist):
@@ -150,14 +151,71 @@ def test_strategist_archive_proposal(strategist):
     # Verify file exists
     assert filepath.exists()
     
-    # Verify it's in approved directory
-    assert "approved" in str(filepath)
+    # A viable proposal remains pending until an explicit human approval.
+    assert filepath.parent.name == "pending"
     
     # Verify content
     data = document_store.read(filepath)
     
     assert data['proposal_title'] == "Archive Test"
     assert data['viable'] is True
+    assert data['approved'] is False
+    assert data['status'] == 'pending'
+
+
+
+
+def test_strategist_approve_proposal_records_human_decision(strategist):
+    cost = CostEstimate(api_cost_usd=1.0)
+    impact = ImpactEstimate(user_utility_level=ImpactLevel.HIGH)
+    risk = RiskEstimate(risk_level=RiskLevel.LOW)
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Approval Gate",
+        proposal_description="Must wait for explicit human approval.",
+        cost=cost,
+        impact=impact,
+        risk=risk,
+    )
+    pending_path = strategist.archive_proposal(matrix)
+
+    approved_path = strategist.approve_proposal(
+        pending_path.name,
+        approved_by="commander",
+    )
+
+    assert approved_path.parent == strategist.approved_dir
+    assert not pending_path.exists()
+    data = document_store.read(approved_path)
+    assert data["viable"] is True
+    assert data["approved"] is True
+    assert data["status"] == "approved"
+    assert data["approved_by"] == "commander"
+    assert data["approved_at"]
+
+
+def test_strategist_approval_rejects_path_traversal(strategist):
+    with pytest.raises(ValueError, match="Invalid proposal filename"):
+        strategist.approve_proposal("../approved/other.jrvs")
+
+
+def test_strategist_execute_archives_viable_proposal_as_pending(strategist):
+    result = strategist.execute(
+        {
+            "action": "evaluate_proposal",
+            "proposal_title": "Execute Gate",
+            "proposal_description": "Create a proposal without auto-approval.",
+            "cost": {"api_cost_usd": 1.0, "code_complexity": "simple"},
+            "impact": {"user_utility_level": "high", "performance_gain_percent": 25.0},
+            "risk": {"risk_level": "low"},
+        }
+    )
+
+    assert result["success"] is True
+    assert result["status"] == "pending"
+    assert result["viable"] is True
+    assert result["approved"] is False
+    assert Path(result["proposal_path"]).parent.name == "pending"
+    assert "Posso prosseguir" in result["decision_prompt"]
 
 
 def test_strategist_archive_rejected_proposal(strategist):
