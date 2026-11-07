@@ -22,14 +22,33 @@ select ok(
     'only service_role can execute the task lease renewal RPC'
 );
 
+insert into public.jarvis_agents (
+    agent_id, runtime_version, environment, available_tools, status,
+    active_tasks, concurrency_limit, last_seen_at
+) values (
+    'lease-worker', 'pgTAP', 'ci', '[]'::jsonb, 'available', 0, 1, now()
+);
+
 insert into public.jarvis_agent_tasks (
-    task_id, assigned_agent_id, attempt_id, status, lease_expires_at
+    task_id, objective, leader_id, assigned_agent_id, attempt_id, status, lease_expires_at
 ) values (
     'lease-renewal-test',
+    'Verify lease renewal ownership and expiry',
+    'lease-leader',
     'lease-worker',
     '11111111-1111-4111-8111-111111111111',
     'in_progress',
     now() + interval '60 seconds'
+);
+
+insert into public.jarvis_agent_attempts (
+    attempt_id, task_id, agent_id, assigned_role, status
+) values (
+    '11111111-1111-4111-8111-111111111111',
+    'lease-renewal-test',
+    'lease-worker',
+    'worker',
+    'in_progress'
 );
 
 do $null_lease$
