@@ -376,7 +376,7 @@ class StrategistService(NexusComponent):
         rfc_filename = f"RFC-{rfc_number:04d}.md"
         rfc_path = self.proposals_dir / rfc_filename
         
-        rfc_content = self._format_rfc(matrix, rfc_number)
+        rfc_content = self._format_rfc(matrix, rfc_number, approved_by, approved_at)
         
         # Write RFC file
         with open(rfc_path, 'w', encoding='utf-8') as f:
@@ -522,11 +522,17 @@ class StrategistService(NexusComponent):
         
         return max(numbers) + 1 if numbers else 1
     
-    def _format_rfc(self, matrix: ViabilityMatrix, rfc_number: int) -> str:
+    def _format_rfc(
+        self,
+        matrix: ViabilityMatrix,
+        rfc_number: int,
+        approved_by: str,
+        approved_at: str,
+    ) -> str:
         """Format RFC markdown content"""
         rfc_content = f"""# RFC-{rfc_number:04d}: {matrix.proposal_title}
 
-**Status:** Proposto  
+**Status:** Aprovado para implementação  
 **Data:** {matrix.created_at.strftime('%Y-%m-%d')}  
 **Autor:** Jarvis (Xerife Strategist)  
 **ROI Score:** {matrix.calculate_roi():.2f}
@@ -592,8 +598,8 @@ _[A ser preenchido durante a discussão]_
 
 ## Decisão
 
-**Aprovado por:** _[Aguardando aprovação do Comandante]_  
-**Data da Decisão:** _[Pendente]_
+**Aprovado por:** {approved_by}  
+**Data da Decisão:** {approved_at}
 
 ## Referências
 
