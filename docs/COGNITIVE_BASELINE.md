@@ -85,7 +85,8 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 1. **Baseline comportamental integrado:** PR #759 cobre fontes → coletor → `IntelligenceCore` → endpoint autenticado, com deduplicação, correlação candidata, sucesso parcial e isolamento de erros. O contrato está testado com fontes controladas; disponibilidade de todos os providers em produção ainda exige validação.
 2. **Memória:** PR #759 comprova readback do `MemoryManager`; PR #762 adiciona redaction fail-closed e escopo por usuário; PR #769 adiciona persistência vetorial Supabase, readback entre processos e rollback lossless da consolidação. A tabela de produção está implantada, mas permanece vazia; falta comprovar um insert/readback real do runtime, idempotência, retention/erasure verificáveis e bootstrap procedural.
-3. **Executive / task queue:** PR #761 valida fencing de mensagens em dois processos independentes; PR #766 valida claim → renew → execute → complete de tarefa em dois processos independentes contra Supabase isolado. Isso prova o contrato de banco, não a execução de tarefas reais no runtime de produção. Três mini-agentes Groq estão online, mas anunciam apenas `text_reasoning`; as duas tarefas prontas exigem `repository_read`, `github_read` e `production_read`. O claim está corretamente bloqueado por incompatibilidade de capacidades.
+3. **Executive / task queue:** PR #761 valida fencing de mensagens em dois processos independentes; PR #766 valida claim → renew → execute → complete em dois processos independentes contra Supabase isolado. PR #773 foi merged em 2026-11-07 e adiciona credenciais opacas por agente, autenticação dupla no caminho HTTP, capabilities concedidas no servidor e tokens distintos por slot. Os workflows associados ao head da PR passaram: suíte completa Linux/Python 3.11.18 com 2.717 passed e 14 skipped; Windows/Python 3.12.10 com 2.716 passed e 15 skipped; testes direcionados da fila 8/8. Isso comprova código e CI, não rollout. A migration de credenciais está agora na main, mas ainda não consta no ledger Supabase; não há tokens provisionados nem configuração de runtime confirmada. O worker Supabase com service-role continua como fallback legado sem identidade individual. A fila permanece global e não persiste owner_id/created_by; o evento task_blocked usa a identidade do chamador autenticado, não um proprietário persistido da tarefa. ToolRegistry segue metadata-only e ToolDispatcher fail-closed sem ToolAuthorizationPolicy host-backed.
+
 4. **Leases e recuperação:** PR #763 e #767 instalaram a RPC NULL-safe, fencing e os cinco índices. Os contratos pgTAP passaram. Ainda falta executar uma tarefa real de ponta a ponta no runtime após registrar ferramentas compatíveis e verificar recuperação após expiração de lease.
 5. **Recurring intelligence worker:** tabelas e RPCs foram implantadas e têm RLS/ACL restrita. O Jarvis-api Render está live, mas seus logs mostram que o worker é desabilitado por feature flags; a lease está sem proprietário e existem zero registros de execução. A ativação continua pendente de autorização operacional e validação de uma execução controlada.
 6. **Aprovação:** PR #764 exige ator autenticado e persiste `approved_by`/`approved_at`. Falta integrar o provedor real de identidade e política de autorização de produção; o teste atual usa identidade injetada.
@@ -97,27 +98,31 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 ## 7. Próxima implementação recomendada
 
-**Manter C0 aberto.** As PRs #759–#767 fecharam contratos de coleta, memória, aprovação, fencing e migrações. A camada de banco está reconciliada; o bloqueio agora é a integração entre capacidades anunciadas pelos agentes e ferramentas realmente executáveis.
+**Manter C0 aberto.** O merge da PR #773 fecha a primeira fatia de identidade individual no código e na CI, mas não fecha sua implantação nem os contratos de ownership e autorização. Nenhuma capacidade externa deve ser anunciada enquanto não houver executor invocável e policy host-backed.
 
 Evidências integradas:
-- **PR #759 — merged:** baseline da coleta de inteligência e readback do `MemoryManager`.
+- **PR #759 — merged:** baseline da coleta de inteligência e readback do MemoryManager.
 - **PR #760 — merged:** health check do vector store mantém fallback puro-Python sem FAISS.
-- **PR #761 — merged:** fencing por `claim_token`; E2E de leader/worker em processos independentes.
+- **PR #761 — merged:** fencing por claim_token; E2E de leader/worker em processos independentes.
 - **PR #762 — merged:** redaction fail-closed e escopo por usuário na memória/histórico cobertos.
 - **PR #763 — merged:** RPC de renovação de lease com validação explícita de duração nula.
 - **PR #764 — merged:** gate de aprovação humana autenticada para propostas do Strategist.
 - **PR #765 — merged:** atualização documental do C0 após PRs #759–#764.
 - **PR #766 — merged:** E2E real da fila de tarefas em dois processos independentes; pgTAP, renovação, completion e eventos persistidos.
-- **PR #767 — merged:** reconciliação do ledger histórico e migrations forward-only; Supabase passou a registrar 26/26 versões.
-- **PR #769 — merged:** memória vetorial durável Supabase, isolamento por usuário, redaction recursiva de metadata, readback persistente e consolidação com recuperação lossless. CI, 38 testes direcionados e 16 pgTAP passaram.
+- **PR #767 — merged:** reconciliação do ledger histórico e migrations forward-only.
+- **PR #769 — merged:** memória vetorial Supabase, isolamento por usuário, redaction recursiva de metadata, readback entre processos e consolidação com recuperação lossless. O schema está implantado, mas a tabela segue sem registros.
+- **PR #770 — merged:** Initiative Engine proposal-only e user-scoped; estado/cooldown ainda process-local e a origem de tarefas não tem owner persistido.
+- **PR #772 — merged:** revalidação documental de migrations, memória e runtime.
+- **PR #773 — merged:** credenciais individuais de worker, hash-only, rotação/revogação, autenticação dupla HTTP e grants server-side. CI completa aprovada nos dois workflows; a migration ainda não foi aplicada ao banco e não há credenciais provisionadas.
 
-Próxima sequência:
-1. Integrar o registry real de ferramentas ao heartbeat/upsert do agente; nunca anunciar capability sem executor funcional.
-2. Implementar/ligar `repository_read`, `github_read` e `production_read` aos conectores autorizados ou encaminhar essas tarefas para agentes que já possuam tais ferramentas.
-3. Revalidar as duas tarefas prontas sem forçar claim; executar uma tarefa controlada após a compatibilidade de capabilities estar comprovada.
-4. Configurar o processo recorrente de inteligência e comprovar claim de lease, execução, persistência de run e liberação.
-5. Completar durabilidade vetorial/procedural, retention/erasure e proveniência.
-6. Só então fechar C0 e iniciar C1 — World Model.
+Próxima sequência prioritária:
+1. **Ownership da tarefa:** introduzir owner/creator persistido a partir do usuário autenticado no enqueue, propagar esse vínculo até os eventos de conclusão/bloqueio e impedir que a identidade do worker seja confundida com a do dono. Exigir migration forward-only, compatibilidade com tarefas legadas e testes de isolamento/atribuição antes de habilitar notificações multiusuário.
+2. **Autorização executável:** integrar um registro de executores reais ao heartbeat e ao ToolDispatcher; implementar/registrar ToolAuthorizationPolicy host-backed com principal, sessão, escopo e aprovação. Capability só pode ser concedida quando existir executor invocável e policy válida.
+3. **Migração operacional dos workers:** após o fluxo normal aplicar 20261107183000_agent_worker_credentials.sql, provisionar tokens individuais no secret store aprovado e comprovar heartbeat/claim/finish/release via HTTP. Não alterar secrets nem desativar o fallback legado nesta etapa documental.
+4. **Memória e recorrência:** comprovar insert/readback vetorial real com service role; manter o recurring intelligence worker desabilitado até autorização operacional e uma execução supervisionada com lease/run/persistência/liberação verificadas.
+5. Reexecutar o baseline comportamental integrado, fechar as lacunas de C0 e somente então iniciar C1 — World Model.
+
+Não aplicar migrations, provisionar credenciais, alterar feature flags ou executar tarefas reais como parte desta auditoria.
 
 ## 8. Trilhas transversais e mudanças recentes
 
@@ -267,7 +272,9 @@ Esta seção supersede as contagens anteriores de migrations e o diagnóstico de
 5. Manter C0 aberto até que os baselines comportamentais estejam comprovados. C1 — World Model não começa antes disso.
 
 
-### 9.7 Identidade individual de workers — primeira fatia de C0
+### 9.7 Identidade individual de workers — snapshot pré-merge (histórico)
+
+> Esta seção registra o estado da branch antes do merge da PR #773. Para o estado atual em main e a evidência de CI, consulte a seção 9.8.
 
 A branch de implementação adiciona um caminho autenticado para workers HTTP:
 
@@ -286,3 +293,33 @@ A branch de implementação adiciona um caminho autenticado para workers HTTP:
 - `ToolAuthorizationPolicy` host-backed ainda não está implementada/registrada em produção; o dispatcher deve continuar fail-closed.
 
 Os testes da branch cobrem hash-only, rotação, expiração, revogação, capabilities não permitidas, heartbeat sem spoofing, impersonation em heartbeat/claim e seleção/falha do runtime. O merge e a integração da migration ainda dependem de CI e do fluxo normal de publicação. C0 permanece aberto; C1 não começa.
+
+
+### 9.8 Revalidação após os merges das PRs #770 e #773 — 2026-11-07
+
+**Snapshot do repositório**
+- A branch main contém o merge da PR #773 no commit 4f35eac4a425bd508f0e156637f35a9f9e0f01b3; o commit mais recente consultado é 1ad74752a6393cb8f0de3614d74be0994ece940b (atualização do mapa de arquitetura).
+- Não havia PRs abertas no momento da consulta. As PRs #770, #772 e #773 estavam merged.
+- O commit mais recente de documentação usa [skip ci]; a ausência de runs nesse commit não é falha de CI.
+
+**CI da PR #773**
+- Task Queue Tests, run 42403685896 (#777): success. Testes direcionados da fila: **8 passed**; suíte completa Windows/Python 3.12.10: **2.716 passed, 15 skipped, 80 warnings**.
+- JARVIS PR Validation, run 42403685897 (#434): success. Frontend geospatial e build Docker do sandbox: success; suíte completa Linux/Python 3.11.18: **2.717 passed, 14 skipped, 8 warnings**.
+- O bot de revisão Codex não concluiu a revisão por limite de uso; não há review formal registrada na PR. Isso não altera o resultado verde dos workflows, mas significa que a revisão automatizada independente não foi comprovada.
+
+**Identidade de worker — código versus runtime**
+- app/adapters/infrastructure/agent_worker_credentials.py armazena hash SHA-256 de token opaco e resolve agent_id, principal_id e capabilities concedidas pelo operador. A allowlist atual contém apenas text_reasoning.
+- app/adapters/infrastructure/routers/agent_tasks.py exige JWT do chamador e X-Jarvis-Worker-Token para heartbeat, claim, finish e release; o agent_id do corpo é comparado ao agente resolvido pelo token e capabilities/concurrency do heartbeat vêm do servidor.
+- app/multiagent/agent_worker_runtime.py prefere HTTP autenticado quando há tokens individuais configurados. O backend Supabase com service-role continua como fallback legado e não possui identidade individual equivalente.
+- A migration 20261107183000_agent_worker_credentials.sql agora está na main, mas o último snapshot operacional disponível do Supabase continua com 27 versões no ledger e não inclui essa migration. Não houve aplicação manual nesta auditoria.
+- Não há evidência de tokens provisionados nem de variáveis individuais configuradas no Render. Portanto, o caminho HTTP individual está **implementado e testado em CI**, mas não está **runtime/production verified**.
+
+**Ownership e autorização**
+- jarvis_agent_tasks continua sem owner_id/created_by; o serviço de enqueue não persiste o usuário autenticado. A PR #770 documenta que o sinal task_blocked usa o chamador autenticado, não o proprietário da tarefa.
+- ToolRegistry permanece metadata-only e ToolDispatcher falha fechado sem ToolAuthorizationPolicy host-backed. Não há evidência de executores externos autorizados para repository_read, github_read ou production_read.
+- O worker recorrente de Universal Intelligence continua desabilitado por feature flags; não foi iniciada coleta nem escrita operacional.
+
+**Conclusão C0**
+- A identidade individual HTTP avançou para TESTED (CI), não RUNTIME_VERIFIED.
+- Ownership persistido, autorização host-backed, executores reais, readback vetorial em runtime e worker recorrente supervisionado continuam pendentes.
+- C0 permanece aberto. C1 — World Model não começa até que os gates obrigatórios de C0 sejam comprovados.
