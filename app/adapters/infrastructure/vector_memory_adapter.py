@@ -154,9 +154,11 @@ class VectorMemoryAdapter(MemoryProvider):
         ts = timestamp or datetime.now(tz=timezone.utc)
         vector = _vectorize(safe_text, self._dim)
 
-        combined_metadata = metadata or {}
-        if user_id:
-            combined_metadata = {**combined_metadata, "user_id": user_id}
+        combined_metadata = dict(metadata or {})
+        if user_id is not None:
+            if not isinstance(user_id, str) or not user_id.strip():
+                raise ValueError("user_id must be a non-empty string when provided")
+            combined_metadata["user_id"] = user_id.strip()
 
         self._events.append(
             {
@@ -199,18 +201,32 @@ class VectorMemoryAdapter(MemoryProvider):
         if cutoff_ts:
             candidates = [e for e in self._events if e["timestamp"] >= cutoff_ts]
 
-        # Filter by user_id when provided (biographical memory is per-user)
-        if user_id:
+        # Unscoped callers may read only local/system records, never user data.
+        if user_id is None:
             candidates = [
                 e for e in candidates
-                if e.get("metadata", {}).get("user_id") == user_id
+                if e.get("metadata", {}).get("user_id") is None
+            ]
+        else:
+            if not isinstance(user_id, str) or not user_id.strip():
+                raise ValueError("user_id must be a non-empty string when provided")
+            normalized_user_id = user_id.strip()
+            candidates = [
+                e for e in candidates
+                if e.get("metadata", {}).get("user_id") == normalized_user_id
             ]
 
         if not candidates:
             return []
 
-        if _FAISS_AVAILABLE and self._index is not None and days_back is None and not user_id:
-            # Fast path: use FAISS index (no date/user filter, searches the full index)
+        if (
+            _FAISS_AVAILABLE
+            and self._index is not None
+            and days_back is None
+            and user_id is None
+            and len(candidates) == len(self._events)
+        ):
+            # FAISS can only search the full index when every event is unscoped.
             q_np = np.array([query_vector], dtype=np.float32)
             k = min(top_k, len(self._events))
             distances, indices = self._index.search(q_np, k)
