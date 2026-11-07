@@ -141,6 +141,22 @@ class AgentWorkerCredentialStore:
                     "expires_at": normalized_expiry,
                 },
             )
+            # Never leave capabilities from a legacy/self-reported heartbeat
+            # active while a newly provisioned credential is waiting to connect.
+            connection.execute(
+                text(f"""
+                    UPDATE {agents_table}
+                       SET available_tools = {capabilities_expression},
+                           status = 'offline',
+                           updated_at = :now
+                     WHERE agent_id = :agent_id
+                """),
+                {
+                    "available_tools": capabilities_json,
+                    "agent_id": normalized_agent,
+                    "now": now,
+                },
+            )
         return token
 
     def authenticate(self, token: str) -> AgentWorkerPrincipal | None:
@@ -227,4 +243,21 @@ class AgentWorkerCredentialStore:
                 """),
                 {"agent_id": normalized_agent, "now": now},
             )
-        return int(result.rowcount or 0)
+            revoked_count = int(result.rowcount or 0)
+            if revoked_count:
+                empty_tools_expression = "CAST(:empty_tools AS jsonb)" if self._schema else ":empty_tools"
+                connection.execute(
+                    text(f"""
+                        UPDATE {agents_table}
+                           SET available_tools = {empty_tools_expression},
+                               status = 'offline',
+                               updated_at = :now
+                         WHERE agent_id = :agent_id
+                    """),
+                    {
+                        "agent_id": normalized_agent,
+                        "empty_tools": "[]",
+                        "now": now,
+                    },
+                )
+        return revoked_count
