@@ -347,10 +347,9 @@ def test_process_command_scopes_semantic_and_vector_memory_to_request_user():
     )
 
     assert response.success is True
-    interpreter.interpret.assert_called_once_with(
-        "private request",
-        user_id="alice",
-    )
+    interpreter.execute.assert_called_once()
+    assert interpreter.execute.call_args.args[0]["user_id"] == "alice"
+    interpreter.interpret.assert_not_called()
     vector_memory.query_similar.assert_called_once_with(
         "private request",
         top_k=3,
