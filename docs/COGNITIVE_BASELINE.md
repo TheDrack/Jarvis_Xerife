@@ -102,7 +102,8 @@ Evidências de contrato já adicionadas ou existentes:
 - **PR #759:** integra `collect_live_intelligence()` ao endpoint autenticado e adiciona readback do `MemoryManager` após reinício. O workflow de suíte completa passou no head atual; o workflow dedicado de fila foi cancelado e não é contabilizado como sucesso.
 - **Autorização de planos:** `tests/multiagent/test_task_runner_execution_plan_integration.py` cobre allow/deny, ferramenta sensível retornando `approval_required` e bloqueio quando o journal durável falha. São testes com doubles; não comprovam aprovação humana nem identidade/autorização em produção.
 - **PR #760:** corrige o health check do `VectorMemoryAdapter` para aceitar o backend puro-Python quando FAISS não está disponível. A regressão valida consolidação e busca; os workflows de suíte completa e fila passaram.
-- **PR #761:** adiciona `claim_token` por tentativa à fila de mensagens, rejeita ACK obsoleto e revoga a RPC antiga sem fencing. O pgTAP em PostgreSQL isolado passou; os workflows Python ainda estão em validação. O teste de clientes usa backend determinístico em memória; não é E2E de processos nem de produção. A migration de fencing ainda não foi aplicada porque o histórico remoto/local continua divergente.
+- **PR #761:** adiciona `claim_token` por tentativa à fila de mensagens, rejeita ACK obsoleto e revoga a RPC antiga sem fencing. O pgTAP em PostgreSQL isolado e a suíte completa do workflow Task Queue passaram; o workflow `JARVIS PR Validation` foi cancelado e não é contado como sucesso. O teste de clientes usa backend determinístico em memória; não é E2E de processos nem de produção. A migration de fencing ainda não foi aplicada porque o histórico remoto/local continua divergente.
+- **PR #763:** adiciona migration forward-only para rejeitar duração `NULL` na RPC de renovação de lease, preservando a migration histórica. pgTAP isolado, suíte completa e workflow Task Queue passaram. A migration ainda não foi aplicada ao projeto remoto; o RPC continua ausente em produção até a reconciliação e implantação.
 
 Pendências reais de C0:
 
@@ -168,6 +169,8 @@ A migration do worker recorrente cria lease, runs e cinco RPCs protegidas. Como 
 A RPC `mark_stale_jarvis_agents_offline` existe, e as RPCs de claim direto/por fila já aplicam filtros de provider e ferramentas; o claim por fila também chama a reconciliação de heartbeat. `release_jarvis_agent_task` existe. Porém, `renew_jarvis_agent_task_lease` está ausente no banco remoto. O `SupabaseTaskQueueMiniAgent` tenta renová-la a cada 30 segundos (lease padrão de 90 segundos); tarefas longas podem perder o lease, ser reivindicadas novamente e ter a conclusão original rejeitada pelo fencing. Não há tarefa ativa no snapshot atual. A migration local `20261028130000_worker_lease_and_security_hardening.sql` contém essa RPC e os cinco índices reportados ausentes pelo advisor, mas não está aplicada.
 
 A fencing migration da PR #761 protege a fila de mensagens (`jarvis_agent_messages`); ela não implementa a renovação de lease da fila de tarefas (`jarvis_agent_tasks`).
+
+A PR #763 adiciona `20261107020000_task_lease_renewal_null_duration_guard.sql`, que cria/substitui a RPC com validação explícita de `NULL`. O teste de regressão reproduziu o defeito na versão histórica e passou após a migration forward-only. Essa migration não instala os cinco índices da migration `20261028130000`; eles continuam pendentes de reconciliação. Nenhuma das duas migrations foi aplicada ao projeto remoto.
 
 ### 9.2 Segurança e performance do banco
 
