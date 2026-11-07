@@ -13,6 +13,7 @@ class RecordingConnector:
         self.send_error = send_error
         self.sent = []
         self.acknowledged = []
+        self.acknowledged_tokens = []
         self.receive_calls = 0
 
     def receive(self, agent_id, *, timeout_seconds=0):
@@ -26,8 +27,9 @@ class RecordingConnector:
         self.sent.append(message)
         return message.message_id
 
-    def acknowledge(self, message_id, agent_id):
+    def acknowledge(self, message_id, agent_id, *, claim_token=None):
         self.acknowledged.append((message_id, agent_id))
+        self.acknowledged_tokens.append(claim_token)
         return self.acknowledge_result
 
 
