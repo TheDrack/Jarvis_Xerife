@@ -166,22 +166,30 @@ def start_configured_worker() -> tuple[WorkerGroup, threading.Event] | None:
             for name in os.environ
         )
     )
+    has_api_caller = bool(
+        os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
+        or (
+            os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip()
+            and os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "").strip()
+        )
+    )
     has_worker_api = bool(
         os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
         and all(worker_tokens.values())
-        and (
-            os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
-            or (
-                os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip()
-                and os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "").strip()
-            )
-        )
+        and has_api_caller
     )
     if worker_token_configured and not has_worker_api:
+        missing = []
+        if not os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip():
+            missing.append("JARVIS_TASK_QUEUE_API_URL")
+        if not has_api_caller:
+            missing.append("JARVIS_TASK_QUEUE_API_TOKEN or username/password caller identity")
+        if not all(worker_tokens.values()):
+            missing.append("one dedicated worker token per agent slot")
         raise RuntimeError(
-            "Per-agent HTTP workers require JARVIS_TASK_QUEUE_API_URL, a caller JWT "
-            "or username/password, and one dedicated worker token per agent slot. "
-            "The global JARVIS_TASK_QUEUE_WORKER_TOKEN is valid only for a single slot."
+            "Worker identity is configured but incomplete; missing: "
+            + ", ".join(missing)
+            + ". The global JARVIS_TASK_QUEUE_WORKER_TOKEN is valid only for a single slot."
         )
 
     if has_worker_api:
