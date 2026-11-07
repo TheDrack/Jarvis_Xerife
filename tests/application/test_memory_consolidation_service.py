@@ -46,7 +46,7 @@ class _DurableStore:
     def is_healthy(self):
         return True
 
-    def append(self, event):
+    def append(self, event, user_id=None):
         self.events.append(dict(event))
 
     def list_events(self, user_id=None, days_back=None):
