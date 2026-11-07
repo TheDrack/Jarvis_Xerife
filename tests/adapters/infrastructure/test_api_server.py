@@ -665,14 +665,10 @@ class TestJarvisDispatchEndpoint(NexusComponent):
         assert payload["context"] == "Use structured logging with timestamps"
         assert payload["triggered_by"] == "admin"
 
-def test_api_lifespan_starts_and_stops_proactive_monitor(monkeypatch):
+def test_api_lifespan_starts_and_stops_proactive_monitor():
     assistant = Mock(spec=AssistantService)
     assistant.start_proactive_monitor.return_value = True
     assistant.stop_proactive_monitor.return_value = None
-    monkeypatch.setattr(
-        "app.adapters.infrastructure.api_server.nexus.resolve",
-        lambda _component_id: None,
-    )
 
     app = create_api_server(assistant, extension_manager=Mock())
 
