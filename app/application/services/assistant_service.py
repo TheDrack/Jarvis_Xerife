@@ -631,7 +631,18 @@ class AssistantService(NexusComponent):
         self._proactive_task = None
         if task is not None and not task.done():
             try:
-                task.get_loop().call_soon_threadsafe(task.cancel)
+                loop = task.get_loop()
+                if loop.is_closed():
+                    return
+                try:
+                    running_loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    running_loop = None
+
+                if running_loop is loop:
+                    task.cancel()
+                else:
+                    loop.call_soon_threadsafe(task.cancel)
             except RuntimeError:
                 logger.debug("Proactive monitor loop already closed")
 
