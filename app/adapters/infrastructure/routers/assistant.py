@@ -105,15 +105,23 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
             if bypass_identifier:
                 logger.info("GitHub-sourced request – bypassing Jarvis identifier.")
 
-            metadata_dict = None
-            if body.metadata:
-                metadata_dict = {
-                    "source_device_id": body.metadata.source_device_id,
-                    "network_id": body.metadata.network_id,
-                    "network_type": body.metadata.network_type,
-                    "request_source": request_source,
-                    "bypass_identifier": bypass_identifier,
-                }
+            authenticated_user_id = (
+                getattr(current_user, "user_id", None)
+                or getattr(current_user, "username", None)
+            )
+            if not isinstance(authenticated_user_id, str) or not authenticated_user_id.strip():
+                raise HTTPException(
+                    status_code=401,
+                    detail="Authenticated user has no stable identity",
+                )
+            metadata_dict = {
+                "user_id": authenticated_user_id.strip(),
+                "source_device_id": body.metadata.source_device_id if body.metadata else None,
+                "network_id": body.metadata.network_id if body.metadata else None,
+                "network_type": body.metadata.network_type if body.metadata else None,
+                "request_source": request_source,
+                "bypass_identifier": bypass_identifier,
+            }
 
             response = await assistant_service.async_process_command(
                 body.command, channel="api", request_metadata=metadata_dict
@@ -145,7 +153,20 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
         """Send a natural-language message to the assistant (Protected endpoint)."""
         try:
             logger.info(f"User '{current_user.username}' sending message: {body.text}")
-            response = await assistant_service.async_process_command(body.text, channel="api")
+            authenticated_user_id = (
+                getattr(current_user, "user_id", None)
+                or getattr(current_user, "username", None)
+            )
+            if not isinstance(authenticated_user_id, str) or not authenticated_user_id.strip():
+                raise HTTPException(
+                    status_code=401,
+                    detail="Authenticated user has no stable identity",
+                )
+            response = await assistant_service.async_process_command(
+                body.text,
+                channel="api",
+                request_metadata={"user_id": authenticated_user_id.strip()},
+            )
             logger.info(
                 f"Response for '{current_user.username}': success={response.success}, "
                 f"len={len(response.message) if response.message else 0}"
