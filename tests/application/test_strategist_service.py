@@ -69,7 +69,7 @@ def test_viability_matrix_roi_calculation():
 
 def test_viability_matrix_approval_logic():
     """Test approval logic based on ROI and risk"""
-    # Good proposal - should be approved
+    # Good proposal - should be viable, but not human-approved.
     good_matrix = ViabilityMatrix(
         cost=CostEstimate(api_cost_usd=0.5, code_complexity="simple"),
         impact=ImpactEstimate(
@@ -136,7 +136,7 @@ def test_strategist_archive_proposal(strategist):
     impact = ImpactEstimate(user_utility_level=ImpactLevel.HIGH)
     risk = RiskEstimate(risk_level=RiskLevel.LOW)
     
-    # Create approved matrix
+    # Create viable matrix; it must remain pending until human approval.
     matrix = strategist.generate_viability_matrix(
         proposal_title="Archive Test",
         proposal_description="Test archiving",
