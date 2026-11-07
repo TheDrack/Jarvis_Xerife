@@ -195,8 +195,8 @@ As duas entradas históricas `google_linked_identities` foram preservadas separa
 
 ### 9.2 Segurança e performance do banco
 
-- As 26 tabelas apontadas pelo advisor têm RLS habilitado e nenhuma policy. A consulta de privilégios não encontrou grants de tabela para `anon` ou `authenticated`; os acessos observados ficam restritos a `service_role` e ao owner. O advisor classifica isso como INFO. Não tratar ausência de policy, isoladamente, como exposição pública.
-- Advisor de performance reporta cinco foreign keys sem índice de cobertura e 33 índices ainda não utilizados. Não remover índices sem evidência de carga; avaliar os cinco índices ausentes depois da reconciliação de migrations.
+- As tabelas públicas verificadas têm RLS habilitado. A consulta de privilégios não encontrou grants de tabela para `anon` ou `authenticated`; os acessos observados ficam restritos a `service_role` e ao owner. As entradas do advisor sem policy são INFO neste schema, não prova de exposição pública.
+- Os cinco índices de foreign keys para attempts/events/parent/routine foram criados e verificados após PR #767. Ainda há 33 índices não utilizados no advisor; não remover sem evidência de carga.
 - Advisor de health não reportou findings.
 
 ### 9.3 Limites de execução local e E2E
