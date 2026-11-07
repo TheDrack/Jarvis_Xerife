@@ -7,6 +7,9 @@ on:
       - "supabase/migrations/20261104235000_provider_aware_remote_task_claims.sql"
       - "supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql"
       - "supabase/tests/provider_aware_task_claims.test.sql"
+      - "supabase/migrations/20261028130000_worker_lease_and_security_hardening.sql"
+      - "supabase/tests/task_lease_renewal.test.sql"
+      - ".github/test-fixtures/task_lease_renewal_fixture.sql"
       - ".github/workflows/supabase-provider-claims-tests.yml"
   workflow_dispatch:
 
@@ -64,4 +67,46 @@ jobs:
       - name: Stop isolated database
         if: always()
         working-directory: ${{ runner.temp }}/jarvis-provider-claims
+        run: supabase stop --no-backup || true
+
+  task-lease-renewal:
+    name: PostgreSQL task lease renewal tests (isolated local Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+
+      - name: Assemble isolated migration fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_dir="${RUNNER_TEMP}/jarvis-task-lease-renewal"
+          mkdir -p "${test_dir}"
+          cd "${test_dir}"
+          supabase init --force
+          mkdir -p supabase/migrations supabase/tests
+          cp "${GITHUB_WORKSPACE}/.github/test-fixtures/task_lease_renewal_fixture.sql" supabase/migrations/20261001000000_task_lease_renewal_fixture.sql
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261028130000_worker_lease_and_security_hardening.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/tests/task_lease_renewal.test.sql" supabase/tests/
+
+      - name: Start isolated PostgreSQL
+        working-directory: ${{ runner.temp }}/jarvis-task-lease-renewal
+        run: |
+          supabase start --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Execute pgTAP behavior tests
+        working-directory: ${{ runner.temp }}/jarvis-task-lease-renewal
+        run: supabase test db supabase/tests/task_lease_renewal.test.sql
+
+      - name: Stop isolated database
+        if: always()
+        working-directory: ${{ runner.temp }}/jarvis-task-lease-renewal
         run: supabase stop --no-backup || true
