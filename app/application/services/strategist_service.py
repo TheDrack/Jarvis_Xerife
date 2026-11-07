@@ -48,17 +48,19 @@ class StrategistService(NexusComponent):
         cost_payload = payload.get("cost")
         impact_payload = payload.get("impact")
         risk_payload = payload.get("risk")
-        missing = [
-            name
-            for name, value in (
-                ("proposal_title", title),
-                ("proposal_description", description),
-                ("cost", cost_payload),
-                ("impact", impact_payload),
-                ("risk", risk_payload),
-            )
-            if value is None or value == "" or value == {}
-        ]
+        missing = []
+        for name, value in (
+            ("proposal_title", title),
+            ("proposal_description", description),
+            ("cost", cost_payload),
+            ("impact", impact_payload),
+            ("risk", risk_payload),
+        ):
+            if name in {"proposal_title", "proposal_description"}:
+                if not isinstance(value, str) or not value.strip():
+                    missing.append(name)
+            elif value is None or value == {}:
+                missing.append(name)
         if missing:
             return {
                 "success": False,
@@ -124,6 +126,7 @@ class StrategistService(NexusComponent):
             "status": "pending" if viable else "rejected",
             "viable": viable,
             "approved": False,
+            "approval_required": viable,
             "roi": matrix.calculate_roi(),
             "rejection_reason": matrix.rejection_reason,
             "decision_prompt": self.format_decision_prompt(matrix) if viable else None,
