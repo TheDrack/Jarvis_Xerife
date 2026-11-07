@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.application.ports.memory_provider import MemoryProvider
+from app.application.ports.vector_memory_store import VectorMemoryStore
 from app.adapters.infrastructure.supabase_vector_memory_store import SupabaseVectorMemoryStore
 
 logger = logging.getLogger(__name__)
@@ -101,7 +102,7 @@ class VectorMemoryAdapter(MemoryProvider):
                 )
                 self._store = None
         else:
-            self._store = store
+            self._store: Optional[VectorMemoryStore] = store
 
         if _FAISS_AVAILABLE:
             self._index = faiss.IndexFlatL2(dim)
