@@ -2,6 +2,7 @@
 """Memory Consolidation Service — Ponte entre curto e longo prazo.
 CORREÇÃO: Health check do VectorAdapter antes de ejetar memórias.
 """
+
 import logging
 from typing import Any, Dict, List, Optional
 from app.core.nexus import NexusComponent, nexus
@@ -12,13 +13,13 @@ logger = logging.getLogger(__name__)
 class MemoryConsolidationService(NexusComponent):
     """
     Orquestra transferência da WorkingMemory para VectorMemory.
-    
+
     Analogia Biológica:
     - WorkingMemory = Hipocampo (curto prazo)
     - VectorMemory = Córtex (longo prazo)
     - Este serviço = Sono REM (consolidação)
     """
-    
+
     def __init__(
         self,
         working_memory: Optional[Any] = None,
@@ -27,24 +28,28 @@ class MemoryConsolidationService(NexusComponent):
         super().__init__()
         self._working_memory = working_memory
         self._vector_adapter = vector_adapter
-    
+
     def _get_working_memory(self) -> Optional[Any]:
         """Lazy loading via Nexus."""
         if self._working_memory is None:
             try:
                 self._working_memory = nexus.resolve("working_memory")
             except Exception as exc:
-                logger.debug(f"[ConsolidationService] WorkingMemory indisponível: {exc}")
+                logger.debug(
+                    f"[ConsolidationService] WorkingMemory indisponível: {exc}"
+                )
                 return None
         return self._working_memory
-    
+
     def _get_vector_adapter(self) -> Optional[Any]:
         """Lazy loading via Nexus."""
         if self._vector_adapter is None:
             try:
                 self._vector_adapter = nexus.resolve("vector_memory_adapter")
             except Exception as exc:
-                logger.debug(f"[ConsolidationService] VectorAdapter indisponível: {exc}")
+                logger.debug(
+                    f"[ConsolidationService] VectorAdapter indisponível: {exc}"
+                )
                 return None
         return self._vector_adapter
 
@@ -55,11 +60,11 @@ class MemoryConsolidationService(NexusComponent):
             True se VectorAdapter está saudável e pronto para escrita.
         """
         vector_adapter = self._get_vector_adapter()
-        
+
         if vector_adapter is None:
             logger.warning("[ConsolidationService] VectorAdapter não resolvido.")
             return False
-        
+
         # A working in-memory fallback is not enough for consolidation:
         # only evict short-term memory when the destination is durable.
         if hasattr(vector_adapter, "is_durable"):
@@ -85,13 +90,17 @@ class MemoryConsolidationService(NexusComponent):
             try:
                 healthy = vector_adapter.is_healthy()
                 if not healthy:
-                    logger.warning("[ConsolidationService] VectorAdapter reportou não saudável.")
+                    logger.warning(
+                        "[ConsolidationService] VectorAdapter reportou não saudável."
+                    )
                     return False
-                logger.debug("[ConsolidationService] VectorAdapter saudável (is_healthy).")
+                logger.debug(
+                    "[ConsolidationService] VectorAdapter saudável (is_healthy)."
+                )
                 return True
             except Exception as exc:
                 logger.debug(f"[ConsolidationService] is_healthy() falhou: {exc}")
-        
+
         # Método 2: Check de atributo _index (FAISS)
         if hasattr(vector_adapter, "_index"):
             if vector_adapter._index is None:
@@ -99,12 +108,12 @@ class MemoryConsolidationService(NexusComponent):
                 return False
             logger.debug("[ConsolidationService] FAISS index presente.")
             return True
-        
+
         # Método 3: Check de instância (fallback puro Python)
         if hasattr(vector_adapter, "_store"):
             logger.debug("[ConsolidationService] Fallback Python ativo.")
             return True
-        
+
         # Método 4: Teste de escrita leve (sem modificar dados permanentes)
         try:
             # Verifica se método store_event existe
@@ -142,7 +151,7 @@ class MemoryConsolidationService(NexusComponent):
             return {
                 "success": True,
                 "consolidated_count": count,
-                "message": f"{count} memórias transformadas em longo prazo."
+                "message": f"{count} memórias transformadas em longo prazo.",
             }
         except Exception as e:
             logger.error(f"[ConsolidationService] Falha na consolidação: {e}")
@@ -186,7 +195,9 @@ class MemoryConsolidationService(NexusComponent):
         if not evicted_entries:
             return 0
 
-        logger.info(f"[ConsolidationService] {len(evicted_entries)} memórias ejetadas para consolidação.")
+        logger.info(
+            f"[ConsolidationService] {len(evicted_entries)} memórias ejetadas para consolidação."
+        )
 
         # 2. Transformação Semântica
         documents_to_embed = []
@@ -197,7 +208,8 @@ class MemoryConsolidationService(NexusComponent):
 
             # Metadados limpos para busca futura
             meta = {
-                k: v for k, v in entry.items()
+                k: v
+                for k, v in entry.items()
                 if k not in ["user_input", "response", "_ts"]
             }
             meta["source"] = "working_memory_consolidation"
@@ -210,10 +222,7 @@ class MemoryConsolidationService(NexusComponent):
                 f"Jarvis: {response}"
             )
 
-            documents_to_embed.append({
-                "text": semantic_text,
-                "metadata": meta
-            })
+            documents_to_embed.append({"text": semantic_text, "metadata": meta})
 
         # 3. Persistência (VectorAdapter armazena)
         consolidated = 0
@@ -221,10 +230,7 @@ class MemoryConsolidationService(NexusComponent):
 
         for doc in documents_to_embed:
             try:
-                vector_adapter.store_event(
-                    text=doc["text"],
-                    metadata=doc["metadata"]
-                )
+                vector_adapter.store_event(text=doc["text"], metadata=doc["metadata"])
                 consolidated += 1
             except Exception as e:
                 logger.error(f"[ConsolidationService] Falha ao gravar vetor: {e}")
@@ -243,12 +249,17 @@ class MemoryConsolidationService(NexusComponent):
                     "user_input": doc["metadata"].get("user_input", ""),
                     "response": doc["metadata"].get("response", ""),
                     "_ts": doc["metadata"].get("original_timestamp", ""),
-                    **{k: v for k, v in doc["metadata"].items()
-                       if k not in ["source", "original_timestamp"]}
+                    **{
+                        k: v
+                        for k, v in doc["metadata"].items()
+                        if k not in ["source", "original_timestamp"]
+                    },
                 }
                 working_memory.push(original_entry)
 
-        logger.info(f"🧠 [ConsolidationService] {consolidated}/{len(documents_to_embed)} memórias consolidadas.")
+        logger.info(
+            f"🧠 [ConsolidationService] {consolidated}/{len(documents_to_embed)} memórias consolidadas."
+        )
         return consolidated
 
 

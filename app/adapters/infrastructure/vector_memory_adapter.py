@@ -21,7 +21,9 @@ from typing import Any, Dict, List, Optional
 
 from app.application.ports.memory_provider import MemoryProvider
 from app.application.ports.vector_memory_store import VectorMemoryStore
-from app.adapters.infrastructure.supabase_vector_memory_store import SupabaseVectorMemoryStore
+from app.adapters.infrastructure.supabase_vector_memory_store import (
+    SupabaseVectorMemoryStore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -142,11 +144,15 @@ class VectorMemoryAdapter(MemoryProvider):
         if self._pii_redactor is None:
             try:
                 from app.core.nexus import nexus
+
                 self._pii_redactor = nexus.resolve("pii_redactor")
             except Exception as exc:  # pragma: no cover
-                logger.warning("⚠️ [VectorMemory] Nexus PiiRedactor indisponível: %s", exc)
+                logger.warning(
+                    "⚠️ [VectorMemory] Nexus PiiRedactor indisponível: %s", exc
+                )
             if self._pii_redactor is None:
                 from app.application.privacy.pii_redactor import PiiRedactor
+
                 self._pii_redactor = PiiRedactor()
         return self._pii_redactor
 
@@ -210,10 +216,7 @@ class VectorMemoryAdapter(MemoryProvider):
             if not isinstance(user_id, str) or not user_id.strip():
                 raise ValueError("user_id must be a non-empty string when provided")
             normalized_user_id = user_id.strip()
-            if (
-                metadata_user_id is not None
-                and metadata_user_id != normalized_user_id
-            ):
+            if metadata_user_id is not None and metadata_user_id != normalized_user_id:
                 raise ValueError(
                     "metadata user_id conflicts with authenticated user_id"
                 )
@@ -230,7 +233,7 @@ class VectorMemoryAdapter(MemoryProvider):
         # Persist before updating the in-memory cache. A failed cloud write
         # must not look like a successful durable memory operation.
         if self._store is not None:
-            self._store.append(event, user_id=combined_metadata.get('user_id'))
+            self._store.append(event, user_id=combined_metadata.get("user_id"))
 
         if self._store is None:
             self._events.append(event)
@@ -238,7 +241,11 @@ class VectorMemoryAdapter(MemoryProvider):
                 vec_np = np.array([vector], dtype=np.float32)
                 self._index.add(vec_np)
 
-        logger.debug("🧠 [VectorMemory] Evento armazenado: %s (total=%d)", event_id, len(self._events))
+        logger.debug(
+            "🧠 [VectorMemory] Evento armazenado: %s (total=%d)",
+            event_id,
+            len(self._events),
+        )
         return event_id
 
     def query_similar(
@@ -267,6 +274,7 @@ class VectorMemoryAdapter(MemoryProvider):
 
         if days_back is not None:
             from datetime import timedelta
+
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days_back)
             cutoff_ts = cutoff.isoformat()
 
@@ -274,22 +282,21 @@ class VectorMemoryAdapter(MemoryProvider):
         # predicate server-side, while the local fallback applies it here.
         if cutoff_ts:
             candidates = [
-                e for e in candidates
-                if str(e.get("timestamp", "")) >= cutoff_ts
+                e for e in candidates if str(e.get("timestamp", "")) >= cutoff_ts
             ]
 
         # Unscoped callers may read only local/system records, never user data.
         if user_id is None:
             candidates = [
-                e for e in candidates
-                if e.get("metadata", {}).get("user_id") is None
+                e for e in candidates if e.get("metadata", {}).get("user_id") is None
             ]
         else:
             if not isinstance(user_id, str) or not user_id.strip():
                 raise ValueError("user_id must be a non-empty string when provided")
             normalized_user_id = user_id.strip()
             candidates = [
-                e for e in candidates
+                e
+                for e in candidates
                 if e.get("metadata", {}).get("user_id") == normalized_user_id
             ]
 
@@ -323,10 +330,7 @@ class VectorMemoryAdapter(MemoryProvider):
             dot = sum(x * y for x, y in zip(a, b))
             return dot  # vectors are already L2-normalised → dot == cosine
 
-        scored = [
-            (e, _cosine(query_vector, e["vector"]))
-            for e in candidates
-        ]
+        scored = [(e, _cosine(query_vector, e["vector"])) for e in candidates]
         scored.sort(key=lambda t: t[1], reverse=True)
 
         results = []
@@ -337,7 +341,7 @@ class VectorMemoryAdapter(MemoryProvider):
             results.append(ev)
 
         return results
-        
+
     def get_recent_entries(
         self,
         limit: int = 100,
@@ -351,14 +355,16 @@ class VectorMemoryAdapter(MemoryProvider):
         else:
             if user_id is None:
                 events = [
-                    event for event in self._events
+                    event
+                    for event in self._events
                     if event.get("metadata", {}).get("user_id") is None
                 ]
             else:
                 if not isinstance(user_id, str) or not user_id.strip():
                     raise ValueError("user_id must be a non-empty string when provided")
                 events = [
-                    event for event in self._events
+                    event
+                    for event in self._events
                     if event.get("metadata", {}).get("user_id") == user_id.strip()
                 ]
         return sorted(
@@ -376,7 +382,8 @@ class VectorMemoryAdapter(MemoryProvider):
             if self._store is not None:
                 self._store.delete_events(user_id=normalized_user_id)
             self._events = [
-                event for event in self._events
+                event
+                for event in self._events
                 if event.get("metadata", {}).get("user_id") != normalized_user_id
             ]
         else:
@@ -388,6 +395,8 @@ class VectorMemoryAdapter(MemoryProvider):
             self._index.reset()
             if self._events:
                 self._index.add(
-                    np.array([event["vector"] for event in self._events], dtype=np.float32)
+                    np.array(
+                        [event["vector"] for event in self._events], dtype=np.float32
+                    )
                 )
         logger.info("🗑️ [VectorMemory] Memória vetorial limpa.")

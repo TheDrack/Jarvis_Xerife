@@ -124,7 +124,9 @@ def test_store_event_uses_local_redactor_when_nexus_redactor_is_missing(
 
     monkeypatch.setattr(nexus, "resolve", lambda _name: None)
 
-    pii_vector_adapter.store_event("Contact alice.smith@example.com, CPF 123.456.789-09")
+    pii_vector_adapter.store_event(
+        "Contact alice.smith@example.com, CPF 123.456.789-09"
+    )
 
     stored_text = pii_vector_adapter._events[0]["text"]
     assert "[EMAIL_REDACTED]" in stored_text
@@ -133,7 +135,9 @@ def test_store_event_uses_local_redactor_when_nexus_redactor_is_missing(
     assert "123.456.789-09" not in stored_text
 
 
-def test_store_event_refuses_an_invalid_registered_redactor(monkeypatch, pii_vector_adapter):
+def test_store_event_refuses_an_invalid_registered_redactor(
+    monkeypatch, pii_vector_adapter
+):
     from app.core.nexus import nexus
 
     monkeypatch.setattr(nexus, "resolve", lambda _name: object())
@@ -159,6 +163,7 @@ def test_store_event_rejects_user_id_in_untrusted_metadata(
 
     assert pii_vector_adapter._events == []
 
+
 def test_store_event_rejects_conflicting_user_id_metadata(
     monkeypatch, pii_vector_adapter
 ):
@@ -174,6 +179,7 @@ def test_store_event_rejects_conflicting_user_id_metadata(
         )
 
     assert pii_vector_adapter._events == []
+
 
 class _SharedVectorMemoryStore:
     def __init__(self, events=None):
@@ -282,6 +288,7 @@ def test_clear_only_removes_the_requested_user_partition():
     assert len(store.list_events(user_id="alice")) == 0
     assert len(store.list_events(user_id="bob")) == 1
 
+
 def test_vector_memory_clear_without_user_id_clears_all_partitions_explicitly():
     store = _SharedVectorMemoryStore()
     adapter = VectorMemoryAdapter(dim=32, store=store)
@@ -292,6 +299,7 @@ def test_vector_memory_clear_without_user_id_clears_all_partitions_explicitly():
 
     assert store.events == []
     assert adapter._events == []
+
 
 def test_configured_but_unhealthy_vector_store_is_not_healthy():
     class UnhealthyStore(_SharedVectorMemoryStore):

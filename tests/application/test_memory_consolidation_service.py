@@ -37,6 +37,7 @@ def test_consolidation_accepts_vector_adapter_without_faiss(monkeypatch):
     assert len(results) == 1
     assert "authenticated service endpoints" in results[0]["text"]
 
+
 class _DurableStore:
     is_available = True
 
@@ -85,6 +86,7 @@ def test_consolidation_preserves_working_memory_without_durable_vector_store():
 
     assert consolidated == 0
     assert working_memory.size == 1
+
 
 def test_consolidation_preserves_working_memory_when_durable_store_is_unhealthy():
     class UnhealthyStore(_DurableStore):

@@ -24,7 +24,9 @@ class SupabaseVectorMemoryStore:
     it is never trusted from the metadata JSON object.
     """
 
-    def __init__(self, client: Any = _AUTO_CLIENT, table_name: str = _TABLE_NAME) -> None:
+    def __init__(
+        self, client: Any = _AUTO_CLIENT, table_name: str = _TABLE_NAME
+    ) -> None:
         self._client = get_supabase_admin_client() if client is _AUTO_CLIENT else client
         self._table_name = table_name
 
@@ -127,7 +129,9 @@ class SupabaseVectorMemoryStore:
         while True:
             query = (
                 self._client.table(self._table_name)
-                .select("id,user_id,scope_key,event_text,embedding,metadata,created_at,vector_dim")
+                .select(
+                    "id,user_id,scope_key,event_text,embedding,metadata,created_at,vector_dim"
+                )
                 .eq("scope_key", scope_key)
                 .order("created_at", desc=True)
                 .range(offset, offset + _PAGE_SIZE - 1)
@@ -161,7 +165,9 @@ class SupabaseVectorMemoryStore:
         if not self.is_available:
             raise RuntimeError("Supabase vector-memory persistence is unavailable")
         scope_key = self._scope_key(user_id)
-        self._client.table(self._table_name).delete().eq("scope_key", scope_key).execute()
+        self._client.table(self._table_name).delete().eq(
+            "scope_key", scope_key
+        ).execute()
 
     def delete_all(self) -> None:
         """Delete every partition; called only by the explicit adapter clear()."""

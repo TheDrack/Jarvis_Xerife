@@ -39,7 +39,7 @@ def test_append_uses_authoritative_scope_column_and_strips_user_from_metadata():
         "timestamp": datetime(2026, 11, 7, tzinfo=timezone.utc),
     }
 
-    store.append(event, user_id='alice')
+    store.append(event, user_id="alice")
 
     client.table.assert_called_once_with("jarvis_vector_memories")
     row = query.insert.call_args.args[0]
@@ -107,6 +107,7 @@ def test_store_without_service_client_is_not_available():
     assert store.is_available is False
     assert store.is_healthy() is False
 
+
 def test_append_rejects_user_identity_supplied_only_in_metadata():
     client, _ = _client_with_query()
     store = SupabaseVectorMemoryStore(client=client)
@@ -124,6 +125,7 @@ def test_append_rejects_user_identity_supplied_only_in_metadata():
         assert "trusted user_id argument" in str(exc)
     else:
         raise AssertionError("untrusted metadata must not establish memory ownership")
+
 
 def test_delete_all_uses_a_non_empty_scope_guard():
     client, query = _client_with_query()
