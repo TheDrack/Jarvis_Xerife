@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 _TABLE_NAME = "jarvis_vector_memories"
 _PAGE_SIZE = 1000
+_AUTO_CLIENT = object()
 
 
 class SupabaseVectorMemoryStore:
@@ -23,8 +24,8 @@ class SupabaseVectorMemoryStore:
     it is never trusted from the metadata JSON object.
     """
 
-    def __init__(self, client: Any = None, table_name: str = _TABLE_NAME) -> None:
-        self._client = client if client is not None else get_supabase_admin_client()
+    def __init__(self, client: Any = _AUTO_CLIENT, table_name: str = _TABLE_NAME) -> None:
+        self._client = get_supabase_admin_client() if client is _AUTO_CLIENT else client
         self._table_name = table_name
 
     @property
