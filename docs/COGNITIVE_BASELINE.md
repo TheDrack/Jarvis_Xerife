@@ -95,11 +95,24 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 
 ## 7. Próxima implementação recomendada
 
-**Concluir C0 com testes de baseline de integração, sem criar módulos novos.**
+**Manter C0 aberto até provar persistência e execução entre runtimes reais.**
 
-O primeiro teste integrado está incluído na PR #759. Ele conecta `collect_live_intelligence()` ao endpoint autenticado com duas fontes controladas e falhas parciais. CI ainda precisa confirmar o resultado.
+Evidências de contrato já adicionadas ou existentes:
 
-Próximo incremento: baseline de memória e autorização do plano com fakes, sem acesso a banco ou serviços externos. Depois, provar store/readback após reinício e idempotência. Só iniciar C1 quando C0 satisfizer critérios de integração, persistência, autorização e recuperação.
+- **PR #759:** integra `collect_live_intelligence()` ao endpoint autenticado com fontes controladas, deduplicação, correlação candidata e falhas parciais. Os workflows de suíte completa e fila passaram.
+- **Autorização de planos:** `tests/multiagent/test_task_runner_execution_plan_integration.py` cobre allow/deny, ferramenta sensível retornando `approval_required` e bloqueio quando o journal durável falha. São testes com doubles; não comprovam aprovação humana nem identidade/autorização em produção.
+- **PR #760:** corrige o health check do `VectorMemoryAdapter` para aceitar o backend puro-Python quando FAISS não está disponível. A regressão valida consolidação e busca; workflows ainda precisam terminar.
+- **PR #761:** verifica dispatch, consumo, resposta correlacionada, ACK e redelivery após expiração do lease com clientes independentes. O backend é determinístico em memória; não é Supabase E2E e não prova que o runtime de produção inicia esse caminho.
+
+Pendências reais de C0:
+
+1. Provar escrita e readback de memória persistente após reinício, com idempotência.
+2. Executar dois processos/runtimes isolados contra um banco de integração isolado, sem usar o projeto de produção.
+3. Escolher e demonstrar um caminho canônico de execução: o runtime supervisionado atual inicia `SupabaseTaskQueueMiniAgent` ou `PriorityQueueMiniAgent`; a via `AgentLeader`/`AgentWorker` ainda é separada.
+4. Validar aprovação humana e autorização com identidade real, além dos doubles existentes.
+5. Fechar lease/fencing e recuperação no caminho efetivamente escolhido.
+
+Não iniciar C1 nem ativar o worker recorrente até que essas evidências e a reconciliação do ledger de migrations estejam concluídas.
 
 ## 8. Trilhas transversais e mudanças recentes
 
