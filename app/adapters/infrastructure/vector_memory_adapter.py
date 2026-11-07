@@ -182,7 +182,9 @@ class VectorMemoryAdapter(MemoryProvider):
         if not text:
             return {"success": False, "error": "Campo 'text' obrigatório no contexto."}
         event_id = self.store_event(
-            text, metadata=ctx.get("metadata"), user_id=ctx.get("user_id")
+            text,
+            metadata=ctx.get("metadata"),
+            user_id=ctx.get("user_id"),
         )
         return {"success": True, "event_id": event_id}
 
@@ -240,7 +242,12 @@ class VectorMemoryAdapter(MemoryProvider):
                 )
             combined_metadata["user_id"] = normalized_user_id
 
+        # The trusted owner identifier is an authorization key, not free-form
+        # metadata. Preserve it exactly while redacting every other metadata value.
+        trusted_user_id = combined_metadata.pop("user_id", None)
         combined_metadata = _sanitize_metadata(combined_metadata, sanitize)
+        if trusted_user_id is not None:
+            combined_metadata["user_id"] = trusted_user_id
 
         event = {
             "id": event_id,
