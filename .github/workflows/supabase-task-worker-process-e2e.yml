@@ -6,12 +6,10 @@ on:
     paths:
       - "app/multiagent/supabase_task_worker.py"
       - "app/multiagent/supabase_store.py"
-      - "supabase/migrations/202610230002_multi_agent_control_plane.sql"
-      - "supabase/migrations/202610230004_priority_routine_scheduler.sql"
-      - "supabase/migrations/202610260001_red_blue_venice_routing.sql"
-      - "supabase/migrations/20261027120000_agent_model_provider.sql"
-      - "supabase/migrations/20261028100000_agent_heartbeat_reconciliation.sql"
-      - "supabase/migrations/20261104235000_provider_aware_remote_task_claims.sql"
+      - "supabase/migrations/20261024142635_202610230002_multi_agent_control_plane.sql"
+      - "supabase/migrations/20261024142639_202610230004_priority_routine_scheduler.sql"
+      - "supabase/migrations/20261027165940_20261027_multi_agent_model_provider_heartbeat.sql"
+      - "supabase/migrations/20261105023946_provider_aware_remote_task_claims.sql"
       - "supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql"
       - "supabase/migrations/20261107020000_task_lease_renewal_null_duration_guard.sql"
       - "supabase/tests/task_lease_renewal.test.sql"
@@ -53,12 +51,10 @@ jobs:
           supabase init --force
           mkdir -p supabase/migrations supabase/tests
 
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610230002_multi_agent_control_plane.sql" supabase/migrations/
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610230004_priority_routine_scheduler.sql" supabase/migrations/
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610260001_red_blue_venice_routing.sql" supabase/migrations/
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261027120000_agent_model_provider.sql" supabase/migrations/
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261028100000_agent_heartbeat_reconciliation.sql" supabase/migrations/
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261104235000_provider_aware_remote_task_claims.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261024142635_202610230002_multi_agent_control_plane.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261024142639_202610230004_priority_routine_scheduler.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261027165940_20261027_multi_agent_model_provider_heartbeat.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105023946_provider_aware_remote_task_claims.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/migrations/20261107020000_task_lease_renewal_null_duration_guard.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/tests/task_lease_renewal.test.sql" supabase/tests/

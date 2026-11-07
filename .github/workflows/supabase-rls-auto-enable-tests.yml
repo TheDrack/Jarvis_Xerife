@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "supabase/migrations/20261105110000_rls_auto_enable_execute_acl.sql"
+      - "supabase/migrations/20261105093046_rls_auto_enable_execute_acl.sql"
       - "supabase/tests/rls_auto_enable_execute_acl.test.sql"
       - ".github/workflows/supabase-rls-auto-enable-tests.yml"
   workflow_dispatch:
@@ -42,7 +42,7 @@ jobs:
           supabase init --force
           mkdir -p supabase/migrations supabase/tests
           cp "${GITHUB_WORKSPACE}/.github/test-fixtures/rls_auto_enable_fixture.sql" supabase/migrations/20261001000000_fixture_rls_auto_enable.sql
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105110000_rls_auto_enable_execute_acl.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105093046_rls_auto_enable_execute_acl.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/tests/rls_auto_enable_execute_acl.test.sql" supabase/tests/
 
       - name: Start isolated PostgreSQL

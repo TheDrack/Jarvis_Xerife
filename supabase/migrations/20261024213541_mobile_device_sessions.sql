@@ -29,8 +29,6 @@ alter table public.jarvis_mobile_device_sessions enable row level security;
 revoke all on table public.jarvis_mobile_device_sessions from public, anon, authenticated;
 grant select, insert, update, delete on table public.jarvis_mobile_device_sessions to service_role;
 
--- Rotate atomically under a row lock. Reuse of a rotated or expired token
--- revokes the entire token family, which limits damage from refresh-token replay.
 create or replace function public.rotate_jarvis_mobile_session(
     p_token_hash text,
     p_replacement_hash text,
@@ -102,9 +100,6 @@ revoke all on function public.rotate_jarvis_mobile_session(text, text, text, tim
 grant execute on function public.rotate_jarvis_mobile_session(text, text, text, timestamptz)
     to service_role;
 
-
--- Revoke the entire session family, not just the presented token. This also
--- handles logout racing with an in-flight refresh-token rotation.
 create or replace function public.revoke_jarvis_mobile_session(
     p_token_hash text,
     p_device_id text

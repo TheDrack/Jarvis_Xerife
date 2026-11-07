@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - "supabase/migrations/20261105100000_evolution_rewards_least_privilege.sql"
+      - "supabase/migrations/20261105093043_evolution_rewards_least_privilege.sql"
       - "supabase/tests/evolution_rewards_least_privilege.test.sql"
       - ".github/workflows/supabase-evolution-rewards-tests.yml"
   workflow_dispatch:
@@ -42,7 +42,7 @@ jobs:
           supabase init --force
           mkdir -p supabase/migrations supabase/tests
           cp "${GITHUB_WORKSPACE}/.github/test-fixtures/evolution_rewards_fixture.sql" supabase/migrations/20261001000000_fixture_evolution_rewards.sql
-          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105100000_evolution_rewards_least_privilege.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105093043_evolution_rewards_least_privilege.sql" supabase/migrations/
           cp "${GITHUB_WORKSPACE}/supabase/tests/evolution_rewards_least_privilege.test.sql" supabase/tests/
 
       - name: Start isolated PostgreSQL
