@@ -13,6 +13,8 @@ Task-queue worker requests carry two independent credentials:
 
 The worker's `agent_id` in the request body must exactly match the credential's registered `agent_id`. A mismatch is rejected with HTTP 403. A missing, expired, unknown, or revoked worker credential is rejected with HTTP 401. If the credential registry cannot be reached, the API fails closed with HTTP 503.
 
+Provisioning first marks the agent offline and replaces its persisted capability list with the new server grant. Revocation marks it offline and clears its capabilities. This prevents stale capabilities from an older, self-reported heartbeat remaining schedulable while a replacement worker has not yet authenticated.
+
 The worker token is generated from 48 bytes of cryptographic randomness with the `jarvisw_` prefix. Only its SHA-256 hash is stored. Tokens are displayed once by the provisioning CLI, expire within 90 days, and are rotated atomically: issuing a replacement revokes previous active credentials for that agent. Revocation is available per agent.
 
 ## Capability boundary
