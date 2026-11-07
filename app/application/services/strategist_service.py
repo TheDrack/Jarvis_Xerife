@@ -249,6 +249,8 @@ class StrategistService(NexusComponent):
 
         filename = f"{matrix.proposal_id}.jrvs"
         filepath = target_dir / filename
+        if filepath.exists() or filepath.is_symlink():
+            raise FileExistsError(f"Proposal already exists: {filename}")
         proposal_data = matrix.to_dict()
         proposal_data.update(
             {
