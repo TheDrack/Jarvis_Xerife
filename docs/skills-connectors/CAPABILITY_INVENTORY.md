@@ -2,7 +2,7 @@
 
 **Scope:** repo-derived discovery map for compatible agent harnesses.  
 **Source of truth:** source code, tests, live connector registry, deployment state, and the delivery audit—not the status field alone.  
-**Last reviewed:** 2026-11-07 (post-merge migration ledger, remote schema, queue and runtime capability audit; not a complete production runtime audit).
+**Last reviewed:** 2026-11-07 (post-merge PR #769; migration ledger, vector-memory schema/ACL and worker capability boundary checked read-only; not a complete production runtime audit).
 
 ## How to interpret status
 
@@ -36,7 +36,7 @@ Never infer the latter states from file names, README claims, inventory metadata
 | Browser portas and traffic observer (CDP) | app/adapters/edge/portas_*.py, data/portas/macros | Implemented on PR branch; unit tests cover macro authorization, URL scheme allowlisting, URL/payload redaction and WebSocket event callbacks. CI integration test attaches to Chromium/CDP and captures HTTP events. WebSocket frames via real CDP and the user's persistent browser profile remain runtime acceptance items. |
 | Android navigation | skills/jarvis-android-navigation/SKILL.md and Android-related modules/workflows | Skill exists; paired device and end-to-end hardware behavior must be checked live. |
 | LLM routing and cost tracking | app/multiagent/model_registry.py, app/multiagent/model_runtime_factory.py, app/application/ports/model_runtime.py, app/adapters/infrastructure/freellmapi_model_runtime.py, llm_router, model/gateway adapters, CostTrackerAdapter | Model profiles and provider-to-runtime bindings are implemented; the shared mini-agent composition is used by HTTP, Supabase and supervised worker roots. This resolves the configured default profile to an adapter but does not probe provider health, prove credentials/connectivity, select among multiple eligible models, or unify LLMRouter/AIGateway/ModelOrchestrator. Provider-specific routes remain active. |
-| Context/memory | memory services/adapters and context protocol | Code does not prove persistence backend is connected or that provider-native memory changed. Confirm writes and readback. |
+| Context/memory | `app/adapters/infrastructure/vector_memory_adapter.py`, `app/adapters/infrastructure/supabase_vector_memory_store.py`, `app/application/ports/vector_memory_store.py`, `MemoryManager`, `WorkingMemory`, `MemoryConsolidationService` | PR #769 adds durable per-user vector persistence/readback, metadata PII redaction, and consolidation fail-safe. Migration `20261107033349` is applied in the active Supabase project; read-only verification found RLS enabled, zero policies, `service_role` SELECT/INSERT/DELETE only (no UPDATE), no client SELECT grants, two indexes, four constraints, and zero rows. Isolated pgTAP 16/16 and full PR Validation/Task Queue passed. This verifies schema/ACL and CI, not the Render application deployment. Remaining: procedural bootstrap, idempotency, retention/erasure, full provenance, ANN/pgvector scaling, and runtime write/readback after deploy. |
 | Remote access | [RDC → Aperture → Tailscale → Jarvis runbook](../ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md) | Installation-specific route. Validate live connector, grants, tailnet and interactive Windows session. |
 | GitHub / Supabase / Render operations | Connector families listed in [CATALOG.md](CATALOG.md) | The current AI agent can use only tools actually exposed by its connected host and authorized account. |
 
@@ -51,6 +51,7 @@ Never infer the latter states from file names, README claims, inventory metadata
 7. **Declarative plans:** unknown outcomes after a connector dispatch must not be blindly retried. Sensitive capabilities remain blocked pending trusted approval/resume.
 8. **Production state is separate from repo state:** deployment, migration, connector connectivity, device availability, and service-role access each require live evidence.
 9. **Mini-agent tool boundary:** FreeLLMAPI workers are deliberately text-only and advertise `text_reasoning`; they do not have a production ToolAuthorizationPolicy or GitHub/Supabase/Render execution adapters. Never add `repository_read`, `github_read`, or `production_read` to `available_tools` until a real executor and host-backed authorization path exist.
+10. **Vector-memory runtime boundary:** the Supabase table and ACL are production-verified, but the Render application deploy after PR #769 was not confirmed in this audit. The table had zero rows; do not claim that live requests are already writing or reading durable memories until a runtime insert/readback probe is observed.
 
 ## Roadmap rule
 
