@@ -505,3 +505,102 @@ class TestHiveMindMemory:
         )
         history = adapter.get_recent_history(limit=1)
         assert history[0]["channel"] == "telegram"
+
+
+
+def test_recent_history_is_partitioned_by_user(adapter):
+    adapter.save_interaction(
+        user_input="alice private query",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="alice private answer",
+        user_id="alice",
+    )
+    adapter.save_interaction(
+        user_input="bob private query",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="bob private answer",
+        user_id="bob",
+    )
+    adapter.save_interaction(
+        user_input="local command",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="local answer",
+    )
+
+    alice = adapter.get_recent_history(limit=10, user_id="alice")
+    bob = adapter.get_recent_history(limit=10, user_id="bob")
+    local = adapter.get_recent_history(limit=10)
+
+    assert [item["user_input"] for item in alice] == ["alice private query"]
+    assert [item["user_input"] for item in bob] == ["bob private query"]
+    assert [item["user_input"] for item in local] == ["local command"]
+
+
+def test_hive_history_is_partitioned_by_user(adapter):
+    adapter.save_interaction(
+        user_input="alice hive query",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="alice hive answer",
+        channel="api",
+        user_id="alice",
+    )
+    adapter.save_interaction(
+        user_input="bob hive query",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="bob hive answer",
+        channel="telegram",
+        user_id="bob",
+    )
+
+    alice = adapter.get_recent_hive_history(limit=10, user_id="alice")
+    bob = adapter.get_recent_hive_history(limit=10, user_id="bob")
+
+    assert [item["user_input"] for item in alice] == ["alice hive query"]
+    assert [item["user_input"] for item in bob] == ["bob hive query"]
+
+
+def test_history_schema_migration_adds_user_id_column(tmp_path):
+    from sqlalchemy import create_engine, inspect, text
+
+    database = tmp_path / "history-without-user-id.db"
+    url = f"sqlite:///{database}"
+    engine = create_engine(url, echo=False)
+    with engine.begin() as connection:
+        connection.execute(text(
+            """CREATE TABLE interactions (
+                id INTEGER PRIMARY KEY,
+                timestamp DATETIME NOT NULL,
+                user_input VARCHAR NOT NULL,
+                command_type VARCHAR NOT NULL,
+                parameters VARCHAR NOT NULL DEFAULT '{}',
+                success BOOLEAN NOT NULL DEFAULT 0,
+                response_text VARCHAR NOT NULL DEFAULT '',
+                status VARCHAR NOT NULL DEFAULT 'pending',
+                processed_at DATETIME,
+                channel VARCHAR NOT NULL DEFAULT 'api'
+            )"""
+        ))
+    engine.dispose()
+
+    adapter = SQLiteHistoryAdapter(database_url=url)
+    columns = {column["name"] for column in inspect(adapter.engine).get_columns("interactions")}
+    assert "user_id" in columns
+    adapter.save_interaction(
+        user_input="owned",
+        command_type="chat",
+        parameters={},
+        success=True,
+        response_text="scoped",
+        user_id="alice",
+    )
+    assert [row["user_input"] for row in adapter.get_recent_history(user_id="alice")] == ["owned"]
