@@ -119,6 +119,7 @@ def _postgres_service_with_connection():
     engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
     service = AgentTaskQueueService(engine)
     connection = MagicMock()
+    connection.__enter__.return_value = connection
     transaction = MagicMock()
     transaction.__enter__.return_value = connection
     engine.begin = MagicMock(return_value=transaction)
