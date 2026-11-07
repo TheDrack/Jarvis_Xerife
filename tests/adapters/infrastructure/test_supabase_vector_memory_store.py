@@ -16,6 +16,7 @@ def _client_with_query(data=None, *, raises=None):
     query.upsert.return_value = query
     query.delete.return_value = query
     query.eq.return_value = query
+    query.neq.return_value = query
     query.gte.return_value = query
     query.order.return_value = query
     query.range.return_value = query
