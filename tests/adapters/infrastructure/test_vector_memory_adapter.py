@@ -183,7 +183,7 @@ class _SharedVectorMemoryStore:
     def is_healthy(self):
         return True
 
-    def append(self, event):
+    def append(self, event, user_id=None):
         self.events.append(dict(event))
 
     def list_events(self, user_id=None, days_back=None):
@@ -249,7 +249,7 @@ def test_vector_memory_store_partitions_users_and_system_scope():
 
 def test_vector_memory_store_failure_does_not_cache_unpersisted_event():
     class FailingStore(_SharedVectorMemoryStore):
-        def append(self, event):
+        def append(self, event, user_id=None):
             raise RuntimeError("database unavailable")
 
     adapter = VectorMemoryAdapter(dim=32, store=FailingStore())
