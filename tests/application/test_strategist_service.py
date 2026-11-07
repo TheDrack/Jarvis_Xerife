@@ -214,7 +214,9 @@ def test_strategist_execute_archives_viable_proposal_as_pending(strategist):
     assert result["status"] == "pending"
     assert result["viable"] is True
     assert result["approved"] is False
+    assert result["approval_required"] is True
     assert Path(result["proposal_path"]).parent.name == "pending"
+    assert "APROVAR (aguardando decisão humana)" in result["decision_prompt"]
     assert "Posso prosseguir" in result["decision_prompt"]
 
 
