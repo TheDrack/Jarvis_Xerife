@@ -69,7 +69,7 @@ def test_viability_matrix_roi_calculation():
 
 def test_viability_matrix_approval_logic():
     """Test approval logic based on ROI and risk"""
-    # Good proposal - should be approved
+    # Good proposal - should be viable, but not human-approved.
     good_matrix = ViabilityMatrix(
         cost=CostEstimate(api_cost_usd=0.5, code_complexity="simple"),
         impact=ImpactEstimate(
@@ -107,6 +107,17 @@ def test_viability_matrix_approval_logic():
     assert not security_matrix.is_viable()
 
 
+
+def test_strategist_proposal_ids_do_not_collide_for_same_title(strategist):
+    first = strategist._generate_proposal_id("Repeated Proposal")
+    second = strategist._generate_proposal_id("Repeated Proposal")
+
+    assert first != second
+    assert first.startswith("repeated-proposal-")
+    assert second.startswith("repeated-proposal-")
+
+
+
 def test_strategist_generate_viability_matrix(strategist):
     """Test viability matrix generation"""
     cost = CostEstimate(api_cost_usd=2.0, code_complexity="moderate")
@@ -127,6 +138,7 @@ def test_strategist_generate_viability_matrix(strategist):
     assert matrix.proposal_title == "Test Feature"
     assert matrix.proposal_id.startswith("test-feature-")
     assert matrix.calculate_roi() > 0
+    assert matrix.approved is False
 
 
 def test_strategist_archive_proposal(strategist):
@@ -135,7 +147,7 @@ def test_strategist_archive_proposal(strategist):
     impact = ImpactEstimate(user_utility_level=ImpactLevel.HIGH)
     risk = RiskEstimate(risk_level=RiskLevel.LOW)
     
-    # Create approved matrix
+    # Create viable matrix; it must remain pending until human approval.
     matrix = strategist.generate_viability_matrix(
         proposal_title="Archive Test",
         proposal_description="Test archiving",
@@ -150,14 +162,179 @@ def test_strategist_archive_proposal(strategist):
     # Verify file exists
     assert filepath.exists()
     
-    # Verify it's in approved directory
-    assert "approved" in str(filepath)
+    # A viable proposal remains pending until an explicit human approval.
+    assert filepath.parent.name == "pending"
     
     # Verify content
     data = document_store.read(filepath)
     
     assert data['proposal_title'] == "Archive Test"
     assert data['viable'] is True
+    assert data['approved'] is False
+    assert data['status'] == 'pending'
+
+
+
+
+def test_strategist_approve_proposal_records_human_decision(strategist):
+    cost = CostEstimate(api_cost_usd=1.0)
+    impact = ImpactEstimate(user_utility_level=ImpactLevel.HIGH)
+    risk = RiskEstimate(risk_level=RiskLevel.LOW)
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Approval Gate",
+        proposal_description="Must wait for explicit human approval.",
+        cost=cost,
+        impact=impact,
+        risk=risk,
+    )
+    pending_path = strategist.archive_proposal(matrix)
+
+    approved_path = strategist.approve_proposal(
+        pending_path.name,
+        approved_by="commander",
+    )
+
+    assert approved_path.parent == strategist.approved_dir
+    assert not pending_path.exists()
+    data = document_store.read(approved_path)
+    assert data["viable"] is True
+    assert data["approved"] is True
+    assert data["status"] == "approved"
+    assert data["approved_by"] == "commander"
+    assert data["approved_at"]
+
+
+
+def test_strategist_approval_rejects_proposal_identity_mismatch(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Identity Check",
+        proposal_description="The file name and proposal identity must match.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    pending_path = strategist.archive_proposal(matrix)
+    proposal_data = document_store.read(pending_path)
+    proposal_data["proposal_id"] = "different-proposal-id"
+    document_store.write(pending_path, proposal_data)
+
+    with pytest.raises(ValueError, match="identity does not match"):
+        strategist.approve_proposal(
+            pending_path.name,
+            approved_by="commander",
+        )
+
+    assert pending_path.exists()
+    assert not list(strategist.approved_dir.glob("*.jrvs"))
+
+
+
+def test_strategist_approval_rejects_path_traversal(strategist):
+    with pytest.raises(ValueError, match="Invalid proposal filename"):
+        strategist.approve_proposal("../approved/other.jrvs")
+
+
+
+def test_strategist_approval_requires_a_nonempty_human_identity(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Actor Required",
+        proposal_description="Approval must be attributable.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    pending_path = strategist.archive_proposal(matrix)
+
+    with pytest.raises(ValueError, match="approved_by"):
+        strategist.approve_proposal(pending_path.name)
+
+    with pytest.raises(ValueError, match="approved_by"):
+        strategist.approve_proposal(pending_path.name, approved_by="  ")
+
+    assert pending_path.exists()
+    assert not list(strategist.approved_dir.glob("*.jrvs"))
+
+
+def test_generate_rfc_requires_a_persisted_human_approval(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Persisted Approval",
+        proposal_description="An in-memory boolean is not an approval record.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    matrix.approved = True
+
+    with pytest.raises(ValueError, match="persisted human approval"):
+        strategist.generate_rfc(matrix)
+
+    pending_path = strategist.archive_proposal(matrix)
+    strategist.approve_proposal(pending_path.name, approved_by="commander")
+
+    # The persisted approval record is authoritative; a mutable in-memory
+    # boolean does not have to be set by the caller.
+    matrix.approved = False
+    rfc_path = strategist.generate_rfc(matrix)
+    assert rfc_path.exists()
+
+
+
+def test_generate_rfc_rejects_matrix_mutation_after_approval(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Immutable Approval",
+        proposal_description="The approved snapshot must be authoritative.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    pending_path = strategist.archive_proposal(matrix)
+    strategist.approve_proposal(pending_path.name, approved_by="commander")
+
+    matrix.impact.performance_gain_percent = 99.0
+
+    with pytest.raises(ValueError, match="does not match persisted approved proposal"):
+        strategist.generate_rfc(matrix)
+
+
+
+def test_strategist_execute_archives_viable_proposal_as_pending(strategist):
+    result = strategist.execute(
+        {
+            "action": "evaluate_proposal",
+            "proposal_title": "Execute Gate",
+            "proposal_description": "Create a proposal without auto-approval.",
+            "cost": {"api_cost_usd": 1.0, "code_complexity": "simple"},
+            "impact": {"user_utility_level": "high", "performance_gain_percent": 25.0},
+            "risk": {"risk_level": "low"},
+        }
+    )
+
+    assert result["success"] is True
+    assert result["status"] == "pending"
+    assert result["viable"] is True
+    assert result["approved"] is False
+    assert result["approval_required"] is True
+    assert Path(result["proposal_path"]).parent.name == "pending"
+    assert "APROVAR (aguardando decisão humana)" in result["decision_prompt"]
+    assert "Posso prosseguir" in result["decision_prompt"]
+
+
+
+def test_strategist_archive_rejects_path_traversal_identity(strategist):
+    matrix = strategist.generate_viability_matrix(
+        proposal_title="Unsafe Identity",
+        proposal_description="The proposal identity must not control filesystem paths.",
+        cost=CostEstimate(api_cost_usd=1.0),
+        impact=ImpactEstimate(user_utility_level=ImpactLevel.HIGH),
+        risk=RiskEstimate(risk_level=RiskLevel.LOW),
+    )
+    matrix.proposal_id = "../../outside"
+
+    with pytest.raises(ValueError, match="Invalid proposal identity"):
+        strategist.archive_proposal(matrix)
+
+    assert not (strategist.proposals_dir.parent / "outside.jrvs").exists()
+
 
 
 def test_strategist_archive_rejected_proposal(strategist):
@@ -202,7 +379,8 @@ def test_strategist_generate_rfc(strategist):
         risk=risk,
     )
     
-    # Generate RFC
+    pending_path = strategist.archive_proposal(matrix)
+    strategist.approve_proposal(pending_path.name, approved_by="commander")
     rfc_path = strategist.generate_rfc(matrix)
     
     # Verify file exists
@@ -211,10 +389,16 @@ def test_strategist_generate_rfc(strategist):
     assert rfc_path.suffix == ".md"
     
     # Verify content
-    content = rfc_path.read_text()
+    content = rfc_path.read_text(encoding="utf-8")
+    approval = document_store.read(strategist.approved_dir / pending_path.name)
     assert "RFC Test" in content
     assert "Test RFC generation" in content
     assert "ROI Score" in content
+    assert "Aprovado para implementação" in content
+    assert "**Aprovado por:** commander" in content
+    assert approval["approved_at"] in content
+
+
 
 
 def test_strategist_rfc_rejected_proposal_fails(strategist):
