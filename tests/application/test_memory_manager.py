@@ -222,3 +222,24 @@ def test_user_scoped_memory_paths_do_not_expose_user_identifiers(tmp_path):
     assert len(scoped_files) == 1
     assert "alice@example.com" not in scoped_files[0].name
     assert not (tmp_path / "memory.json").exists()
+
+
+def test_memory_readback_survives_manager_recreation(tmp_path):
+    """A new manager instance must recover the previously stored interaction."""
+    storage_path = str(tmp_path / "restart_memory.json")
+    first_manager = MemoryManager(storage_path=storage_path)
+    first_manager.store_interaction(
+        "configure the Jarvis network connector",
+        "Use the authenticated connector and verify its health.",
+    )
+
+    restarted_manager = MemoryManager(storage_path=storage_path)
+    recovered = restarted_manager.get_relevant_context(
+        "Jarvis network connector"
+    )
+
+    assert len(recovered) == 1
+    assert recovered[0]["user"] == "configure the Jarvis network connector"
+    assert recovered[0]["jarvis"] == (
+        "Use the authenticated connector and verify its health."
+    )
