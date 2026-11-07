@@ -158,7 +158,7 @@ class GatewayLLMCommandAdapter(AutoRepairMixin):
         if self.gemini_adapter is not None:
             sync_fn = getattr(self.gemini_adapter, "_interpret_sync", None)
             if sync_fn is not None:
-                return sync_fn(raw_input)
+                return sync_fn(raw_input, user_id=user_id)
 
         # Fallback: return unknown intent when no synchronous path is available.
         command = raw_input.lower().strip()
