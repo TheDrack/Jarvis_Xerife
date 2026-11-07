@@ -6,6 +6,11 @@ on:
     paths:
       - "supabase/migrations/20261107033349_vector_memory_store.sql"
       - "supabase/tests/vector_memory_store.test.sql"
+      - "app/adapters/infrastructure/supabase_vector_memory_store.py"
+      - "app/adapters/infrastructure/vector_memory_adapter.py"
+      - "app/application/services/memory_consolidation_service.py"
+      - "app/application/ports/vector_memory_store.py"
+      - "tests/adapters/infrastructure/test_supabase_vector_memory_store.py"
       - ".github/workflows/supabase-vector-memory-tests.yml"
   workflow_dispatch:
 
