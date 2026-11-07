@@ -170,18 +170,26 @@ class AssistantService(NexusComponent):
         except Exception as exc:
             logger.debug(f"📨 [HealthCheck] Falha ao enviar notificação: {exc}")
 
-    def _get_hive_context(self, limit: int = 5) -> List[Dict[str, Any]]:
-        """Recupera o histórico recente de TODOS os canais (hive mind)."""
+    def _get_hive_context(
+        self, limit: int = 5, user_id: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Retrieve cross-channel context only from the selected user partition."""
         try:
             adapter = self._get_history_adapter()
             if adapter and hasattr(adapter, "get_recent_hive_history"):
-                return adapter.get_recent_hive_history(limit=limit)
+                return adapter.get_recent_hive_history(limit=limit, user_id=user_id)
         except Exception as e:
             logger.debug(f"Hive context unavailable: {e}")
         return []
 
-    def _save_to_hive(self, user_input: str, response: Response, channel: str = "api") -> None:
-        """Persiste a interação no banco compartilhado (hive mind)."""
+    def _save_to_hive(
+        self,
+        user_input: str,
+        response: Response,
+        channel: str = "api",
+        user_id: Optional[str] = None,
+    ) -> None:
+        """Persist the interaction only in the selected user's hive partition."""
         try:
             adapter = self._get_history_adapter()
             if adapter and hasattr(adapter, "save_interaction"):
@@ -200,6 +208,7 @@ class AssistantService(NexusComponent):
                     success=response.success,
                     response_text=response.message,
                     channel=channel,
+                    user_id=user_id,
                 )
         except Exception as e:
             logger.debug(f"Failed to save to hive memory: {e}")
@@ -239,9 +248,9 @@ class AssistantService(NexusComponent):
                 if not interpreter:
                     return Response(success=False, message="Interpreter unavailable", error="INIT_FAILURE")
                 if hasattr(interpreter, "interpret"):
-                    intent = interpreter.interpret(text)
+                    intent = interpreter.interpret(text, user_id=user_id)
                 else:
-                    intent = interpreter.execute({"text": text})
+                    intent = interpreter.execute({"text": text, "user_id": user_id})
                 response = self._dispatch_with_providers(intent)
                 self._command_history.insert(0, {
                     "command": text,
@@ -250,7 +259,7 @@ class AssistantService(NexusComponent):
                     "message": response.message or "",
                     "user_id": user_id,
                 })
-                self._save_to_hive(text, response, channel=channel)
+                self._save_to_hive(text, response, channel=channel, user_id=user_id)
                 return response
 
             logger.info(f"🎙️ [{channel.upper()}] Processando: {text}")
@@ -492,7 +501,9 @@ class AssistantService(NexusComponent):
                 interpreter = self._interpreter
                 if hasattr(interpreter, "generate_conversational_response"):
                     try:
-                        response_text = interpreter.generate_conversational_response(intent.raw_input)
+                        response_text = interpreter.generate_conversational_response(
+                            intent.raw_input, user_id=user_id
+                        )
                         return Response(success=True, message=response_text, data={"command_type": "chat"})
                     except Exception:
                         pass
