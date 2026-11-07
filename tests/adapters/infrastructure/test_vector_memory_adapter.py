@@ -105,28 +105,40 @@ class TestVectorMemoryAdapter:
         assert results[0]["metadata"] == {"role": "user"}
 
 
+@pytest.fixture
+def pii_vector_adapter():
+    import app.adapters.infrastructure.vector_memory_adapter as mod
+
+    original = mod._FAISS_AVAILABLE
+    mod._FAISS_AVAILABLE = False
+    adapter = VectorMemoryAdapter(dim=64)
+    adapter._index = None
+    yield adapter
+    mod._FAISS_AVAILABLE = original
+
+
 def test_store_event_uses_local_redactor_when_nexus_redactor_is_missing(
-    monkeypatch, adapter
+    monkeypatch, pii_vector_adapter
 ):
     from app.core.nexus import nexus
 
     monkeypatch.setattr(nexus, "resolve", lambda _name: None)
 
-    adapter.store_event("Contact alice.smith@example.com, CPF 123.456.789-09")
+    pii_vector_adapter.store_event("Contact alice.smith@example.com, CPF 123.456.789-09")
 
-    stored_text = adapter._events[0]["text"]
+    stored_text = pii_vector_adapter._events[0]["text"]
     assert "[EMAIL_REDACTED]" in stored_text
     assert "[CPF_REDACTED]" in stored_text
     assert "alice.smith@example.com" not in stored_text
     assert "123.456.789-09" not in stored_text
 
 
-def test_store_event_refuses_an_invalid_registered_redactor(monkeypatch, adapter):
+def test_store_event_refuses_an_invalid_registered_redactor(monkeypatch, pii_vector_adapter):
     from app.core.nexus import nexus
 
     monkeypatch.setattr(nexus, "resolve", lambda _name: object())
 
     with pytest.raises(RuntimeError, match="sanitize"):
-        adapter.store_event("private email alice@example.com")
+        pii_vector_adapter.store_event("private email alice@example.com")
 
-    assert adapter._events == []
+    assert pii_vector_adapter._events == []
