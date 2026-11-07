@@ -92,6 +92,19 @@ def create_api_server(
         docs_url=None,
         redoc_url=None,
     )
+    # The proactive monitor is user-scoped and proposal-only; it does not execute tools.
+    start_proactive_monitor = getattr(assistant_service, "start_proactive_monitor", None)
+    stop_proactive_monitor = getattr(assistant_service, "stop_proactive_monitor", None)
+    if callable(start_proactive_monitor):
+        async def _start_proactive_monitor() -> None:
+            start_proactive_monitor()
+
+        app.add_event_handler("startup", _start_proactive_monitor)
+    if callable(stop_proactive_monitor):
+        async def _stop_proactive_monitor() -> None:
+            stop_proactive_monitor()
+
+        app.add_event_handler("shutdown", _stop_proactive_monitor)
 
     limiter = Limiter(key_func=get_remote_address)
     app.state.limiter = limiter
