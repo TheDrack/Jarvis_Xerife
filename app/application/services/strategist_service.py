@@ -264,12 +264,9 @@ class StrategistService(NexusComponent):
     def approve_proposal(
         self,
         proposal_filename: str,
-        approved_by: str,
+        approved_by: Optional[str] = None,
     ) -> Path:
         """Promote one viable pending proposal with a durable human actor identity."""
-        if not isinstance(approved_by, str) or not approved_by.strip():
-            raise ValueError("approved_by must identify the authenticated human approver")
-        approved_by = approved_by.strip()
         if (
             not isinstance(proposal_filename, str)
             or not proposal_filename
@@ -280,8 +277,12 @@ class StrategistService(NexusComponent):
         ):
             raise ValueError("Invalid proposal filename")
 
+        if not isinstance(approved_by, str) or not approved_by.strip():
+            raise ValueError("approved_by must identify the authenticated human approver")
+        approved_by = approved_by.strip()
+
         source_path = self.pending_dir / proposal_filename
-        if not source_path.is_file():
+        if source_path.is_symlink() or not source_path.is_file():
             raise FileNotFoundError(f"Pending proposal not found: {proposal_filename}")
 
         destination_path = self.approved_dir / proposal_filename
