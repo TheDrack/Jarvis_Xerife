@@ -138,14 +138,17 @@ class TestVectorMemoryUserIdFilter:
         assert all(r["metadata"].get("user_id") == "alice" for r in results_alice)
         assert all(r["metadata"].get("user_id") == "bob" for r in results_bob)
 
-    def test_query_similar_no_user_id_returns_all(self):
+    def test_query_similar_without_user_id_returns_only_unscoped_events(self):
         adapter = VectorMemoryAdapter()
-        adapter.store_event("JARVIS command", user_id="alice")
-        adapter.store_event("JARVIS command", user_id="bob")
+        adapter.store_event("JARVIS command alice", user_id="alice")
+        adapter.store_event("JARVIS command bob", user_id="bob")
+        adapter.store_event("JARVIS local unscoped command")
 
         results = adapter.query_similar("JARVIS", user_id=None, days_back=None)
-        user_ids = {r["metadata"].get("user_id") for r in results}
-        assert "alice" in user_ids or "bob" in user_ids  # at least one returned
+
+        assert results
+        assert all(r["metadata"].get("user_id") is None for r in results)
+        assert [r["text"] for r in results] == ["JARVIS local unscoped command"]
 
     def test_query_similar_missing_user_returns_empty(self):
         adapter = VectorMemoryAdapter()
