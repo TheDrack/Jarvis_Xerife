@@ -105,3 +105,21 @@ def test_store_without_service_client_is_not_available():
 
     assert store.is_available is False
     assert store.is_healthy() is False
+
+def test_append_rejects_user_identity_supplied_only_in_metadata():
+    client, _ = _client_with_query()
+    store = SupabaseVectorMemoryStore(client=client)
+    event = {
+        "id": "event-2",
+        "text": "private event",
+        "vector": [0.1, 0.2],
+        "metadata": {"user_id": "alice"},
+        "timestamp": datetime(2026, 11, 7, tzinfo=timezone.utc),
+    }
+
+    try:
+        store.append(event)
+    except ValueError as exc:
+        assert "trusted user_id argument" in str(exc)
+    else:
+        raise AssertionError("untrusted metadata must not establish memory ownership")
