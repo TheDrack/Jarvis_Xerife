@@ -17,7 +17,9 @@ def _store():
             create table jarvis_agents (
                 agent_id text primary key,
                 runtime_version text not null,
-                status text not null
+                status text not null,
+                available_tools text not null default '[]',
+                updated_at datetime
             )
         """))
         connection.execute(text("""
@@ -39,6 +41,10 @@ def _store():
 def test_issue_stores_only_a_hash_and_registers_the_agent():
     engine, store = _store()
     expires_at = datetime.now(timezone.utc) + timedelta(hours=2)
+    with engine.begin() as connection:
+        connection.execute(
+            text("insert into jarvis_agents (agent_id, runtime_version, status, available_tools) values ('mini-worker-1', 'legacy', 'available', '[\"shell_execute\"]')")
+        )
 
     token = store.issue(
         agent_id="mini-worker-1",
@@ -53,13 +59,15 @@ def test_issue_stores_only_a_hash_and_registers_the_agent():
             "select token_hash, available_tools from jarvis_agent_credentials"
         )).mappings().one()
         agent = connection.execute(text(
-            "select agent_id, status from jarvis_agents"
+            "select agent_id, status, available_tools from jarvis_agents"
         )).mappings().one()
 
     assert credential["token_hash"] != token
     assert len(credential["token_hash"]) == 64
     assert json.loads(credential["available_tools"]) == ["text_reasoning"]
-    assert dict(agent) == {"agent_id": "mini-worker-1", "status": "offline"}
+    assert agent["agent_id"] == "mini-worker-1"
+    assert agent["status"] == "offline"
+    assert json.loads(agent["available_tools"]) == ["text_reasoning"]
 
 
 def test_authenticate_resolves_server_side_agent_identity_and_capabilities():
@@ -102,7 +110,13 @@ def test_authenticate_rejects_unknown_expired_and_revoked_tokens():
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
     )
     store.revoke_agent("revoked-worker")
+    with engine.connect() as connection:
+        revoked_agent = connection.execute(
+            text("select status, available_tools from jarvis_agents where agent_id = 'revoked-worker'")
+        ).mappings().one()
 
+    assert revoked_agent["status"] == "offline"
+    assert json.loads(revoked_agent["available_tools"]) == []
     assert store.authenticate("jarvisw_unknown") is None
     assert store.authenticate(expired) is None
     assert store.authenticate(revoked) is None
