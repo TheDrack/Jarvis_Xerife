@@ -372,9 +372,13 @@ def test_strategist_generate_rfc(strategist):
     
     # Verify content
     content = rfc_path.read_text()
+    approval = document_store.read(strategist.approved_dir / pending_path.name)
     assert "RFC Test" in content
     assert "Test RFC generation" in content
     assert "ROI Score" in content
+    assert "Aprovado para implementação" in content
+    assert "Aprovado por: commander" in content
+    assert approval["approved_at"] in content
 
 
 
