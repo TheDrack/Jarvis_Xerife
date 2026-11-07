@@ -196,7 +196,7 @@ class TestTrustedPublisher:
         repository = tmp_path / "repository"
         target = repository / "app" / "module.py"
         target.parent.mkdir(parents=True)
-        target.write_text("ORIGINAL = True\\n", encoding="utf-8")
+        target.write_text("ORIGINAL = True\n", encoding="utf-8")
         artifact_dir, manifest, _ = _write_artifact(tmp_path)
         manifest["mission_id"] = "C0-BASELINE-PERCEPTION"
         next(artifact_dir.glob("*/manifest.json")).write_text(
@@ -213,7 +213,7 @@ class TestTrustedPublisher:
                 stdout = manifest["source_commit"]
             elif command[1:3] == ["ls-files", "--error-unmatch"]:
                 stdout = "app/module.py"
-            elif command[1:3] == ["gh", "pr"] and command[3] == "list":
+            elif command[:3] == ["gh", "pr", "list"]:
                 stdout = json.dumps(
                     [{"number": 321, "title": "[JARVIS Evolution] C0-BASELINE-PERCEPTION"}]
                 )
