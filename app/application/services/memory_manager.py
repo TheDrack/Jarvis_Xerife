@@ -145,3 +145,4 @@ class MemoryManager(NexusComponent):
             document_store.write(self._storage_path, interactions)
         except OSError as e:
             logger.error(f"❌ [MEMORY] Falha ao persistir memória: {e}")
+            raise
