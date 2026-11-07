@@ -114,6 +114,30 @@ def test_later_phase_is_blocked_until_status_marks_it_active(tmp_path):
     assert selected["reason"] == "roadmap_phase_not_active"
 
 
+def test_c1_cannot_run_while_c0_is_still_in_progress(tmp_path):
+    service = _service(
+        tmp_path,
+        phase="C1",
+        phase_status="Em andamento",
+        missions=[
+            _mission(
+                id="C1-001",
+                criterion_id="C1-A01",
+            )
+        ],
+    )
+    (Path(tmp_path) / "docs" / "STATUS.md").write_text(
+        "| C0 | Audit | **Em andamento** | C0 remains open |\\n"
+        "| C1 | World Model | **Em andamento** | Must wait for C0 |\\n",
+        encoding="utf-8",
+    )
+
+    selected = service.find_next_mission()
+
+    assert selected["status"] == "blocked"
+    assert selected["reason"] == "roadmap_phase_not_active"
+
+
 def test_protected_target_is_rejected_before_candidate_generation(tmp_path):
     protected_target = "app/application/security/candidate.py"
     service = _service(
