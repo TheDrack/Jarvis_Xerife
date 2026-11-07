@@ -68,7 +68,8 @@ class CommandInterpreter(NexusComponent):
             return self.interpret("")
             
         text = context.get("text", "")
-        return self.interpret(text)
+        user_id = context.get("user_id")
+        return self.interpret(text, user_id=user_id)
 
     def interpret(
         self, raw_input: str, user_id: Optional[str] = None
