@@ -134,13 +134,8 @@ class VectorMemoryAdapter(MemoryProvider):
 
     @property
     def is_durable(self) -> bool:
-        """Whether writes can survive process restarts in the configured store."""
-        if self._store is None:
-            return False
-        try:
-            return bool(self._store.is_healthy())
-        except Exception:
-            return False
+        """Whether a durable persistence backend is configured."""
+        return self._store is not None
 
     def _get_pii_redactor(self):
         """Resolve Nexus redaction policy or fall back to the built-in local redactor."""
