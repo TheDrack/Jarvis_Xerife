@@ -63,6 +63,9 @@ class _DurableStore:
             if event.get("metadata", {}).get("user_id") != user_id
         ]
 
+    def delete_all(self):
+        self.events.clear()
+
 
 def test_consolidation_preserves_working_memory_without_durable_vector_store():
     working_memory = WorkingMemory()
