@@ -42,14 +42,14 @@ def test_append_uses_authoritative_scope_column_and_strips_user_from_metadata():
     store.append(event, user_id='alice')
 
     client.table.assert_called_once_with("jarvis_vector_memories")
-    row = query.upsert.call_args.args[0]
+    row = query.insert.call_args.args[0]
     assert row["scope_key"] == "user:alice"
     assert row["user_id"] == "alice"
     assert row["metadata"] == {"kind": "fact"}
     assert row["event_text"] == "redacted event"
     assert row["embedding"] == [0.1, 0.2]
     assert row["vector_dim"] == 2
-    assert query.upsert.call_args.kwargs == {"on_conflict": "id"}
+    assert query.insert.call_args.kwargs == {}
 
 
 def test_list_events_filters_by_user_scope_and_restores_trusted_user_id():
