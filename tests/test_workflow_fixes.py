@@ -10,6 +10,7 @@ Validates:
 4. services package importable without optional dependencies (sqlmodel, etc.)
 """
 
+import json
 import os
 import subprocess
 import sys
@@ -19,6 +20,51 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).parent.parent
+
+
+def _roadmap_service(tmp_path, service_module):
+    root = Path(tmp_path)
+    (root / "app" / "services").mkdir(parents=True, exist_ok=True)
+    (root / "tests").mkdir(parents=True, exist_ok=True)
+    target_file = "app/services/feature.py"
+    test_file = "tests/test_feature.py"
+    (root / target_file).write_text("def feature(): return True\\n", encoding="utf-8")
+    (root / test_file).write_text("def test_feature(): assert True\\n", encoding="utf-8")
+
+    mission = {
+        "id": "C0-001",
+        "criterion_id": "C0-A01",
+        "title": "Add a deterministic C0 baseline check",
+        "description": "Implement one reviewed behavioral baseline check.",
+        "target_file": target_file,
+        "tests": [test_file],
+        "depends_on": [],
+        "priority": 1,
+        "status": "ready",
+        "risk": "low",
+        "expected_result": "The existing consumer behavior is verified by a regression test.",
+    }
+    roadmap = (
+        "# Cognitive Roadmap\\n\\n"
+        "- **C0-A01:** Each critical capability has a code path, consumer, and test.\\n"
+        "<!-- JARVIS_EVOLUTION_MANIFEST_START -->\\n"
+        "```json\\n"
+        + json.dumps({"schema_version": 1, "phase": "C0", "missions": [mission]})
+        + "\\n```\\n"
+        "<!-- JARVIS_EVOLUTION_MANIFEST_END -->\\n"
+    )
+    status = (
+        "| C0 | Audit | **Em andamento** | Baseline pending |\\n"
+        "| C1 | World Model | **Auditoria necessária** | Blocked by C0 |\\n"
+    )
+    (root / "docs").mkdir(parents=True, exist_ok=True)
+    (root / "docs" / "COGNITIVE_ROADMAP.md").write_text(roadmap, encoding="utf-8")
+    (root / "docs" / "STATUS.md").write_text(status, encoding="utf-8")
+    return service_module.AutoEvolutionServiceV2(
+        roadmap_path=str(root / "docs" / "COGNITIVE_ROADMAP.md"),
+        status_path=str(root / "docs" / "STATUS.md"),
+        repository_root=str(root),
+    )
 
 
 def test_metabolism_analyzer_required_outputs():
@@ -122,6 +168,7 @@ def test_evolve_all_pending_unknown_cap_id_fails():
         [
             sys.executable,
             str(PROJECT_ROOT / 'scripts' / 'evolve_all_pending.py'),
+            '--legacy-capability',
             '--cap-id',
             'CAP-999',
         ],
@@ -155,7 +202,7 @@ def test_auto_evolution_service():
     assert is_not_auto is False, "is_auto_evolution_pr() should not match regular PRs"
 
 
-def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch):
+def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch, tmp_path):
     """A mutação de capabilities deve passar pelo EvolutionOrchestrator (via Nexus).
 
     O antigo ``scripts/evolution_mutator.py`` foi removido do projeto; a ação
@@ -166,9 +213,9 @@ def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch):
     import app.application.services.auto_evolutionV2 as mod
 
     monkeypatch.setenv("EVOLUTION_ENABLED", "true")
-    service = mod.AutoEvolutionServiceV2(capabilities_path=str(PROJECT_ROOT / 'data' / 'capabilities.json'))
+    service = _roadmap_service(tmp_path, mod)
     mission = service.find_next_mission()
-    assert mission is not None, "O inventário precisa ter ao menos uma cap pendente"
+    assert mission is not None and mission.get("status") != "blocked", mission
 
     orchestrator = MagicMock()
     orchestrator.execute.return_value = {"success": True, "proposal": "data/evolution_proposals/x.py"}
@@ -182,24 +229,27 @@ def test_auto_evolution_evolve_uses_evolution_orchestrator(monkeypatch):
     mock_nexus.resolve.assert_called_with("evolution_orchestrator")
     payload = orchestrator.execute.call_args.args[0]
     assert payload["cap_id"] == mission["id"]
+    assert payload["target_file"] == mission["target_file"]
     assert payload["roadmap_context"]
 
 
-def test_auto_evolution_falls_back_to_json_inventory():
-    """Sem o ``.jrvs``, o inventário ``.json`` equivalente deve ser usado.
-
-    O serviço registrado no Nexus usa ``data/capabilities.jrvs`` por padrão; como
-    o inventário versionado está em ``capabilities.json``, o fallback evita que a
-    auto-evolução responda ``empty_inventory`` e nunca encontre missões.
-    """
+def test_legacy_json_inventory_is_metrics_only_not_a_scheduler_source():
+    """The legacy catalog remains readable but cannot select scheduled missions."""
     import app.application.services.auto_evolutionV2 as mod
 
     service = mod.AutoEvolutionServiceV2()
     metrics = service.get_success_metrics()
+    mission = service.find_next_mission()
 
-    assert metrics["total_missions"] > 0, "O inventário real deve ser carregado"
+    assert metrics["total_missions"] > 0, "O catálogo legado deve continuar legível"
     assert metrics["status"] == "operational"
-    assert service.find_next_mission() is not None
+    assert metrics["source"] == "legacy_capability_inventory"
+    assert metrics["selection_source"] == "docs/COGNITIVE_ROADMAP.md"
+    assert mission == {
+        "status": "blocked",
+        "reason": "no_approved_roadmap_mission",
+        "phase": "C0",
+    }
 
 
 def test_auto_evolution_resolved_path_prefers_existing_sibling(tmp_path):
@@ -224,14 +274,14 @@ def test_auto_evolution_resolved_path_keeps_configured_jrvs(tmp_path):
     assert service._resolved_path() == jrvs_path
 
 
-def test_auto_evolution_evolve_reports_missing_orchestrator(monkeypatch):
+def test_auto_evolution_evolve_reports_missing_orchestrator(monkeypatch, tmp_path):
     """Sem orchestrator no Nexus, a evolução deve falhar de forma explícita."""
     from unittest.mock import patch
 
     import app.application.services.auto_evolutionV2 as mod
 
     monkeypatch.setenv("EVOLUTION_ENABLED", "true")
-    service = mod.AutoEvolutionServiceV2(capabilities_path=str(PROJECT_ROOT / 'data' / 'capabilities.json'))
+    service = _roadmap_service(tmp_path, mod)
 
     with patch.object(mod, "nexus") as mock_nexus:
         mock_nexus.resolve.side_effect = RuntimeError("component not found")
