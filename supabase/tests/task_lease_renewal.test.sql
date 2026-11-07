@@ -1,4 +1,5 @@
 -- pgTAP tests for the task-worker lease renewal contract.
+-- NULL must be rejected explicitly because PL/pgSQL IF treats a NULL predicate as not true.
 begin;
 select plan(11);
 
