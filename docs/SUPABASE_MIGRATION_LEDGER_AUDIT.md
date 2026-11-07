@@ -235,7 +235,7 @@ The six previously identified local files without matching remote ledger entries
 
 **What the merged PRs prove**
 - PR #761's dedicated workflow starts an ephemeral local Supabase stack, runs pgTAP, and runs a leader/worker exchange in two spawned processes with independent Supabase clients. This proves the message-queue contract against an isolated database; it does not apply the migration to production or validate the task queue.
-- PR #763 adds a forward-only NULL-duration guard for task lease renewal. It does not install the missing historical `renew_jarvis_agent_task_lease` RPC by itself.
+- PR #763's forward-only migration defines the complete `renew_jarvis_agent_task_lease` RPC with explicit NULL-duration validation; applying it would create the currently absent function against the existing task/event columns. It has not been applied remotely. It does not install the five indexes or other objects from the historical worker-lease migration.
 - PR #762 adds user-scoped memory/history and fail-closed redaction in the code paths covered by its tests. It does not change the Supabase migration ledger.
 - PR #764 adds an authenticated human-approval gate for Strategist proposals. It does not change the Supabase schema.
 
