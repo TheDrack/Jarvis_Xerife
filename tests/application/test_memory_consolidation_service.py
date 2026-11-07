@@ -159,6 +159,7 @@ def test_consolidation_restores_exact_original_entry_after_persistence_failure()
     assert consolidated == 0
     assert working_memory.to_list() == [original_entry]
 
+
 def test_empty_working_memory_is_not_misreported_as_missing_dependency(caplog):
     working_memory = WorkingMemory()
     vector_adapter = VectorMemoryAdapter(dim=32, store=_DurableStore())
