@@ -118,9 +118,6 @@ jobs:
                   print("⛔ Identificador de missão do roadmap ausente ou inválido.")
                   sys.exit(0)
 
-              context = auto.get_roadmap_context(next_mission)
-              with open("mission_context.txt", "w", encoding="utf-8") as file:
-                  file.write(context)
 
               target_file = str(next_mission.get("target_file") or "").strip()
               if (
@@ -164,8 +161,7 @@ jobs:
           python scripts/evolve_all_pending.py \
             --mission-id "$MISSION_ID" \
             --max-attempts 3 \
-            --target-file "$TARGET_FILE" \
-            --roadmap-context "$(cat mission_context.txt)"
+            --target-file "$TARGET_FILE"
 
       - name: 📦 Upload validated candidate artifact
         if: steps.evolve.outputs.artifact_available == 'true'
