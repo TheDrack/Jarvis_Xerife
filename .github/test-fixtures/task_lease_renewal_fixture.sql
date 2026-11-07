@@ -2,6 +2,7 @@
 create table public.jarvis_agent_tasks (
     task_id text primary key,
     objective text not null default 'fixture objective',
+    leader_id text not null default 'fixture-leader',
     assigned_agent_id text,
     attempt_id uuid,
     status text not null default 'ready',
