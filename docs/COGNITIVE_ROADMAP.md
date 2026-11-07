@@ -79,9 +79,24 @@ A busca de código é um inventário preliminar. Nenhum item desta tabela está 
 - ADR para decisões estruturais que alterem limites ou persistência.
 
 ### Aceitação
-- Cada capacidade crítica tem caminho de código, consumidor e teste identificados.
-- Lacunas e incertezas estão explicitamente registradas.
-- Nenhum módulo é considerado pronto apenas por nome ou documentação.
+- **C0-A01:** cada capacidade crítica tem caminho de código, consumidor e teste identificados.
+- **C0-A02:** lacunas e incertezas estão explicitamente registradas.
+- **C0-A03:** nenhum módulo é considerado pronto apenas por nome ou documentação.
+
+### Manifesto de missões executáveis
+O selector agendado consome exclusivamente o manifesto versionado neste documento. Cada missão deve referenciar um critério C0–C8 existente, um único arquivo Python rastreado e não protegido, testes existentes, dependências, risco e resultado esperado. A fase declarada precisa estar marcada como **Em andamento** em `docs/STATUS.md`. O manifesto vazio é intencional: não existe atualmente um alvo C0 aprovado para mutação automática. A ausência de missão elegível mantém o workflow em `blocked`, antes de LLM, sandbox ou publicação.
+
+O manifesto seleciona trabalho; ele não concede autorização. EVOLUTION_ENABLED, Gatekeeper, sandbox Docker, publisher confiável, deduplicação de PR, checks e revisão humana continuam obrigatórios.
+
+<!-- JARVIS_EVOLUTION_MANIFEST_START -->
+```json
+{
+  "schema_version": 1,
+  "phase": "C0",
+  "missions": []
+}
+```
+<!-- JARVIS_EVOLUTION_MANIFEST_END -->
 
 ## 5. Fase 1 — World Model
 
