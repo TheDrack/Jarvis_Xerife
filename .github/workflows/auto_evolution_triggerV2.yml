@@ -81,7 +81,7 @@ jobs:
 
               if not next_mission:
                   with open(github_output, "a", encoding="utf-8") as output:
-                      output.write("action=idle\\n")
+                      output.write("action=idle\n")
                   print(f"⏸️ Nenhuma missão do Cognitive Roadmap aprovada: {selector.hold_reason}")
                   sys.exit(0)
 
@@ -92,19 +92,19 @@ jobs:
 
               if not re.fullmatch(r"CAP-[0-9]+", cap_id):
                   with open(github_output, "a", encoding="utf-8") as output:
-                      output.write("action=blocked\\n")
+                      output.write("action=blocked\n")
                   print("⛔ Referência de compatibilidade CAP ausente ou inválida; evolução bloqueada.")
                   sys.exit(0)
 
               if not re.fullmatch(r"C[0-8]-[A-Z0-9]+(?:-[A-Z0-9]+)*", mission_id):
                   with open(github_output, "a", encoding="utf-8") as output:
-                      output.write("action=blocked\\n")
+                      output.write("action=blocked\n")
                   print("⛔ Criterion ID inválido; evolução bloqueada.")
                   sys.exit(0)
 
               if not target_file or not mission_title:
                   with open(github_output, "a", encoding="utf-8") as output:
-                      output.write("action=blocked\\n")
+                      output.write("action=blocked\n")
                   print("⛔ Metadados de alvo/título ausentes; evolução bloqueada.")
                   sys.exit(0)
 
@@ -112,11 +112,11 @@ jobs:
                   file.write(next_mission["roadmap_context"])
 
               with open(github_output, "a", encoding="utf-8") as output:
-                  output.write(f"cap_id={cap_id}\\n")
-                  output.write(f"mission_id={mission_id}\\n")
-                  output.write(f"mission_title={mission_title}\\n")
-                  output.write(f"target_file={target_file}\\n")
-                  output.write("action=evolve\\n")
+                  output.write(f"cap_id={cap_id}\n")
+                  output.write(f"mission_id={mission_id}\n")
+                  output.write(f"mission_title={mission_title}\n")
+                  output.write(f"target_file={target_file}\n")
+                  output.write("action=evolve\n")
               print(f"🚀 Critério do roadmap selecionado: {mission_id} ({cap_id})")
           except Exception as exc:
               print(f"❌ Roadmap mission selector falhou de forma fechada: {exc}")
