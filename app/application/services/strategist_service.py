@@ -10,6 +10,7 @@ but under strict cost-benefit and security filters.
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.domain.models.viability import (
@@ -495,8 +496,8 @@ class StrategistService(NexusComponent):
         # Remove special characters
         proposal_id = ''.join(c for c in proposal_id if c.isalnum() or c == '-')
         # Add timestamp for uniqueness
-        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
-        return f"{proposal_id}-{timestamp}"
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f')
+        return f"{proposal_id}-{timestamp}-{uuid4().hex[:8]}"
     
     def _get_next_rfc_number(self) -> int:
         """Get the next available RFC number"""
