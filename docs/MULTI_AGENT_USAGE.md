@@ -101,9 +101,15 @@ pelo fluxo normal de integração, em um ambiente administrativo confiável:
 python scripts\\manage_agent_worker_credentials.py issue --agent-id mini-freellmapi-1
 ```
 
-O comando mostra o token uma única vez. Guarde-o no secret store do processo que executa
-aquele agente como `JARVIS_TASK_QUEUE_WORKER_TOKEN`; nunca o grave no repositório ou em
-logs. Reemitir um token para o mesmo `agent_id` revoga o anterior.
+O comando mostra o token uma única vez e informa o nome exato da variável individual,
+por exemplo `JARVIS_TASK_QUEUE_WORKER_TOKEN_MINI_FREELLMAPI_1`. Guarde-o no secret store
+do processo daquele agente; nunca o grave no repositório ou em logs. Reemitir um token
+para o mesmo `agent_id` revoga o anterior.
+
+Para um único slot, também é aceito o nome global `JARVIS_TASK_QUEUE_WORKER_TOKEN`.
+Para múltiplos slots, configure uma credencial distinta para cada `agent_id` gerado.
+O runtime não reutiliza um token global entre agentes e falha fechado se faltar qualquer
+credencial individual.
 
 Para revogar todas as credenciais ativas de um agente:
 
