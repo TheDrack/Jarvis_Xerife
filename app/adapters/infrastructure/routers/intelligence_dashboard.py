@@ -35,10 +35,10 @@ def _repository_root() -> Path:
 def build_intelligence_status() -> dict[str, Any]:
     """Return only verifiable configuration/implementation state, never fabricated telemetry."""
     root = _repository_root()
-    migration = root / "supabase" / "migrations" / "20261103100304_intelligence_history.sql"
+    migration = root / "supabase" / "migrations" / "20261103184307_20261103100304_intelligence_history.sql"
     migration_present = migration.is_file()
     adapter_present = (root / "app" / "adapters" / "infrastructure" / "intelligence" / "supabase_intelligence_history.py").is_file()
-    worker_migration = root / "supabase" / "migrations" / "20261103184308_intelligence_recurring_worker.sql"
+    worker_migration = root / "supabase" / "migrations" / "20261107025932_intelligence_recurring_worker.sql"
     worker_migration_present = worker_migration.is_file()
     history_enabled = os.getenv("JARVIS_INTELLIGENCE_HISTORY_ENABLED", "false").strip().casefold() == "true"
     worker_enabled = os.getenv("JARVIS_INTELLIGENCE_WORKER_ENABLED", "false").strip().casefold() == "true"
