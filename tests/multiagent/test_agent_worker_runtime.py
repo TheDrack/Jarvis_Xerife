@@ -85,13 +85,14 @@ def test_runtime_opt_in_fails_closed_without_required_credentials(monkeypatch, c
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
     for key in (
         "JARVIS_TASK_QUEUE_API_URL", "JARVIS_TASK_QUEUE_API_TOKEN",
-        "JARVIS_TASK_QUEUE_USERNAME", "JARVIS_TASK_QUEUE_PASSWORD", "FREELLMAPI_API_KEY",
+        "JARVIS_TASK_QUEUE_USERNAME", "JARVIS_TASK_QUEUE_PASSWORD",
+        "JARVIS_TASK_QUEUE_WORKER_TOKEN", "FREELLMAPI_API_KEY",
     ):
         monkeypatch.delenv(key, raising=False)
     with pytest.raises(RuntimeError, match="JARVIS_TASK_QUEUE_API_URL"):
         start_configured_worker()
     assert "Mini-agent runtime configuration incomplete" in caplog.text
-    assert "JARVIS_TASK_QUEUE_API_TOKEN" in caplog.text
+    assert "JARVIS_TASK_QUEUE_WORKER_TOKEN" in caplog.text
 
 
 def test_runtime_starts_configured_worker_and_can_be_stopped(monkeypatch):
@@ -115,6 +116,40 @@ def test_runtime_starts_configured_worker_and_can_be_stopped(monkeypatch):
     stop.set()
     thread.join(timeout=1)
     assert not thread.is_alive()
+
+
+def test_runtime_prefers_bound_http_worker_when_both_backends_exist(monkeypatch):
+    class IdleWorker:
+        agent_id = "bound-http-worker"
+
+        def run_once(self):
+            return None
+
+    monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "legacy-service-role")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_URL", "https://jarvis.example")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_API_TOKEN", "user-jwt")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "worker-credential")
+    monkeypatch.setenv("FREELLMAPI_API_KEY", "provider-key")
+    monkeypatch.setattr(
+        "app.multiagent.agent_worker_runtime.PriorityQueueMiniAgent.from_env",
+        lambda agent_id=None: IdleWorker(),
+    )
+    monkeypatch.setattr(
+        "app.multiagent.supabase_task_worker.SupabaseTaskQueueMiniAgent.from_env",
+        lambda agent_id=None: (_ for _ in ()).throw(
+            AssertionError("legacy service-role path must not win when worker credentials exist")
+        ),
+    )
+
+    runtime = start_configured_worker()
+    assert runtime is not None
+    group, stop = runtime
+    assert group.threads[0].name == "JarvisAgentWorker-bound-http-worker"
+    stop.set()
+    group.join(timeout=1)
+    assert not group.is_alive()
 
 
 def test_runtime_prefers_supabase_native_worker_when_admin_credentials_exist(monkeypatch):
@@ -234,3 +269,18 @@ def test_configured_workers_poll_simultaneously(monkeypatch):
         "mini-freellmapi-3",
     ], "every configured worker must run its loop at the same time"
     assert not group.is_alive()
+
+
+
+def test_runtime_fails_closed_when_worker_token_lacks_user_api_identity(monkeypatch):
+    monkeypatch.setenv("JARVIS_MINI_AGENT_ENABLED", "true")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "legacy-service-role")
+    monkeypatch.setenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "worker-credential")
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_API_URL", raising=False)
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_API_TOKEN", raising=False)
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_USERNAME", raising=False)
+    monkeypatch.delenv("JARVIS_TASK_QUEUE_PASSWORD", raising=False)
+
+    with pytest.raises(RuntimeError, match="JARVIS_TASK_QUEUE_WORKER_TOKEN requires"):
+        start_configured_worker()

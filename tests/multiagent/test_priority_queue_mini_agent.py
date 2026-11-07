@@ -27,7 +27,7 @@ def test_priority_worker_heartbeats_claims_and_finishes_one_task():
     calls = []
     def handler(request):
         body = __import__("json").loads(request.content)
-        calls.append((request.url.path, body, request.headers["Authorization"]))
+        calls.append((request.url.path, body, request.headers["Authorization"], request.headers["X-Jarvis-Worker-Token"]))
         if request.url.path.endswith("/heartbeat"):
             return httpx.Response(200, json={"agent_id": "mini-1", "status": "available"})
         if request.url.path.endswith("/claim-next"):
@@ -46,6 +46,7 @@ def test_priority_worker_heartbeats_claims_and_finishes_one_task():
     worker = PriorityQueueMiniAgent(
         api_base_url="https://jarvis.example",
         api_token="api-test-token",
+        worker_token="worker-test-token",
         agent_id="mini-1",
         handler=worker_handler,
         client=http_client,
@@ -64,6 +65,7 @@ def test_priority_worker_heartbeats_claims_and_finishes_one_task():
     assert calls[2][1]["status"] == "completed"
     assert calls[2][1]["attempt_id"].endswith("0022")
     assert all(call[2] == "Bearer api-test-token" for call in calls)
+    assert all(call[3] == "worker-test-token" for call in calls)
     assert worker_handler.messages[0].payload["objective"] == "Summarize the supplied context"
 
 
@@ -76,7 +78,7 @@ def test_priority_worker_returns_none_when_queue_empty():
     client = httpx.Client(transport=httpx.MockTransport(handler))
     worker = PriorityQueueMiniAgent(
         api_base_url="https://jarvis.example", api_token="token",
-        agent_id="mini-1", handler=FakeHandler(), client=client,
+        worker_token="worker-test-token", agent_id="mini-1", handler=FakeHandler(), client=client,
     )
     try:
         assert worker.run_once() is None
@@ -104,6 +106,7 @@ def test_priority_worker_releases_task_when_inference_raises():
     client = httpx.Client(transport=httpx.MockTransport(transport))
     worker = PriorityQueueMiniAgent(
         api_base_url="https://jarvis.example", api_token="token",
+        worker_token="worker-test-token",
         agent_id="mini-1", handler=FakeHandler(error=RuntimeError("model unavailable")),
         client=client,
     )
@@ -141,6 +144,7 @@ def test_priority_worker_keeps_original_error_when_release_endpoint_fails():
     client = httpx.Client(transport=httpx.MockTransport(transport))
     worker = PriorityQueueMiniAgent(
         api_base_url="https://jarvis.example", api_token="token",
+        worker_token="worker-test-token",
         agent_id="mini-1", handler=FakeHandler(error=RuntimeError("model unavailable")),
         client=client,
     )
@@ -170,7 +174,7 @@ def test_priority_worker_can_login_and_refresh_expired_jwt():
     client = httpx.Client(transport=httpx.MockTransport(transport))
     worker = PriorityQueueMiniAgent(
         api_base_url="https://jarvis.example", api_token="stale-jwt",
-        agent_id="mini-1", username="agent@example.test", password="not-logged",
+        worker_token="worker-test-token", agent_id="mini-1", username="agent@example.test", password="not-logged",
         handler=FakeHandler(), client=client,
     )
     try:

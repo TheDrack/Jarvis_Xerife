@@ -133,10 +133,9 @@ def start_configured_worker() -> tuple[WorkerGroup, threading.Event] | None:
         )
         return None
 
-    # Prefer the in-process Supabase service-role path: it shares the exact
-    # queue database and avoids creating a separate user/password for a worker.
-    # Fall back to the authenticated HTTP runtime for installations without an
-    # admin Supabase client.
+    # Prefer the API path when a per-agent credential is provisioned. The
+    # service-role consumer remains a legacy fallback until every deployment
+    # has been migrated; it is not equivalent to an individual worker identity.
     stop_event = threading.Event()
     slots = _configured_worker_count()
     agent_ids = _agent_ids(_configured_agent_id(), slots)
@@ -145,8 +144,36 @@ def start_configured_worker() -> tuple[WorkerGroup, threading.Event] | None:
         os.getenv("SUPABASE_URL", "").strip()
         and os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
     )
-    if has_supabase_admin:
-        logger.info("Mini-agent runtime using configured Supabase queue backend")
+    worker_token_configured = bool(
+        os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
+    )
+    has_worker_api = bool(
+        os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
+        and worker_token_configured
+        and (
+            os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
+            or (
+                os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip()
+                and os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "").strip()
+            )
+        )
+    )
+    if worker_token_configured and not has_worker_api:
+        raise RuntimeError(
+            "JARVIS_TASK_QUEUE_WORKER_TOKEN requires JARVIS_TASK_QUEUE_API_URL "
+            "and an API JWT or username/password caller identity."
+        )
+
+    if has_worker_api:
+        logger.info("Mini-agent runtime using per-agent authenticated HTTP queue backend")
+        workers = [
+            PriorityQueueMiniAgent.from_env(agent_id=agent_id) for agent_id in agent_ids
+        ]
+    elif has_supabase_admin:
+        logger.warning(
+            "Mini-agent runtime using legacy Supabase service-role queue access; "
+            "per-agent worker identity is not enforced on this path"
+        )
         from .supabase_task_worker import SupabaseTaskQueueMiniAgent
 
         workers = [
@@ -159,6 +186,7 @@ def start_configured_worker() -> tuple[WorkerGroup, threading.Event] | None:
             "JARVIS_TASK_QUEUE_API_TOKEN",
             "JARVIS_TASK_QUEUE_USERNAME",
             "JARVIS_TASK_QUEUE_PASSWORD",
+            "JARVIS_TASK_QUEUE_WORKER_TOKEN",
             "FREELLMAPI_API_KEY",
         )
         missing = [key for key in required if not os.getenv(key, "").strip()]

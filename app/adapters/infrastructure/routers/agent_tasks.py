@@ -6,10 +6,11 @@ import os
 from functools import lru_cache
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine
 
+from app.adapters.infrastructure.agent_worker_credentials import AgentWorkerCredentialStore
 from app.application.services.agent_task_queue_service import (
     AgentTaskQueueService, TaskQueueUnavailable,
 )
@@ -119,7 +120,7 @@ class RoutineRequest(BaseModel):
     enabled: bool = True
 
 
-def create_agent_tasks_router(db_adapter, get_current_user) -> APIRouter:
+def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=None) -> APIRouter:
     router = APIRouter(prefix="/v1", tags=["agent-task-queue"])
 
     @lru_cache(maxsize=1)
@@ -156,10 +157,62 @@ def create_agent_tasks_router(db_adapter, get_current_user) -> APIRouter:
             return HTTPException(status_code=422, detail=str(exc))
         return HTTPException(status_code=500, detail="Task queue operation failed")
 
-    @router.post("/agents/heartbeat")
-    async def heartbeat(request: AgentHeartbeatRequest, _user=Depends(get_current_user)):
+    def authenticate_worker(
+        worker_token: str | None = Header(default=None, alias="X-Jarvis-Worker-Token"),
+    ):
+        if not isinstance(worker_token, str) or not worker_token.strip():
+            raise HTTPException(
+                status_code=401,
+                detail="Worker credential is required",
+                headers={"WWW-Authenticate": "JarvisWorker"},
+            )
+        engine = queue_engine()
+        if engine is None or getattr(getattr(engine, "dialect", None), "name", None) != "postgresql":
+            raise HTTPException(
+                status_code=503,
+                detail="Worker credential registry requires the shared PostgreSQL task queue",
+            )
         try:
-            return service().heartbeat(**request.model_dump())
+            principal = AgentWorkerCredentialStore(engine).authenticate(worker_token.strip())
+        except Exception as exc:
+            logger.error("Worker credential lookup failed (%s)", type(exc).__name__)
+            raise HTTPException(
+                status_code=503,
+                detail="Worker credential registry is unavailable",
+            ) from None
+        if principal is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Worker credential is invalid, expired, or revoked",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return principal
+
+    worker_dependency = get_current_worker or authenticate_worker
+
+    def require_worker_identity(requested_agent_id: str, principal: Any) -> str:
+        trusted_agent_id = str(getattr(principal, "agent_id", "") or "").strip()
+        if not trusted_agent_id or requested_agent_id != trusted_agent_id:
+            raise HTTPException(status_code=403, detail="Worker credential is not authorized for this agent")
+        return trusted_agent_id
+
+    @router.post("/agents/heartbeat")
+    async def heartbeat(
+        request: AgentHeartbeatRequest,
+        _user=Depends(get_current_user),
+        worker=Depends(worker_dependency),
+    ):
+        try:
+            agent_id = require_worker_identity(request.agent_id, worker)
+            payload = request.model_dump(exclude={"agent_id", "available_tools"})
+            payload["agent_id"] = agent_id
+            payload["available_tools"] = list(worker.available_tools)
+            # The current worker runtime executes one task per loop. Do not let
+            # the request body inflate the scheduler's concurrency budget.
+            payload["concurrency_limit"] = 1
+            return service().heartbeat(**payload)
+        except HTTPException:
+            raise
         except Exception as exc:
             raise translate_error(exc) from exc
 
@@ -171,18 +224,31 @@ def create_agent_tasks_router(db_adapter, get_current_user) -> APIRouter:
             raise translate_error(exc) from exc
 
     @router.post("/agent-tasks/claim-next")
-    async def claim_next(request: ClaimTaskRequest, _user=Depends(get_current_user)):
+    async def claim_next(
+        request: ClaimTaskRequest,
+        _user=Depends(get_current_user),
+        worker=Depends(worker_dependency),
+    ):
         try:
-            task = service().claim_next(request.agent_id, request.lease_seconds)
+            agent_id = require_worker_identity(request.agent_id, worker)
+            task = service().claim_next(agent_id, request.lease_seconds)
             return {"task": task}
+        except HTTPException:
+            raise
         except Exception as exc:
             raise translate_error(exc) from exc
 
     @router.post("/agent-tasks/{task_id}/finish")
-    async def finish(task_id: str, request: FinishTaskRequest, _user=Depends(get_current_user)):
+    async def finish(
+        task_id: str,
+        request: FinishTaskRequest,
+        _user=Depends(get_current_user),
+        worker=Depends(worker_dependency),
+    ):
         try:
+            agent_id = require_worker_identity(request.agent_id, worker)
             accepted = service().finish(
-                task_id, request.agent_id, request.attempt_id, request.status, request.result
+                task_id, agent_id, request.attempt_id, request.status, request.result
             )
             if not accepted:
                 raise HTTPException(status_code=409, detail="Task ownership or attempt is stale")
@@ -200,10 +266,16 @@ def create_agent_tasks_router(db_adapter, get_current_user) -> APIRouter:
             raise translate_error(exc) from exc
 
     @router.post("/agent-tasks/{task_id}/release")
-    async def release(task_id: str, request: ReleaseTaskRequest, _user=Depends(get_current_user)):
+    async def release(
+        task_id: str,
+        request: ReleaseTaskRequest,
+        _user=Depends(get_current_user),
+        worker=Depends(worker_dependency),
+    ):
         try:
+            agent_id = require_worker_identity(request.agent_id, worker)
             released = service().release(
-                task_id, request.agent_id, request.attempt_id, request.reason
+                task_id, agent_id, request.attempt_id, request.reason
             )
             if not released:
                 raise HTTPException(status_code=409, detail="Task ownership or attempt is stale")

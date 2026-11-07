@@ -26,13 +26,20 @@ import urllib.error
 import urllib.request
 
 QUEUE_ACCESS = {
-    "supabase_native": ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"),
-    "http_token": ("JARVIS_TASK_QUEUE_API_URL", "JARVIS_TASK_QUEUE_API_TOKEN"),
-    "http_password": (
+    "http_worker_token": (
         "JARVIS_TASK_QUEUE_API_URL",
+        "JARVIS_TASK_QUEUE_WORKER_TOKEN",
+        "JARVIS_TASK_QUEUE_API_TOKEN",
+    ),
+    "http_worker_password": (
+        "JARVIS_TASK_QUEUE_API_URL",
+        "JARVIS_TASK_QUEUE_WORKER_TOKEN",
         "JARVIS_TASK_QUEUE_USERNAME",
         "JARVIS_TASK_QUEUE_PASSWORD",
     ),
+    # Legacy service-role access remains available during migration, but does
+    # not provide an individual worker principal and must not be preferred.
+    "supabase_native_legacy": ("SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"),
 }
 INFERENCE_KEYS = ("FREELLMAPI_API_KEY", "GROQ_API_KEY", "VENICE_API_KEY")
 OPTIONAL = (
@@ -85,13 +92,21 @@ def main() -> int:
     }
 
     enabled = os.getenv("JARVIS_MINI_AGENT_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
-    access_mode, access_state = queue_group()
+    access_mode, _access_state = queue_group()
     inference = presence(INFERENCE_KEYS)
 
-    report["variables"] = {**access_state, **inference, **presence(OPTIONAL)}
+    all_queue_variables = tuple(dict.fromkeys(
+        name for names in QUEUE_ACCESS.values() for name in names
+    ))
+    report["variables"] = {
+        **presence(all_queue_variables),
+        **inference,
+        **presence(OPTIONAL),
+    }
     report["opt_in_enabled"] = enabled
     report["groups"] = {
         "queue_access": access_mode if access_mode != "missing" else "missing",
+        "queue_access_is_legacy": access_mode == "supabase_native_legacy",
         "inference_credential": sorted(key for key, ok in inference.items() if ok) or "missing",
         "worker_opt_in": "enabled" if enabled else "disabled",
     }
@@ -101,8 +116,10 @@ def main() -> int:
         blockers.append("JARVIS_MINI_AGENT_ENABLED is not enabled in this environment")
     if access_mode == "missing":
         blockers.append(
-            "no queue access configured: set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY, or "
-            "JARVIS_TASK_QUEUE_API_URL with a token or username/password"
+            "no queue access configured: set JARVIS_TASK_QUEUE_API_URL, "
+            "JARVIS_TASK_QUEUE_WORKER_TOKEN, and either JARVIS_TASK_QUEUE_API_TOKEN "
+            "or JARVIS_TASK_QUEUE_USERNAME/JARVIS_TASK_QUEUE_PASSWORD; the legacy "
+            "Supabase service-role path is reported separately"
         )
     if not any(inference.values()):
         blockers.append(
@@ -127,6 +144,7 @@ def main() -> int:
 
     report["limitations"] = [
         "Presence only: this checker never reads or prints variable values.",
+        "The Supabase service-role path is a legacy fallback and does not bind a request to an individual worker credential.",
         "A ready verdict means the runtime can start here; it does not prove the queue migrations "
         "are applied to the target database or that a worker is currently heartbeating.",
         "Tasks requiring repository, shell, browser or production-diagnostic tools cannot be claimed "
