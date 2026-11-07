@@ -159,3 +159,45 @@ Do not enable `JARVIS_INTELLIGENCE_HISTORY_ENABLED` or the recurring worker unti
 - Official deployment guide: [Diagnosing and fixing migration sync errors](https://supabase.com/docs/guides/deployment/database-migrations).
 
 **Final status:** read-only audit complete; repository reconciliation and any production repair remain pending. No production database changes were made.
+
+
+## Revalidation 2026-11-06 (current runtime state)
+
+This section supersedes the historical object/claim observations above where they differ. The earlier audit remains useful as the record of the prior snapshot.
+
+**Repository and remote ledger**
+- Repository baseline: merge commit `a31f5554776531c245166cb864abbf8a0eb03075` (PR #758).
+- Supabase project `saibtpdehhprttqlgqdt` reports `ACTIVE_HEALTHY`; its `main` branch reports `MIGRATIONS_FAILED`.
+- Current repository has 25 local migration files; remote ledger has 20 entries; only 5 version timestamps match exactly.
+- Six local files have no matching remote ledger entry by name/version: Red/Blue routing, failed-task release, heartbeat reconciliation, worker lease/security hardening, recurring intelligence worker, and direct-claim parent dependency guard.
+- Two remote entries are named `google_linked_identities`. Do not normalize either entry by filename alone; retain SQL/provenance comparison.
+- Supabase Preview fails with `Remote migration versions not found in local migrations directory.`
+
+**Current task-queue RPC state**
+- `claim_jarvis_agent_task` and `claim_next_jarvis_agent_task` now include provider and `available_tools` checks. The direct claim also enforces parent-task dependency; the queue claim calls `mark_stale_jarvis_agents_offline`.
+- `mark_stale_jarvis_agents_offline(integer)` and `release_jarvis_agent_task` exist remotely.
+- `renew_jarvis_agent_task_lease(text,text,uuid,integer)` does **not** exist remotely. The local migration `20261028130000_worker_lease_and_security_hardening.sql` defines it.
+- `SupabaseTaskQueueMiniAgent` attempts renewal every one-third of its configured lease (30 seconds for the default 90-second lease). If a task runs longer than its lease, renewal cannot succeed; the lease can expire, another worker can reclaim the task, and the original attempt can be rejected by fencing.
+- No task was active in the read-only snapshot, so no duplicate execution was observed. Do not treat this as a proven-safe long-running worker deployment.
+- The five indexes in the local worker-lease migration correspond to the five foreign-key index warnings from the Supabase performance advisor.
+
+**Current intelligence persistence state**
+- `intelligence_event_snapshots` and `intelligence_observation_snapshots` exist but each contains zero rows.
+- `jarvis_environment_observations` contains 1,755 rows.
+- The recurring intelligence worker's tables and five RPCs remain absent. Keep that worker disabled.
+
+**Agent capability state**
+- Three agents (`mini-freellmapi-1/2/3`) were available with provider `groq` and only `text_reasoning` advertised.
+- Two ready tasks require `repository_read`, `github_read`, and `production_read`; no active agent advertises those tools. The claim RPC correctly refuses to assign them. This is capability coverage, not evidence of a scheduler defect.
+
+**Security and performance**
+- The 26 public tables reported by the security advisor have RLS enabled and no policies; the read-only privilege probe found no table grants for `anon` or `authenticated`. Access is limited to the owner and service role. Treat the advisor's no-policy entries as INFO in this schema, not as proof of public exposure.
+- Performance advisor reports five unindexed foreign keys and 33 unused indexes. Do not drop unused indexes without workload evidence.
+- No production DDL/DML, migration repair, push, grant, or deployment was performed.
+
+**Separate message-queue fencing work**
+- PR #761 adds a `claim_token` to `jarvis_agent_messages` and requires the same token for ACK. Its pgTAP tests run against an isolated local fixture.
+- This protects message ACK attempts; it does not create `renew_jarvis_agent_task_lease` for the task queue. The two lease domains must not be conflated.
+- PR #763 adds isolated pgTAP coverage for task lease renewal. Its test-first revision is expected to expose that the local renewal function does not explicitly reject a NULL lease duration. No production migration is applied by that PR.
+
+**Current gate:** reconcile the migration ledger and verify the missing task-lease RPC before relying on long-running task execution. Keep the recurring intelligence worker disabled until its separate migration and persistence tests pass.
