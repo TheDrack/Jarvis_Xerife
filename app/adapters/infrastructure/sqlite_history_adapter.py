@@ -342,9 +342,10 @@ class SQLiteHistoryAdapter(HistoryProvider):
                     statement = statement.where(Interaction.user_id.is_(None))
                 else:
                     statement = statement.where(Interaction.user_id == user_id.strip())
-                statement = statement.group_by(Interaction.command_type)
+                statement = (
+                    statement.group_by(Interaction.command_type)
                     .order_by(func.count(Interaction.command_type).desc())
-                    .limit(limit)
+                    .limit(max(0, limit))
                 )
                 results = session.exec(statement).all()
 
