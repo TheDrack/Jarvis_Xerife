@@ -157,10 +157,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evolução em lote de capacidades JARVIS")
     parser.add_argument("--dry-run", action="store_true", help="Lista sem executar")
     parser.add_argument("--limit", type=int, default=None, help="Máximo de caps a evoluir")
-    parser.add_argument("--cap-id", help="Evolve apenas uma cap específica (ex: CAP-042)")
+    mission_group = parser.add_mutually_exclusive_group()
+    mission_group.add_argument(
+        "--mission-id",
+        help="Evolve somente a próxima missão elegível do Cognitive Roadmap (ex: C0-001)",
+    )
+    mission_group.add_argument(
+        "--cap-id",
+        help="Legacy only: capability ID; requires --legacy-capability",
+    )
+    parser.add_argument(
+        "--legacy-capability",
+        action="store_true",
+        help="Explicitly opt in to the legacy capabilities.json selector",
+    )
     parser.add_argument(
         "--target-file",
-        help="Caminho relativo confiável do arquivo-alvo, vindo do inventário da capability",
+        help="Target path; in roadmap mode it must exactly match the reviewed manifest",
     )
     parser.add_argument(
         "--delay", type=float, default=2.0, help="Segundos entre caps (padrão: 2.0)"
@@ -173,18 +186,61 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    all_caps = _load_capabilities()
-    completed_ids: Set[str] = {c["id"] for c in all_caps if c.get("status") == "complete"}
+    if args.mission_id:
+        if args.legacy_capability:
+            parser.error("--mission-id cannot be combined with --legacy-capability")
+        from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
 
-    if args.cap_id:
-        # Modo de cap específica
-        target = next((c for c in all_caps if c["id"] == args.cap_id), None)
-        if not target:
-            print(f"❌ {args.cap_id} não encontrado em capabilities.jrvs")
-            sys.exit(1)
-        pending_ordered = [target]
+        service = AutoEvolutionServiceV2()
+        mission = service.find_mission_by_id(args.mission_id)
+        if not mission or mission.get("status") == "blocked":
+            reason = (mission or {}).get("reason", "roadmap_mission_not_found")
+            print(f"⛔ Missão do Cognitive Roadmap bloqueada: {reason}")
+            sys.exit(2)
+        if args.target_file and args.target_file != mission["target_file"]:
+            print("⛔ --target-file diverge do alvo validado no manifesto do roadmap.")
+            sys.exit(2)
+
+        canonical_context = service.get_roadmap_context(mission)
+        if args.roadmap_context and args.roadmap_context != canonical_context:
+            print("⛔ --roadmap-context diverge da missão validada no manifesto.")
+            sys.exit(2)
+        args.roadmap_context = canonical_context
+        args.target_file = mission["target_file"]
+        all_caps = [
+            {
+                "id": mission["id"],
+                "title": mission["title"],
+                "notes": canonical_context,
+                "target_file": mission["target_file"],
+                "status": "pending",
+                "priority": mission["priority"],
+                "depends_on": mission["depends_on"],
+            }
+        ]
+        completed_ids: Set[str] = set()
+        pending_ordered = all_caps
+
+    elif args.legacy_capability:
+        all_caps = _load_capabilities()
+        completed_ids = {
+            c["id"] for c in all_caps if c.get("status") == "complete"
+        }
+        if args.cap_id:
+            target = next((c for c in all_caps if c["id"] == args.cap_id), None)
+            if not target:
+                print(f"❌ {args.cap_id} não encontrado no catálogo legado.")
+                sys.exit(1)
+            pending_ordered = [target]
+        else:
+            pending_ordered = _topological_sort(all_caps, completed_ids)
+
     else:
-        pending_ordered = _topological_sort(all_caps, completed_ids)
+        print(
+            "⛔ Selecione --mission-id do Cognitive Roadmap. "
+            "O catálogo legado exige opt-in explícito com --legacy-capability."
+        )
+        sys.exit(2)
 
     if args.limit:
         pending_ordered = pending_ordered[: args.limit]
