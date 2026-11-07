@@ -123,3 +123,12 @@ def test_append_rejects_user_identity_supplied_only_in_metadata():
         assert "trusted user_id argument" in str(exc)
     else:
         raise AssertionError("untrusted metadata must not establish memory ownership")
+
+def test_delete_all_uses_a_non_empty_scope_guard():
+    client, query = _client_with_query()
+    store = SupabaseVectorMemoryStore(client=client)
+
+    store.delete_all()
+
+    query.delete.assert_called_once_with()
+    query.neq.assert_called_once_with("scope_key", "")
