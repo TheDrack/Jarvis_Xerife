@@ -97,6 +97,7 @@ async def test_proactive_monitor_lifecycle_is_cancellable(monkeypatch):
     assert task is not None and not task.done()
 
     service.stop_proactive_monitor()
-    await asyncio.sleep(0)
+    with pytest.raises(asyncio.CancelledError):
+        await task
 
     assert task.cancelled()
