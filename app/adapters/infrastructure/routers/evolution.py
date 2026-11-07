@@ -201,7 +201,9 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
             approved_by = _authenticated_actor_id(current_user)
             strategist = _get_strategist()
             github_worker = nexus.resolve("github_worker")
-            if github_worker is None:
+            if github_worker is None or getattr(
+                github_worker, "__is_cloud_mock__", False
+            ):
                 raise HTTPException(
                     status_code=503,
                     detail="GitHub publisher is unavailable; proposal was not approved.",
