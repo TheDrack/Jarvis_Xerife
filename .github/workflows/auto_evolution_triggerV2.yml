@@ -96,17 +96,26 @@ jobs:
 
               print("🟢 Buscando próxima mutação na apostila de aprendizado...")
               next_mission = auto.find_next_mission()
+              if next_mission and next_mission.get("status") == "blocked":
+                  with open(github_output, "a", encoding="utf-8") as output:
+                      output.write("action=blocked\n")
+                  print(
+                      "⛔ Selector do Cognitive Roadmap bloqueou a execução: "
+                      + str(next_mission.get("reason") or "unknown")
+                  )
+                  sys.exit(0)
+
               if not next_mission:
                   with open(github_output, "a", encoding="utf-8") as output:
                       output.write("action=idle\n")
-                  print("😴 Sem missões pendentes no momento.")
+                  print("😴 Todas as missões aprovadas do roadmap foram concluídas.")
                   sys.exit(0)
 
-              cap_id = str(next_mission.get("id") or "").strip()
-              if not re.fullmatch(r"CAP-[0-9]+", cap_id):
+              mission_id = str(next_mission.get("id") or "").strip()
+              if not re.fullmatch(r"C[0-8]-[0-9]{3}", mission_id):
                   with open(github_output, "a", encoding="utf-8") as output:
                       output.write("action=blocked\n")
-                  print("⛔ Identificador de missão ausente ou inválido; evolução bloqueada.")
+                  print("⛔ Identificador de missão do roadmap ausente ou inválido.")
                   sys.exit(0)
 
               context = auto.get_roadmap_context(next_mission)
@@ -126,10 +135,10 @@ jobs:
                   sys.exit(0)
 
               with open(github_output, "a", encoding="utf-8") as output:
-                  output.write(f"cap_id={cap_id}\n")
+                  output.write(f"mission_id={mission_id}\n")
                   output.write(f"target_file={target_file}\n")
                   output.write("action=evolve\n")
-              print(f"🚀 Alvo identificado: {cap_id}")
+              print(f"🚀 Missão do roadmap identificada: {mission_id}")
           except Exception as exc:
               print(f"❌ Falha no Orquestrador: {exc}")
               sys.exit(1)
@@ -147,13 +156,13 @@ jobs:
           EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
           EVOLUTION_SANDBOX_IMAGE: jarvis-evolution-sandbox:ci
           EVOLUTION_ARTIFACT_DIR: ${{ runner.temp }}/jarvis-evolution-artifacts
-          CAP_ID: ${{ steps.flow.outputs.cap_id }}
+          MISSION_ID: ${{ steps.flow.outputs.mission_id }}
           TARGET_FILE: ${{ steps.flow.outputs.target_file }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
           source .venv/bin/activate
           python scripts/evolve_all_pending.py \
-            --cap-id "$CAP_ID" \
+            --mission-id "$MISSION_ID" \
             --max-attempts 3 \
             --target-file "$TARGET_FILE" \
             --roadmap-context "$(cat mission_context.txt)"
