@@ -138,7 +138,7 @@ def test_store_event_refuses_an_invalid_registered_redactor(monkeypatch, pii_vec
 
     monkeypatch.setattr(nexus, "resolve", lambda _name: object())
 
-    with pytest.raises(RuntimeError, match="sanitize"):
+    with pytest.raises(RuntimeError, match="PII redactor is unavailable"):
         pii_vector_adapter.store_event("private email alice@example.com")
 
     assert pii_vector_adapter._events == []
