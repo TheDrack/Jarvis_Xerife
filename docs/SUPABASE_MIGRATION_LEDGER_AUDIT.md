@@ -1,30 +1,65 @@
 # Supabase Migration Ledger Reconciliation
 
-**Audit date:** 2026-11-03 (America/Sao_Paulo)
+**Audit date:** 2026-11-07 (America/Sao_Paulo)
 **Repository:** `TheDrack/Jarvis_Xerife`
-**Audited base:** `origin/main` at `e50d9332`
+**Audited base:** `origin/main` at `316a44d91e580c1998b26607f4bd859add4278f7`
 **Supabase project:** `saibtpdehhprttqlgqdt` (`jarvis-xerife`)
-**Scope:** read-only comparison of repository migration files, remote migration ledger, and selected remote schema objects.
+**Scope:** post-merge read-only verification of repository migrations, remote migration ledger, RPC signatures/ACLs, indexes, runtime queue state, and Render deployment.
 
 ## Safety boundary
 
-This audit performed no DDL, DML, migration repair, migration push, grant changes, or feature-flag changes. Remote checks used the migration-list connector and read-only catalog queries. The production database was not modified.
+No manual DDL/DML, `db push`, `migration repair`, grants, or deployment command was issued. After PR #767 merged, the connected GitHub–Supabase integration automatically applied the six pending migration files. The resulting ledger and schema were then re-read through the Supabase connector. This was an automatic integration deployment, not a manual database operation.
 
-Do not run `supabase db push`, `supabase migration repair`, `supabase migration up`, or apply a migration until each discrepancy below has a reviewed resolution and the schema has been compared with the exact migration SQL.
+The historical sections below preserve the earlier 2026-11-03 and 2026-11-06 audit snapshots. They are not the current state; the post-merge status below supersedes them.
 
-## Executive result
+## Current executive result — post PR #767 merge
 
-| Evidence | Result |
+| Evidence | Current result |
 |---|---:|
-| Local migration files on audited `main` | 20 |
-| Remote migration ledger entries | 16 |
-| Exact local/remote timestamp matches | 4 |
-| Remote duplicate name | `google_linked_identities` appears twice with semantically equivalent SQL |
-| Intelligence history schema tables | Both exist |
-| Intelligence worker lease/run tables | Both absent |
-| Intelligence worker RPCs | All five absent |
+| Local migration files on `main` | 26 |
+| Remote migration ledger entries | 26 |
+| Exact local/remote version matches | 26/26 |
+| Local migrations pending | 0 |
+| Latest remote migration version | `20261107025932` |
+| Supabase main branch status | `FUNCTIONS_DEPLOYED` |
+| Supabase project status | `ACTIVE_HEALTHY` |
+| Intelligence worker lease/run tables | Present with RLS |
+| Intelligence worker RPCs | All five present; service-role only |
+| Message claim-token column and fenced ACK | Present |
+| Task lease renewal RPC | Present; service-role only |
+| Five worker supporting indexes | Present |
 
-Supabase CLI compares migration timestamps, not migration names. A local file with the same semantic name but a different timestamp is still considered a different migration. Consequently, the current ledger cannot safely be reconciled by renaming files based on names alone.
+The duplicate `google_linked_identities` history entries remain as two separate remote versions and two exact local files. The 20 historical versions were reconstructed from `schema_migrations.statements`; the six forward migrations were then applied automatically by the connected GitHub–Supabase integration after PR #767 merged.
+
+## Post-merge remote verification — 2026-11-07
+
+**Six migrations applied after the historical ledger was restored:**
+- `20261105202000` — direct claim parent-dependency guard.
+- `20261107010000` — message claim-token fencing.
+- `20261107020000` — NULL-safe task lease renewal.
+- `20261107025840` — failed-attempt release RPC.
+- `20261107025853` — five task-worker supporting indexes.
+- `20261107025932` — recurring intelligence worker lease/run schema and RPCs.
+
+**RPC signatures and privileges**
+- `claim_jarvis_agent_task` now enforces parent completion on direct claims as well as provider/tool eligibility.
+- `claim_jarvis_agent_message` returns a claim token; the three-argument `ack_jarvis_agent_message(message_id, agent_id, claim_token)` is executable by `service_role` only.
+- The legacy two-argument ACK overload remains in the catalog for compatibility/history, but `service_role`, `anon`, and `authenticated` have no EXECUTE privilege on it.
+- `renew_jarvis_agent_task_lease`, `release_jarvis_agent_task`, and all five intelligence-worker RPCs are executable by `service_role` only.
+- All five worker supporting indexes are present.
+- The intelligence worker lease/run tables have RLS enabled.
+
+**Runtime state after deployment**
+- Three `mini-freellmapi` agents are online under provider `groq`; all advertise only `text_reasoning`.
+- Two old tasks remain `ready` and require `repository_read`, `github_read`, and `production_read`. No agent advertises those tools, so the scheduler correctly does not assign them.
+- The recurring intelligence worker lease is unowned (`worker_id=NULL`, no expiry) and the run table contains zero executions. The database contract is deployed; the recurring process is not active.
+- Render `Jarvis-api` is live. The last observed successful deploy is commit `cf887192615fadeefc535f3d9c0330585a2f699f`; PRs #766/#767 changed tests, migrations, and documentation, not application runtime code.
+
+**Operational decision**
+- Migration drift is reconciled: 26/26 local versions match the remote ledger, with zero pending.
+- Do not populate `available_tools` with capabilities that lack real executors. Integrate the runtime tool registry and connectors before retrying the two ready tasks.
+- Keep the recurring intelligence worker disabled until a scheduler/process is configured and a real lease/run record is verified.
+- C0 remains open for capability integration, production task execution proof, recurring worker activation, memory durability, and reasoning/planning/initiative/learning contracts.
 
 ## Remote ledger observed
 
