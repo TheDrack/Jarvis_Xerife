@@ -1,0 +1,66 @@
+name: Supabase durable vector memory tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "supabase/migrations/20261107033349_vector_memory_store.sql"
+      - "supabase/tests/vector_memory_store.test.sql"
+      - "app/adapters/infrastructure/supabase_vector_memory_store.py"
+      - "app/adapters/infrastructure/vector_memory_adapter.py"
+      - "app/application/services/memory_consolidation_service.py"
+      - "app/application/ports/vector_memory_store.py"
+      - "tests/adapters/infrastructure/test_supabase_vector_memory_store.py"
+      - "tests/adapters/infrastructure/test_vector_memory_adapter.py"
+      - "tests/application/test_memory_consolidation_service.py"
+      - ".github/workflows/supabase-vector-memory-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-vector-memory-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vector-memory:
+    name: PostgreSQL vector-memory isolation tests (isolated local Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+
+      - name: Assemble isolated vector-memory schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_dir="${RUNNER_TEMP}/jarvis-vector-memory"
+          mkdir -p "${test_dir}"
+          cd "${test_dir}"
+          supabase init --force
+          mkdir -p supabase/migrations supabase/tests
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261107033349_vector_memory_store.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/tests/vector_memory_store.test.sql" supabase/tests/
+
+      - name: Start isolated PostgreSQL
+        working-directory: ${{ runner.temp }}/jarvis-vector-memory
+        run: |
+          supabase start --exclude gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Execute pgTAP behavior tests
+        working-directory: ${{ runner.temp }}/jarvis-vector-memory
+        run: supabase test db supabase/tests/vector_memory_store.test.sql
+
+      - name: Stop isolated database
+        if: always()
+        working-directory: ${{ runner.temp }}/jarvis-vector-memory
+        run: supabase stop --no-backup || true

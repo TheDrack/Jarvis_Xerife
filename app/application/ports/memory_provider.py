@@ -26,6 +26,7 @@ class MemoryProvider(NexusComponent):
         text: str,
         metadata: Optional[Dict[str, Any]] = None,
         timestamp: Optional[datetime] = None,
+        user_id: Optional[str] = None,
     ) -> str:
         """
         Encode *text* as a vector and persist it with optional metadata.
@@ -46,6 +47,7 @@ class MemoryProvider(NexusComponent):
         query_text: str,
         top_k: int = 5,
         days_back: Optional[int] = 30,
+        user_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Return the *top_k* most semantically similar stored events.
@@ -62,6 +64,6 @@ class MemoryProvider(NexusComponent):
         pass
 
     @abstractmethod
-    def clear(self) -> None:
-        """Remove all stored events from the memory store."""
+    def clear(self, user_id: Optional[str] = None) -> None:
+        """Remove one user's events, or all events when explicitly unscoped."""
         pass

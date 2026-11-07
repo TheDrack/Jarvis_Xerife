@@ -124,7 +124,9 @@ def test_store_event_uses_local_redactor_when_nexus_redactor_is_missing(
 
     monkeypatch.setattr(nexus, "resolve", lambda _name: None)
 
-    pii_vector_adapter.store_event("Contact alice.smith@example.com, CPF 123.456.789-09")
+    pii_vector_adapter.store_event(
+        "Contact alice.smith@example.com, CPF 123.456.789-09"
+    )
 
     stored_text = pii_vector_adapter._events[0]["text"]
     assert "[EMAIL_REDACTED]" in stored_text
@@ -133,7 +135,9 @@ def test_store_event_uses_local_redactor_when_nexus_redactor_is_missing(
     assert "123.456.789-09" not in stored_text
 
 
-def test_store_event_refuses_an_invalid_registered_redactor(monkeypatch, pii_vector_adapter):
+def test_store_event_refuses_an_invalid_registered_redactor(
+    monkeypatch, pii_vector_adapter
+):
     from app.core.nexus import nexus
 
     monkeypatch.setattr(nexus, "resolve", lambda _name: object())
@@ -159,6 +163,7 @@ def test_store_event_rejects_user_id_in_untrusted_metadata(
 
     assert pii_vector_adapter._events == []
 
+
 def test_store_event_rejects_conflicting_user_id_metadata(
     monkeypatch, pii_vector_adapter
 ):
@@ -174,3 +179,188 @@ def test_store_event_rejects_conflicting_user_id_metadata(
         )
 
     assert pii_vector_adapter._events == []
+
+
+class _SharedVectorMemoryStore:
+    def __init__(self, events=None):
+        self.events = events if events is not None else []
+        self.is_available = True
+
+    def is_healthy(self):
+        return True
+
+    def append(self, event, user_id=None):
+        self.events.append(dict(event))
+
+    def list_events(self, user_id=None, days_back=None):
+        return [
+            dict(event)
+            for event in self.events
+            if event.get("metadata", {}).get("user_id") == user_id
+        ]
+
+    def delete_events(self, user_id=None):
+        self.events[:] = [
+            event
+            for event in self.events
+            if event.get("metadata", {}).get("user_id") != user_id
+        ]
+
+    def delete_all(self):
+        self.events.clear()
+
+
+def test_vector_memory_readback_survives_adapter_recreation():
+    shared_events = []
+    first = VectorMemoryAdapter(
+        dim=32,
+        store=_SharedVectorMemoryStore(shared_events),
+    )
+    first.store_event(
+        "configure the Jarvis network connector",
+        metadata={"kind": "fact"},
+        user_id="alice",
+    )
+
+    restarted = VectorMemoryAdapter(
+        dim=32,
+        store=_SharedVectorMemoryStore(shared_events),
+    )
+    results = restarted.query_similar(
+        "Jarvis network connector",
+        top_k=1,
+        user_id="alice",
+        days_back=None,
+    )
+
+    assert len(results) == 1
+    assert results[0]["metadata"]["user_id"] == "alice"
+
+
+def test_vector_memory_store_partitions_users_and_system_scope():
+    store = _SharedVectorMemoryStore()
+    adapter = VectorMemoryAdapter(dim=32, store=store)
+    adapter.store_event("alice private memory", user_id="alice")
+    adapter.store_event("bob private memory", user_id="bob")
+    adapter.store_event("system memory")
+
+    alice = adapter.query_similar(
+        "private memory", top_k=10, user_id="alice", days_back=None
+    )
+    system = adapter.query_similar(
+        "system memory", top_k=10, user_id=None, days_back=None
+    )
+
+    assert [item["metadata"]["user_id"] for item in alice] == ["alice"]
+    assert len(system) == 1
+    assert "user_id" not in system[0]["metadata"]
+
+
+def test_vector_memory_store_failure_does_not_cache_unpersisted_event():
+    class FailingStore(_SharedVectorMemoryStore):
+        def append(self, event, user_id=None):
+            raise RuntimeError("database unavailable")
+
+    adapter = VectorMemoryAdapter(dim=32, store=FailingStore())
+
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        adapter.store_event("do not cache unpersisted event", user_id="alice")
+
+    assert adapter._events == []
+
+
+def test_vector_memory_durability_requires_a_configured_persistent_store():
+    durable = VectorMemoryAdapter(dim=32, store=_SharedVectorMemoryStore())
+    ephemeral = VectorMemoryAdapter(dim=32, store=None)
+
+    assert durable.is_durable is True
+    assert ephemeral.is_durable is False
+
+
+def test_clear_only_removes_the_requested_user_partition():
+    store = _SharedVectorMemoryStore()
+    adapter = VectorMemoryAdapter(dim=32, store=store)
+    adapter.store_event("alice memory", user_id="alice")
+    adapter.store_event("bob memory", user_id="bob")
+
+    adapter.clear(user_id="alice")
+
+    assert len(store.list_events(user_id="alice")) == 0
+    assert len(store.list_events(user_id="bob")) == 1
+
+
+def test_vector_memory_clear_without_user_id_clears_all_partitions_explicitly():
+    store = _SharedVectorMemoryStore()
+    adapter = VectorMemoryAdapter(dim=32, store=store)
+    adapter.store_event("alice memory", user_id="alice")
+    adapter.store_event("system memory")
+
+    adapter.clear()
+
+    assert store.events == []
+    assert adapter._events == []
+
+
+def test_configured_but_unhealthy_vector_store_is_not_healthy():
+    class UnhealthyStore(_SharedVectorMemoryStore):
+        def is_healthy(self):
+            return False
+
+    adapter = VectorMemoryAdapter(dim=32, store=UnhealthyStore())
+
+    assert adapter.is_durable is True
+    assert adapter.is_healthy() is False
+
+
+def test_store_event_redacts_pii_inside_nested_metadata(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    pii_vector_adapter.store_event(
+        "safe event text",
+        metadata={
+            "contact": "alice.smith@example.com",
+            "details": ["CPF 123.456.789-09"],
+        },
+    )
+
+    stored_metadata = pii_vector_adapter._events[0]["metadata"]
+    assert stored_metadata["contact"] == "[EMAIL_REDACTED]"
+    assert stored_metadata["details"] == ["CPF [CPF_REDACTED]"]
+
+
+def test_execute_preserves_trusted_user_scope_from_context(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    result = pii_vector_adapter.execute(
+        {"text": "user-scoped event", "user_id": "alice"}
+    )
+
+    assert result["success"] is True
+    assert pii_vector_adapter._events[0]["metadata"]["user_id"] == "alice"
+
+
+def test_email_shaped_user_id_is_preserved_while_metadata_pii_is_redacted(
+    monkeypatch, pii_vector_adapter
+):
+    from app.core.nexus import nexus
+
+    monkeypatch.setattr(nexus, "resolve", lambda _name: None)
+
+    store = _SharedVectorMemoryStore()
+    adapter = VectorMemoryAdapter(dim=32, store=store)
+    adapter.store_event(
+        "safe event text",
+        metadata={"contact": "alice.smith@example.com"},
+        user_id="alice.smith@example.com",
+    )
+
+    assert store.events[0]["metadata"]["user_id"] == "alice.smith@example.com"
+    assert store.events[0]["metadata"]["contact"] == "[EMAIL_REDACTED]"
