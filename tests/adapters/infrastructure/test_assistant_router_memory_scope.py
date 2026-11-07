@@ -63,13 +63,13 @@ def test_history_endpoint_requires_authenticated_user_scope():
     def get_user_history(*, limit, user_id):
         seen_user_ids.append(user_id)
         return [
-        {
-            "command": "charlie private command",
-            "timestamp": "2026-11-06T12:00:00",
-            "success": True,
-            "message": "private response",
-        }
-    ]
+            {
+                "command": "charlie private command",
+                "timestamp": "2026-11-06T12:00:00",
+                "success": True,
+                "message": "private response",
+            }
+        ]
     service.get_command_history = get_user_history
 
     response = client.get("/v1/history")
