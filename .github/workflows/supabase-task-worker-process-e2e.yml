@@ -1,0 +1,102 @@
+name: Supabase task worker process E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/multiagent/supabase_task_worker.py"
+      - "app/multiagent/supabase_store.py"
+      - "supabase/migrations/202610230002_multi_agent_control_plane.sql"
+      - "supabase/migrations/202610230004_priority_routine_scheduler.sql"
+      - "supabase/migrations/202610260001_red_blue_venice_routing.sql"
+      - "supabase/migrations/20261027120000_agent_model_provider.sql"
+      - "supabase/migrations/20261028100000_agent_heartbeat_reconciliation.sql"
+      - "supabase/migrations/20261104235000_provider_aware_remote_task_claims.sql"
+      - "supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql"
+      - "supabase/migrations/20261107020000_task_lease_renewal_null_duration_guard.sql"
+      - "supabase/tests/task_lease_renewal.test.sql"
+      - "tests/multiagent/test_supabase_task_process_e2e.py"
+      - "requirements/dev.txt"
+      - ".github/workflows/supabase-task-worker-process-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-task-worker-process-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  task-worker-process-e2e:
+    name: Independent task worker process against isolated Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 3.0.0
+
+      - name: Assemble isolated task-queue schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          test_dir="${RUNNER_TEMP}/jarvis-task-worker-process"
+          mkdir -p "${test_dir}"
+          cd "${test_dir}"
+          supabase init --force
+          mkdir -p supabase/migrations supabase/tests
+
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610230002_multi_agent_control_plane.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610230004_priority_routine_scheduler.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/202610260001_red_blue_venice_routing.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261027120000_agent_model_provider.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261028100000_agent_heartbeat_reconciliation.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261104235000_provider_aware_remote_task_claims.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261105202000_direct_claim_parent_dependency_guard.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/migrations/20261107020000_task_lease_renewal_null_duration_guard.sql" supabase/migrations/
+          cp "${GITHUB_WORKSPACE}/supabase/tests/task_lease_renewal.test.sql" supabase/tests/
+
+      - name: Start isolated Supabase
+        working-directory: ${{ runner.temp }}/jarvis-task-worker-process
+        run: |
+          supabase start --exclude realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Verify lease renewal SQL contract
+        working-directory: ${{ runner.temp }}/jarvis-task-worker-process
+        run: supabase test db supabase/tests/task_lease_renewal.test.sql
+
+      - name: Export isolated API credentials
+        working-directory: ${{ runner.temp }}/jarvis-task-worker-process
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          test -n "${API_URL}"
+          test -n "${SERVICE_ROLE_KEY}"
+          echo "JARVIS_TASK_E2E_SUPABASE_URL=${API_URL}" >> "${GITHUB_ENV}"
+          echo "JARVIS_TASK_E2E_SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}" >> "${GITHUB_ENV}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install integration test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements/dev.txt "supabase>=2.0.0"
+
+      - name: Run independent task worker process E2E
+        run: python -m pytest tests/multiagent/test_supabase_task_process_e2e.py -q
+
+      - name: Stop isolated Supabase
+        if: always()
+        working-directory: ${{ runner.temp }}/jarvis-task-worker-process
+        run: supabase stop --no-backup || true
