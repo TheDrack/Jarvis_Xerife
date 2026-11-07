@@ -9,6 +9,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 
 from app.adapters.infrastructure.agent_worker_credentials import AgentWorkerCredentialStore
 from app.application.services.agent_task_queue_service import (
@@ -20,16 +21,14 @@ logger = logging.getLogger(__name__)
 
 
 def _emit_proactive_task_signal(
-    user: Any,
+    owner_id: str | None,
     event_type: str,
     *,
     task_id: str,
     result: dict[str, Any],
 ) -> bool:
     """Forward a grounded task event using only the authenticated owner's identity."""
-    owner_id = str(
-        getattr(user, "user_id", None) or getattr(user, "username", None) or ""
-    ).strip()
+    owner_id = str(owner_id or "").strip()
     if not owner_id or event_type != "task_blocked":
         return False
 
@@ -150,9 +149,27 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
             )
         return AgentTaskQueueService(engine)
 
+    def authenticated_owner_id(user: Any) -> str:
+        value = (
+            getattr(user, "user_id", None)
+            or getattr(user, "id", None)
+            or getattr(user, "username", None)
+        )
+        owner_id = str(value or "").strip()
+        if not owner_id or len(owner_id) > 200:
+            raise HTTPException(
+                status_code=401,
+                detail="Authenticated user has no stable owner identity",
+            )
+        return owner_id
+
     def translate_error(exc: Exception) -> HTTPException:
         if isinstance(exc, TaskQueueUnavailable):
             return HTTPException(status_code=503, detail=str(exc))
+        if isinstance(exc, PermissionError):
+            return HTTPException(status_code=403, detail=str(exc))
+        if isinstance(exc, IntegrityError):
+            return HTTPException(status_code=409, detail="Task or routine identifier already exists")
         if isinstance(exc, ValueError):
             return HTTPException(status_code=422, detail=str(exc))
         return HTTPException(status_code=500, detail="Task queue operation failed")
@@ -219,7 +236,11 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
     @router.post("/agent-tasks")
     async def enqueue(request: EnqueueTaskRequest, _user=Depends(get_current_user)):
         try:
-            return service().enqueue(**request.model_dump())
+            owner_id = authenticated_owner_id(_user)
+            payload = request.model_dump()
+            payload["created_by"] = owner_id
+            payload["owner_id"] = owner_id
+            return service().enqueue(**payload)
         except Exception as exc:
             raise translate_error(exc) from exc
 
@@ -247,18 +268,27 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
     ):
         try:
             agent_id = require_worker_identity(request.agent_id, worker)
-            accepted = service().finish(
+            queue = service()
+            accepted = queue.finish(
                 task_id, agent_id, request.attempt_id, request.status, request.result
             )
             if not accepted:
                 raise HTTPException(status_code=409, detail="Task ownership or attempt is stale")
             if request.status == "blocked":
-                _emit_proactive_task_signal(
-                    _user,
-                    "task_blocked",
-                    task_id=task_id,
-                    result=request.result,
-                )
+                try:
+                    task_owner = queue.get_task_owner(task_id)
+                except Exception as exc:
+                    logger.warning(
+                        "Could not resolve task owner for proactive signal (%s)",
+                        type(exc).__name__,
+                    )
+                else:
+                    _emit_proactive_task_signal(
+                        task_owner,
+                        "task_blocked",
+                        task_id=task_id,
+                        result=request.result,
+                    )
             return {"accepted": True, "task_id": task_id, "status": request.status}
         except HTTPException:
             raise
@@ -288,7 +318,11 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
     @router.post("/routines")
     async def upsert_routine(request: RoutineRequest, _user=Depends(get_current_user)):
         try:
-            return service().create_routine(**request.model_dump())
+            owner_id = authenticated_owner_id(_user)
+            payload = request.model_dump()
+            payload["created_by"] = owner_id
+            payload["owner_id"] = owner_id
+            return service().create_routine(**payload)
         except Exception as exc:
             raise translate_error(exc) from exc
 
@@ -299,7 +333,12 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
         _user=Depends(get_current_user),
     ):
         try:
-            return service().trigger_routine(routine_key, request.run_key)
+            owner_id = authenticated_owner_id(_user)
+            return service().trigger_routine(
+                routine_key,
+                request.run_key,
+                owner_id=owner_id,
+            )
         except Exception as exc:
             raise translate_error(exc) from exc
 
