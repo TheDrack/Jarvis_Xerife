@@ -101,8 +101,8 @@ Evidências de contrato já adicionadas ou existentes:
 
 - **PR #759:** integra `collect_live_intelligence()` ao endpoint autenticado com fontes controladas, deduplicação, correlação candidata e falhas parciais. Os workflows de suíte completa e fila passaram.
 - **Autorização de planos:** `tests/multiagent/test_task_runner_execution_plan_integration.py` cobre allow/deny, ferramenta sensível retornando `approval_required` e bloqueio quando o journal durável falha. São testes com doubles; não comprovam aprovação humana nem identidade/autorização em produção.
-- **PR #760:** corrige o health check do `VectorMemoryAdapter` para aceitar o backend puro-Python quando FAISS não está disponível. A regressão valida consolidação e busca; workflows ainda precisam terminar.
-- **PR #761:** verifica dispatch, consumo, resposta correlacionada, ACK e redelivery após expiração do lease com clientes independentes. O backend é determinístico em memória; não é Supabase E2E e não prova que o runtime de produção inicia esse caminho.
+- **PR #760:** corrige o health check do `VectorMemoryAdapter` para aceitar o backend puro-Python quando FAISS não está disponível. A regressão valida consolidação e busca; os workflows de suíte completa e fila passaram.
+- **PR #761:** verifica dispatch, consumo, resposta correlacionada, ACK e redelivery após expiração do lease com clientes independentes. Também adiciona `claim_token` por tentativa, rejeita ACK obsoleto e revoga a RPC antiga sem fencing. O backend de teste é determinístico em memória; não é Supabase E2E e não prova que o runtime de produção inicia esse caminho. A migration de fencing ainda não foi aplicada porque o histórico remoto/local continua divergente.
 
 Pendências reais de C0:
 
