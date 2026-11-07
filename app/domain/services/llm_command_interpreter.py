@@ -111,7 +111,7 @@ class LLMCommandInterpreter(NexusComponent):
                     return asyncio.run(self.interpret_async(raw_input, user_id=user_id))
                 except Exception as e:
                     logger.error(f"Sync LLM interpretation failed: {e}. Using fallback.", exc_info=True)
-                    return self._fallback_interpretation(raw_input)
+                    return self._fallback_interpretation(raw_input, user_id=user_id)
         
         if self._fallback_interpreter:
             return self._fallback_interpreter.interpret(raw_input, user_id=user_id)
