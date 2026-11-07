@@ -16,6 +16,15 @@ PROTECTED_PATH_PREFIXES = (
     "app/adapters/infrastructure",
     "app/application/security",
 )
+PROTECTED_PATH_FILES = (
+    "app/application/services/auto_evolutionV2.py",
+    "app/application/services/evolution_orchestrator.py",
+    "app/application/services/evolution_gatekeeper.py",
+    "app/application/services/evolution_sandbox.py",
+    "app/application/services/roadmap_mission_selector.py",
+    "scripts/evolve_all_pending.py",
+    "scripts/publish_validated_evolution.py",
+)
 FROZEN_DIRECTORY = ".frozen"
 _WINDOWS_RESERVED_NAMES = {
     "CON",
@@ -118,12 +127,15 @@ def resolve_repository_path(
 
 
 def protected_prefix_for(relative_path: str) -> Optional[str]:
-    """Return the protected prefix containing a repository-relative path."""
+    """Return a protected directory prefix or exact control-plane file."""
     normalized = relative_path.replace("\\", "/").strip("/").casefold()
     for prefix in PROTECTED_PATH_PREFIXES:
         candidate = prefix.casefold()
         if normalized == candidate or normalized.startswith(candidate + "/"):
             return prefix
+    for protected_file in PROTECTED_PATH_FILES:
+        if normalized == protected_file.casefold():
+            return protected_file
     return None
 
 
