@@ -72,10 +72,13 @@ class PriorityQueueMiniAgent:
         password = os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "") or None
         agent_id = (agent_id or os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1")).strip()
         if worker_token is None:
-            worker_token = (
-                os.getenv(worker_token_env_name(agent_id), "").strip()
-                or os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
-            )
+            specific_token = os.getenv(worker_token_env_name(agent_id), "").strip()
+            try:
+                configured_slots = max(1, min(8, int(os.getenv("JARVIS_MINI_AGENT_WORKERS", "1"))))
+            except ValueError:
+                configured_slots = 1
+            global_token = os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
+            worker_token = specific_token or (global_token if configured_slots == 1 else "")
         if not api_base_url or not (api_token or (username and password)):
             raise RuntimeError(
                 "Set JARVIS_TASK_QUEUE_API_URL and either JARVIS_TASK_QUEUE_API_TOKEN "
