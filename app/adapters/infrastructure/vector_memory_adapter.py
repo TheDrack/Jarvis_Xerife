@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Vector Memory Adapter - FAISS-based local biographical memory for JARVIS.
+"""Vector Memory Adapter - user-scoped semantic memory with durable Supabase storage when configured.
 
 Stores and queries events (user commands + LLM responses) as dense vectors
 using a TF-IDF-inspired bag-of-words encoding so that the adapter works fully
@@ -70,11 +70,12 @@ def _vectorize(text: str, dim: int = _VECTOR_DIM) -> List[float]:
 
 class VectorMemoryAdapter(MemoryProvider):
     """
-    Local vector store for JARVIS biographical memory.
+    User-partitioned vector memory for JARVIS biographical memory.
 
-    Uses FAISS (if available) for efficient approximate-nearest-neighbour
-    search, otherwise falls back to brute-force cosine similarity over an
-    in-memory list.
+    Supabase service-role storage is used when configured. Without it, the
+    adapter remains usable as an ephemeral in-memory fallback; consolidation
+    separately checks ``is_durable`` before evicting working memory.
+    FAISS accelerates only the in-memory fallback.
 
     Integrates with :class:`~app.application.privacy.pii_redactor.PiiRedactor`
     via ``nexus.resolve("pii_redactor")`` to sanitize all text before indexing.
@@ -91,6 +92,7 @@ class VectorMemoryAdapter(MemoryProvider):
         self._dim = dim
         self._events: List[Dict[str, Any]] = []
         self._pii_redactor = None  # resolved lazily via Nexus
+        self._store: Optional[VectorMemoryStore] = None
         if store is _AUTO_STORE:
             try:
                 candidate = SupabaseVectorMemoryStore()
@@ -112,11 +114,11 @@ class VectorMemoryAdapter(MemoryProvider):
             logger.info("ℹ️ [VectorMemory] Usando fallback puro-Python.")
 
     def is_healthy(self) -> bool:
-        """Report storage health independently from the optional FAISS backend.
+        """Report adapter availability independently from persistence durability.
 
-        The in-memory event list is canonical in both modes. FAISS only
-        accelerates nearest-neighbour lookup; its absence must not make a
-        working pure-Python adapter unavailable to memory consolidation.
+        FAISS is optional; the pure-Python fallback remains healthy. The
+        consolidation service separately requires ``is_durable`` before it
+        removes anything from short-term memory.
         """
         if self._dim <= 0 or not isinstance(self._events, list):
             return False
@@ -174,8 +176,8 @@ class VectorMemoryAdapter(MemoryProvider):
             text:      Raw text to store.
             metadata:  Optional extra metadata dict.
             timestamp: Optional explicit event timestamp (defaults to now).
-            user_id:   Optional user identifier — stored in metadata so that
-                       queries can be filtered per-user.
+            user_id:   Trusted user identifier — stored in a dedicated database
+                       column and used to enforce per-user query partitions.
         """
         # Sanitization is mandatory: never persist raw text when redaction is unavailable.
         pii_redactor = self._get_pii_redactor()
