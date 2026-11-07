@@ -158,7 +158,52 @@ Do not enable `JARVIS_INTELLIGENCE_HISTORY_ENABLED` or the recurring worker unti
 - Official Supabase CLI reference: [migration list and repair](https://supabase.com/docs/reference/cli/supabase-migration-list).
 - Official deployment guide: [Diagnosing and fixing migration sync errors](https://supabase.com/docs/guides/deployment/database-migrations).
 
-**Final status:** read-only audit complete; repository reconciliation and any production repair remain pending. No production database changes were made.
+**Final status:** read-only audit complete; repository reconciliation and any production repair remain pending.
+
+## Reconciliation 2026-11-07 — exact remote migration statements restored
+
+This section supersedes the earlier local/remote version mismatch counts above.
+
+**Source of truth used:** read-only query of `supabase_migrations.schema_migrations(version, name, statements)` in project `saibtpdehhprttqlgqdt`. The remote ledger contains 20 rows. The SQL statement arrays were used to restore exact local historical files using their original 14-digit version IDs and recorded names. The duplicate `google_linked_identities` entries were preserved as two separate versions; no ledger row was deleted or normalized.
+
+**Repository branch `fix/supabase-ledger-reconcile`:**
+- 20/20 remote version IDs now have local migration files.
+- 26 local migration files total.
+- Six local migrations remain pending, all with versions greater than the remote maximum `20261105093046`:
+  - `20261105202000_direct_claim_parent_dependency_guard.sql`
+  - `20261107010000_multi_agent_message_claim_fencing.sql`
+  - `20261107020000_task_lease_renewal_null_duration_guard.sql`
+  - `20261107025840_release_failed_task_attempt.sql`
+  - `20261107025853_worker_lease_supporting_indexes.sql`
+  - `20261107025932_intelligence_recurring_worker.sql`
+
+**Historical corrections**
+- Restored original `mobile_push_delivery` SQL, which creates `jarvis_mobile_push_devices`; the later recorded `mobile_native_event_queue` migration drops that legacy table and creates `jarvis_mobile_devices`.
+- Restored the exact remote model-provider/heartbeat metadata migration and provider-aware claim migration. Red/Blue routing and heartbeat local files were removed as superseded duplicates; the remote provider-aware claim migration already includes the provider and stale-heartbeat checks.
+- Restored the remote execution-plan, environment-observation, mobile-session, intelligence-history, and least-privilege statements under their exact remote version IDs.
+- Rebased the unledgered release-task RPC migration and intelligence recurring-worker migration to versions after the remote ledger.
+- Replaced the old unledgered `20261028130000_worker_lease_and_security_hardening.sql` with `20261107025853_worker_lease_supporting_indexes.sql`. The old file duplicated the lease-renewal RPC and included `jarvis_mobile_push_devices` in its table loop. That table is absent after the later mobile-native migration, so replaying the old file after the remote ledger would fail. The five missing indexes are now isolated in an idempotent migration; lease renewal remains defined by PR #763.
+
+**Remote schema re-probes (read-only)**
+- `jarvis_agents.model_provider`, `mark_stale_jarvis_agents_offline(integer)`, and provider-aware task-claim functions exist.
+- The remote queue claim includes parent-task eligibility, but the direct claim function does not yet enforce the parent dependency. PR #742's migration remains pending.
+- `release_jarvis_agent_task(text,text,uuid,text)` exists remotely.
+- `renew_jarvis_agent_task_lease(text,text,uuid,integer)` remains absent.
+- `jarvis_agent_messages.claim_token` remains absent; the remote ACK remains the legacy two-argument overload.
+- The five supporting indexes remain absent.
+- `jarvis_mobile_push_devices` is absent; `jarvis_mobile_devices` is present.
+- Recurring intelligence worker lease/run tables and RPCs remain absent.
+
+**Validation added in this branch**
+- The provider-aware task claim workflow now uses the restored historical migration filenames.
+- The task lease workflow runs the NULL-safe lease pgTAP suite and a separate five-index pgTAP suite against an isolated database.
+- A new isolated workflow and pgTAP test cover recurring intelligence worker lease ownership, renewal, release, telemetry persistence, service-role grants, and history metrics.
+
+**Production safety**
+- Supabase branch status remains `MIGRATIONS_FAILED` until a controlled deployment/reconciliation is performed.
+- The repository reconstruction does not modify the remote ledger. No `migration repair`, `db push`, production DDL/DML, grants, or deployment were executed.
+- Do not enable message workers, long-running task workers, or the recurring intelligence worker until the pending migrations are reviewed, CI is green, and the deployment order is approved.
+ No production database changes were made.
 
 
 ## Revalidation 2026-11-06 (current runtime state)
@@ -241,6 +286,6 @@ The six previously identified local files without matching remote ledger entries
 
 **Operational decision**
 - Do not run `migration repair`, `db push`, apply either new migration, or enable a worker that depends on the new RPC signatures until each local migration is reconciled against the actual remote schema and ledger.
-- Reconcile the historical worker-lease migration before applying PR #763's forward-only guard; the guard alone does not create the absent RPC.
+- The old unledgered worker-lease migration was removed from the pending sequence because it references the obsolete `jarvis_mobile_push_devices` table and duplicates the lease RPC. PR #763 supplies the NULL-safe renewal RPC; a separate forward-only migration now creates only the five missing indexes.
 - Reconcile and apply PR #761's fencing migration before deploying a worker that calls the three-argument ACK RPC.
 - No production DDL, DML, migration repair, grants, or deployment were performed during this revalidation.

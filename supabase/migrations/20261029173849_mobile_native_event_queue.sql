@@ -1,5 +1,5 @@
 -- Replace the legacy provider-token registry with a provider-neutral mobile registry.
--- Removes the legacy provider-token table on installations that already applied the earlier schema.
+-- Historical migration files are immutable; this migration removes the legacy table from the live schema.
 
 drop table if exists public.jarvis_mobile_push_devices;
 

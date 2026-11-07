@@ -195,7 +195,7 @@ def test_worker_migration_is_least_privilege_and_records_retention_metrics():
     root = Path(__file__).resolve().parents[2]
     migration = (
         root / "supabase" / "migrations"
-        / "20261103184308_intelligence_recurring_worker.sql"
+        / "20261107025932_intelligence_recurring_worker.sql"
     ).read_text(encoding="utf-8")
 
     assert "enable row level security" in migration.lower()

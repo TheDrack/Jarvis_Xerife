@@ -11,10 +11,7 @@ create table if not exists public.jarvis_external_identities (
     unique (provider, provider_subject),
     unique (provider, user_id)
 );
-
-create index if not exists jarvis_external_identities_user_idx
-    on public.jarvis_external_identities (user_id);
-
+create index if not exists jarvis_external_identities_user_idx on public.jarvis_external_identities (user_id);
 alter table public.jarvis_external_identities enable row level security;
 revoke all on table public.jarvis_external_identities from public, anon, authenticated;
 grant select, insert, update, delete on table public.jarvis_external_identities to service_role;

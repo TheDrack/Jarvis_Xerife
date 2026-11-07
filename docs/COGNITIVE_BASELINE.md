@@ -156,10 +156,10 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 | Evidência remota | Resultado observado |
 |---|---:|
 | Status da branch Supabase `main` | `MIGRATIONS_FAILED` |
-| Arquivos locais em `supabase/migrations` após PRs #761/#763 | 27 |
+| Arquivos locais em `supabase/migrations` após reconciliação do ledger | 26 |
 | Entradas no ledger remoto | 20 |
-| Versões com timestamp idêntico local/remoto | 5 |
-| Migrations locais sem entrada remota correspondente por nome/versão | 8 |
+| Versões remotas restauradas com prefixo exato no repositório | 20 |
+| Migrations locais pendentes após o último version remoto | 6 |
 | `jarvis_agents` | 5 linhas |
 | `jarvis_agent_tasks` | 13 linhas |
 | `jarvis_agent_attempts` | 12 linhas |
@@ -171,17 +171,17 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 | `jarvis_mobile_device_sessions` | 48 linhas |
 | `jarvis_mobile_devices` | 1 linha |
 
-O ledger remoto ainda contém duas entradas chamadas `google_linked_identities`. Seis migrations locais já estavam sem correspondência por nome/versão na auditoria anterior; as duas novas migrations locais das PRs #761 e #763 também não têm entrada remota:
-- `202610260001_red_blue_venice_routing.sql`
-- `20261028090000_release_failed_task_attempt.sql`
-- `20261028100000_agent_heartbeat_reconciliation.sql`
-- `20261028130000_worker_lease_and_security_hardening.sql`
-- `20261103184308_intelligence_recurring_worker.sql`
+O ledger remoto ainda contém duas entradas chamadas `google_linked_identities`; ambas foram restauradas separadamente com seus version IDs originais, sem deduplicação. As 20 versões remotas agora têm arquivos locais com o prefixo exato. Restam seis migrations locais pendentes, todas com versões posteriores ao último registro remoto:
 - `20261105202000_direct_claim_parent_dependency_guard.sql`
 - `20261107010000_multi_agent_message_claim_fencing.sql`
 - `20261107020000_task_lease_renewal_null_duration_guard.sql`
+- `20261107025840_release_failed_task_attempt.sql`
+- `20261107025853_worker_lease_supporting_indexes.sql`
+- `20261107025932_intelligence_recurring_worker.sql`
 
-As demais divergências de timestamp têm candidatos semânticos, não equivalência SQL automaticamente comprovada. Não executar `migration repair`, `db push` ou aplicar migrations pendentes antes de reconciliar cada SQL com o schema remoto.
+A migration antiga `20261028130000_worker_lease_and_security_hardening.sql` foi retirada do conjunto pendente: além de duplicar a RPC de lease corrigida pela PR #763, ela referenciava `jarvis_mobile_push_devices`, tabela removida pela migration posterior `mobile_native_event_queue`. Seus cinco índices foram isolados numa migration forward-only que não referencia a tabela obsoleta. A migration de Red/Blue e a migration de heartbeat também foram removidas como duplicatas/supersedidas pelas versões históricas restauradas e pela migration remota de provider-aware claims.
+
+Não executar `migration repair`, `db push` ou aplicar migrations pendentes até a validação do PR de reconciliação e revisão da ordem final.
 
 **RPCs e colunas verificadas diretamente no schema remoto em 2026-11-06:**
 - `claim_jarvis_agent_message(p_agent_id text, p_lease_seconds integer)` existe sem token de tentativa.
@@ -215,5 +215,22 @@ Nenhum DDL, DML, migration repair, grant ou deploy foi executado nesta revalida�
 - `VectorMemoryAdapter` agora falha fechado quando o redactor não está disponível e aceita o backend puro-Python sem FAISS (PR #760/#762). O store continua em memória do processo; não há save/load nem readback vetorial após reinício.
 - `ProceduralMemoryAdapter.bootstrap_from_db()` ainda não tem call site confirmado; o índice de soluções permanece volátil.
 - A redaction atual cobre padrões de email, CPF e telefone; não é uma política DLP completa. A exclusão/purge de IDs vetoriais e a retenção de ThoughtLogs/logs ainda precisam de prova ponta a ponta.
+
+### 9.5 Reconciliação do ledger em 2026-11-07
+
+A coluna `supabase_migrations.schema_migrations.statements` foi consultada em modo somente leitura. Ela contém o SQL efetivamente registrado para cada versão remota. Os 20 arquivos históricos foram reconstruídos a partir desses statements, preservando inclusive as duas entradas distintas `google_linked_identities`. Verificação local do branch de reconciliação: 20/20 versões remotas presentes, 26 arquivos locais no total e seis migrations pendentes acima do maior version remoto.
+
+**Estado de schema confirmado:**
+- `model_provider`, `mark_stale_jarvis_agents_offline` e o roteamento provider-aware estão presentes; a migration histórica remota `20261027165940` foi restaurada no repositório.
+- `release_jarvis_agent_task` já existe no banco remoto; sua migration local foi rebaseada para registrar a definição no histórico sem alterar a semântica.
+- A RPC de claim da fila já respeita dependência de tarefa-pai; a RPC de claim direto ainda não. A migration `20261105202000` permanece pendente.
+- `jarvis_mobile_push_devices` não existe; a sequência histórica cria essa tabela e depois a migration de fila nativa a remove, criando `jarvis_mobile_devices`. A antiga migration de hardening não podia ser reaplicada depois dessa transição.
+- Os cinco índices de recuperação/lookup de attempts, events, parent tasks e routines não existem. A migration `20261107025853` agora cria apenas esses índices.
+- `renew_jarvis_agent_task_lease` não existe no remoto; `20261107020000` continua pendente.
+- `jarvis_agent_messages.claim_token` não existe e o ACK remoto continua na assinatura antiga de dois argumentos; `20261107010000` continua pendente.
+- As tabelas/RPCs do recurring intelligence worker não existem; `20261107025932` continua pendente e ainda precisa de validação isolada.
+- O estado remoto da branch Supabase permanece `MIGRATIONS_FAILED`. Restaurar os arquivos locais corrige a ausência de versões no repositório, mas não altera o ledger remoto.
+
+Nenhum DDL, DML, `migration repair`, `db push`, grant ou deploy foi executado.
 
 **Conclusão:** C0 continua aberto. Universal Intelligence já possui coleta, normalização e candidatos de correlação, mas histórico persistente ainda não está provado. C1 — World Model permanece bloqueado até fechar baseline de memória, identidade, proveniência e integração operacional.
