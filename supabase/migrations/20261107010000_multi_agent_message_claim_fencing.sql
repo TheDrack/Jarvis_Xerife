@@ -39,7 +39,7 @@ begin
     if p_agent_id is null or btrim(p_agent_id) = '' then
         raise exception 'p_agent_id must not be empty';
     end if;
-    if p_lease_seconds < 1 or p_lease_seconds > 3600 then
+    if p_lease_seconds is null or p_lease_seconds < 1 or p_lease_seconds > 3600 then
         raise exception 'p_lease_seconds must be between 1 and 3600';
     end if;
 
