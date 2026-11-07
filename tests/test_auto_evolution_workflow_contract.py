@@ -36,3 +36,13 @@ def test_scheduled_workflow_does_not_select_from_legacy_capability_inventory():
     assert "--mission-id" in workflow
     assert "--cap-id" not in workflow
     assert "CAP-[0-9]+" not in workflow
+
+
+def test_duplicate_pr_guard_runs_before_candidate_generation():
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "pull-requests: read" in workflow
+    assert "GITHUB_TOKEN: \${{ github.token }}" in workflow
+    assert "find_existing_mission_pr(" in workflow
+    assert "A missão já possui PR #" in workflow
+    assert "Não foi possível provar ausência de PR anterior" in workflow
