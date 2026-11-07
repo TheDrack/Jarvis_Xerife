@@ -36,7 +36,7 @@
 - Public-source adapter: `app/adapters/infrastructure/intelligence/public_intelligence_adapter.py`, normalized contracts: `app/domain/intelligence/contracts.py`.
 - Initial read-only sources registered in Nexus/Tool Registry: GDELT DOC article search, NASA EONET open events, and USGS all-day earthquake feed. The personal/entity Eagle OSINT adapter remains separate.
 - These manifests are descriptive and the current production ToolAuthorizationPolicy is still not wired; do not claim live dispatcher execution. The on-demand collector now combines public events, OSIRIS events and OSIRIS entity observations, plus optional GEV observations, with source-level partial failure reporting.
-- Append-only history and recurring-worker schema/RPCs are deployed after PR #767; local migrations and the remote ledger match 26/26 versions. The recurring process is still inactive: the lease has no owner and the run table has zero rows. Keep the worker disabled until a supervised process/scheduler is wired and a controlled run plus insert/readback is verified. Briefing synthesis and geospatial presentation remain separate increments.
+- Append-only history, recurring-worker schema/RPCs and durable vector-memory schema are deployed after PRs #767/#769; local migrations and the remote ledger match 27/27 versions. The recurring process is wired to main.py but remains disabled by Render feature flags: the lease has no owner and the run table has zero rows. The vector-memory table is service-role-only and currently has zero rows, so runtime insert/readback remains unverified. Keep recurring collection disabled until explicitly authorized and a controlled run plus persistence/readback is verified. Briefing synthesis and geospatial presentation remain separate increments.
 
 ## Optional God's Eye View MCP observation adapter
 
@@ -134,7 +134,7 @@ The table describes integration families in the repository/installation; it does
 
 ## Current runtime capability boundary — 2026-11-07
 
-- Supabase migration ledger: 26/26 local/remote versions, zero pending; project `ACTIVE_HEALTHY`, branch `FUNCTIONS_DEPLOYED`.
+- Supabase migration ledger: 27/27 local/remote versions, zero pending; project `ACTIVE_HEALTHY`, branch `FUNCTIONS_DEPLOYED`.
 - Three `mini-freellmapi` workers heartbeat with provider `groq` and advertise only `text_reasoning`.
 - Two existing ready tasks require `repository_read`, `github_read`, and `production_read`; no online agent advertises those capabilities, so no claim occurs.
 - `ToolRegistry` is metadata-only. `ToolDispatcher` fails closed without a host-backed `ToolAuthorizationPolicy`. No production principal/session resolver or approval verifier is registered.
