@@ -132,7 +132,7 @@ This is a first, conservative vertical slice, not a full Dots-equivalent compani
 
 1. Active-user registry, pending proposals, and cooldowns are process-local; restart loses them. Durable proposal history and dedupe should be added through an existing user-scoped persistence adapter before multi-instance deployment.
 2. Temporal inference uses repeated command text and median time-of-day; it does not yet use calendar events, device routines, project milestones, or learned availability.
-3. Help-signal producers must call `AssistantService.on_event(event_type, data)` with a user-scoped payload. Existing producers have not all been wired to emit these event kinds.
+3. The shared agent-task API now emits `task_blocked` after an authenticated task completion is accepted with blocked status. Deadline, stalled-project, and missing-dependency producers are still not wired.
 4. Delivery currently supports only the configured paired mobile owner (`JARVIS_MOBILE_USER_ID` / `JARVIS_MOBILE_DEVICE_ID`). Other user partitions are not sent to a shared/global channel and remain pending; multi-user push and HUD presentation are not implemented.
 5. The user can respond through the normal assistant interface; explicit accept/decline buttons and proposal lifecycle states are not yet implemented.
 6. Preparation currently builds a structured objective/evidence package. It does not dispatch a TaskRunner or multi-agent job. Any future execution must go through the existing plan validator, authorization policy, queue, and outcome verification.
@@ -142,4 +142,5 @@ This is a first, conservative vertical slice, not a full Dots-equivalent compani
 
 - `tests/application/test_proactive_initiative_engine.py`: temporal recurrence, insufficient evidence, help signal, quiet hours, cooldown, malformed timestamps.
 - `tests/application/test_assistant_proactive_monitor.py`: user-scoped event ingestion, user-scoped pending delivery, monitor lifecycle.
-- Runtime/CI verification of AssistantService and API lifecycle integration is still required in an environment with the repository's full dependencies installed.
+- `tests/adapters/infrastructure/test_agent_tasks_proactive_signals.py`: blocked-task signal is scoped to the authenticated owner and discarded without an owner identity.
+- `tests/adapters/infrastructure/test_api_server.py`: API lifecycle integration and route regression coverage.
