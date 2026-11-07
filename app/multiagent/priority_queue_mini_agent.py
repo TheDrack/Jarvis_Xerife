@@ -7,6 +7,8 @@ from typing import Any
 
 import httpx
 
+from app.adapters.infrastructure.agent_worker_credentials import worker_token_env_name
+
 from .freellmapi_client import FreeLLMAPIClient, configured_provider_id
 from .freellmapi_handler import FreeLLMAgentHandler
 from .model_runtime_factory import create_registered_model_handler
@@ -59,13 +61,21 @@ class PriorityQueueMiniAgent:
         self._client = client
 
     @classmethod
-    def from_env(cls, agent_id: str | None = None) -> "PriorityQueueMiniAgent":
+    def from_env(
+        cls,
+        agent_id: str | None = None,
+        worker_token: str | None = None,
+    ) -> "PriorityQueueMiniAgent":
         api_token = os.getenv("JARVIS_TASK_QUEUE_API_TOKEN", "").strip()
-        worker_token = os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
         api_base_url = os.getenv("JARVIS_TASK_QUEUE_API_URL", "").strip()
         username = os.getenv("JARVIS_TASK_QUEUE_USERNAME", "").strip() or None
         password = os.getenv("JARVIS_TASK_QUEUE_PASSWORD", "") or None
         agent_id = (agent_id or os.getenv("JARVIS_AGENT_ID", "mini-freellmapi-1")).strip()
+        if worker_token is None:
+            worker_token = (
+                os.getenv(worker_token_env_name(agent_id), "").strip()
+                or os.getenv("JARVIS_TASK_QUEUE_WORKER_TOKEN", "").strip()
+            )
         if not api_base_url or not (api_token or (username and password)):
             raise RuntimeError(
                 "Set JARVIS_TASK_QUEUE_API_URL and either JARVIS_TASK_QUEUE_API_TOKEN "
