@@ -112,7 +112,7 @@ O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.
 
 ### Estado da seleção de autoevolução — 2026-11-07
 
-- data/capabilities.jrvs não existe; AutoEvolutionServiceV2 usa o fallback data/capabilities.json.
+- O catálogo alternativo no formato JRVS não está versionado; AutoEvolutionServiceV2 usa o fallback JSON em `data/capabilities.json`.
 - O inventário contém 102 registros, 34 pendentes, 34 auto=true e 0 target_file. A primeira missão elegível é CAP-058, Adapt plans during execution, prioridade 5 — catálogo legado, não critério C0.
 - find_next_mission() retorna target metadata dentro de mission e não a propaga ao nível superior; auto_evolution_triggerV2.yml lê next_mission.target_file.
 - Resultado previsto pelo código: action=blocked antes do LLM e do sandbox. O workflow não lê docs/COGNITIVE_ROADMAP.md nem docs/STATUS.md.
