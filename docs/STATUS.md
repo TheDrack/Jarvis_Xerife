@@ -35,7 +35,7 @@
 - Três agentes `mini-freellmapi` online, provider `groq`, capabilities `text_reasoning` apenas. Duas tarefas `ready` exigem `repository_read`, `github_read`, `production_read`; nenhum agente possui essas capabilities, então não há claim. Não adicionar capabilities sem executor e policy reais.
 - A tabela `public.jarvis_vector_memories` foi verificada no projeto ativo: RLS habilitado, zero policies, `service_role` com SELECT/INSERT/DELETE e sem UPDATE; `anon`/`authenticated` sem SELECT; dois índices, quatro constraints e zero linhas. O schema está em produção; o deploy do código da aplicação após o merge #769 ainda não foi confirmado.
 - A lease do recurring intelligence worker está livre (`worker_id=NULL`) e o histórico de runs contém zero execuções. O schema está implantado; o processo/scheduler ainda não está ativo.
-- Render `Jarvis-api` permanece `live`; último deploy observado `cf887192`. O código runtime atual já contém PRs #759–#764; #766/#767 não adicionaram código de aplicação.
+- Render `Jarvis-api` estava `live` no último deploy observado `cf887192`, contendo PRs #759–#764. PR #769 adicionou código de aplicação para persistência vetorial; o deploy posterior não foi confirmado nesta auditoria porque o workspace Render não foi selecionado.
 - A próxima entrega de C0 é integrar ToolRegistry/ToolDispatcher com policy host-backed, principal/sessão confiáveis, scope e aprovação; depois ligar os conectores autorizados e executar uma tarefa controlada. Não forçar claim nem ativar o recurring worker antes disso.
 
 ### Evidência histórica Supabase — 2026-11-05 (superseded)
