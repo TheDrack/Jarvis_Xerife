@@ -77,6 +77,18 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
             RequestSource.GITHUB_ISSUE.value,
         }
 
+    def _authenticated_user_id(current_user: User) -> str:
+        """Return a stable authenticated identity for per-user data isolation."""
+        user_id = getattr(current_user, "user_id", None) or getattr(
+            current_user, "username", None
+        )
+        if not isinstance(user_id, str) or not user_id.strip():
+            raise HTTPException(
+                status_code=401,
+                detail="Authenticated user has no stable identity",
+            )
+        return user_id.strip()
+
     @router.post("/v1/execute", response_model=ExecuteResponse)
     @_rate_limit
     async def execute_command(
@@ -105,17 +117,9 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
             if bypass_identifier:
                 logger.info("GitHub-sourced request – bypassing Jarvis identifier.")
 
-            authenticated_user_id = (
-                getattr(current_user, "user_id", None)
-                or getattr(current_user, "username", None)
-            )
-            if not isinstance(authenticated_user_id, str) or not authenticated_user_id.strip():
-                raise HTTPException(
-                    status_code=401,
-                    detail="Authenticated user has no stable identity",
-                )
+            authenticated_user_id = _authenticated_user_id(current_user)
             metadata_dict = {
-                "user_id": authenticated_user_id.strip(),
+                "user_id": authenticated_user_id,
                 "source_device_id": body.metadata.source_device_id if body.metadata else None,
                 "network_id": body.metadata.network_id if body.metadata else None,
                 "network_type": body.metadata.network_type if body.metadata else None,
@@ -153,19 +157,11 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
         """Send a natural-language message to the assistant (Protected endpoint)."""
         try:
             logger.info(f"User '{current_user.username}' sending message: {body.text}")
-            authenticated_user_id = (
-                getattr(current_user, "user_id", None)
-                or getattr(current_user, "username", None)
-            )
-            if not isinstance(authenticated_user_id, str) or not authenticated_user_id.strip():
-                raise HTTPException(
-                    status_code=401,
-                    detail="Authenticated user has no stable identity",
-                )
+            authenticated_user_id = _authenticated_user_id(current_user)
             response = await assistant_service.async_process_command(
                 body.text,
                 channel="api",
-                request_metadata={"user_id": authenticated_user_id.strip()},
+                request_metadata={"user_id": authenticated_user_id},
             )
             logger.info(
                 f"Response for '{current_user.username}': success={response.success}, "
@@ -231,11 +227,18 @@ def create_assistant_router(assistant_service, db_adapter, get_current_user, lim
             raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
     @router.get("/v1/history", response_model=HistoryResponse)
-    async def get_history(limit: int = 5) -> HistoryResponse:
-        """Get recent command history (max 50 entries)."""
+    async def get_history(
+        limit: int = 5,
+        current_user: User = Depends(get_current_user),
+    ) -> HistoryResponse:
+        """Get the authenticated user's recent command history (max 50 entries)."""
         try:
             limit = max(1, min(limit, 50))
-            history = assistant_service.get_command_history(limit=limit)
+            user_id = _authenticated_user_id(current_user)
+            history = assistant_service.get_command_history(
+                limit=limit,
+                user_id=user_id,
+            )
             return HistoryResponse(
                 commands=[
                     CommandHistoryItem(
