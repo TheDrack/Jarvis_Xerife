@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.application.ports.memory_provider import MemoryProvider
+from app.adapters.infrastructure.supabase_vector_memory_store import SupabaseVectorMemoryStore
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ except ImportError:  # pragma: no cover
     )
 
 _VECTOR_DIM = 256  # dimensionality of the bag-of-words projection
+_AUTO_STORE = object()
 
 
 def _tokenize(text: str) -> List[str]:
@@ -80,10 +82,26 @@ class VectorMemoryAdapter(MemoryProvider):
         dim: Dimensionality of the internal vectors (default: 256).
     """
 
-    def __init__(self, dim: int = _VECTOR_DIM) -> None:
+    def __init__(
+        self,
+        dim: int = _VECTOR_DIM,
+        store: Any = _AUTO_STORE,
+    ) -> None:
         self._dim = dim
         self._events: List[Dict[str, Any]] = []
         self._pii_redactor = None  # resolved lazily via Nexus
+        if store is _AUTO_STORE:
+            try:
+                candidate = SupabaseVectorMemoryStore()
+                self._store = candidate if candidate.is_available else None
+            except Exception as exc:
+                logger.warning(
+                    "[VectorMemory] Supabase persistence unavailable; using volatile fallback: %s",
+                    exc,
+                )
+                self._store = None
+        else:
+            self._store = store
 
         if _FAISS_AVAILABLE:
             self._index = faiss.IndexFlatL2(dim)
@@ -102,6 +120,16 @@ class VectorMemoryAdapter(MemoryProvider):
         if self._dim <= 0 or not isinstance(self._events, list):
             return False
         return not _FAISS_AVAILABLE or self._index is not None
+
+    @property
+    def is_durable(self) -> bool:
+        """Whether writes can survive process restarts in the configured store."""
+        if self._store is None:
+            return False
+        try:
+            return bool(self._store.is_healthy())
+        except Exception:
+            return False
 
     def _get_pii_redactor(self):
         """Resolve Nexus redaction policy or fall back to the built-in local redactor."""
@@ -185,15 +213,20 @@ class VectorMemoryAdapter(MemoryProvider):
                 )
             combined_metadata["user_id"] = normalized_user_id
 
-        self._events.append(
-            {
-                "id": event_id,
-                "text": safe_text,
-                "vector": vector,
-                "metadata": combined_metadata,
-                "timestamp": ts.isoformat(),
-            }
-        )
+        event = {
+            "id": event_id,
+            "text": safe_text,
+            "vector": vector,
+            "metadata": combined_metadata,
+            "timestamp": ts.isoformat(),
+        }
+
+        # Persist before updating the in-memory cache. A failed cloud write
+        # must not look like a successful durable memory operation.
+        if self._store is not None:
+            self._store.append(event)
+
+        self._events.append(event)
 
         if _FAISS_AVAILABLE and self._index is not None:
             vec_np = np.array([vector], dtype=np.float32)
@@ -209,8 +242,18 @@ class VectorMemoryAdapter(MemoryProvider):
         days_back: Optional[int] = 30,
         user_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Return the *top_k* most similar stored events."""
-        if not self._events:
+        """Return the *top_k* most similar stored events in one user scope."""
+        if top_k <= 0:
+            return []
+
+        if self._store is not None:
+            candidates = self._store.list_events(
+                user_id=user_id,
+                days_back=days_back,
+            )
+        else:
+            candidates = self._events
+        if not candidates:
             return []
 
         query_vector = _vectorize(query_text, self._dim)
@@ -221,10 +264,13 @@ class VectorMemoryAdapter(MemoryProvider):
             cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days_back)
             cutoff_ts = cutoff.isoformat()
 
-        # Filter by date first (cheap)
-        candidates = self._events
+        # Filter by date first (cheap); the Supabase store also applies this
+        # predicate server-side, while the local fallback applies it here.
         if cutoff_ts:
-            candidates = [e for e in self._events if e["timestamp"] >= cutoff_ts]
+            candidates = [
+                e for e in candidates
+                if str(e.get("timestamp", "")) >= cutoff_ts
+            ]
 
         # Unscoped callers may read only local/system records, never user data.
         if user_id is None:
@@ -245,7 +291,8 @@ class VectorMemoryAdapter(MemoryProvider):
             return []
 
         if (
-            _FAISS_AVAILABLE
+            self._store is None
+            and _FAISS_AVAILABLE
             and self._index is not None
             and days_back is None
             and user_id is None
@@ -285,21 +332,56 @@ class VectorMemoryAdapter(MemoryProvider):
 
         return results
         
-    def get_recent_entries(self, limit: int = 100) -> List[Dict[str, Any]]:
-        """
-        CORREÇÃO: Retorna as entradas mais recentes.
-        Usado pela consolidação semântica para ejetar dados ao Córtex.
-        """
-        if not self._events:
+    def get_recent_entries(
+        self,
+        limit: int = 100,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return recent entries from one user partition (system by default)."""
+        if limit <= 0:
             return []
-            
-        # Ordena as entradas por timestamp em ordem decrescente (mais novas primeiro)
-        sorted_events = sorted(self._events, key=lambda x: x.get("timestamp", ""), reverse=True)
-        return sorted_events[:limit]
+        if self._store is not None:
+            events = self._store.list_events(user_id=user_id, days_back=None)
+        else:
+            if user_id is None:
+                events = [
+                    event for event in self._events
+                    if event.get("metadata", {}).get("user_id") is None
+                ]
+            else:
+                if not isinstance(user_id, str) or not user_id.strip():
+                    raise ValueError("user_id must be a non-empty string when provided")
+                events = [
+                    event for event in self._events
+                    if event.get("metadata", {}).get("user_id") == user_id.strip()
+                ]
+        return sorted(
+            events,
+            key=lambda event: str(event.get("timestamp", "")),
+            reverse=True,
+        )[:limit]
 
-    def clear(self) -> None:
-        """Remove all stored events."""
-        self._events.clear()
+    def clear(self, user_id: Optional[str] = None) -> None:
+        """Clear all partitions, or only the explicitly requested user partition."""
+        if user_id is not None:
+            if not isinstance(user_id, str) or not user_id.strip():
+                raise ValueError("user_id must be a non-empty string when provided")
+            normalized_user_id = user_id.strip()
+            if self._store is not None:
+                self._store.delete_events(user_id=normalized_user_id)
+            self._events = [
+                event for event in self._events
+                if event.get("metadata", {}).get("user_id") != normalized_user_id
+            ]
+        else:
+            if self._store is not None:
+                self._store.delete_all()
+            self._events.clear()
+
         if _FAISS_AVAILABLE and self._index is not None:
             self._index.reset()
+            if self._events:
+                self._index.add(
+                    np.array([event["vector"] for event in self._events], dtype=np.float32)
+                )
         logger.info("🗑️ [VectorMemory] Memória vetorial limpa.")
