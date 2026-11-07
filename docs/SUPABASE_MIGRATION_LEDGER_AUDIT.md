@@ -198,6 +198,6 @@ This section supersedes the historical object/claim observations above where the
 **Separate message-queue fencing work**
 - PR #761 adds a `claim_token` to `jarvis_agent_messages` and requires the same token for ACK. Its pgTAP tests run against an isolated local fixture.
 - This protects message ACK attempts; it does not create `renew_jarvis_agent_task_lease` for the task queue. The two lease domains must not be conflated.
-- PR #763 adds isolated pgTAP coverage for task lease renewal. Its test-first revision is expected to expose that the local renewal function does not explicitly reject a NULL lease duration. No production migration is applied by that PR.
+- PR #763 adds isolated pgTAP coverage for task lease renewal and a new forward-only migration, `20261107020000_task_lease_renewal_null_duration_guard.sql`, that explicitly rejects NULL lease duration. The historical worker-lease migration is preserved unchanged. CI is still running on the latest revision; no production migration is applied.
 
 **Current gate:** reconcile the migration ledger and verify the missing task-lease RPC before relying on long-running task execution. Keep the recurring intelligence worker disabled until its separate migration and persistence tests pass.
