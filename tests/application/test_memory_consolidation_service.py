@@ -10,7 +10,7 @@ from app.domain.memory.working_memory import WorkingMemory
 
 def test_consolidation_accepts_vector_adapter_without_faiss(monkeypatch):
     monkeypatch.setattr(vector_memory_module, "_FAISS_AVAILABLE", False)
-    vector_adapter = VectorMemoryAdapter(dim=32)
+    vector_adapter = VectorMemoryAdapter(dim=32, store=_DurableStore())
     assert vector_adapter.is_healthy() is True
     working_memory = WorkingMemory()
     working_memory.push(
@@ -36,3 +36,49 @@ def test_consolidation_accepts_vector_adapter_without_faiss(monkeypatch):
     )
     assert len(results) == 1
     assert "authenticated service endpoints" in results[0]["text"]
+
+class _DurableStore:
+    is_available = True
+
+    def __init__(self):
+        self.events = []
+
+    def is_healthy(self):
+        return True
+
+    def append(self, event):
+        self.events.append(dict(event))
+
+    def list_events(self, user_id=None, days_back=None):
+        return [
+            dict(event)
+            for event in self.events
+            if event.get("metadata", {}).get("user_id") == user_id
+        ]
+
+    def delete_events(self, user_id=None):
+        self.events[:] = [
+            event
+            for event in self.events
+            if event.get("metadata", {}).get("user_id") != user_id
+        ]
+
+
+def test_consolidation_preserves_working_memory_without_durable_vector_store():
+    working_memory = WorkingMemory()
+    working_memory.push(
+        {
+            "user_input": "keep this until durable storage is available",
+            "response": "Do not evict this item.",
+            "_ts": "2000-01-01T00:00:00+00:00",
+        }
+    )
+    service = MemoryConsolidationService(
+        working_memory=working_memory,
+        vector_adapter=VectorMemoryAdapter(dim=32, store=None),
+    )
+
+    consolidated = service.consolidate_memories(max_age_hours=24)
+
+    assert consolidated == 0
+    assert working_memory.size == 1
