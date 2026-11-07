@@ -248,6 +248,7 @@ class AssistantService(NexusComponent):
                     "success": response.success,
                     "timestamp": _dt.now().isoformat(),
                     "message": response.message or "",
+                    "user_id": user_id,
                 })
                 self._save_to_hive(text, response, channel=channel)
                 return response
@@ -381,6 +382,7 @@ class AssistantService(NexusComponent):
                 "success": response.success,
                 "timestamp": _dt.now().isoformat(),
                 "message": response.message or "",
+                "user_id": user_id,
             })
             return response
 
@@ -393,6 +395,7 @@ class AssistantService(NexusComponent):
                 "success": False,
                 "timestamp": _dt.now().isoformat(),
                 "message": response.message or "",
+                "user_id": user_id,
             })
             return response
 
@@ -416,9 +419,29 @@ class AssistantService(NexusComponent):
         """Stop the assistant service."""
         self.is_running = False
 
-    def get_command_history(self, limit: int = 5) -> List[Dict[str, Any]]:
-        """Return the most recent command history entries."""
-        return self._command_history[:limit]
+    def get_command_history(
+        self,
+        limit: int = 5,
+        user_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Return only the requesting user's history; None is local/system scope."""
+        if user_id is not None and (
+            not isinstance(user_id, str) or not user_id.strip()
+        ):
+            raise ValueError("user_id must be a non-empty string when provided")
+
+        if user_id is None:
+            scoped_history = [
+                item for item in self._command_history
+                if item.get("user_id") is None
+            ]
+        else:
+            normalized_user_id = user_id.strip()
+            scoped_history = [
+                item for item in self._command_history
+                if item.get("user_id") == normalized_user_id
+            ]
+        return scoped_history[:max(0, limit)]
 
     def _dispatch_with_providers(self, intent) -> Response:
         """Direct dispatch to injected providers based on intent command type."""
