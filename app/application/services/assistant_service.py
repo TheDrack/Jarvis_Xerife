@@ -625,15 +625,15 @@ class AssistantService(NexusComponent):
             signals.append(signal)
             self._proactive_signals[normalized_user_id] = signals[-50:]
 
-    def stop_proactive_monitor(self) -> None:
-        """Cancel the proactive heartbeat without affecting the health monitor."""
+    def stop_proactive_monitor(self) -> Optional[asyncio.Task]:
+        """Cancel the proactive heartbeat and return its task for graceful shutdown."""
         task = self._proactive_task
         self._proactive_task = None
         if task is not None and not task.done():
             try:
                 loop = task.get_loop()
                 if loop.is_closed():
-                    return
+                    return task
                 try:
                     running_loop = asyncio.get_running_loop()
                 except RuntimeError:
@@ -645,6 +645,7 @@ class AssistantService(NexusComponent):
                     loop.call_soon_threadsafe(task.cancel)
             except RuntimeError:
                 logger.debug("Proactive monitor loop already closed")
+        return task
 
     def stop(self) -> None:
         """Stop the assistant service and its background monitor."""
