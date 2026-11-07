@@ -169,17 +169,23 @@ def create_evolution_router(db_adapter, get_current_user=None) -> APIRouter:
         """Approve a pending proposal and trigger its implementation via GitHub dispatch."""
         try:
             strategist = _get_strategist()
-            destination = strategist.approve_proposal(proposal_id)
-            logger.info("Proposal '%s' explicitly approved and promoted.", proposal_id)
-
             from app.application.services.github_worker import GitHubWorker
 
             github_worker = nexus.resolve("github_worker")
+            if github_worker is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail="GitHub publisher is unavailable; proposal was not approved.",
+                )
+
+            destination = strategist.approve_proposal(proposal_id)
+            approved_data = document_store.read(destination)
+            logger.info("Proposal '%s' explicitly approved and promoted.", proposal_id)
             dispatch_ok = github_worker.trigger_repository_dispatch(
                 event_type="implement_proposal",
                 client_payload={
                     "proposal_id": proposal_id,
-                    "approved_at": datetime.now(timezone.utc).isoformat(),
+                    "approved_at": approved_data.get("approved_at"),
                 },
             )
 
