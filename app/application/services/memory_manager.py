@@ -108,34 +108,36 @@ class MemoryManager(NexusComponent):
         return [item for _, item in scored[:max_results]]
 
     def _load_interactions(self) -> List[Dict[str, Any]]:
-        """Carrega as interações persistidas via DocumentStore."""
-        if os.path.exists(self._storage_path):
-            try:
-                data = document_store.read(self._storage_path)
-                if not isinstance(data, list):
-                    return []
-                sanitized_items: List[Dict[str, Any]] = []
-                changed = False
-                for item in data:
-                    if not isinstance(item, dict):
-                        continue
-                    sanitized = dict(item)
-                    for field in ("user", "jarvis"):
-                        value = sanitized.get(field)
-                        if isinstance(value, str):
-                            safe_value = self._sanitize_text(value)
-                            if safe_value != value:
-                                changed = True
-                            sanitized[field] = safe_value
-                    sanitized_items.append(sanitized)
-                # Migrate legacy plaintext records on first read, not just on next write.
-                if changed:
-                    self._save_interactions(sanitized_items)
-                return sanitized_items
-            except Exception as e:
-                logger.warning(f"⚠️ [MEMORY] Erro ao carregar memória: {e}")
-                raise
-        return []
+        """Load and sanitize interactions, migrating legacy plaintext records."""
+        if not os.path.exists(self._storage_path):
+            return []
+        try:
+            data = document_store.read(self._storage_path)
+        except Exception as e:
+            logger.warning(f"⚠️ [MEMORY] Erro ao carregar memória: {e}")
+            return []
+        if not isinstance(data, list):
+            return []
+
+        sanitized_items: List[Dict[str, Any]] = []
+        changed = False
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            sanitized = dict(item)
+            for field in ("user", "jarvis"):
+                value = sanitized.get(field)
+                if isinstance(value, str):
+                    safe_value = self._sanitize_text(value)
+                    if safe_value != value:
+                        changed = True
+                    sanitized[field] = safe_value
+            sanitized_items.append(sanitized)
+
+        # Migrate legacy plaintext records on first read, not just on next write.
+        if changed:
+            self._save_interactions(sanitized_items)
+        return sanitized_items
 
     def _save_interactions(self, interactions: List[Dict[str, Any]]) -> None:
         """Persiste as interações via DocumentStore."""
