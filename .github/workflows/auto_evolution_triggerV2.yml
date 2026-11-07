@@ -35,6 +35,7 @@ jobs:
     needs: gate
     permissions:
       contents: read
+      pull-requests: read
     if: |
       github.ref == 'refs/heads/main' &&
       needs.gate.outputs.enabled == 'true' &&
@@ -62,6 +63,8 @@ jobs:
         id: flow
         env:
           EVOLUTION_ENABLED: ${{ vars.EVOLUTION_ENABLED }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
           uv venv --clear --python 3.11
@@ -73,6 +76,7 @@ jobs:
           import re
           import sys
           from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
+          from scripts.roadmap_mission_guard import find_existing_mission_pr
 
           try:
               auto = AutoEvolutionServiceV2()
@@ -116,6 +120,33 @@ jobs:
                   with open(github_output, "a", encoding="utf-8") as output:
                       output.write("action=blocked\n")
                   print("⛔ Identificador de missão do roadmap ausente ou inválido.")
+                  sys.exit(0)
+
+              try:
+                  existing_pr = find_existing_mission_pr(
+                      os.environ.get("GITHUB_REPOSITORY", ""),
+                      mission_id,
+                      os.environ.get("GITHUB_TOKEN", ""),
+                  )
+              except Exception as exc:
+                  with open(github_output, "a", encoding="utf-8") as output:
+                      output.write("action=blocked\n")
+                  print(
+                      "⛔ Não foi possível provar ausência de PR anterior; "
+                      "execução bloqueada: " + str(exc)
+                  )
+                  sys.exit(0)
+
+              if existing_pr:
+                  with open(github_output, "a", encoding="utf-8") as output:
+                      output.write("action=blocked\n")
+                  print(
+                      "⛔ A missão já possui PR #"
+                      + str(existing_pr.get("number"))
+                      + " ("
+                      + str(existing_pr.get("state"))
+                      + "); nenhum novo candidato será gerado."
+                  )
                   sys.exit(0)
 
 
