@@ -62,12 +62,27 @@ class SupabaseVectorMemoryStore:
             return parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc)
 
-    def append(self, event: Dict[str, Any]) -> None:
+    def append(
+        self,
+        event: Dict[str, Any],
+        user_id: Optional[str] = None,
+    ) -> None:
         if not self.is_available:
             raise RuntimeError("Supabase vector-memory persistence is unavailable")
 
         metadata = dict(event.get("metadata") or {})
-        user_id = metadata.pop("user_id", None)
+        metadata_user_id = metadata.pop("user_id", None)
+        if user_id is None:
+            if metadata_user_id is not None:
+                raise ValueError(
+                    "user_id must be supplied as a trusted user_id argument"
+                )
+        else:
+            if not isinstance(user_id, str) or not user_id.strip():
+                raise ValueError("user_id must be a non-empty string when provided")
+            user_id = user_id.strip()
+            if metadata_user_id is not None and metadata_user_id != user_id:
+                raise ValueError("metadata user_id conflicts with trusted user_id")
         vector = event.get("vector")
         if not isinstance(vector, list) or not vector:
             raise ValueError("vector-memory embedding must be a non-empty list")
