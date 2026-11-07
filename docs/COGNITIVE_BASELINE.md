@@ -93,12 +93,12 @@ Não foi justificada nesta auditoria a criação de um novo banco de grafos, eve
 7. **Reasoning:** separar ThoughtLog/MetaReflection de inferência rastreável; contraditório, calibração e abstenção ainda não estão demonstrados.
 8. **Planning:** provar persistência de objetivo, dependências e replanejamento; matriz de viabilidade e plano declarativo continuam sendo contratos distintos.
 9. **Initiative:** demonstrar gatilho independente de prompt, deduplicação, orçamento e política de notificação.
-10. **Learning:** isolamento Docker e publicação privilegiada estão implementados (PR #756/#757). O bloqueio é a ausência de `target_file` confiável para capabilities pendentes e o contrato limitado a um arquivo-alvo; não ativar evolução automática multi-arquivo antes de suportar e testar mudanças coordenadas.
+10. **Learning:** isolamento Docker e publicação privilegiada estão implementados (PR #756/#757), com path policy, snapshot descartável, execução sem rede/secrets e publisher separado. O bloqueio operacional é anterior à geração: a evolução agendada ainda seleciona o inventário legado `data/capabilities.json`, não o Cognitive Roadmap; há 102 registros, 34 pendentes, 34 auto e 0 `target_file`. Além disso, `find_next_mission()` devolve o registro dentro de `mission`, mas não propaga `target_file` ao nível superior lido pelo workflow. O fluxo termina em blocked/no-op antes de chamar o LLM ou construir o sandbox. Não ativar mutação nem inventar alvo.
 11. **Proveniência e privacidade:** PR #762 reduz exposição nos stores cobertos, mas não é DLP/tenant isolation completa para todos os providers, workers, logs e dados vetoriais. Retenção, exclusão verificável e proveniência continuam pendentes.
 
 ## 7. Próxima implementação recomendada
 
-**Manter C0 aberto.** O merge da PR #773 fecha a primeira fatia de identidade individual no código e na CI, mas não fecha sua implantação nem os contratos de ownership e autorização. Nenhuma capacidade externa deve ser anunciada enquanto não houver executor invocável e policy host-backed.
+**Manter C0 aberto.** A identidade individual de workers está merged, a migration está aplicada e o deploy contém o código, mas o runtime ainda usa service-role. A evolução agendada também permanece em no-op seguro: não está conectada ao Cognitive Roadmap.
 
 Evidências integradas:
 - **PR #759 — merged:** baseline da coleta de inteligência e readback do MemoryManager.
@@ -113,14 +113,15 @@ Evidências integradas:
 - **PR #769 — merged:** memória vetorial Supabase, isolamento por usuário, redaction recursiva de metadata, readback entre processos e consolidação com recuperação lossless. O schema está implantado, mas a tabela segue sem registros.
 - **PR #770 — merged:** Initiative Engine proposal-only e user-scoped; estado/cooldown ainda process-local e a origem de tarefas não tem owner persistido.
 - **PR #772 — merged:** revalidação documental de migrations, memória e runtime.
-- **PR #773 — merged:** credenciais individuais de worker, hash-only, rotação/revogação, autenticação dupla HTTP e grants server-side. CI completa aprovada nos dois workflows; a integração GitHub–Supabase aplicou a migration após o merge, mas ainda não há credenciais provisionadas.
+- **PR #773 — merged:** credenciais individuais de worker, hash-only, rotação/revogação, autenticação dupla HTTP e grants server-side. CI completa aprovada nos dois workflows; a migration foi aplicada pela integração GitHub–Supabase, mas não há credenciais provisionadas e o runtime permanece no fallback service-role.
 
 Próxima sequência prioritária:
-1. **Ownership da tarefa:** introduzir owner/creator persistido a partir do usuário autenticado no enqueue, propagar esse vínculo até os eventos de conclusão/bloqueio e impedir que a identidade do worker seja confundida com a do dono. Exigir migration forward-only, compatibilidade com tarefas legadas e testes de isolamento/atribuição antes de habilitar notificações multiusuário.
-2. **Autorização executável:** integrar um registro de executores reais ao heartbeat e ao ToolDispatcher; implementar/registrar ToolAuthorizationPolicy host-backed com principal, sessão, escopo e aprovação. Capability só pode ser concedida quando existir executor invocável e policy válida.
-3. **Migração operacional dos workers:** a migration 20261107183000_agent_worker_credentials.sql já foi aplicada pela integração GitHub–Supabase. O próximo gate é provisionar tokens individuais por fluxo administrativo aprovado e secret store; depois comprovar heartbeat/claim/finish/release via HTTP. Não alterar secrets nem desativar o fallback legado nesta etapa documental.
-4. **Memória e recorrência:** comprovar insert/readback vetorial real com service role; manter o recurring intelligence worker desabilitado até autorização operacional e uma execução supervisionada com lease/run/persistência/liberação verificadas.
-5. Reexecutar o baseline comportamental integrado, fechar as lacunas de C0 e somente então iniciar C1 — World Model.
+1. **Conectar a autoevolução ao Cognitive Roadmap:** criar um manifesto de missão C0 revisado, com criterion_id, target_file confiável, teste(s), dependências, risco e resultado esperado; fazer o selector consumir esse manifesto, não data/capabilities.json. Corrigir também a perda de target_file no retorno de find_next_mission ou substituir esse selector no fluxo roadmap-driven. Manter blocked/no-op se o manifesto não for válido. Não inferir caminho a partir da saída do LLM.
+2. **Ownership da tarefa:** introduzir owner/creator persistido a partir do usuário autenticado no enqueue, propagar esse vínculo até eventos de conclusão/bloqueio e impedir que identidade do worker seja confundida com a do dono. Exigir migration forward-only, compatibilidade com tarefas legadas e testes de isolamento/atribuição antes de habilitar notificações multiusuário.
+3. **Autorização executável:** integrar um registro de executores reais ao heartbeat e ao ToolDispatcher; implementar/registrar ToolAuthorizationPolicy host-backed com principal, sessão, escopo e aprovação. Capability só pode ser concedida quando existir executor invocável e policy válida.
+4. **Migração operacional dos workers:** a migration 20261107183000_agent_worker_credentials.sql já foi aplicada pela integração GitHub–Supabase. O próximo gate é provisionar tokens individuais por fluxo administrativo aprovado e secret store; depois comprovar heartbeat/claim/finish/release via HTTP. Não alterar secrets nem desativar o fallback legado nesta auditoria.
+5. **Memória e recorrência:** comprovar insert/readback vetorial real com service role; manter o recurring intelligence worker desabilitado até autorização operacional e uma execução supervisionada com lease/run/persistência/liberação verificadas.
+6. Reexecutar o baseline comportamental integrado, fechar as lacunas de C0 e somente então iniciar C1 — World Model.
 
 Não aplicar migrations, provisionar credenciais, alterar feature flags ou executar tarefas reais como parte desta auditoria.
 
@@ -326,3 +327,24 @@ Os testes da branch cobrem hash-only, rotação, expiração, revogação, capab
 - A identidade individual HTTP avançou para TESTED (CI), não RUNTIME_VERIFIED.
 - Ownership persistido, autorização host-backed, executores reais, readback vetorial em runtime e worker recorrente supervisionado continuam pendentes.
 - C0 permanece aberto. C1 — World Model não começa até que os gates obrigatórios de C0 sejam comprovados.
+
+
+### 9.9 Autoevolução agendada — bloqueio seguro por contrato incompleto — 2026-11-07
+
+**Fonte efetiva consultada**
+- data/capabilities.jrvs não existe na main; AutoEvolutionServiceV2._resolved_path() cai para data/capabilities.json.
+- O JSON contém **102 capabilities**, das quais **34 estão pendentes**, **34 têm auto=true** e **0 possuem target_file**.
+- A primeira missão elegível pelo algoritmo legado é CAP-058 — Adapt plans during execution, prioridade 5. Ela pertence ao inventário antigo, não é um critério do C0 do Cognitive Roadmap.
+- AutoEvolutionServiceV2.find_next_mission() retorna {mission, id, title, description, notes, priority}; não propaga target_file. O workflow auto_evolution_triggerV2.yml lê next_mission.target_file no nível superior.
+- Com o inventário atual, a etapa de seleção grava action=blocked e encerra antes de invocar o LLM, construir a imagem ou executar Docker. Isso é fail-closed correto, mas significa que a autoevolução agendada não está funcionalmente conectada ao Cognitive Roadmap.
+- O workflow de seleção não lê docs/COGNITIVE_ROADMAP.md nem docs/STATUS.md. A orientação documental está alinhada ao roadmap; o código de seleção ainda usa o catálogo legado.
+- A ferramenta GitHub disponível nesta execução expõe runs por commit/PR, não uma listagem completa dos runs schedule. Portanto, a conclusão de no-op é baseada no caminho determinístico de código/configuração, não em uma execução schedule observada nesta auditoria.
+
+**Segurança da fronteira de evolução**
+- repository_path_policy.py protege app/core, capabilities, app/domain/capabilities, app/adapters/infrastructure e app/application/security; rejeita traversal, aliases Windows, symlinks/escapes e diretórios .frozen. Os testes de Gatekeeper cobrem os prefixos, traversal e aliases por symlink.
+- EvolutionGatekeeper resolve EvolutionSandbox; EvolutionSandbox substitui o arquivo-alvo em snapshot e executa pytest dentro de Docker com network none, read-only root, usuário não-root, capabilities removidas, no-new-privileges e limites de CPU/memória/PIDs. A imagem Docker é construída no workflow.
+- O ambiente do processo Docker recebe somente PATH (e SYSTEMROOT no Windows), sem provider/GitHub/Supabase credentials. O publisher recebe o artefato validado, verifica SHA-256, commit de origem, target e diff staged exato; não executa o candidato.
+- tests/test_evolution_sandbox.py verifica snapshot, exclusão de .env/.git/estado local, flags de isolamento, ambiente limpo, falha fechada sem Docker e timeout. A documentação de segurança informa que o teste adversarial de integração está conectado ao PR validation.
+- Issue #708 permanece aberta, mas seu corpo contém evidência anterior às correções de protected paths e sandbox Docker. Não fechar sem revalidar o acceptance set completo; o bloqueio atual mais claro é a ausência de missão/target confiável e a falta de integração do selector com o Cognitive Roadmap.
+
+**Conclusão:** a fronteira de execução/publicação evoluiu em código e CI; o scheduler de autoevolução permanece bloqueado de forma segura e ainda não é roadmap-driven. A próxima mudança deve ser o manifesto/selector C0, não a reativação da mutação nem a atribuição automática de paths.
