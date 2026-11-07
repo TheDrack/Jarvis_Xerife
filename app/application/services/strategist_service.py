@@ -286,7 +286,7 @@ class StrategistService(NexusComponent):
             raise FileNotFoundError(f"Pending proposal not found: {proposal_filename}")
 
         destination_path = self.approved_dir / proposal_filename
-        if destination_path.exists():
+        if destination_path.exists() or destination_path.is_symlink():
             raise FileExistsError(f"Proposal already approved: {proposal_filename}")
 
         proposal_data = document_store.read(source_path)
@@ -356,6 +356,15 @@ class StrategistService(NexusComponent):
             or not approved_at.strip()
         ):
             raise ValueError("Cannot generate RFC without persisted human approval")
+
+        matrix_snapshot = matrix.to_dict()
+        if any(
+            approval.get(field) != matrix_snapshot.get(field)
+            for field in ("cost", "impact", "risk")
+        ):
+            raise ValueError(
+                "Cannot generate RFC: matrix does not match persisted approved proposal"
+            )
 
         # Generate RFC content
         rfc_number = self._get_next_rfc_number()
