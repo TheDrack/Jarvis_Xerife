@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import threading
 from types import SimpleNamespace
+from uuid import uuid4
 
 from app.multiagent import (
     AgentLeader,
@@ -48,6 +49,7 @@ class SharedMessageDatabase:
                     "claimed_at": None,
                     "lease_expires_at": None,
                     "delivery_attempts": 0,
+                    "claim_token": None,
                     "created_sequence": self._sequence,
                     "delivered_at": None,
                 }
@@ -83,17 +85,21 @@ class SharedMessageDatabase:
                     "claimed_at": self._now,
                     "lease_expires_at": self._now + lease_seconds,
                     "delivery_attempts": row["delivery_attempts"] + 1,
+                    "claim_token": str(uuid4()),
                 }
             )
             return [copy.deepcopy(row)]
 
-    def acknowledge(self, message_id: str, agent_id: str) -> bool:
+    def acknowledge(
+        self, message_id: str, agent_id: str, claim_token: str | None
+    ) -> bool:
         with self._lock:
             row = self.messages.get(message_id)
             if (
                 row is None
                 or row["recipient_id"] != agent_id
                 or row["claimed_by"] != agent_id
+                or row["claim_token"] != claim_token
                 or row["status"] != "claimed"
                 or row["lease_expires_at"] <= self._now
             ):
@@ -103,6 +109,7 @@ class SharedMessageDatabase:
                     "status": "delivered",
                     "delivered_at": self._now,
                     "lease_expires_at": None,
+                    "claim_token": None,
                 }
             )
             return True
@@ -129,7 +136,9 @@ class SharedDatabaseClient:
         if name == "ack_jarvis_agent_message":
             return MessageRpc(
                 lambda: self.database.acknowledge(
-                    params["p_message_id"], params["p_agent_id"]
+                    params["p_message_id"],
+                    params["p_agent_id"],
+                    params["p_claim_token"],
                 )
             )
         raise AssertionError(f"unexpected RPC: {name}")
@@ -235,7 +244,11 @@ def test_independent_runtimes_dispatch_process_and_correlate_durable_response():
         }
     }
     assert database.messages[result_message.message_id]["status"] == "claimed"
-    assert leader_connector.acknowledge(result_message.message_id, "leader") is True
+    assert leader_connector.acknowledge(
+        result_message.message_id,
+        "leader",
+        claim_token=result_message.claim_token,
+    ) is True
     assert database.messages[result_message.message_id]["status"] == "delivered"
 
 
@@ -267,5 +280,10 @@ def test_message_is_redelivered_to_new_runtime_after_unacked_lease_expires():
     redelivery = restarted_runtime.receive("worker-a")
     assert redelivery == message
     assert database.messages[message.message_id]["delivery_attempts"] == 2
-    assert restarted_runtime.acknowledge(message.message_id, "worker-a") is True
+    assert crashed_runtime.acknowledge(
+        message.message_id, "worker-a", claim_token=first_delivery.claim_token
+    ) is False
+    assert restarted_runtime.acknowledge(
+        message.message_id, "worker-a", claim_token=redelivery.claim_token
+    ) is True
     assert database.messages[message.message_id]["status"] == "delivered"
