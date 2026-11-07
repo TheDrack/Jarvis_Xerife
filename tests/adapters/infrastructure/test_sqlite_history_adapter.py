@@ -12,6 +12,12 @@ from app.adapters.infrastructure.sqlite_history_adapter import (
 )
 
 
+@pytest.fixture
+def isolated_adapter():
+    """Module-level fixture for the user-scope integration tests below the test class."""
+    return SQLiteHistoryAdapter(database_url="sqlite:///:memory:")
+
+
 class TestSQLiteHistoryAdapter(NexusComponent):
 
     def execute(self, context: dict):
@@ -508,8 +514,8 @@ class TestHiveMindMemory:
 
 
 
-def test_recent_history_is_partitioned_by_user(adapter):
-    adapter.save_interaction(
+def test_recent_history_is_partitioned_by_user(isolated_adapter):
+    isolated_adapter.save_interaction(
         user_input="alice private query",
         command_type="chat",
         parameters={},
@@ -517,7 +523,7 @@ def test_recent_history_is_partitioned_by_user(adapter):
         response_text="alice private answer",
         user_id="alice",
     )
-    adapter.save_interaction(
+    isolated_adapter.save_interaction(
         user_input="bob private query",
         command_type="chat",
         parameters={},
@@ -525,7 +531,7 @@ def test_recent_history_is_partitioned_by_user(adapter):
         response_text="bob private answer",
         user_id="bob",
     )
-    adapter.save_interaction(
+    isolated_adapter.save_interaction(
         user_input="local command",
         command_type="chat",
         parameters={},
@@ -533,17 +539,17 @@ def test_recent_history_is_partitioned_by_user(adapter):
         response_text="local answer",
     )
 
-    alice = adapter.get_recent_history(limit=10, user_id="alice")
-    bob = adapter.get_recent_history(limit=10, user_id="bob")
-    local = adapter.get_recent_history(limit=10)
+    alice = isolated_adapter.get_recent_history(limit=10, user_id="alice")
+    bob = isolated_adapter.get_recent_history(limit=10, user_id="bob")
+    local = isolated_adapter.get_recent_history(limit=10)
 
     assert [item["user_input"] for item in alice] == ["alice private query"]
     assert [item["user_input"] for item in bob] == ["bob private query"]
     assert [item["user_input"] for item in local] == ["local command"]
 
 
-def test_hive_history_is_partitioned_by_user(adapter):
-    adapter.save_interaction(
+def test_hive_history_is_partitioned_by_user(isolated_adapter):
+    isolated_adapter.save_interaction(
         user_input="alice hive query",
         command_type="chat",
         parameters={},
@@ -552,7 +558,7 @@ def test_hive_history_is_partitioned_by_user(adapter):
         channel="api",
         user_id="alice",
     )
-    adapter.save_interaction(
+    isolated_adapter.save_interaction(
         user_input="bob hive query",
         command_type="chat",
         parameters={},
@@ -562,8 +568,8 @@ def test_hive_history_is_partitioned_by_user(adapter):
         user_id="bob",
     )
 
-    alice = adapter.get_recent_hive_history(limit=10, user_id="alice")
-    bob = adapter.get_recent_hive_history(limit=10, user_id="bob")
+    alice = isolated_adapter.get_recent_hive_history(limit=10, user_id="alice")
+    bob = isolated_adapter.get_recent_hive_history(limit=10, user_id="bob")
 
     assert [item["user_input"] for item in alice] == ["alice hive query"]
     assert [item["user_input"] for item in bob] == ["bob hive query"]
@@ -607,8 +613,8 @@ def test_history_schema_migration_adds_user_id_column(tmp_path):
 
 
 
-def test_pending_command_keeps_owner_for_worker_execution(adapter):
-    command_id = adapter.save_pending_command(
+def test_pending_command_keeps_owner_for_worker_execution(isolated_adapter):
+    command_id = isolated_adapter.save_pending_command(
         user_input="alice private queued task",
         command_type="chat",
         parameters={"intent": "chat"},
@@ -616,7 +622,7 @@ def test_pending_command_keeps_owner_for_worker_execution(adapter):
     )
 
     assert command_id is not None
-    pending = adapter.get_next_pending_command()
+    pending = isolated_adapter.get_next_pending_command()
 
     assert pending is not None
     assert pending["id"] == command_id
