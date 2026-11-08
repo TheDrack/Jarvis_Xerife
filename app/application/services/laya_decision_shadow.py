@@ -34,7 +34,23 @@ class LayaDecisionShadowObserver:
         self._closed = False
 
     def submit(self, context: Mapping[str, Any], actual_task_type: str) -> bool:
-        """Queue a shadow sample; return immediately and never alter routing."""
+        """Compare the router's existing task type against Laya's shadow prediction."""
+        normalized_actual = actual_task_type if actual_task_type in _TASK_TYPES else "general"
+        return self.submit_question(
+            context, "task_type", _TASK_TYPE_QUESTION, normalized_actual,
+            event_name="laya_shadow_decision",
+        )
+
+    def submit_question(
+        self,
+        context: Mapping[str, Any],
+        question_name: str,
+        question: Mapping[str, Any],
+        expected_value: str,
+        *,
+        event_name: str = "laya_shadow_decision",
+    ) -> bool:
+        """Queue any typed choice comparison without changing application behavior."""
         if self._closed or not self._capacity.acquire(blocking=False):
             return False
         text = self._extract_text(context)
@@ -43,7 +59,8 @@ class LayaDecisionShadowObserver:
             return False
         try:
             future = self._executor.submit(
-                self._evaluate, {"request": text[:8000]}, actual_task_type
+                self._evaluate_question, {"request": text[:8000]}, question_name,
+                dict(question), str(expected_value), event_name,
             )
         except RuntimeError:
             self._capacity.release()
@@ -65,23 +82,34 @@ class LayaDecisionShadowObserver:
             return "\n".join(parts).strip()
         return ""
 
-    def _evaluate(self, state: dict[str, str], actual_task_type: str) -> None:
+    def _evaluate_question(
+        self,
+        state: dict[str, str],
+        question_name: str,
+        question: dict[str, Any],
+        expected_value: str,
+        event_name: str,
+    ) -> None:
         try:
-            response = self.engine.decide(state, {"task_type": _TASK_TYPE_QUESTION})
-            answer = response["answers"]["task_type"]
+            response = self.engine.decide(state, {question_name: question})
+            answer = response["answers"][question_name]
             predicted = answer.get("choice")
-            if predicted not in _TASK_TYPES:
-                raise ValueError("Laya returned an unknown task category")
+            criteria = question.get("criteria")
+            if not isinstance(criteria, Mapping) or predicted not in criteria:
+                raise ValueError("Laya returned an unknown choice")
             confidence = answer.get("answer_confidence", answer.get("confidence"))
-            normalized_actual = actual_task_type if actual_task_type in _TASK_TYPES else "general"
             event = {
-                "event": "laya_shadow_decision",
-                "predicted_task_type": predicted,
-                "existing_task_type": normalized_actual,
-                "agreement": predicted == normalized_actual,
+                "event": event_name,
+                "decision_type": question_name,
+                "predicted_value": predicted,
+                "existing_value": expected_value,
+                "agreement": predicted == expected_value,
                 "confidence": confidence if isinstance(confidence, (int, float)) else None,
                 "model": (response.get("routing") or {}).get("model"),
             }
+            if question_name == "task_type":
+                event["predicted_task_type"] = predicted
+                event["existing_task_type"] = expected_value
             logger.info("Laya shadow decision: %s", event)
             if self._event_sink is not None:
                 self._event_sink(event)
