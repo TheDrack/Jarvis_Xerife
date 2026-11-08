@@ -537,6 +537,52 @@ def network_capture_etw(duration_seconds: int = 10, keywords: str = "0xFFFFFFFFF
     from app.adapters.edge.windows_etw_network_adapter import capture_tcpip_events
     return capture_tcpip_events(duration_seconds=duration_seconds, keywords=keywords)
 
+
+
+@mcp.tool()
+@tracked_action("Diagnosticando recursos do host")
+def host_resource_diagnostics(process_limit: int = 25) -> dict[str, Any]:
+    """Return bounded, read-only host resource diagnostics.
+
+    Reports OS identity, CPU/RAM, mounted filesystem usage and top processes.
+    Process command lines, environment variables, credentials and file contents
+    are never collected. This is the preferred first step before any cleanup.
+    """
+    try:
+        from app.adapters.edge.host.psutil_host_adapter import PsutilHostAdapter
+        from app.domain.ports.host_port import HostPort
+        from dataclasses import asdict
+
+        if isinstance(process_limit, bool) or not isinstance(process_limit, int):
+            return {"success": False, "status": "invalid_process_limit"}
+        if not 1 <= process_limit <= 50:
+            return {"success": False, "status": "invalid_process_limit", "allowed_range": [1, 50]}
+
+        adapter = PsutilHostAdapter()
+        identity = asdict(adapter.get_identity())
+        resources = asdict(adapter.get_resources())
+        resources["captured_at"] = resources["captured_at"].isoformat()
+        processes = [asdict(item) for item in adapter.list_processes(process_limit)]
+        return {
+            "success": True,
+            "read_only": True,
+            "identity": identity,
+            "resources": resources,
+            "top_processes": processes,
+            "process_limit": process_limit,
+            "privacy": {
+                "command_lines_collected": False,
+                "environment_variables_collected": False,
+                "file_contents_collected": False,
+            },
+        }
+    except RuntimeError as exc:
+        logger.warning("Host diagnostics unavailable: %s", exc)
+        return {"success": False, "status": "dependency_unavailable", "error": str(exc)}
+    except Exception as exc:
+        logger.exception("Host diagnostics failed")
+        return {"success": False, "status": "diagnostic_failed", "error": type(exc).__name__}
+
 # Android navigation tools are registered additively on the same MCP server.
 # Existing desktop tool implementations and their default behavior remain unchanged.
 @mcp.tool()
