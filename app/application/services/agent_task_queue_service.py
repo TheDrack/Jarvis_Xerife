@@ -289,7 +289,10 @@ class AgentTaskQueueService:
             if routine_owner is not None and routine_owner != normalized_owner:
                 raise PermissionError("Routine belongs to another owner")
             task_owner = routine_owner or normalized_owner
-            task_creator = self._optional_identity(routine["created_by"], "created_by") or normalized_owner
+            task_creator = (
+                self._optional_identity(routine["created_by"], "created_by")
+                or normalized_owner
+            )
             template = routine["task_template"] or {}
             if not isinstance(template, dict) or not template.get("objective"):
                 raise ValueError("Routine task_template must contain an objective")
