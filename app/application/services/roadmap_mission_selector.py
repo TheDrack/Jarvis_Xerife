@@ -137,6 +137,7 @@ class RoadmapMissionSelector:
 
         if (
             not isinstance(payload, dict)
+            or isinstance(payload.get("schema_version"), bool)
             or payload.get("schema_version") != 1
             or payload.get("roadmap_path") != _ROADMAP_PATH
             or not isinstance(payload.get("criteria"), list)
@@ -156,7 +157,7 @@ class RoadmapMissionSelector:
                 or not re.search(rf"`{re.escape(criterion_id)}`", roadmap_content)
             ):
                 raise RoadmapManifestError("cognitive_status_criterion_not_in_roadmap")
-            if state not in {"pending", "blocked", "verified"}:
+            if not isinstance(state, str) or state not in {"pending", "blocked", "verified"}:
                 raise RoadmapManifestError("cognitive_status_criterion_state_invalid")
             if criterion_id in records:
                 raise RoadmapManifestError("cognitive_status_duplicate_criterion")
@@ -219,6 +220,37 @@ class RoadmapMissionSelector:
 
             records[criterion_id] = {"state": state, "evidence": normalized_evidence}
         return records
+
+    @staticmethod
+    def _roadmap_criteria_by_phase(content: str) -> Dict[int, List[str]]:
+        """Extract machine-readable acceptance criterion IDs from each phase."""
+        lines = content.splitlines()
+        criteria_by_phase: Dict[int, List[str]] = {}
+        for index, heading in enumerate(lines):
+            if not heading.startswith("## "):
+                continue
+            phase_match = re.search(r"\\bFase\\s+([0-8])\\b", heading)
+            if phase_match is None:
+                continue
+            phase_number = int(phase_match.group(1))
+            if phase_number in criteria_by_phase:
+                raise RoadmapManifestError("roadmap_phase_heading_duplicated")
+            end = next(
+                (
+                    position
+                    for position in range(index + 1, len(lines))
+                    if lines[position].startswith("## ")
+                ),
+                len(lines),
+            )
+            section = "\\n".join(lines[index:end])
+            pattern = re.compile(
+                rf"`(C{phase_number}-[A-Z0-9]+(?:-[A-Z0-9]+)*)`"
+            )
+            criteria_by_phase[phase_number] = list(
+                dict.fromkeys(pattern.findall(section))
+            )
+        return criteria_by_phase
 
     @staticmethod
     def _roadmap_section(content: str, heading: str) -> str:
@@ -393,7 +425,25 @@ class RoadmapMissionSelector:
         if len(by_id) != len(validated):
             raise RoadmapManifestError("roadmap_manifest_duplicate_criterion_id")
 
+        criteria_by_phase = self._roadmap_criteria_by_phase(roadmap_content)
         for mission in validated:
+            phase_number = int(mission["phase"][1:])
+            if phase_number > 0:
+                required_prior_criteria: List[str] = []
+                for prior_phase in range(phase_number):
+                    prior_criteria = criteria_by_phase.get(prior_phase, [])
+                    if not prior_criteria:
+                        raise RoadmapManifestError(
+                            "roadmap_prior_phase_criteria_unaddressable"
+                        )
+                    required_prior_criteria.extend(prior_criteria)
+                if not set(required_prior_criteria).issubset(
+                    set(mission["depends_on"])
+                ):
+                    raise RoadmapManifestError(
+                        "mission_prior_phase_dependencies_missing"
+                    )
+
             for dependency in mission["depends_on"]:
                 if dependency not in by_id:
                     raise RoadmapManifestError("roadmap_manifest_unknown_dependency")
