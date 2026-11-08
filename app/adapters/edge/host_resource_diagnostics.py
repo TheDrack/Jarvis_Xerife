@@ -29,6 +29,16 @@ def collect_host_resource_diagnostics(
     resources = asdict(host.get_resources())
     resources["captured_at"] = resources["captured_at"].isoformat()
     processes = [asdict(item) for item in host.list_processes(process_limit)]
+    memory_method = getattr(host, "list_processes_by_memory", None)
+    memory_processes = (
+        [asdict(item) for item in memory_method(process_limit)]
+        if callable(memory_method)
+        else sorted(
+            processes,
+            key=lambda item: (item["memory_rss_bytes"], item["cpu_percent"], -item["pid"]),
+            reverse=True,
+        )
+    )
 
     return {
         "success": True,
@@ -36,6 +46,8 @@ def collect_host_resource_diagnostics(
         "identity": identity,
         "resources": resources,
         "top_processes": processes,
+        "top_cpu_processes": processes,
+        "top_memory_processes": memory_processes,
         "process_limit": process_limit,
         "privacy": {
             "command_lines_collected": False,
