@@ -186,3 +186,13 @@ Só marcar como concluído quando os critérios de aceitação correspondentes t
 - Issues abertas: #682, #732 e #723. A #732 continua exigindo validação schema-aware/Preview; a #723 permanece vinculada a esse histórico.
 - `data/roadmap_missions.json` continua vazio; a evolução agendada permanece em no-op seguro. C0 segue aberto; C1 não iniciado. Não criar missão nem atribuir target sem mapeamento revisado de critério, código e teste.
 - Self Healing V3 e PR Validation foram preservados sem alteração. Nenhuma migration, deploy, alteração de secrets/flags ou escrita em produção foi executada.
+
+
+## Atualização pós-merge — 2026-11-08 22:39 UTC
+
+- PR #784 foi merged pelo usuário às 22:38:28 UTC, commit `c0ceefcc6c2986499f5b1cf0e1a4757282f4242f`. O merge não foi executado por esta auditoria.
+- A mudança expõe `PsutilHostAdapter` por ferramenta MCP de diagnóstico somente leitura: identidade do host, CPU/RAM, volumes e até 50 processos, sem command lines, variáveis de ambiente ou conteúdo de arquivos.
+- A correção do teste de observabilidade WebSocket sincroniza o evento recebido do Chromium/CDP antes de consultar o buffer; mantém asserções para abertura e frames enviados/recebidos.
+- CI do head da PR #784: Portas de navegador success; JARVIS PR Validation **2.794 passed, 14 skipped, 8 warnings**; Task Queue Tests **2.793 passed, 15 skipped, 80 warnings** e foco da fila 15/15. O teste de navegador que falhou no primeiro run passou após a sincronização; nenhuma cobertura foi removida.
+- Validação pós-merge na main (runs 42531241885 e 42531241814) ainda estava em execução no momento deste registro. A execução de Auto-Documentation 42531241847 terminou com success.
+- A integração MCP de diagnóstico está comprovada em código e CI, mas ainda não foi executada no Windows do usuário; depende da restauração do Secure MCP Tunnel. Não inferir diagnóstico atual de disco/RAM a partir dos testes.
