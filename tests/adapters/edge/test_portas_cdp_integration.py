@@ -8,6 +8,7 @@ import base64
 import hashlib
 import socketserver
 import threading
+import time
 from contextlib import contextmanager
 from urllib.parse import urlparse
 
@@ -176,11 +177,11 @@ def test_observer_captura_frames_websocket_reais_via_chromium():
                 echoed = page.evaluate(
                     """url => new Promise((resolve, reject) => {
                         const ws = new WebSocket(url);
+                        window.__jarvisProbeSocket = ws;
                         const timer = setTimeout(() => reject(new Error("websocket timeout")), 8000);
                         ws.onopen = () => ws.send("jarvis-ws-probe");
                         ws.onmessage = event => {
                             clearTimeout(timer);
-                            ws.close();
                             resolve(event.data);
                         };
                         ws.onerror = () => reject(new Error("websocket error"));
@@ -188,11 +189,31 @@ def test_observer_captura_frames_websocket_reais_via_chromium():
                     ws_url,
                 )
                 assert echoed == "jarvis-ws-probe"
-                events = observer.events(limit=100)["events"]
-                assert any(event["type"] == "websocket_open" and event.get("host") == "127.0.0.1" for event in events)
-                frames = [event for event in events if event["type"] == "websocket_frame"]
-                assert any(event["direction"] == "sent" for event in frames)
-                assert any(event["direction"] == "received" for event in frames)
+
+                # The page and the observer consume CDP events on different
+                # event loops. Wait for the observer callback instead of racing
+                # the immediate JavaScript onmessage callback.
+                deadline = time.monotonic() + 3.0
+                events = []
+                frames = []
+                while time.monotonic() < deadline:
+                    events = observer.events(limit=100)["events"]
+                    frames = [event for event in events if event["type"] == "websocket_frame"]
+                    has_open = any(
+                        event["type"] == "websocket_open"
+                        and event.get("host") == "127.0.0.1"
+                        for event in events
+                    )
+                    has_sent = any(event["direction"] == "sent" for event in frames)
+                    has_received = any(event["direction"] == "received" for event in frames)
+                    if has_open and has_sent and has_received:
+                        break
+                    time.sleep(0.05)
+
+                assert has_open
+                assert has_sent
+                assert has_received, f"observer events did not include received frame: {events!r}"
+                page.evaluate("window.__jarvisProbeSocket.close()")
             finally:
                 page.close()
     finally:
