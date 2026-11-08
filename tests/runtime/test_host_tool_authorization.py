@@ -334,3 +334,43 @@ def test_dispatcher_rejects_authorization_decision_for_another_task():
     assert result.success is False
     assert result.error_code == "authorization_denied"
     assert resolved == []
+
+
+
+def test_approval_cannot_be_replayed_with_a_different_idempotency_key():
+    manifest = _manifest(risk_level="active")
+    now = datetime.now(timezone.utc)
+    original = ToolRequest(
+        tool_id=manifest.tool_id,
+        capability="sample.write",
+        arguments={"value": "same-effect"},
+        scope="local",
+        approval_id="approval-1",
+        idempotency_key="intent-1",
+    )
+    approval = VerifiedToolApproval(
+        approval_id="approval-1",
+        status="approved",
+        principal_id="user-1",
+        session_id="session-1",
+        task_id=None,
+        tool_id=manifest.tool_id,
+        tool_version=manifest.version,
+        capability="sample.write",
+        scope="local",
+        operation=manifest.operation,
+        arguments_digest=tool_request_digest(original),
+        approved_at=now - timedelta(seconds=1),
+        expires_at=now + timedelta(minutes=2),
+    )
+    policy = HostToolAuthorizationPolicy(
+        principal_resolver=lambda: _principal(capabilities=("sample.write",)),
+        approval_verifier=lambda approval_id: approval,
+        clock=lambda: now,
+    )
+
+    with pytest.raises(PermissionError, match="does not match"):
+        policy.authorize_tool(
+            original.model_copy(update={"idempotency_key": "intent-2"}),
+            manifest,
+        )
