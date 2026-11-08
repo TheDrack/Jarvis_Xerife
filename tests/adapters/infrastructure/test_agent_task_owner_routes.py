@@ -111,3 +111,70 @@ def test_task_creation_rejects_authenticated_user_without_stable_identity(monkey
 
     assert response.status_code == 401
     assert called is False
+
+
+def test_enqueue_supports_auth_adapter_user_dict_with_stable_user_id(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        AgentTaskQueueService,
+        "enqueue",
+        lambda self, **kwargs: captured.update(kwargs) or {"task_id": kwargs["task_id"]},
+    )
+    client = _client(
+        monkeypatch,
+        {"user_id": "supabase-user-123", "username": "person@example.test"},
+    )
+
+    response = client.post(
+        "/v1/agent-tasks",
+        json={"task_id": "dict-user-task", "objective": "Persist dict principal"},
+    )
+
+    assert response.status_code == 200
+    assert captured["owner_id"] == "supabase-user-123"
+    assert captured["created_by"] == "supabase-user-123"
+
+
+def test_enqueue_maps_legacy_environment_admin_to_stable_local_principal(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        AgentTaskQueueService,
+        "enqueue",
+        lambda self, **kwargs: captured.update(kwargs) or {"task_id": kwargs["task_id"]},
+    )
+    client = _client(
+        monkeypatch,
+        {"user_id": "", "username": "admin", "email": "admin@jarvis.local"},
+    )
+
+    response = client.post(
+        "/v1/agent-tasks",
+        json={"task_id": "admin-task", "objective": "Persist local admin task"},
+    )
+
+    assert response.status_code == 200
+    assert captured["owner_id"] == "local-admin"
+    assert captured["created_by"] == "local-admin"
+
+
+def test_enqueue_does_not_treat_arbitrary_username_as_stable_owner(monkeypatch):
+    called = False
+
+    def enqueue_stub(self, **kwargs):
+        nonlocal called
+        called = True
+        return {"task_id": kwargs["task_id"]}
+
+    monkeypatch.setattr(AgentTaskQueueService, "enqueue", enqueue_stub)
+    client = _client(
+        monkeypatch,
+        {"user_id": "", "username": "mutable-name@example.test"},
+    )
+
+    response = client.post(
+        "/v1/agent-tasks",
+        json={"task_id": "unstable-user-task", "objective": "Must reject mutable username"},
+    )
+
+    assert response.status_code == 401
+    assert called is False
