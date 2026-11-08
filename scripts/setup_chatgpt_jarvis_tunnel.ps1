@@ -202,7 +202,7 @@ switch ($Action) {
             Write-Output 'Tunnel readiness endpoint responded.'
             $ready | ConvertTo-Json -Depth 6
         } catch { Write-Output 'Tunnel readiness endpoint not responding; tunnel is not yet verified.' }
-        if (Test-Path -LiteralPath $LogFile) { Get-Content -LiteralPath $LogFile -Tail 12 }
+        if (Test-Path -LiteralPath $LogFile) { Get-Content -LiteralPath $LogFile -Tail 12 | ForEach-Object { Protect-LogText $_ } }
     }
     'stop' {
         Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
