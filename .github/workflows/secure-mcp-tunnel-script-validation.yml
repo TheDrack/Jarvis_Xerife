@@ -1,0 +1,32 @@
+name: Secure MCP Tunnel PowerShell validation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/setup_chatgpt_jarvis_tunnel.ps1"
+      - ".github/workflows/secure-mcp-tunnel-script-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  parse:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Parse tunnel setup script with Windows PowerShell parser
+        shell: pwsh
+        run: |
+          $path = Join-Path $env:GITHUB_WORKSPACE 'scripts/setup_chatgpt_jarvis_tunnel.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error ("Line {0}, Column {1}: {2} ({3})" -f $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message, $_.ErrorId) }
+            exit 1
+          }
+          Write-Output "PowerShell parser accepted $path"
