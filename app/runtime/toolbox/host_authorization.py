@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 from app.runtime.toolbox.contracts import (
     ToolAuthorizationDecision,
     ToolManifest,
@@ -21,45 +23,56 @@ from app.runtime.toolbox.contracts import (
 )
 
 
-@dataclass(frozen=True)
-class TrustedToolPrincipal:
+class TrustedToolPrincipal(BaseModel):
     """Authenticated principal resolved by the host, never from a tool request."""
 
-    principal_id: str
-    session_id: str
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    principal_id: str = Field(min_length=1, max_length=256)
+    session_id: str = Field(min_length=1, max_length=256)
     capabilities: frozenset[str]
-    agent_id: str | None = None
+    agent_id: str | None = Field(default=None, min_length=1, max_length=200)
 
-    def __post_init__(self) -> None:
-        if not self.principal_id.strip() or len(self.principal_id) > 256:
-            raise ValueError("principal_id must contain 1 to 256 characters")
-        if not self.session_id.strip() or len(self.session_id) > 256:
-            raise ValueError("session_id must contain 1 to 256 characters")
-        if any(not item.strip() for item in self.capabilities):
-            raise ValueError("capability grants must not contain empty values")
-        if self.agent_id is not None and (
-            not self.agent_id.strip() or len(self.agent_id) > 200
-        ):
-            raise ValueError("agent_id must contain 1 to 200 characters")
+    @field_validator("principal_id", "session_id", "agent_id")
+    @classmethod
+    def validate_identity_fields(cls, value: str | None) -> str | None:
+        if value is not None and value != value.strip():
+            raise ValueError("identity fields must not contain surrounding whitespace")
+        return value
+
+    @field_validator("capabilities")
+    @classmethod
+    def validate_capability_grants(cls, values: frozenset[str]) -> frozenset[str]:
+        if any(not value or value != value.strip() for value in values):
+            raise ValueError("capability grants must be non-empty canonical identifiers")
+        return values
 
 
-@dataclass(frozen=True)
-class VerifiedToolApproval:
+class VerifiedToolApproval(BaseModel):
     """Approval record returned only by a trusted, durable approval verifier."""
 
-    approval_id: str
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    approval_id: str = Field(min_length=1, max_length=256)
     status: str
-    principal_id: str
-    session_id: str
-    task_id: str | None
-    tool_id: str
-    tool_version: str
-    capability: str
-    scope: str
-    operation: str
-    arguments_digest: str
+    principal_id: str = Field(min_length=1, max_length=256)
+    session_id: str = Field(min_length=1, max_length=256)
+    task_id: str | None = Field(default=None, max_length=200)
+    tool_id: str = Field(min_length=3, max_length=128)
+    tool_version: str = Field(min_length=5, max_length=64)
+    capability: str = Field(min_length=1, max_length=128)
+    scope: str = Field(min_length=1, max_length=256)
+    operation: str = Field(min_length=1, max_length=128)
+    arguments_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     approved_at: datetime
     expires_at: datetime
+
+    @field_validator("approved_at", "expires_at")
+    @classmethod
+    def require_aware_timestamps(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("approval timestamps must be timezone-aware")
+        return value
 
 
 def tool_request_digest(request: ToolRequest) -> str:
@@ -174,16 +187,7 @@ class HostToolAuthorizationPolicy:
                 capabilities = value.get("capabilities", ())
                 if not isinstance(capabilities, (list, tuple, set, frozenset)):
                     raise ValueError("capabilities must be a collection")
-                return TrustedToolPrincipal(
-                    principal_id=str(value.get("principal_id") or ""),
-                    session_id=str(value.get("session_id") or ""),
-                    capabilities=frozenset(str(item) for item in capabilities),
-                    agent_id=(
-                        str(value["agent_id"])
-                        if value.get("agent_id") is not None
-                        else None
-                    ),
-                )
+                return TrustedToolPrincipal.model_validate(dict(value))
             except (TypeError, ValueError) as exc:
                 raise PermissionError("Trusted principal context is invalid") from exc
         raise PermissionError("Principal resolver returned an unsupported identity type")
@@ -242,7 +246,7 @@ class HostToolAuthorizationPolicy:
             approval = value
         elif isinstance(value, Mapping):
             try:
-                approval = VerifiedToolApproval(**dict(value))
+                approval = VerifiedToolApproval.model_validate(dict(value))
             except (TypeError, ValueError) as exc:
                 raise PermissionError("Approval record is invalid") from exc
         else:
