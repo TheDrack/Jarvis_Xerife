@@ -41,7 +41,13 @@ class LayaDecisionShadowObserver:
         if not text:
             self._capacity.release()
             return False
-        future = self._executor.submit(self._evaluate, {"request": text[:8000]}, actual_task_type)
+        try:
+            future = self._executor.submit(
+                self._evaluate, {"request": text[:8000]}, actual_task_type
+            )
+        except RuntimeError:
+            self._capacity.release()
+            return False
         future.add_done_callback(lambda _future: self._capacity.release())
         return True
 
