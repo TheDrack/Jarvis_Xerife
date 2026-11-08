@@ -196,3 +196,11 @@ Só marcar como concluído quando os critérios de aceitação correspondentes t
 - CI do head da PR #784: Portas de navegador success; JARVIS PR Validation **2.794 passed, 14 skipped, 8 warnings**; Task Queue Tests **2.793 passed, 15 skipped, 80 warnings** e foco da fila 15/15. O teste de navegador que falhou no primeiro run passou após a sincronização; nenhuma cobertura foi removida.
 - Validação pós-merge na main (runs 42531241885 e 42531241814) ainda estava em execução no momento deste registro. A execução de Auto-Documentation 42531241847 terminou com success.
 - A integração MCP de diagnóstico está comprovada em código e CI, mas ainda não foi executada no Windows do usuário; depende da restauração do Secure MCP Tunnel. Não inferir diagnóstico atual de disco/RAM a partir dos testes.
+
+
+### C0 blocker — selector completion status versus proven STATUS
+
+- Confirmed from `app/application/services/roadmap_mission_selector.py`: the selector validates criterion IDs against the roadmap, but reads no `docs/STATUS.md`. A dependency is treated as complete when its manifest entry says `status: complete`; no evidence pointer or STATUS corroboration is required.
+- `data/roadmap_missions.json` is currently empty, so the scheduled workflow remains a safe no-op. No LLM generation, Docker candidate execution or publication occurs.
+- Before a reviewed mission is marked ready, define and test a fail-closed evidence contract binding each completed criterion to the proven state in STATUS. Also add an integration test using the actual C0 criterion IDs from the production roadmap; the selector's current dependency tests use synthetic IDs in a fixture.
+- This is the next C0 hardening task. Do not populate the manifest or begin C1 until C0's capability map, behavioral baseline, evidence provenance and completion-state consistency are verified.
