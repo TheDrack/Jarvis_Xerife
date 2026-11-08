@@ -19,6 +19,7 @@ ROADMAP_CRITERIA = (
     "C0-GAPS-RECORDED",
     "C0-NO-NAME-BASED-COMPLETION",
 )
+ROADMAP_ALL_CRITERIA = ROADMAP_CRITERIA + ("C1-WORLD-MODEL",)
 
 _STATUS_START = "<!-- JARVIS_COGNITIVE_EVIDENCE_START -->"
 _STATUS_END = "<!-- JARVIS_COGNITIVE_EVIDENCE_END -->"
@@ -95,7 +96,7 @@ def _repository(tmp_path: Path, missions=None) -> tuple[Path, dict]:
         + "\n\n- `C1-WORLD-MODEL`: fixture criterion.\n",
         encoding="utf-8",
     )
-    _write_status_ledger(tmp_path, ROADMAP_CRITERIA)
+    _write_status_ledger(tmp_path, ROADMAP_ALL_CRITERIA)
     (tmp_path / "app" / "services" / "target.py").write_text(
         "VALUE = 1\n", encoding="utf-8"
     )
