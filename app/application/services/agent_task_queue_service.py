@@ -32,6 +32,15 @@ class AgentTaskQueueService:
     def _json(value: Any) -> str:
         return json.dumps(value if value is not None else {}, ensure_ascii=False)
 
+    @staticmethod
+    def _optional_identity(value: Any, field_name: str) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized or len(normalized) > 200:
+            raise ValueError(f"{field_name} must contain between 1 and 200 characters")
+        return normalized
+
     def heartbeat(
         self,
         agent_id: str,
@@ -107,8 +116,12 @@ class AgentTaskQueueService:
         max_attempts: int = 3,
         expected_value: float = 1,
         max_cost: float | None = None,
+        created_by: str | None = None,
+        owner_id: str | None = None,
     ) -> dict[str, Any]:
         self._ensure_postgres()
+        normalized_creator = self._optional_identity(created_by, "created_by")
+        normalized_owner = self._optional_identity(owner_id, "owner_id")
         if not task_id.strip() or not objective.strip():
             raise ValueError("task_id and objective must not be empty")
         if not 0 <= priority <= 1000:
@@ -121,17 +134,20 @@ class AgentTaskQueueService:
                     task_id, objective, priority, task_type, required_tools, constraints,
                     acceptance_criteria, risk_level, leader_id, parent_task_id,
                     routine_id, idempotency_key, max_attempts, expected_value, max_cost,
-                    status
+                    created_by, owner_id, status
                 ) values (
                     :task_id, :objective, :priority, :task_type, :required_tools,
                     cast(:constraints as jsonb), cast(:acceptance_criteria as jsonb),
                     :risk_level, :leader_id, :parent_task_id, :routine_id,
-                    :idempotency_key, :max_attempts, :expected_value, :max_cost, 'ready'
+                    :idempotency_key, :max_attempts, :expected_value, :max_cost,
+                    :created_by, :owner_id, 'ready'
                 )
                 on conflict (idempotency_key) where idempotency_key is not null
                 do update set idempotency_key = excluded.idempotency_key
+                where public.jarvis_agent_tasks.owner_id is not distinct from excluded.owner_id
                 returning task_id, objective, priority, task_type, required_tools,
-                          status, created_at, idempotency_key, attempts, max_attempts
+                          status, created_at, idempotency_key, attempts, max_attempts,
+                          created_by, owner_id
             """), {
                 "task_id": task_id, "objective": objective, "priority": priority,
                 "task_type": task_type, "required_tools": required_tools or [],
@@ -141,7 +157,10 @@ class AgentTaskQueueService:
                 "parent_task_id": parent_task_id, "routine_id": routine_id,
                 "idempotency_key": idempotency_key, "max_attempts": max_attempts,
                 "expected_value": expected_value, "max_cost": max_cost,
-            }).mappings().one()
+                "created_by": normalized_creator, "owner_id": normalized_owner,
+            }).mappings().first()
+            if row is None:
+                raise PermissionError("idempotency_key already belongs to another owner")
         return dict(row)
 
     def claim_next(self, agent_id: str, lease_seconds: int = 90) -> dict[str, Any] | None:
@@ -205,8 +224,12 @@ class AgentTaskQueueService:
         schedule: dict[str, Any] | None = None,
         task_template: dict[str, Any] | None = None,
         enabled: bool = True,
+        created_by: str | None = None,
+        owner_id: str | None = None,
     ) -> dict[str, Any]:
         self._ensure_postgres()
+        normalized_creator = self._optional_identity(created_by, "created_by")
+        normalized_owner = self._optional_identity(owner_id, "owner_id")
         if not routine_key.strip() or not name.strip():
             raise ValueError("routine_key and name must not be empty")
         if not 0 <= priority <= 1000:
@@ -214,31 +237,46 @@ class AgentTaskQueueService:
         with self.engine.begin() as conn:
             row = conn.execute(text("""
                 insert into public.jarvis_routine_definitions
-                    (routine_key, name, priority, schedule, task_template, enabled)
+                    (routine_key, name, priority, schedule, task_template, enabled,
+                     created_by, owner_id)
                 values (:routine_key, :name, :priority, cast(:schedule as jsonb),
-                        cast(:task_template as jsonb), :enabled)
+                        cast(:task_template as jsonb), :enabled, :created_by, :owner_id)
                 on conflict (routine_key) do update set
                     name = excluded.name, priority = excluded.priority,
                     schedule = excluded.schedule, task_template = excluded.task_template,
                     enabled = excluded.enabled, updated_at = now()
+                where public.jarvis_routine_definitions.owner_id
+                      is not distinct from excluded.owner_id
                 returning routine_id, routine_key, name, priority, schedule,
-                          task_template, enabled, last_triggered_at
+                          task_template, enabled, last_triggered_at, created_by, owner_id
             """), {
                 "routine_key": routine_key, "name": name, "priority": priority,
                 "schedule": self._json(schedule or {}),
                 "task_template": self._json(task_template or {}),
                 "enabled": enabled,
-            }).mappings().one()
+                "created_by": normalized_creator,
+                "owner_id": normalized_owner,
+            }).mappings().first()
+            if row is None:
+                raise PermissionError("routine_key already belongs to another owner")
         return dict(row)
 
-    def trigger_routine(self, routine_key: str, run_key: str) -> dict[str, Any]:
+    def trigger_routine(
+        self,
+        routine_key: str,
+        run_key: str,
+        *,
+        owner_id: str | None = None,
+    ) -> dict[str, Any]:
         """Materialize one routine run as an idempotent task."""
         self._ensure_postgres()
+        normalized_owner = self._optional_identity(owner_id, "owner_id")
         if not routine_key.strip() or not run_key.strip():
             raise ValueError("routine_key and run_key must not be empty")
         with self.engine.begin() as conn:
             routine = conn.execute(text("""
-                select routine_id, routine_key, name, priority, task_template, enabled
+                select routine_id, routine_key, name, priority, task_template, enabled,
+                       created_by, owner_id
                   from public.jarvis_routine_definitions
                  where routine_key = :routine_key
                  for update
@@ -247,6 +285,14 @@ class AgentTaskQueueService:
                 raise ValueError("Routine not found")
             if not routine["enabled"]:
                 raise ValueError("Routine is disabled")
+            routine_owner = self._optional_identity(routine["owner_id"], "owner_id")
+            if routine_owner is not None and routine_owner != normalized_owner:
+                raise PermissionError("Routine belongs to another owner")
+            task_owner = routine_owner or normalized_owner
+            task_creator = (
+                self._optional_identity(routine["created_by"], "created_by")
+                or normalized_owner
+            )
             template = routine["task_template"] or {}
             if not isinstance(template, dict) or not template.get("objective"):
                 raise ValueError("Routine task_template must contain an objective")
@@ -255,16 +301,18 @@ class AgentTaskQueueService:
                     task_id, objective, priority, task_type, required_tools,
                     constraints, acceptance_criteria, risk_level, leader_id,
                     routine_id, idempotency_key, max_attempts, expected_value,
-                    max_cost, status
+                    max_cost, created_by, owner_id, status
                 ) values (
                     :task_id, :objective, :priority, :task_type, :required_tools,
                     cast(:constraints as jsonb), cast(:acceptance_criteria as jsonb),
                     :risk_level, :leader_id, :routine_id, :idempotency_key,
-                    :max_attempts, :expected_value, :max_cost, 'ready'
+                    :max_attempts, :expected_value, :max_cost, :created_by, :owner_id, 'ready'
                 )
                 on conflict (idempotency_key) where idempotency_key is not null
                 do update set idempotency_key = excluded.idempotency_key
-                returning task_id, objective, priority, status, created_at, idempotency_key
+                where public.jarvis_agent_tasks.owner_id is not distinct from excluded.owner_id
+                returning task_id, objective, priority, status, created_at, idempotency_key,
+                          created_by, owner_id
             """), {
                 "task_id": str(uuid4()),
                 "objective": template["objective"],
@@ -276,14 +324,35 @@ class AgentTaskQueueService:
                 "risk_level": template.get("risk_level", "low"),
                 "leader_id": template.get("leader_id", "jarvis"),
                 "routine_id": str(routine["routine_id"]),
-                "idempotency_key": f"routine:{routine_key}:{run_key}",
+                "idempotency_key": f"routine:{routine_key}:{run_key}:{task_owner or 'system'}",
                 "max_attempts": int(template.get("max_attempts", 3)),
                 "expected_value": float(template.get("expected_value", 1)),
                 "max_cost": template.get("max_cost"),
-            }).mappings().one()
+                "created_by": task_creator,
+                "owner_id": task_owner,
+            }).mappings().first()
+            if row is None:
+                raise PermissionError("routine run idempotency key belongs to another owner")
             conn.execute(text("""
                 update public.jarvis_routine_definitions
                    set last_triggered_at = now(), updated_at = now()
                  where routine_id = :routine_id
             """), {"routine_id": str(routine["routine_id"])})
         return dict(row)
+
+
+    def get_task_owner(self, task_id: str) -> str | None:
+        """Return the persisted owner for a task, or None for legacy/internal tasks."""
+        self._ensure_postgres()
+        if not task_id.strip():
+            raise ValueError("task_id must not be empty")
+        with self.engine.connect() as conn:
+            row = conn.execute(
+                text("""
+                    select owner_id
+                      from public.jarvis_agent_tasks
+                     where task_id = :task_id
+                """),
+                {"task_id": task_id},
+            ).mappings().first()
+        return self._optional_identity(row["owner_id"], "owner_id") if row else None
