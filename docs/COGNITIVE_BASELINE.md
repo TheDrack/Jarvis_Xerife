@@ -437,3 +437,12 @@ A sessão do Jarvis Secure MCP Tunnel terminou durante a tentativa de continuar 
 - Issues ainda abertas observadas: #682 (proteção de main), #732 (reconciliação schema-aware/Preview do ledger) e #723 (histórico de RPCs condicionado à #732).
 - `data/roadmap_missions.json` permanece com `missions: []`; o workflow roadmap-driven faz no-op seguro e não chama LLM, sandbox ou publisher. C0 permanece aberto e C1 não iniciado.
 - Self Healing V3 e JARVIS PR Validation continuam versionados na main, sem alteração nesta auditoria. Não houve merge, deploy, migration, alteração de secrets/flags ou operação de produção.
+
+
+### C0 finding — completion evidence is not yet bound to STATUS.md
+
+A read-only code audit of `RoadmapMissionSelector` found that it reads `docs/COGNITIVE_ROADMAP.md`, `data/roadmap_missions.json` and the legacy capability catalog, but **does not read `docs/STATUS.md`**. Dependency completion is currently determined solely by each manifest entry's `status == "complete"`.
+
+The manifest is empty, so this does not currently enable a candidate or cause a mutation. The workflow remains a safe no-op. Before any mission is marked `ready`, C0 must define a machine-checkable evidence contract that ties completed criterion IDs to the proven state in `docs/STATUS.md` (or an explicitly referenced evidence record that STATUS summarizes), and the selector must reject missing/stale evidence. Add an integration test against the real roadmap; the current selector unit-test fixture contains synthetic C0 IDs that are not declared in the production roadmap.
+
+This is a confirmed architecture gap, not a completed capability. It is the next selector hardening item before populating the mission manifest.
