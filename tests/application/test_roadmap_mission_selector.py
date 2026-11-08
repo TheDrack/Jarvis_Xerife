@@ -318,6 +318,45 @@ def test_real_repository_roadmap_and_empty_manifest_remain_a_safe_noop():
     assert "C0 remains open" in selector.hold_reason
 
 
+def test_c1_mission_requires_all_c0_acceptance_criteria(tmp_path):
+    c1_mission = _mission(
+        criterion_id="C1-WORLD-MODEL",
+        phase="C1",
+        roadmap_heading=ROADMAP_HEADING_C1,
+    )
+    root, _ = _repository(tmp_path, [c1_mission])
+
+    with pytest.raises(
+        RoadmapManifestError, match="mission_prior_phase_dependencies_missing"
+    ):
+        _selector(root).find_next_mission()
+
+
+def test_c1_mission_is_selectable_only_after_all_c0_criteria_are_verified(tmp_path):
+    completed_c0 = [
+        _mission(criterion_id=criterion_id, status="complete", priority=index + 1)
+        for index, criterion_id in enumerate(ROADMAP_CRITERIA)
+    ]
+    c1_mission = _mission(
+        criterion_id="C1-WORLD-MODEL",
+        phase="C1",
+        roadmap_heading=ROADMAP_HEADING_C1,
+        depends_on=list(ROADMAP_CRITERIA),
+        priority=10,
+    )
+    root, _ = _repository(tmp_path, [*completed_c0, c1_mission])
+    _write_status_ledger(
+        root,
+        ROADMAP_CRITERIA,
+        {criterion_id: _verified_evidence() for criterion_id in ROADMAP_CRITERIA},
+    )
+
+    selected = _selector(root).find_next_mission()
+
+    assert selected is not None
+    assert selected["criterion_id"] == "C1-WORLD-MODEL"
+
+
 def test_manifest_with_unsupported_schema_fails_closed(tmp_path):
     root, manifest = _repository(tmp_path)
     manifest["schema_version"] = 2
