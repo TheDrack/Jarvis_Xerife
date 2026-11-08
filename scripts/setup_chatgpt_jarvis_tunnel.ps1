@@ -1,7 +1,7 @@
 #requires -Version 5.1
 [CmdletBinding()]
 param(
-    [ValidateSet('configure','run','start','status','stop','uninstall')]
+    [ValidateSet('configure','run','start','status','diagnose','stop','uninstall')]
     [string]$Action = 'status'
 )
 $ErrorActionPreference = 'Stop'
@@ -16,9 +16,35 @@ $LogFile = Join-Path $LogDir 'openai-tunnel-client.log'
 $HealthUrl = 'http://127.0.0.1:8767'
 $ProfileFile = Join-Path $ProfileDir ($ProfileName + '.yaml')
 
+function Protect-LogText([string]$Text) {
+    if ($null -eq $Text) { return '' }
+    $safe = [string]$Text
+    $safe = [regex]::Replace($safe, '(?i)(sk-[A-Za-z0-9_-]{16,})', '[REDACTED_API_KEY]')
+    $safe = [regex]::Replace($safe, '(?i)(Bearer\s+)[A-Za-z0-9._~+/-]+=*', '$1[REDACTED]')
+    $safe = [regex]::Replace($safe, '(?i)(CONTROL_PLANE_API_KEY\s*[:=]\s*)\S+', '$1[REDACTED]')
+    return $safe
+}
+function Rotate-LogIfNeeded {
+    if (-not (Test-Path -LiteralPath $LogFile)) { return }
+    $item = Get-Item -LiteralPath $LogFile -ErrorAction SilentlyContinue
+    if (-not $item -or $item.Length -lt 2MB) { return }
+    for ($i = 3; $i -ge 1; $i--) {
+        $source = if ($i -eq 1) { $LogFile } else { "$LogFile.$($i - 1)" }
+        $target = "$LogFile.$i"
+        if (Test-Path -LiteralPath $source) {
+            if ($i -eq 3) { Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue }
+            Move-Item -LiteralPath $source -Destination $target -Force
+        }
+    }
+}
 function Write-Log([string]$Message) {
-    New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
-    Add-Content -LiteralPath $LogFile -Value ('[{0}] {1}' -f (Get-Date -Format s), $Message)
+    try {
+        New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+        Rotate-LogIfNeeded
+        Add-Content -LiteralPath $LogFile -Value ('[{0}] {1}' -f (Get-Date -Format s), (Protect-LogText $Message))
+    } catch {
+        Write-Warning ("Não foi possível gravar log do túnel: " + (Protect-LogText $_.Exception.Message))
+    }
 }
 function Set-RuntimeKey {
     if (-not (Test-Path -LiteralPath $SecretFile)) {
@@ -39,9 +65,160 @@ function Test-JarvisLocal {
     try {
         $a = $tcp.BeginConnect('127.0.0.1',8765,$null,$null)
         if (-not $a.AsyncWaitHandle.WaitOne(1500) -or -not $tcp.Connected) {
-            throw 'Jarvis MCP não está escutando em 127.0.0.1:8765. Inicie o MCP interativo primeiro.'
+            throw 'Jarvis MCP não está escutando em 127.0.0.1:8765.'
         }
     } finally { $tcp.Dispose() }
+}
+function Wait-JarvisLocal([int]$TimeoutSeconds = 180) {
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $lastLog = [DateTime]::MinValue
+    while ((Get-Date) -lt $deadline) {
+        try {
+            Test-JarvisLocal
+            Write-Log 'Jarvis MCP local disponível em 127.0.0.1:8765.'
+            return
+        } catch {
+            if (((Get-Date) - $lastLog).TotalSeconds -ge 15) {
+                Write-Log 'Aguardando Jarvis MCP local; o serviço pode iniciar depois do logon.'
+                $lastLog = Get-Date
+            }
+            Start-Sleep -Seconds 3
+        }
+    }
+    throw "Jarvis MCP não ficou disponível em 127.0.0.1:8765 após $TimeoutSeconds segundos."
+}
+function Get-TunnelDiagnostics {
+    Write-Output '=== Jarvis Secure MCP Tunnel diagnostics (read-only) ==='
+    Write-Output "Computer: $env:COMPUTERNAME"
+    Write-Output "User: $env:USERNAME"
+    Write-Output "Client installed: $(Test-Path -LiteralPath $Client)"
+    Write-Output "Profile configured: $(Test-Path -LiteralPath $ProfileFile)"
+    Write-Output "DPAPI runtime key file exists: $(Test-Path -LiteralPath $SecretFile)"
+    $driveRoot = [IO.Path]::GetPathRoot($env:LOCALAPPDATA)
+    $driveName = $driveRoot.TrimEnd('\').TrimEnd(':')
+    $drive = Get-PSDrive -Name $driveName -ErrorAction SilentlyContinue
+    if ($drive) {
+        $freeMB = [math]::Round($drive.Free / 1MB, 1)
+        Write-Output ("LocalAppData drive: " + $driveName + ":; free MB: " + $freeMB)
+        if ($freeMB -lt 1024) { Write-Warning 'Pouco espaço livre no volume do perfil; não faça limpeza automática de arquivos do sistema.' }
+    }
+    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($task) {
+        $task | Select-Object TaskName,State,@{N='RunAs';E={$_.Principal.UserId}} | Format-List
+        Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction SilentlyContinue | Select-Object LastRunTime,LastTaskResult | Format-List
+    } else { Write-Output "Task installed: False" }
+    try { Test-JarvisLocal; Write-Output 'Jarvis MCP TCP 127.0.0.1:8765: reachable' }
+    catch { Write-Warning 'Jarvis MCP TCP 127.0.0.1:8765: not reachable' }
+    try {
+        $ready = Invoke-RestMethod -Uri ($HealthUrl + '/readyz') -TimeoutSec 3
+        Write-Output 'Tunnel readiness endpoint: responding'
+        $ready | ConvertTo-Json -Depth 6
+    } catch { Write-Output 'Tunnel readiness endpoint: not responding (not conclusive if tunnel is not running)' }
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^tunnel-client\.exe
+function Invoke-TunnelDoctor {
+    Set-RuntimeKey
+    try {
+        # An ephemeral port avoids colliding with a healthy tunnel-client already on 8767.
+        & $Client doctor --profile $ProfileName --profile-dir $ProfileDir --health-listen-addr '127.0.0.1:0' --explain
+        if ($LASTEXITCODE -ne 0) { throw "tunnel-client doctor falhou (exit=$LASTEXITCODE)." }
+    } finally {
+        Remove-Item Env:CONTROL_PLANE_API_KEY -ErrorAction SilentlyContinue
+    }
+}
+switch ($Action) {
+    'configure' {
+        if (-not (Test-Path -LiteralPath $Client)) { throw "tunnel-client não encontrado: $Client. Instale-o pela página oficial Platform → Tunnels." }
+        Test-JarvisLocal
+        $tunnelId = Read-Host 'Cole o tunnel_id criado em https://platform.openai.com/settings/organization/tunnels'
+        if ($tunnelId -notmatch '^tunnel_[A-Za-z0-9_-]{8,}$') { throw 'Formato de tunnel_id inválido.' }
+        $key = Read-Host 'Informe a runtime API key com permissão Tunnels Read + Use (entrada oculta)' -AsSecureString
+        if ($key.Length -lt 20) { $key.Dispose(); throw 'A chave parece curta demais; nenhuma configuração foi aplicada.' }
+        New-Item -ItemType Directory -Path $SecretDir -Force | Out-Null
+        $key | ConvertFrom-SecureString | Set-Content -LiteralPath $SecretFile -Encoding ascii
+        $key.Dispose()
+        New-Item -ItemType Directory -Path $ProfileDir -Force | Out-Null
+        & $Client init --sample sample_mcp_remote_no_auth --profile $ProfileName --profile-dir $ProfileDir --tunnel-id $tunnelId --mcp-server-url 'http://127.0.0.1:8765/mcp' --control-plane-api-key-ref 'env:CONTROL_PLANE_API_KEY' --health-listen-addr '127.0.0.1:8767' --force
+        if ($LASTEXITCODE -ne 0) { throw "Falha ao criar perfil tunnel-client (exit=$LASTEXITCODE)." }
+        Invoke-TunnelDoctor
+        $userId = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $scriptPath = $PSCommandPath
+        $taskAction = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy Bypass -File "' + $scriptPath + '" -Action run')
+        $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
+        $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1)
+        Register-ScheduledTask -TaskName $TaskName -Action $taskAction -Trigger $trigger -Principal $principal -Settings $settings -Description 'Private OpenAI Secure MCP Tunnel to Jarvis Desktop MCP; runs as the interactive user.' -Force | Out-Null
+        Write-Log "Configured profile=$ProfileName endpoint=http://127.0.0.1:8765/mcp task=$TaskName"
+        Write-Output "Perfil configurado. Tarefa instalada para o usuário $userId."
+        Write-Output 'A conexão no ChatGPT ainda precisa ser criada em Plugins/Apps com Connection=Tunnel.'
+        Start-ScheduledTask -TaskName $TaskName
+    }
+    'run' {
+        if (-not (Test-Path -LiteralPath $Client)) { throw "tunnel-client não encontrado: $Client" }
+        Wait-JarvisLocal -TimeoutSeconds 180
+        Set-RuntimeKey
+        Write-Log "Starting tunnel-client profile=$ProfileName"
+        try {
+            & $Client run --profile $ProfileName --profile-dir $ProfileDir 2>&1 | ForEach-Object {
+                Write-Log ([string]$_)
+            }
+            $code = $LASTEXITCODE
+            Write-Log "tunnel-client exited code=$code"
+            exit $code
+        } catch {
+            Write-Log "ERROR: $_"
+            throw
+        } finally {
+            Remove-Item Env:CONTROL_PLANE_API_KEY -ErrorAction SilentlyContinue
+        }
+    }
+    'start' {
+        $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        if (-not $task) { throw "Tarefa ausente. Execute -Action configure após criar tunnel_id e runtime key." }
+        Start-ScheduledTask -TaskName $TaskName
+        Write-Output "Tarefa $TaskName iniciada."
+    }
+    'diagnose' {
+        Get-TunnelDiagnostics
+    }
+    'status' {
+        Write-Output "Client installed: $(Test-Path -LiteralPath $Client)"
+        Write-Output "Profile configured: $(Test-Path -LiteralPath $ProfileFile)"
+        Write-Output "Encrypted runtime key exists: $(Test-Path -LiteralPath $SecretFile)"
+        $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        if ($task) {
+            $task | Select-Object TaskName,State,@{N='RunAs';E={$_.Principal.UserId}} | Format-List
+            Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction SilentlyContinue | Select-Object LastRunTime,LastTaskResult | Format-List
+        } else { Write-Output "Task installed: False" }
+        try {
+            $ready = Invoke-RestMethod -Uri ($HealthUrl + '/readyz') -TimeoutSec 2
+            Write-Output 'Tunnel readiness endpoint responded.'
+            $ready | ConvertTo-Json -Depth 6
+        } catch { Write-Output 'Tunnel readiness endpoint not responding; tunnel is not yet verified.' }
+        if (Test-Path -LiteralPath $LogFile) { Get-Content -LiteralPath $LogFile -Tail 12 }
+    }
+    'stop' {
+        Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -match 'tunnel-client\.exe run --profile jarvis-direct-chatgpt' } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+        Write-Output 'Tarefa parada.'
+    }
+    'uninstall' {
+        Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $ProfileFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $SecretFile -Force -ErrorAction SilentlyContinue
+        Write-Output 'Tarefa, perfil Jarvis dedicado e segredo DPAPI removidos. Nenhum outro túnel foi alterado.'
+    }
+}
+ } |
+        Select-Object ProcessId,Name,SessionId
+    if (Test-Path -LiteralPath $LogFile) {
+        $log = Get-Item -LiteralPath $LogFile
+        Write-Output "Log bytes: $($log.Length)"
+        Get-Content -LiteralPath $LogFile -Tail 20 | ForEach-Object { Protect-LogText $_ }
+    } else { Write-Output 'Tunnel log: not created yet' }
 }
 function Invoke-TunnelDoctor {
     Set-RuntimeKey
