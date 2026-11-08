@@ -141,7 +141,6 @@ class AgentTaskQueueService:
             raise ValueError("priority must be between 0 and 1000")
         if not 1 <= max_attempts <= 20:
             raise ValueError("max_attempts must be between 1 and 20")
-        self._submit_laya_shadow(objective, task_type)
         with self.engine.begin() as conn:
             row = conn.execute(text("""
                 insert into public.jarvis_agent_tasks (
@@ -169,6 +168,7 @@ class AgentTaskQueueService:
                 "idempotency_key": idempotency_key, "max_attempts": max_attempts,
                 "expected_value": expected_value, "max_cost": max_cost,
             }).mappings().one()
+        self._submit_laya_shadow(objective, task_type)
         return dict(row)
 
     def claim_next(self, agent_id: str, lease_seconds: int = 90) -> dict[str, Any] | None:
