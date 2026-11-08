@@ -105,10 +105,25 @@ class RoadmapMissionSelector:
         }
         return identifiers
 
+    @staticmethod
+    def _roadmap_section(content: str, heading: str) -> str:
+        """Return one level-two roadmap section without adjacent phases."""
+        lines = content.splitlines()
+        try:
+            start = lines.index(heading)
+        except ValueError:
+            return ""
+        end = next(
+            (index for index in range(start + 1, len(lines)) if lines[index].startswith("## ")),
+            len(lines),
+        )
+        return "\\n".join(lines[start:end])
+
     def _validate_mission(
         self,
         mission: Any,
         roadmap_lines: set[str],
+        roadmap_content: str,
         capability_ids: set[str],
     ) -> Dict[str, Any]:
         if not isinstance(mission, dict):
@@ -139,6 +154,12 @@ class RoadmapMissionSelector:
             raise RoadmapManifestError("mission_risk_invalid")
         if not roadmap_heading.startswith("## ") or roadmap_heading not in roadmap_lines:
             raise RoadmapManifestError("mission_roadmap_heading_not_found")
+        heading_phase = re.search(r"\\bFase\\s+([0-8])\\b", roadmap_heading)
+        if not heading_phase or phase != f"C{heading_phase.group(1)}":
+            raise RoadmapManifestError("mission_phase_heading_mismatch")
+        roadmap_section = self._roadmap_section(roadmap_content, roadmap_heading)
+        if not re.search(rf"`{re.escape(criterion_id)}`", roadmap_section):
+            raise RoadmapManifestError("mission_criterion_id_not_in_roadmap")
 
         priority = mission.get("priority")
         if isinstance(priority, bool) or not isinstance(priority, int) or priority < 1:
@@ -220,7 +241,8 @@ class RoadmapMissionSelector:
 
         try:
             manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-            roadmap_lines = set(roadmap_file.read_text(encoding="utf-8").splitlines())
+            roadmap_content = roadmap_file.read_text(encoding="utf-8")
+            roadmap_lines = set(roadmap_content.splitlines())
         except (OSError, json.JSONDecodeError) as exc:
             raise RoadmapManifestError("roadmap_manifest_or_roadmap_unreadable") from exc
 
@@ -247,7 +269,7 @@ class RoadmapMissionSelector:
 
         capability_ids = self._load_capability_ids()
         validated = [
-            self._validate_mission(item, roadmap_lines, capability_ids)
+            self._validate_mission(item, roadmap_lines, roadmap_content, capability_ids)
             for item in missions
         ]
         by_id = {item["criterion_id"]: item for item in validated}
