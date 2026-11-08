@@ -446,3 +446,13 @@ A read-only code audit of `RoadmapMissionSelector` found that it reads `docs/COG
 The manifest is empty, so this does not currently enable a candidate or cause a mutation. The workflow remains a safe no-op. Before any mission is marked `ready`, C0 must define a machine-checkable evidence contract that ties completed criterion IDs to the proven state in `docs/STATUS.md` (or an explicitly referenced evidence record that STATUS summarizes), and the selector must reject missing/stale evidence. Add an integration test against the real roadmap; the current selector unit-test fixture contains synthetic C0 IDs that are not declared in the production roadmap.
 
 This is a confirmed architecture gap, not a completed capability. It is the next selector hardening item before populating the mission manifest.
+
+
+### C0 completion-evidence gate — implementation in PR #782
+
+- The selector now reads the machine-readable evidence ledger embedded in `docs/STATUS.md`; malformed or missing ledger blocks selection.
+- A manifest entry marked `complete` is rejected unless STATUS marks the same criterion `verified` and supplies a repository commit URL, at least one GitHub Actions run URL, existing implementation/consumer/test paths, and test paths matching the mission's declared regression tests.
+- The selector includes evidence references for completed dependencies in the candidate context. The parser validates reference shape and local path existence; it does not independently query GitHub to authenticate the remote commit or check result. Human review remains mandatory.
+- The ledger currently marks all three production C0 acceptance IDs as `pending`. The mission manifest remains empty, so scheduled evolution remains a safe no-op.
+- The selector tests now use the actual C0 IDs from `docs/COGNITIVE_ROADMAP.md` and include a repository-level test for the real empty manifest.
+- PR #782 remains open. This change is not a completed C0 capability until CI passes and the PR is reviewed/merged. C0 remains open; C1 remains unstarted.
