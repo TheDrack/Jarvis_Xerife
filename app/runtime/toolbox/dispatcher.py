@@ -783,6 +783,11 @@ class ToolDispatcher:
                 if authorization_decision
                 else None
             ),
+            executor_id=(
+                authorization_decision.executor_id
+                if authorization_decision
+                else None
+            ),
             approval_id=(
                 authorization_decision.approval_id
                 if authorization_decision
