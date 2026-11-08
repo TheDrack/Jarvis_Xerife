@@ -175,3 +175,14 @@ Só marcar como concluído quando os critérios de aceitação correspondentes t
 - Memória vetorial: 0 linhas. Intelligence event/observation snapshots: 0. Worker runs: 0. Lease: uma linha com worker_id e lease_expires_at NULL.
 - RLS está habilitado sem policies nas seis tabelas C0 consultadas; grants observados apenas para service_role, sem grants anon/authenticated. Advisor global reportou 30 tabelas com RLS/no policy (INFO), mas não foram auditados grants de todas as 30.
 - Advisor de performance reportou 42 índices unused (INFO). Não remover sem medir workload. A consulta de logs Supabase não encontrou mensagens “recurring worker” na janela de 24h; isso não prova estado da feature flag Render.
+
+
+## Delta da auditoria recorrente — 2026-11-08 22:27 UTC
+
+- Main revalidada em `6f2222a24b829c13db96c561c0691e50c070e494`; branch protection segue ausente (`protected=false`, sem required checks). Issue #682 permanece aberta por depender de configuração administrativa.
+- Issue #708 fechada após validação em código, testes de regressão, teste real Docker no CI e separação de permissões/credenciais. A fronteira de sandbox/publicação está coberta; isso não declara a autoevolução funcional.
+- CI atual das PRs: #782 full pytest **2.786 passed, 14 skipped, 8 warnings** (run 42529184685); #783 PowerShell parser e PR validation success nos runs 42524233622/42524233623; #777 PR Validation e Task Queue success; #781 PR Validation success. Falhas antigas do parser PowerShell em #783 foram corrigidas em commits posteriores; não há falha atual pendente.
+- PRs abertas: #782, #783, #777 e #781. Nenhuma foi merged nesta auditoria.
+- Issues abertas: #682, #732 e #723. A #732 continua exigindo validação schema-aware/Preview; a #723 permanece vinculada a esse histórico.
+- `data/roadmap_missions.json` continua vazio; a evolução agendada permanece em no-op seguro. C0 segue aberto; C1 não iniciado. Não criar missão nem atribuir target sem mapeamento revisado de critério, código e teste.
+- Self Healing V3 e PR Validation foram preservados sem alteração. Nenhuma migration, deploy, alteração de secrets/flags ou escrita em produção foi executada.
