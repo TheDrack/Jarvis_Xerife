@@ -63,7 +63,7 @@ class ToolApprovalStore:
         capability = self._required(capability, "capability", 128)
         scope = self._required(scope, "scope", 256)
         operation = self._required(operation, "operation", 128)
-        if not re.fullmatch(r"\\d+\\.\\d+\\.\\d+", tool_version):
+        if not re.fullmatch(r"\d+\.\d+\.\d+", tool_version):
             raise ValueError("tool_version must be semantic version x.y.z")
         if not re.fullmatch(r"[0-9a-f]{64}", str(arguments_digest)):
             raise ValueError("arguments_digest must be a SHA-256 hex digest")
