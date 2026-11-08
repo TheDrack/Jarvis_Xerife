@@ -231,6 +231,60 @@ def test_active_tool_requires_verifiable_exact_request_approval():
     assert decision.expires_at == approval.expires_at
 
 
+
+def test_worker_approval_binds_task_owner_not_worker_session():
+    manifest = _manifest(risk_level="active")
+    request = ToolRequest(
+        tool_id=manifest.tool_id,
+        capability="sample.write",
+        arguments={"value": "approved"},
+        scope="local",
+        approval_id="approval-worker-1",
+        task_id="task-1",
+        attempt_id="attempt-1",
+        idempotency_key="intent-worker-1",
+    )
+    now = datetime.now(timezone.utc)
+    approval = VerifiedToolApproval(
+        approval_id="approval-worker-1",
+        status="approved",
+        principal_id="user-1",
+        approver_session_id="human-session-9",
+        task_id="task-1",
+        tool_id=manifest.tool_id,
+        tool_version=manifest.version,
+        capability="sample.write",
+        scope="local",
+        operation=manifest.operation,
+        arguments_digest=tool_request_digest(request),
+        approved_at=now - timedelta(seconds=1),
+        expires_at=now + timedelta(minutes=2),
+    )
+    observed = []
+    policy = HostToolAuthorizationPolicy(
+        principal_resolver=lambda: TrustedToolPrincipal(
+            principal_id="worker:worker-1",
+            session_id="worker-session-1",
+            capabilities=frozenset({"sample.write"}),
+            agent_id="worker-1",
+        ),
+        task_owner_resolver=lambda task_id: "user-1",
+        task_executor_resolver=lambda task_id, attempt_id: "worker-1",
+        approval_verifier=lambda approval_id, envelope, owner_id, executor_id: (
+            observed.append((owner_id, executor_id, envelope.task_id))
+            or {**approval.model_dump(), "status": "consumed"}
+        ),
+        clock=lambda: now,
+    )
+
+    decision = policy.authorize_tool(request, manifest)
+
+    assert observed == [("user-1", "worker-1", "task-1")]
+    assert decision.principal_id == "user-1"
+    assert decision.executor_id == "worker-1"
+    assert decision.session_id == "worker-session-1"
+    assert decision.approval_id == "approval-worker-1"
+
 def test_active_tool_without_approval_verifier_fails_closed():
     manifest = _manifest(risk_level="active")
     request = ToolRequest(
