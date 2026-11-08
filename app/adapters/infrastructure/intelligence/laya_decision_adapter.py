@@ -5,6 +5,7 @@ import os
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 class LayaDecisionError(RuntimeError):
     """Sanitized Laya transport or response failure."""
@@ -15,7 +16,11 @@ class LayaDecisionAdapter:
                  timeout_seconds: float = 0.8, opener=urlopen) -> None:
         if not isinstance(base_url, str) or not base_url.strip():
             raise ValueError("base_url must be a non-empty URL")
-        if not base_url.startswith(("http://127.0.0.1", "http://localhost", "http://[::1]", "https://")):
+        parsed = urlsplit(base_url)
+        loopback_hosts = {"127.0.0.1", "localhost", "::1"}
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("Laya endpoint must be an HTTP(S) URL")
+        if parsed.scheme == "http" and parsed.hostname not in loopback_hosts:
             raise ValueError("Laya endpoint must use loopback HTTP or HTTPS")
         if timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
