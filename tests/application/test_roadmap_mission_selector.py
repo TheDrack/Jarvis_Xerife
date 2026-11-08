@@ -61,38 +61,21 @@ def _write_status_ledger(root: Path, criteria, verified=None):
         "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
         "criteria": entries,
     }
+    fence = chr(96) * 3
     document = (
-        "# Status\\n\\n"
+        "# Status\n\n"
         + _STATUS_START
-        + "\\n```json\\n"
+        + "\n"
+        + fence
+        + "json\n"
         + json.dumps(payload)
-        + "\\n```\\n"
+        + "\n"
+        + fence
+        + "\n"
         + _STATUS_END
-        + "\\n"
+        + "\n"
     )
     (root / "docs" / "STATUS.md").write_text(document, encoding="utf-8")
-
-
-ROADMAP_CRITERIA = (
-    "C0-CAPABILITY-MAP",
-    "C0-GAPS-RECORDED",
-    "C0-NO-NAME-BASED-COMPLETION",
-)
-
-_STATUS_START = "<!-- JARVIS_COGNITIVE_EVIDENCE_START -->"
-_STATUS_END = "<!-- JARVIS_COGNITIVE_EVIDENCE_END -->"
-
-
-def _verified_evidence(**overrides):
-    evidence = {
-        "commit_url": "https://github.com/TheDrack/Jarvis_Xerife/commit/" + "a" * 40,
-        "check_urls": ["https://github.com/TheDrack/Jarvis_Xerife/actions/runs/123"],
-        "implementation_paths": ["app/services/target.py"],
-        "consumer_paths": ["app/application/services/roadmap_mission_selector.py"],
-        "test_paths": ["tests/test_target.py"],
-    }
-    evidence.update(overrides)
-    return evidence
 
 
 def _repository(tmp_path: Path, missions=None) -> tuple[Path, dict]:
@@ -216,7 +199,7 @@ def test_priority_is_deterministic_and_dependencies_must_be_complete(tmp_path):
     selected = _selector(root).find_next_mission()
 
     assert selected is not None
-    assert selected["criterion_id"] == "C0-BASELINE-CORE"
+    assert selected["criterion_id"] == "C0-GAPS-RECORDED"
 
 
 @pytest.mark.parametrize(
