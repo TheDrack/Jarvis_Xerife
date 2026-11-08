@@ -15,6 +15,7 @@ Fallback automático quando EMA de confiabilidade está abaixo do threshold.
 
 import logging
 import os
+from threading import Lock
 from typing import Any, Dict, Optional
 
 from app.core.nexus import NexusComponent, nexus
@@ -55,6 +56,7 @@ class LLMRouter(NexusComponent):
         self.default_adapter = default_adapter
         self._cost_tracker: Optional[Any] = None
         self._decision_observer = decision_observer
+        self._decision_observer_lock = Lock()
 
 
     def configure(self, config: Dict[str, Any]) -> None:
@@ -102,19 +104,21 @@ class LLMRouter(NexusComponent):
         if self._decision_observer is None:
             if os.getenv("JARVIS_LAYA_SHADOW_ENABLED", "").strip().lower() != "true":
                 return
-            try:
-                from app.adapters.infrastructure.intelligence.laya_decision_adapter import (
-                    LayaDecisionAdapter,
-                )
-                from app.application.services.laya_decision_shadow import (
-                    LayaDecisionShadowObserver,
-                )
-                self._decision_observer = LayaDecisionShadowObserver(
-                    LayaDecisionAdapter.from_env()
-                )
-            except Exception as exc:
-                logger.debug("[LLMRouter] Laya shadow unavailable: %s", type(exc).__name__)
-                return
+            with self._decision_observer_lock:
+                if self._decision_observer is None:
+                    try:
+                        from app.adapters.infrastructure.intelligence.laya_decision_adapter import (
+                            LayaDecisionAdapter,
+                        )
+                        from app.application.services.laya_decision_shadow import (
+                            LayaDecisionShadowObserver,
+                        )
+                        self._decision_observer = LayaDecisionShadowObserver(
+                            LayaDecisionAdapter.from_env()
+                        )
+                    except Exception as exc:
+                        logger.debug("[LLMRouter] Laya shadow unavailable: %s", type(exc).__name__)
+                        return
         try:
             self._decision_observer.submit(context, task_type)
         except Exception as exc:
@@ -122,7 +126,8 @@ class LLMRouter(NexusComponent):
 
     def close(self) -> None:
         """Release the optional shadow worker during application shutdown."""
-        observer, self._decision_observer = self._decision_observer, None
+        with self._decision_observer_lock:
+            observer, self._decision_observer = self._decision_observer, None
         if observer is not None and hasattr(observer, "close"):
             observer.close(wait=False)
 
