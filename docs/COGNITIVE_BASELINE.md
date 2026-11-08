@@ -349,3 +349,28 @@ Os testes da branch cobrem hash-only, rotação, expiração, revogação, capab
 - Issue #708 permanece aberta, mas seu corpo contém evidência anterior às correções de protected paths e sandbox Docker. Não fechar sem revalidar o acceptance set completo; o bloqueio atual mais claro é a ausência de missão/target confiável e a falta de integração do selector com o Cognitive Roadmap.
 
 **Conclusão:** a fronteira de execução/publicação evoluiu em código e CI; o scheduler de autoevolução permanece bloqueado de forma segura e ainda não é roadmap-driven. A próxima mudança deve ser o manifesto/selector C0, não a reativação da mutação nem a atribuição automática de paths.
+
+
+## 10. Atualizações posteriores ao snapshot de 2026-11-07
+
+O snapshot e as classificações acima permanecem históricos: os merges seguintes não equivalem a uma nova auditoria completa nem comprovam operação em produção.
+
+### Mudanças integradas em 2026-11-08
+
+- **PR #778 — Wake/Sleep continual-learning architecture:** documentação de arquitetura integrada à main. Define consolidação e aprendizagem em ciclos ociosos, reutilizando os serviços existentes; não implementa treinamento autônomo nem habilita execução de jobs.
+- **PR #780 — Evidence-backed fine-tuning samples:** integrada à main. `FineTuneDatasetCollector` agora exige `success=True`, status explícito `internal_monologue`, recompensa explícita, numérica, finita e acima do maior entre o threshold configurado e o piso absoluto. Registros `user_interaction`, proveniência desconhecida e recompensas ausentes/inválidas são excluídos. Os testes de regressão reproduziram as duas falhas anteriores e passaram após a correção; os dois workflows de pytest foram aprovados.
+- **Treinamento continua desabilitado:** a correção protege a elegibilidade do dataset, mas não prova consentimento, redaction completa, retenção, isolamento multi-tenant ou ground truth. Esses controles permanecem gates separados antes de qualquer treinamento.
+
+### DeepSeek V4.1 Flash
+
+A referência de arquitetura e integração está sendo documentada separadamente. O alias oficial atual da API é `deepseek-flash`, servido pelo checkpoint `DeepSeek-V4.1-Flash-1017`. O uso inicial recomendado é como professor externo isolado; não repontar a frota global de mini-agentes nem baixar o checkpoint completo para o PC de trabalho.
+
+### Estado operacional do computador
+
+A inspeção remota anterior observou Windows 10 Pro, Intel Core i3-10100F, 8 GB de RAM, unidade C: sem espaço livre e unidade D: com aproximadamente 171 GB livres. Esses valores são apenas o último snapshot observado, não uma leitura atual.
+
+A sessão do Jarvis Secure MCP Tunnel terminou durante a tentativa de continuar o inventário devido a erro de falta de espaço no dispositivo de captura. GPU, VRAM, identidade física/serial do SSD dedicado, esquema de partições e boot mode **não foram confirmados**. Não foi feita limpeza, formatação, particionamento, instalação de driver ou alteração de boot.
+
+### Estado de C0
+
+**C0 permanece aberto.** As mudanças acima reduzem riscos específicos, mas não completam a auditoria comportamental, a comprovação de persistência operacional, a política de dados de treinamento nem a validação ponta a ponta dos providers e workers. A próxima implementação deve continuar a partir das lacunas da seção 7, sem criar um segundo sistema de memória, scheduler ou event bus.
