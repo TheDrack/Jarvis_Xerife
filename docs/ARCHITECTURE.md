@@ -351,66 +351,57 @@ gap = registry.execute({
 | `procedural_memory` | Memória de padrões | store_pattern, find_similar |
 | `semantic_memory` | Memória de eventos | store_event, query_similar |
 
-### DockerSandbox
+### DockerSandbox — adapter sem consumidor comprovado
 
-Isolamento de testes em containers Docker:
+Existe um adapter em `app/adapters/infrastructure/docker_sandbox.py`, registrado no
+Nexus, mas a auditoria de consumidores não encontrou um caminho de produção nem
+testes que comprovem seu uso. Não confundir esse adapter com o sandbox efetivamente
+usado pela autoevolução.
 
-```python
-from app.adapters.infrastructure.docker_sandbox import DockerSandbox
+### EvolutionSandbox — caminho ativo de validação
 
-sandbox = DockerSandbox(image="python:3.11-slim")
+O caminho de código candidato é
+`EvolutionOrchestrator → EvolutionGatekeeper → EvolutionSandbox`. O sandbox ativo:
 
-# Executa testes em container isolado
-success, output = sandbox.run_tests(
-    code="def test_x(): assert 1+1==2",
-    test_file="tests/test_x.py"
-)
+- cria um snapshot descartável do repositório;
+- substitui o conteúdo do `target_file` pelo candidato antes da execução;
+- envia o snapshot para um container Docker sem bind mount do host;
+- executa pytest dentro do snapshot que contém o candidato;
+- usa rede desabilitada, root filesystem read-only, UID não-root, capabilities
+  removidas, `no-new-privileges` e limites de CPU/memória/PIDs/tempo;
+- não encaminha variáveis de provider, GitHub, Supabase ou credenciais locais para
+  o processo Docker.
 
-if success:
-    print("✅ Testes passaram")
-else:
-    print(f"❌ Testes falharam: {output}")
-```
+A integração real é coberta por
+`tests/test_evolution_sandbox_docker_integration.py`, que verifica a aplicação do
+candidato, a ausência de arquivo/segredos do host e a falha de conexão externa.
+A especificação detalhada está em
+`docs/architecture/evolution-candidate-security.md`.
 
-**Features:**
-- ✅ Container efêmero (auto-remove após execução)
-- ✅ Sem rede (network_disabled=True)
-- ✅ Sem capabilities Linux (cap_drop=["ALL"])
-- ✅ Filesystem read-only (exceto /app)
-- ✅ Timeout configurável (120s padrão)
-- ✅ Fallback para sandbox local se Docker indisponível
+### EvolutionGatekeeper — validação fail-closed
 
-### EvolutionGatekeeper
+A API atual é `approve_evolution(proposed_change)`; o antigo exemplo
+`_approve_or_reject` não é um contrato disponível.
 
-5 verificações antes de aprovar mudanças no código:
+As verificações atuais são:
 
-```python
-from app.application.services.evolution_gatekeeper import EvolutionGatekeeper
+1. **Coleta de testes:** executa `pytest --co -q`; exige código de saída zero e
+   contagem positiva reconhecida. `min_test_count` é configurável e o fallback
+   atual é zero, não um mínimo fixo de 400.
+2. **Estabilidade:** consulta o histórico recente do `evolution_loop` e bloqueia
+   rollback/deploy failure quando o provider está disponível; se não estiver,
+   essa verificação é ignorada.
+3. **Arquivos frozen:** bloqueia caminhos que contenham o segmento `.frozen`.
+4. **Caminhos protegidos:** rejeita traversal, symlink/escape e os prefixos
+   protegidos definidos em `repository_path_policy.py`. A PR #775 acrescenta
+   arquivos exatos do control plane à política compartilhada, ainda pendente de
+   merge.
+5. **Sandbox:** exige alvo explícito e valida a proposta com o
+   `EvolutionSandbox` Docker-backed. Ausência, erro, timeout ou falha do container
+   bloqueiam a proposta.
 
-gk = EvolutionGatekeeper()
-
-proposed_change = {
-    "files_modified": ["app/application/services/new_feature.py"],
-    "before_state": {"tests_passing_rate": 0.9},
-    "after_state": {"tests_passing_rate": 1.0},
-}
-
-approved, reason = gk._approve_or_reject(proposed_change)
-
-if approved:
-    print("✅ Mudança aprovada")
-else:
-    print(f"❌ Mudança reprovada: {reason}")
-```
-
-**5 Verificações:**
-1. ✅ Cobertura de testes (mínimo 400 testes)
-2. ✅ Estabilidade recente (sem falhas nas últimas 24h)
-3. ✅ Proteção de arquivos frozen (não modificar .frozen/)
-4. ✅ Proteção do núcleo (não modificar app/core/)
-5. ✅ Sandbox (testes passam em isolamento)
-
----
+O campo legado `gatekeeper_override` não concede bypass. A aprovação do Gatekeeper
+não é autorização para merge ou deploy; a publicação segue em job separado e PR.
 
 ## 📊 Camadas e Responsabilidades
 
@@ -428,8 +419,8 @@ else:
 
 | Camada | Proteção |
 |--------|----------|
-| **DockerSandbox** | Isolamento de testes (sem rede, sem capabilities) |
-| **EvolutionSandbox** | Sandbox local para testes rápidos |
+| **DockerSandbox** | Adapter existente, mas sem consumidor de produção/teste comprovado |
+| **EvolutionSandbox** | Sandbox Docker-backed ativo para validar candidato em snapshot descartável |
 | **EvolutionGatekeeper** | 5 verificações antes de aprovar código |
 | **SafetyGuardian** | Validação de segurança de ações |
 | **CapabilityAuthorizer** | Autorização de capabilities por usuário |

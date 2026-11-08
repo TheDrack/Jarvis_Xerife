@@ -13,6 +13,7 @@ Uso:
 """
 import argparse
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -58,6 +59,8 @@ def evolve(
     roadmap_context: str = "",
     max_attempts: int = 3,
     target_file: Optional[str] = None,
+    mission_id: Optional[str] = None,
+    mission_title: Optional[str] = None,
 ) -> Optional[bool]:
     """Evolui uma capability.
 
@@ -73,7 +76,8 @@ def evolve(
         result = orchestrator.execute(
             {
                 "cap_id": cap_id,
-                "mission_id": cap_id,
+                "mission_id": mission_id or cap_id,
+                "cap_title": mission_title or "",
                 "roadmap_context": roadmap_context,
                 "target_file": target_file,
             }
@@ -160,7 +164,15 @@ def main() -> None:
     parser.add_argument("--cap-id", help="Evolve apenas uma cap específica (ex: CAP-042)")
     parser.add_argument(
         "--target-file",
-        help="Caminho relativo confiável do arquivo-alvo, vindo do inventário da capability",
+        help="Caminho relativo confiável do arquivo-alvo, vindo do manifesto revisado do roadmap",
+    )
+    parser.add_argument(
+        "--mission-id",
+        help="Criterion ID do Cognitive Roadmap usado na proveniência do artefato",
+    )
+    parser.add_argument(
+        "--mission-title",
+        help="Título revisado do critério do Cognitive Roadmap",
     )
     parser.add_argument(
         "--delay", type=float, default=2.0, help="Segundos entre caps (padrão: 2.0)"
@@ -172,6 +184,11 @@ def main() -> None:
         help="Contexto textual da missão (substitui as notas da capability)",
     )
     args = parser.parse_args()
+
+    if args.mission_id and not re.fullmatch(r"C[0-8]-[A-Z0-9]+(?:-[A-Z0-9]+)*", args.mission_id):
+        parser.error("--mission-id must be a valid Cognitive Roadmap criterion ID")
+    if args.mission_title and ("\n" in args.mission_title or "\r" in args.mission_title):
+        parser.error("--mission-title must be a single line")
 
     all_caps = _load_capabilities()
     completed_ids: Set[str] = {c["id"] for c in all_caps if c.get("status") == "complete"}
@@ -226,6 +243,8 @@ def main() -> None:
                 roadmap_context=args.roadmap_context or cap.get("notes", ""),
                 max_attempts=args.max_attempts,
                 target_file=args.target_file or cap.get("target_file"),
+                mission_id=args.mission_id or cap_id,
+                mission_title=args.mission_title or title,
             )
             if outcome is True:
                 successes += 1

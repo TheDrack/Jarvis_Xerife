@@ -72,66 +72,54 @@ jobs:
           import os
           import re
           import sys
-          from app.application.services.auto_evolutionV2 import AutoEvolutionServiceV2
+          from app.application.services.roadmap_mission_selector import RoadmapMissionSelector
 
           try:
-              auto = AutoEvolutionServiceV2()
+              selector = RoadmapMissionSelector()
+              next_mission = selector.find_next_mission()
               github_output = os.environ["GITHUB_OUTPUT"]
-              last_msg = os.popen("git log -1 --pretty=%B").read()
-              print(f"--- ANALISANDO DNA ---\nMsg: {last_msg.strip()}")
 
-              is_auto_evolution = bool(
-                  re.search(r"auto-evolution|mission-\d+", last_msg, re.IGNORECASE)
-              )
-              is_sync = "Inventory Synchronized" in last_msg
-
-              if is_auto_evolution and not is_sync:
-                  print("🎯 DNA de Evolução detectado. Sincronizando inventário...")
-                  match = re.search(r"CAP-\d+", last_msg)
-                  if match and auto.mark_mission_as_completed(match.group()):
-                      print(f"✅ Missão {match.group()} integrada com sucesso.")
-                  with open(github_output, "a", encoding="utf-8") as output:
-                      output.write("action=idle\n")
-                  sys.exit(0)
-
-              print("🟢 Buscando próxima mutação na apostila de aprendizado...")
-              next_mission = auto.find_next_mission()
               if not next_mission:
                   with open(github_output, "a", encoding="utf-8") as output:
                       output.write("action=idle\n")
-                  print("😴 Sem missões pendentes no momento.")
+                  print(f"⏸️ Nenhuma missão do Cognitive Roadmap aprovada: {selector.hold_reason}")
                   sys.exit(0)
 
-              cap_id = str(next_mission.get("id") or "").strip()
+              cap_id = str(next_mission.get("legacy_capability_id") or "").strip()
+              mission_id = str(next_mission.get("criterion_id") or "").strip()
+              mission_title = str(next_mission.get("title") or "").strip()
+              target_file = str(next_mission.get("target_file") or "").strip()
+
               if not re.fullmatch(r"CAP-[0-9]+", cap_id):
                   with open(github_output, "a", encoding="utf-8") as output:
                       output.write("action=blocked\n")
-                  print("⛔ Identificador de missão ausente ou inválido; evolução bloqueada.")
+                  print("⛔ Referência de compatibilidade CAP ausente ou inválida; evolução bloqueada.")
                   sys.exit(0)
 
-              context = auto.get_roadmap_context(next_mission)
-              with open("mission_context.txt", "w", encoding="utf-8") as file:
-                  file.write(context)
-
-              target_file = str(next_mission.get("target_file") or "").strip()
-              if (
-                  not re.fullmatch(r"[A-Za-z0-9_./-]+", target_file)
-                  or any(part in {"", ".", ".."} for part in target_file.split("/"))
-              ):
+              if not re.fullmatch(r"C[0-8]-[A-Z0-9]+(?:-[A-Z0-9]+)*", mission_id):
                   with open(github_output, "a", encoding="utf-8") as output:
                       output.write("action=blocked\n")
-                  print(
-                      "⛔ Missão sem target_file confiável; LLM e sandbox não serão executados."
-                  )
+                  print("⛔ Criterion ID inválido; evolução bloqueada.")
                   sys.exit(0)
+
+              if not target_file or not mission_title:
+                  with open(github_output, "a", encoding="utf-8") as output:
+                      output.write("action=blocked\n")
+                  print("⛔ Metadados de alvo/título ausentes; evolução bloqueada.")
+                  sys.exit(0)
+
+              with open("mission_context.txt", "w", encoding="utf-8") as file:
+                  file.write(next_mission["roadmap_context"])
 
               with open(github_output, "a", encoding="utf-8") as output:
                   output.write(f"cap_id={cap_id}\n")
+                  output.write(f"mission_id={mission_id}\n")
+                  output.write(f"mission_title={mission_title}\n")
                   output.write(f"target_file={target_file}\n")
                   output.write("action=evolve\n")
-              print(f"🚀 Alvo identificado: {cap_id}")
+              print(f"🚀 Critério do roadmap selecionado: {mission_id} ({cap_id})")
           except Exception as exc:
-              print(f"❌ Falha no Orquestrador: {exc}")
+              print(f"❌ Roadmap mission selector falhou de forma fechada: {exc}")
               sys.exit(1)
           PYCODE
 
@@ -148,12 +136,16 @@ jobs:
           EVOLUTION_SANDBOX_IMAGE: jarvis-evolution-sandbox:ci
           EVOLUTION_ARTIFACT_DIR: ${{ runner.temp }}/jarvis-evolution-artifacts
           CAP_ID: ${{ steps.flow.outputs.cap_id }}
+          MISSION_ID: ${{ steps.flow.outputs.mission_id }}
+          MISSION_TITLE: ${{ steps.flow.outputs.mission_title }}
           TARGET_FILE: ${{ steps.flow.outputs.target_file }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
           source .venv/bin/activate
           python scripts/evolve_all_pending.py \
             --cap-id "$CAP_ID" \
+            --mission-id "$MISSION_ID" \
+            --mission-title "$MISSION_TITLE" \
             --max-attempts 3 \
             --target-file "$TARGET_FILE" \
             --roadmap-context "$(cat mission_context.txt)"

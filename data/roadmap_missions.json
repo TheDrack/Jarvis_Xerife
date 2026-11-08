@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
+  "hold_reason": "C0 remains open. No criterion currently has a reviewed, existing Python target and regression-test mapping suitable for autonomous generation. Do not infer targets from legacy capability notes or model output.",
+  "missions": []
+}

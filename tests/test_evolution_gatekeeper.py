@@ -176,6 +176,13 @@ class TestEvolutionGatekeeperCoreProtection:
             "app/domain/capabilities/cap_001.py",
             "app/adapters/infrastructure/new_adapter.py",
             "app/application/security/policy.py",
+            "app/application/services/roadmap_mission_selector.py",
+            "app/application/services/auto_evolutionV2.py",
+            "app/application/services/evolution_orchestrator.py",
+            "app/application/services/evolution_gatekeeper.py",
+            "app/application/services/evolution_sandbox.py",
+            "scripts/evolve_all_pending.py",
+            "scripts/publish_validated_evolution.py",
             r"APP\ADAPTERS\INFRASTRUCTURE\new_adapter.py",
         ],
     )

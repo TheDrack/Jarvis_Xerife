@@ -187,6 +187,63 @@ class TestTrustedPublisher:
                 publish_artifact(artifact_dir, repository)
         assert not any(command[1:3] == ["checkout", "-b"] for command in calls)
 
+
+    def test_refuses_evolution_control_plane_target_before_git_operations(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("GH_TOKEN", "publisher-token")
+        monkeypatch.setenv("EXPECTED_EVOLUTION_SANDBOX_IMAGE", "jarvis-evolution-sandbox:ci")
+        repository = tmp_path / "repository"
+        target = repository / "app" / "application" / "services" / "roadmap_mission_selector.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("ORIGINAL = True\n", encoding="utf-8")
+        artifact_dir, _, _ = _write_artifact(
+            tmp_path,
+            target_file="app/application/services/roadmap_mission_selector.py",
+        )
+        with patch("scripts.publish_validated_evolution._run") as run:
+            with pytest.raises(PublicationError, match="target_path_is_protected"):
+                publish_artifact(artifact_dir, repository)
+        run.assert_not_called()
+
+
+    def test_refuses_duplicate_open_roadmap_mission_pr_before_branch_creation(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.setenv("GH_TOKEN", "publisher-token")
+        monkeypatch.setenv("EXPECTED_EVOLUTION_SANDBOX_IMAGE", "jarvis-evolution-sandbox:ci")
+        repository = tmp_path / "repository"
+        target = repository / "app" / "module.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("ORIGINAL = True\n", encoding="utf-8")
+        artifact_dir, manifest, _ = _write_artifact(tmp_path)
+        manifest["mission_id"] = "C0-BASELINE-PERCEPTION"
+        next(artifact_dir.glob("*/manifest.json")).write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        calls = []
+
+        def fake_run(command, cwd, check=True):
+            calls.append(command)
+            stdout = ""
+            if command[1:3] == ["rev-parse", "--abbrev-ref"]:
+                stdout = "main"
+            elif command[1:2] == ["rev-parse"]:
+                stdout = manifest["source_commit"]
+            elif command[1:3] == ["ls-files", "--error-unmatch"]:
+                stdout = "app/module.py"
+            elif command[:3] == ["gh", "pr", "list"]:
+                stdout = json.dumps(
+                    [{"number": 321, "title": "[JARVIS Evolution] C0-BASELINE-PERCEPTION"}]
+                )
+            return subprocess.CompletedProcess(command, 0, stdout, "")
+
+        with patch("scripts.publish_validated_evolution._run", side_effect=fake_run):
+            with pytest.raises(PublicationError, match="open_evolution_pr_already_exists:321"):
+                publish_artifact(artifact_dir, repository)
+
+        assert not any(command[1:3] == ["checkout", "-b"] for command in calls)
+
     def test_publishes_only_the_validated_target_without_executing_it(
         self, tmp_path, monkeypatch
     ):
