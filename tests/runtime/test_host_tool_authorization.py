@@ -298,7 +298,7 @@ def test_expired_or_rejected_approval_is_denied():
         approval_id="approval-1",
         status="rejected",
         principal_id="user-1",
-        session_id="session-1",
+        approver_session_id="approver-session-1",
         task_id=None,
         tool_id=manifest.tool_id,
         tool_version=manifest.version,
@@ -409,7 +409,7 @@ def test_approval_cannot_be_replayed_with_a_different_idempotency_key():
         approval_id="approval-1",
         status="approved",
         principal_id="user-1",
-        session_id="session-1",
+        approver_session_id="approver-session-1",
         task_id=None,
         tool_id=manifest.tool_id,
         tool_version=manifest.version,
@@ -454,7 +454,7 @@ def test_dispatcher_idempotency_namespace_isolated_between_owned_tasks():
             approval_id=request.approval_id,
             status="approved",
             principal_id="user-1",
-            session_id="session-1",
+            approver_session_id="approver-session-1",
             task_id=request.task_id,
             tool_id=manifest.tool_id,
             tool_version=manifest.version,
@@ -480,7 +480,10 @@ def test_dispatcher_idempotency_namespace_isolated_between_owned_tasks():
         authorizer=HostToolAuthorizationPolicy(
             principal_resolver=lambda: _principal(capabilities=("sample.write",)),
             task_owner_resolver=lambda task_id: "user-1",
-            approval_verifier=lambda approval_id: approvals.get(approval_id),
+            approval_verifier=lambda approval_id, request, principal_id, executor_id: (
+                {**approvals[approval_id].model_dump(), "status": "consumed"}
+                if approval_id in approvals else None
+            ),
             clock=lambda: now,
         ),
     )
