@@ -51,8 +51,8 @@ O modo `run` aguarda até 180 segundos pelo MCP local antes de iniciar o cliente
 Recuperação quando o PC voltar a ficar acessível:
 
 ```powershell
-.\\scripts\\setup_chatgpt_jarvis_tunnel.ps1 -Action diagnose
-.\\scripts\\setup_chatgpt_jarvis_tunnel.ps1 -Action status
+.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action diagnose
+.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action status
 ```
 
 Se o volume do perfil estiver quase cheio, primeiro use Configurações → Sistema → Armazenamento → Recomendações de limpeza para revisar cada categoria manualmente. Não apague `Windows.old`, Downloads, pastas de projeto, perfis, chaves ou arquivos desconhecidos sem confirmar o conteúdo. A Microsoft documenta Storage Sense e as opções de limpeza do Windows; consulte as referências abaixo.
