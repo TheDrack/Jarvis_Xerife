@@ -117,7 +117,7 @@ class RoadmapMissionSelector:
             (index for index in range(start + 1, len(lines)) if lines[index].startswith("## ")),
             len(lines),
         )
-        return "\\n".join(lines[start:end])
+        return "\n".join(lines[start:end])
 
     def _validate_mission(
         self,
@@ -154,7 +154,7 @@ class RoadmapMissionSelector:
             raise RoadmapManifestError("mission_risk_invalid")
         if not roadmap_heading.startswith("## ") or roadmap_heading not in roadmap_lines:
             raise RoadmapManifestError("mission_roadmap_heading_not_found")
-        heading_phase = re.search(r"\\bFase\\s+([0-8])\\b", roadmap_heading)
+        heading_phase = re.search(r"\bFase\s+([0-8])\b", roadmap_heading)
         if not heading_phase or phase != f"C{heading_phase.group(1)}":
             raise RoadmapManifestError("mission_phase_heading_mismatch")
         roadmap_section = self._roadmap_section(roadmap_content, roadmap_heading)
