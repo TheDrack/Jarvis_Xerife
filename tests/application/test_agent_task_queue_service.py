@@ -142,7 +142,7 @@ def test_enqueue_persists_creator_and_owner_and_scopes_idempotency():
     params = connection.execute.call_args.args[1]
     assert result["owner_id"] == "owner-1"
     assert "created_by" in statement and "owner_id" in statement
-    assert "IS NOT DISTINCT FROM excluded.owner_id" in statement
+    assert "is not distinct from excluded.owner_id" in statement.lower()
     assert params["created_by"] == params["owner_id"] == "owner-1"
 
 
