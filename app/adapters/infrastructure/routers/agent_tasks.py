@@ -249,6 +249,8 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
             payload["created_by"] = owner_id
             payload["owner_id"] = owner_id
             return service().enqueue(**payload)
+        except HTTPException:
+            raise
         except Exception as exc:
             raise translate_error(exc) from exc
 
@@ -331,6 +333,8 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
             payload["created_by"] = owner_id
             payload["owner_id"] = owner_id
             return service().create_routine(**payload)
+        except HTTPException:
+            raise
         except Exception as exc:
             raise translate_error(exc) from exc
 
@@ -347,6 +351,8 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
                 request.run_key,
                 owner_id=owner_id,
             )
+        except HTTPException:
+            raise
         except Exception as exc:
             raise translate_error(exc) from exc
 
