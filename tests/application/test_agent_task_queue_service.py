@@ -170,7 +170,7 @@ def test_create_routine_persists_owner_and_rejects_cross_owner_upsert():
     statement = str(connection.execute.call_args.args[0])
     params = connection.execute.call_args.args[1]
     assert result["owner_id"] == "owner-1"
-    assert "IS NOT DISTINCT FROM excluded.owner_id" in statement
+    assert "is not distinct from excluded.owner_id" in statement.lower()
     assert params["created_by"] == params["owner_id"] == "owner-1"
 
 
