@@ -13,6 +13,16 @@ from app.application.services.roadmap_mission_selector import (
 
 
 ROADMAP_HEADING = "## 4. Fase 0 — Auditoria de capacidades e contratos"
+ROADMAP_HEADING_C1 = "## 5. Fase 1 — World Model"
+ROADMAP_CRITERIA = (
+    "C0-CAPABILITY-MAP",
+    "C0-BASELINE-COLLECTOR",
+    "C0-BASELINE-CORE",
+    "C0-BASELINE-PROVENANCE",
+    "C0-BASELINE-HIGH-RISK",
+    "C0-BASELINE-DEPENDENCY",
+    "C0-BASELINE-DEPENDENT",
+)
 
 
 def _repository(tmp_path: Path, missions=None) -> tuple[Path, dict]:
@@ -23,7 +33,13 @@ def _repository(tmp_path: Path, missions=None) -> tuple[Path, dict]:
     (tmp_path / "scripts").mkdir()
     (tmp_path / "tests").mkdir()
     (tmp_path / "docs" / "COGNITIVE_ROADMAP.md").write_text(
-        "# Roadmap\n\n" + ROADMAP_HEADING + "\n\nC0 audit.\n",
+        "# Roadmap\n\n"
+        + ROADMAP_HEADING
+        + "\n\n"
+        + "\n".join(f"- `{criterion}`: fixture criterion." for criterion in ROADMAP_CRITERIA)
+        + "\n\n"
+        + ROADMAP_HEADING_C1
+        + "\n\n- `C1-WORLD-MODEL`: fixture criterion.\n",
         encoding="utf-8",
     )
     (tmp_path / "app" / "services" / "target.py").write_text(
@@ -56,13 +72,13 @@ def _repository(tmp_path: Path, missions=None) -> tuple[Path, dict]:
 
 def _mission(**overrides):
     mission = {
-        "criterion_id": "C0-BASELINE-PERCEPTION",
+        "criterion_id": "C0-CAPABILITY-MAP",
         "phase": "C0",
         "legacy_capability_id": "CAP-058",
         "status": "ready",
         "risk": "low",
         "priority": 1,
-        "title": "Complete the C0 perception baseline",
+        "title": "Complete the C0 capability map",
         "objective": "Exercise the existing collector and core without creating a new event system.",
         "expected_result": "A deterministic regression test proves partial-source failure and event deduplication.",
         "roadmap_heading": ROADMAP_HEADING,
@@ -94,12 +110,12 @@ def test_selects_only_reviewed_low_risk_mission_and_builds_roadmap_context(tmp_p
     selected = _selector(root).find_next_mission()
 
     assert selected is not None
-    assert selected["criterion_id"] == "C0-BASELINE-PERCEPTION"
+    assert selected["criterion_id"] == "C0-CAPABILITY-MAP"
     assert selected["legacy_capability_id"] == "CAP-058"
     assert selected["target_file"] == "app/services/target.py"
     assert selected["tests"] == ["tests/test_target.py"]
     assert '"source_of_truth": "docs/COGNITIVE_ROADMAP.md"' in selected["roadmap_context"]
-    assert '"criterion_id": "C0-BASELINE-PERCEPTION"' in selected["roadmap_context"]
+    assert '"criterion_id": "C0-CAPABILITY-MAP"' in selected["roadmap_context"]
 
 
 def test_priority_is_deterministic_and_dependencies_must_be_complete(tmp_path):
@@ -131,7 +147,12 @@ def test_priority_is_deterministic_and_dependencies_must_be_complete(tmp_path):
     ("overrides", "message"),
     [
         ({"criterion_id": "CAP-058"}, "mission_criterion_id_invalid"),
+        ({"criterion_id": "C0-UNDECLARED"}, "mission_criterion_id_not_in_roadmap"),
         ({"phase": "C1"}, "mission_phase_mismatch"),
+        (
+            {"phase": "C1", "criterion_id": "C1-WORLD-MODEL"},
+            "mission_phase_heading_mismatch",
+        ),
         ({"risk": "critical"}, "mission_risk_invalid"),
         ({"roadmap_heading": "## Nonexistent heading"}, "mission_roadmap_heading_not_found"),
         ({"target_file": "../outside.py"}, "mission_target_path_rejected"),
@@ -215,10 +236,10 @@ def test_evolve_preserves_roadmap_criterion_in_candidate_artifact(monkeypatch):
 
     result = evolve_all_pending.evolve(
         "CAP-058",
-        roadmap_context='{"criterion_id":"C0-BASELINE-PERCEPTION"}',
+        roadmap_context='{"criterion_id":"C0-CAPABILITY-MAP"}',
         target_file="app/services/target.py",
-        mission_id="C0-BASELINE-PERCEPTION",
-        mission_title="Complete the C0 perception baseline",
+        mission_id="C0-CAPABILITY-MAP",
+        mission_title="Complete the C0 capability map",
     )
 
     assert result is True
