@@ -219,6 +219,14 @@ class RoadmapMissionSelector:
                     normalized_evidence[field] = list(dict.fromkeys(normalized_paths))
 
             records[criterion_id] = {"state": state, "evidence": normalized_evidence}
+
+        expected_criteria = {
+            criterion_id
+            for phase_criteria in self._roadmap_criteria_by_phase(roadmap_content).values()
+            for criterion_id in phase_criteria
+        }
+        if not expected_criteria.issubset(records):
+            raise RoadmapManifestError("cognitive_status_criteria_missing")
         return records
 
     @staticmethod
