@@ -10,10 +10,8 @@ def test_blocked_task_signal_uses_authenticated_owner_identity(monkeypatch):
         "app.adapters.infrastructure.routers.agent_tasks.nexus.resolve",
         lambda component_id: assistant if component_id == "assistant_service" else None,
     )
-    user = SimpleNamespace(user_id="owner-123", username="owner@example.test")
-
     emitted = _emit_proactive_task_signal(
-        user,
+        "owner-123",
         "task_blocked",
         task_id="task-42",
         result={"objective": "Integrate memory provider", "reason": "Missing credentials"},
@@ -44,7 +42,7 @@ def test_task_signal_is_not_emitted_without_authenticated_owner(monkeypatch):
     )
 
     emitted = _emit_proactive_task_signal(
-        SimpleNamespace(user_id=None, username=None),
+        None,
         "task_blocked",
         task_id="task-42",
         result={},
@@ -52,3 +50,50 @@ def test_task_signal_is_not_emitted_without_authenticated_owner(monkeypatch):
 
     assert emitted is False
     assistant.on_event.assert_not_called()
+
+
+def test_blocked_signal_targets_persisted_task_owner_not_worker_api_user(monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.adapters.infrastructure.routers.agent_tasks import create_agent_tasks_router
+    from app.application.services.agent_task_queue_service import AgentTaskQueueService
+
+    assistant = SimpleNamespace(on_event=Mock())
+    monkeypatch.setattr(
+        "app.adapters.infrastructure.routers.agent_tasks.nexus.resolve",
+        lambda component_id: assistant if component_id == "assistant_service" else None,
+    )
+    monkeypatch.setattr(AgentTaskQueueService, "finish", lambda self, *args, **kwargs: True)
+    monkeypatch.setattr(
+        AgentTaskQueueService, "get_task_owner",
+        lambda self, task_id: "task-owner-7",
+    )
+    adapter = SimpleNamespace(engine=SimpleNamespace(dialect=SimpleNamespace(name="postgresql")))
+    worker = SimpleNamespace(
+        agent_id="mini-worker-1",
+        principal_id="worker:mini-worker-1",
+        available_tools=("text_reasoning",),
+    )
+    app = FastAPI()
+    app.include_router(
+        create_agent_tasks_router(
+            adapter,
+            lambda: {"user_id": "api-caller-99"},
+            get_current_worker=lambda: worker,
+        )
+    )
+
+    response = TestClient(app).post(
+        "/v1/agent-tasks/task-7/finish",
+        json={
+            "agent_id": "mini-worker-1",
+            "attempt_id": "00000000-0000-0000-0000-000000000007",
+            "status": "blocked",
+            "result": {"objective": "Need user input"},
+        },
+    )
+
+    assert response.status_code == 200
+    assert assistant.on_event.call_args.args[1]["user_id"] == "task-owner-7"
+    assert assistant.on_event.call_args.args[1]["user_id"] != "api-caller-99"
