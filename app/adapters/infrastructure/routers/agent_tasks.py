@@ -174,7 +174,10 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
         if isinstance(exc, PermissionError):
             return HTTPException(status_code=403, detail=str(exc))
         if isinstance(exc, IntegrityError):
-            return HTTPException(status_code=409, detail="Task or routine identifier already exists")
+            return HTTPException(
+                status_code=409,
+                detail="Task or routine identifier already exists",
+            )
         if isinstance(exc, ValueError):
             return HTTPException(status_code=422, detail=str(exc))
         return HTTPException(status_code=500, detail="Task queue operation failed")
