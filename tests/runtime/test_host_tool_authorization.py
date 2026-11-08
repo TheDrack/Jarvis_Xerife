@@ -374,3 +374,59 @@ def test_approval_cannot_be_replayed_with_a_different_idempotency_key():
             original.model_copy(update={"idempotency_key": "intent-2"}),
             manifest,
         )
+
+
+
+def test_dispatcher_idempotency_namespace_isolated_between_owned_tasks():
+    manifest = _manifest(risk_level="active")
+    now = datetime.now(timezone.utc)
+    requests = [
+        ToolRequest(
+            tool_id=manifest.tool_id,
+            capability="sample.write",
+            task_id=task_id,
+            approval_id=f"approval-{task_id}",
+            idempotency_key="same-key",
+        )
+        for task_id in ("task-a", "task-b")
+    ]
+    approvals = {
+        request.approval_id: VerifiedToolApproval(
+            approval_id=request.approval_id,
+            status="approved",
+            principal_id="user-1",
+            session_id="session-1",
+            task_id=request.task_id,
+            tool_id=manifest.tool_id,
+            tool_version=manifest.version,
+            capability="sample.write",
+            scope="local",
+            operation=manifest.operation,
+            arguments_digest=tool_request_digest(request),
+            approved_at=now - timedelta(seconds=1),
+            expires_at=now + timedelta(minutes=2),
+        )
+        for request in requests
+    }
+    calls = []
+
+    class Adapter:
+        def write(self):
+            calls.append("write")
+            return {"ok": True}
+
+    dispatcher = ToolDispatcher(
+        ToolRegistry([manifest]),
+        resolver=lambda _: Adapter(),
+        authorizer=HostToolAuthorizationPolicy(
+            principal_resolver=lambda: _principal(capabilities=("sample.write",)),
+            task_owner_resolver=lambda task_id: "user-1",
+            approval_verifier=lambda approval_id: approvals.get(approval_id),
+            clock=lambda: now,
+        ),
+    )
+
+    results = [dispatcher.dispatch(request) for request in requests]
+
+    assert all(result.success for result in results)
+    assert calls == ["write", "write"]
