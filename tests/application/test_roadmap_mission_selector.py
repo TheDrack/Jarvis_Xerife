@@ -244,6 +244,6 @@ def test_evolve_preserves_roadmap_criterion_in_candidate_artifact(monkeypatch):
 
     assert result is True
     assert fake.context["cap_id"] == "CAP-058"
-    assert fake.context["mission_id"] == "C0-BASELINE-PERCEPTION"
-    assert fake.context["cap_title"] == "Complete the C0 perception baseline"
+    assert fake.context["mission_id"] == "C0-CAPABILITY-MAP"
+    assert fake.context["cap_title"] == "Complete the C0 capability map"
     assert fake.context["target_file"] == "app/services/target.py"
