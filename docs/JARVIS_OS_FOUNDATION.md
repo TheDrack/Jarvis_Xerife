@@ -59,6 +59,15 @@ The first deliverable is a portable foundation, not a bootable distribution and 
 - Only after boot, networking, drivers, desktop, recovery and update tests pass, create a bootable image artifact.
 - Never overwrite the current workstation disk during prototype testing.
 
+### G. Local intelligence and continual learning
+- Keep the cognitive learning engine independent from the host OS and model provider.
+- Run PyTorch/Transformers/PEFT in an isolated optional training environment; the portable Harness must not import the ML training stack.
+- Use the dedicated SSD for the Jarvis OS prototype only after read-only disk identity/capacity verification. Separate OS, Jarvis data, model cache/checkpoints and temporary training workspace according to measured capacity.
+- Implement Wake/Sleep under Cognitive Roadmap C8: first dry-run consolidation and evaluation, then small specialist models/adapters only when baseline evidence justifies training.
+- Treat free/open model providers as replaceable teachers and critics; the local Jarvis-owned experience, evaluation, memory and artifact lifecycle remain authoritative.
+- Training jobs must be resource-bounded, preemptible, resumable and isolated from foreground agent execution.
+- Do not format, repartition, install a bootloader to, or write an OS image to a physical disk until its model/serial/capacity and target partitions have been verified explicitly.
+
 ## Initial sequence
 
 1. Architecture and repository map.
