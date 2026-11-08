@@ -204,3 +204,52 @@ Só marcar como concluído quando os critérios de aceitação correspondentes t
 - `data/roadmap_missions.json` is currently empty, so the scheduled workflow remains a safe no-op. No LLM generation, Docker candidate execution or publication occurs.
 - Before a reviewed mission is marked ready, define and test a fail-closed evidence contract binding each completed criterion to the proven state in STATUS. Also add an integration test using the actual C0 criterion IDs from the production roadmap; the selector's current dependency tests use synthetic IDs in a fixture.
 - This is the next C0 hardening task. Do not populate the manifest or begin C1 until C0's capability map, behavioral baseline, evidence provenance and completion-state consistency are verified.
+
+
+## Ledger verificável dos critérios cognitivos
+
+Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser tratado como concluído quando estiver como `verified` e trouxer referência imutável de commit, execução de Actions, implementação, consumidor e testes. A presença das referências é validada pelo selector; a autenticidade e a suficiência técnica continuam sujeitas à revisão humana.
+
+<!-- JARVIS_COGNITIVE_EVIDENCE_START -->
+```json
+{
+  "schema_version": 1,
+  "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
+  "criteria": [
+    {
+      "criterion_id": "C0-CAPABILITY-MAP",
+      "state": "pending",
+      "evidence": {
+        "commit_url": null,
+        "check_urls": [],
+        "implementation_paths": [],
+        "consumer_paths": [],
+        "test_paths": []
+      }
+    },
+    {
+      "criterion_id": "C0-GAPS-RECORDED",
+      "state": "pending",
+      "evidence": {
+        "commit_url": null,
+        "check_urls": [],
+        "implementation_paths": [],
+        "consumer_paths": [],
+        "test_paths": []
+      }
+    },
+    {
+      "criterion_id": "C0-NO-NAME-BASED-COMPLETION",
+      "state": "pending",
+      "evidence": {
+        "commit_url": null,
+        "check_urls": [],
+        "implementation_paths": [],
+        "consumer_paths": [],
+        "test_paths": []
+      }
+    }
+  ]
+}
+```
+<!-- JARVIS_COGNITIVE_EVIDENCE_END -->
