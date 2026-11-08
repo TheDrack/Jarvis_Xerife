@@ -12,6 +12,12 @@ from app.runtime.toolbox.contracts import (
     ToolResult,
 )
 from app.runtime.toolbox.dispatcher import ToolDispatcher
+from app.runtime.toolbox.host_authorization import (
+    HostToolAuthorizationPolicy,
+    TrustedToolPrincipal,
+    VerifiedToolApproval,
+    tool_request_digest,
+)
 from app.runtime.toolbox.registry import ToolRegistry
 from app.runtime.toolbox.toolchains import (
     ToolchainManifest,
@@ -22,6 +28,10 @@ from app.runtime.toolbox.toolchains import (
 
 __all__ = [
     "ToolDispatcher",
+    "HostToolAuthorizationPolicy",
+    "TrustedToolPrincipal",
+    "VerifiedToolApproval",
+    "tool_request_digest",
     "JsonlToolAuditSink",
     "EvidenceRecord",
     "ToolAuthorizationDecision",
