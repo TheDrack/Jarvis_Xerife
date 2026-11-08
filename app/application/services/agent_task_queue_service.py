@@ -7,10 +7,15 @@ application logic.
 from __future__ import annotations
 
 import json
+import logging
+import os
+from threading import Lock
 from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import text
+
+logger = logging.getLogger(__name__)
 
 
 class TaskQueueUnavailable(RuntimeError):
@@ -18,8 +23,29 @@ class TaskQueueUnavailable(RuntimeError):
 
 
 class AgentTaskQueueService:
-    def __init__(self, engine):
+    def __init__(self, engine, decision_observer=None):
         self.engine = engine
+        self._decision_observer = decision_observer
+        self._decision_observer_lock = Lock()
+
+    def _submit_laya_shadow(self, objective: str, task_type: str) -> None:
+        """Observe queued task classification without changing queue data."""
+        if self._decision_observer is None:
+            if os.getenv("JARVIS_LAYA_SHADOW_ENABLED", "").strip().lower() != "true":
+                return
+            with self._decision_observer_lock:
+                if self._decision_observer is None:
+                    try:
+                        from app.adapters.infrastructure.intelligence.laya_decision_adapter import LayaDecisionAdapter
+                        from app.application.services.laya_decision_shadow import LayaDecisionShadowObserver
+                        self._decision_observer = LayaDecisionShadowObserver(LayaDecisionAdapter.from_env())
+                    except Exception as exc:
+                        logger.debug("[AgentTaskQueue] Laya shadow unavailable: %s", type(exc).__name__)
+                        return
+        try:
+            self._decision_observer.submit({"objective": objective}, task_type)
+        except Exception as exc:
+            logger.debug("[AgentTaskQueue] Laya shadow submission failed: %s", type(exc).__name__)
 
     def _ensure_postgres(self) -> None:
         if self.engine.dialect.name != "postgresql":
@@ -115,6 +141,7 @@ class AgentTaskQueueService:
             raise ValueError("priority must be between 0 and 1000")
         if not 1 <= max_attempts <= 20:
             raise ValueError("max_attempts must be between 1 and 20")
+        self._submit_laya_shadow(objective, task_type)
         with self.engine.begin() as conn:
             row = conn.execute(text("""
                 insert into public.jarvis_agent_tasks (
