@@ -16,10 +16,10 @@ Install and run the upstream server in a separate Python environment (do not ins
 
 ```bash
 python -m pip install "laya[serve]"
-LAYA_DEVICE=cpu LAYA_PRELOAD=1 python examples/server.py
+LAYA_DEVICE=cpu LAYA_PRELOAD=1 laya-serve
 ```
 
-For a CUDA-capable host, use `LAYA_DEVICE=cuda` after installing a PyTorch build compatible with its NVIDIA GPU and driver. The upstream CLI server can also be started with `laya-serve`; consult the upstream README for its supported flags and checkpoint selection.
+For a CUDA-capable host, use `LAYA_DEVICE=cuda` after installing a PyTorch build compatible with its NVIDIA GPU and driver. For the upstream example playground instead, run `python examples/server.py --device cpu`. Consult the upstream README for its supported flags and checkpoint selection.
 
 Then set:
 
