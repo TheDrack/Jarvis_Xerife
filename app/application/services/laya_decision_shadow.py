@@ -67,11 +67,12 @@ class LayaDecisionShadowObserver:
             if predicted not in _TASK_TYPES:
                 raise ValueError("Laya returned an unknown task category")
             confidence = answer.get("answer_confidence", answer.get("confidence"))
+            normalized_actual = actual_task_type if actual_task_type in _TASK_TYPES else "general"
             event = {
                 "event": "laya_shadow_decision",
                 "predicted_task_type": predicted,
-                "existing_task_type": str(actual_task_type or "general"),
-                "agreement": predicted == (actual_task_type or "general"),
+                "existing_task_type": normalized_actual,
+                "agreement": predicted == normalized_actual,
                 "confidence": confidence if isinstance(confidence, (int, float)) else None,
                 "model": (response.get("routing") or {}).get("model"),
             }
