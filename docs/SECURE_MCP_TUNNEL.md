@@ -38,6 +38,7 @@ Na raiz do repositório, execute:
 O configurador cria o perfil `jarvis-direct-chatgpt`, grava a referência à chave de runtime de forma protegida por DPAPI e registra a tarefa `Jarvis-OpenAI-Secure-MCP-Tunnel` para iniciar no logon interativo. A tarefa tem política de reinício para até cinco falhas, com intervalo de um minuto, e execução sem limite de tempo. O túnel é executado no contexto do usuário que configurou a chave; não copie o segredo para a conta SYSTEM nem execute o perfil DPAPI por outra conta.
 
 Ações disponíveis:
+- `diagnose`: coleta diagnóstico somente leitura de espaço livre no volume do perfil, cliente, perfil, existência do segredo DPAPI, tarefa agendada, porta MCP local, readiness, processos e logs recentes sanitizados. Não altera arquivos nem encerra processos.
 - `configure`: solicita o `tunnel_id` e a runtime key, valida o MCP local, cria o perfil e registra/inicia a tarefa.
 - `status`: mostra a presença do cliente, perfil, segredo protegido, tarefa e prontidão.
 - `start`: inicia a tarefa já configurada.
@@ -45,7 +46,31 @@ Ações disponíveis:
 - `stop`: interrompe a tarefa/cliente dedicado do Jarvis.
 - `uninstall`: remove a tarefa, o perfil dedicado e o segredo DPAPI do usuário. Use somente quando realmente quiser desinstalar esta integração.
 
+O modo `run` aguarda até 180 segundos pelo MCP local antes de iniciar o cliente, evitando que a tarefa de logon falhe apenas porque o supervisor interativo ainda está subindo. Os logs do cliente são rotacionados em 2 MB (três cópias) e passam por filtros básicos de segredo; não compartilhe logs sem revisão. A rotação só remove cópias antigas do próprio log do túnel. Nenhum arquivo temporário, download, cache ou conteúdo do usuário é apagado automaticamente.
+
+Recuperação quando o PC voltar a ficar acessível:
+
+```powershell
+.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action diagnose
+.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action status
+```
+
+Se o volume do perfil estiver quase cheio, primeiro use Configurações → Sistema → Armazenamento → Recomendações de limpeza para revisar cada categoria manualmente. Não apague `Windows.old`, Downloads, pastas de projeto, perfis, chaves ou arquivos desconhecidos sem confirmar o conteúdo. A Microsoft documenta Storage Sense e as opções de limpeza do Windows; consulte as referências abaixo.
+
 O script não cria um túnel hospedado nem registra o app dentro do ChatGPT; essas duas etapas dependem da conta e do workspace do usuário. O Magic Executor pode chamar este script como etapa assistida, mas deve deixar a entrada da chave no terminal seguro e nunca capturar, registrar ou reenviar seu valor.
+
+## Diagnóstico do erro 429 durante a sondagem do conector
+
+Se a criação ou descoberta do app no ChatGPT retornar `MCP SSE probe returned 429 from openai.org`, registre isso como falha da sondagem do endpoint hospedado. Esse erro, isoladamente, não comprova falha do listener MCP local, falta de espaço no disco ou corrupção do perfil.
+
+Ordem de diagnóstico:
+1. No computador hospedeiro, execute `-Action diagnose` e confirme se o cliente, perfil, tarefa e listener MCP local existem.
+2. Consulte `/health?details=true`, `/health/mcp` e `/readyz` na interface local do `tunnel-client`, quando esses endpoints estiverem habilitados. Diferencie processo vivo de cliente pronto e polling ativo.
+3. Confirme que o túnel e o app pertencem à organização/workspace pretendidos e que o operador possui `Tunnels Read + Use`.
+4. Evite tentativas repetidas de criação do conector em sequência. Respeite eventual `Retry-After` e repita após intervalo; não rotacione a runtime key, recrie o túnel ou reinstale o cliente sem evidência.
+5. Se persistir, preserve horário UTC, erro integral sanitizado, versão do cliente e snapshots de health/readiness para investigação do serviço hospedado.
+
+A documentação do Secure MCP Tunnel define limites de tráfego MCP e requisitos de associação/permissão, mas um HTTP 429 específico na sondagem SSE não identifica sozinho qual limite ou política foi acionado. Não trate o limite padrão de tráfego MCP como diagnóstico confirmado desse erro.
 
 ## Bateria de testes e critérios de aceite
 
