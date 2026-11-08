@@ -206,6 +206,23 @@ Só marcar como concluído quando os critérios de aceitação correspondentes t
 - This is the next C0 hardening task. Do not populate the manifest or begin C1 until C0's capability map, behavioral baseline, evidence provenance and completion-state consistency are verified.
 
 
+
+
+## Auditoria recorrente — 2026-11-08 — revalidação da main
+
+**Snapshot:** `main` em `ccaea37134f0c73012fda436dcf151212000dc55` (merge da PR #785).
+
+- PR #785 foi merged pelo usuário. O head da PR passou no pytest completo (run 42531527379) e na validação PowerShell (42531527338). PR #784 também foi merged; seus checks de Chromium/CDP, pytest completo e Task Queue concluíram com success (runs 42530829407, 42530829424 e 42530829368).
+- PRs abertas observadas: #782, #786, #777 e #781. CI dos heads consultados: #786 full pytest e Task Queue success (42531696010/42531695981); #777 PR Validation e Task Queue success (42523333002/42523333055); #781 full pytest success (42523339700). PR #782 teve sucesso no head anterior (42531878759), mas os novos commits de selector/testes precisam de validação própria.
+- No commit atual de main, a API retornou apenas o check `Supabase Preview: skipped`; não foi localizado full pytest associado exatamente ao SHA `ccaea371...`. O sucesso dos heads de PR anteriores não substitui validação do merge atual.
+- Issues abertas: #682 (proteção de main), #732 (reconciliação schema-aware/Preview do ledger) e #723 (RPCs provider-aware).
+- A consulta atual de branch protection retornou 403 (`Resource not accessible by integration`). A última evidência administrativa registrada em 2026-11-08 22:27 UTC indicava `protected=false` e nenhum required check; o estado atual não pôde ser revalidado nesta passagem.
+- `homeostase.yml` (Self Healing V3) e `jarvis-pr-validation.yml` continuam presentes na main. A PR #782 não altera esses workflows nem suas permissões.
+- Percepção: `collect_live_intelligence` é consumido pelo dashboard autenticado e pelo desktop local; o worker recorrente também usa o coletor, mas depende de duas flags separadas. Testes existentes cobrem falha parcial de fonte, falha de observações OSIRIS sem descartar eventos, deduplicação determinística de eventos, deduplicação de snapshots de observação, proveniência e lease/persistência isoladas. Os testes do worker usam collector/history fakes; não foi localizado nesta passagem um teste ponta a ponta do coletor real até persistência e consumidor. O último log Render documentado (07/11) dizia que o worker estava desabilitado; não foi reconsultado nesta execução.
+- A PR #782 adiciona gate de evidência em STATUS e ordem entre fases: toda missão marcada complete exige evidência estruturada; C1 exige dependência explícita de todos os critérios C0. O ledger atual mantém os três critérios C0 como pending. `data/roadmap_missions.json` permanece vazio, portanto a evolução agendada continua em no-op seguro.
+- C0 permanece aberto. Próximo critério: consolidar um teste comportamental integrado que ligue coleta real, falha parcial, síntese/deduplicação/proveniência, persistência e consumidor; comprovar runtime/persistência sem habilitar o worker ou alterar produção. C1 continua bloqueado.
+- Nenhum merge, deploy, migration, alteração de secrets/flags, escrita em produção ou alteração dos workflows de self-healing foi executado por esta auditoria.
+
 ## Ledger verificável dos critérios cognitivos
 
 Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser tratado como concluído quando estiver como `verified` e trouxer referência imutável de commit, execução de Actions, implementação, consumidor e testes. A presença das referências é validada pelo selector; a autenticidade e a suficiência técnica continuam sujeitas à revisão humana.
