@@ -115,3 +115,67 @@ def test_llm_router_continues_when_shadow_observer_fails():
 
     assert result["success"] is True
     adapter.execute.assert_called_once()
+
+
+def test_shadow_observer_supports_custom_typed_questions():
+    sink, engine = MagicMock(), MagicMock()
+    engine.decide.return_value = {
+        "answers": {"command_type": {"choice": "open_url", "answer_confidence": 0.92}},
+        "routing": {"model": "multilingual"},
+    }
+    observer = LayaDecisionShadowObserver(engine, event_sink=sink)
+    question = {
+        "type": "choice",
+        "instructions": "Qual comando corresponde à solicitação?",
+        "criteria": {"open_url": "Abrir URL", "type_text": "Digitar texto"},
+    }
+    try:
+        assert observer.submit_question(
+            {"request": "abra example.com"}, "command_type", question, "open_url",
+            event_name="laya_shadow_intent",
+        )
+    finally:
+        observer.close(wait=True)
+    event = sink.call_args.args[0]
+    assert event["event"] == "laya_shadow_intent"
+    assert event["predicted_value"] == "open_url"
+    assert event["existing_value"] == "open_url"
+    assert event["agreement"] is True
+
+
+def test_intent_processor_shadow_does_not_change_execution():
+    from app.domain.services.intent_processor import IntentProcessor
+    observer = MagicMock()
+    processor = IntentProcessor(decision_observer=observer)
+    intent = __import__("app.domain.models", fromlist=["Intent"]).Intent(
+        command_type=__import__("app.domain.models", fromlist=["CommandType"]).CommandType.TYPE_TEXT,
+        raw_input="digite olá",
+    )
+    executor = MagicMock()
+    executor.execute.return_value = {"message": "Texto digitado"}
+    with __import__("unittest.mock", fromlist=["patch"]).patch(
+        "app.domain.services.intent_processor.nexus"
+    ) as nexus_mock:
+        nexus_mock.resolve.return_value = executor
+        result = processor.execute({"intent": intent})
+    assert result == "Texto digitado"
+    observer.submit_question.assert_called_once()
+    executor.execute.assert_called_once()
+
+
+def test_task_queue_shadow_observes_without_changing_enqueue():
+    from app.application.services.agent_task_queue_service import AgentTaskQueueService
+    observer = MagicMock()
+    engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+    service = AgentTaskQueueService(engine, decision_observer=observer)
+    connection = MagicMock()
+    connection.execute.return_value.mappings.return_value.one.return_value = {
+        "task_id": "task-1", "task_type": "planning", "priority": 60, "status": "ready"
+    }
+    transaction = MagicMock()
+    transaction.__enter__.return_value = connection
+    engine.begin = MagicMock(return_value=transaction)
+    result = service.enqueue("task-1", "Plan migration", task_type="planning", priority=60)
+    assert result["task_id"] == "task-1"
+    observer.submit.assert_called_once()
+    assert observer.submit.call_args.args[1] == "planning"
