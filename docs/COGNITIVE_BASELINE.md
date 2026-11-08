@@ -424,3 +424,16 @@ A sessão do Jarvis Secure MCP Tunnel terminou durante a tentativa de continuar 
 - Advisors de performance reportaram 42 índices não utilizados (INFO). Não remover índices sem baseline de carga/consulta; tabelas vazias e pouco tráfego podem explicar parte do resultado.
 - A consulta read-only de logs Supabase não encontrou mensagens contendo “recurring worker” na janela de 24 horas. Isso não comprova que a feature flag esteja desligada; a flag Render não foi consultada nesta execução.
 - A lista de branches Supabase retornou somente main, status FUNCTIONS_DEPLOYED e preview_project_status ACTIVE_HEALTHY. Isso não substitui a validação específica do check Supabase Preview no GitHub.
+
+
+### Revalidação complementar — 2026-11-08 22:27 UTC
+
+- Main permanece em `6f2222a24b829c13db96c561c0691e50c070e494`.
+- A issue #708 foi fechada após revalidar os seis critérios da fronteira de evolução: política de paths, snapshot/candidato realmente executado em Docker, ausência de secrets/host files/rede no teste de integração, separação de permissões/credenciais, publisher não executor e documentação da fronteira. Evidências e limitações foram registradas no corpo da issue.
+- A API da branch confirmou novamente `main.protected=false`, `protection.enabled=false` e ausência de required checks. Issue #682 continua aberta; o conector não oferece escrita administrativa para corrigir branch protection.
+- PR #782: run 42529184685 success no head 75419ace; frontend, build Docker e pytest completo: 2.786 passed, 14 skipped, 8 warnings. O teste `tests/test_evolution_sandbox_docker_integration.py` é executado nesse workflow com `EVOLUTION_SANDBOX_IMAGE` configurado.
+- PR #783: os runs antigos 42524096133 e 42524145111 falharam porque o parser PowerShell encontrou tokens `}` inesperados e um pipe vazio no script. A branch recebeu correção; no head posterior, PowerShell validation 42524233622 e PR validation 42524233623 passaram. Não há falha atual pendente nessa PR.
+- PR #777: Task Queue Tests 42523333055 e PR Validation 42523333002 passaram. PR #781: PR Validation 42523339700 passou. PRs #782, #783, #777 e #781 continuam abertas; nenhuma foi merged nesta auditoria.
+- Issues ainda abertas observadas: #682 (proteção de main), #732 (reconciliação schema-aware/Preview do ledger) e #723 (histórico de RPCs condicionado à #732).
+- `data/roadmap_missions.json` permanece com `missions: []`; o workflow roadmap-driven faz no-op seguro e não chama LLM, sandbox ou publisher. C0 permanece aberto e C1 não iniciado.
+- Self Healing V3 e JARVIS PR Validation continuam versionados na main, sem alteração nesta auditoria. Não houve merge, deploy, migration, alteração de secrets/flags ou operação de produção.
