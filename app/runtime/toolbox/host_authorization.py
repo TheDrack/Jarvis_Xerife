@@ -103,8 +103,10 @@ class HostToolAuthorizationPolicy:
     - task_executor_resolver: active attempt's persisted worker identity;
     - approval_verifier: durable approval lookup with revocation/expiry semantics.
 
-    Missing evidence is a denial. This class does not silently fall back to
-    caller labels, user metadata, booleans, or an in-memory approval cache.
+    For worker execution, the persisted task owner becomes the effective
+    principal while the worker remains a separate executor identity. The
+    approval's approver session is intentionally independent from the later
+    worker execution session. Missing evidence is a denial.
     """
 
     def __init__(
