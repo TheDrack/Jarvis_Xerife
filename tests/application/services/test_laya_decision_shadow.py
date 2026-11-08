@@ -170,7 +170,7 @@ def test_task_queue_shadow_observes_without_changing_enqueue():
     engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
     service = AgentTaskQueueService(engine, decision_observer=observer)
     connection = MagicMock()
-    connection.execute.return_value.mappings.return_value.one.return_value = {
+    connection.execute.return_value.mappings.return_value.first.return_value = {
         "task_id": "task-1", "task_type": "planning", "priority": 60, "status": "ready"
     }
     transaction = MagicMock()
