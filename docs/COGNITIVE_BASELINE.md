@@ -456,3 +456,19 @@ This is a confirmed architecture gap, not a completed capability. It is the next
 - The ledger currently marks all three production C0 acceptance IDs as `pending`. The mission manifest remains empty, so scheduled evolution remains a safe no-op.
 - The selector tests now use the actual C0 IDs from `docs/COGNITIVE_ROADMAP.md` and include a repository-level test for the real empty manifest.
 - PR #782 remains open. This change is not a completed C0 capability until CI passes and the PR is reviewed/merged. C0 remains open; C1 remains unstarted.
+
+
+### Revalidação comportamental de percepção — main `ccaea371`
+
+- `collect_live_intelligence` executa Public Intelligence, OSIRIS e God's Eye em paralelo, preservando `SourceHealth` e sucesso parcial. `_collect_osiris` isola coleta de eventos e observações.
+- Consumidores encontrados: `intelligence_dashboard.py` (endpoint autenticado sob demanda), `jarvis_desktop_local.py` (endpoint local) e `IntelligenceRecurringWorker` (coleta/persistência recorrente quando ambas as flags estão habilitadas).
+- Testes localizados: falha de uma fonte sem descartar as demais; falha de observações OSIRIS sem descartar eventos; deduplicação de evento por identidade, seleção determinística em payload conflitante e independência da ordem; deduplicação de observação por entidade/provedor/instante, preservação de timestamps diferentes e exigência de proveniência.
+- Limite confirmado: os testes do worker usam `FakeReport`, `FakeHistory` e `FakeStore`; os testes do coletor/core/observações são separados. Não foi localizado um único teste que atravesse o coletor real, o core, o adaptador de histórico e o consumidor autenticado. O runtime recorrente também não foi comprovado nesta execução.
+- Portanto, a cobertura unitária dos componentes é substancial, mas C0 ainda precisa de um teste comportamental integrado e evidência operacional de persistência/consumidor. Não criar outro core, event bus, memória ou scheduler.
+
+### Gate de ordem do Cognitive Roadmap — PR #782
+
+- O selector exige que cada missão de fase posterior declare dependência de todos os IDs de aceitação das fases anteriores. C1 depende dos três critérios C0; fases posteriores ficam bloqueadas se uma fase anterior ainda não tiver critérios machine-readable.
+- Critério marcado `complete` no manifesto precisa de registro `verified` em STATUS, commit URL, Actions run URL, paths existentes de implementação/consumidor/testes e correspondência exata do target e testes declarados.
+- O parser valida formato e existência local dos caminhos; não consulta o GitHub para autenticar o commit ou a conclusão do run. A revisão humana permanece obrigatória.
+- O ledger mantém `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` como pending. A mudança está em PR aberta e não conclui C0.
