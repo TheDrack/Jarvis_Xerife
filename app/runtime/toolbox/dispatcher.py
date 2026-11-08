@@ -269,6 +269,7 @@ class ToolDispatcher:
                     envelope.arguments,
                     authorization_decision.principal_id,
                     envelope.scope,
+                    envelope.task_id,
                 )
                 with self._lock:
                     completed = self._completed.get(idempotency_ref)
@@ -616,10 +617,18 @@ class ToolDispatcher:
 
     @staticmethod
     def _arguments_digest(
-        arguments: dict[str, Any], caller: str, scope: str
+        arguments: dict[str, Any],
+        caller: str,
+        scope: str,
+        task_id: Optional[str] = None,
     ) -> str:
         canonical = json.dumps(
-            {"arguments": arguments, "caller": caller, "scope": scope},
+            {
+                "arguments": arguments,
+                "caller": caller,
+                "scope": scope,
+                "task_id": task_id,
+            },
             sort_keys=True,
             separators=(",", ":"),
             default=str,
@@ -755,6 +764,7 @@ class ToolDispatcher:
                     else "unauthenticated"
                 ),
                 request.scope,
+                request.task_id,
             ),
             cost_units=manifest.cost_units if manifest else 0,
             caller=(
