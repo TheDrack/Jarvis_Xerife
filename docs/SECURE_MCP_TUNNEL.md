@@ -38,12 +38,24 @@ Na raiz do repositório, execute:
 O configurador cria o perfil `jarvis-direct-chatgpt`, grava a referência à chave de runtime de forma protegida por DPAPI e registra a tarefa `Jarvis-OpenAI-Secure-MCP-Tunnel` para iniciar no logon interativo. A tarefa tem política de reinício para até cinco falhas, com intervalo de um minuto, e execução sem limite de tempo. O túnel é executado no contexto do usuário que configurou a chave; não copie o segredo para a conta SYSTEM nem execute o perfil DPAPI por outra conta.
 
 Ações disponíveis:
+- `diagnose`: coleta diagnóstico somente leitura de espaço livre no volume do perfil, cliente, perfil, existência do segredo DPAPI, tarefa agendada, porta MCP local, readiness, processos e logs recentes sanitizados. Não altera arquivos nem encerra processos.
 - `configure`: solicita o `tunnel_id` e a runtime key, valida o MCP local, cria o perfil e registra/inicia a tarefa.
 - `status`: mostra a presença do cliente, perfil, segredo protegido, tarefa e prontidão.
 - `start`: inicia a tarefa já configurada.
 - `run`: executa o cliente em primeiro plano para diagnóstico.
 - `stop`: interrompe a tarefa/cliente dedicado do Jarvis.
 - `uninstall`: remove a tarefa, o perfil dedicado e o segredo DPAPI do usuário. Use somente quando realmente quiser desinstalar esta integração.
+
+O modo `run` aguarda até 180 segundos pelo MCP local antes de iniciar o cliente, evitando que a tarefa de logon falhe apenas porque o supervisor interativo ainda está subindo. Os logs do cliente são rotacionados em 2 MB (três cópias) e passam por filtros básicos de segredo; não compartilhe logs sem revisão. A rotação só remove cópias antigas do próprio log do túnel. Nenhum arquivo temporário, download, cache ou conteúdo do usuário é apagado automaticamente.
+
+Recuperação quando o PC voltar a ficar acessível:
+
+```powershell
+.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action diagnose
+.\scripts\setup_chatgpt_jarvis_tunnel.ps1 -Action status
+```
+
+Se o volume do perfil estiver quase cheio, primeiro use Configurações → Sistema → Armazenamento → Recomendações de limpeza para revisar cada categoria manualmente. Não apague `Windows.old`, Downloads, pastas de projeto, perfis, chaves ou arquivos desconhecidos sem confirmar o conteúdo. A Microsoft documenta Storage Sense e as opções de limpeza do Windows; consulte as referências abaixo.
 
 O script não cria um túnel hospedado nem registra o app dentro do ChatGPT; essas duas etapas dependem da conta e do workspace do usuário. O Magic Executor pode chamar este script como etapa assistida, mas deve deixar a entrada da chave no terminal seguro e nunca capturar, registrar ou reenviar seu valor.
 
