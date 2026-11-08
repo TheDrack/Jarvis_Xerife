@@ -71,3 +71,47 @@ def test_shadow_observer_drops_samples_when_queue_is_full():
     finally:
         gate.set()
         observer.close(wait=True)
+
+
+def test_laya_adapter_rejects_http_hostname_prefix_spoof():
+    with pytest.raises(ValueError, match="loopback"):
+        LayaDecisionAdapter("http://127.0.0.1.attacker.invalid:8000")
+
+
+def test_llm_router_shadow_observation_does_not_change_selected_adapter():
+    from app.application.services.llm_router import LLMRouter
+
+    observer = MagicMock()
+    adapter = MagicMock()
+    adapter.execute.return_value = {"success": True, "response": "done"}
+    router = LLMRouter(decision_observer=observer)
+    router._resolve_adapter = lambda _name: adapter
+    router._is_reliable = lambda _name: True
+    router._is_available = lambda _adapter: True
+
+    result = router.execute({"task_type": "planning", "prompt": "plan a migration"})
+
+    assert result["success"] is True
+    assert result["routed_to"] == "MagicMock"
+    observer.submit.assert_called_once_with(
+        {"task_type": "planning", "prompt": "plan a migration"}, "planning"
+    )
+    adapter.execute.assert_called_once()
+
+
+def test_llm_router_continues_when_shadow_observer_fails():
+    from app.application.services.llm_router import LLMRouter
+
+    observer = MagicMock()
+    observer.submit.side_effect = RuntimeError("shadow unavailable")
+    adapter = MagicMock()
+    adapter.execute.return_value = {"success": True}
+    router = LLMRouter(decision_observer=observer)
+    router._resolve_adapter = lambda _name: adapter
+    router._is_reliable = lambda _name: True
+    router._is_available = lambda _adapter: True
+
+    result = router.execute({"task_type": "planning", "prompt": "plan safely"})
+
+    assert result["success"] is True
+    adapter.execute.assert_called_once()
