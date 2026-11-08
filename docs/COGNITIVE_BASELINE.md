@@ -411,3 +411,16 @@ A sessão do Jarvis Secure MCP Tunnel terminou durante a tentativa de continuar 
 - O selector roadmap-driven e a persistência de ownership avançaram para código integrado e testado.
 - C0 permanece aberto: o mapa ainda precisa identificar consumers/runtime para todas as capacidades críticas; a policy host-backed não tem composition root de produção; worker identity individual permanece sem credenciais provisionadas e o runtime segue no fallback legado; memória vetorial continua sem insert/readback real; o recurring worker segue desabilitado; o baseline comportamental integrado ainda precisa ser reexecutado com evidências atuais.
 - C1 — World Model permanece bloqueado pela ordem do roadmap. Não criar contratos ou armazenamento paralelos antes de fechar os gates C0.
+
+
+### Supabase runtime read-only — 2026-11-08 22:10 UTC
+
+- Projeto Supabase saibtpdehhprttqlgqdt: ACTIVE_HEALTHY, PostgreSQL 17.6.1.063.
+- Ledger remoto: 29 migrations. O diretório supabase/migrations em main também contém 29 arquivos SQL; comparação exata de version + name encontrou 29/29 correspondências, sem arquivo local ou entrada remota excedente. A última é 20261108120000 / agent_task_ownership. Isso atualiza o snapshot histórico de 28 migrations; não substitui a validação schema-aware nem a confirmação do workflow Preview exigidas pela issue #732.
+- jarvis_agent_tasks: 13 linhas; 0 com owner_id e 0 com created_by. Status: 8 completed, 3 cancelled e 2 ready. A migration/código de ownership existem, mas o banco ainda contém somente registros legados sem owner; o resolver de ownership deve negar esses casos até haver política explícita de compatibilidade/backfill.
+- jarvis_agents: 5 registros, 3 available e 2 offline. jarvis_agent_credentials: 0 registros. jarvis_routine_definitions: 0 registros.
+- jarvis_vector_memories: 0 registros. jarvis_intelligence_worker_runs: 0. A tabela de lease tem uma linha, mas worker_id e lease_expires_at são NULL. intelligence_event_snapshots e intelligence_observation_snapshots: 0 registros.
+- Nas seis tabelas C0 consultadas (agent_tasks, routine_definitions, agent_credentials, vector_memories, worker_lease e worker_runs), RLS está habilitado, não há policies e os grants observados são apenas para service_role; não foram observados grants anon/authenticated. O advisor classifica RLS enabled/no policy como INFO. O advisor global reportou 30 tabelas nessa condição; não foi feita auditoria de grants de todas as 30.
+- Advisors de performance reportaram 42 índices não utilizados (INFO). Não remover índices sem baseline de carga/consulta; tabelas vazias e pouco tráfego podem explicar parte do resultado.
+- A consulta read-only de logs Supabase não encontrou mensagens contendo “recurring worker” na janela de 24 horas. Isso não comprova que a feature flag esteja desligada; a flag Render não foi consultada nesta execução.
+- A lista de branches Supabase retornou somente main, status FUNCTIONS_DEPLOYED e preview_project_status ACTIVE_HEALTHY. Isso não substitui a validação específica do check Supabase Preview no GitHub.
