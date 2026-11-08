@@ -34,6 +34,7 @@ class TestFineTuneDatasetCollectorCollect:
         """Helper: cria um mock de ThoughtLog."""
         t = MagicMock()
         t.success = success
+        t.status = "internal_monologue"
         t.problem_description = problem
         t.solution_attempt = solution
         # Define ambos os campos de reward para compatibilidade com _is_successful()
@@ -81,6 +82,34 @@ class TestFineTuneDatasetCollectorCollect:
     def test_collect_excludes_success_without_explicit_reward(self, collector):
         """A success flag alone is not evidence strong enough for training."""
         thought = self._make_thought("prompt", "solution", success=True, reward=None)
+
+        mock_tls = MagicMock()
+        mock_tls.get_recent_thoughts.return_value = [thought]
+
+        with patch("app.application.services.finetune_dataset_collector.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = mock_tls
+            pairs = collector.collect(min_reward=0.0)
+
+        assert pairs == []
+
+    def test_collect_excludes_records_without_an_internal_status(self, collector):
+        """Unknown provenance must not be silently treated as internal training data."""
+        thought = self._make_thought("prompt", "solution", success=True, reward=0.9)
+        thought.status = None
+
+        mock_tls = MagicMock()
+        mock_tls.get_recent_thoughts.return_value = [thought]
+
+        with patch("app.application.services.finetune_dataset_collector.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = mock_tls
+            pairs = collector.collect(min_reward=0.0)
+
+        assert pairs == []
+
+    @pytest.mark.parametrize("reward", [float("nan"), float("inf"), float("-inf"), True, "invalid"])
+    def test_collect_excludes_invalid_reward_values(self, collector, reward):
+        """Non-finite, boolean, and non-numeric rewards are not valid evidence."""
+        thought = self._make_thought("prompt", "solution", success=True, reward=reward)
 
         mock_tls = MagicMock()
         mock_tls.get_recent_thoughts.return_value = [thought]
@@ -153,6 +182,7 @@ class TestFineTuneDatasetCollectorExport:
         """Pares coletados devem incluir campo 'reward' com valor do ThoughtLog."""
         t = MagicMock()
         t.success = True
+        t.status = "internal_monologue"
         t.problem_description = "my prompt"
         t.solution_attempt = "def f(): pass"
         t.reward_received = 0.8
@@ -173,6 +203,7 @@ class TestFineTuneDatasetCollectorExport:
         """Pares com reward < 0.6 devem ser filtrados pelo REWARD_FLOOR."""
         t_low = MagicMock()
         t_low.success = True
+        t_low.status = "internal_monologue"
         t_low.problem_description = "prompt"
         t_low.solution_attempt = "code"
         t_low.reward_received = 0.4
@@ -180,6 +211,7 @@ class TestFineTuneDatasetCollectorExport:
 
         t_high = MagicMock()
         t_high.success = True
+        t_high.status = "internal_monologue"
         t_high.problem_description = "prompt2"
         t_high.solution_attempt = "code2"
         t_high.reward_received = 0.7
