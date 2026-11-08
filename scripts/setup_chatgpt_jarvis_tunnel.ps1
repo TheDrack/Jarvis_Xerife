@@ -115,7 +115,14 @@ function Get-TunnelDiagnostics {
         $ready | ConvertTo-Json -Depth 6
     } catch { Write-Output 'Tunnel readiness endpoint: not responding (not conclusive if tunnel is not running)' }
     Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match '^tunnel-client\.exe
+        Where-Object { $_.Name -like 'tunnel-client.exe' } |
+        Select-Object ProcessId,Name,SessionId
+    if (Test-Path -LiteralPath $LogFile) {
+        $log = Get-Item -LiteralPath $LogFile
+        Write-Output ("Log bytes: " + $log.Length)
+        Get-Content -LiteralPath $LogFile -Tail 20 | ForEach-Object { Protect-LogText $_ }
+    } else { Write-Output 'Tunnel log: not created yet' }
+}
 function Invoke-TunnelDoctor {
     Set-RuntimeKey
     try {
