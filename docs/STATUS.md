@@ -1,29 +1,29 @@
 # JARVIS — Status do Projeto
 
 **Versão:** 2.0.0  
-**Revisão documental:** 2026-11-07
-**Escopo desta revisão:** reconciliar C0 após os merges #770/#773, confirmar a migration no Supabase e o runtime Render, auditar a fronteira de autoevolução e verificar se o selector agendado consome o Cognitive Roadmap.
+**Revisão documental:** 2026-11-08
+**Escopo desta revisão:** revalidar C0 após os merges #775/#776/#778/#779/#780; confirmar o selector roadmap-driven, ownership da fila, fronteira host-backed e CI recente. Snapshot de código em 2026-11-08; runtime/produção só são declarados quando há evidência própria.
 
 ## Visão geral e qualidade da evidência
 
 | Área | Estado sustentado pelas evidências disponíveis | Limite / próxima validação |
 |---|---|---|
 | Arquitetura hexagonal e Nexus DI | Implementados e cobertos por testes segundo a auditoria de entregas | Reexecutar CI no HEAD atual antes de usar métricas antigas como estado corrente |
-| Auto-evolução e self-healing | Gatekeeper aplica protected prefixes; EvolutionSandbox substitui o alvo em snapshot e testa em Docker hardened; publisher separado valida digest/source/path e não executa candidato. PRs #756/#757 integraram a fronteira à main. | Na `main` (`82ca2ac`), o workflow ainda usa o selector legado e bloqueia antes de LLM/Docker por ausência de `target_file`. PR #775 está aberta, não merged: introduz `RoadmapMissionSelector` + manifesto `data/roadmap_missions.json`, limita targets a `app/`, protege arquivos exatos do control plane pela política compartilhada, preserva o criterion ID no artefato e bloqueia PR duplicada aberta. O manifesto está intencionalmente vazio; após merge o workflow continuará em idle até existir mapeamento revisado de critério, alvo existente e testes. Self Healing e PR Validation permanecem inalterados. |
+| Auto-evolução e self-healing | Gatekeeper, snapshot descartável em Docker hardened e publisher privilegiado separado estão integrados. PR #775 foi merged em 2026-11-08: o workflow usa RoadmapMissionSelector e data/roadmap_missions.json, não o selector legado. | O manifesto está vazio; o selector retorna no-op antes de LLM/Docker. Nenhuma missão C0 tem target/testes revisados para geração. Self Healing V3 e PR Validation continuam presentes e inalterados. Não declarar autoevolução funcional enquanto não houver missão aprovada e validação supervisionada. |
 | JarvisDevAgent | Fluxo de desenvolvimento e registro de jobs existem | A auditoria identificou promessas não cumpridas: AdapterRegistry sem consumidor de produção, execução de código existente não priorizada de forma comprovada e geração automática de pipelines não entregue |
 | PipelineRunner | Runner consome pipelines YAML; a main agora inclui etapas explícitas tool_id via dispatcher pela PR #681 | Migração de todos os passos legados e validação de produção ainda pendentes |
-| Universal Toolbox | Registry versionado canônico, dispatcher fail-closed com JSON Schema, toolchains DAG, adapters Telegram/Drive/rede passiva e audit JSONL local implementados e integrados à main pela PR #681 (merge em 2026-11-02) | No HEAD da PR `8dd5cd1734a6a42a6dc208691d13a416061badee`, CI Linux/Python 3.11.17 e Windows/Python 3.12.10 aprovou a suíte completa: 2043 passed, 12 skipped em cada plataforma. Não há reviews nem threads de revisão registradas na PR #681; revisão técnica/segurança, policy host-backed, auditoria/estado distribuídos, idempotência distribuída e migração dos demais conectores permanecem pendentes. |
+| Universal Toolbox | Registry, dispatcher fail-closed, toolchains DAG e audit JSONL estão integrados. PR #779 adicionou HostToolAuthorizationPolicy, exportada pelo pacote e coberta por testes. | Não foi localizada instanciação da policy em composition root de produção; resolvers confiáveis de principal, owner, executor e aprovação ainda precisam ser conectados. Não há executores reais habilitados; ToolDispatcher permanece fail-closed. |
 | Universal Intelligence | Contratos de eventos/observações, Core 0.2, adaptadores GEV MCP/OSIRIS, coleta sob demanda, histórico append-only e schema/RPCs do recurring worker estão integrados. O ledger remoto tem 28 versões e inclui a migration de identidade 20261107183000; a comparação integral local/remota 28/28 não foi refeita nesta execução. | O recurring worker segue desabilitado por feature flags no Render; logs após o deploy atual confirmam `Universal Intelligence recurring worker disabled by feature flags`. Lease sem owner e zero execuções. A ativação exige autorização operacional e prova de uma execução supervisionada com persistência/readback. GEV/OSIRIS continuam exigindo health checks live; GDELT pode responder 429 e AISSTREAM_API_KEY não está configurada. |
 | Memória vetorial | PR #769 adicionou `SupabaseVectorMemoryStore`, escopo por usuário, redaction recursiva de metadata e readback após reinício; 38 testes direcionados e 16 pgTAP passaram. | A tabela de produção existe com RLS; service_role tem SELECT/INSERT/DELETE sem UPDATE e roles de cliente não têm SELECT. A tabela contém 0 linhas, portanto escrita/readback real pelo runtime ainda não foi demonstrada. Sem service-role, o adapter permanece em fallback volátil. |
-| Inventário de capabilities | data/capabilities.json contém 102 registros; 34 pendentes, 34 com auto=true e nenhum target_file. O primeiro elegível pelo seletor legado é CAP-058. | Esse catálogo não representa os critérios C0–C8 e não é consumido pelo Cognitive Roadmap. Não usar status/auto como evidência comportamental; criar manifesto de missão revisado e target explícito antes de qualquer evolução. |
+| Inventário de capabilities | data/capabilities.json mantém 102 registros legados; 34 pendentes, 34 com auto=true e nenhum target_file no snapshot anterior. | O catálogo legado não seleciona missões cognitivas; serve apenas para validar o CAP de compatibilidade quando uma missão do manifesto existe. A seleção agendada usa data/roadmap_missions.json, atualmente vazio. |
 | Soldier Mesh / edge | Há modelos, registry, adapters e testes relacionados | Continua parcial até existir validação ponta a ponta com dispositivos reais |
 | Otimização econômica | CostTrackerAdapter está descrito como integrado ao llm_router | ResourceOptimizer não foi encontrado pela auditoria; não marcar fase como completa |
-| Coordenação multiagente | Contratos, scheduler, transporte, fila e workers integrados. PR #761 valida message fencing em dois processos; PR #766 valida task claim/renew/execute/complete em dois processos independentes contra Supabase isolado. PR #773 foi merged com credencial opaca por agente, rotação/revogação, autenticação dupla HTTP e grants server-side. | CI da PR #773 passou: 2.717 passed/14 skipped em Linux, 2.716 passed/15 skipped em Windows e 8 testes direcionados. A migration está aplicada; a tabela de credenciais tem RLS, ACL service_role e 0 registros. Logs Render confirmam fallback Supabase service-role e três workers com text_reasoning. Ownership de tarefas, attestation dinâmica, executores reais e ToolAuthorizationPolicy host-backed continuam pendentes. |
+| Coordenação multiagente | Contratos, scheduler, transporte, fila e workers estão integrados. PR #776 persistiu created_by/owner_id derivados da identidade autenticada para tarefas e rotinas; task_blocked consulta o owner persistido. PR #773 adicionou credenciais opacas por agente e autenticação HTTP. | A migration de credenciais está aplicada, mas a tabela permanece com 0 credenciais e os workers Render seguem no fallback Supabase service-role. PR #779 adicionou a policy host-backed, porém não há composition root de produção localizado. Executores reais, attestation dinâmica e E2E de autorização continuam pendentes. |
 | Planos declarativos | Interpretador, integração no orquestrador, autorizador e adaptador de diário estão no repositório | Execução exige plano estruturado, allowlist e diário durável. Ações sensíveis permanecem bloqueadas até existir protocolo confiável de aprovação/retomada |
 | Diário de planos no Supabase | Migrações e grants registrados; ledger remoto 28 versões, incluindo 20261107183000; comparação integral 28/28 não refeita nesta execução | Insert/readback pelo adaptador em runtime ainda precisa de prova; existência de tabela não comprova integração operacional |
 | Catálogo comum de agentes | Catálogo de skills/connectors e protocolo de memória existem; quatro skills portáteis foram localizadas no repositório | A leitura automática no início de toda conversa depende de cada host/harness e precisa ser validada por runtime |
 | Deploy Render | `Jarvis-api` está live no commit `1ad74752a6393cb8f0de3614d74be0994ece940b`; deploy concluído em 2026-11-07 19:01:33 UTC e inclui o merge da PR #773. | Logs após o deploy confirmam fallback legado Supabase service-role para os três workers e Universal Intelligence recurring worker desabilitado por feature flags. A identidade HTTP individual está no código, mas não foi ativada no runtime. Memória vetorial segue sem linhas. |
-| Governança da branch main | **Proteção ausente; issue #682 aberta** | API do GitHub confirmou `protected=false`, `protection.enabled=false` e zero rulesets. Exigir PR e o check de validação sempre executado; o workflow path-filtered da fila precisa de agregador antes de ser obrigatório globalmente. |
+| Governança da branch main | **Proteção ausente — confirmado em 2026-11-08** | API da branch main retornou protected=false, protection.enabled=false e nenhum required check. Issue #682 permanece aberta; exigir PR e validação sempre executada sem tornar workflow path-filtered obrigatório globalmente sem agregador. |
 | Segurança Supabase / RLS legado | **Mitigação aplicada em produção; issue #726 fechada** | A migration `lock_down_legacy_public_tables` removeu a policy ampla e revogou grants de tabela e coluna para `PUBLIC`, `anon` e `authenticated` nas sete tabelas. Verificação dos catálogos: zero grants de cliente, zero policies amplas e 28/28 grants CRUD preservados para `service_role`. O acesso direto de clientes permanece bloqueado até existir API com ownership explícito. |
 
 ### Evidência operacional Supabase — 2026-11-07 (estado atual)
@@ -58,7 +58,7 @@
 | Fase / trilha | Estado | Evidência e critério para avançar |
 |---|---|---|
 | Phase 1 — Arquitetura hexagonal + Nexus DI | **Implementada; testes documentados** | Auditoria anterior registrou resolução por ID, discovery e testes de contrato/circuit breaker. Revalidar no HEAD atual para atualizar métricas. |
-| Phase 2 — Auto-evolução + self-healing | **Parcial / fronteira de execução corrigida; scheduler roadmap-driven bloqueado** | Gatekeeper, protected-path policy, Docker snapshot sem rede/secrets e publisher separado estão integrados. O workflow agendado ainda usa o inventário legado sem target_file e não lê o Cognitive Roadmap; permanece em blocked/no-op. Não considerar a autoevolução funcional nem reativar mutação até existir manifesto/selector C0 validado e execução controlada. |
+| Phase 2 — Auto-evolução + self-healing | **Parcial / selector roadmap-driven integrado; geração permanece em idle seguro** | PR #775 integrou RoadmapMissionSelector e manifesto vazio. O workflow consome o Cognitive Roadmap e não usa o catálogo legado para escolher missões; sem mapeamento revisado, não invoca LLM/Docker/publicador. Preservar Self Healing e PR Validation como trilha transversal. |
 | Phase 3 — JarvisDevAgent + AdapterRegistry + PipelineRunner | **Parcial em termos de entrega comportamental** | Runner existe; auditoria registrou que AdapterRegistry não era consumido em produção e geração automática de pipelines não estava implementada. Não manter um selo global de completo sem fechar esses critérios. |
 | Phase 4 — Soldier Mesh / Edge Computing | **Em progresso** | Existem componentes e testes, mas não foi comprovada execução ponta a ponta com dispositivo real. |
 | Phase 5 — Economia de recursos | **Parcial** | CostTrackerAdapter é consumido pelo llm_router; ResourceOptimizer permanece pendente na auditoria. |
@@ -66,7 +66,7 @@
 | Trilha — harness multiagente e fila compartilhada | **Implementação parcial** | Contratos, scheduler, transporte, fila e workers existem. O worker Supabase de tarefas já atualiza heartbeat e renova lease com testes unitários; ainda faltam supervisão contínua do processo, deduplicação/recovery comprovados e E2E entre dois runtimes reais. |
 | Trilha — execução declarativa auditável | **Código integrado; validação de produção pendente** | PRs #610–#613 integraram TaskRunner, limites de aprovação, diário Supabase e orquestrador. Confirmar deploy atual, gravação real e comportamento runtime. |
 | Trilha — descoberta universal de skills/connectors | **Documentação atualizada; adoção por host pendente** | Catálogo comum agora lista skills e famílias de capacidades; cada host deve carregar o catálogo e descobrir ferramentas vivas. Não pressupor injeção automática em todos os provedores. |
-| Trilha — Universal Toolbox / Toolchains | **Implementação integrada à main; revisão de segurança e produção pendentes** | Issue #680. Registry, dispatcher fail-closed, toolchains DAG e integração inicial do PipelineRunner foram integrados pela PR #681 em 2026-11-02. O HEAD validado `8dd5cd1734a6a42a6dc208691d13a416061badee` passou a suíte completa em Linux/Python 3.11.17 e Windows/Python 3.12.10: 2043 passed, 12 skipped em cada plataforma. A PR não tem reviews nem threads registradas. Permanecem pendentes revisão técnica/segurança, policy host-backed, estado/audit distribuídos, migração gradual e validação runtime. |
+| Trilha — Universal Toolbox / Toolchains | **Registry/dispatcher integrados; policy host-backed implementada, integração de produção pendente** | PR #681 integrou registry/dispatcher/toolchains; PR #779 adicionou HostToolAuthorizationPolicy e testes. Não foi localizado consumidor em composition root; faltam resolvers host confiáveis, executores invocáveis, estado/audit distribuídos e validação runtime. |
 | Trilha — Jarvis Universal Intelligence | **Coleta sob demanda integrada; recurring worker permanece desabilitado** | O ledger remoto contém 28 versões, incluindo a migration de identidade de worker; a reconciliação local/remota completa 28/28 não foi refeita nesta execução. As tabelas/RPCs do recurring worker estão presentes, mas Render logs confirmam feature flag desabilitada, lease sem owner e zero execuções. A memória vetorial tem schema/ACL implantados, porém zero linhas; insert/readback do runtime não foi demonstrado. Próximos gates: autorização operacional, execução supervisionada com lease/run/persistência/readback e health checks live dos providers. |
 
 ## Regra operacional permanente — correção automática de PRs
@@ -81,7 +81,7 @@ O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.
 
 | Marco | Capacidade | Estado inicial | Critério principal |
 |---|---|---|---|
-| C0 | Auditoria de capacidades e baseline comportamental | **Em andamento — identidade HTTP ainda não ativa; autoevolução agendada em no-op seguro** | [COGNITIVE_BASELINE.md](COGNITIVE_BASELINE.md) registra PR #773, CI verde, migration aplicada e runtime Render ainda no fallback service-role. O workflow agendado não consome o Cognitive Roadmap: usa data/capabilities.json, que tem 0 target_file, e o selector também não propaga esse campo. Permanecem manifesto/selector C0, ownership persistido, ToolAuthorizationPolicy host-backed e executores reais. |
+| C0 | Auditoria de capacidades e baseline comportamental | **Em andamento — selector roadmap-driven integrado; manifesto vazio; policy host-backed sem consumidor de produção** | PR #775 integra seleção por manifesto fail-closed; PR #776 persiste owner/creator; PR #779 implementa/testa a policy, ainda sem composition root. Permanecem baseline comportamental integrado, mapa completo de consumers/runtime, identidade HTTP ativa, executores reais autorizados, insert/readback vetorial e worker recorrente supervisionado. C1 não inicia até fechar C0. |
 | C1 | World Model | **Auditoria necessária** | Entidades, relações, observações, proveniência, identidade conservadora e histórico temporal reconstruível |
 | C2 | Cognitive Memory | **Parcial / auditoria necessária** | Consolidar memórias episódica, semântica, procedural e prospectiva com recuperação contextual, conflitos e retenção |
 | C3 | Perception Engine | **Parcial / auditoria necessária** | Integrar fontes existentes em pipeline normalizado, resiliente, idempotente e observável |
@@ -96,19 +96,18 @@ O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.
 **Próximo passo:** concluir C0 e especificar os contratos do World Model. Não criar um segundo sistema de memória, event bus, scheduler ou grafo antes de comprovar que os existentes não atendem ao contrato. Migrations e flags de produção permanecem fora desta atualização documental.
 
 ## Pendências prioritárias sustentadas pela auditoria
-1. Reexecutar o baseline comportamental C0 com evidências atuais; não usar contagens históricas como métricas correntes.
-2. **Roadmap-driven autoevolution:** criar manifesto de missão C0 revisado com criterion_id, target_file confiável, testes, dependências, risco e resultado esperado; fazer o selector consumir o manifesto, não data/capabilities.json, e propagar o target_file ao workflow. Preservar blocked/no-op até o contrato estar válido. Não inferir alvo pelo LLM.
-3. Persistir owner/creator nas tarefas da fila a partir do usuário autenticado e propagar o proprietário aos eventos de iniciativa; cobrir isolamento, tarefas legadas e atribuição correta de task_blocked.
-4. Integrar executores reais ao ToolDispatcher e registrar ToolAuthorizationPolicy host-backed com principal, sessão, escopo e aprovação verificáveis; manter fail-closed até então.
-5. Provisionar tokens individuais de worker somente por fluxo administrativo autorizado e secret store; comprovar heartbeat/claim/finish/release HTTP e retirar o fallback service-role apenas após validação e rollout aprovado.
-6. Validar multiagente ponta a ponta com dois runtimes independentes no runtime de produção/teste controlado, supervisão, deduplicação e recuperação de lease; workers atuais continuam no fallback service-role.
-7. Guard de provider nas RPCs Supabase de claim: implementação aplicada e verificada em 2026-11-05 nas duas definições remotas, com ACL restrita a service_role e pgTAP isolado 29/29 (PR #729). Issue #723 permanece aberta apenas pelo drift histórico, acompanhado em #732; não repetir a implementação do guard.
-8. Provar insert/readback vetorial real com service_role em execução controlada; tabela permanece vazia. Não executar db push nem migration repair sem divergência nova comprovada.
-9. Validar em cada harness se catálogo e skills são carregados no bootstrap de uma conversa nova.
-10. Proteger main com PR obrigatório e validação CI obrigatória, conforme issue #682. Última evidência explícita, de 2026-11-05, indicava main sem proteção; o estado atual não foi reconsultado por falta de endpoint administrativo no conector.
-11. Avançar a etapa global de seleção de modelos: adaptar LLMRouter/AIGateway/ModelOrchestrator ao port comum sem remover adapters existentes; introduzir seleção por capabilities/modalities e política de custo/latência no scheduler, com testes de concorrência, timeout, cancelamento, usage e falhas de provider.
-
-
+1. **Concluir C0 — capability map e baseline comportamental:** para cada capacidade crítica, registrar caminho de código, consumidor real, testes e nível de verificação. Reexecutar o fluxo percepção → collector → IntelligenceCore → endpoint com falha parcial, duplicatas, reordenação e proveniência; distinguir CI de runtime.
+2. **Integrar autorização host-backed no composition root:** PR #779 adicionou HostToolAuthorizationPolicy e testes, mas não foi localizada instanciação em produção. Implementar resolvers host-owned de principal/sessão, owner, executor/attempt e aprovação durável; manter fail-closed até existirem.
+3. **Revisar o primeiro mapeamento de missão C0:** PR #775 integrou selector/manifesto; data/roadmap_missions.json continua vazio. Só adicionar missão ready após revisão humana de criterion, target Python existente e não protegido, testes de regressão, dependências, risco baixo e resultado esperado. Não inferir target por LLM.
+4. **Validar ownership ponta a ponta:** PR #776 persiste owner/creator autenticado e usa owner persistido para task_blocked. Ainda verificar compatibilidade de tarefas legadas, isolamento multiusuário e propagação até os consumidores de iniciativa/rotina em runtime.
+5. **Ativar identidade individual de workers somente após autorização operacional:** a migration está aplicada, mas há 0 credenciais provisionadas e Render usa fallback Supabase service-role. Provisionar via fluxo aprovado/secret store e comprovar heartbeat/claim/finish/release HTTP; não alterar secrets nesta trilha.
+6. **Validar multiagente E2E:** dois runtimes independentes, ownership, fencing, renovação/recovery de lease, executor real e autorização vinculada à tentativa.
+7. **Provar memória vetorial em runtime:** insert/readback real com service role, idempotência, retenção/erasure e isolamento; a tabela permanece vazia no último snapshot verificado.
+8. **Manter Universal Intelligence recurring worker desabilitado** até autorização operacional e uma execução supervisionada com lease/run/persistência/readback/liberação comprovados.
+9. **Manter treinamento desabilitado:** PR #780 endureceu elegibilidade de amostras, mas consentimento, redaction completa, retenção, isolamento multi-tenant e ground truth ainda não estão demonstrados.
+10. **Proteger main:** API confirmou protected=false e nenhum required check em 2026-11-08; issue #682 permanece aberta.
+11. **Reconciliar histórico de migrations:** issue #732 continua aberta; não executar repair/reset/db push nem reescrever histórico sem plano schema-aware revisado.
+12. **Validar bootstrap e roteamento de modelos:** confirmar carregamento de skills/connectors em cada harness e integrar LLMRouter/AIGateway/ModelOrchestrator ao port comum sem remover adapters, com testes de concorrência, timeout, cancelamento, usage e falhas de provider.
 
 ### Estado da seleção de autoevolução — 2026-11-07
 
@@ -139,3 +138,30 @@ O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.
 ## Regra de atualização do roadmap
 
 Só marcar como concluído quando os critérios de aceitação correspondentes tiverem evidência verificável. Para funcionalidades de produção, exigir também confirmação de deploy, saúde e conectividade reais. Um arquivo, skill, migração, PR merged ou campo status=complete no inventário, isoladamente, não comprova comportamento funcional.
+
+
+## Revalidação técnica — 2026-11-08 21:54 UTC
+
+**Base consultada:** main em 6f2222a24b829c13db96c561c0691e50c070e494. PRs abertas observadas: #783 (recuperação do MCP Tunnel em disco cheio), #782 (refresh C0), #777 (Laya shadow mode) e #781 (referência DeepSeek). Issues abertas observadas: #708 (fronteira de autoevolução), #732 (ledger Supabase), #682 (proteção de main) e #723 (RPCs/ledger provider-aware). Não foram criadas issues nem PR duplicadas.
+
+**Roadmap e código**
+- PR #775 merged: RoadmapMissionSelector é consumido pelo workflow agendado; manifesto vazio e testes confirmam no-op seguro. O inventário data/capabilities.json deixou de ser fonte de seleção.
+- PR #776 merged: enqueue deriva owner da identidade autenticada e persiste created_by/owner_id; sinal task_blocked usa o owner consultado da tarefa.
+- PR #779 merged: HostToolAuthorizationPolicy está implementada, exportada e testada; não foi localizada instanciação em composition root de produção. Não declarar autorização de ferramentas operacional.
+- PRs #778/#780: arquitetura Wake/Sleep é documental; filtro de dataset foi endurecido, mas treinamento permanece desabilitado e gates de privacidade não comprovados.
+- docs/COGNITIVE_ROADMAP.md não foi alterado. C0 permanece aberto; C1 não iniciado.
+
+**Actions/CI**
+- Main commit #779: Task Queue Tests run 42526509992 — success; Auto-Documentation run 42526509993 — success.
+- PR #777: runs 42523333002 e 42523333055 — success.
+- PR #781: run 42523339700 — success.
+- PR #783: runs 42524233623 e 42524233622 — success no head consultado.
+- PR #782: run 42523443734 executou frontend, build Docker e pytest completo com success no head anterior; a atualização documental desta PR precisa de novos checks.
+- Não foi executado pytest local nesta sessão. Não usar os checks antigos como evidência do novo commit da PR #782.
+- Comentários do Codex em #777/#779/#781/#783 reportaram limite de uso; não há revisão automatizada independente concluída para esses heads.
+
+**Limites e segurança**
+- API da branch main: protected=false, protection.enabled=false; não há required checks. Issue #682 continua aberta.
+- homeostase.yml e jarvis-pr-validation.yml continuam versionados na main e não foram alterados.
+- Nenhum merge, deploy, migration, alteração de secrets, feature flag ou ação destrutiva foi executado.
+- Não foi possível confirmar o valor atual de EVOLUTION_ENABLED, uma execução schedule específica, composição de produção da policy host-backed, credenciais individuais de worker ou insert/readback vetorial em runtime.

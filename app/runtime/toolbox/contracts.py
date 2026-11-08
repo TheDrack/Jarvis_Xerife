@@ -40,6 +40,8 @@ class ToolRequest(BaseModel):
     approval_id: Optional[str] = Field(
         default=None, min_length=1, max_length=256
     )
+    task_id: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    attempt_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
     idempotency_key: Optional[str] = None
     correlation_id: Optional[str] = None
     request_id: str = Field(default_factory=lambda: uuid4().hex)
@@ -78,6 +80,8 @@ class ToolAuthorizationDecision(BaseModel):
     capability: str = Field(min_length=1)
     scope: str = Field(min_length=1)
     operation: str = Field(min_length=1)
+    task_id: Optional[str] = None
+    attempt_id: Optional[str] = None
     approval_id: Optional[str] = None
     correlation_id: Optional[str] = None
     expires_at: datetime
@@ -101,6 +105,8 @@ class ToolExecutionEvent(BaseModel):
     principal_id: Optional[str] = None
     session_id: Optional[str] = None
     approval_id: Optional[str] = None
+    task_id: Optional[str] = None
+    attempt_id: Optional[str] = None
     tool_id: str
     tool_version: Optional[str] = None
     provider: Optional[str] = None

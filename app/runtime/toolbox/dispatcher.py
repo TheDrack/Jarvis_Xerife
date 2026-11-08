@@ -76,9 +76,9 @@ class ToolDispatcher:
         self._event_sink = event_sink
         self._max_idempotency_entries = max(1, int(max_idempotency_entries))
         self._lock = threading.RLock()
-        self._inflight: dict[tuple[str, str, str, str, str], str] = {}
+        self._inflight: dict[tuple[str, str, str, str, str, str], str] = {}
         self._completed: dict[
-            tuple[str, str, str, str, str], tuple[str, ToolResult]
+            tuple[str, str, str, str, str, str], tuple[str, ToolResult]
         ] = {}
         self._rate_calls: dict[str, Any] = {}
         self._breaker_failures: dict[str, int] = {}
@@ -263,12 +263,14 @@ class ToolDispatcher:
                     manifest.tool_id,
                     manifest.version,
                     requested_capability,
+                    envelope.task_id or "",
                     envelope.idempotency_key,
                 )
                 idempotency_digest = self._arguments_digest(
                     envelope.arguments,
                     authorization_decision.principal_id,
                     envelope.scope,
+                    envelope.task_id,
                 )
                 with self._lock:
                     completed = self._completed.get(idempotency_ref)
@@ -575,6 +577,8 @@ class ToolDispatcher:
             "capability": requested_capability,
             "scope": request.scope,
             "operation": manifest.operation,
+            "task_id": request.task_id,
+            "attempt_id": request.attempt_id,
         }
         mismatches = [
             field
@@ -614,10 +618,18 @@ class ToolDispatcher:
 
     @staticmethod
     def _arguments_digest(
-        arguments: dict[str, Any], caller: str, scope: str
+        arguments: dict[str, Any],
+        caller: str,
+        scope: str,
+        task_id: Optional[str] = None,
     ) -> str:
         canonical = json.dumps(
-            {"arguments": arguments, "caller": caller, "scope": scope},
+            {
+                "arguments": arguments,
+                "caller": caller,
+                "scope": scope,
+                "task_id": task_id,
+            },
             sort_keys=True,
             separators=(",", ":"),
             default=str,
@@ -753,6 +765,7 @@ class ToolDispatcher:
                     else "unauthenticated"
                 ),
                 request.scope,
+                request.task_id,
             ),
             cost_units=manifest.cost_units if manifest else 0,
             caller=(
@@ -775,6 +788,8 @@ class ToolDispatcher:
                 if authorization_decision
                 else None
             ),
+            task_id=request.task_id,
+            attempt_id=request.attempt_id,
             scope=request.scope,
             status=result.status,
             started_at=started_at,

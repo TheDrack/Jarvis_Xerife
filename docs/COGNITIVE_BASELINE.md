@@ -374,3 +374,40 @@ A sessão do Jarvis Secure MCP Tunnel terminou durante a tentativa de continuar 
 ### Estado de C0
 
 **C0 permanece aberto.** As mudanças acima reduzem riscos específicos, mas não completam a auditoria comportamental, a comprovação de persistência operacional, a política de dados de treinamento nem a validação ponta a ponta dos providers e workers. A próxima implementação deve continuar a partir das lacunas da seção 7, sem criar um segundo sistema de memória, scheduler ou event bus.
+
+
+### Revalidação da main — 2026-11-08 21:54 UTC
+
+**Snapshot consultado:** main em 6f2222a24b829c13db96c561c0691e50c070e494. O snapshot inclui os merges #775, #776, #778, #779 e #780. Ele comprova estado de código e CI; não equivale a validação de runtime ou produção.
+
+**Autoevolução orientada pelo Cognitive Roadmap**
+- A PR #775 foi merged em 2026-11-08. app/application/services/roadmap_mission_selector.py é consumido por .github/workflows/auto_evolution_triggerV2.yml; o workflow não seleciona mais missões pelo inventário legado.
+- data/roadmap_missions.json existe e contém missions: [], com hold reason explícito de que C0 permanece aberto. O selector retorna None para manifesto vazio antes de consultar o catálogo legado; o teste test_empty_manifest_is_a_safe_noop_without_legacy_inventory_lookup comprova esse comportamento.
+- Os testes do selector cobrem fase/heading/criterion, CAP de compatibilidade, risco, target Python existente sob app/, caminhos protegidos/traversal, testes obrigatórios, dependências e seleção determinística. tests/test_auto_evolution_workflow_contract.py confirma que o workflow usa o selector e mantém o manifesto vazio em no-op.
+- Portanto, a trilha está conectada ao roadmap, mas nenhuma missão está aprovada para geração. Quando o gate EVOLUTION_ENABLED permitir o ciclo, o manifesto vazio leva a action=idle; não há candidato, Docker ou publicação. O valor atual da variável de repositório e uma execução schedule específica não foram verificados nesta leitura.
+- Não foi acrescentada missão ready: ainda não há mapeamento revisado que justifique um target de código de baixo risco para um critério C0 sem inferir caminhos.
+
+**Ownership de tarefas e rotinas**
+- A PR #776 foi merged. agent_tasks.py deriva owner_id da identidade autenticada no enqueue e grava created_by/owner_id; o serviço persiste esses campos e impede reutilização de chave idempotente por outro owner.
+- Para task_blocked, o endpoint consulta get_task_owner(task_id) e emite o sinal usando o owner persistido, não a identidade do worker/chamador. Há testes de persistência e isolamento de idempotência.
+- Isso comprova o caminho de código e seus testes; não comprova cobertura de todas as tarefas legadas nem uma notificação ponta a ponta em runtime.
+
+**Autorização de ferramentas**
+- A PR #779 foi merged no commit 42aa845f1a2de1addc033998df8fdbf66dd712bf. app/runtime/toolbox/host_authorization.py implementa HostToolAuthorizationPolicy com resolução injetada de principal/sessão, owner da tarefa, executor da tentativa e aprovação durável; a ausência de evidência resulta em negação. O pacote exporta a classe e tests/runtime/test_host_tool_authorization.py cobre o contrato.
+- A busca no código da branch padrão encontrou a definição, a exportação e os testes, mas não uma instanciação em composition root de produção. Assim, a policy está implementada/testada, não integrada/runtime-verified. ToolDispatcher e executores reais continuam fail-closed até que os resolvers confiáveis e o ponto de composição sejam conectados.
+
+**Aprendizado**
+- PR #778 adicionou arquitetura Wake/Sleep documental; não habilitou treinamento autônomo.
+- PR #780 restringiu elegibilidade de amostras de fine-tuning com sucesso, status, recompensa finita e proveniência explícitos. Isso não comprova consentimento, redaction completa, retenção, isolamento multi-tenant ou ground truth. Treinamento permanece desabilitado.
+
+**Governança e CI**
+- A leitura da API da branch main retornou protected=false, protection.enabled=false e nenhum check obrigatório. Issue #682 continua aberta.
+- homeostase.yml (Self Healing V3) e jarvis-pr-validation.yml continuam presentes na main. Nenhum desses workflows foi alterado nesta revisão.
+- No commit #779 em main, Task Queue Tests run 42526509992 e Auto-Documentation run 42526509993 concluíram com success.
+- PR #777: JARVIS PR Validation 42523333002 e Task Queue Tests 42523333055 success. PR #781: JARVIS PR Validation 42523339700 success. PR #783: JARVIS PR Validation 42524233623 e PowerShell validation 42524233622 success no head atual consultado. PR #782 tinha JARVIS PR Validation 42523443734 success antes desta atualização; os checks devem reexecutar após o novo commit.
+- Os comentários de revisão Codex em #777/#779/#781/#783 reportaram limite de uso; isso não é aprovação de revisão. CI verde não substitui revisão técnica independente.
+
+**Conclusão C0**
+- O selector roadmap-driven e a persistência de ownership avançaram para código integrado e testado.
+- C0 permanece aberto: o mapa ainda precisa identificar consumers/runtime para todas as capacidades críticas; a policy host-backed não tem composition root de produção; worker identity individual permanece sem credenciais provisionadas e o runtime segue no fallback legado; memória vetorial continua sem insert/readback real; o recurring worker segue desabilitado; o baseline comportamental integrado ainda precisa ser reexecutado com evidências atuais.
+- C1 — World Model permanece bloqueado pela ordem do roadmap. Não criar contratos ou armazenamento paralelos antes de fechar os gates C0.
