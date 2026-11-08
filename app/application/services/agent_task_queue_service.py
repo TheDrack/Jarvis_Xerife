@@ -46,18 +46,12 @@ class AgentTaskQueueService:
                             LayaDecisionAdapter.from_env()
                         )
                     except Exception as exc:
-                        logger.debug(
-                            "[AgentTaskQueue] Laya shadow unavailable: %s",
-                            type(exc).__name__,
-                        )
+                        logger.debug("[AgentTaskQueue] Laya shadow unavailable: %s", type(exc).__name__)
                         return
         try:
             self._decision_observer.submit({"objective": objective}, task_type)
         except Exception as exc:
-            logger.debug(
-                "[AgentTaskQueue] Laya shadow submission failed: %s",
-                type(exc).__name__,
-            )
+            logger.debug("[AgentTaskQueue] Laya shadow submission failed: %s", type(exc).__name__)
 
     def _ensure_postgres(self) -> None:
         if self.engine.dialect.name != "postgresql":
