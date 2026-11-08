@@ -223,7 +223,7 @@ graph LR
     app_runtime["<b>runtime</b><br/><hr/>📄 pipeline_runner.py: CloudMock, run_pipeline"]
     class app_runtime support
     app --> app_runtime
-    app_runtime_toolbox["<b>toolbox</b><br/><hr/>📄 authorization.py: ToolAuthorizationPolicy, authorize_tool<br/>📄 audit.py: JsonlToolAuditSink<br/>📄 toolchains.py: ToolchainStep, ToolchainManifest, from_file<br/>📄 contracts.py: ToolRequest, ToolResult, ToolAuthorizationDecision"]
+    app_runtime_toolbox["<b>toolbox</b><br/><hr/>📄 authorization.py: ToolAuthorizationPolicy, authorize_tool<br/>📄 audit.py: JsonlToolAuditSink<br/>📄 toolchains.py: ToolchainStep, ToolchainManifest, from_file<br/>📄 contracts.py: ToolRequest, ToolResult, ToolAuthorizationDecision<br/>📄 host_authorization.py: TrustedToolPrincipal, validate_identity_fields, validate_capability_grants"]
     class app_runtime_toolbox support
     app_runtime --> app_runtime_toolbox
     app_domain["<b>domain</b>"]
