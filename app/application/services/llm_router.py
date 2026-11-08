@@ -49,10 +49,13 @@ class LLMRouter(NexusComponent):
         self,
         reliability_threshold: float = _DEFAULT_RELIABILITY_THRESHOLD,
         default_adapter: str = "metabolism_core",
+        decision_observer: Optional[Any] = None,
     ) -> None:
         self.reliability_threshold = reliability_threshold
         self.default_adapter = default_adapter
         self._cost_tracker: Optional[Any] = None
+        self._decision_observer = decision_observer
+
 
     def configure(self, config: Dict[str, Any]) -> None:
         """Configura o router via dicionário."""
@@ -77,6 +80,7 @@ class LLMRouter(NexusComponent):
         """
         ctx = context or {}
         task_type = ctx.get("task_type", "")
+        self._submit_laya_shadow(ctx, task_type)
         adapter = self.select_adapter(task_type, ctx)
         if adapter is None:
             logger.warning("[LLMRouter] Nenhum adaptador disponível para task_type='%s'.", task_type)
@@ -92,6 +96,35 @@ class LLMRouter(NexusComponent):
         except Exception as exc:
             logger.error("[LLMRouter] Falha no adaptador %s: %s", adapter_name, exc)
             return {"success": False, "error": str(exc), "routed_to": adapter_name}
+
+    def _submit_laya_shadow(self, context: Dict[str, Any], task_type: str) -> None:
+        """Submit optional Laya shadow inference without affecting this request."""
+        if self._decision_observer is None:
+            if os.getenv("JARVIS_LAYA_SHADOW_ENABLED", "").strip().lower() != "true":
+                return
+            try:
+                from app.adapters.infrastructure.intelligence.laya_decision_adapter import (
+                    LayaDecisionAdapter,
+                )
+                from app.application.services.laya_decision_shadow import (
+                    LayaDecisionShadowObserver,
+                )
+                self._decision_observer = LayaDecisionShadowObserver(
+                    LayaDecisionAdapter.from_env()
+                )
+            except Exception as exc:
+                logger.debug("[LLMRouter] Laya shadow unavailable: %s", type(exc).__name__)
+                return
+        try:
+            self._decision_observer.submit(context, task_type)
+        except Exception as exc:
+            logger.debug("[LLMRouter] Laya shadow submission failed: %s", type(exc).__name__)
+
+    def close(self) -> None:
+        """Release the optional shadow worker during application shutdown."""
+        observer, self._decision_observer = self._decision_observer, None
+        if observer is not None and hasattr(observer, "close"):
+            observer.close(wait=False)
 
     # ------------------------------------------------------------------
     # Public routing API
