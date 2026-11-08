@@ -127,7 +127,7 @@ class RoadmapMissionSelector:
             raise RoadmapManifestError("cognitive_status_evidence_block_invalid")
 
         block = content[start:end]
-        match = re.fullmatch(r"\\s*```json\\s*(\\{.*\\})\\s*```\\s*", block, re.DOTALL)
+        match = re.fullmatch(r"\s*```json\s*(\{.*\})\s*```\s*", block, re.DOTALL)
         if match is None:
             raise RoadmapManifestError("cognitive_status_evidence_json_missing")
         try:
