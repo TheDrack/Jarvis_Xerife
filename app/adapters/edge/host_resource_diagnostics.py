@@ -1,0 +1,45 @@
+"""Bounded, read-only host resource diagnostics for MCP and other edge runtimes."""
+from __future__ import annotations
+
+from dataclasses import asdict
+from typing import Any
+
+from app.adapters.edge.host.psutil_host_adapter import PsutilHostAdapter
+from app.domain.ports.host_port import HostPort
+
+
+def collect_host_resource_diagnostics(
+    adapter: HostPort | None = None,
+    *,
+    process_limit: int = 25,
+) -> dict[str, Any]:
+    """Collect identity, CPU/RAM, mounted disk usage and top processes.
+
+    The host contract intentionally excludes command lines and environment data.
+    The limit is stricter than the generic HostPort maximum to keep MCP payloads
+    small and predictable.
+    """
+    if isinstance(process_limit, bool) or not isinstance(process_limit, int):
+        raise TypeError("process_limit must be an integer")
+    if not 1 <= process_limit <= 50:
+        raise ValueError("process_limit must be between 1 and 50")
+
+    host = adapter or PsutilHostAdapter()
+    identity = asdict(host.get_identity())
+    resources = asdict(host.get_resources())
+    resources["captured_at"] = resources["captured_at"].isoformat()
+    processes = [asdict(item) for item in host.list_processes(process_limit)]
+
+    return {
+        "success": True,
+        "read_only": True,
+        "identity": identity,
+        "resources": resources,
+        "top_processes": processes,
+        "process_limit": process_limit,
+        "privacy": {
+            "command_lines_collected": False,
+            "environment_variables_collected": False,
+            "file_contents_collected": False,
+        },
+    }

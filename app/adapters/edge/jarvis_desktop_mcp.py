@@ -537,6 +537,31 @@ def network_capture_etw(duration_seconds: int = 10, keywords: str = "0xFFFFFFFFF
     from app.adapters.edge.windows_etw_network_adapter import capture_tcpip_events
     return capture_tcpip_events(duration_seconds=duration_seconds, keywords=keywords)
 
+
+
+@mcp.tool()
+@tracked_action("Diagnosticando recursos do host")
+def host_resource_diagnostics(process_limit: int = 25) -> dict[str, Any]:
+    """Return bounded, read-only host resource diagnostics.
+
+    Reports OS identity, CPU/RAM, mounted filesystem usage and top processes.
+    Process command lines, environment variables, credentials and file contents
+    are never collected. This is the preferred first step before any cleanup.
+    """
+    try:
+        from app.adapters.edge.host_resource_diagnostics import collect_host_resource_diagnostics
+
+        return collect_host_resource_diagnostics(process_limit=process_limit)
+    except (TypeError, ValueError) as exc:
+        return {"success": False, "status": "invalid_process_limit", "error": str(exc)}
+    except RuntimeError as exc:
+        logger.warning("Host diagnostics unavailable: %s", exc)
+        return {"success": False, "status": "dependency_unavailable", "error": str(exc)}
+    except Exception as exc:
+        logger.exception("Host diagnostics failed")
+        return {"success": False, "status": "diagnostic_failed", "error": type(exc).__name__}
+
+
 # Android navigation tools are registered additively on the same MCP server.
 # Existing desktop tool implementations and their default behavior remain unchanged.
 @mcp.tool()
