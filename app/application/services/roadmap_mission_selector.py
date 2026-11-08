@@ -229,7 +229,7 @@ class RoadmapMissionSelector:
         for index, heading in enumerate(lines):
             if not heading.startswith("## "):
                 continue
-            phase_match = re.search(r"\\bFase\\s+([0-8])\\b", heading)
+            phase_match = re.search(r"\bFase\s+([0-8])\b", heading)
             if phase_match is None:
                 continue
             phase_number = int(phase_match.group(1))
@@ -243,7 +243,7 @@ class RoadmapMissionSelector:
                 ),
                 len(lines),
             )
-            section = "\\n".join(lines[index:end])
+            section = "\n".join(lines[index:end])
             pattern = re.compile(
                 rf"`(C{phase_number}-[A-Z0-9]+(?:-[A-Z0-9]+)*)`"
             )
