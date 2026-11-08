@@ -365,15 +365,45 @@ def test_expired_or_rejected_approval_is_denied():
     )
     policy = HostToolAuthorizationPolicy(
         principal_resolver=lambda: _principal(capabilities=("sample.write",)),
-        approval_verifier=lambda approval_id, request, principal_id, executor_id: {
-            **approval.model_dump(), "status": "consumed"
-        },
+        approval_verifier=lambda approval_id, request, principal_id, executor_id: approval.model_dump(),
         clock=lambda: now,
     )
 
-    with pytest.raises(PermissionError):
+    with pytest.raises(PermissionError, match="does not match"):
         policy.authorize_tool(request, manifest)
 
+
+def test_expired_consumption_receipt_is_denied():
+    manifest = _manifest(risk_level="active")
+    now = datetime.now(timezone.utc)
+    request = ToolRequest(
+        tool_id=manifest.tool_id,
+        capability="sample.write",
+        approval_id="approval-expired",
+    )
+    approval = VerifiedToolApproval(
+        approval_id="approval-expired",
+        status="consumed",
+        principal_id="user-1",
+        approver_session_id="approver-session-1",
+        task_id=None,
+        tool_id=manifest.tool_id,
+        tool_version=manifest.version,
+        capability="sample.write",
+        scope="local",
+        operation=manifest.operation,
+        arguments_digest=tool_request_digest(request),
+        approved_at=now - timedelta(minutes=3),
+        expires_at=now - timedelta(minutes=1),
+    )
+    policy = HostToolAuthorizationPolicy(
+        principal_resolver=lambda: _principal(capabilities=("sample.write",)),
+        approval_verifier=lambda approval_id, envelope, principal_id, executor_id: approval,
+        clock=lambda: now,
+    )
+
+    with pytest.raises(PermissionError, match="not currently valid"):
+        policy.authorize_tool(request, manifest)
 
 
 def test_dispatcher_passes_task_binding_to_audit_after_host_authorization():
