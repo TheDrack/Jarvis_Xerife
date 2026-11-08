@@ -76,9 +76,9 @@ class ToolDispatcher:
         self._event_sink = event_sink
         self._max_idempotency_entries = max(1, int(max_idempotency_entries))
         self._lock = threading.RLock()
-        self._inflight: dict[tuple[str, str, str, str, str], str] = {}
+        self._inflight: dict[tuple[str, str, str, str, str, str], str] = {}
         self._completed: dict[
-            tuple[str, str, str, str, str], tuple[str, ToolResult]
+            tuple[str, str, str, str, str, str], tuple[str, ToolResult]
         ] = {}
         self._rate_calls: dict[str, Any] = {}
         self._breaker_failures: dict[str, int] = {}
@@ -263,6 +263,7 @@ class ToolDispatcher:
                     manifest.tool_id,
                     manifest.version,
                     requested_capability,
+                    envelope.task_id or "",
                     envelope.idempotency_key,
                 )
                 idempotency_digest = self._arguments_digest(
