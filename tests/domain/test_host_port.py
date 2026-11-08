@@ -123,6 +123,10 @@ def test_psutil_adapter_normalizes_linux_host_without_os_specific_calls(monkeypa
             return SimpleNamespace(total=16384, used=8192, free=8192, percent=50.0)
 
         @staticmethod
+        def swap_memory():
+            return SimpleNamespace(total=4096, used=1024, free=3072, percent=25.0)
+
+        @staticmethod
         def cpu_percent(interval=0.1):
             return 7.5
 
@@ -220,3 +224,73 @@ def test_psutil_adapter_selects_stable_top_n_from_a_lazy_process_iterator(monkey
 
     assert [process.pid for process in processes] == [3, 4, 2]
     assert len(processes) == 3
+
+
+def test_psutil_adapter_reports_swap_and_ranks_full_process_table_by_memory(monkeypatch):
+    from types import SimpleNamespace
+
+    import app.adapters.edge.host.psutil_host_adapter as adapter_module
+    from app.adapters.edge.host.psutil_host_adapter import PsutilHostAdapter
+
+    records = [
+        (1, 90.0, 1000),
+        (2, 2.0, 9000),
+        (3, 15.0, 5000),
+        (4, 1.0, 200),
+    ]
+
+    class FakeProcess:
+        def __init__(self, pid, cpu, rss):
+            self.info = {
+                "pid": pid,
+                "name": f"process-{pid}",
+                "status": "running",
+                "memory_info": SimpleNamespace(rss=rss),
+                "create_time": float(pid),
+            }
+            self._cpu = cpu
+
+        def cpu_percent(self, interval=None):
+            return self._cpu
+
+    class FakePsutil:
+        class NoSuchProcess(Exception):
+            pass
+
+        class AccessDenied(Exception):
+            pass
+
+        class ZombieProcess(Exception):
+            pass
+
+        @staticmethod
+        def virtual_memory():
+            return SimpleNamespace(total=16000, available=4000, used=12000, percent=75.0)
+
+        @staticmethod
+        def swap_memory():
+            return SimpleNamespace(total=4096, used=1024, free=3072, percent=25.0)
+
+        @staticmethod
+        def disk_partitions(all=False):
+            return []
+
+        @staticmethod
+        def cpu_percent(interval=0.1):
+            return 12.0
+
+        @staticmethod
+        def process_iter(attrs):
+            return (
+                FakeProcess(pid, cpu, rss)
+                for pid, cpu, rss in records
+            )
+
+    adapter = PsutilHostAdapter(psutil_module=FakePsutil)
+    resources = adapter.get_resources()
+    top_memory = adapter.list_processes_by_memory(limit=3)
+
+    assert resources.swap.total_bytes == 4096
+    assert resources.swap.used_bytes == 1024
+    assert resources.swap.percent == 25.0
+    assert [process.pid for process in top_memory] == [2, 3, 1]
