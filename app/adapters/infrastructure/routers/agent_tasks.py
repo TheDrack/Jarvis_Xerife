@@ -150,11 +150,16 @@ def create_agent_tasks_router(db_adapter, get_current_user, get_current_worker=N
         return AgentTaskQueueService(engine)
 
     def authenticated_owner_id(user: Any) -> str:
-        value = (
-            getattr(user, "user_id", None)
-            or getattr(user, "id", None)
-            or getattr(user, "username", None)
-        )
+        def identity_field(name: str):
+            if isinstance(user, dict):
+                return user.get(name)
+            return getattr(user, name, None)
+
+        value = identity_field("user_id") or identity_field("id")
+        # AuthAdapter's environment-admin fallback deliberately has no database
+        # user ID. Give that single local principal a stable, non-user-editable key.
+        if not value and identity_field("username") == "admin":
+            value = "local-admin"
         owner_id = str(value or "").strip()
         if not owner_id or len(owner_id) > 200:
             raise HTTPException(
