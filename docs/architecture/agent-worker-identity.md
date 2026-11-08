@@ -69,7 +69,7 @@ Tests cover:
 - Migrate the Supabase-native worker away from direct service-role task access.
 - Keep the task owner (derived from the persisted task), worker credential principal, and active attempt executor as separate identities. The host policy now derives the effective owner from the task record and records the worker executor independently; it does not compare a `worker:*` principal directly with the task owner.
 - Add host/runtime executor attestation; the current `text_reasoning` grant is provisioned, not dynamically attested.
-- Add an authenticated approval-intent creation/confirmation API that derives the owner and approver session from verified auth context; the durable store primitive exists in PR #780 but is not deployed or wired.
+- Add an authenticated approval-intent creation/confirmation API that derives the owner and approver session from verified auth context; the durable store primitive exists in PR #787 but is not deployed or wired.
 - Implement and register a production host-backed `ToolAuthorizationPolicy` with real principal/session/task/attempt resolvers, atomic approval consumption, and Nexus composition.
 - Verify two independently provisioned workers, cross-agent rejection, revocation, owner isolation, and complete queue execution in an isolated Supabase integration environment.
 - Provision production credentials only after the migration is deployed and a controlled rollout is explicitly authorized.
