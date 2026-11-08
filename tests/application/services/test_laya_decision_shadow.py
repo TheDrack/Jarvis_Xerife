@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 import threading
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 import pytest
 from app.adapters.infrastructure.intelligence.laya_decision_adapter import LayaDecisionAdapter, LayaDecisionError
