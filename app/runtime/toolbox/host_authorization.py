@@ -7,6 +7,7 @@ derived from ToolRequest.caller or other request-supplied identity labels.
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 from dataclasses import dataclass
@@ -125,6 +126,11 @@ class HostToolAuthorizationPolicy:
             raise PermissionError("Requested capability is not declared by the tool manifest")
         if capability not in principal.capabilities:
             raise PermissionError("Authenticated principal has no server-side capability grant")
+        if not any(
+            fnmatch.fnmatchcase(request.scope, pattern)
+            for pattern in manifest.allowed_scopes
+        ):
+            raise PermissionError("Requested scope is outside the tool manifest allowlist")
 
         self._verify_task_binding(request, principal)
 
@@ -144,6 +150,8 @@ class HostToolAuthorizationPolicy:
             capability=capability,
             scope=request.scope,
             operation=manifest.operation,
+            task_id=request.task_id,
+            attempt_id=request.attempt_id,
             approval_id=approval_id,
             correlation_id=request.correlation_id,
             expires_at=expires_at,
