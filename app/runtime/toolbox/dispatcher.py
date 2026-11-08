@@ -575,6 +575,8 @@ class ToolDispatcher:
             "capability": requested_capability,
             "scope": request.scope,
             "operation": manifest.operation,
+            "task_id": request.task_id,
+            "attempt_id": request.attempt_id,
         }
         mismatches = [
             field
@@ -775,6 +777,8 @@ class ToolDispatcher:
                 if authorization_decision
                 else None
             ),
+            task_id=request.task_id,
+            attempt_id=request.attempt_id,
             scope=request.scope,
             status=result.status,
             started_at=started_at,
