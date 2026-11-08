@@ -4,9 +4,15 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.runtime.toolbox import ToolManifest, ToolRequest
-from app.runtime.toolbox.host_authorization import (
+from app.runtime.toolbox import (
     HostToolAuthorizationPolicy,
+    ToolAuthorizationDecision,
+    ToolDispatcher,
+    ToolManifest,
+    ToolRegistry,
+    ToolRequest,
+)
+from app.runtime.toolbox.host_authorization import (
     TrustedToolPrincipal,
     VerifiedToolApproval,
     tool_request_digest,
@@ -257,3 +263,74 @@ def test_expired_or_rejected_approval_is_denied():
 
     with pytest.raises(PermissionError):
         policy.authorize_tool(request, manifest)
+
+
+
+def test_dispatcher_passes_task_binding_to_audit_after_host_authorization():
+    manifest = _manifest()
+    events = []
+    dispatcher = ToolDispatcher(
+        ToolRegistry([manifest]),
+        resolver=lambda _: type("Adapter", (), {"read": lambda self: {"ok": True}})(),
+        authorizer=HostToolAuthorizationPolicy(
+            principal_resolver=lambda: _principal(agent_id="worker-1"),
+            task_owner_resolver=lambda task_id: "user-1",
+            task_executor_resolver=lambda task_id, attempt_id: "worker-1",
+        ),
+        event_sink=events.append,
+    )
+
+    result = dispatcher.dispatch(
+        ToolRequest(
+            tool_id=manifest.tool_id,
+            capability="sample.read",
+            task_id="task-1",
+            attempt_id="attempt-1",
+        )
+    )
+
+    assert result.success is True
+    assert len(events) == 1
+    assert events[0].task_id == "task-1"
+    assert events[0].attempt_id == "attempt-1"
+    assert events[0].principal_id == "user-1"
+
+
+def test_dispatcher_rejects_authorization_decision_for_another_task():
+    manifest = _manifest()
+    resolved = []
+    decision = ToolAuthorizationDecision(
+        granted=True,
+        principal_id="user-1",
+        session_id="session-1",
+        tool_id=manifest.tool_id,
+        tool_version=manifest.version,
+        capability="sample.read",
+        scope="local",
+        operation=manifest.operation,
+        task_id="different-task",
+        attempt_id="attempt-1",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=1),
+    )
+
+    class MismatchedPolicy:
+        def authorize_tool(self, request, selected_manifest):
+            return decision
+
+    dispatcher = ToolDispatcher(
+        ToolRegistry([manifest]),
+        resolver=lambda _: resolved.append("adapter"),
+        authorizer=MismatchedPolicy(),
+    )
+    result = dispatcher.dispatch(
+        ToolRequest(
+            tool_id=manifest.tool_id,
+            capability="sample.read",
+            task_id="task-1",
+            attempt_id="attempt-1",
+        )
+    )
+
+    assert result.success is False
+    assert result.error_code == "authorization_denied"
+    assert resolved == []
