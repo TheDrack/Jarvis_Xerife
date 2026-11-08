@@ -79,9 +79,9 @@ A busca de código é um inventário preliminar. Nenhum item desta tabela está 
 - ADR para decisões estruturais que alterem limites ou persistência.
 
 ### Aceitação
-- Cada capacidade crítica tem caminho de código, consumidor e teste identificados.
-- Lacunas e incertezas estão explicitamente registradas.
-- Nenhum módulo é considerado pronto apenas por nome ou documentação.
+- **`C0-CAPABILITY-MAP`**: Cada capacidade crítica tem caminho de código, consumidor e teste identificados.
+- **`C0-GAPS-RECORDED`**: Lacunas e incertezas estão explicitamente registradas.
+- **`C0-NO-NAME-BASED-COMPLETION`**: Nenhum módulo é considerado pronto apenas por nome ou documentação.
 
 ## 5. Fase 1 — World Model
 
