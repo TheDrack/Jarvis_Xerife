@@ -243,12 +243,20 @@ A busca de código é um inventário preliminar. Nenhum item desta tabela está 
 - Reutilizar Evolution Orchestrator, Sandbox e Gatekeeper; integrar revisão e rollback.
 - Exigir avaliação de segurança, regressão, custo, latência e qualidade antes de promover mudança.
 - Separar aprendizado de política/modelo de alteração automática do código-fonte.
+- Implementar o ciclo **Wake / Sleep** como parte do C8, reutilizando memória de trabalho, memória vetorial/procedural, replay, ModelRegistry, fila e sandbox existentes.
+- Wake captura episódios com proveniência, escopo, rótulos de resultado e custo; não treina pesos durante requisições do usuário.
+- Sleep executa consolidação seletiva, geração de currículo sintético ("Dreaming"), avaliação offline e relatório; deve ser agendável, limitado por recursos, cancelável e retomável.
+- Iniciar por memória e procedimentos; depois regras/skills e modelos pequenos especializados; somente então considerar LoRA/PEFT isolado com base congelada. Fine-tuning do modelo-base fica fora do escopo inicial.
+- Manter datasets observados, julgamentos humanos, avaliações de modelos e exemplos sintéticos como classes de evidência distintas.
 
 ### Aceitação
 - Toda melhoria compara baseline e candidato com métricas reproduzíveis.
 - Nenhuma mudança é promovida se houver regressão acima do limite definido.
 - Há trilha de auditoria, versão e rollback testado.
 - O aprendizado não altera permissões nem amplia autonomia por conta própria.
+- Um ciclo Sleep dry-run seleciona episódios elegíveis, explica exclusões, gera candidatos versionados e pode ser interrompido sem alterar memória/modelo ativos.
+- Currículo sintético é marcado e avaliado separadamente; um modelo não pode validar sozinho as próprias respostas.
+- O primeiro slice não atualiza pesos nem publica código automaticamente.
 
 ## 13. Cognitive Runtime — integração contínua
 
