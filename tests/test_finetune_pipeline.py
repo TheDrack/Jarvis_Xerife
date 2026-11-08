@@ -78,6 +78,33 @@ class TestFineTuneDatasetCollectorCollect:
         # Apenas p1 (0.9) e p3 (0.8) passam (0.5 < 0.6 floor e < 0.7 threshold)
         assert len(pairs) == 2
 
+    def test_collect_excludes_success_without_explicit_reward(self, collector):
+        """A success flag alone is not evidence strong enough for training."""
+        thought = self._make_thought("prompt", "solution", success=True, reward=None)
+
+        mock_tls = MagicMock()
+        mock_tls.get_recent_thoughts.return_value = [thought]
+
+        with patch("app.application.services.finetune_dataset_collector.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = mock_tls
+            pairs = collector.collect(min_reward=0.0)
+
+        assert pairs == []
+
+    def test_collect_excludes_user_interaction_records(self, collector):
+        """Raw user-interaction records must not enter the training corpus."""
+        thought = self._make_thought("user text", "assistant answer", success=True, reward=0.9)
+        thought.status = "user_interaction"
+
+        mock_tls = MagicMock()
+        mock_tls.get_recent_thoughts.return_value = [thought]
+
+        with patch("app.application.services.finetune_dataset_collector.nexus") as mock_nexus:
+            mock_nexus.resolve.return_value = mock_tls
+            pairs = collector.collect(min_reward=0.0)
+
+        assert pairs == []
+
     def test_collect_returns_empty_when_no_tls(self, collector):
         """Sem ThoughtLogService disponível, retorna lista vazia."""
         with patch("app.application.services.finetune_dataset_collector.nexus") as mock_nexus:
