@@ -40,6 +40,8 @@ class ToolRequest(BaseModel):
     approval_id: Optional[str] = Field(
         default=None, min_length=1, max_length=256
     )
+    task_id: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    attempt_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
     idempotency_key: Optional[str] = None
     correlation_id: Optional[str] = None
     request_id: str = Field(default_factory=lambda: uuid4().hex)
