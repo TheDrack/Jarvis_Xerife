@@ -17,6 +17,7 @@ from app.domain.ports.host_port import (
     HostPort,
     ProcessInfo,
     ResourceSnapshot,
+    SwapUsage,
 )
 
 
@@ -68,6 +69,7 @@ class PsutilHostAdapter(HostPort):
                 )
             )
 
+        swap = psutil.swap_memory()
         return ResourceSnapshot(
             captured_at=datetime.now(UTC),
             cpu_percent=float(psutil.cpu_percent(interval=0.1)),
@@ -76,6 +78,12 @@ class PsutilHostAdapter(HostPort):
             memory_used_bytes=int(memory.used),
             memory_percent=float(memory.percent),
             disks=tuple(disks),
+            swap=SwapUsage(
+                total_bytes=int(swap.total),
+                used_bytes=int(swap.used),
+                free_bytes=int(swap.free),
+                percent=float(swap.percent),
+            ),
         )
 
     def _iter_process_info(self) -> Iterator[ProcessInfo]:
@@ -107,7 +115,7 @@ class PsutilHostAdapter(HostPort):
                 continue
 
     def list_processes(self, limit: int = 50) -> Sequence[ProcessInfo]:
-        """Return top-N processes using O(limit) intermediate memory.
+        """Return top-N CPU consumers using O(limit) intermediate memory.
 
         The process table still has to be traversed to identify the true top-N,
         but the adapter no longer builds and sorts a list containing every
@@ -120,6 +128,20 @@ class PsutilHostAdapter(HostPort):
             key=lambda entry: (
                 entry[1].cpu_percent,
                 entry[1].memory_rss_bytes,
+                -entry[0],
+            ),
+        )
+        return tuple(process for _, process in ranked)
+
+    def list_processes_by_memory(self, limit: int = 50) -> Sequence[ProcessInfo]:
+        """Return top-N resident-memory consumers using O(limit) extra memory."""
+        limit = self.validate_process_limit(limit)
+        ranked = heapq.nlargest(
+            limit,
+            enumerate(self._iter_process_info()),
+            key=lambda entry: (
+                entry[1].memory_rss_bytes,
+                entry[1].cpu_percent,
                 -entry[0],
             ),
         )
