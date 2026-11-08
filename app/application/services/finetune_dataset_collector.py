@@ -12,6 +12,7 @@ Método principal::
 
 import json
 import logging
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -171,43 +172,60 @@ class FineTuneDatasetCollector(NexusComponent):
             return []
 
     def _is_successful(self, thought: Any, min_reward: float) -> bool:
-        """Verifica se o ThoughtLog representa um ciclo de sucesso."""
-        # Verifica campo success direto
+        """Require an internal record and an explicit finite reward above the floor."""
         if hasattr(thought, "success"):
             success = thought.success
         else:
             success = thought.get("success", False) if isinstance(thought, dict) else False
-
         if not success:
             return False
 
-        # Verifica reward se disponível
-        reward = None
-        if hasattr(thought, "reward_received"):
-            reward = thought.reward_received
-        elif hasattr(thought, "reward_value"):
-            reward = thought.reward_value
+        if hasattr(thought, "status"):
+            status = thought.status
         elif isinstance(thought, dict):
-            reward = thought.get("reward_received", thought.get("reward_value"))
+            status = thought.get("status")
+        else:
+            status = None
+        status_value = getattr(status, "value", status)
+        if status_value != "internal_monologue":
+            return False
 
-        if reward is not None:
-            # Aplica threshold mínimo configurado E o floor absoluto de 0.6
-            return float(reward) >= max(min_reward, self._REWARD_FLOOR)
+        reward = self._get_reward_value(thought)
+        if reward is None or isinstance(reward, bool):
+            return False
+        try:
+            numeric_reward = float(reward)
+        except (TypeError, ValueError, OverflowError):
+            return False
+        if not math.isfinite(numeric_reward):
+            return False
 
-        # Sem reward registrado = inclui (ciclo bem-sucedido)
-        return True
+        return numeric_reward >= max(min_reward, self._REWARD_FLOOR)
+
+    @staticmethod
+    def _get_reward_value(thought: Any) -> Any:
+        """Return the first explicitly populated reward field, if present."""
+        for field in ("reward_received", "reward_value"):
+            if hasattr(thought, field):
+                value = getattr(thought, field)
+            elif isinstance(thought, dict):
+                value = thought.get(field)
+            else:
+                value = None
+            if value is not None:
+                return value
+        return None
 
     def _extract_reward(self, thought: Any) -> float:
-        """Extrai o valor de reward do ThoughtLog."""
-        if hasattr(thought, "reward_received"):
-            val = thought.reward_received
-        elif hasattr(thought, "reward_value"):
-            val = thought.reward_value
-        elif isinstance(thought, dict):
-            val = thought.get("reward_received", thought.get("reward_value", 0.0))
-        else:
-            val = 0.0
-        return float(val) if val is not None else 0.0
+        """Extract a finite numeric reward from the ThoughtLog."""
+        value = self._get_reward_value(thought)
+        if value is None or isinstance(value, bool):
+            return 0.0
+        try:
+            reward = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return 0.0
+        return reward if math.isfinite(reward) else 0.0
 
     def _extract_prompt(self, thought: Any) -> str:
         """Extrai o prompt enviado ao LLM do ThoughtLog."""
