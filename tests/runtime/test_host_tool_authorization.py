@@ -168,6 +168,7 @@ def test_active_tool_requires_verifiable_exact_request_approval():
     )
     policy = HostToolAuthorizationPolicy(
         principal_resolver=lambda: _principal(capabilities=("sample.write",)),
+        task_owner_resolver=lambda task_id: "user-1",
         approval_verifier=lambda approval_id: approval,
         clock=lambda: now,
     )
