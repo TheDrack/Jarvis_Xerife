@@ -311,6 +311,16 @@ def test_verified_status_requires_commit_ci_and_repository_paths(tmp_path):
         _selector(root).find_next_mission()
 
 
+def test_status_ledger_must_cover_all_roadmap_criteria(tmp_path):
+    root, _ = _repository(tmp_path)
+    _write_status_ledger(root, ROADMAP_CRITERIA[:-1])
+
+    with pytest.raises(
+        RoadmapManifestError, match="cognitive_status_criteria_missing"
+    ):
+        _selector(root).find_next_mission()
+
+
 def test_real_repository_roadmap_and_empty_manifest_remain_a_safe_noop():
     selector = RoadmapMissionSelector()
 
