@@ -71,7 +71,8 @@ class LayaDecisionShadowObserver:
     @staticmethod
     def _extract_text(context: Mapping[str, Any]) -> str:
         for value in (context.get("prompt"), context.get("objective"),
-                      context.get("text"), context.get("message")):
+                      context.get("text"), context.get("message"),
+                      context.get("request")):
             if isinstance(value, str) and value.strip():
                 return value.strip()
         messages = context.get("messages")
