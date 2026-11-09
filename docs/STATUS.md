@@ -297,3 +297,9 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 - `ToolApprovalStore` existe e sua migration está aplicada, mas não há API de criação/confirmação de approval, resolver de sessão autenticada, composição dos resolvers owner/executor nem registro `tool_authorization_policy` no Nexus. O JWT atual não carrega `sid`/session claim e `get_current_user` não fornece session_id. `ToolDispatcher` continua fail-closed; não declarar dispatch operacional.
 - O ledger de evidência cognitiva continua com os três critérios C0 em `pending`; `data/roadmap_missions.json` permanece vazio. Nenhum critério foi promovido por presença de migration, PR merged ou CI isolado.
 - C0 continua aberto. C1 — World Model — permanece bloqueado até a aceitação C0 e não deve começar nesta etapa.
+
+
+### Perception ambiental — snapshot read-only 2026-11-09
+
+- Consulta SQL somente leitura em `public.jarvis_environment_observations`: **1.755 registros** (878 `presence`, 877 `network_snapshot`); **0 não expirados e 1.755 expirados**. Último `received_at`: `2026-11-03 15:11:28 UTC`; maior `expires_at`: `2026-11-03 15:16:27 UTC`. O router define TTL de 2 minutos para presença e 5 minutos para network snapshot. A consulta não leu payloads nem identificadores.
+- Isso comprova ingestão histórica da trilha de observação ambiental, mas não telemetria atual nem recorrência em 2026-11-09. Não confundir esta tabela com `intelligence_observation_snapshots`, que continua com 0 linhas. Portanto Perception permanece parcial e sem evidência de frescor operacional.
