@@ -30,7 +30,17 @@ class FakeHost(HostPort):
 
     def list_processes(self, limit=50):
         self.validate_process_limit(limit)
-        return (ProcessInfo(10, "python.exe", "running", 2.5, 1024),)
+        return (
+            ProcessInfo(10, "cpu-heavy.exe", "running", 95.0, 1024),
+            ProcessInfo(11, "memory-heavy.exe", "running", 2.5, 8192),
+        )
+
+    def list_processes_by_memory(self, limit=50):
+        self.validate_process_limit(limit)
+        return (
+            ProcessInfo(11, "memory-heavy.exe", "running", 2.5, 8192),
+            ProcessInfo(10, "cpu-heavy.exe", "running", 95.0, 1024),
+        )
 
 
 def test_host_resource_diagnostics_returns_read_only_snapshot():
@@ -41,7 +51,8 @@ def test_host_resource_diagnostics_returns_read_only_snapshot():
     assert result["identity"]["hostname"] == "test-pc"
     assert result["resources"]["memory_percent"] == 75.0
     assert result["resources"]["disks"][0]["free_bytes"] == 10_000
-    assert result["top_processes"][0]["name"] == "python.exe"
+    assert result["top_cpu_processes"][0]["name"] == "cpu-heavy.exe"
+    assert result["top_memory_processes"][0]["name"] == "memory-heavy.exe"
     assert result["privacy"]["command_lines_collected"] is False
     assert result["privacy"]["environment_variables_collected"] is False
 
