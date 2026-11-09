@@ -31,6 +31,17 @@ def test_scan_reports_directory_and_file_sizes_without_reading_contents(tmp_path
     assert result["privacy"]["file_contents_read"] is False
 
 
+def test_scan_stops_after_maximum_visited_entries(tmp_path):
+    for index in range(120):
+        (tmp_path / f"file-{index:03}.bin").write_bytes(b"x")
+
+    result = _scan_root(tmp_path, max_entries=100)
+
+    assert result["scan"]["visited_entries"] == 100
+    assert result["scan"]["truncated"] is True
+    assert result["scan"]["stopped_reason"] == "entry_limit"
+
+
 def test_scan_skips_symlinks_and_does_not_follow_them(tmp_path):
     outside = tmp_path.parent / f"{tmp_path.name}-outside"
     outside.mkdir()
