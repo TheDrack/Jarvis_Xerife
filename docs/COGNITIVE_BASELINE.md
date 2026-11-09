@@ -178,6 +178,7 @@ O workflow `.github/workflows/homeostase.yml` permanece versionado com gatilhos 
 | `intelligence_observation_snapshots` | 0 linhas |
 | `jarvis_mobile_device_sessions` | 48 linhas |
 | `jarvis_mobile_devices` | 1 linha |
+
 As duas entradas históricas `google_linked_identities` foram preservadas separadamente. A integração GitHub–Supabase aplicou as seis migrations pendentes após o merge do PR #767; o ledger remoto agora contém todas as 26 versões. Não foi executado `db push`, `migration repair` ou DDL manual pelo ChatGPT.
 
 **RPCs, fencing e ACLs verificados diretamente:**
@@ -356,7 +357,8 @@ O snapshot e as classificações acima permanecem históricos: os merges seguint
 
 ### Mudanças integradas em 2026-11-08
 
-- **PR #778 — Wake/Sleep continual-learning architecture:** documentação de arquitetura integrada à main. Define consolidação e aprendizagem em ciclos ociosos, reutilizando os serviços existentes; não implementa treinamento autônomo nem habilita execução de jobs.- **PR #780 — Evidence-backed fine-tuning samples:** integrada à main. `FineTuneDatasetCollector` agora exige `success=True`, status explícito `internal_monologue`, recompensa explícita, numérica, finita e acima do maior entre o threshold configurado e o piso absoluto. Registros `user_interaction`, proveniência desconhecida e recompensas ausentes/inválidas são excluídos. Os testes de regressão reproduziram as duas falhas anteriores e passaram após a correção; os dois workflows de pytest foram aprovados.
+- **PR #778 — Wake/Sleep continual-learning architecture:** documentação de arquitetura integrada à main. Define consolidação e aprendizagem em ciclos ociosos, reutilizando os serviços existentes; não implementa treinamento autônomo nem habilita execução de jobs.
+- **PR #780 — Evidence-backed fine-tuning samples:** integrada à main. `FineTuneDatasetCollector` agora exige `success=True`, status explícito `internal_monologue`, recompensa explícita, numérica, finita e acima do maior entre o threshold configurado e o piso absoluto. Registros `user_interaction`, proveniência desconhecida e recompensas ausentes/inválidas são excluídos. Os testes de regressão reproduziram as duas falhas anteriores e passaram após a correção; os dois workflows de pytest foram aprovados.
 - **Treinamento continua desabilitado:** a correção protege a elegibilidade do dataset, mas não prova consentimento, redaction completa, retenção, isolamento multi-tenant ou ground truth. Esses controles permanecem gates separados antes de qualquer treinamento.
 
 ### DeepSeek V4.1 Flash
