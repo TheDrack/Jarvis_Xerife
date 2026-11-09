@@ -69,6 +69,7 @@ def _scan_root(
     extension_sizes: dict[str, int] = defaultdict(int)
     extension_counts: dict[str, int] = defaultdict(int)
     largest_files: list[dict[str, Any]] = []
+    visited_entries = 0
     scanned_directories = 0
     scanned_files = 0
     skipped_entries = 0
@@ -86,9 +87,10 @@ def _scan_root(
                     if time.monotonic() >= deadline:
                         stopped_reason = "time_limit"
                         break
-                    if scanned_directories + scanned_files >= max_entries:
+                    if visited_entries >= max_entries:
                         stopped_reason = "entry_limit"
                         break
+                    visited_entries += 1
                     try:
                         metadata = entry.stat(follow_symlinks=False)
                     except (OSError, PermissionError):
@@ -163,6 +165,7 @@ def _scan_root(
             "max_results": _MAX_RESULTS,
         },
         "scan": {
+            "visited_entries": visited_entries,
             "scanned_directories": scanned_directories,
             "scanned_files": scanned_files,
             "skipped_entries": skipped_entries,
