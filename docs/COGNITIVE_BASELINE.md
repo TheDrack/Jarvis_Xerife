@@ -550,3 +550,13 @@ O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remota
 - Os três critérios C0 permanecem pending. A prioridade continua **C0-CAPABILITY-MAP**: fechar o mapa de consumidores e testes comportamentais ausentes (em especial roteamento cognitivo, iniciativa e a ausência explícita do World Model canônico), distinguindo código, teste, CI e runtime.
 - **C0-GAPS-RECORDED** e **C0-NO-NAME-BASED-COMPLETION** também permanecem pending até revisão explícita da matriz completa e evidências. Não promover status por PR merged, documentação isolada ou CI isolado.
 - C1 não começa nesta revalidação. O próximo trabalho de World Model só deve ser contratos canônicos após a aceitação formal de C0.
+
+
+### Achado C0 — roteamento e iniciativa ainda sem comportamento integrado
+
+- `app/domain/gears/cognitive_router.py` define `CognitiveRouter.execute()`; `data/nexus_registry.json` registra o componente e `config/pipelines/jarvis_chat.yml` o referencia. A busca de código encontrou o teste `tests/test_nexus_registry_sync.py`, que valida apenas sincronização do registro; não foi encontrado teste de execução do router nem prova de que o pipeline completo consome esse passo em runtime. Classificação: registro/configuração confirmados; consumo dinâmico e comportamento ponta a ponta não verificados.
+- `app/application/services/assistant_curiosity.py` define `maybe_inject_curiosity_question()` e `capture_curiosity_answer()`. A primeira envia `action=detect_gaps` e a segunda `action=store_answer` ao `CuriosityEngine`.
+- `app/application/services/curiosity_engine.py::execute()` aceita somente `analyze`, `explore` e `suggest`; portanto as duas ações chamadas pelo helper são rejeitadas como desconhecidas. Além disso, `capture_curiosity_answer()` termina em `(False, None)` quando não consegue armazenar a resposta, em vez de preservar `pending_need_id`.
+- A busca por `maybe_inject_curiosity_question`, `capture_curiosity_answer` e `maybe_get_proactive_suggestion` não encontrou callsites fora das próprias definições; também não foram encontrados testes específicos para esses helpers ou para `CuriosityEngine`. O efeito em runtime é **provável, não confirmado**, pois o caminho não foi ligado a um consumidor observado.
+- Não promover Curiosity/Initiative nem CognitiveRouter a capacidade operacional. Próximo passo C0: identificar o composition root e o consumidor pretendido; depois adicionar teste de contrato para as ações válidas e teste de integração pelo consumidor real. Não criar um segundo motor de curiosidade nem inferir um consumer a partir do registro Nexus.
+
