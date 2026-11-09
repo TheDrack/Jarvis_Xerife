@@ -63,7 +63,7 @@ O script não cria um túnel hospedado nem registra o app dentro do ChatGPT; ess
 
 O servidor MCP expõe a ferramenta `run_shell_command`. As chamadas passam pelo mesmo Secure MCP Tunnel autenticado; não é aberta uma nova porta nem criado um endpoint HTTP de execução.
 
-**Não é um shell remoto irrestrito.** A política local aceita apenas um comando PowerShell simples por chamada, validado pela AST do PowerShell antes da execução. São bloqueados pipelines, encadeamento, variáveis, scriptblocks, redirecionamento, invocação dinâmica, executáveis arbitrários e leitura de arquivos. O processo roda sem elevação, com ambiente mínimo (sem as variáveis de segredo do processo Jarvis), timeout de 1–60 segundos, saída limitada e sanitizada, e logs que registram apenas nome do comando, resultado e duração.
+**Não é um shell remoto irrestrito.** A política local aceita apenas um comando PowerShell simples por chamada, validado pela AST do PowerShell antes da execução. Além da allowlist de cmdlets, cada cmdlet possui uma allowlist própria de parâmetros, bloqueando opções de sessão remota e parâmetros comuns de saída/encadeamento. São bloqueados pipelines, encadeamento, variáveis, scriptblocks, redirecionamento, invocação dinâmica, executáveis arbitrários e leitura de arquivos. O processo roda sem elevação, com ambiente mínimo (sem as variáveis de segredo do processo Jarvis), timeout de 1–60 segundos, saída limitada e sanitizada, e logs que registram apenas nome do comando, resultado e duração.
 
 Comandos de diagnóstico disponíveis:
 - `Get-Process`
