@@ -3,6 +3,8 @@
 ATUALIZAÇÃO: Adicionado checkpoint de hardware (Passo 5 da integração).
 """
 import logging
+import os
+from threading import Lock
 from typing import Any, Dict, Optional
 from app.core.nexus import CloudMock, NexusComponent, nexus
 from app.domain.models import CommandType
@@ -11,6 +13,41 @@ logger = logging.getLogger(__name__)
 
 
 class IntentProcessor(NexusComponent):
+    def __init__(self, decision_observer: Any = None) -> None:
+        self._decision_observer = decision_observer
+        self._decision_observer_lock = Lock()
+
+    def _submit_laya_intent_shadow(self, raw_text: str, target_id: str) -> None:
+        """Compare Laya's command classification with the current parser output."""
+        if self._decision_observer is None:
+            if os.getenv("JARVIS_LAYA_SHADOW_ENABLED", "").strip().lower() != "true":
+                return
+            with self._decision_observer_lock:
+                if self._decision_observer is None:
+                    try:
+                        from app.adapters.infrastructure.intelligence.laya_decision_adapter import LayaDecisionAdapter
+                        from app.application.services.laya_decision_shadow import LayaDecisionShadowObserver
+                        self._decision_observer = LayaDecisionShadowObserver(LayaDecisionAdapter.from_env())
+                    except Exception as exc:
+                        logger.debug("[PROCESSOR] Laya shadow unavailable: %s", type(exc).__name__)
+                        return
+        criteria = {
+            item.name.lower(): item.value.replace("_", " ")
+            for item in CommandType
+        }
+        question = {
+            "type": "choice",
+            "instructions": "Qual tipo de comando melhor representa a solicitação do usuário?",
+            "criteria": criteria,
+        }
+        try:
+            self._decision_observer.submit_question(
+                {"request": raw_text}, "command_type", question, target_id,
+                event_name="laya_shadow_intent",
+            )
+        except Exception as exc:
+            logger.debug("[PROCESSOR] Laya shadow submission failed: %s", type(exc).__name__)
+
     """
     Processador de Intenções com checkpoint de hardware MacroDroid.
     
@@ -50,6 +87,7 @@ class IntentProcessor(NexusComponent):
         else:            target_id = str(cmd_type).split('.')[-1].lower()
         
         raw_text = getattr(intent_obj, 'raw_input', str(intent_obj))
+        self._submit_laya_intent_shadow(raw_text, target_id)
         
         # 2. FILTRO DE ATALHO: Se for unknown, verifica hardware ANTES de LLM
         if target_id == "unknown":
