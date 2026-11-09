@@ -361,4 +361,4 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 - Os três critérios `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem `pending`; o ledger não foi alterado. `docs/COGNITIVE_BASELINE.md` precisa distinguir o mapa local/testado dos consumidores e runtime ainda não verificados.
 - C0 permanece aberto; C1 — World Model — permanece bloqueado. Não criar contratos, banco de grafos, event bus, memória ou scheduler paralelo.
 
-**Operações desta auditoria:** somente leitura no GitHub, Supabase e Render. Nenhum DDL/DML, migration, deploy manual, alteração de secret/flag, mudança de permissão ou alteração de produção foi executado.
+**Operações de ambiente:** consultas somente leitura no Supabase e Render; nenhum DDL/DML, migration, deploy manual, alteração de secret/flag, mudança de permissão ou alteração de produção foi executado. **Mutação GitHub:** somente branch isolada e atualização destes dois documentos; sem alteração de código/workflows, commit na main ou merge.
