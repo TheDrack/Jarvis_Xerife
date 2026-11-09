@@ -11,7 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-_MAX_DEPTH = 4
+_MAX_DEPTH = 5
 _MAX_ENTRIES = 20_000
 _MAX_SECONDS = 8.0
 _MAX_RESULTS = 30
