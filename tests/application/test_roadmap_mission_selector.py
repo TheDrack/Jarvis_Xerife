@@ -300,7 +300,7 @@ def test_complete_mission_requires_matching_target_and_test_evidence(tmp_path):
 
 
 def test_verified_status_requires_commit_ci_and_repository_paths(tmp_path):
-    root, _ = _repository(tmp_path)
+    root, _ = _repository(tmp_path, [_mission()])
     _write_status_ledger(
         root,
         ROADMAP_ALL_CRITERIA,
@@ -314,7 +314,7 @@ def test_verified_status_requires_commit_ci_and_repository_paths(tmp_path):
 
 
 def test_status_ledger_must_cover_all_roadmap_criteria(tmp_path):
-    root, _ = _repository(tmp_path)
+    root, _ = _repository(tmp_path, [_mission()])
     _write_status_ledger(root, ROADMAP_ALL_CRITERIA[:-1])
 
     with pytest.raises(
