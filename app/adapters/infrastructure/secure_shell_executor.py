@@ -39,6 +39,19 @@ _READ_ONLY_COMMANDS = frozenset(
 )
 _START_TASK_COMMAND = "Start-ScheduledTask"
 _ALLOWED_COMMANDS = _READ_ONLY_COMMANDS | {_START_TASK_COMMAND}
+_ALLOWED_PARAMETERS = {
+    "Get-Process": frozenset({"Name", "Id"}),
+    "Get-Service": frozenset({"Name", "DisplayName"}),
+    "Get-ScheduledTask": frozenset({"TaskName", "TaskPath", "State"}),
+    "Get-ScheduledTaskInfo": frozenset({"TaskName", "TaskPath"}),
+    "Get-PSDrive": frozenset({"Name", "PSProvider"}),
+    "Get-NetTCPConnection": frozenset({"State", "LocalPort", "RemotePort", "OwningProcess"}),
+    "Get-NetAdapter": frozenset({"Name", "InterfaceDescription", "Physical"}),
+    "Get-Date": frozenset(),
+    "Get-ComputerInfo": frozenset({"Property"}),
+    "Start-ScheduledTask": frozenset({"TaskName"}),
+}
+_PARAMETER_NAME = re.compile(r"(?<!\\S)-([A-Za-z][A-Za-z0-9]*)\\b")
 _FORBIDDEN_SYNTAX = re.compile(r"[\x00\r\n;|&`$<>{}\[\]()]" )
 _COMMAND_NAME = re.compile(r"^([A-Za-z][A-Za-z0-9-]*)\b")
 _START_TUNNEL_TASK = re.compile(
@@ -87,6 +100,25 @@ $allowedCommands = @(
 if ($allowedCommands -notcontains $commandName) {
     [Console]::Error.WriteLine('Command is not allowlisted.')
     exit 65
+}
+$allowedParameters = @{
+    'Get-Process' = @('Name', 'Id')
+    'Get-Service' = @('Name', 'DisplayName')
+    'Get-ScheduledTask' = @('TaskName', 'TaskPath', 'State')
+    'Get-ScheduledTaskInfo' = @('TaskName', 'TaskPath')
+    'Get-PSDrive' = @('Name', 'PSProvider')
+    'Get-NetTCPConnection' = @('State', 'LocalPort', 'RemotePort', 'OwningProcess')
+    'Get-NetAdapter' = @('Name', 'InterfaceDescription', 'Physical')
+    'Get-Date' = @()
+    'Get-ComputerInfo' = @('Property')
+    'Start-ScheduledTask' = @('TaskName')
+}
+foreach ($element in $commandAst.CommandElements) {
+    if ($element -is [System.Management.Automation.Language.CommandParameterAst] -and
+        $allowedParameters[$commandName] -notcontains $element.ParameterName) {
+        [Console]::Error.WriteLine('Command parameter is not allowlisted.')
+        exit 65
+    }
 }
 $allowedNodeTypes = @(
     'ScriptBlockAst', 'NamedBlockAst', 'StatementBlockAst', 'PipelineAst',
@@ -167,11 +199,19 @@ def _validate_command(command: str) -> tuple[str, str]:
     if match is None:
         raise ValueError("command name is invalid")
     command_name = match.group(1)
-    if command_name.casefold() not in {name.casefold() for name in _ALLOWED_COMMANDS}:
+    canonical_name = next(
+        (name for name in _ALLOWED_COMMANDS if name.casefold() == command_name.casefold()),
+        None,
+    )
+    if canonical_name is None:
         raise ValueError("command is not allowlisted")
-    if command_name.casefold() == _START_TASK_COMMAND.casefold() and not _START_TUNNEL_TASK.fullmatch(normalized):
+    supplied_parameters = _PARAMETER_NAME.findall(normalized)
+    allowed_parameters = _ALLOWED_PARAMETERS[canonical_name]
+    if any(parameter.casefold() not in {item.casefold() for item in allowed_parameters} for parameter in supplied_parameters):
+        raise ValueError("command parameter is not allowlisted")
+    if canonical_name == _START_TASK_COMMAND and not _START_TUNNEL_TASK.fullmatch(normalized):
         raise ValueError("only the dedicated Jarvis tunnel scheduled task may be started")
-    return normalized, command_name
+    return normalized, canonical_name
 
 
 def _safe_environment(command: str) -> dict[str, str]:
