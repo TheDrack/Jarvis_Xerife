@@ -2,7 +2,7 @@
 
 **Versão:** 2.0.0  
 **Revisão documental:** 2026-11-09
-**Escopo desta revisão:** delta pós-merge #782/#787/#788; revalidar ledger Supabase, ACL/RLS de approvals, ownership e credenciais de workers, CI e integração da autorização. Runtime/produção só são declarados com evidência direta.
+**Escopo desta revisão:** revalidação pós-merge #792–#794; CI, autoevolução agendada, baseline C0, Supabase read-only e Render. Runtime/produção só são declarados com evidência direta.
 
 ## Visão geral e qualidade da evidência
 
@@ -13,7 +13,7 @@
 | JarvisDevAgent | Fluxo de desenvolvimento e registro de jobs existem | A auditoria identificou promessas não cumpridas: AdapterRegistry sem consumidor de produção, execução de código existente não priorizada de forma comprovada e geração automática de pipelines não entregue |
 | PipelineRunner | Runner consome pipelines YAML; a main agora inclui etapas explícitas tool_id via dispatcher pela PR #681 | Migração de todos os passos legados e validação de produção ainda pendentes |
 | Universal Toolbox | Registry, dispatcher fail-closed, toolchains DAG e audit JSONL estão integrados. PR #779 adicionou HostToolAuthorizationPolicy; PR #787 adicionou o store de approvals e a migration foi aplicada em produção. | A tabela `jarvis_tool_approvals` existe, com RLS e ACL service-role-only, mas contém 0 linhas. Não há API de aprovação, resolver de sessão nem registro da policy no Nexus; ToolDispatcher permanece fail-closed. |
-| Universal Intelligence | Contratos de eventos/observações, Core 0.2, adaptadores GEV MCP/OSIRIS, coleta sob demanda e schema/RPCs do worker estão integrados. Ledger Supabase: 30 migrations locais e 30 remotas, com correspondência exata version/name 30/30; última 20261108193000 durable_tool_approvals. | Snapshot read-only 2026-11-09: event snapshots 0, observation snapshots 0 e worker runs 0. A flag Render não foi reconsultada; não declarar worker recorrente ativo. GEV/OSIRIS ainda exigem health checks live; GDELT pode responder 429 e AISSTREAM_API_KEY não foi verificada nesta execução. |
+| Universal Intelligence | Contratos de eventos/observações, Core 0.2, adaptadores GEV MCP/OSIRIS, coleta sob demanda e schema/RPCs do worker estão integrados. Ledger Supabase: 30 migrations locais e 30 remotas, com correspondência exata version/name 30/30; última 20261108193000 durable_tool_approvals. | Snapshot read-only 2026-11-09: event snapshots 0, observation snapshots 0 e worker runs 0. Render foi reconsultado em 2026-11-09: os logs registram o worker recorrente desabilitado por feature flags; lease sem proprietário/expiração e zero execuções. Não habilitar sem autorização operacional. GEV/OSIRIS ainda exigem health checks live; GDELT pode responder 429 e AISSTREAM_API_KEY não foi verificada nesta execução. |
 | Memória vetorial | SupabaseVectorMemoryStore, escopo por usuário e redaction recursiva estão integrados; RLS está habilitado. | Consulta read-only em 2026-11-08 confirmou 0 linhas em jarvis_vector_memories. Os grants observados são service_role-only, sem grants anon/authenticated; insert/readback real do runtime continua não comprovado. |
 | Inventário de capabilities | data/capabilities.json mantém 102 registros legados; 34 pendentes, 34 com auto=true e nenhum target_file no snapshot anterior. | O catálogo legado não seleciona missões cognitivas; serve apenas para validar o CAP de compatibilidade quando uma missão do manifesto existe. A seleção agendada usa data/roadmap_missions.json, atualmente vazio. |
 | Soldier Mesh / edge | Há modelos, registry, adapters e testes relacionados | Continua parcial até existir validação ponta a ponta com dispositivos reais |
@@ -311,8 +311,54 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 - Checks associados aos heads finais: #789 PR Validation run 42641532396 success; #790 PR Validation 42641924299 success e Task Queue 42641924074 success; #791 PR Validation 42642600559 success. Esses checks comprovam os respectivos commits/ambientes de CI, não execução recorrente ou persistência atual em produção.
 - A revisão do código em main confirma que RoadmapMissionSelector lê o ledger estruturado de docs/STATUS.md por _load_status_evidence. Uma missão marcada complete exige o mesmo criterion_id como verified, commit URL, Actions run URL, paths existentes de implementação/consumidor/testes e correspondência do target/testes. O parser valida formato e existência local; não autentica o commit ou o resultado do Actions remotamente.
 - A nota histórica anterior que afirmava que o selector não lia STATUS foi supersedida pela implementação da PR #782, já merged. A limitação restante é que o teste real do repositório para manifesto vazio retorna antes de exercitar o parser do ledger.
-- PR #790 fecha o teste integrado de percepção local, mas não prova worker ativo nem snapshots persistidos em produção. Novo teste em branch test/c0-real-status-ledger-contract exercita o ledger real da main e confirma os três critérios C0 como pending; aguarda CI.
+- PR #790 fecha o teste integrado de percepção local, mas não prova worker ativo nem snapshots persistidos em produção. PR #792 foi merged: `tests/application/test_roadmap_mission_selector.py` exercita `_load_status_evidence` contra o STATUS real e confirma os três critérios C0 como `pending`; PR Validation run 42647241982 e Task Queue run 42647241960 passaram. O teste do manifesto vazio continua sendo um no-op e não substitui essa cobertura dedicada.
 - data/roadmap_missions.json permanece com missions vazio. C0-CAPABILITY-MAP, C0-GAPS-RECORDED e C0-NO-NAME-BASED-COMPLETION permanecem pending. C1 — World Model — continua bloqueado.
 - Issues abertas verificadas: #682 (proteção da main), #723 (histórico/Preview relacionado às RPCs provider-aware) e #732 (reconciliação schema-aware, Preview e rollback). Nenhuma issue nova foi criada.
 - Self Healing V3 e JARVIS PR Validation permanecem presentes. A documentação do repositório confirma que Self Healing atua em falhas/timouts/cancelamentos originados na main; não processa runs de PR. Não desabilitar nem reduzir essa proteção. Extensão segura para PRs exige separar execução de código não confiável e credenciais privilegiadas.
 - Nenhum merge, deploy, migration, alteração de secrets/flags, DDL/DML ou alteração de produção foi executado nesta revalidação.
+
+
+## Revalidação recorrente — 2026-11-09 — main #794
+
+**Base consultada:** `main` em `1ac9186eedb6ab0825d6254aaa8c3204582f4a11`. O commit #794 foi implantado automaticamente no Render; o deploy `dep-dbp301favr4c73e6comg` terminou `live` em 2026-11-09 20:43:42 UTC. Esta auditoria não acionou deploy.
+
+### PRs, issues e governança
+
+- PRs abertas: **0**. A PR #757, que separou geração de candidato e publicação privilegiada, já está merged; PRs #792, #793 e #794 também estão merged.
+- Issues abertas: #682 (proteção de `main`), #723 (reconciliação das RPCs provider-aware/Preview) e #732 (histórico de migrations/Preview/rollback).
+- A API da branch retorna `protected=false`, `protection.enabled=false`, required checks `off` e nenhum contexto obrigatório; a API de repository rulesets retorna `[]`. O endpoint administrativo de branch protection não está acessível ao conector. A issue #682 continua bloqueada por acesso administrativo.
+- Nenhuma issue foi criada ou fechada nesta auditoria.
+
+### CI e correção contínua
+
+- PR #792: PR Validation run [42647241982](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42647241982) e Task Queue run [42647241960](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42647241960) passaram. O teste real do ledger C0 está em `tests/application/test_roadmap_mission_selector.py`.
+- PR #793: PR Validation [42677389755](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42677389755) e Task Queue [42677389547](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42677389547) passaram.
+- PR #794: PR Validation [42693842123](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42693842123), Task Queue [42693842031](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42693842031) e Browser Tests [42693842090](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42693842090) passaram. No pytest Linux/Python 3.11.18: **2.888 passed, 15 skipped, 8 warnings**.
+- Após o merge, Task Queue run [42694784471](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42694784471) passou no HEAD #794; pytest Windows/Python 3.12.10: **2.888 passed, 15 skipped, 181 warnings**. Auto-Documentation run [42694785391](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42694785391) também passou.
+- O run main [42646055614](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42646055614), no SHA anterior `601f7c4`, falhou somente em `test_windows_runner_executes_an_allowlisted_command_end_to_end`: `Get-Date` excedeu o timeout de 10 s. O teste direcionado passou 15/15 e o restante da suíte passou; a suíte completa em HEAD posterior #794 passou sem alteração desse teste. Classificação: timeout transitório do runner/ambiente Windows, provável flakiness de inicialização do PowerShell; não há evidência de defeito determinístico no código. Nenhum teste foi removido, afrouxado ou reexecutado artificialmente.
+- Os runs cancelados de heads intermediários da PR #793 ocorreram quando a branch avançou; o head final passou. Não são falhas de teste.
+- `homeostase.yml` (Self Healing V3) permanece ativo e inalterado. Seu gatilho aceita workflows selecionados originados em `main`; não inclui JARVIS PR Validation nem Jarvis Task Queue Tests. Portanto, o workflow preservado não é um auto-healer de falhas de branches de PR. Não foi feita extensão privilegiada nesta auditoria: ela exigiria uma fronteira explícita entre código de PR não confiável e publicação com credenciais.
+
+### Autoevolução agendada
+
+- O run agendado mais recente localizado foi [42669010758](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42669010758), no SHA anterior `36d47cb`. O job Gate registrou `EVOLUTION_ENABLED` vazio e a mensagem `Auto-evolução pausada (EVOLUTION_ENABLED != true)`; geração/sandbox e publicação foram `skipped`.
+- `data/roadmap_missions.json` permanece com `missions: []`. São dois bloqueios independentes: a variável de ativação não está em `true` e não há missão revisada aprovada. Nenhum LLM, Docker candidato ou publisher foi executado. Não alterar flags/secrets nesta auditoria.
+
+### Supabase e runtime — consultas somente leitura
+
+- Projeto `saibtpdehhprttqlgqdt`: `ACTIVE_HEALTHY`, PostgreSQL 17.6.1.063.
+- Ledger remoto: **30 migrations**; diretório local: **30 arquivos SQL**, correspondência exata de versão e nome **30/30**. Última entrada: `20261108193000 / durable_tool_approvals`. Isso resolve a divergência de nomes/versões do inventário anterior, mas **não fecha #732**: comparação schema-aware, Preview descartável e plano de rollback continuam sem validação. A lista de branches Supabase retornou apenas `main`; não foi criada branch paga.
+- `jarvis_agent_tasks`: 13 linhas, 0 com `owner_id`, 0 com `created_by`. `jarvis_agents`: 5 (3 available, 2 offline). Credenciais ativas de agentes: 0. `jarvis_tool_approvals`: 0. `jarvis_vector_memories`: 0.
+- `intelligence_event_snapshots`: 0; `intelligence_observation_snapshots`: 0; `jarvis_intelligence_worker_runs`: 0. A única linha da lease tem `worker_id=NULL` e `lease_expires_at=NULL`.
+- `jarvis_environment_observations`: 1.755 registros, 0 não expirados; último `received_at` em 2026-11-03 15:11:28 UTC e maior `expires_at` em 15:16:27 UTC. Há ingestão histórica, não telemetria fresca.
+- Logs do Render `Jarvis-api` registraram `Universal Intelligence recurring worker disabled by feature flags` até 2026-11-09 20:43:31 UTC, inclusive após o deploy #794. O deploy está live, mas o worker recorrente continua desabilitado.
+- Advisor de segurança: 31 tabelas com RLS habilitado e sem policies (INFO). Consulta de privilégios confirmou zero grants de SELECT/INSERT/UPDATE/DELETE para `anon` e `authenticated` nessas 31 tabelas; `service_role` possui ao menos um desses privilégios em 30/31. O aviso não equivale a exposição pública. Advisor de health: nenhum finding.
+- Advisor de performance: 43 índices marcados como unused (INFO). Não remover: tabelas vazias, baixo tráfego e janela de observação curta podem explicar o resultado; medir workload antes de qualquer alteração.
+
+### Estado cognitivo
+
+- PR #790 já comprova em CI a composição local do coletor, Core, worker e adaptador de histórico com doubles determinísticos; PR #792 acrescenta teste do ledger real de STATUS. Isso não prova worker ativo, persistência real ou consumer autenticado ponta a ponta.
+- Os três critérios `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem `pending`; o ledger não foi alterado. `docs/COGNITIVE_BASELINE.md` precisa distinguir o mapa local/testado dos consumidores e runtime ainda não verificados.
+- C0 permanece aberto; C1 — World Model — permanece bloqueado. Não criar contratos, banco de grafos, event bus, memória ou scheduler paralelo.
+
+**Operações desta auditoria:** somente leitura no GitHub, Supabase e Render. Nenhum DDL/DML, migration, deploy manual, alteração de secret/flag, mudança de permissão ou alteração de produção foi executado.
