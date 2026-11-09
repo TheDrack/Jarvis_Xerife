@@ -416,14 +416,13 @@ class RoadmapMissionSelector:
             raise RoadmapManifestError("roadmap_manifest_hold_reason_invalid")
         self.hold_reason = hold_reason or self.hold_reason
 
-        status_evidence = self._load_status_evidence(roadmap_content)
-
         missions = manifest.get("missions")
         if not isinstance(missions, list):
             raise RoadmapManifestError("roadmap_manifest_missions_must_be_list")
         if not missions:
             return None
 
+        status_evidence = self._load_status_evidence(roadmap_content)
         capability_ids = self._load_capability_ids()
         validated = [
             self._validate_mission(item, roadmap_lines, roadmap_content, capability_ids)
