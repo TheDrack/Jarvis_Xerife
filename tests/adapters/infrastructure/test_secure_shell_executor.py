@@ -103,6 +103,11 @@ def test_runner_uses_non_shell_powershell_and_a_sanitized_environment(monkeypatc
     assert "command arguments" not in result
 
 
+
+def test_psdrive_projection_serializes_provider_as_a_scalar():
+    assert "Provider.Name" in executor._POWERSHELL_WRAPPER
+    assert "Name, Provider, Root, Used, Free" not in executor._POWERSHELL_WRAPPER
+
 def test_runner_redacts_and_bounds_command_output(monkeypatch):
     monkeypatch.setattr(
         executor.shutil, "which", lambda name: "C:\\Windows\\powershell.exe"
