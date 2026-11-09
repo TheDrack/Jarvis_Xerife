@@ -175,26 +175,19 @@ def _validate_command(command: str) -> tuple[str, str]:
 
 
 def _safe_environment(command: str) -> dict[str, str]:
-    """Forward only OS variables required to launch PowerShell and load modules."""
-    allowed = {
-        "APPDATA",
-        "LOCALAPPDATA",
-        "PATH",
-        "PROGRAMDATA",
-        "PROGRAMFILES",
-        "PROGRAMFILES(X86)",
-        "PSMODULEPATH",
-        "SYSTEMROOT",
-        "TEMP",
-        "TMP",
-        "USERPROFILE",
-        "WINDIR",
-    }
+    """Build a minimal process environment with only system PowerShell modules."""
+    system_root = os.environ.get("SystemRoot") or os.environ.get("WINDIR") or r"C:\\Windows"
+    program_files = os.environ.get("ProgramFiles") or r"C:\\Program Files"
+    module_paths = [
+        os.path.join(system_root, "System32", "WindowsPowerShell", "v1.0", "Modules"),
+        os.path.join(program_files, "WindowsPowerShell", "Modules"),
+    ]
     environment = {
-        key: value
-        for key, value in os.environ.items()
-        if key.upper() in allowed and isinstance(value, str)
+        key: os.environ[key]
+        for key in ("SystemRoot", "WINDIR", "TEMP", "TMP", "ProgramData", "ProgramFiles")
+        if key in os.environ
     }
+    environment["PSModulePath"] = os.pathsep.join(module_paths)
     environment["JARVIS_SHELL_COMMAND"] = command
     environment["POWERSHELL_TELEMETRY_OPTOUT"] = "1"
     return environment
