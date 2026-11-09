@@ -109,9 +109,9 @@ def test_task_execution_requires_owner_and_current_worker_attempt():
 
 @pytest.mark.parametrize(
     ("owner", "executor"),
-    [("user-2", "worker-1"), ("user-1", "worker-2"), ("user-1", None)],
+    [("user-1", "worker-2"), ("user-1", None)],
 )
-def test_cross_owner_or_stale_worker_attempt_is_denied(owner, executor):
+def test_wrong_or_stale_worker_attempt_is_denied(owner, executor):
     manifest = _manifest()
     request = ToolRequest(
         tool_id=manifest.tool_id,
@@ -140,6 +140,55 @@ def test_worker_cannot_dispatch_without_task_and_attempt_binding():
         policy.authorize_tool(request, manifest)
 
 
+
+def test_worker_identity_is_not_confused_with_task_owner():
+    manifest = _manifest()
+    request = ToolRequest(
+        tool_id=manifest.tool_id,
+        capability="sample.read",
+        task_id="task-owned-by-user",
+        attempt_id="attempt-7",
+    )
+    policy = HostToolAuthorizationPolicy(
+        principal_resolver=lambda: TrustedToolPrincipal(
+            principal_id="worker:worker-7",
+            session_id="worker-session-7",
+            capabilities=frozenset({"sample.read"}),
+            agent_id="worker-7",
+        ),
+        task_owner_resolver=lambda task_id: "user-42",
+        task_executor_resolver=lambda task_id, attempt_id: "worker-7",
+    )
+
+    decision = policy.authorize_tool(request, manifest)
+
+    assert decision.principal_id == "user-42"
+    assert decision.executor_id == "worker-7"
+    assert decision.session_id == "worker-session-7"
+
+
+def test_worker_cannot_claim_another_workers_attempt_even_when_task_owner_matches():
+    manifest = _manifest()
+    request = ToolRequest(
+        tool_id=manifest.tool_id,
+        capability="sample.read",
+        task_id="task-owned-by-user",
+        attempt_id="attempt-7",
+    )
+    policy = HostToolAuthorizationPolicy(
+        principal_resolver=lambda: TrustedToolPrincipal(
+            principal_id="worker:worker-8",
+            session_id="worker-session-8",
+            capabilities=frozenset({"sample.read"}),
+            agent_id="worker-8",
+        ),
+        task_owner_resolver=lambda task_id: "user-42",
+        task_executor_resolver=lambda task_id, attempt_id: "worker-7",
+    )
+
+    with pytest.raises(PermissionError, match="active task attempt"):
+        policy.authorize_tool(request, manifest)
+
 def test_active_tool_requires_verifiable_exact_request_approval():
     manifest = _manifest(risk_level="active")
     request = ToolRequest(
@@ -155,7 +204,7 @@ def test_active_tool_requires_verifiable_exact_request_approval():
         approval_id="approval-1",
         status="approved",
         principal_id="user-1",
-        session_id="session-1",
+        approver_session_id="approver-session-1",
         task_id="task-1",
         tool_id=manifest.tool_id,
         tool_version=manifest.version,
@@ -169,7 +218,9 @@ def test_active_tool_requires_verifiable_exact_request_approval():
     policy = HostToolAuthorizationPolicy(
         principal_resolver=lambda: _principal(capabilities=("sample.write",)),
         task_owner_resolver=lambda task_id: "user-1",
-        approval_verifier=lambda approval_id: approval,
+        approval_verifier=lambda approval_id, request, principal_id, executor_id: {
+            **approval.model_dump(), "status": "consumed"
+        },
         clock=lambda: now,
     )
 
@@ -179,6 +230,60 @@ def test_active_tool_requires_verifiable_exact_request_approval():
     assert decision.approval_id == "approval-1"
     assert decision.expires_at == approval.expires_at
 
+
+
+def test_worker_approval_binds_task_owner_not_worker_session():
+    manifest = _manifest(risk_level="active")
+    request = ToolRequest(
+        tool_id=manifest.tool_id,
+        capability="sample.write",
+        arguments={"value": "approved"},
+        scope="local",
+        approval_id="approval-worker-1",
+        task_id="task-1",
+        attempt_id="attempt-1",
+        idempotency_key="intent-worker-1",
+    )
+    now = datetime.now(timezone.utc)
+    approval = VerifiedToolApproval(
+        approval_id="approval-worker-1",
+        status="approved",
+        principal_id="user-1",
+        approver_session_id="human-session-9",
+        task_id="task-1",
+        tool_id=manifest.tool_id,
+        tool_version=manifest.version,
+        capability="sample.write",
+        scope="local",
+        operation=manifest.operation,
+        arguments_digest=tool_request_digest(request),
+        approved_at=now - timedelta(seconds=1),
+        expires_at=now + timedelta(minutes=2),
+    )
+    observed = []
+    policy = HostToolAuthorizationPolicy(
+        principal_resolver=lambda: TrustedToolPrincipal(
+            principal_id="worker:worker-1",
+            session_id="worker-session-1",
+            capabilities=frozenset({"sample.write"}),
+            agent_id="worker-1",
+        ),
+        task_owner_resolver=lambda task_id: "user-1",
+        task_executor_resolver=lambda task_id, attempt_id: "worker-1",
+        approval_verifier=lambda approval_id, envelope, owner_id, executor_id: (
+            observed.append((owner_id, executor_id, envelope.task_id))
+            or {**approval.model_dump(), "status": "consumed"}
+        ),
+        clock=lambda: now,
+    )
+
+    decision = policy.authorize_tool(request, manifest)
+
+    assert observed == [("user-1", "worker-1", "task-1")]
+    assert decision.principal_id == "user-1"
+    assert decision.executor_id == "worker-1"
+    assert decision.session_id == "worker-session-1"
+    assert decision.approval_id == "approval-worker-1"
 
 def test_active_tool_without_approval_verifier_fails_closed():
     manifest = _manifest(risk_level="active")
@@ -209,7 +314,7 @@ def test_approval_cannot_be_replayed_with_changed_arguments_or_scope():
         approval_id="approval-1",
         status="approved",
         principal_id="user-1",
-        session_id="session-1",
+        approver_session_id="approver-session-1",
         task_id=None,
         tool_id=manifest.tool_id,
         tool_version=manifest.version,
@@ -225,7 +330,9 @@ def test_approval_cannot_be_replayed_with_changed_arguments_or_scope():
     )
     policy = HostToolAuthorizationPolicy(
         principal_resolver=lambda: _principal(capabilities=("sample.write",)),
-        approval_verifier=lambda approval_id: approval,
+        approval_verifier=lambda approval_id, request, principal_id, executor_id: {
+            **approval.model_dump(), "status": "consumed"
+        },
         clock=lambda: now,
     )
 
@@ -245,7 +352,7 @@ def test_expired_or_rejected_approval_is_denied():
         approval_id="approval-1",
         status="rejected",
         principal_id="user-1",
-        session_id="session-1",
+        approver_session_id="approver-session-1",
         task_id=None,
         tool_id=manifest.tool_id,
         tool_version=manifest.version,
@@ -258,13 +365,45 @@ def test_expired_or_rejected_approval_is_denied():
     )
     policy = HostToolAuthorizationPolicy(
         principal_resolver=lambda: _principal(capabilities=("sample.write",)),
-        approval_verifier=lambda approval_id: approval,
+        approval_verifier=lambda approval_id, request, principal_id, executor_id: approval.model_dump(),
         clock=lambda: now,
     )
 
-    with pytest.raises(PermissionError):
+    with pytest.raises(PermissionError, match="does not match"):
         policy.authorize_tool(request, manifest)
 
+
+def test_expired_consumption_receipt_is_denied():
+    manifest = _manifest(risk_level="active")
+    now = datetime.now(timezone.utc)
+    request = ToolRequest(
+        tool_id=manifest.tool_id,
+        capability="sample.write",
+        approval_id="approval-expired",
+    )
+    approval = VerifiedToolApproval(
+        approval_id="approval-expired",
+        status="consumed",
+        principal_id="user-1",
+        approver_session_id="approver-session-1",
+        task_id=None,
+        tool_id=manifest.tool_id,
+        tool_version=manifest.version,
+        capability="sample.write",
+        scope="local",
+        operation=manifest.operation,
+        arguments_digest=tool_request_digest(request),
+        approved_at=now - timedelta(minutes=3),
+        expires_at=now - timedelta(minutes=1),
+    )
+    policy = HostToolAuthorizationPolicy(
+        principal_resolver=lambda: _principal(capabilities=("sample.write",)),
+        approval_verifier=lambda approval_id, envelope, principal_id, executor_id: approval,
+        clock=lambda: now,
+    )
+
+    with pytest.raises(PermissionError, match="not currently valid"):
+        policy.authorize_tool(request, manifest)
 
 
 def test_dispatcher_passes_task_binding_to_audit_after_host_authorization():
@@ -295,6 +434,7 @@ def test_dispatcher_passes_task_binding_to_audit_after_host_authorization():
     assert events[0].task_id == "task-1"
     assert events[0].attempt_id == "attempt-1"
     assert events[0].principal_id == "user-1"
+    assert events[0].executor_id == "worker-1"
 
 
 def test_dispatcher_rejects_authorization_decision_for_another_task():
@@ -353,7 +493,7 @@ def test_approval_cannot_be_replayed_with_a_different_idempotency_key():
         approval_id="approval-1",
         status="approved",
         principal_id="user-1",
-        session_id="session-1",
+        approver_session_id="approver-session-1",
         task_id=None,
         tool_id=manifest.tool_id,
         tool_version=manifest.version,
@@ -366,7 +506,9 @@ def test_approval_cannot_be_replayed_with_a_different_idempotency_key():
     )
     policy = HostToolAuthorizationPolicy(
         principal_resolver=lambda: _principal(capabilities=("sample.write",)),
-        approval_verifier=lambda approval_id: approval,
+        approval_verifier=lambda approval_id, request, principal_id, executor_id: {
+            **approval.model_dump(), "status": "consumed"
+        },
         clock=lambda: now,
     )
 
@@ -396,7 +538,7 @@ def test_dispatcher_idempotency_namespace_isolated_between_owned_tasks():
             approval_id=request.approval_id,
             status="approved",
             principal_id="user-1",
-            session_id="session-1",
+            approver_session_id="approver-session-1",
             task_id=request.task_id,
             tool_id=manifest.tool_id,
             tool_version=manifest.version,
@@ -422,7 +564,10 @@ def test_dispatcher_idempotency_namespace_isolated_between_owned_tasks():
         authorizer=HostToolAuthorizationPolicy(
             principal_resolver=lambda: _principal(capabilities=("sample.write",)),
             task_owner_resolver=lambda task_id: "user-1",
-            approval_verifier=lambda approval_id: approvals.get(approval_id),
+            approval_verifier=lambda approval_id, request, principal_id, executor_id: (
+                {**approvals[approval_id].model_dump(), "status": "consumed"}
+                if approval_id in approvals else None
+            ),
             clock=lambda: now,
         ),
     )

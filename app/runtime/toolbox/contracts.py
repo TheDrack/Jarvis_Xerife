@@ -75,6 +75,7 @@ class ToolAuthorizationDecision(BaseModel):
     granted: bool
     principal_id: str = Field(min_length=1, max_length=256)
     session_id: str = Field(min_length=1, max_length=256)
+    executor_id: Optional[str] = Field(default=None, min_length=1, max_length=256)
     tool_id: str = Field(min_length=3)
     tool_version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
     capability: str = Field(min_length=1)
@@ -104,6 +105,7 @@ class ToolExecutionEvent(BaseModel):
     correlation_id: Optional[str] = None
     principal_id: Optional[str] = None
     session_id: Optional[str] = None
+    executor_id: Optional[str] = None
     approval_id: Optional[str] = None
     task_id: Optional[str] = None
     attempt_id: Optional[str] = None

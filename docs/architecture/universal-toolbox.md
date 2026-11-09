@@ -52,7 +52,8 @@ The Toolbox uses DriveUploader.upload_backup_scoped(context), restricted to the 
 - Cancellation is observed between toolchain steps/retries; it cannot forcibly stop a synchronous provider call already running in a worker thread.
 - Retry is restricted to explicitly retryable read-only operations; active/intervention retry/compensation remains disabled.
 - Legacy pipeline steps are not automatically migrated; their behavior remains unchanged.
-- No production `tool_authorization_policy` is registered yet. Until a host-backed principal/session resolver and approval verifier are implemented, all real dispatch attempts fail closed; the tests use an explicitly test-only policy double.
+- A durable, service-role-only approval store now models pending → approved → consumed/revoked transitions. Consumption is an atomic compare-and-set over owner, task, tool/version, capability, scope, operation, arguments digest, and idempotency key; the approver session is distinct from the later executor session. The migration and store are not yet deployed or registered in production.
+- No production `tool_authorization_policy` is registered yet. The approval creation/confirmation API, authenticated session resolver, task/executor resolver composition, and Nexus registration remain pending. Real dispatch attempts continue to fail closed.
 - GitHub, Supabase, Render, browser, network, and other connectors remain migration targets; they are not declared universalized by this first registry.
 
 ## Consequences

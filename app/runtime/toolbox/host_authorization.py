@@ -55,7 +55,7 @@ class VerifiedToolApproval(BaseModel):
     approval_id: str = Field(min_length=1, max_length=256)
     status: str
     principal_id: str = Field(min_length=1, max_length=256)
-    session_id: str = Field(min_length=1, max_length=256)
+    approver_session_id: str = Field(min_length=1, max_length=256)
     task_id: str | None = Field(default=None, max_length=200)
     tool_id: str = Field(min_length=3, max_length=128)
     tool_version: str = Field(min_length=5, max_length=64)
@@ -103,8 +103,10 @@ class HostToolAuthorizationPolicy:
     - task_executor_resolver: active attempt's persisted worker identity;
     - approval_verifier: durable approval lookup with revocation/expiry semantics.
 
-    Missing evidence is a denial. This class does not silently fall back to
-    caller labels, user metadata, booleans, or an in-memory approval cache.
+    For worker execution, the persisted task owner becomes the effective
+    principal while the worker remains a separate executor identity. The
+    approval's approver session is intentionally independent from the later
+    worker execution session. Missing evidence is a denial.
     """
 
     def __init__(
@@ -113,7 +115,7 @@ class HostToolAuthorizationPolicy:
         principal_resolver: Callable[[], TrustedToolPrincipal | Mapping[str, Any] | None],
         task_owner_resolver: Callable[[str], str | None] | None = None,
         task_executor_resolver: Callable[[str, str], str | None] | None = None,
-        approval_verifier: Callable[[str], VerifiedToolApproval | Mapping[str, Any] | None] | None = None,
+        approval_verifier: Callable[[str, ToolRequest, str, str], VerifiedToolApproval | Mapping[str, Any] | None] | None = None,
         clock: Callable[[], datetime] | None = None,
         decision_ttl: timedelta = timedelta(seconds=60),
     ) -> None:
@@ -145,19 +147,22 @@ class HostToolAuthorizationPolicy:
         ):
             raise PermissionError("Requested scope is outside the tool manifest allowlist")
 
-        self._verify_task_binding(request, principal)
+        effective_principal_id = self._verify_task_binding(request, principal)
 
         approval_id = None
         expires_at = self._now() + self._decision_ttl
         if manifest.risk_level != "read_only":
-            approval = self._verify_approval(request, manifest, principal, capability)
+            approval = self._verify_approval(
+                request, manifest, principal, capability, effective_principal_id
+            )
             approval_id = approval.approval_id
             expires_at = approval.expires_at
 
         return ToolAuthorizationDecision(
             granted=True,
-            principal_id=principal.principal_id,
+            principal_id=effective_principal_id,
             session_id=principal.session_id,
+            executor_id=principal.agent_id or principal.principal_id,
             tool_id=manifest.tool_id,
             tool_version=manifest.version,
             capability=capability,
@@ -191,13 +196,16 @@ class HostToolAuthorizationPolicy:
                 raise PermissionError("Trusted principal context is invalid") from exc
         raise PermissionError("Principal resolver returned an unsupported identity type")
 
-    def _verify_task_binding(self, request: ToolRequest, principal: TrustedToolPrincipal) -> None:
+    def _verify_task_binding(
+        self, request: ToolRequest, principal: TrustedToolPrincipal
+    ) -> str:
+        """Return the trusted task owner; worker identity is never treated as owner."""
         if request.attempt_id and not request.task_id:
             raise PermissionError("An attempt must be bound to a task")
         if principal.agent_id and (not request.task_id or not request.attempt_id):
             raise PermissionError("Worker tool execution requires a task and attempt binding")
         if not request.task_id:
-            return
+            return principal.principal_id
         if self._task_owner_resolver is None:
             raise PermissionError("Trusted task-owner resolver is unavailable")
         try:
@@ -206,7 +214,9 @@ class HostToolAuthorizationPolicy:
             raise PermissionError(
                 f"Task ownership verification failed ({type(exc).__name__})"
             ) from None
-        if owner_id != principal.principal_id:
+        if not owner_id:
+            raise PermissionError("Task has no persisted owner")
+        if not principal.agent_id and owner_id != principal.principal_id:
             raise PermissionError("Task is not owned by the authenticated principal")
         if principal.agent_id:
             if self._task_executor_resolver is None:
@@ -221,6 +231,7 @@ class HostToolAuthorizationPolicy:
                 ) from None
             if executor_id != principal.agent_id:
                 raise PermissionError("Worker does not own the active task attempt")
+        return owner_id
 
     def _verify_approval(
         self,
@@ -228,13 +239,19 @@ class HostToolAuthorizationPolicy:
         manifest: ToolManifest,
         principal: TrustedToolPrincipal,
         capability: str,
+        effective_principal_id: str,
     ) -> VerifiedToolApproval:
         if not request.approval_id:
             raise PermissionError("Active tool execution requires an approval reference")
         if self._approval_verifier is None:
             raise PermissionError("Trusted approval verifier is unavailable")
         try:
-            value = self._approval_verifier(request.approval_id)
+            value = self._approval_verifier(
+                request.approval_id,
+                request,
+                effective_principal_id,
+                principal.agent_id or principal.principal_id,
+            )
         except Exception as exc:
             raise PermissionError(
                 f"Approval verification failed ({type(exc).__name__})"
@@ -253,9 +270,8 @@ class HostToolAuthorizationPolicy:
 
         expected = {
             "approval_id": request.approval_id,
-            "status": "approved",
-            "principal_id": principal.principal_id,
-            "session_id": principal.session_id,
+            "status": "consumed",
+            "principal_id": effective_principal_id,
             "task_id": request.task_id,
             "tool_id": manifest.tool_id,
             "tool_version": manifest.version,
