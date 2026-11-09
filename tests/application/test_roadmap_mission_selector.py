@@ -149,9 +149,10 @@ def _selector(root: Path) -> RoadmapMissionSelector:
     return RoadmapMissionSelector(repository_root=root)
 
 
-def test_empty_manifest_is_a_safe_noop_without_legacy_inventory_lookup(tmp_path):
+def test_empty_manifest_is_a_safe_noop_without_legacy_inventory_or_status_lookup(tmp_path):
     root, _ = _repository(tmp_path)
     (root / "data" / "capabilities.json").unlink()
+    (root / "docs" / "STATUS.md").unlink()
 
     selector = _selector(root)
 
