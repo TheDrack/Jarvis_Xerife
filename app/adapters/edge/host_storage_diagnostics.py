@@ -46,7 +46,11 @@ def _scan_root(
     """Walk a bounded directory tree and aggregate file metadata only."""
     if isinstance(max_depth, bool) or not isinstance(max_depth, int) or not 1 <= max_depth <= 6:
         raise ValueError("max_depth must be an integer between 1 and 6")
-    if isinstance(max_entries, bool) or not isinstance(max_entries, int) or not 100 <= max_entries <= 50_000:
+    if (
+        isinstance(max_entries, bool)
+        or not isinstance(max_entries, int)
+        or not 100 <= max_entries <= 50_000
+    ):
         raise ValueError("max_entries must be an integer between 100 and 50000")
     if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, (int, float)):
         raise ValueError("timeout_seconds must be numeric")
@@ -98,14 +102,13 @@ def _scan_root(
                     path = Path(entry.path)
                     if stat.S_ISDIR(metadata.st_mode):
                         name = entry.name.casefold()
-                        if name in _PROTECTED_DIRS:
+                        if name in _PROTECTED_DIRS or depth >= max_depth:
                             skipped_entries += 1
                             continue
                         scanned_directories += 1
                         directory_depths[path] = depth + 1
                         directory_sizes.setdefault(path, 0)
-                        if depth < max_depth:
-                            stack.append((path, depth + 1, (*ancestors, path)))
+                        stack.append((path, depth + 1, (*ancestors, path)))
                     elif stat.S_ISREG(metadata.st_mode):
                         scanned_files += 1
                         size = max(0, int(metadata.st_size))
