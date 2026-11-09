@@ -9,9 +9,16 @@ from typing import Any, Callable
 
 from app.application.services.adapter_registry import AdapterRegistry
 from app.application.services.graph_expander_setup import get_graph_expander_registry
+from app.application.services.graph_store_setup import get_graph_store
 from app.application.services.osint_adapter_setup import get_osint_registry
 from app.application.services.osint_discovery import OSINTDiscoveryService
-from app.domain.graph.edges import Edge
+from app.domain.graph.confidence import (
+    CROSS_SCOPE_FACTOR,
+    PIVOT_FACTOR,
+    edge_confidence,
+    is_strong_pivot,
+)
+from app.domain.graph.edges import WEAK_PIVOT_CAP, WEAK_PIVOTS, Edge, PivotType
 from app.domain.graph.nodes import Node, NodeType
 from app.domain.graph.registry import RateLimitExceeded
 from app.domain.intelligence.osint import Coordinate, Host
@@ -121,6 +128,95 @@ def register_osint_tools(mcp: Any) -> None:
                     edge.model_dump(mode="json") for edge in unique_edges.values()
                 ],
                 "gap": registry.find_gap(node_type=NodeType.IP).as_dict(),
+            }
+        except Exception as exc:
+            return failure(exc)
+
+    @mcp.tool(name="osint.graph.explain")
+    def osint_graph_explain(
+        edge_id: str | None = None,
+        scope_id: str | None = None,
+        edge: dict[str, Any] | None = None,
+        src_node: dict[str, Any] | None = None,
+        dst_node: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Explain an edge from its pivot, selector, source and confidence.
+
+        Pass either a persisted ``edge_id`` (optionally scoped) or the full
+        ``edge`` dump. The store lookup reloads both endpoints, so the canonical
+        confidence is always recomputed; the payload form recomputes only when
+        ``src_node``/``dst_node`` are supplied. The edge is re-validated (derived
+        id, bounds, weak-pivot cap) and a disagreement is reported as
+        ``consistent: false`` instead of being silently corrected.
+        """
+        try:
+            if (edge is None) == (edge_id is None):
+                raise ValueError("provide exactly one of edge_id or edge")
+            if edge_id is not None:
+                store = get_graph_store()
+                persisted = store.get_edge(edge_id, scope_id=scope_id)
+                if persisted is None:
+                    return {
+                        "success": False,
+                        "error": f"edge {edge_id} not found"
+                        + (f" in scope {scope_id}" if scope_id else ""),
+                        "error_type": "LookupError",
+                        "edge_id": edge_id,
+                        "scope_id": scope_id,
+                    }
+                explained = persisted
+                src = store.get_node(persisted.src)
+                dst = store.get_node(persisted.dst)
+                resolved_from = "store"
+            else:
+                explained = Edge.model_validate(edge)
+                if scope_id is not None and explained.scope_id != scope_id:
+                    raise ValueError("edge does not belong to the requested scope")
+                src = _explain_endpoint(src_node, explained.scope_id)
+                dst = _explain_endpoint(dst_node, explained.scope_id)
+                resolved_from = "payload"
+            factor = PIVOT_FACTOR[explained.pivot]
+            expected = (
+                edge_confidence(src, dst, explained.pivot) if src and dst else None
+            )
+            checks, caveats = _explain_checks(explained, src, dst, factor, expected)
+            consistent = None
+            if expected is not None:
+                consistent = (
+                    abs(expected - explained.confidence) <= 1e-9
+                    and all(check["passed"] for check in checks if check["required"])
+                )
+            return {
+                "success": True,
+                "resolved_from": resolved_from,
+                "edge_id": explained.id,
+                "src": explained.src,
+                "dst": explained.dst,
+                "pivot": explained.pivot.value,
+                "pivot_kind": _pivot_kind(explained.pivot),
+                "selector_used": explained.selector_used,
+                "source": explained.source,
+                "confidence": explained.confidence,
+                "scope_id": explained.scope_id,
+                "pivot_weak": explained.pivot_weak,
+                "confidence_breakdown": {
+                    "pivot_factor": factor,
+                    "weak_pivot_cap": (
+                        WEAK_PIVOT_CAP if explained.pivot in WEAK_PIVOTS else None
+                    ),
+                    "cross_scope_factor": CROSS_SCOPE_FACTOR,
+                    "expected": expected,
+                    "observed": explained.confidence,
+                },
+                "checks": [
+                    {key: value for key, value in check.items() if key != "required"}
+                    for check in checks
+                ],
+                "consistent": consistent,
+                "explanation": _explain_text(
+                    explained, src, dst, factor, expected
+                ),
+                "caveats": caveats,
             }
         except Exception as exc:
             return failure(exc)
@@ -252,6 +348,145 @@ def register_osint_tools(mcp: Any) -> None:
             }
         except Exception as exc:
             return failure(exc)
+
+
+def _explain_endpoint(descriptor: dict[str, Any] | None, scope_id: str) -> Node | None:
+    """Rebuild one endpoint node from its evidence, defaulting the scope."""
+    if descriptor is None:
+        return None
+    return Node.model_validate({**descriptor, "scope_id": descriptor.get("scope_id", scope_id)})
+
+
+def _pivot_kind(pivot: PivotType) -> str:
+    current = PivotType(pivot)
+    if is_strong_pivot(current):
+        return "strong"
+    if current in WEAK_PIVOTS:
+        return "weak"
+    return "contextual"
+
+
+def _explain_checks(
+    edge: Edge,
+    src: Node | None,
+    dst: Node | None,
+    factor: float,
+    expected: float | None,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    checks: list[dict[str, Any]] = [
+        {
+            "check": "edge_id",
+            "passed": True,
+            "required": True,
+            "detail": "id derivado de (src, dst, pivot, selector_used, source)",
+        },
+        {
+            "check": "pivot_confidence",
+            "passed": abs(edge.confidence - factor) <= 1e-9,
+            "required": False,
+            "detail": f"fator do pivô {edge.pivot.value} = {factor}",
+        },
+    ]
+    caveats: list[str] = []
+    if abs(edge.confidence - factor) > 1e-9:
+        caveats.append(
+            "confiança difere do fator do pivô; pode ser o fator de escopo "
+            f"cruzado ({CROSS_SCOPE_FACTOR}) ou um valor inconsistente"
+        )
+
+    if edge.pivot in WEAK_PIVOTS:
+        checks.append(
+            {
+                "check": "weak_pivot_cap",
+                "passed": edge.confidence <= WEAK_PIVOT_CAP,
+                "required": True,
+                "detail": f"teto de pivô fraco = {WEAK_PIVOT_CAP}",
+            }
+        )
+
+    for name, node, endpoint_id in (
+        ("src_node", src, edge.src),
+        ("dst_node", dst, edge.dst),
+    ):
+        if node is None:
+            continue
+        checks.append(
+            {
+                "check": f"{name}_identity",
+                "passed": node.id == endpoint_id,
+                "required": True,
+                "detail": f"{node.type.value}@{node.scope_id} → {node.id}",
+            }
+        )
+
+    if src is not None and dst is not None:
+        checks.append(
+            {
+                "check": "same_scope",
+                "passed": src.scope_id == dst.scope_id,
+                "required": False,
+                "detail": f"{src.scope_id} ↔ {dst.scope_id}",
+            }
+        )
+        if src.scope_id != dst.scope_id:
+            caveats.append(
+                "escopos divergentes: a confiança foi penalizada pelo fator cruzado"
+            )
+
+    if expected is not None:
+        checks.append(
+            {
+                "check": "expected_confidence",
+                "passed": abs(expected - edge.confidence) <= 1e-9,
+                "required": True,
+                "detail": f"recalculada = {expected}, informada = {edge.confidence}",
+            }
+        )
+
+    endpoint_selectors = {
+        node.selector.casefold() for node in (src, dst) if node is not None
+    }
+    if endpoint_selectors:
+        selector = edge.selector_used.strip().casefold()
+        checks.append(
+            {
+                "check": "selector_matches_endpoint",
+                "passed": selector in endpoint_selectors,
+                "required": False,
+                "detail": "seletor literal de um endpoint" if selector in endpoint_selectors
+                else "seletor não é o literal de um endpoint (pode ser consulta)",
+            }
+        )
+        if selector not in endpoint_selectors:
+            caveats.append(
+                "selector_used não é o seletor literal de um endpoint; trate como "
+                "parâmetro de consulta, não como identidade"
+            )
+
+    return checks, caveats
+
+
+def _explain_text(
+    edge: Edge,
+    src: Node | None,
+    dst: Node | None,
+    factor: float,
+    expected: float | None,
+) -> str:
+    endpoints = " a ".join(
+        node.selector if node is not None else node_id
+        for node, node_id in ((src, edge.src), (dst, edge.dst))
+    )
+    text = (
+        f"'{edge.source}' liga {endpoints} pelo pivô {edge.pivot.value} "
+        f"usando o seletor '{edge.selector_used}', com confiança {edge.confidence}"
+    )
+    if expected is not None:
+        verdict = "coerente" if abs(expected - edge.confidence) <= 1e-9 else "incoerente"
+        return f"{text}; recalculada a partir dos nós = {expected} ({verdict})"
+    if abs(edge.confidence - factor) <= 1e-9:
+        return f"{text} = fator do pivô ({factor})"
+    return f"{text}, abaixo do fator do pivô ({factor})"
 
 
 def _bbox_to_circle(

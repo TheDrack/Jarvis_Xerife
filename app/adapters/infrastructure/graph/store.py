@@ -208,6 +208,17 @@ class SQLiteGraphStore:
             ).fetchone()
         return _row_to_node(row) if row is not None else None
 
+    def get_edge(self, edge_id: str, *, scope_id: str | None = None) -> Edge | None:
+        """Return one edge, optionally only when it belongs to *scope_id*."""
+        query = "SELECT * FROM edges WHERE id = ?"
+        params: tuple[object, ...] = (edge_id,)
+        if scope_id is not None:
+            query += " AND scope_id = ?"
+            params = (edge_id, scope_id)
+        with self._lock:
+            row = self._conn.execute(query, params).fetchone()
+        return _row_to_edge(row) if row is not None else None
+
     def nodes(self, scope_id: str | None = None) -> tuple[Node, ...]:
         query = "SELECT * FROM nodes"
         params: tuple[object, ...] = ()

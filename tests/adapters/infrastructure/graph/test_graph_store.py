@@ -150,3 +150,14 @@ def test_roundtrip_preserves_last_seen_and_attributes(store) -> None:
     assert loaded is not None
     assert loaded.last_seen == observed
     assert dict(loaded.attributes) == {"asn": 64500, "country": "BR"}
+
+
+def test_get_edge_by_id_is_scoped(store) -> None:
+    src, dst = _ip(), _asn()
+    link = _link(src, dst)
+    store.upsert_delta(GraphDelta(nodes=(src, dst), edges=(link,)))
+
+    assert store.get_edge(link.id) == link
+    assert store.get_edge(link.id, scope_id=SCOPE) == link
+    assert store.get_edge(link.id, scope_id="case-2") is None
+    assert store.get_edge("sha256:" + "0" * 64) is None

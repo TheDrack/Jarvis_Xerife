@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Grafo OSINT — aresta persistida por escopo (2026-11-06)
+
+- `GraphStorePort.get_edge(edge_id, scope_id=None)` e
+  `SQLiteGraphStore.get_edge`: busca uma aresta pelo id derivado,
+  opcionalmente restrita ao escopo. Recusa silenciosa não existe: id
+  desconhecido ou fora do escopo retorna `None`.
+- `app/application/services/graph_store_setup.py`: `graph_db_path()` lê
+  `JARVIS_GRAPH_DB` (padrão `jarvis_graph.sqlite` na raiz do repositório) e
+  `get_graph_store()` abre o `SQLiteGraphStore` uma vez por processo;
+  `reset_graph_store()` fecha no shutdown/testes.
+- `osint.graph.explain` agora aceita `edge_id` + `scope_id` em vez do dump:
+  carrega a aresta e os dois endpoints do store e recalcula a confiança
+  canônica, com `resolved_from: "store"`. Id inexistente ou de outro escopo
+  retorna `success: false`/`LookupError`; `edge` e `edge_id` juntos ou
+  ausentes são recusados.
+- Testes: busca escopada no store, wiring singleton/caminho e resolução da
+  aresta persistida com recálculo, isolamento de escopo e exclusividade da
+  fonte.
+
+#### Grafo OSINT — `osint.graph.explain` via MCP (2026-11-06)
+
+- `app/adapters/edge/osint_mcp_tools.py`: ferramenta atômica `osint.graph.explain`
+  que explica uma aresta sem rede nem estado: recebe o dump da `Edge` e,
+  opcionalmente, os descritores dos nós de origem/destino. Revalida a aresta
+  (id derivado, limites, teto de pivô fraco), expõe `selector_used`, `source`,
+  fator do pivô, fator de escopo cruzado e teto de pivô fraco, e recalcula a
+  confiança canônica quando os dois endpoints são informados.
+- Divergência entre confiança informada e recalculada não é corrigida em
+  silêncio: retorna `consistent: false` com o `expected` e o check
+  `expected_confidence` reprovado. Endpoints com id divergente, `same_scope`
+  falso e `selector_used` que não é o literal de um endpoint aparecem como
+  checks/caveats.
+- `tests/adapters/edge/test_osint_mcp_tools.py`: cobre aresta coerente, modo
+  sem endpoints, confiança incoerente, id forjado, penalidade de escopo
+  cruzado e teto do pivô fraco.
+
 #### Grafo OSINT — `osint.ip.enrich` via MCP (2026-11-06)
 
 - `app/adapters/edge/osint_mcp_tools.py`: ferramenta atômica `osint.ip.enrich`
