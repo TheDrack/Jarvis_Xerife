@@ -563,6 +563,28 @@ def host_resource_diagnostics(process_limit: int = 25) -> dict[str, Any]:
 
 
 @mcp.tool()
+@tracked_action("Inventariando armazenamento do host")
+def host_storage_diagnostics() -> dict[str, Any]:
+    """Return a bounded, read-only inventory of system-drive file metadata.
+
+    Reports largest directories/files and extension totals. File contents are
+    never opened; symlinks and junctions are not followed.
+    """
+    try:
+        from app.adapters.edge.host_storage_diagnostics import collect_host_storage_diagnostics
+
+        return collect_host_storage_diagnostics()
+    except Exception as exc:
+        logger.exception("Host storage diagnostics failed")
+        return {
+            "success": False,
+            "status": "storage_diagnostic_failed",
+            "error": type(exc).__name__,
+            "read_only": True,
+        }
+
+
+@mcp.tool()
 @tracked_action("Executando comando Shell restrito")
 def run_shell_command(command: str, timeout_seconds: int = 15) -> dict[str, Any]:
     """Run one allowlisted, non-elevated PowerShell command through the authenticated MCP tunnel.
