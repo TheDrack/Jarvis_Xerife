@@ -93,10 +93,11 @@ def capture_curiosity_answer(
         curiosity_engine: Instância do CuriosityEngine (opcional)
         
     Returns:
-        Tuple (sucesso, novo_need_id) — novo_need_id é None se capturado
+        Tuple (capturado, novo_need_id). O ID pendente só é limpo após
+        confirmação de sucesso; em falha permanece disponível para retry.
     """
     if not pending_need_id:
-        return False, pending_need_id    
+        return False, pending_need_id
     try:
         if curiosity_engine is None:
             curiosity_engine = nexus.resolve("curiosity_engine")
@@ -115,7 +116,8 @@ def capture_curiosity_answer(
     except Exception as e:
         logger.debug(f"Falha ao capturar resposta: {e}")
     
-    return False, None
+    # Preserve the pending ID so a transient failure can be retried safely.
+    return False, pending_need_id
 
 
 def _get_config_snapshot() -> Dict[str, Any]:
