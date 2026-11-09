@@ -527,7 +527,7 @@ O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remota
 - **PR #793 — merged:** adiciona inventário de armazenamento limitado e somente leitura, com metadados de filesystem, limites de profundidade/entradas/tempo e exclusão de symlinks/reparse points. Inclui testes em `tests/adapters/edge/test_host_storage_diagnostics.py` e projeção PowerShell em `tests/adapters/infrastructure/test_secure_shell_executor.py`.
 - **PR #794 — merged:** expõe o inventário como opção `include_storage_inventory` no diagnóstico de recursos já concedido, mantendo-o opt-in. Testes em `tests/adapters/edge/test_host_resource_diagnostics.py`. PR Validation run 42693842123, Task Queue run 42693842031 e Browser Tests run 42693842090 passaram. Full pytest Linux: 2.888 passed, 15 skipped, 8 warnings. Após merge, Task Queue run 42694784471 no HEAD #794: 2.888 passed, 15 skipped, 181 warnings em Windows/Python 3.12.10. Auto-Documentation run 42694785391 passou.
 - Main run 42646055614 falhou apenas porque `Get-Date` excedeu 10 segundos no teste end-to-end do executor PowerShell. O teste direcionado passou; o full pytest posterior no HEAD #794 passou sem mudança do timeout. Evidência compatível com lentidão transitória do runner/PowerShell, não com defeito determinístico. Não houve redução de cobertura.
-- Não há PRs abertas no estado consultado. Issues abertas: #682, #723 e #732. A PR #757 e as PRs #789–#794 relevantes foram confirmadas merged.
+- No início da auditoria não havia PRs abertas; esta revalidação abriu a PR documental #795. Issues abertas: #682, #723 e #732. A PR #757 e as PRs #789–#794 relevantes foram confirmadas merged.
 
 ### Revalidação de execução e autoevolução
 
