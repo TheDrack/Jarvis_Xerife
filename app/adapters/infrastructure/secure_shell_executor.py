@@ -162,7 +162,7 @@ try {
             $safeItems = @($items | Select-Object -First 100 TaskName, LastRunTime, LastTaskResult, NextRunTime, NumberOfMissedRuns)
         }
         'Get-PSDrive' {
-            $safeItems = @($items | Select-Object -First 100 Name, Provider, Root, Used, Free)
+            $safeItems = @($items | Select-Object -First 100 Name, @{Name='Provider';Expression={$_.Provider.Name}}, Root, Used, Free)
         }
         'Get-NetTCPConnection' {
             $safeItems = @($items | Select-Object -First 100 LocalAddress, LocalPort, RemoteAddress, RemotePort, State, OwningProcess)
