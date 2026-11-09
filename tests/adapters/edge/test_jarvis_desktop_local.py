@@ -462,6 +462,7 @@ def test_local_intelligence_config_loads_only_allowlisted_values(tmp_path, monke
         "JARVIS_GEV_AREA_WEST=-49.0\n"
         "JARVIS_OSIRIS_ENABLED=false\n"
         "JARVIS_DEVICES_DB=C:\\data\\jarvis.db\n"
+        "JARVIS_GRAPH_DB=C:\\data\\jarvis_graph.sqlite\n"
         "SUPABASE_SERVICE_ROLE_KEY=must-not-load\n",
         encoding="utf-8",
     )
@@ -469,13 +470,15 @@ def test_local_intelligence_config_loads_only_allowlisted_values(tmp_path, monke
     monkeypatch.delenv("JARVIS_GEV_AREA_WEST", raising=False)
     monkeypatch.delenv("JARVIS_OSIRIS_ENABLED", raising=False)
     monkeypatch.delenv("JARVIS_DEVICES_DB", raising=False)
+    monkeypatch.delenv("JARVIS_GRAPH_DB", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
 
     loaded = _load_local_intelligence_config(config)
 
-    assert loaded == 4
+    assert loaded == 5
     assert os.environ["JARVIS_GEV_MCP_ENTRYPOINT"].endswith("stdio.js")
     assert os.environ["JARVIS_DEVICES_DB"] == r"C:\data\jarvis.db"
+    assert os.environ["JARVIS_GRAPH_DB"] == r"C:\data\jarvis_graph.sqlite"
     assert os.environ["JARVIS_GEV_AREA_WEST"] == "-49.0"
     assert os.environ["JARVIS_OSIRIS_ENABLED"] == "false"
     assert "SUPABASE_SERVICE_ROLE_KEY" not in os.environ

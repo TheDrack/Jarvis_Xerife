@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Testes: busca escopada no store, wiring singleton/caminho e resolução da
   aresta persistida com recálculo, isolamento de escopo e exclusividade da
   fonte.
+- `osint.ip.enrich` passa a persistir o delta (nós antes das arestas) no store
+  durável e devolve `persisted` com inseridos/duplicados; `persist=false`
+  mantém a chamada sem estado. Falha de disco não descarta a evidência: a
+  expansão continua em `success: true` e o erro aparece em `persisted`.
+- `JARVIS_GRAPH_DB` entra na allowlist de `intelligence.env` do desktop e é
+  documentado em `desktop/README.md`.
 
 #### Grafo OSINT — `osint.graph.explain` via MCP (2026-11-06)
 

@@ -5,8 +5,10 @@ Active scan/capture tools intentionally live in a separate stdio-only server.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from typing import Any, Callable
 
+from app.application.ports.graph_store import GraphStorePort, UpsertReport
 from app.application.services.adapter_registry import AdapterRegistry
 from app.application.services.graph_expander_setup import get_graph_expander_registry
 from app.application.services.graph_store_setup import get_graph_store
@@ -19,9 +21,51 @@ from app.domain.graph.confidence import (
     is_strong_pivot,
 )
 from app.domain.graph.edges import WEAK_PIVOT_CAP, WEAK_PIVOTS, Edge, PivotType
+from app.domain.graph.graph import GraphDelta
 from app.domain.graph.nodes import Node, NodeType
 from app.domain.graph.registry import RateLimitExceeded
 from app.domain.intelligence.osint import Coordinate, Host
+
+
+def _persist_expansion(
+    persist: bool,
+    nodes: Mapping[str, Node],
+    edges: Mapping[str, Edge],
+) -> dict[str, Any]:
+    """Upsert one expansion; storage failures never discard the evidence."""
+    if not persist:
+        return {"requested": False, "saved": False}
+    node_report = UpsertReport()
+    edge_report = UpsertReport()
+    try:
+        store: GraphStorePort = get_graph_store()
+        if nodes:
+            node_report, _ = store.upsert_delta(
+                GraphDelta(nodes=tuple(nodes.values()))
+            )
+        if edges:
+            _, edge_report = store.upsert_delta(
+                GraphDelta(edges=tuple(edges.values()))
+            )
+    except Exception as exc:
+        return {
+            "requested": True,
+            "saved": False,
+            "error": str(exc),
+            "error_type": type(exc).__name__,
+        }
+    return {
+        "requested": True,
+        "saved": True,
+        "nodes": {
+            "inserted": node_report.inserted,
+            "duplicates": node_report.duplicates,
+        },
+        "edges": {
+            "inserted": edge_report.inserted,
+            "duplicates": edge_report.duplicates,
+        },
+    }
 
 
 def register_osint_tools(mcp: Any) -> None:
@@ -72,12 +116,17 @@ def register_osint_tools(mcp: Any) -> None:
         radius_km: float = 5.0,
         scope_id: str = "osint-mcp",
         capabilities: list[str] | None = None,
+        persist: bool = True,
     ) -> dict[str, Any]:
         """Expand one IP atomically through the configured graph expanders.
 
         Only expanders that accept an ``IP`` node run; nothing cascades into a
         loop, so the result is one hop of evidence. Rate-limited capabilities
-        are reported instead of aborting the whole enrichment.
+        are reported instead of aborting the whole enrichment. With ``persist``
+        (default) the evidence is upserted into the durable graph store, so the
+        returned edge ids can later be passed to ``osint.graph.explain``; a
+        store failure is reported in ``persisted`` without dropping the
+        expansion, and ``persist=False`` keeps the call stateless.
         """
         try:
             seed = Node(
@@ -114,6 +163,7 @@ def register_osint_tools(mcp: Any) -> None:
 
             unique_nodes = {node.id: node for node in nodes}
             unique_edges = {edge.id: edge for edge in edges}
+            persisted = _persist_expansion(persist, unique_nodes, unique_edges)
             return {
                 "success": True,
                 "seed_id": seed.id,
@@ -128,6 +178,7 @@ def register_osint_tools(mcp: Any) -> None:
                     edge.model_dump(mode="json") for edge in unique_edges.values()
                 ],
                 "gap": registry.find_gap(node_type=NodeType.IP).as_dict(),
+                "persisted": persisted,
             }
         except Exception as exc:
             return failure(exc)
