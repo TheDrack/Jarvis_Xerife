@@ -491,6 +491,10 @@ This is a confirmed architecture gap, not a completed capability. It is the next
 
 O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remotas e 30 arquivos locais com correspondência version/name 30/30; `jarvis_tool_approvals` com RLS e grants service-role-only, 0 linhas; 5 agentes, 13 tarefas, 0 credenciais individuais ativas e 0/13 tarefas legadas com owner/creator; 0 snapshots de eventos, 0 snapshots de observações e 0 runs do worker recorrente. Esses números são evidência **reportada na PR #789**, não uma nova consulta independente executada por este adendo. A ausência de linhas/runs não prova falha de código, mas não comprova uso operacional.
 
+
+  
+**Evidência ambiental read-only:** a consulta direta de 2026-11-09 encontrou 1.755 registros em `jarvis_environment_observations` (878 presence, 877 network_snapshot), mas 0 ainda não expirados; o último recebimento foi em 2026-11-03 15:11:28 UTC e a maior expiração em 15:16:27 UTC. Isso prova ingestão histórica, não frescor atual. A tabela é distinta de `intelligence_observation_snapshots`, que permanece vazia.
+
 ### Gates e pendências atualizados
 
 - A PR #789 está aberta e o full pytest Linux do head consultado passou. Não há review formal registrada; o review Codex não concluiu por limite de uso, enquanto a revisão Strix não apontou findings de segurança abertos.
