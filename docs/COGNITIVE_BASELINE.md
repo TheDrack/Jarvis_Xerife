@@ -497,7 +497,7 @@ O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remota
 
 ### Gates e pendências atualizados
 
-- A PR #789 está aberta e o full pytest Linux do head consultado passou. Não há review formal registrada; o review Codex não concluiu por limite de uso, enquanto a revisão Strix não apontou findings de segurança abertos.
+- PR #789 está aberta e mergeable, com head `e339c2f8` (7 commits, 5 arquivos documentais). O run `42641384864` de PR Validation está em andamento; o run `42638251557` passou apenas no head antigo `264a589`, e `42641105518` foi cancelado quando a branch avançou. Strix revisou somente `264a589` e marcou os quatro commits posteriores como não revisados; Codex não concluiu por limite de uso. Não há review formal aprovada nem merge.
 - Self Healing V3 e JARVIS PR Validation permanecem presentes. O workflow Self Healing observado não lista JARVIS PR Validation nem Jarvis Task Queue Tests entre suas fontes de `workflow_run`; logo, não há evidência de correção automática de falhas originadas em branches de PR.
 - O Auto-Documentation run 42616056149 falhou no `git push` por non-fast-forward após atualização concorrente de `main`; o run 42619019669 posterior passou. A causa imediata está confirmada nos logs; a condição de corrida do workflow permanece.
 - **C0 continua aberto:** `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem `pending` no ledger de STATUS. C1 — World Model — não deve começar antes da aceitação C0. Não marcar ownership, migration, policy ou approval schema como comportamento operacional concluído apenas por estarem merged/deployed.
