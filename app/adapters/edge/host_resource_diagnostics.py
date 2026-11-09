@@ -12,6 +12,7 @@ def collect_host_resource_diagnostics(
     adapter: HostPort | None = None,
     *,
     process_limit: int = 25,
+    include_storage_inventory: bool = False,
 ) -> dict[str, Any]:
     """Collect identity, CPU/RAM, mounted disk usage and top processes.
 
@@ -23,6 +24,9 @@ def collect_host_resource_diagnostics(
         raise TypeError("process_limit must be an integer")
     if not 1 <= process_limit <= 50:
         raise ValueError("process_limit must be between 1 and 50")
+
+    if not isinstance(include_storage_inventory, bool):
+        raise TypeError("include_storage_inventory must be a boolean")
 
     host = adapter or PsutilHostAdapter()
     identity = asdict(host.get_identity())
@@ -40,7 +44,7 @@ def collect_host_resource_diagnostics(
         )
     )
 
-    return {
+    result = {
         "success": True,
         "read_only": True,
         "identity": identity,
@@ -55,3 +59,10 @@ def collect_host_resource_diagnostics(
             "file_contents_collected": False,
         },
     }
+
+    if include_storage_inventory:
+        from app.adapters.edge.host_storage_diagnostics import collect_host_storage_diagnostics
+
+        result["storage_inventory"] = collect_host_storage_diagnostics()
+    result["storage_inventory_included"] = include_storage_inventory
+    return result
