@@ -51,7 +51,7 @@ _ALLOWED_PARAMETERS = {
     "Get-ComputerInfo": frozenset({"Property"}),
     "Start-ScheduledTask": frozenset({"TaskName"}),
 }
-_PARAMETER_NAME = re.compile(r"(?<!\\S)-([A-Za-z][A-Za-z0-9]*)\\b")
+_PARAMETER_NAME = re.compile(r"(?<!\S)-([A-Za-z][A-Za-z0-9]*)\b")
 _FORBIDDEN_SYNTAX = re.compile(r"[\x00\r\n;|&`$<>{}\[\]()]" )
 _COMMAND_NAME = re.compile(r"^([A-Za-z][A-Za-z0-9-]*)\b")
 _START_TUNNEL_TASK = re.compile(
