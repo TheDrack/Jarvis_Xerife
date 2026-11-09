@@ -59,6 +59,31 @@ Se o volume do perfil estiver quase cheio, primeiro use Configurações → Sist
 
 O script não cria um túnel hospedado nem registra o app dentro do ChatGPT; essas duas etapas dependem da conta e do workspace do usuário. O Magic Executor pode chamar este script como etapa assistida, mas deve deixar a entrada da chave no terminal seguro e nunca capturar, registrar ou reenviar seu valor.
 
+## Execução Shell remota controlada
+
+O servidor MCP expõe a ferramenta `run_shell_command`. As chamadas passam pelo mesmo Secure MCP Tunnel autenticado; não é aberta uma nova porta nem criado um endpoint HTTP de execução.
+
+**Não é um shell remoto irrestrito.** A política local aceita apenas um comando PowerShell simples por chamada, validado pela AST do PowerShell antes da execução. Além da allowlist de cmdlets, cada cmdlet possui uma allowlist própria de parâmetros, bloqueando opções de sessão remota e parâmetros comuns de saída/encadeamento. São bloqueados pipelines, encadeamento, variáveis, scriptblocks, redirecionamento, invocação dinâmica, executáveis arbitrários e leitura de arquivos. O processo roda sem elevação, com ambiente mínimo (sem as variáveis de segredo do processo Jarvis), timeout de 1–60 segundos, saída limitada e sanitizada, e logs que registram apenas nome do comando, resultado e duração.
+
+Comandos de diagnóstico disponíveis:
+- `Get-Process`
+- `Get-Service -Name 'Tailscale'`
+- `Get-ScheduledTask -TaskName 'Jarvis-OpenAI-Secure-MCP-Tunnel'`
+- `Get-ScheduledTaskInfo -TaskName 'Jarvis-OpenAI-Secure-MCP-Tunnel'`
+- `Get-PSDrive -Name 'C'`
+- `Get-NetTCPConnection -State Listen`
+- `Get-NetAdapter`
+- `Get-Date`
+- `Get-ComputerInfo`
+
+A única operação mutável inicialmente permitida é iniciar exatamente a tarefa `Jarvis-OpenAI-Secure-MCP-Tunnel`:
+
+```powershell
+Start-ScheduledTask -TaskName 'Jarvis-OpenAI-Secure-MCP-Tunnel'
+```
+
+A ferramenta não permite parar processos/serviços, apagar ou editar arquivos, alterar tarefas, elevar privilégios, executar scripts ou ler conteúdo de arquivos. Operações mutáveis adicionais devem ser adicionadas por política explícita, testes e revisão; não se deve transformar esta ferramenta em `shell=True` ou aceitar comandos arbitrários. A aprovação durável do toolbox só poderá ampliar esse escopo quando o fluxo autenticado de aprovação e a composição de runtime estiverem efetivamente registrados e testados.
+
 ## Diagnóstico do erro 429 durante a sondagem do conector
 
 Se a criação ou descoberta do app no ChatGPT retornar `MCP SSE probe returned 429 from openai.org`, registre isso como falha da sondagem do endpoint hospedado. Esse erro, isoladamente, não comprova falha do listener MCP local, falta de espaço no disco ou corrupção do perfil.

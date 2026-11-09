@@ -562,6 +562,24 @@ def host_resource_diagnostics(process_limit: int = 25) -> dict[str, Any]:
         return {"success": False, "status": "diagnostic_failed", "error": type(exc).__name__}
 
 
+@mcp.tool()
+@tracked_action("Executando comando Shell restrito")
+def run_shell_command(command: str, timeout_seconds: int = 15) -> dict[str, Any]:
+    """Run one allowlisted, non-elevated PowerShell command through the authenticated MCP tunnel.
+
+    Supports read-only host diagnostics and starting only the dedicated
+    Jarvis-OpenAI-Secure-MCP-Tunnel scheduled task. This is not an unrestricted
+    shell: pipelines, compound commands, arbitrary executables, file reads,
+    process termination and privilege changes are denied.
+    """
+    from app.adapters.infrastructure.secure_shell_executor import run_shell_command as execute
+
+    try:
+        return execute(command, timeout_seconds=timeout_seconds)
+    except ValueError as exc:
+        return {"success": False, "status": "command_rejected", "error": str(exc)}
+
+
 # Android navigation tools are registered additively on the same MCP server.
 # Existing desktop tool implementations and their default behavior remain unchanged.
 @mcp.tool()
