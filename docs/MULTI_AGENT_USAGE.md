@@ -38,19 +38,29 @@ falhas e diagnóstico. O desenho da fila está em
 
 Aplique nesta ordem, no banco compartilhado. Nada é aplicado automaticamente pelo app.
 
-| Migração | O que cria |
+| Migração (nome exato em `supabase/migrations`) | O que cria / protege |
 |---|---|
-| `202610230002_multi_agent_control_plane.sql` | tabelas `jarvis_agents`, `jarvis_agent_tasks`, `jarvis_agent_attempts`, `jarvis_agent_events`; `claim_jarvis_agent_task`, `finish_jarvis_agent_task` |
-| `202610230003_multi_agent_message_queue.sql` | `jarvis_agent_messages` e RPCs de mensagem (usado pelo transporte entre agentes) |
-| `202610230004_priority_routine_scheduler.sql` | `jarvis_routine_definitions`; `claim_next_jarvis_agent_task`, `recover_expired_jarvis_agent_tasks` |
-| `20261027120000_agent_model_provider.sql` | coluna `jarvis_agents.model_provider` (heartbeat/roteamento Red/Blue) |
-| `20261028090000_release_failed_task_attempt.sql` | `release_jarvis_agent_task` (devolve a tentativa falha sem esperar o lease) |
-| `20261107183000_agent_worker_credentials.sql` | `jarvis_agent_credentials`, com hash do token, capability grant, expiração, revogação, RLS e ACL service-role-only |
+| `20261024142635_202610230002_multi_agent_control_plane.sql` | `jarvis_agents`, `jarvis_agent_tasks`, `jarvis_agent_attempts`, `jarvis_agent_events` e RPCs básicas de claim/finish |
+| `20261024142637_202610230003_multi_agent_message_queue.sql` | `jarvis_agent_messages` e RPCs de entrega at-least-once |
+| `20261024142639_202610230004_priority_routine_scheduler.sql` | `jarvis_routine_definitions`, prioridade, dependência e claim da fila |
+| `20261027165940_20261027_multi_agent_model_provider_heartbeat.sql` | `model_provider` e índice de heartbeat dos agentes |
+| `20261105023946_provider_aware_remote_task_claims.sql` | guard de provider nas RPCs de claim e ACL service-role-only |
+| `20261105202000_direct_claim_parent_dependency_guard.sql` | aplica a dependência de tarefa-pai também ao claim direto |
+| `20261107010000_multi_agent_message_claim_fencing.sql` | `claim_token` para fencing de cada claim de mensagem |
+| `20261107020000_task_lease_renewal_null_duration_guard.sql` | rejeita lease nulo/fora dos limites na renovação |
+| `20261107025840_release_failed_task_attempt.sql` | `release_jarvis_agent_task` para liberar a tentativa atual sem esperar o lease |
+| `20261107025853_worker_lease_supporting_indexes.sql` | índices de tentativa, evento, dependência e rotina |
+| `20261107183000_agent_worker_credentials.sql` | credenciais opacas por agente, hash-only, grants de capability, expiração, revogação e ACL service-role-only |
+| `20261108120000_agent_task_ownership.sql` | `owner_id` e `created_by` em tarefas e rotinas; registros legados permanecem NULL |
+| `20261108193000_durable_tool_approvals.sql` | aprovações duráveis de intenção exata, single-use e ACL service-role-only; ainda sem API/policy de produção |
 
 ```bash
+# Somente em ambiente descartável/staging, após revisar a sequência e o diff:
 supabase link --project-ref <ref>
 supabase db push
 ```
+
+**Produção:** não executar `db push`, `migration repair`, reset ou DDL manual como atalho. O ledger atual está 30/30 por versão/nome, mas a issue #732 permanece aberta até a equivalência de schema, Supabase Preview e rollback serem comprovados. Use o fluxo GitHub–Supabase aprovado e autorização operacional explícita.
 
 ## 2. Variáveis de ambiente
 
@@ -62,14 +72,14 @@ Nomes e presença; nunca valores em log, commit ou chat.
 |---|---|
 | `JARVIS_MINI_AGENT_ENABLED=true` | sem ela o worker não inicia e a API continua normalmente |
 
-**Backend Supabase nativo (preferido)**
+**Backend Supabase nativo (fallback legado)**
 
 | Variável | Uso |
 |---|---|
 | `SUPABASE_URL` | projeto da fila |
 | `SUPABASE_SERVICE_ROLE_KEY` | acesso server-side; nunca no cliente |
 
-**Backend HTTP (alternativa)**
+**Backend HTTP com identidade individual (preferido)**
 
 | Variável | Uso |
 |---|---|
