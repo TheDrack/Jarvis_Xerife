@@ -5,7 +5,7 @@ O Desktop MCP expõe \`host_storage_diagnostics()\` como consulta somente leitur
 ## Escopo e limites
 
 - Examina apenas a raiz da unidade de sistema detectada por \`SystemDrive\`; não aceita caminhos arbitrários do chamador.
-- Limites padrão: profundidade 4, até 20.000 entradas e 8 segundos.
+- Limites padrão: profundidade 5, até 20.000 entradas e 8 segundos.
 - Retorna até 30 diretórios, arquivos e extensões com maior tamanho.
 - Destaca diretórios cujos nomes indicam temporários, caches ou logs.
 - Ignora diretórios protegidos do Windows e não segue symlinks nem junctions/reparse points.
