@@ -1,8 +1,6 @@
 """Tests for the bounded, metadata-only host storage inventory."""
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from app.adapters.edge.host_storage_diagnostics import (
@@ -84,7 +82,7 @@ def test_scan_rejects_out_of_bounds_limits(tmp_path, kwargs, message):
         _scan_root(tmp_path, **kwargs)
 
 
-def test_collect_uses_only_the_system_drive(monkeypatch, tmp_path):
+def test_collect_uses_only_the_system_drive(monkeypatch):
     monkeypatch.setenv("SystemDrive", "not-a-drive")
 
     result = collect_host_storage_diagnostics()
