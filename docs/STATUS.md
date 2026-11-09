@@ -139,7 +139,6 @@ O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.
 
 Só marcar como concluído quando os critérios de aceitação correspondentes tiverem evidência verificável. Para funcionalidades de produção, exigir também confirmação de deploy, saúde e conectividade reais. Um arquivo, skill, migração, PR merged ou campo status=complete no inventário, isoladamente, não comprova comportamento funcional.
 
-
 ## Revalidação técnica — 2026-11-08 21:54 UTC
 
 **Base consultada:** main em 6f2222a24b829c13db96c561c0691e50c070e494. PRs abertas observadas: #783 (recuperação do MCP Tunnel em disco cheio), #782 (refresh C0), #777 (Laya shadow mode) e #781 (referência DeepSeek). Issues abertas observadas: #708 (fronteira de autoevolução), #732 (ledger Supabase), #682 (proteção de main) e #723 (RPCs/ledger provider-aware). Não foram criadas issues nem PR duplicadas.
@@ -277,7 +276,6 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 **Base consultada:** `main` em `00143238801ccac38c7ed82596af46db49f67f75`. PRs abertas: **0**. Issues abertas: #682, #723 e #732. Esta revalidação não executou DDL/DML, migration repair, `db push`, deploy, alteração de secrets/flags, permissões ou workflows.
 
 ### Merges e evidência de CI
-
 - PR #782 (refresh C0) merged em `de181704`; a versão final passou no full pytest Linux e na suíte Windows. Os primeiros runs falharam em dois testes do selector que esperavam `RoadmapManifestError`, mas o cenário não lançava a exceção. A correção ficou na PR correspondente; não houve redução de testes ou cobertura.
 - PR #787 (approvals duráveis) merged em `d86db76c`; a migration `20261108193000_durable_tool_approvals` aparece no ledger de produção.
 - PR #788 (PowerShell restrito pelo MCP Tunnel) merged em `00143238`; os checks de integração, pytest e build do head final passaram. A revisão Strix identificou inicialmente o risco de `-ComputerName`/RPC-NTLM; commits posteriores adicionaram allowlist de parâmetros por cmdlet e testes para `-ComputerName`, `-CimSession` e `-OutVariable`. O thread de revisão continua aberto e não há re-review Strix do commit final; registrar a correção de código não equivale a aprovação independente.
@@ -303,3 +301,16 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 
 - Consulta SQL somente leitura em `public.jarvis_environment_observations`: **1.755 registros** (878 `presence`, 877 `network_snapshot`); **0 não expirados e 1.755 expirados**. Último `received_at`: `2026-11-03 15:11:28 UTC`; maior `expires_at`: `2026-11-03 15:16:27 UTC`. O router define TTL de 2 minutos para presença e 5 minutos para network snapshot. A consulta não leu payloads nem identificadores.
 - Isso comprova ingestão histórica da trilha de observação ambiental, mas não telemetria atual nem recorrência em 2026-11-09. Não confundir esta tabela com `intelligence_observation_snapshots`, que continua com 0 linhas. Portanto Perception permanece parcial e sem evidência de frescor operacional.
+
+
+## Revalidação pós-merge — 2026-11-09 — PRs #789–#791
+
+- GitHub confirma PRs #789, #790 e #791 como merged. #789 atualiza evidência C0; #790 adiciona teste integrado do coletor/core/worker/history adapter com dependências simuladas; #791 serializa escritas do Auto-Documentation e faz checkout do main atual antes da geração.
+- Checks associados aos heads finais: #789 PR Validation run 42641532396 success; #790 PR Validation 42641924299 success e Task Queue 42641924074 success; #791 PR Validation 42642600559 success. Esses checks comprovam os respectivos commits/ambientes de CI, não execução recorrente ou persistência atual em produção.
+- A revisão do código em main confirma que RoadmapMissionSelector lê o ledger estruturado de docs/STATUS.md por _load_status_evidence. Uma missão marcada complete exige o mesmo criterion_id como verified, commit URL, Actions run URL, paths existentes de implementação/consumidor/testes e correspondência do target/testes. O parser valida formato e existência local; não autentica o commit ou o resultado do Actions remotamente.
+- A nota histórica anterior que afirmava que o selector não lia STATUS foi supersedida pela implementação da PR #782, já merged. A limitação restante é que o teste real do repositório para manifesto vazio retorna antes de exercitar o parser do ledger.
+- PR #790 fecha o teste integrado de percepção local, mas não prova worker ativo nem snapshots persistidos em produção. Novo teste em branch test/c0-real-status-ledger-contract exercita o ledger real da main e confirma os três critérios C0 como pending; aguarda CI.
+- data/roadmap_missions.json permanece com missions vazio. C0-CAPABILITY-MAP, C0-GAPS-RECORDED e C0-NO-NAME-BASED-COMPLETION permanecem pending. C1 — World Model — continua bloqueado.
+- Issues abertas verificadas: #682 (proteção da main), #723 (histórico/Preview relacionado às RPCs provider-aware) e #732 (reconciliação schema-aware, Preview e rollback). Nenhuma issue nova foi criada.
+- Self Healing V3 e JARVIS PR Validation permanecem presentes. A documentação do repositório confirma que Self Healing atua em falhas/timouts/cancelamentos originados na main; não processa runs de PR. Não desabilitar nem reduzir essa proteção. Extensão segura para PRs exige separar execução de código não confiável e credenciais privilegiadas.
+- Nenhum merge, deploy, migration, alteração de secrets/flags, DDL/DML ou alteração de produção foi executado nesta revalidação.
