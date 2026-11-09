@@ -26,6 +26,12 @@ _PHASE_RE = re.compile(r"^C[0-8]$")
 _ALLOWED_STATUSES = {"ready", "blocked", "complete"}
 _ALLOWED_RISKS = {"low", "medium", "high"}
 _ROADMAP_PATH = "docs/COGNITIVE_ROADMAP.md"
+_STATUS_PATH = "docs/STATUS.md"
+_STATUS_START = "<!-- JARVIS_COGNITIVE_EVIDENCE_START -->"
+_STATUS_END = "<!-- JARVIS_COGNITIVE_EVIDENCE_END -->"
+_REPOSITORY_URL = "https://github.com/TheDrack/Jarvis_Xerife"
+_COMMIT_URL_RE = re.compile(rf"^{re.escape(_REPOSITORY_URL)}/commit/[0-9a-f]{{40}}$")
+_ACTIONS_RUN_URL_RE = re.compile(rf"^{re.escape(_REPOSITORY_URL)}/actions/runs/[0-9]+$")
 _MANIFEST_PATH = "data/roadmap_missions.json"
 _CAPABILITIES_PATH = "data/capabilities.json"
 
@@ -104,6 +110,155 @@ class RoadmapMissionSelector:
             if isinstance(item, dict) and isinstance(item.get("id"), str)
         }
         return identifiers
+
+    def _load_status_evidence(self, roadmap_content: str) -> Dict[str, Dict[str, Any]]:
+        """Load the machine-readable completion evidence ledger from STATUS.md."""
+        status_file, _ = self._repository_file(_STATUS_PATH, label="cognitive_status")
+        try:
+            content = status_file.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise RoadmapManifestError("cognitive_status_unreadable") from exc
+
+        if content.count(_STATUS_START) != 1 or content.count(_STATUS_END) != 1:
+            raise RoadmapManifestError("cognitive_status_evidence_block_missing_or_duplicated")
+        start = content.index(_STATUS_START) + len(_STATUS_START)
+        end = content.index(_STATUS_END)
+        if end <= start:
+            raise RoadmapManifestError("cognitive_status_evidence_block_invalid")
+
+        block = content[start:end]
+        match = re.fullmatch(r"\s*```json\s*(\{.*\})\s*```\s*", block, re.DOTALL)
+        if match is None:
+            raise RoadmapManifestError("cognitive_status_evidence_json_missing")
+        try:
+            payload = json.loads(match.group(1))
+        except json.JSONDecodeError as exc:
+            raise RoadmapManifestError("cognitive_status_evidence_json_invalid") from exc
+
+        if (
+            not isinstance(payload, dict)
+            or isinstance(payload.get("schema_version"), bool)
+            or payload.get("schema_version") != 1
+            or payload.get("roadmap_path") != _ROADMAP_PATH
+            or not isinstance(payload.get("criteria"), list)
+        ):
+            raise RoadmapManifestError("cognitive_status_evidence_schema_invalid")
+
+        records: Dict[str, Dict[str, Any]] = {}
+        for entry in payload["criteria"]:
+            if not isinstance(entry, dict):
+                raise RoadmapManifestError("cognitive_status_criterion_invalid")
+            criterion_id = entry.get("criterion_id")
+            state = entry.get("state")
+            evidence = entry.get("evidence")
+            if (
+                not isinstance(criterion_id, str)
+                or not _CRITERION_RE.fullmatch(criterion_id)
+                or not re.search(rf"`{re.escape(criterion_id)}`", roadmap_content)
+            ):
+                raise RoadmapManifestError("cognitive_status_criterion_not_in_roadmap")
+            if not isinstance(state, str) or state not in {"pending", "blocked", "verified"}:
+                raise RoadmapManifestError("cognitive_status_criterion_state_invalid")
+            if criterion_id in records:
+                raise RoadmapManifestError("cognitive_status_duplicate_criterion")
+            if not isinstance(evidence, dict):
+                raise RoadmapManifestError("cognitive_status_evidence_invalid")
+
+            normalized_evidence: Dict[str, Any] = {
+                "commit_url": None,
+                "check_urls": [],
+                "implementation_paths": [],
+                "consumer_paths": [],
+                "test_paths": [],
+            }
+            if state == "verified":
+                commit_url = evidence.get("commit_url")
+                check_urls = evidence.get("check_urls")
+                if (
+                    not isinstance(commit_url, str)
+                    or not _COMMIT_URL_RE.fullmatch(commit_url)
+                    or not isinstance(check_urls, list)
+                    or not check_urls
+                    or any(
+                        not isinstance(url, str) or not _ACTIONS_RUN_URL_RE.fullmatch(url)
+                        for url in check_urls
+                    )
+                ):
+                    raise RoadmapManifestError("cognitive_status_evidence_incomplete")
+
+                normalized_evidence["commit_url"] = commit_url
+                normalized_evidence["check_urls"] = list(dict.fromkeys(check_urls))
+                for field in ("implementation_paths", "consumer_paths", "test_paths"):
+                    values = evidence.get(field)
+                    if not isinstance(values, list) or not values:
+                        raise RoadmapManifestError("cognitive_status_evidence_incomplete")
+                    normalized_paths: List[str] = []
+                    for relative_path in values:
+                        if (
+                            not isinstance(relative_path, str)
+                            or not relative_path
+                            or relative_path != relative_path.strip()
+                        ):
+                            raise RoadmapManifestError("cognitive_status_evidence_path_invalid")
+                        try:
+                            path, normalized, resolved = resolve_repository_path(
+                                self.repository_root, relative_path, reject_symlinks=True
+                            )
+                        except (UnsafeRepositoryPath, OSError, RuntimeError) as exc:
+                            raise RoadmapManifestError(
+                                "cognitive_status_evidence_path_rejected"
+                            ) from exc
+                        if normalized != resolved or not path.is_file():
+                            raise RoadmapManifestError("cognitive_status_evidence_path_missing")
+                        if field == "test_paths" and (
+                            not normalized.startswith("tests/")
+                            or path.suffix.casefold() != ".py"
+                        ):
+                            raise RoadmapManifestError("cognitive_status_test_path_invalid")
+                        normalized_paths.append(normalized)
+                    normalized_evidence[field] = list(dict.fromkeys(normalized_paths))
+
+            records[criterion_id] = {"state": state, "evidence": normalized_evidence}
+
+        expected_criteria = {
+            criterion_id
+            for phase_criteria in self._roadmap_criteria_by_phase(roadmap_content).values()
+            for criterion_id in phase_criteria
+        }
+        if not expected_criteria.issubset(records):
+            raise RoadmapManifestError("cognitive_status_criteria_missing")
+        return records
+
+    @staticmethod
+    def _roadmap_criteria_by_phase(content: str) -> Dict[int, List[str]]:
+        """Extract machine-readable acceptance criterion IDs from each phase."""
+        lines = content.splitlines()
+        criteria_by_phase: Dict[int, List[str]] = {}
+        for index, heading in enumerate(lines):
+            if not heading.startswith("## "):
+                continue
+            phase_match = re.search(r"\bFase\s+([0-8])\b", heading)
+            if phase_match is None:
+                continue
+            phase_number = int(phase_match.group(1))
+            if phase_number in criteria_by_phase:
+                raise RoadmapManifestError("roadmap_phase_heading_duplicated")
+            end = next(
+                (
+                    position
+                    for position in range(index + 1, len(lines))
+                    if lines[position].startswith("## ")
+                ),
+                len(lines),
+            )
+            section = "\n".join(lines[index:end])
+            pattern = re.compile(
+                rf"`(C{phase_number}-[A-Z0-9]+(?:-[A-Z0-9]+)*)`"
+            )
+            criteria_by_phase[phase_number] = list(
+                dict.fromkeys(pattern.findall(section))
+            )
+        return criteria_by_phase
 
     @staticmethod
     def _roadmap_section(content: str, heading: str) -> str:
@@ -267,6 +422,7 @@ class RoadmapMissionSelector:
         if not missions:
             return None
 
+        status_evidence = self._load_status_evidence(roadmap_content)
         capability_ids = self._load_capability_ids()
         validated = [
             self._validate_mission(item, roadmap_lines, roadmap_content, capability_ids)
@@ -276,10 +432,39 @@ class RoadmapMissionSelector:
         if len(by_id) != len(validated):
             raise RoadmapManifestError("roadmap_manifest_duplicate_criterion_id")
 
+        criteria_by_phase = self._roadmap_criteria_by_phase(roadmap_content)
         for mission in validated:
+            phase_number = int(mission["phase"][1:])
+            if phase_number > 0:
+                required_prior_criteria: List[str] = []
+                for prior_phase in range(phase_number):
+                    prior_criteria = criteria_by_phase.get(prior_phase, [])
+                    if not prior_criteria:
+                        raise RoadmapManifestError(
+                            "roadmap_prior_phase_criteria_unaddressable"
+                        )
+                    required_prior_criteria.extend(prior_criteria)
+                if not set(required_prior_criteria).issubset(
+                    set(mission["depends_on"])
+                ):
+                    raise RoadmapManifestError(
+                        "mission_prior_phase_dependencies_missing"
+                    )
+
             for dependency in mission["depends_on"]:
                 if dependency not in by_id:
                     raise RoadmapManifestError("roadmap_manifest_unknown_dependency")
+
+            if mission["status"] == "complete":
+                status_record = status_evidence.get(mission["criterion_id"])
+                if status_record is None or status_record["state"] != "verified":
+                    raise RoadmapManifestError("mission_complete_without_status_evidence")
+                evidence = status_record["evidence"]
+                if (
+                    mission["target_file"] not in evidence["implementation_paths"]
+                    or not set(mission["tests"]).issubset(evidence["test_paths"])
+                ):
+                    raise RoadmapManifestError("mission_complete_status_evidence_mismatch")
 
         eligible = [
             mission
@@ -305,6 +490,13 @@ class RoadmapMissionSelector:
                 "target_file": selected["target_file"],
                 "tests": selected["tests"],
                 "depends_on": selected["depends_on"],
+                "completed_dependency_evidence": [
+                    {
+                        "criterion_id": dependency,
+                        "evidence": status_evidence[dependency]["evidence"],
+                    }
+                    for dependency in selected["depends_on"]
+                ],
                 "risk": selected["risk"],
             },
             ensure_ascii=False,

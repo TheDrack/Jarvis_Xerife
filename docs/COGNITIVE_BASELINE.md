@@ -349,3 +349,126 @@ Os testes da branch cobrem hash-only, rotação, expiração, revogação, capab
 - Issue #708 permanece aberta, mas seu corpo contém evidência anterior às correções de protected paths e sandbox Docker. Não fechar sem revalidar o acceptance set completo; o bloqueio atual mais claro é a ausência de missão/target confiável e a falta de integração do selector com o Cognitive Roadmap.
 
 **Conclusão:** a fronteira de execução/publicação evoluiu em código e CI; o scheduler de autoevolução permanece bloqueado de forma segura e ainda não é roadmap-driven. A próxima mudança deve ser o manifesto/selector C0, não a reativação da mutação nem a atribuição automática de paths.
+
+
+## 10. Atualizações posteriores ao snapshot de 2026-11-07
+
+O snapshot e as classificações acima permanecem históricos: os merges seguintes não equivalem a uma nova auditoria completa nem comprovam operação em produção.
+
+### Mudanças integradas em 2026-11-08
+
+- **PR #778 — Wake/Sleep continual-learning architecture:** documentação de arquitetura integrada à main. Define consolidação e aprendizagem em ciclos ociosos, reutilizando os serviços existentes; não implementa treinamento autônomo nem habilita execução de jobs.
+- **PR #780 — Evidence-backed fine-tuning samples:** integrada à main. `FineTuneDatasetCollector` agora exige `success=True`, status explícito `internal_monologue`, recompensa explícita, numérica, finita e acima do maior entre o threshold configurado e o piso absoluto. Registros `user_interaction`, proveniência desconhecida e recompensas ausentes/inválidas são excluídos. Os testes de regressão reproduziram as duas falhas anteriores e passaram após a correção; os dois workflows de pytest foram aprovados.
+- **Treinamento continua desabilitado:** a correção protege a elegibilidade do dataset, mas não prova consentimento, redaction completa, retenção, isolamento multi-tenant ou ground truth. Esses controles permanecem gates separados antes de qualquer treinamento.
+
+### DeepSeek V4.1 Flash
+
+A referência de arquitetura e integração está sendo documentada separadamente. O alias oficial atual da API é `deepseek-flash`, servido pelo checkpoint `DeepSeek-V4.1-Flash-1017`. O uso inicial recomendado é como professor externo isolado; não repontar a frota global de mini-agentes nem baixar o checkpoint completo para o PC de trabalho.
+
+### Estado operacional do computador
+
+A inspeção remota anterior observou Windows 10 Pro, Intel Core i3-10100F, 8 GB de RAM, unidade C: sem espaço livre e unidade D: com aproximadamente 171 GB livres. Esses valores são apenas o último snapshot observado, não uma leitura atual.
+
+A sessão do Jarvis Secure MCP Tunnel terminou durante a tentativa de continuar o inventário devido a erro de falta de espaço no dispositivo de captura. GPU, VRAM, identidade física/serial do SSD dedicado, esquema de partições e boot mode **não foram confirmados**. Não foi feita limpeza, formatação, particionamento, instalação de driver ou alteração de boot.
+
+### Estado de C0
+
+**C0 permanece aberto.** As mudanças acima reduzem riscos específicos, mas não completam a auditoria comportamental, a comprovação de persistência operacional, a política de dados de treinamento nem a validação ponta a ponta dos providers e workers. A próxima implementação deve continuar a partir das lacunas da seção 7, sem criar um segundo sistema de memória, scheduler ou event bus.
+
+
+### Revalidação da main — 2026-11-08 21:54 UTC
+
+**Snapshot consultado:** main em 6f2222a24b829c13db96c561c0691e50c070e494. O snapshot inclui os merges #775, #776, #778, #779 e #780. Ele comprova estado de código e CI; não equivale a validação de runtime ou produção.
+
+**Autoevolução orientada pelo Cognitive Roadmap**
+- A PR #775 foi merged em 2026-11-08. app/application/services/roadmap_mission_selector.py é consumido por .github/workflows/auto_evolution_triggerV2.yml; o workflow não seleciona mais missões pelo inventário legado.
+- data/roadmap_missions.json existe e contém missions: [], com hold reason explícito de que C0 permanece aberto. O selector retorna None para manifesto vazio antes de consultar o catálogo legado; o teste test_empty_manifest_is_a_safe_noop_without_legacy_inventory_lookup comprova esse comportamento.
+- Os testes do selector cobrem fase/heading/criterion, CAP de compatibilidade, risco, target Python existente sob app/, caminhos protegidos/traversal, testes obrigatórios, dependências e seleção determinística. tests/test_auto_evolution_workflow_contract.py confirma que o workflow usa o selector e mantém o manifesto vazio em no-op.
+- Portanto, a trilha está conectada ao roadmap, mas nenhuma missão está aprovada para geração. Quando o gate EVOLUTION_ENABLED permitir o ciclo, o manifesto vazio leva a action=idle; não há candidato, Docker ou publicação. O valor atual da variável de repositório e uma execução schedule específica não foram verificados nesta leitura.
+- Não foi acrescentada missão ready: ainda não há mapeamento revisado que justifique um target de código de baixo risco para um critério C0 sem inferir caminhos.
+
+**Ownership de tarefas e rotinas**
+- A PR #776 foi merged. agent_tasks.py deriva owner_id da identidade autenticada no enqueue e grava created_by/owner_id; o serviço persiste esses campos e impede reutilização de chave idempotente por outro owner.
+- Para task_blocked, o endpoint consulta get_task_owner(task_id) e emite o sinal usando o owner persistido, não a identidade do worker/chamador. Há testes de persistência e isolamento de idempotência.
+- Isso comprova o caminho de código e seus testes; não comprova cobertura de todas as tarefas legadas nem uma notificação ponta a ponta em runtime.
+
+**Autorização de ferramentas**
+- A PR #779 foi merged no commit 42aa845f1a2de1addc033998df8fdbf66dd712bf. app/runtime/toolbox/host_authorization.py implementa HostToolAuthorizationPolicy com resolução injetada de principal/sessão, owner da tarefa, executor da tentativa e aprovação durável; a ausência de evidência resulta em negação. O pacote exporta a classe e tests/runtime/test_host_tool_authorization.py cobre o contrato.
+- A busca no código da branch padrão encontrou a definição, a exportação e os testes, mas não uma instanciação em composition root de produção. Assim, a policy está implementada/testada, não integrada/runtime-verified. ToolDispatcher e executores reais continuam fail-closed até que os resolvers confiáveis e o ponto de composição sejam conectados.
+
+**Aprendizado**
+- PR #778 adicionou arquitetura Wake/Sleep documental; não habilitou treinamento autônomo.
+- PR #780 restringiu elegibilidade de amostras de fine-tuning com sucesso, status, recompensa finita e proveniência explícitos. Isso não comprova consentimento, redaction completa, retenção, isolamento multi-tenant ou ground truth. Treinamento permanece desabilitado.
+
+**Governança e CI**
+- A leitura da API da branch main retornou protected=false, protection.enabled=false e nenhum check obrigatório. Issue #682 continua aberta.
+- homeostase.yml (Self Healing V3) e jarvis-pr-validation.yml continuam presentes na main. Nenhum desses workflows foi alterado nesta revisão.
+- No commit #779 em main, Task Queue Tests run 42526509992 e Auto-Documentation run 42526509993 concluíram com success.
+- PR #777: JARVIS PR Validation 42523333002 e Task Queue Tests 42523333055 success. PR #781: JARVIS PR Validation 42523339700 success. PR #783: JARVIS PR Validation 42524233623 e PowerShell validation 42524233622 success no head atual consultado. PR #782 tinha JARVIS PR Validation 42523443734 success antes desta atualização; os checks devem reexecutar após o novo commit.
+- Os comentários de revisão Codex em #777/#779/#781/#783 reportaram limite de uso; isso não é aprovação de revisão. CI verde não substitui revisão técnica independente.
+
+**Conclusão C0**
+- O selector roadmap-driven e a persistência de ownership avançaram para código integrado e testado.
+- C0 permanece aberto: o mapa ainda precisa identificar consumers/runtime para todas as capacidades críticas; a policy host-backed não tem composition root de produção; worker identity individual permanece sem credenciais provisionadas e o runtime segue no fallback legado; memória vetorial continua sem insert/readback real; o recurring worker segue desabilitado; o baseline comportamental integrado ainda precisa ser reexecutado com evidências atuais.
+- C1 — World Model permanece bloqueado pela ordem do roadmap. Não criar contratos ou armazenamento paralelos antes de fechar os gates C0.
+
+
+### Supabase runtime read-only — 2026-11-08 22:10 UTC
+
+- Projeto Supabase saibtpdehhprttqlgqdt: ACTIVE_HEALTHY, PostgreSQL 17.6.1.063.
+- Ledger remoto: 29 migrations. O diretório supabase/migrations em main também contém 29 arquivos SQL; comparação exata de version + name encontrou 29/29 correspondências, sem arquivo local ou entrada remota excedente. A última é 20261108120000 / agent_task_ownership. Isso atualiza o snapshot histórico de 28 migrations; não substitui a validação schema-aware nem a confirmação do workflow Preview exigidas pela issue #732.
+- jarvis_agent_tasks: 13 linhas; 0 com owner_id e 0 com created_by. Status: 8 completed, 3 cancelled e 2 ready. A migration/código de ownership existem, mas o banco ainda contém somente registros legados sem owner; o resolver de ownership deve negar esses casos até haver política explícita de compatibilidade/backfill.
+- jarvis_agents: 5 registros, 3 available e 2 offline. jarvis_agent_credentials: 0 registros. jarvis_routine_definitions: 0 registros.
+- jarvis_vector_memories: 0 registros. jarvis_intelligence_worker_runs: 0. A tabela de lease tem uma linha, mas worker_id e lease_expires_at são NULL. intelligence_event_snapshots e intelligence_observation_snapshots: 0 registros.
+- Nas seis tabelas C0 consultadas (agent_tasks, routine_definitions, agent_credentials, vector_memories, worker_lease e worker_runs), RLS está habilitado, não há policies e os grants observados são apenas para service_role; não foram observados grants anon/authenticated. O advisor classifica RLS enabled/no policy como INFO. O advisor global reportou 30 tabelas nessa condição; não foi feita auditoria de grants de todas as 30.
+- Advisors de performance reportaram 42 índices não utilizados (INFO). Não remover índices sem baseline de carga/consulta; tabelas vazias e pouco tráfego podem explicar parte do resultado.
+- A consulta read-only de logs Supabase não encontrou mensagens contendo “recurring worker” na janela de 24 horas. Isso não comprova que a feature flag esteja desligada; a flag Render não foi consultada nesta execução.
+- A lista de branches Supabase retornou somente main, status FUNCTIONS_DEPLOYED e preview_project_status ACTIVE_HEALTHY. Isso não substitui a validação específica do check Supabase Preview no GitHub.
+
+
+### Revalidação complementar — 2026-11-08 22:27 UTC
+
+- Main permanece em `6f2222a24b829c13db96c561c0691e50c070e494`.
+- A issue #708 foi fechada após revalidar os seis critérios da fronteira de evolução: política de paths, snapshot/candidato realmente executado em Docker, ausência de secrets/host files/rede no teste de integração, separação de permissões/credenciais, publisher não executor e documentação da fronteira. Evidências e limitações foram registradas no corpo da issue.
+- A API da branch confirmou novamente `main.protected=false`, `protection.enabled=false` e ausência de required checks. Issue #682 continua aberta; o conector não oferece escrita administrativa para corrigir branch protection.
+- PR #782: run 42529184685 success no head 75419ace; frontend, build Docker e pytest completo: 2.786 passed, 14 skipped, 8 warnings. O teste `tests/test_evolution_sandbox_docker_integration.py` é executado nesse workflow com `EVOLUTION_SANDBOX_IMAGE` configurado.
+- PR #783: os runs antigos 42524096133 e 42524145111 falharam porque o parser PowerShell encontrou tokens `}` inesperados e um pipe vazio no script. A branch recebeu correção; no head posterior, PowerShell validation 42524233622 e PR validation 42524233623 passaram. Não há falha atual pendente nessa PR.
+- PR #777: Task Queue Tests 42523333055 e PR Validation 42523333002 passaram. PR #781: PR Validation 42523339700 passou. PRs #782, #783, #777 e #781 continuam abertas; nenhuma foi merged nesta auditoria.
+- Issues ainda abertas observadas: #682 (proteção de main), #732 (reconciliação schema-aware/Preview do ledger) e #723 (histórico de RPCs condicionado à #732).
+- `data/roadmap_missions.json` permanece com `missions: []`; o workflow roadmap-driven faz no-op seguro e não chama LLM, sandbox ou publisher. C0 permanece aberto e C1 não iniciado.
+- Self Healing V3 e JARVIS PR Validation continuam versionados na main, sem alteração nesta auditoria. Não houve merge, deploy, migration, alteração de secrets/flags ou operação de produção.
+
+
+### C0 finding — completion evidence is not yet bound to STATUS.md
+
+A read-only code audit of `RoadmapMissionSelector` found that it reads `docs/COGNITIVE_ROADMAP.md`, `data/roadmap_missions.json` and the legacy capability catalog, but **does not read `docs/STATUS.md`**. Dependency completion is currently determined solely by each manifest entry's `status == "complete"`.
+
+The manifest is empty, so this does not currently enable a candidate or cause a mutation. The workflow remains a safe no-op. Before any mission is marked `ready`, C0 must define a machine-checkable evidence contract that ties completed criterion IDs to the proven state in `docs/STATUS.md` (or an explicitly referenced evidence record that STATUS summarizes), and the selector must reject missing/stale evidence. Add an integration test against the real roadmap; the current selector unit-test fixture contains synthetic C0 IDs that are not declared in the production roadmap.
+
+This is a confirmed architecture gap, not a completed capability. It is the next selector hardening item before populating the mission manifest.
+
+
+### C0 completion-evidence gate — implementation in PR #782
+
+- The selector now reads the machine-readable evidence ledger embedded in `docs/STATUS.md`; malformed or missing ledger blocks selection.
+- A manifest entry marked `complete` is rejected unless STATUS marks the same criterion `verified` and supplies a repository commit URL, at least one GitHub Actions run URL, existing implementation/consumer/test paths, and test paths matching the mission's declared regression tests.
+- The selector includes evidence references for completed dependencies in the candidate context. The parser validates reference shape and local path existence; it does not independently query GitHub to authenticate the remote commit or check result. Human review remains mandatory.
+- The ledger currently marks all three production C0 acceptance IDs as `pending`. The mission manifest remains empty, so scheduled evolution remains a safe no-op.
+- The selector tests now use the actual C0 IDs from `docs/COGNITIVE_ROADMAP.md` and include a repository-level test for the real empty manifest.
+- PR #782 remains open. This change is not a completed C0 capability until CI passes and the PR is reviewed/merged. C0 remains open; C1 remains unstarted.
+
+
+### Revalidação comportamental de percepção — main `ccaea371`
+
+- `collect_live_intelligence` executa Public Intelligence, OSIRIS e God's Eye em paralelo, preservando `SourceHealth` e sucesso parcial. `_collect_osiris` isola coleta de eventos e observações.
+- Consumidores encontrados: `intelligence_dashboard.py` (endpoint autenticado sob demanda), `jarvis_desktop_local.py` (endpoint local) e `IntelligenceRecurringWorker` (coleta/persistência recorrente quando ambas as flags estão habilitadas).
+- Testes localizados: falha de uma fonte sem descartar as demais; falha de observações OSIRIS sem descartar eventos; deduplicação de evento por identidade, seleção determinística em payload conflitante e independência da ordem; deduplicação de observação por entidade/provedor/instante, preservação de timestamps diferentes e exigência de proveniência.
+- Limite confirmado: os testes do worker usam `FakeReport`, `FakeHistory` e `FakeStore`; os testes do coletor/core/observações são separados. Não foi localizado um único teste que atravesse o coletor real, o core, o adaptador de histórico e o consumidor autenticado. O runtime recorrente também não foi comprovado nesta execução.
+- Portanto, a cobertura unitária dos componentes é substancial, mas C0 ainda precisa de um teste comportamental integrado e evidência operacional de persistência/consumidor. Não criar outro core, event bus, memória ou scheduler.
+
+### Gate de ordem do Cognitive Roadmap — PR #782
+
+- O selector exige que cada missão de fase posterior declare dependência de todos os IDs de aceitação das fases anteriores. C1 depende dos três critérios C0; fases posteriores ficam bloqueadas se uma fase anterior ainda não tiver critérios machine-readable.
+- Critério marcado `complete` no manifesto precisa de registro `verified` em STATUS, commit URL, Actions run URL, paths existentes de implementação/consumidor/testes e correspondência exata do target e testes declarados.
+- O parser valida formato e existência local dos caminhos; não consulta o GitHub para autenticar o commit ou a conclusão do run. A revisão humana permanece obrigatória.
+- O ledger mantém `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` como pending. A mudança está em PR aberta e não conclui C0.
