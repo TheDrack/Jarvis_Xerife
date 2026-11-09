@@ -139,6 +139,7 @@ O roadmap cognitivo foi formalizado em [COGNITIVE_ROADMAP.md](COGNITIVE_ROADMAP.
 
 Só marcar como concluído quando os critérios de aceitação correspondentes tiverem evidência verificável. Para funcionalidades de produção, exigir também confirmação de deploy, saúde e conectividade reais. Um arquivo, skill, migração, PR merged ou campo status=complete no inventário, isoladamente, não comprova comportamento funcional.
 
+
 ## Revalidação técnica — 2026-11-08 21:54 UTC
 
 **Base consultada:** main em 6f2222a24b829c13db96c561c0691e50c070e494. PRs abertas observadas: #783 (recuperação do MCP Tunnel em disco cheio), #782 (refresh C0), #777 (Laya shadow mode) e #781 (referência DeepSeek). Issues abertas observadas: #708 (fronteira de autoevolução), #732 (ledger Supabase), #682 (proteção de main) e #723 (RPCs/ledger provider-aware). Não foram criadas issues nem PR duplicadas.
@@ -276,6 +277,7 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 **Base consultada:** `main` em `00143238801ccac38c7ed82596af46db49f67f75`. PRs abertas: **0**. Issues abertas: #682, #723 e #732. Esta revalidação não executou DDL/DML, migration repair, `db push`, deploy, alteração de secrets/flags, permissões ou workflows.
 
 ### Merges e evidência de CI
+
 - PR #782 (refresh C0) merged em `de181704`; a versão final passou no full pytest Linux e na suíte Windows. Os primeiros runs falharam em dois testes do selector que esperavam `RoadmapManifestError`, mas o cenário não lançava a exceção. A correção ficou na PR correspondente; não houve redução de testes ou cobertura.
 - PR #787 (approvals duráveis) merged em `d86db76c`; a migration `20261108193000_durable_tool_approvals` aparece no ledger de produção.
 - PR #788 (PowerShell restrito pelo MCP Tunnel) merged em `00143238`; os checks de integração, pytest e build do head final passaram. A revisão Strix identificou inicialmente o risco de `-ComputerName`/RPC-NTLM; commits posteriores adicionaram allowlist de parâmetros por cmdlet e testes para `-ComputerName`, `-CimSession` e `-OutVariable`. O thread de revisão continua aberto e não há re-review Strix do commit final; registrar a correção de código não equivale a aprovação independente.
