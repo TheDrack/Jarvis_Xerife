@@ -20,3 +20,17 @@ A varredura é best-effort e limitada: os tamanhos são estimativas dos arquivos
 ## Ferramenta Shell
 
 A projeção de \`Get-PSDrive\` retorna \`Provider.Name\` como texto simples em vez de serializar o objeto Provider completo, evitando payloads desnecessariamente grandes.
+
+
+## Fallback pelo diagnóstico de recursos
+
+Quando o gateway MCP expuser `host_resource_diagnostics` mas não conceder a ferramenta
+dedicada `host_storage_diagnostics`, use:
+
+```json
+{"process_limit": 20, "include_storage_inventory": true}
+```
+
+O parâmetro é opt-in e aditivo: chamadas existentes mantêm o comportamento e o payload
+anteriores. O inventário reutiliza os mesmos limites de profundidade, quantidade de
+entradas e tempo; continua restrito à unidade de sistema e somente leitura.

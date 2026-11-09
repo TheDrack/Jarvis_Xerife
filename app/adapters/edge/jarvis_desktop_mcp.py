@@ -541,17 +541,23 @@ def network_capture_etw(duration_seconds: int = 10, keywords: str = "0xFFFFFFFFF
 
 @mcp.tool()
 @tracked_action("Diagnosticando recursos do host")
-def host_resource_diagnostics(process_limit: int = 25) -> dict[str, Any]:
-    """Return bounded, read-only host resource diagnostics.
+def host_resource_diagnostics(
+    process_limit: int = 25,
+    include_storage_inventory: bool = False,
+) -> dict[str, Any]:
+    """Return bounded host resources and optionally a bounded file-metadata inventory.
 
-    Reports OS identity, CPU/RAM, mounted filesystem usage and top processes.
-    Process command lines, environment variables, credentials and file contents
-    are never collected. This is the preferred first step before any cleanup.
+    Set include_storage_inventory=true to include the existing read-only system-drive
+    inventory in this already-exposed tool. This fallback keeps the inventory reachable
+    when a gateway grant omits the dedicated host_storage_diagnostics tool.
     """
     try:
         from app.adapters.edge.host_resource_diagnostics import collect_host_resource_diagnostics
 
-        return collect_host_resource_diagnostics(process_limit=process_limit)
+        return collect_host_resource_diagnostics(
+            process_limit=process_limit,
+            include_storage_inventory=include_storage_inventory,
+        )
     except (TypeError, ValueError) as exc:
         return {"success": False, "status": "invalid_process_limit", "error": str(exc)}
     except RuntimeError as exc:
