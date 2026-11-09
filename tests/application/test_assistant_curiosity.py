@@ -72,3 +72,20 @@ def test_missing_pending_need_skips_engine():
     assert captured is False
     assert pending_need_id is None
     assert engine.context is None
+
+
+def test_real_curiosity_engine_rejection_preserves_pending_need_id():
+    from app.application.services.curiosity_engine import CuriosityEngine
+
+    engine = CuriosityEngine()
+
+    captured, pending_need_id = capture_curiosity_answer(
+        "resposta do usuário",
+        "need-real-engine",
+        curiosity_engine=engine,
+    )
+
+    # The current engine does not implement "store_answer"; failure must not
+    # silently discard the pending need. This does not claim answer persistence.
+    assert captured is False
+    assert pending_need_id == "need-real-engine"
