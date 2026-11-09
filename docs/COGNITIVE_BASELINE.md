@@ -472,3 +472,28 @@ This is a confirmed architecture gap, not a completed capability. It is the next
 - Critério marcado `complete` no manifesto precisa de registro `verified` em STATUS, commit URL, Actions run URL, paths existentes de implementação/consumidor/testes e correspondência exata do target e testes declarados.
 - O parser valida formato e existência local dos caminhos; não consulta o GitHub para autenticar o commit ou a conclusão do run. A revisão humana permanece obrigatória.
 - O ledger mantém `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` como pending. A mudança está em PR aberta e não conclui C0.
+
+
+## Delta pós-snapshot C0 — 2026-11-09
+
+**Base de código:** `main` em `00143238801ccac38c7ed82596af46db49f67f75` (merge da PR #788, 2026-11-09). Esta seção é um adendo; preserva o snapshot histórico de 2026-11-07 e supersede somente os estados futuros que ficaram desatualizados nos registros anteriores.
+
+### Mudanças integradas desde o snapshot
+
+- **PR #775 — merged:** o workflow agendado usa `RoadmapMissionSelector` e `data/roadmap_missions.json`. O manifesto permanece vazio; o caminho agendado termina em no-op antes de chamar LLM, sandbox ou publisher. Isso corrige a seleção de missão, mas não conclui Learning/Evolution nem C0.
+- **PR #782 — merged:** o selector agora lê o ledger machine-readable de `docs/STATUS.md`. Um critério `complete` no manifesto só é aceito se STATUS o marcar `verified` e fornecer commit, Actions run, paths de implementação/consumidor/testes existentes e correspondência com os testes declarados. O selector valida formato e existência local; não autentica remotamente o commit/check. Revisão humana continua obrigatória. Os três critérios C0 permanecem `pending`.
+- **PR #776 — merged:** novos enqueues persistem `created_by` e `owner_id` derivados da identidade autenticada; o sinal `task_blocked` usa o owner persistido. A migration mantém NULL para tarefas legadas/sistema. O snapshot read-only descrito na PR #789 registra 0/13 tarefas existentes com owner/creator; não fazer backfill presumido sem fonte de identidade confiável.
+- **PR #779 — merged:** `HostToolAuthorizationPolicy` implementa a decisão fail-closed e tem testes de principal, escopo, ownership, executor e approval. A classe está exportada, mas a inspeção de código não localizou composição de produção. `app/runtime/pipeline_runner.py::_get_tool_dispatcher()` instancia o dispatcher sem authorizer; portanto esse caminho continua negando dispatch.
+- **PR #787 — merged:** `ToolApprovalStore` implementa criação pending, confirmação, revogação e consumo atômico de intenção exata; a migration `20261108193000_durable_tool_approvals` foi aplicada segundo o snapshot read-only registrado na PR #789. Ainda não há API autenticada de criação/confirmação, resolver de sessão ou registro da policy no Nexus. O `AuthAdapter.create_access_token()` não emite claim de sessão próprio e `get_current_user()` reduz o payload a username/email/full_name/user_id, sem disponibilizar session_id. Não inferir sessão a partir do user_id.
+- **PR #788 — merged:** `run_shell_command` foi exposto no servidor Desktop MCP sobre o Secure MCP Tunnel. É execução PowerShell restrita por AST, allowlist de cmdlets/parâmetros, processo não elevado, ambiente minimizado, timeout e saída limitados. A única mutação permitida é iniciar a tarefa dedicada do túnel. Não é shell geral nem executor autorizado do Universal Toolbox. Os workflows do head final — PR Validation, Task Queue e testes de portas de navegador — concluíram com success.
+
+### Evidência operacional registrada em 2026-11-09
+
+O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remotas e 30 arquivos locais com correspondência version/name 30/30; `jarvis_tool_approvals` com RLS e grants service-role-only, 0 linhas; 5 agentes, 13 tarefas, 0 credenciais individuais ativas e 0/13 tarefas legadas com owner/creator; 0 snapshots de eventos, 0 snapshots de observações e 0 runs do worker recorrente. Esses números são evidência **reportada na PR #789**, não uma nova consulta independente executada por este adendo. A ausência de linhas/runs não prova falha de código, mas não comprova uso operacional.
+
+### Gates e pendências atualizados
+
+- A PR #789 está aberta e o full pytest Linux do head consultado passou. Não há review formal registrada; o review Codex não concluiu por limite de uso, enquanto a revisão Strix não apontou findings de segurança abertos.
+- Self Healing V3 e JARVIS PR Validation permanecem presentes. O workflow Self Healing observado não lista JARVIS PR Validation nem Jarvis Task Queue Tests entre suas fontes de `workflow_run`; logo, não há evidência de correção automática de falhas originadas em branches de PR.
+- O Auto-Documentation run 42616056149 falhou no `git push` por non-fast-forward após atualização concorrente de `main`; o run 42619019669 posterior passou. A causa imediata está confirmada nos logs; a condição de corrida do workflow permanece.
+- **C0 continua aberto:** `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem `pending` no ledger de STATUS. C1 — World Model — não deve começar antes da aceitação C0. Não marcar ownership, migration, policy ou approval schema como comportamento operacional concluído apenas por estarem merged/deployed.
