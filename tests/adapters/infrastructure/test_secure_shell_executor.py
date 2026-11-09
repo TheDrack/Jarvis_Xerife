@@ -1,5 +1,6 @@
 """Security tests for the constrained remote PowerShell executor."""
 
+import os
 import subprocess
 from unittest.mock import patch
 
@@ -144,3 +145,13 @@ def test_runner_fails_closed_when_powershell_is_unavailable(monkeypatch):
 
     assert result["success"] is False
     assert result["status"] == "powershell_unavailable"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="requires Windows PowerShell")
+def test_windows_runner_executes_an_allowlisted_command_end_to_end():
+    result = executor.run_shell_command("Get-Date", timeout_seconds=10)
+
+    assert result["success"] is True
+    assert result["status"] == "completed"
+    assert result["command"] == "Get-Date"
+    assert result["output"]
