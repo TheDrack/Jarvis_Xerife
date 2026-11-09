@@ -109,10 +109,8 @@ def _scan_root(
                     elif stat.S_ISREG(metadata.st_mode):
                         scanned_files += 1
                         size = max(0, int(metadata.st_size))
-                        for parent in (*ancestors,):
+                        for parent in ancestors:
                             directory_sizes[parent] += size
-                        if ancestors:
-                            directory_sizes[ancestors[-1]] += size
                         suffix = path.suffix.casefold() or "[no extension]"
                         extension_sizes[suffix] += size
                         extension_counts[suffix] += 1
