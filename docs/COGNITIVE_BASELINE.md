@@ -501,3 +501,17 @@ O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remota
 - Self Healing V3 e JARVIS PR Validation permanecem presentes. O workflow Self Healing observado não lista JARVIS PR Validation nem Jarvis Task Queue Tests entre suas fontes de `workflow_run`; logo, não há evidência de correção automática de falhas originadas em branches de PR.
 - O Auto-Documentation run 42616056149 falhou no `git push` por non-fast-forward após atualização concorrente de `main`; o run 42619019669 posterior passou. A causa imediata está confirmada nos logs; a condição de corrida do workflow permanece.
 - **C0 continua aberto:** `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem `pending` no ledger de STATUS. C1 — World Model — não deve começar antes da aceitação C0. Não marcar ownership, migration, policy ou approval schema como comportamento operacional concluído apenas por estarem merged/deployed.
+
+
+## Revalidação posterior — 2026-11-09 — PRs #789–#791
+
+**Base:** PRs #789, #790 e #791 foram confirmadas como merged pelo GitHub. Este adendo supersede os estados de PR descritos no snapshot anterior, sem reescrever evidência histórica.
+
+- PR #789 merged: atualiza docs/STATUS.md e este baseline com snapshot Supabase read-only de 2026-11-09. Os números permanecem evidência do snapshot reportado na PR, não consulta executada novamente nesta revalidação.
+- PR #790 merged: adiciona teste integrado para collect_live_intelligence, IntelligenceCore, IntelligenceRecurringWorker e SupabaseIntelligenceHistoryAdapter. Usa doubles determinísticos e não chama serviços externos. CI final: PR Validation run 42641924299 success; Task Queue run 42641924074 success. Isso comprova composição local em CI, não ativação do worker ou persistência em produção.
+- PR #791 merged: corrige a corrida observada no Auto-Documentation com concurrency group e checkout do main atual. CI final: PR Validation run 42642600559 success. O workflow permanece ativo; a correção evita a corrida entre execuções desse workflow, não serializa todos os possíveis escritores de main.
+- O código atual de RoadmapMissionSelector já lê o ledger estruturado em docs/STATUS.md. Missão complete exige estado verified e referências de commit, Actions, implementação, consumidor e testes existentes, com correspondência entre target/testes e STATUS. O parser não autentica remotamente os commits nem os checks; revisão humana continua obrigatória.
+- A nota histórica que dizia que RoadmapMissionSelector não lia STATUS foi supersedida pela PR #782 merged. O teste real do repositório para manifesto vazio ainda retorna antes de exercitar o parser de STATUS. A branch test/c0-real-status-ledger-contract adiciona teste específico para o ledger real e confirma os três critérios C0 como pending; aguarda CI.
+- data/roadmap_missions.json continua vazio. Nenhuma missão foi aprovada. Os critérios C0-CAPABILITY-MAP, C0-GAPS-RECORDED e C0-NO-NAME-BASED-COMPLETION continuam pending. C1 não deve iniciar.
+- Issues abertas verificadas: #682, #723 e #732. Branch protection continua bloqueada por configuração administrativa; histórico de migrations exige validação schema-aware/Preview/rollback; não fazer repair ou alteração de produção como atalho.
+- Self Healing V3 permanece ativo e separado de PR Validation. A documentação confirma que o healer privilegiado só processa falhas de workflows da main, não execuções de PR. Qualquer extensão deve manter isolamento entre código não confiável de PR e credenciais de escrita.

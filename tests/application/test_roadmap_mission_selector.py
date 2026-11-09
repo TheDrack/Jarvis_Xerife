@@ -408,3 +408,17 @@ def test_evolve_preserves_roadmap_criterion_in_candidate_artifact(monkeypatch):
     assert fake.context["mission_id"] == "C0-CAPABILITY-MAP"
     assert fake.context["cap_title"] == "Complete the C0 capability map"
     assert fake.context["target_file"] == "app/services/target.py"
+
+
+def test_real_repository_status_ledger_covers_production_roadmap_criteria():
+    selector = RoadmapMissionSelector()
+    roadmap_path = selector.repository_root / "docs" / "COGNITIVE_ROADMAP.md"
+    roadmap_content = roadmap_path.read_text(encoding="utf-8")
+
+    records = selector._load_status_evidence(roadmap_content)
+
+    assert set(ROADMAP_CRITERIA).issubset(records)
+    assert {
+        criterion_id: records[criterion_id]["state"]
+        for criterion_id in ROADMAP_CRITERIA
+    } == {criterion_id: "pending" for criterion_id in ROADMAP_CRITERIA}
