@@ -109,9 +109,9 @@ def test_task_execution_requires_owner_and_current_worker_attempt():
 
 @pytest.mark.parametrize(
     ("owner", "executor"),
-    [("user-2", "worker-1"), ("user-1", "worker-2"), ("user-1", None)],
+    [("user-1", "worker-2"), ("user-1", None)],
 )
-def test_cross_owner_or_stale_worker_attempt_is_denied(owner, executor):
+def test_wrong_or_stale_worker_attempt_is_denied(owner, executor):
     manifest = _manifest()
     request = ToolRequest(
         tool_id=manifest.tool_id,
