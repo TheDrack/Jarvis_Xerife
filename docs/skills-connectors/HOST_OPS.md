@@ -41,6 +41,10 @@ Each verb has its own parameter allowlist. **Positional or parameter values are 
 
 ### `git`
 
+Repository-scoped profiles (`git` and `pytest`) reject working directories outside the repository root. PowerShell path parameters accept filesystem paths only; provider-qualified paths such as `Registry::`, `Env:`, `Cert:` and `Variable:` are rejected. Listing filters credential directories such as `.ssh`, `.aws`, `.kube` and `.docker`; direct reads inside those directories are blocked.
+
+The `show` and `diff` verbs require `--stat` or `--name-only`. Raw patch/content output is not exposed through this profile. Secret redaction covers provider-prefixed environment variable names, common API tokens, AWS key identifiers and database connection URLs.
+
 Read-only subcommands: `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`, `branch`, `describe`. `-C`, `--git-dir`, `--work-tree`, `--exec-path`, `--upload-pack` and `-c` are rejected; `--no-pager` is always added and `GIT_TERMINAL_PROMPT=0` prevents interactive credential prompts.
 
 ```json
@@ -49,7 +53,7 @@ Read-only subcommands: `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`,
 
 ### `pytest`
 
-Targets must resolve inside `<repo>/tests` (files or directories, ≤ 6 arguments). The fixed suffix is `-q --no-cov -p no:cacheprovider`; optional `-x`, `-q`, `-k <expr>` (validated character set) and `--maxfail <n>`. Plugin injection (`-p`), rootdir changes and arbitrary paths are rejected.
+Targets must resolve inside `<repo>/tests` (files or directories, ≤ 6 arguments). The fixed suffix is `-q -p no:cacheprovider`; repository coverage configuration remains active. optional `-x`, `-q`, `-k <expr>` (validated character set) and `--maxfail <n>`. Plugin injection (`-p`), rootdir changes and arbitrary paths are rejected.
 
 ### `inspect_d`
 
