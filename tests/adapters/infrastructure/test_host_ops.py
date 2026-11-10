@@ -605,3 +605,49 @@ def test_audit_file_is_owner_only(_sandbox):
     mode = _sandbox_audit().stat().st_mode & 0o777
 
     assert mode == 0o600
+
+
+@pytest.mark.parametrize(
+    "network_path",
+    [
+        r"\\\\attacker.example\\share\\secret.txt",
+        "//attacker.example/share/secret.txt",
+        r"\\\\?\\UNC\\attacker.example\\share\\secret.txt",
+        r"\\\\.\\C$\\Windows\\win.ini",
+    ],
+)
+def test_resolve_path_rejects_unc_and_device_paths_before_resolution(network_path):
+    with pytest.raises(ops.PathNotAllowed):
+        ops.resolve_path(network_path)
+
+
+def test_allowed_roots_rejects_unc_configuration_before_resolution(monkeypatch):
+    monkeypatch.setenv("JARVIS_HOST_OPS_ROOTS", r"\\\\attacker.example\\share")
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.allowed_roots()
+
+
+def test_powershell_cwd_cannot_rebase_relative_path_validation(_sandbox, _fake_powershell):
+    alternate = _sandbox / "alternate-working-directory"
+    alternate.mkdir()
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.compile_command(
+            "powershell_readonly", "Get-ChildItem", ["-Path", "."], cwd=str(alternate)
+        )
+
+
+def test_entry_kind_detects_ntfs_junction_without_python_312_api(monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.delattr(ops.os.path, "isjunction", raising=False)
+    entry = SimpleNamespace(
+        path="C:\\junction",
+        is_symlink=lambda: False,
+        stat=lambda **kwargs: SimpleNamespace(st_file_attributes=0x400),
+        is_dir=lambda **kwargs: True,
+        is_file=lambda **kwargs: False,
+    )
+
+    assert ops._entry_kind(entry) == "junction"
