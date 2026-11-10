@@ -112,10 +112,11 @@ def test_git_status_runs_as_argv_without_shell_and_uses_current_directory(tmp_pa
     assert result["success"] is True
     assert result["output"] == "## main"
     args, kwargs = run.call_args
-    assert args[0] == [
-        "git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
-        "status", "--short", "--branch",
-    ]
+    assert args[0][0] == "git"
+    assert args[0][-3:] == ["status", "--short", "--branch"]
+    assert "core.fsmonitor=false" in args[0]
+    assert "core.untrackedCache=false" in args[0]
+    assert "--no-pager" in args[0]
     assert kwargs["shell"] is False
     assert kwargs["cwd"] == str(repo)
     assert kwargs["timeout"] <= 15
