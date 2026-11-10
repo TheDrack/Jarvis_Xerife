@@ -180,7 +180,20 @@ _REDACTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,})"), "[REDACTED_TOKEN]"),
     (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"), "[REDACTED_TOKEN]"),
     (re.compile(r"\bAIza[0-9A-Za-z_-]{30,}"), "[REDACTED_API_KEY]"),
+
+    (re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"), "[REDACTED_AWS_KEY_ID]"),
     (
+        re.compile(
+            r"(?i)(\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|"
+            r"CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET|TOKEN|PASSWORD|PASSWD|"
+            r"CREDENTIAL)[A-Z0-9_]*\s*[:=]\s*[\"']?)([^\"'\s,;]+)"
+        ),
+        r"\1[REDACTED]",
+    ),
+    (
+        re.compile(r"(?i)\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis)://([^:/@\s]+):([^@/\s]+)@"),
+        r"\1://\2:[REDACTED]@",
+    ),    (
         re.compile(
             r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|secret)["']?\s*[:=]\s*["']?)([^"'\s,}]{4,})"""
         ),
@@ -232,6 +245,7 @@ def list_directory(
         max_entries, name="max_entries", minimum=1, maximum=MAX_LIST_ENTRIES
     )
     root = resolve_path(path, must_exist=True)
+    _reject_secret_name(root)
     if not root.is_dir():
         raise ValueError("path is not a directory")
 
@@ -262,7 +276,7 @@ def list_directory(
             if len(entries) >= max_entries:
                 truncated = True
                 return
-            if _SECRET_FILE_NAME.match(entry.name):
+            if entry.name.casefold() in _SECRET_DIRECTORIES or _SECRET_FILE_NAME.match(entry.name):
                 filtered += 1
                 continue
             try:
@@ -538,7 +552,14 @@ def _validate_argument_value(validator: str, value: str) -> None:
     if validator in {"path", "d_path"}:
         if not _PATH_VALIDATOR.match(value):
             raise ValueError("invalid path argument")
+        # PowerShell provider paths are not filesystem paths. Reject namespace
+        # separators and every colon except an absolute Windows drive prefix.
+        if "::" in value or (
+            ":" in value and not re.match(r"^[A-Za-z]:[\\/]", value)
+        ):
+            raise PathNotAllowed("only filesystem paths are permitted")
         resolved = resolve_path(value)
+        _reject_secret_name(resolved)
         if validator == "d_path" and not _norm(resolved).startswith(_norm(Path("D:/"))):
             raise PathNotAllowed("this profile can only inspect D:\\")
         return
@@ -685,6 +706,8 @@ def compile_command(
     workdir = resolve_path(cwd, must_exist=True) if cwd else _repository_root()
     if not workdir.is_dir():
         raise ValueError("working directory is not a directory")
+    if profile in {"git", "pytest"} and not _is_within(workdir, _repository_root()):
+        raise PathNotAllowed("git and pytest must run inside the repository root")
 
     if profile == "git":
         policy = _GIT_POLICIES.get(verb)
@@ -692,6 +715,8 @@ def compile_command(
             raise ValueError("git subcommand is not allowlisted")
         if any(_GIT_FORBIDDEN.search(argument) for argument in arguments):
             raise ValueError("git options that relocate the repository are not permitted")
+        if verb in {"show", "diff"} and not {"--stat", "--name-only"}.intersection(arguments):
+            raise ValueError("git show/diff must use metadata-only --stat or --name-only output")
         parsed = _parse_arguments(verb, arguments, policy)
         argv = ("git", "--no-pager", verb, *[token for pair in parsed for token in pair if token])
         return CompiledCommand(profile, verb, argv, workdir, timeout_seconds, joined)
@@ -772,7 +797,6 @@ def _compile_pytest(
         "pytest",
         *targets,
         "-q",
-        "--no-cov",
         "-p",
         "no:cacheprovider",
         *extra,
