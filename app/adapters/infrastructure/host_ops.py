@@ -142,15 +142,17 @@ def allowed_roots() -> tuple[Path, ...]:
 
 
 def _norm(value: Path | str) -> str:
-    return os.path.normcase(str(value)).rstrip("\\/")
+    # Preserve trailing separators: on POSIX a backslash is a valid filename character.
+    return os.path.normcase(str(value))
 
 
 def _is_within(path: Path, root: Path) -> bool:
     normalized_path = _norm(path)
     normalized_root = _norm(root)
-    return normalized_path == normalized_root or normalized_path.startswith(
-        normalized_root + os.sep
-    )
+    if normalized_path == normalized_root:
+        return True
+    prefix = normalized_root if normalized_root.endswith(os.sep) else normalized_root + os.sep
+    return normalized_path.startswith(prefix)
 
 
 def _is_secret_path(path: Path) -> bool:
@@ -288,7 +290,14 @@ _BINARY_PROBE = 8192
 # --------------------------------------------------------------------------- #
 # Redaction
 # --------------------------------------------------------------------------- #
-_REDACTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+def _redact_credential_value(match: re.Match[str]) -> str:
+    """Replace the complete credential value, preserving its quote style."""
+    value = match.group(2)
+    quote = value[0] if value[:1] in {'"', "'"} else ""
+    return f"{match.group(1)}{quote}[REDACTED]{quote}"
+
+
+_REDACTION_RULES: tuple[tuple[re.Pattern[str], Any], ...] = (
     (re.compile(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]{8,}=*"), r"\1[REDACTED]"),
     (re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"), "[REDACTED_API_KEY]"),
     (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"), "[REDACTED_TOKEN]"),
@@ -308,9 +317,9 @@ _REDACTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     ),
     (
         re.compile(
-            r"""(?i)(["']?\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]*|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL)[A-Z0-9_]*["']?\s*[:=]\s*["']?)([^"'\s,;}]+)"""
+            r"""(?i)(["']?\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]*|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL)[A-Z0-9_]*["']?[ \t]*[:=][ \t]*)((?:"[^"\n]*"|'[^'\n]*'|[^"'\s,;}]+))"""
         ),
-        r"\1[REDACTED]",
+        _redact_credential_value,
     ),
 )
 
