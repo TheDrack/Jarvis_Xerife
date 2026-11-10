@@ -198,3 +198,32 @@ def test_cat_redacts_common_secret_values(tmp_path):
     assert result["success"] is True
     assert "very-secret-value" not in result["output"]
     assert "[REDACTED]" in result["output"]
+
+
+def test_cat_allows_non_sensitive_file_under_path_containing_secret_word(tmp_path):
+    workspace = tmp_path / "secretary-workspace"
+    workspace.mkdir()
+    (workspace / "settings.json").write_text(
+        '{"mode":"safe"}', encoding="utf-8"
+    )
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=workspace)
+
+    result = navigator.execute("cat settings.json")
+
+    assert result["success"] is True
+    assert result["output"] == '{"mode":"safe"}'
+
+
+def test_cat_blocks_secret_store_directory_components(tmp_path):
+    credentials = tmp_path / "credentials"
+    credentials.mkdir()
+    (credentials / "settings.json").write_text(
+        '{"api_key":"must-not-leak"}', encoding="utf-8"
+    )
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=tmp_path)
+
+    result = navigator.execute("cat credentials/settings.json")
+
+    assert result["success"] is False
+    assert result["status"] == "sensitive_file_blocked"
+    assert "must-not-leak" not in result["output"]
