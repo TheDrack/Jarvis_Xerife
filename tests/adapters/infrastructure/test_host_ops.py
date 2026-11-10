@@ -562,3 +562,20 @@ def test_command_output_with_private_key_material_is_withheld(monkeypatch):
 def test_inspect_d_profile_does_not_expose_other_drive_metadata():
     with pytest.raises(ValueError):
         ops.compile_command("inspect_d", "Get-PSDrive", ["-Name", "C"])
+
+
+def test_git_profile_disables_repo_fsmonitor_and_optional_index_cache():
+    compiled = ops.compile_command("git", "status", [])
+
+    assert compiled.argv[:6] == (
+        "git", "-c", "core.fsmonitor=false",
+        "-c", "core.untrackedCache=false", "--no-pager",
+    )
+
+
+def test_git_environment_ignores_user_and_system_configuration(monkeypatch):
+    environment = ops._sanitized_environment()
+
+    assert environment["GIT_CONFIG_NOSYSTEM"] == "1"
+    assert environment["GIT_CONFIG_GLOBAL"] == os.devnull
+    assert environment["GIT_OPTIONAL_LOCKS"] == "0"
