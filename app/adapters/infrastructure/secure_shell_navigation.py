@@ -36,7 +36,7 @@ _TEXT_SUFFIXES = frozenset(
 _SPECIAL_TEXT_NAMES = frozenset({"readme", "license", "dockerfile", "makefile", "procfile"})
 _SENSITIVE_NAMES = re.compile(
     r"(?i)^(?:"
-    r"\.env(?:\..*)?|\.envrc|\.npmrc|\.netrc|\.git-credentials|"
+    r"\.env(?:\..*)?|\.envrc|\.npmrc|\.netrc|\.git|\.git-credentials|"
     r"\.ssh|\.aws|\.azure|\.gnupg|\.kube|\.docker|\.pypirc|\.pgpass|\.my\.cnf|"
     r"\.password-store|\.terraform|\.vault|\.npm|\.config-credentials|"
     r"credentials?(?:[._-].*)?|secrets?(?:[._-].*)?|tokens?(?:[._-].*)?|"
@@ -77,12 +77,16 @@ _SECRET_CONTENT = re.compile(
     rb"client[_-]?secret|private[_-]?key|signing[_-]?key|password|passwd|"
     rb"passphrase|token|secret|credential|authorization|oauth[_-]?token)"
     rb"[A-Z0-9_.-]*[\"']?\s*[:=]\s*[\"']?(?:basic\s+)?[^\s,;\"'}]{4,}|"
+    rb"(?<![A-Z0-9_-])[\"']?key[\"']?\s*[:=]\s*[\"']?[A-Za-z0-9+/=_-]{16,}|"
+    rb"(?im)^\s*[\"']?[A-Z0-9_.-]*(?:password|passwd|token|secret|credential|api[_-]?key)"
+    rb"[A-Z0-9_.-]*[\"']?\s*:\s*[|>][-+]?\s*(?:\r?\n[ \t]+\S+)+|"
+    rb"(?i)\bBearer\s+[A-Za-z0-9._~+/-]{8,}=*|"
+    rb"[a-z][a-z0-9+.-]*://[^/\s:@]+:[^@\s/]+@|"
     rb"<\s*(?:password|token|secret|api[_-]?key)\b[^>]*>\s*[^<]{4,}</\s*"
     rb"(?:password|token|secret|api[_-]?key)\s*>|"
     rb"(?<![A-Z0-9])(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|"
     rb"glpat-[A-Za-z0-9_-]{16,}|xox[abposr]-[A-Za-z0-9-]{10,}|"
     rb"AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,})"
-    rb")"
 )
 
 
