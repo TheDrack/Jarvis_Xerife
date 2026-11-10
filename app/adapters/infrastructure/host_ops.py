@@ -113,7 +113,7 @@ def _reject_windows_path_aliases(raw: str | Path) -> None:
             raise PathNotAllowed("reserved Windows device names are not permitted")
 
 
-def _reject_link_components(candidate: Path) -> None
+def _reject_link_components(candidate: Path) -> None:
     """Reject symlinks and NTFS reparse points before resolving their targets."""
     absolute = candidate if candidate.is_absolute() else candidate.absolute()
     current = Path(absolute.anchor)
@@ -1113,18 +1113,79 @@ def _consume_confirmation(token: str, digest: str) -> bool:
 def _spawn(
     argv: Sequence[str], cwd: Path, environment: Mapping[str, str], timeout_seconds: int
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    """Run a child while draining pipes and retaining only bounded output."""
+    process = subprocess.Popen(
         list(argv),
         cwd=str(cwd),
         env=dict(environment),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=timeout_seconds,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         shell=False,
-        check=False,
+        bufsize=0,
     )
+    stdout_buffer = bytearray()
+    stderr_buffer = bytearray()
+    stdout_overflow = [False]
+    stderr_overflow = [False]
+
+    def drain(stream: Any, buffer: bytearray, limit: int, overflow: list[bool]) -> None:
+        while True:
+            chunk = stream.read(8192)
+            if not chunk:
+                return
+            remaining = limit - len(buffer)
+            if remaining > 0:
+                buffer.extend(chunk[:remaining])
+            if len(chunk) > max(remaining, 0):
+                overflow[0] = True
+
+    assert process.stdout is not None and process.stderr is not None
+    readers = (
+        threading.Thread(
+            target=drain,
+            args=(process.stdout, stdout_buffer, MAX_CAPTURE_STDOUT_BYTES, stdout_overflow),
+            daemon=True,
+        ),
+        threading.Thread(
+            target=drain,
+            args=(process.stderr, stderr_buffer, MAX_CAPTURE_STDERR_BYTES, stderr_overflow),
+            daemon=True,
+        ),
+    )
+    for reader in readers:
+        reader.start()
+
+    def decoded(buffer: bytearray) -> str:
+        return bytes(buffer).decode("utf-8", errors="replace")
+
+    try:
+        return_code = process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+        for reader in readers:
+            reader.join(timeout=2)
+        raise subprocess.TimeoutExpired(
+            list(argv),
+            timeout_seconds,
+            output=decoded(stdout_buffer),
+            stderr=decoded(stderr_buffer),
+        )
+    finally:
+        for reader in readers:
+            reader.join(timeout=2)
+        for stream in (process.stdout, process.stderr):
+            try:
+                stream.close()
+            except OSError:
+                pass
+
+    completed = subprocess.CompletedProcess(
+        list(argv), return_code, decoded(stdout_buffer), decoded(stderr_buffer)
+    )
+    completed._jarvis_truncated = stdout_overflow[0] or stderr_overflow[0]
+    return completed
 
 
 def _names_credential_entry(token: str) -> bool:
@@ -1309,6 +1370,8 @@ def run_host_command(
     elapsed_ms = int((time.monotonic() - started) * 1000)
     stdout, stdout_truncated = _bound(completed.stdout, MAX_STDOUT_CHARS)
     stderr, stderr_truncated = _bound(completed.stderr, MAX_STDERR_CHARS)
+    capture_truncated = bool(getattr(completed, "_jarvis_truncated", False))
+    output_truncated = stdout_truncated or stderr_truncated or capture_truncated
     success = completed.returncode == 0
     audit_id, logged = _audit(
         {
@@ -1320,7 +1383,7 @@ def run_host_command(
             "cwd": str(compiled.cwd),
             "exit_code": completed.returncode,
             "elapsed_ms": elapsed_ms,
-            "truncated": stdout_truncated or stderr_truncated,
+            "truncated": output_truncated,
             "confirmed": confirmed,
             "elevated": False,
         }
@@ -1338,7 +1401,7 @@ def run_host_command(
         "stderr": stderr,
         "exit_code": completed.returncode,
         "timed_out": False,
-        "truncated": stdout_truncated or stderr_truncated,
+        "truncated": output_truncated,
         "elapsed_ms": elapsed_ms,
         "audit_id": audit_id,
         "audit_logged": logged,
