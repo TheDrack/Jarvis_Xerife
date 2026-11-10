@@ -106,7 +106,9 @@ def _reject_windows_path_aliases(raw: str | Path) -> None:
             raise PathNotAllowed("trailing dots and spaces are not permitted in Windows paths")
         if ":" in component:
             raise PathNotAllowed("NTFS alternate data streams are not permitted")
-        device_name = component.split(".", 1)[0].casefold()
+        device_name = component.split(".", 1)[0].casefold().translate(
+            str.maketrans("\u00b9\u00b2\u00b3", "123")
+        )
         if device_name in {"con", "prn", "aux", "nul"} or re.fullmatch(
             r"(?:com|lpt)[1-9]", device_name
         ):
@@ -316,36 +318,67 @@ _BINARY_PROBE = 8192
 # --------------------------------------------------------------------------- #
 # Redaction
 # --------------------------------------------------------------------------- #
-def _redact_credential_value(match: re.Match[str]) -> str:
-    """Replace the complete credential value, preserving its quote style."""
-    value = match.group(2)
-    quote = value[0] if value[:1] in {'"', "'"} else ""
-    return f"{match.group(1)}{quote}[REDACTED]{quote}"
+_CREDENTIAL_KEY_MARKERS = (
+    "APIKEY",
+    "ACCESSKEY",
+    "PRIVATEKEY",
+    "SIGNINGKEY",
+    "AUTHTOKEN",
+    "ACCESSTOKEN",
+    "REFRESHTOKEN",
+    "CLIENTSECRET",
+    "SERVICEROLEKEY",
+    "SECRET",
+    "TOKEN",
+    "PASSWORD",
+    "PASSWD",
+    "PASSPHRASE",
+    "CREDENTIAL",
+)
+
+# The key token is scanned linearly; the callback checks marker membership.
+# This avoids nested, overlapping quantifiers and length-based redaction bypasses.
+_CREDENTIAL_ASSIGNMENT = re.compile(
+    r"""(?i)(?<![A-Z0-9_-])(?P<prefix>(?P<quote>[\"']?)(?P<key>[A-Z0-9_-]+)(?P=quote)[ \\t]*[:=][ \\t]*)(?P<value>\"[^\"\\n]*(?:\"|(?=\\n|$))|'[^'\\n]*(?:'|(?=\\n|$))|[^\"'\\s,;}]+)"""
+)
+
+
+def _redact_credential_assignments(value: str) -> tuple[str, int]:
+    """Redact assignment values whenever the complete key contains a secret marker."""
+    replacements = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal replacements
+        key = match.group("key").replace("_", "").replace("-", "").upper()
+        if not any(marker in key for marker in _CREDENTIAL_KEY_MARKERS):
+            return match.group(0)
+
+        raw_value = match.group("value")
+        quote = raw_value[:1] if raw_value[:1] in {'\"', "'"} else ""
+        closing_quote = quote if quote and raw_value.endswith(quote) and len(raw_value) > 1 else ""
+        replacements += 1
+        return f"{match.group('prefix')}{quote}[REDACTED]{closing_quote}"
+
+    return _CREDENTIAL_ASSIGNMENT.sub(replace, value), replacements
 
 
 _REDACTION_RULES: tuple[tuple[re.Pattern[str], Any], ...] = (
-    (re.compile(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]{8,}=*"), r"\1[REDACTED]"),
-    (re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"), "[REDACTED_API_KEY]"),
-    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"), "[REDACTED_TOKEN]"),
-    (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"), "[REDACTED_TOKEN]"),
-    (re.compile(r"\bglpat-[A-Za-z0-9_-]{16,}|\bnpm_[A-Za-z0-9]{16,}"), "[REDACTED_TOKEN]"),
-    (re.compile(r"\bAIza[0-9A-Za-z_-]{30,}"), "[REDACTED_API_KEY]"),
-    (re.compile(r"\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\b"), "[REDACTED_AWS_KEY_ID]"),
+    (re.compile(r"(?i)(Bearer\\s+)[A-Za-z0-9._~+/-]{8,}=*"), r"\\1[REDACTED]"),
+    (re.compile(r"\\bsk-[A-Za-z0-9_-]{16,}"), "[REDACTED_API_KEY]"),
+    (re.compile(r"\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"), "[REDACTED_TOKEN]"),
+    (re.compile(r"\\bxox[baprs]-[A-Za-z0-9-]{10,}"), "[REDACTED_TOKEN]"),
+    (re.compile(r"\\bglpat-[A-Za-z0-9_-]{16,}|\\bnpm_[A-Za-z0-9]{16,}"), "[REDACTED_TOKEN]"),
+    (re.compile(r"\\bAIza[0-9A-Za-z_-]{30,}"), "[REDACTED_API_KEY]"),
+    (re.compile(r"\\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\\b"), "[REDACTED_AWS_KEY_ID]"),
     (
         re.compile(
-            r"""(?i)((?:client[_-]?key[_-]?data|certificate[_-]?authority[_-]?data|account[_-]?key)["']?\s*[:=]\s*["']?)([^"'\s,;}]{8,})"""
+            r"""(?i)((?:client[_-]?key[_-]?data|certificate[_-]?authority[_-]?data|account[_-]?key)[\"']?\\s*[:=]\\s*[\"']?)([^\"'\\s,;}]{8,})"""
         ),
-        r"\1[REDACTED]",
+        r"\\1[REDACTED]",
     ),
     (
-        re.compile(r"""([a-z][a-z0-9+.-]*://[^/\s:@"']*:)([^@\s/"']+)@"""),
-        r"\1[REDACTED]@",
-    ),
-    (
-        re.compile(
-            r"""(?i)(["']?\b[A-Z0-9_]{0,40}(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]{0,40}|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL)[A-Z0-9_]{0,40}["']?[ \t]*[:=][ \t]*)((?:"[^"\n]*"|'[^'\n]*'|[^"'\s,;}]+))"""
-        ),
-        _redact_credential_value,
+        re.compile(r"""([a-z][a-z0-9+.-]*://[^/\\s:@\"']*:)([^@\\s/\"']+)@"""),
+        r"\\1[REDACTED]@",
     ),
 )
 
@@ -357,6 +390,8 @@ def redact(value: str) -> tuple[str, int]:
     for pattern, replacement in _REDACTION_RULES:
         text, count = pattern.subn(replacement, text)
         total += count
+    text, count = _redact_credential_assignments(text)
+    total += count
     return text, total
 
 
@@ -557,6 +592,9 @@ def read_text_file(
     truncated_by_bytes = len(data) > max_bytes
     if truncated_by_bytes:
         text = data[:max_bytes].decode("utf-8", errors="replace")
+        # A byte cap may cut through a credential value. Keep only complete lines.
+        last_complete_line = text.rfind("\n")
+        text = text[: last_complete_line + 1] if last_complete_line >= 0 else ""
     redacted, redactions = redact(text)
     lines = redacted.splitlines()
     truncated_by_lines = len(lines) > max_lines
@@ -1009,7 +1047,9 @@ def _audit_argument_digest(arguments: Sequence[Any]) -> str:
         )
     except (TypeError, ValueError):
         payload = f"<{type(arguments).__name__}>"
-    return hmac.new(_AUDIT_SECRET, payload.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    return hmac.new(
+        _AUDIT_SECRET, payload.encode("utf-8", errors="surrogatepass"), hashlib.sha256
+    ).hexdigest()[:16]
 
 
 def _request_digest(profile: str, verb: str, arguments: Sequence[str], cwd: Path) -> str:
@@ -1141,6 +1181,14 @@ def _spawn(
                 buffer.extend(chunk[:remaining])
             if len(chunk) > max(remaining, 0):
                 overflow[0] = True
+        if overflow[0]:
+            # A truncated final line may contain a value whose closing delimiter
+            # was not captured; discard it before any redaction or return.
+            last_complete_line = buffer.rfind(b"\n")
+            if last_complete_line >= 0:
+                del buffer[last_complete_line + 1 :]
+            else:
+                buffer.clear()
 
     assert process.stdout is not None and process.stderr is not None
     readers = (
