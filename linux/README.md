@@ -113,10 +113,11 @@ linux/provision-jarvis-os.sh --with-dev --with-mcp --with-desktop --start
 linux/verify-jarvis-os.sh --services --tests
 ```
 
-- Ambiente: `~/.config/jarvis/jarvis.env` (0600). Preencha as chaves de provedor **ali**, nunca em chat, commit ou unit.
-- Dados: `~/.local/share/jarvis/` (`JARVIS_DEVICES_DB`, `JARVIS_GEOINT_DB`, `JARVIS_GRAPH_DB`).
+- Ambiente: `~/.config/jarvis/jarvis.env` (diretório 0700, arquivo 0600). Preencha as chaves de provedor **ali**, nunca em chat, commit ou unit.
+- Dados: `~/.local/share/jarvis/` (diretório 0700; `JARVIS_DEVICES_DB`, `JARVIS_GEOINT_DB`, `JARVIS_GRAPH_DB`).
 - Serviços de usuário; para sobreviver ao logout: `sudo loginctl enable-linger $USER`.
-- MCP continua loopback. Exposição remota segue `docs/INSTALACAO_WINDOWS.md`: Tailscale Serve, nunca Funnel, nunca `0.0.0.0`.
+- MCP Linux usa `jarvis_linux_mcp`: loopback + autenticação obrigatória `Authorization: Bearer`. O provisionador gera `JARVIS_DESKTOP_AUTH_TOKEN` aleatório quando `--with-mcp` é usado e o guarda no arquivo 0600. Configure esse token no cliente MCP; nunca o imprima em logs, chat ou commit.
+- Host/Origin allowlists continuam ativos. Para Tailscale Serve, inclua explicitamente o hostname privado nos allowlists e configure o cliente com o bearer token. Nunca use Funnel nem `0.0.0.0`.
 - `--harden-network` é opt-in porque muda firewall; sem ele, nada de rede é alterado.
 
 ## 7. Gaps de portabilidade Linux conhecidos
