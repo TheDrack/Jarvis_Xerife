@@ -1,6 +1,7 @@
 """Integration tests for the MCP registration of host operations tools."""
 from __future__ import annotations
 
+import json
 from typing import get_type_hints
 
 from app.adapters.infrastructure import host_ops
@@ -103,7 +104,9 @@ def test_command_run_executes_through_the_injected_runner(monkeypatch):
     assert result["shell"] is False
 
 
-def test_confirmation_tool_never_unlocks_blocked_operations():
+def test_confirmation_tool_never_unlocks_blocked_operations(tmp_path, monkeypatch):
+    audit_path = tmp_path / "audit.jsonl"
+    monkeypatch.setenv("JARVIS_HOST_OPS_AUDIT_LOG", str(audit_path))
     mcp = _registered()
 
     not_applicable = mcp.tools["host_command_request_confirmation"](profile="git", verb="status")
@@ -113,6 +116,19 @@ def test_confirmation_tool_never_unlocks_blocked_operations():
 
     assert not_applicable["status"] == "confirmation_not_applicable"
     assert blocked["success"] is False
+    assert blocked["status"] == "confirmation_rejected"
+    assert not_applicable["audit_logged"] is True
+    assert blocked["audit_logged"] is True
+
+    records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert len(records) == 2
+    assert all(record["event"] == "confirmation" for record in records)
+    assert [record["status"] for record in records] == [
+        "confirmation_not_applicable",
+        "confirmation_rejected",
+    ]
+    assert all(record["argument_digest"] for record in records)
+    assert "C:/x" not in audit_path.read_text(encoding="utf-8")
 
 
 def test_registered_tool_annotations_resolve_like_fastmcp():
@@ -167,3 +183,26 @@ def test_read_tool_writes_audit_record_without_raw_path(tmp_path, monkeypatch):
     assert record["event"] == "fs_read"
     assert record["path_digest"]
     assert str(target) not in audit_path.read_text(encoding="utf-8")
+
+
+def test_filesystem_tools_audit_unpaired_surrogate_paths(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_HOST_OPS_ROOTS", str(tmp_path))
+    audit_path = tmp_path / "audit.jsonl"
+    monkeypatch.setenv("JARVIS_HOST_OPS_AUDIT_LOG", str(audit_path))
+    tools = _registered().tools
+
+    listed = tools["host_fs_list"](path="\\ud800", depth=0, max_entries=10)
+    read = tools["host_fs_read_text"](path="\\ud800")
+
+    assert listed["success"] is False
+    assert read["success"] is False
+    assert listed["audit_logged"] is True
+    assert read["audit_logged"] is True
+
+    records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    assert len(records) == 2
+    assert [record["event"] for record in records] == ["fs_list", "fs_read"]
+    assert all(record["path_digest"] for record in records)
+    assert "\\ud800" not in audit_path.read_text(encoding="utf-8")
+
+
