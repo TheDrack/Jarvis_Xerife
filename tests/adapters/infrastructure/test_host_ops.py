@@ -901,3 +901,30 @@ def test_git_show_and_diff_are_metadata_only():
         compiled = ops.compile_command("git", verb, arguments)
         assert "--no-ext-diff" in compiled.argv
         assert "--no-textconv" in compiled.argv
+
+
+
+@pytest.mark.skipif(os.name == "nt", reason="backslash is a path separator on Windows")
+def test_allowed_root_with_trailing_backslash_is_not_treated_as_root(_sandbox):
+    candidate = Path(f"{_sandbox}\\\\")
+    assert ops._is_within(_sandbox, _sandbox) is True
+    assert ops._is_within(candidate, _sandbox) is False
+
+
+def test_redact_consumes_complete_quoted_multiline_safe_value():
+    value = 'password: "correct horse battery staple"\\nordinary: visible'
+    redacted, count = ops.redact(value)
+
+    assert count == 1
+    assert 'correct horse battery staple' not in redacted
+    assert 'password: "[REDACTED]"' in redacted
+    assert 'ordinary: visible' in redacted
+
+
+def test_redact_does_not_consume_following_line_when_value_is_unquoted():
+    value = "password: first-line-secret\\nordinary: visible"
+    redacted, count = ops.redact(value)
+
+    assert count == 1
+    assert "first-line-secret" not in redacted
+    assert "ordinary: visible" in redacted
