@@ -27,3 +27,22 @@ def test_linux_verifier_checks_effective_api_bind_address():
 
     assert "systemctl --user show jarvis-api.service" in verifier
     assert "API_HOST=127.0.0.1" in verifier
+
+
+def test_mcp_unit_uses_authenticated_linux_entrypoint():
+    unit = (ROOT / "linux/systemd/jarvis-mcp.service").read_text(encoding="utf-8")
+
+    assert "app.adapters.edge.jarvis_linux_mcp" in unit
+    assert "app.adapters.edge.jarvis_desktop_mcp" not in unit
+
+
+def test_provisioner_protects_credentials_directory_and_temp_copy():
+    script = (ROOT / "linux/provision-jarvis-os.sh").read_text(encoding="utf-8")
+
+    assert script.index("umask 077") < script.index('mkdir -p "$ENV_DIR"')
+    assert 'chmod 700 "$ENV_DIR"' in script
+    assert 'trap \'rm -f "$runtime_env_tmp" "${runtime_env_tmp}.next"\' EXIT' in script
+    assert 'chmod 600 "$runtime_env_tmp"' in script
+    assert 'chmod 600 "$ENV_FILE"' in script
+    assert "secrets.token_urlsafe(48)" in script
+    assert 'JARVIS_DESKTOP_AUTH_TOKEN=' in script
