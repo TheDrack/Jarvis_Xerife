@@ -447,7 +447,7 @@ class ShellNavigator:
                         return self._failure("git_repository_outside_allowed_roots", str(exc))
                     try:
                         _assert_trusted_git_config(git_dir)
-                        if args[0] == "diff":
+                        if args[0] in {"diff", "show"}:
                             _assert_safe_attributes(_repo_root)
                     except (OSError, UnicodeError, ValueError) as exc:
                         return self._failure("git_config_rejected", str(exc) or "repository Git config is not trusted")
