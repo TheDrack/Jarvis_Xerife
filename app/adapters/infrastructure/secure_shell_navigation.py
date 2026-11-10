@@ -245,8 +245,8 @@ class ShellNavigator:
                     )
                     raw_output = completed.stdout or ""
                     if args[:2] == ["remote", "-v"]:
-                        raw_output = re.sub(r"(https?://)[^/@\\s]+:[^/@\\s]+@", r"\\1[REDACTED]@", raw_output)
-                        raw_output = re.sub(r"(?i)(token|key|password)=([^&\\s]+)", r"\\1=[REDACTED]", raw_output)
+                        raw_output = re.sub(r"(https?://)[^/@\s]+:[^/@\s]+@", r"\1[REDACTED]@", raw_output)
+                        raw_output = re.sub(r"(?i)(token|key|password)=([^&\s]+)", r"\1=[REDACTED]", raw_output)
                     output = raw_output[:MAX_OUTPUT_CHARS]
                     error = (completed.stderr or "")[:4_000]
                     return {
