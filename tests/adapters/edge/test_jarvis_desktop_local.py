@@ -489,6 +489,7 @@ def test_local_intelligence_config_uses_explicit_path_without_scanning_other_pro
     config = tmp_path / "intelligence.env"
     config.write_text("JARVIS_GEV_AREA_WEST=-49.0\\n", encoding="utf-8")
     monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.delenv("JARVIS_GEV_AREA_WEST", raising=False)
     monkeypatch.setenv("JARVIS_INTELLIGENCE_ENV", str(config))
     original_iterdir = Path.iterdir
 
