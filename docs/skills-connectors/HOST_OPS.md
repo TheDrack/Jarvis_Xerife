@@ -30,7 +30,7 @@ Default on Windows: the repository root and `D:\`. On other platforms: the repos
 $env:JARVIS_HOST_OPS_ROOTS = "D:\\"
 ```
 
-The repository root is always appended. Paths are resolved with `Path.resolve()` (which follows junctions) and re-checked against the roots, so a link cannot escape. `..` segments, `~` paths and control characters are rejected before resolution.
+The repository root is always appended. UNC/device paths and mapped network drives are rejected before any resolution. Symlink and NTFS reparse-point components are rejected before `Path.resolve()`, so resolution never follows a caller-controlled link. `..` segments, `~` paths and control characters are rejected.
 
 ## Command profiles
 
