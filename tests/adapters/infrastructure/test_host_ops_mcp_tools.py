@@ -7,6 +7,14 @@ from app.adapters.infrastructure import host_ops
 from app.adapters.infrastructure.host_ops_mcp_tools import TOOL_NAMES, register_host_ops_tools
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _enable_host_ops_for_tests(monkeypatch):
+    monkeypatch.setenv("JARVIS_HOST_OPS_ENABLED", "1")
+
+
 class FakeMCP:
     def __init__(self):
         self.tools = {}
@@ -112,3 +120,13 @@ def test_registered_tool_annotations_resolve_like_fastmcp():
 
     for function in mcp.tools.values():
         get_type_hints(function)
+
+
+def test_host_ops_tools_are_not_registered_without_explicit_local_opt_in(monkeypatch):
+    monkeypatch.delenv("JARVIS_HOST_OPS_ENABLED", raising=False)
+    mcp = FakeMCP()
+
+    registered = register_host_ops_tools(mcp)
+
+    assert registered == ()
+    assert mcp.tools == {}
