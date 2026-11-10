@@ -992,22 +992,79 @@ def test_git_commit_probe_timeout_is_audited_rejection(_sandbox, monkeypatch):
 @pytest.mark.skipif(os.name != "nt", reason="NTFS path aliases are Windows-specific")
 @pytest.mark.parametrize(
     "suffix",
-    ["file:stream", "file.", "file ", "CON", "NUL.txt", "COM1.log", "LPT9"],
+    [
+        "file:stream",
+        "file.",
+        "file ",
+        "CON",
+        "NUL.txt",
+        "COM1.log",
+        "LPT9",
+        "COM\\u00b9",
+        "COM\\u00b2.txt",
+        "LPT\\u00b9",
+        "LPT\\u00b3.log",
+    ],
 )
 def test_resolve_path_rejects_ntfs_aliases(_sandbox, suffix):
     with pytest.raises(ops.PathNotAllowed):
         ops.resolve_path(str(_sandbox / suffix))
 
 
-def test_spawn_caps_child_output_instead_of_buffering_unbounded_streams(_sandbox):
+def test_spawn_caps_child_output_and_discards_partial_secret_line(_sandbox):
     command = [
         sys.executable,
         "-c",
-        "import sys; sys.stdout.write('x' * 1000000); sys.stderr.write('y' * 1000000)",
+        "import sys; sys.stdout.write('safe\\nPASSWORD=\\\"' + 'x' * 1000000); sys.stderr.write('y' * 1000000)",
     ]
 
     completed = ops._spawn(command, _sandbox, ops._sanitized_environment(), 10)
 
+    assert completed.stdout == "safe\\n"
+    assert "PASSWORD=" not in completed.stdout
     assert len(completed.stdout.encode("utf-8")) <= ops.MAX_STDOUT_CHARS * 4
     assert len(completed.stderr.encode("utf-8")) <= ops.MAX_STDERR_CHARS * 4
     assert completed._jarvis_truncated is True
+
+
+def test_redact_long_credential_key_names_on_file_and_command_output_paths(_sandbox):
+    key = "MY_SUPER_LONG_APPLICATION_CONFIGURATION_ENCRYPTION_PASSWORD"
+    secret = "S3cr3t-Pr0d-Passw0rd"
+    target = _sandbox / "ordinary-config.yaml"
+    target.write_text(f"{key}: {secret}\\nmode: safe\\n", encoding="utf-8")
+
+    read_result = ops.read_text_file(str(target))
+    command_output, _ = ops._bound(f"{key}: {secret}\\n", 4_000)
+
+    assert read_result["success"] is True
+    assert secret not in read_result["content"]
+    assert "[REDACTED]" in read_result["content"]
+    assert secret not in command_output
+    assert "[REDACTED]" in command_output
+
+
+def test_redact_incomplete_quoted_credential_value_at_end_of_buffer():
+    redacted, count = ops.redact('PASSWORD="unterminated-secret-value')
+
+    assert count == 1
+    assert "unterminated-secret-value" not in redacted
+    assert "[REDACTED]" in redacted
+
+
+def test_read_byte_truncation_discards_incomplete_final_line(_sandbox):
+    target = _sandbox / "ordinary-config.yaml"
+    secret = "long-secret-value-" * 20
+    target.write_text(
+        "mode: safe\\nMY_SUPER_LONG_APPLICATION_CONFIGURATION_ENCRYPTION_PASSWORD: "
+        + f'"{secret}"\\n',
+        encoding="utf-8",
+    )
+
+    result = ops.read_text_file(str(target), max_bytes=64)
+
+    assert result["success"] is True
+    assert result["truncated"] is True
+    assert result["content"] == "mode: safe"
+    assert secret not in result["content"]
+
+
