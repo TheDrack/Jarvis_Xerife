@@ -224,7 +224,7 @@ _SECRET_FILE_NAME = re.compile(
 )
 _SENSITIVE_OUTPUT_NAME = re.compile(
     r"(?i)(?<![A-Z0-9_.-])(?:"
-    r"\.aws|\.azure|\.ssh|\.gnupg|\.kube|\.docker|\.npmrc|\.pypirc|\.netrc|_netrc|\.envrc|gcloud|github cli|globalstorage|keyrings|"
+    r"\.aws|\.azure|\.ssh|\.gnupg|\.kube|\.docker|gh|containers|\.npmrc|\.pypirc|\.netrc|_netrc|\.envrc|gcloud|github cli|globalstorage|keyrings|"
     r"\.git-credentials|credentials?(?:\.(?:json|db|ya?ml|txt))?|"
     r"secrets?(?:\.(?:json|db|ya?ml|txt))?|tokens?(?:\.(?:json|db|ya?ml|txt))?|"
     r"id_(?:rsa|dsa|ecdsa|ed25519)|client_secret\.json|application_default_credentials\.json"
