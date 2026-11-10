@@ -34,6 +34,7 @@ import secrets
 import shutil
 import stat
 import subprocess
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -53,6 +54,8 @@ MAX_ARGUMENTS = 24
 MAX_ARGUMENT_CHARS = 512
 MAX_STDOUT_CHARS = 16_000
 MAX_STDERR_CHARS = 4_000
+MAX_CAPTURE_STDOUT_BYTES = MAX_STDOUT_CHARS * 4
+MAX_CAPTURE_STDERR_BYTES = MAX_STDERR_CHARS * 4
 MIN_TIMEOUT_SECONDS = 1
 MAX_TIMEOUT_SECONDS = 60
 _AUDIT_SECRET = secrets.token_bytes(32)
@@ -90,7 +93,27 @@ def _reject_network_path(raw: str | Path) -> None:
                 raise PathNotAllowed("unknown, unavailable or mapped network drives are not permitted")
 
 
-def _reject_link_components(candidate: Path) -> None:
+def _reject_windows_path_aliases(raw: str | Path) -> None:
+    """Reject Windows filesystem aliases that can address objects outside a lexical path."""
+    if os.name != "nt":
+        return
+    text = os.fspath(raw).replace("/", "\\")
+    _drive, tail = os.path.splitdrive(text)
+    for component in tail.split("\\"):
+        if not component or component in {".", ".."}:
+            continue
+        if component.endswith((".", " ")):
+            raise PathNotAllowed("trailing dots and spaces are not permitted in Windows paths")
+        if ":" in component:
+            raise PathNotAllowed("NTFS alternate data streams are not permitted")
+        device_name = component.split(".", 1)[0].casefold()
+        if device_name in {"con", "prn", "aux", "nul"} or re.fullmatch(
+            r"(?:com|lpt)[1-9]", device_name
+        ):
+            raise PathNotAllowed("reserved Windows device names are not permitted")
+
+
+def _reject_link_components(candidate: Path) -> None
     """Reject symlinks and NTFS reparse points before resolving their targets."""
     absolute = candidate if candidate.is_absolute() else candidate.absolute()
     current = Path(absolute.anchor)
@@ -189,6 +212,7 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
     if text.startswith("~"):
         raise PathNotAllowed("home-relative paths are not accepted; use an absolute allowed root")
     _reject_network_path(text)
+    _reject_windows_path_aliases(text)
     # A Windows drive-absolute path must never be reinterpreted as a relative
     # POSIX path (for example, C:/Windows under the repository root).
     if os.name != "nt" and re.match(r"^[A-Za-z]:[\\/]", text):
@@ -317,7 +341,7 @@ _REDACTION_RULES: tuple[tuple[re.Pattern[str], Any], ...] = (
     ),
     (
         re.compile(
-            r"""(?i)(["']?\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]*|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL)[A-Z0-9_]*["']?[ \t]*[:=][ \t]*)((?:"[^"\n]*"|'[^'\n]*'|[^"'\s,;}]+))"""
+            r"""(?i)(["']?\b[A-Z0-9_]{0,40}(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]{0,40}|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL)[A-Z0-9_]{0,40}["']?[ \t]*[:=][ \t]*)((?:"[^"\n]*"|'[^'\n]*'|[^"'\s,;}]+))"""
         ),
         _redact_credential_value,
     ),
@@ -784,8 +808,11 @@ def _parse_arguments(
     return parsed
 
 
+_UNICODE_QUOTE_CHARS = "‘’‚‛“”„‟＂＇"
+
+
 def _powershell_quote(value: str) -> str:
-    if "'" in value or "`" in value:
+    if "'" in value or "`" in value or any(char in value for char in _UNICODE_QUOTE_CHARS):
         raise ValueError("PowerShell argument quoting rejected")
     return f"'{value}'"
 
@@ -858,7 +885,7 @@ def _require_commitish(ref: str, workdir: Path) -> None:
             shell=False,
             check=False,
         )
-    except OSError as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         raise ValueError("git show commit validation is unavailable") from exc
     if probe.returncode != 0:
         raise ValueError("git show targets must resolve to a commit")
@@ -1173,7 +1200,7 @@ def run_host_command(
             "audit_logged": logged,
             "elevated": False,
         }
-    except (ValueError, RuntimeError) as exc:
+    except (ValueError, RuntimeError, OSError, subprocess.SubprocessError) as exc:
         audit_id, logged = _audit(
             {
                 "event": "rejected",
