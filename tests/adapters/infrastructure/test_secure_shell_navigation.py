@@ -373,36 +373,29 @@ def test_git_show_rejects_blob_object_targets(tmp_path):
     repo = tmp_path / "repo"
     (repo / ".git").mkdir(parents=True)
     navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
-    failed_probe = subprocess.CompletedProcess(
-        args=["git", "rev-parse"], returncode=1, stdout="", stderr=""
-    )
     with patch(
-        "app.adapters.infrastructure.secure_shell_navigation.subprocess.run",
-        return_value=failed_probe,
+        "app.adapters.infrastructure.secure_shell_navigation.subprocess.run"
     ) as run:
         result = navigator.execute("git show --stat deadbeef")
 
     assert result["success"] is False
     assert result["status"] == "command_rejected"
-    run.assert_called_once()
+    run.assert_not_called()
 
 
-def test_git_show_accepts_commit_targets_and_keeps_metadata_only_flags(tmp_path):
+def test_git_show_accepts_only_the_fixed_metadata_command(tmp_path):
     repo = tmp_path / "repo"
     (repo / ".git").mkdir(parents=True)
     navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
-    probe = subprocess.CompletedProcess(
-        args=["git", "rev-parse"], returncode=0, stdout="deadbeef", stderr=""
-    )
     command = subprocess.CompletedProcess(
-        args=["git", "show"], returncode=0, stdout="commit 123\n 1 file changed", stderr=""
+        args=["git", "show"], returncode=0, stdout="commit 123\\n 1 file changed", stderr=""
     )
     with patch(
         "app.adapters.infrastructure.secure_shell_navigation.subprocess.run",
-        side_effect=[probe, command],
+        return_value=command,
     ) as run:
-        result = navigator.execute("git show --stat HEAD")
+        result = navigator.execute("git show --stat --oneline -1")
 
     assert result["success"] is True
     assert "1 file changed" in result["output"]
-    assert run.call_count == 2
+    run.assert_called_once()
