@@ -700,7 +700,11 @@ def test_read_redacts_json_quoted_credential_keys(_sandbox):
     assert result["redactions"] >= 2
 
 
-@pytest.mark.parametrize("name", [".envrc", "_netrc", "credential.json"])
+@pytest.mark.parametrize(
+    "name",
+    [".envrc", "_netrc", "credential.json", ".pgpass.bak", "prod-secrets.yaml",
+     "kubeconfig-prod.yaml", "credentials.json.bak"],
+)
 def test_read_blocks_additional_credential_filenames(_sandbox, name):
     target = _sandbox / name
     target.write_text("password=must-not-leak", encoding="utf-8")
@@ -765,3 +769,65 @@ def test_junction_detection_uses_windows_reparse_attribute(monkeypatch):
     entry = SimpleNamespace(path="C:/safe/junction", is_symlink=lambda: False)
 
     assert ops._is_junction(entry) is True
+
+
+def test_git_show_rejects_blob_object_targets(_sandbox, monkeypatch):
+    monkeypatch.setattr(ops, "_repository_root", lambda: _sandbox)
+    monkeypatch.setattr(ops, "allowed_roots", lambda: (_sandbox,))
+    monkeypatch.setattr(
+        ops.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args=args[0], returncode=1, stdout="", stderr=""),
+    )
+
+    with pytest.raises(ValueError, match="commit"):
+        ops.compile_command(
+            "git", "show", ["--stat", "deadbeef"], cwd=str(_sandbox)
+        )
+
+
+def test_git_show_accepts_commit_object_targets(_sandbox, monkeypatch):
+    monkeypatch.setattr(ops, "_repository_root", lambda: _sandbox)
+    monkeypatch.setattr(ops, "allowed_roots", lambda: (_sandbox,))
+    monkeypatch.setattr(
+        ops.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args=args[0], returncode=0, stdout="deadbeef", stderr=""),
+    )
+
+    compiled = ops.compile_command(
+        "git", "show", ["--stat", "deadbeef"], cwd=str(_sandbox)
+    )
+
+    assert compiled.argv[0] == "git"
+    assert "show" in compiled.argv
+
+
+def test_bound_removes_credential_names_from_command_output():
+    output = (
+        "Directory: C:\\Users\\operator\\project\n"
+        "d----- .ssh\n"
+        "-a---- .env\n"
+        "-a---- id_rsa\n"
+        "-a---- credentials.json\n"
+        "-a---- README.md\n"
+    )
+
+    bounded, _ = ops._bound(output, 4000)
+
+    assert ".ssh" not in bounded
+    assert ".env" not in bounded
+    assert "id_rsa" not in bounded
+    assert "credentials.json" not in bounded
+    assert "README.md" in bounded
+
+
+def test_audit_does_not_persist_rejected_credential_argument(_sandbox):
+    secret = "AWS_SECRET_ACCESS_KEY=caller-supplied-secret"
+    result = ops.run_host_command(
+        "powershell_readonly", "Get-ChildItem", [secret]
+    )
+
+    assert result["success"] is False
+    audit = _sandbox_audit().read_text(encoding="utf-8")
+    assert secret not in audit
