@@ -152,13 +152,22 @@ def _is_within(path: Path, root: Path) -> bool:
     )
 
 
-def _reject_secret_name(path: Path) -> None:
-    for part in path.parts:
-        lowered = part.casefold()
-        if lowered in _SECRET_DIRECTORIES:
-            raise PathNotAllowed("path component is a credential directory")
+def _is_secret_path(path: Path) -> bool:
+    parts = tuple(part.casefold() for part in path.parts)
+    if any(part in _SECRET_DIRECTORIES for part in parts):
+        return True
     if _SECRET_FILE_NAME.match(path.name):
-        raise PathNotAllowed("file name looks like a credential store")
+        return True
+    for prefix in _SECRET_PATH_PREFIXES:
+        width = len(prefix)
+        if any(parts[index:index + width] == prefix for index in range(len(parts) - width + 1)):
+            return True
+    return False
+
+
+def _reject_secret_name(path: Path) -> None:
+    if _is_secret_path(path):
+        raise PathNotAllowed("path looks like a credential store")
 
 
 def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
@@ -209,26 +218,43 @@ _SECRET_DIRECTORIES = frozenset(
 _SECRET_FILE_NAME = re.compile(
     r"""(?ix)^(
         .*\.env(\..*)?
-        |\.npmrc|\.pypirc|\.netrc|_netrc|\.envrc|\.git-credentials|credential(\..*)?
+        |\.npmrc|\.pypirc|\.netrc|_netrc|\.envrc|\.git-credentials|credential([._-].*)?
         |id_(rsa|dsa|ecdsa|ed25519)(\..*)?
-        |kubeconfig(\..*)?|admin\.conf
-        |credentials(\..*)?
-        |secrets?(\.(json|ya?ml|txt|toml))?
-        |token(s)?\.(json|txt)
-        |\.pgpass|pgpass\.conf|\.htpasswd|\.boto|\.s3cfg|\.my\.cnf
-        |client[_-]?secret.*\.json|application_default_credentials.*\.json
-        |.*\.(pem|key|pfx|p12|jks|keystore|kdbx|asc|ppk|p8|ovpn|gpg|pgp)
+        |kubeconfig([._-].*)?|admin\.conf
+        |credentials?([._-].*)?
+        |(.*[._-])?secrets?([._-].*)?
+        |tokens?(\..*)?
+        |\.pgpass(\..*)?|pgpass\.conf(\..*)?|\.htpasswd|\.boto|\.s3cfg|\.my\.cnf
+        |client[_-]?secret.*\.json(\..*)?|application_default_credentials.*\.json(\..*)?
+        |.*\.(pem|key|pfx|p12|jks|keystore|kdbx|asc|ppk|p8|ovpn|gpg|pgp)(\..*)?
         |.*\.(tfvars|tfstate)(\..*)?
-        |.*\.(sqlite|sqlite3|db)
+        |.*\.(sqlite|sqlite3|db)(\..*)?
+        |\.yarnrc\.yml
     )$"""
 )
-_SENSITIVE_OUTPUT_NAME = re.compile(
-    r"(?i)(?<![A-Z0-9_.-])(?:"
-    r"\.aws|\.azure|\.ssh|\.gnupg|\.kube|\.docker|gh|containers|\.npmrc|\.pypirc|\.netrc|_netrc|\.envrc|gcloud|github cli|globalstorage|keyrings|"
-    r"\.git-credentials|credentials?(?:\.(?:json|db|ya?ml|txt))?|"
-    r"secrets?(?:\.(?:json|db|ya?ml|txt))?|tokens?(?:\.(?:json|db|ya?ml|txt))?|"
-    r"id_(?:rsa|dsa|ecdsa|ed25519)|client_secret\.json|application_default_credentials\.json"
-    r")(?![A-Z0-9_.-])"
+_SECRET_PATH_PREFIXES = (
+    (".config", "gh"),
+    (".config", "glab-cli"),
+    (".config", "github-copilot"),
+    (".config", "composer"),
+    (".config", "containers"),
+    (".config", "age"),
+    (".config", "ngrok"),
+    (".config", "op"),
+    (".config", "sops"),
+    (".config", "gcloud"),
+    (".config", "rclone"),
+    (".config", "hub"),
+    (".config", "podman"),
+    (".config", "keyring"),
+    (".m2",),
+    (".gem", "credentials"),
+)
+
+_SECRET_CONTENT = re.compile(
+    rb"""(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|_authToken|npmAuthToken|oauth_token|"
+    rb"client[-_]?key[-_]?data|certificate[-_]?authority[-_]?data|account[-_]?key|"
+    rb"AGE-SECRET-KEY-|<\s*(?:password|token|secret|api[_-]?key)\b[^>]*>\s*[^<]{4,}</\s*(?:password|token|secret|api[_-]?key)\s*>)"
 )
 _PRIVATE_KEY_BLOCK = re.compile(
     r"(?:-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"
@@ -375,7 +401,7 @@ def list_directory(
             if len(entries) >= max_entries:
                 truncated = True
                 return
-            if entry.name.casefold() in _SECRET_DIRECTORIES or _SECRET_FILE_NAME.match(entry.name):
+            if _is_secret_path(Path(entry.path)):
                 filtered += 1
                 continue
             try:
@@ -447,6 +473,14 @@ def read_text_file(
             "path": str(resolved),
             "total_bytes": total_bytes,
             "message": "binary content is not returned by this tool",
+        }
+    if _SECRET_CONTENT.search(data):
+        return {
+            "success": False,
+            "status": "secret_content_blocked",
+            "path": str(resolved),
+            "total_bytes": total_bytes,
+            "message": "file contains stored credential material",
         }
     text = data.decode("utf-8", errors="replace")
     if _PRIVATE_KEY_BLOCK.search(text):
