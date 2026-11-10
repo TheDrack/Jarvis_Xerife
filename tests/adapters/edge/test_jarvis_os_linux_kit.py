@@ -46,3 +46,11 @@ def test_provisioner_protects_credentials_directory_and_temp_copy():
     assert 'chmod 600 "$ENV_FILE"' in script
     assert "secrets.token_urlsafe(48)" in script
     assert 'JARVIS_DESKTOP_AUTH_TOKEN=' in script
+
+
+def test_mcp_asgi_wrapper_dependency_is_available_in_linux_profile():
+    requirements = (ROOT / "linux/requirements-linux.txt").read_text(encoding="utf-8")
+    edge_requirements = (ROOT / "requirements/edge.txt").read_text(encoding="utf-8")
+
+    assert "mcp>=1.30,<2" in requirements
+    assert "mcp>=1.30,<2" in edge_requirements
