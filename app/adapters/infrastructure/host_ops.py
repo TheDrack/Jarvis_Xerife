@@ -68,6 +68,24 @@ def _repository_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _reject_network_path(raw: str | Path) -> None:
+    """Reject UNC/device paths and mapped network drives before Path.resolve can contact them."""
+    text = os.fspath(raw)
+    if text.startswith(("\\\\", "//")):
+        raise PathNotAllowed("UNC and device paths are not permitted")
+    if os.name == "nt":
+        drive, _tail = os.path.splitdrive(text)
+        if drive and len(drive) == 2 and drive[1] == ":":
+            try:
+                import ctypes
+
+                drive_type = ctypes.windll.kernel32.GetDriveTypeW(f"{drive}\\")
+            except (AttributeError, OSError):
+                drive_type = 0
+            if drive_type == 4:
+                raise PathNotAllowed("mapped network drives are not permitted")
+
+
 def allowed_roots() -> tuple[Path, ...]:
     """Return the effective allowlist of filesystem roots.
 
@@ -88,6 +106,7 @@ def allowed_roots() -> tuple[Path, ...]:
     roots: list[Path] = []
     for candidate in candidates:
         try:
+            _reject_network_path(candidate)
             resolved = candidate.resolve()
         except OSError:
             continue
@@ -132,6 +151,7 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
         raise PathNotAllowed("path contains control characters")
     if text.startswith("~"):
         raise PathNotAllowed("home-relative paths are not accepted; use an absolute allowed root")
+    _reject_network_path(text)
     if ":" in text and not re.match(r"^[A-Za-z]:[\\/]", text):
         raise PathNotAllowed("provider-qualified and drive-relative paths are not accepted")
     if re.split(r"[\\/]+", text).count("..") or ".." in re.split(r"[\\/]+", text):
@@ -235,11 +255,28 @@ def _bounded_int(value: Any, *, name: str, minimum: int, maximum: int) -> int:
     return value
 
 
+def _is_junction(entry: os.DirEntry[str]) -> bool:
+    checker = getattr(os.path, "isjunction", None)
+    if checker is not None:
+        try:
+            if checker(entry.path):
+                return True
+        except OSError:
+            return False
+    if os.name == "nt":
+        try:
+            attributes = entry.stat(follow_symlinks=False).st_file_attributes
+            reparse_point = getattr(__import__("stat"), "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+            return bool(attributes & reparse_point) and not entry.is_symlink()
+        except (AttributeError, OSError):
+            return False
+    return False
+
+
 def _entry_kind(entry: os.DirEntry[str]) -> str:
     if entry.is_symlink():
         return "symlink"
-    is_junction = getattr(os.path, "isjunction", lambda _path: False)
-    if is_junction(entry.path):
+    if _is_junction(entry):
         return "junction"
     if entry.is_dir(follow_symlinks=False):
         return "directory"
@@ -718,6 +755,8 @@ def compile_command(
         raise ValueError("working directory is not a directory")
     if profile == "git" and not _is_within(workdir, _repository_root()):
         raise PathNotAllowed("git must run inside the repository root")
+    if profile in {"powershell_readonly", "inspect_d"} and _norm(workdir) != _norm(_repository_root()):
+        raise PathNotAllowed("PowerShell profiles use the repository root as cwd; pass absolute paths")
 
     if profile == "git":
         policy = _GIT_POLICIES.get(verb)
