@@ -295,15 +295,16 @@ def _bounded_int(value: Any, *, name: str, minimum: int, maximum: int) -> int:
 
 def _is_junction(entry: os.DirEntry[str]) -> bool:
     reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
-    if os.name == "nt":
-        try:
-            import ctypes
+    try:
+        import ctypes
 
-            attributes = ctypes.windll.kernel32.GetFileAttributesW(ctypes.c_wchar_p(entry.path))
+        kernel32 = getattr(getattr(ctypes, "windll", None), "kernel32", None)
+        if kernel32 is not None:
+            attributes = kernel32.GetFileAttributesW(ctypes.c_wchar_p(entry.path))
             if attributes != 0xFFFFFFFF and attributes & reparse_point:
                 return not entry.is_symlink()
-        except (AttributeError, OSError):
-            pass
+    except (AttributeError, OSError):
+        pass
     checker = getattr(os.path, "isjunction", None)
     if checker is not None:
         try:
