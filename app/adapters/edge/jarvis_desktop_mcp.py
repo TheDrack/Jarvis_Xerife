@@ -677,14 +677,14 @@ registrar_visualizacao_portas(mcp, tracked_action, _portas_content)
 registrar_utilizacao_portas(mcp, tracked_action)
 registrar_observabilidade_portas(mcp, tracked_action)
 
-# Remote-capable MCP surface: passive OSINT only. Active tools live in the
-# separate local-only OSINT server and are never registered on this gateway.
+# Remote-capable MCP surface:
+# - OSINT tools are passive; active OSINT remains on the separate local server.
+# - Host operations are bounded/read-only and are not registered unless the
+#   machine owner explicitly opts in with JARVIS_HOST_OPS_ENABLED=1.
 from app.adapters.edge.osint_mcp_tools import register_osint_tools
 from app.adapters.infrastructure.host_ops_mcp_tools import register_host_ops_tools
 
 register_osint_tools(mcp)
-
-# Read-only host operations (paths, text files, allowlisted argv profiles).
 register_host_ops_tools(mcp)
 
 
