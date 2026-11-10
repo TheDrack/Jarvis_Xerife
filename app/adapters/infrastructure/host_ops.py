@@ -133,6 +133,8 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
         raise PathNotAllowed("path contains control characters")
     if text.startswith("~"):
         raise PathNotAllowed("home-relative paths are not accepted; use an absolute allowed root")
+    if ":" in text and not re.match(r"^[A-Za-z]:[\\/]", text):
+        raise PathNotAllowed("provider-qualified and drive-relative paths are not accepted")
     if re.split(r"[\\/]+", text).count("..") or ".." in re.split(r"[\\/]+", text):
         raise PathNotAllowed("parent traversal is not permitted")
 
@@ -153,17 +155,19 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
 
 
 _SECRET_DIRECTORIES = frozenset(
-    {".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store"}
+    {".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store", ".git"}
 )
 _SECRET_FILE_NAME = re.compile(
     r"""(?ix)^(
-        \.env(\..*)?
+        .*\.env(\..*)?
         |\.npmrc|\.pypirc|\.netrc|\.git-credentials
         |id_(rsa|dsa|ecdsa|ed25519)(\..*)?
+        |kubeconfig(\..*)?|admin\.conf
         |credentials(\..*)?
         |secrets?(\.(json|ya?ml|txt|toml))?
         |token(s)?\.(json|txt)
         |.*\.(pem|key|pfx|p12|jks|keystore|kdbx)
+        |.*\.(tfvars|tfstate)
         |.*\.(sqlite|sqlite3|db)
     )$"""
 )
@@ -177,26 +181,27 @@ _BINARY_PROBE = 8192
 _REDACTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]{8,}=*"), r"\1[REDACTED]"),
     (re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"), "[REDACTED_API_KEY]"),
-    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,})"), "[REDACTED_TOKEN]"),
+    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"), "[REDACTED_TOKEN]"),
     (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"), "[REDACTED_TOKEN]"),
+    (re.compile(r"\bglpat-[A-Za-z0-9_-]{16,}|\bnpm_[A-Za-z0-9]{16,}"), "[REDACTED_TOKEN]"),
     (re.compile(r"\bAIza[0-9A-Za-z_-]{30,}"), "[REDACTED_API_KEY]"),
-
-    (re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b"), "[REDACTED_AWS_KEY_ID]"),
+    (re.compile(r"\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\b"), "[REDACTED_AWS_KEY_ID]"),
     (
         re.compile(
-            r"(?i)(\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|"
-            r"CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET|TOKEN|PASSWORD|PASSWD|"
-            r"CREDENTIAL)[A-Z0-9_]*\s*[:=]\s*[\"']?)([^\"'\s,;]+)"
+            r"(?i)((?:client[_-]?key[_-]?data|certificate[_-]?authority[_-]?data|account[_-]?key)\s*[:=]\s*)(\S{8,})"
         ),
         r"\1[REDACTED]",
     ),
     (
-        re.compile(r"(?i)\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis)://([^:/@\s]+):([^@/\s]+)@"),
-        r"\1://\2:[REDACTED]@",
+        re.compile(r"""([a-z][a-z0-9+.-]*://[^/\s:@"']*:)([^@\s/"']+)@"""),
+        r"\1[REDACTED]@",
     ),
     (
         re.compile(
-            r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|secret)["']?\s*[:=]\s*["']?)([^"'\s,}]{4,})"""
+            r"(?i)(\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|"
+            r"AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|"
+            r"SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]*|TOKEN|PASSWORD|PASSWD|PASSPHRASE|"
+            r"CREDENTIAL)[A-Z0-9_]*\s*[:=]\s*["']?)([^"'\s,;}]+)"
         ),
         r"\1[REDACTED]",
     ),
@@ -719,6 +724,9 @@ def compile_command(
         if verb in {"show", "diff"} and not {"--stat", "--name-only"}.intersection(arguments):
             raise ValueError("git show/diff must use metadata-only --stat or --name-only output")
         parsed = _parse_arguments(verb, arguments, policy)
+        metadata_flags = {flag for flag, _value in parsed if flag} & {"--stat", "--name-only"}
+        if verb in {"show", "diff"} and not metadata_flags:
+            raise ValueError("git show/diff must use metadata-only --stat or --name-only output")
         argv = ("git", "--no-pager", verb, *[token for pair in parsed for token in pair if token])
         return CompiledCommand(profile, verb, argv, workdir, timeout_seconds, joined)
 
@@ -925,6 +933,8 @@ def _spawn(
 
 def _bound(value: str | None, limit: int) -> tuple[str, bool]:
     redacted, _ = redact(value or "")
+    if _PRIVATE_KEY_BLOCK.search(redacted):
+        return "[WITHHELD: output contained a private key block]", True
     return redacted[:limit], len(redacted) > limit
 
 
