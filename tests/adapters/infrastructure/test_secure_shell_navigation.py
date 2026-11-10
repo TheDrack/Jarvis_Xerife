@@ -297,3 +297,24 @@ def test_shell_navigation_tool_registers_and_uses_injected_navigator(tmp_path, m
     assert registered == ("shell_navigate",)
     assert result["success"] is True
     assert result["output"] == str(tmp_path.resolve())
+
+
+def test_parser_preserves_backslashes_in_quoted_windows_paths():
+    assert ShellNavigator._tokens('cat "C:\\Users\\Example\\notes.txt"') == [
+        "cat",
+        "C:\\Users\\Example\\notes.txt",
+    ]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows path aliases are platform-specific")
+@pytest.mark.parametrize(
+    "suffix",
+    ["file:stream", "file.", "file ", "COM1", "NUL.txt", "COM\\u00b9", "LPT\\u00b2.txt"],
+)
+def test_windows_device_and_stream_aliases_are_rejected(tmp_path, suffix):
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute(f'cat "{suffix}"')
+
+    assert result["success"] is False
+    assert result["status"] == "path_rejected"
