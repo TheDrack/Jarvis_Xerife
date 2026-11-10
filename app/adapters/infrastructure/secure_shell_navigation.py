@@ -192,8 +192,20 @@ _TEXT_SUFFIXES = {
 _SPECIAL_TEXT_NAMES = {"readme", "license", "dockerfile", "makefile", "procfile"}
 
 
+_SECRET_ASSIGNMENT_PREFIX = re.compile(
+    r"""(?i)(["']?[A-Za-z0-9_.-]*?(?:api[_-]?key|access[_-]?key|secret[_-]?key|"""
+    r"""private[_-]?key|signing[_-]?key|keys?|client[_-]?secret|secrets?|passwd|"""
+    r"""passwords?|passphrase|pass|pwd|pin|salt|tokens?|credentials?|"""
+    r"""authorization|auth|pat)(?:[A-Z][A-Za-z0-9]*|[_.-][A-Za-z0-9_.-]*)?"""
+    r"""["']?[ \t]*[:=][ \t]*)"""
+)
+_SECRET_ASSIGNMENT_VALUE = re.compile(
+    r"""(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^,}\]\r\n]+)"""
+)
+
+
 def _redact_text(value: str) -> str:
-    """Redact provider tokens, key material, URL userinfo and credential assignments."""
+    """Redact provider tokens, URL userinfo and complete secret assignments."""
     value = re.sub(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]+=*", r"\1[REDACTED]", value)
     value = re.sub(
         r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
@@ -210,12 +222,55 @@ def _redact_text(value: str) -> str:
         value,
     )
     value = re.sub(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s]+@", r"\1[REDACTED]@", value)
-    return re.sub(
-        r"""(?i)(["']?[A-Za-z0-9_.-]*(?:api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|client[_-]?secret|secret|passwd|password|passphrase|pwd|token|credential|authorization|auth|pat)["']?\s*[:=]\s*["']?)[^"'\s,}]+""",
-        r"\1[REDACTED]",
-        value,
-    )
 
+    lines = value.splitlines(keepends=True)
+    if not lines and value:
+        lines = [value]
+    redacted_lines: list[str] = []
+    block_indent: int | None = None
+
+    for line in lines:
+        body = line.rstrip("\r\n")
+        ending = line[len(body):]
+        indent = len(body) - len(body.lstrip(" \t"))
+
+        if block_indent is not None:
+            if not body.strip() or indent > block_indent:
+                redacted_lines.append(" " * indent + "[REDACTED]" + ending)
+                continue
+            block_indent = None
+
+        prefix = _SECRET_ASSIGNMENT_PREFIX.search(body)
+        if prefix is None:
+            redacted_lines.append(line)
+            continue
+
+        rest = body[prefix.end():]
+        if rest.startswith(('"""', "'''")):
+            replacement = rest[:3] + "[REDACTED]"
+            suffix = rest[3:]
+            block_indent = indent
+        else:
+            value_match = _SECRET_ASSIGNMENT_VALUE.match(rest)
+            if value_match is None:
+                redacted_lines.append(line)
+                continue
+            raw_value = value_match.group(0)
+            suffix = rest[len(raw_value):]
+            indicator = raw_value.strip()
+            if indicator in {"|", ">", "|-", ">-", "|+", ">+"}:
+                replacement = "[REDACTED]"
+                block_indent = indent
+            elif raw_value.startswith('"') and raw_value.endswith('"'):
+                replacement = '"[REDACTED]"'
+            elif raw_value.startswith("'") and raw_value.endswith("'"):
+                replacement = "'[REDACTED]'"
+            else:
+                replacement = "[REDACTED]"
+
+        redacted_lines.append(body[:prefix.end()] + replacement + suffix + ending)
+
+    return "".join(redacted_lines)
 
 _GIT_SIMPLE_ARGS = {
     ("status",): ["status"],
@@ -420,16 +475,15 @@ class ShellNavigator:
                     raw = target.read_bytes()
                     if b"\x00" in raw:
                         return self._failure("binary_file_blocked", "binary files cannot be read through this tool")
-                    # Structured credential stores and private-key material are refused.
-                    # Ordinary text containing credential assignments is safe to inspect
-                    # only after _redact_text removes the values from the returned output.
+                    # Known credential-store markers and key material are refused.
+                    # Other secret-bearing assignments are redacted before returning text.
                     non_redactable_secret = re.compile(
                         rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|"
                         rb"-----BEGIN PGP PRIVATE KEY BLOCK-----|\"auths\"\s*:|"
                         rb"client[-_]?key[-_]?data|certificate[-_]?authority[-_]?data|AGE-SECRET-KEY-|"
                         rb"(?:^|[\r\n;])\s*(?:Environment\s*=\s*)?[A-Za-z_][A-Za-z0-9_]*(?:PASS(?:WORD)?|SECRET|TOKEN|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY)[A-Za-z0-9_]*\s*=\s*[^\s\r\n]{4,})"
                     )
-                    if non_redactable_secret.search(raw):
+                    if _SECRET_CONTENT.search(raw) or non_redactable_secret.search(raw):
                         return self._failure("sensitive_file_blocked", "file content contains key material or a credential store")
                     try:
                         output = raw.decode("utf-8")
@@ -525,11 +579,34 @@ class ShellNavigator:
 
     @staticmethod
     def _result(output: str, **metadata: Any) -> dict[str, Any]:
+        reported_truncated = bool(metadata.pop("truncated", False))
+        truncated = reported_truncated or len(output) > MAX_OUTPUT_CHARS
+
+        if len(output) > MAX_OUTPUT_CHARS and output.lstrip().startswith("["):
+            try:
+                payload = json.loads(output)
+            except (TypeError, ValueError):
+                payload = None
+            if isinstance(payload, list):
+                bounded: list[Any] = []
+                for item in payload:
+                    candidate = json.dumps([*bounded, item], ensure_ascii=False)
+                    if len(candidate) > MAX_OUTPUT_CHARS:
+                        break
+                    bounded.append(item)
+                output = json.dumps(bounded, ensure_ascii=False)
+                if "entries" in metadata:
+                    metadata["entries"] = len(bounded)
+            else:
+                output = output[:MAX_OUTPUT_CHARS]
+        else:
+            output = output[:MAX_OUTPUT_CHARS]
+
         return {
             "success": True,
             "status": "completed",
-            "output": output[:MAX_OUTPUT_CHARS],
-            "truncated": len(output) > MAX_OUTPUT_CHARS,
+            "output": output,
+            "truncated": truncated,
             **metadata,
         }
 
