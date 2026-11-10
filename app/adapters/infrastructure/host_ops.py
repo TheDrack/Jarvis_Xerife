@@ -73,7 +73,8 @@ def _repository_root() -> Path:
 def _reject_network_path(raw: str | Path) -> None:
     """Reject UNC/device paths and mapped network drives before Path.resolve can contact them."""
     text = os.fspath(raw)
-    if text.startswith(("\\\\", "//")):
+    normalized = text.replace("/", "\\")
+    if text.startswith(("\\\\", "//")) or normalized.startswith("\\\\"):
         raise PathNotAllowed("UNC and device paths are not permitted")
     if os.name == "nt":
         drive, _tail = os.path.splitdrive(text)
@@ -208,7 +209,7 @@ _SECRET_DIRECTORIES = frozenset(
 _SECRET_FILE_NAME = re.compile(
     r"""(?ix)^(
         .*\.env(\..*)?
-        |\.npmrc|\.pypirc|\.netrc|\.git-credentials
+        |\.npmrc|\.pypirc|\.netrc|_netrc|\.envrc|\.git-credentials|credential(\..*)?
         |id_(rsa|dsa|ecdsa|ed25519)(\..*)?
         |kubeconfig(\..*)?|admin\.conf
         |credentials(\..*)?
@@ -220,6 +221,14 @@ _SECRET_FILE_NAME = re.compile(
         |.*\.(tfvars|tfstate)(\..*)?
         |.*\.(sqlite|sqlite3|db)
     )$"""
+)
+_SENSITIVE_OUTPUT_NAME = re.compile(
+    r"(?i)(?<![A-Z0-9_.-])(?:"
+    r"\.aws|\.azure|\.ssh|\.gnupg|\.kube|\.docker|\.npmrc|\.pypirc|\.netrc|_netrc|\.envrc|"
+    r"\.git-credentials|credentials?(?:\.(?:json|db|ya?ml|txt))?|"
+    r"secrets?(?:\.(?:json|db|ya?ml|txt))?|tokens?(?:\.(?:json|db|ya?ml|txt))?|"
+    r"id_(?:rsa|dsa|ecdsa|ed25519)|client_secret\.json|application_default_credentials\.json"
+    r")(?![A-Z0-9_.-])"
 )
 _PRIVATE_KEY_BLOCK = re.compile(
     r"(?:-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"
@@ -256,7 +265,7 @@ _REDACTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     ),
     (
         re.compile(
-            r"""(?i)(\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]*|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL)[A-Z0-9_]*\s*[:=]\s*["']?)([^"'\s,;}]+)"""
+            r"""(?i)(["']?\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]*|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL)[A-Z0-9_]*["']?\s*[:=]\s*["']?)([^"'\s,;}]+)"""
         ),
         r"\1[REDACTED]",
     ),
@@ -285,6 +294,16 @@ def _bounded_int(value: Any, *, name: str, minimum: int, maximum: int) -> int:
 
 
 def _is_junction(entry: os.DirEntry[str]) -> bool:
+    reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            attributes = ctypes.windll.kernel32.GetFileAttributesW(entry.path)
+            if attributes != 0xFFFFFFFF and attributes & reparse_point:
+                return not entry.is_symlink()
+        except (AttributeError, OSError):
+            pass
     checker = getattr(os.path, "isjunction", None)
     if checker is not None:
         try:
@@ -294,7 +313,6 @@ def _is_junction(entry: os.DirEntry[str]) -> bool:
             return False
     try:
         attributes = entry.stat(follow_symlinks=False).st_file_attributes
-        reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
         return bool(attributes & reparse_point) and not entry.is_symlink()
     except (AttributeError, OSError):
         return False
@@ -870,6 +888,14 @@ def _request_digest(profile: str, verb: str, arguments: Sequence[str], cwd: Path
 def _audit(record: Mapping[str, Any]) -> tuple[str, bool]:
     audit_id = uuid.uuid4().hex[:12]
     payload = {"ts": datetime.now(tz=timezone.utc).isoformat(timespec="seconds"), "audit_id": audit_id, **record}
+    if "profile" in payload and payload["profile"] not in PROFILES:
+        payload["profile"] = "unknown"
+    if "verb" in payload:
+        allowed_verbs = set(_POWERSHELL_POLICIES) | set(_GIT_POLICIES) | set(_INSPECT_D_POLICIES)
+        if payload["verb"] not in allowed_verbs:
+            payload["verb"] = "unknown"
+    if "reason" in payload:
+        payload["reason"] = "validation_error"
     try:
         path = _audit_path()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -972,6 +998,7 @@ def _bound(value: str | None, limit: int) -> tuple[str, bool]:
     if _PRIVATE_KEY_BLOCK.search(raw):
         return "[WITHHELD: output contained a private key block]", True
     redacted, _ = redact(raw)
+    redacted = _SENSITIVE_OUTPUT_NAME.sub("[REDACTED_NAME]", redacted)
     if _PRIVATE_KEY_BLOCK.search(redacted):
         return "[WITHHELD: output contained a private key block]", True
     return redacted[:limit], len(redacted) > limit
