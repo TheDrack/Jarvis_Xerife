@@ -928,3 +928,71 @@ def test_redact_does_not_consume_following_line_when_value_is_unquoted():
     assert count == 1
     assert "first-line-secret" not in redacted
     assert "ordinary: visible" in redacted
+
+
+# --------------------------------------------------------------------------- #
+# Security review regressions: follow-up hardening
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("quote", ["\\u2018", "\\u2019", "\\u201a", "\\u201b", "\\u201c", "\\u201d", "\\u201e", "\\u201f", "\\uff02", "\\uff07"])
+def test_powershell_rejects_unicode_quote_delimiters(_fake_powershell, quote):
+    with pytest.raises(ValueError, match="quot"):
+        ops.compile_command(
+            "powershell_readonly",
+            "Get-ChildItem",
+            ["-Filter", f"safe{quote} -Recurse"],
+        )
+
+
+def test_credential_redaction_is_bounded_for_repeated_secret_prefixes():
+    import time
+
+    payload = "SECRET" * 200
+    started = time.monotonic()
+
+    sanitized, _ = ops.redact(payload)
+
+    assert sanitized == payload
+    assert time.monotonic() - started < 1.0
+
+
+def test_compile_rejection_for_missing_cwd_is_audited(_sandbox):
+    missing = _sandbox / "does-not-exist"
+
+    result = ops.run_host_command("git", "status", [], cwd=str(missing))
+
+    assert result["success"] is False
+    assert result["status"] == "command_rejected"
+    assert result["audit_logged"] is True
+    record = json.loads(_sandbox_audit().read_text(encoding="utf-8").splitlines()[-1])
+    assert record["event"] == "rejected"
+    assert record["reason"] == "validation_error"
+
+
+def test_git_commit_probe_timeout_is_audited_rejection(_sandbox, monkeypatch):
+    monkeypatch.setattr(ops, "_repository_root", lambda: _sandbox)
+    monkeypatch.setattr(ops, "allowed_roots", lambda: (_sandbox,))
+
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], kwargs.get("timeout", 1))
+
+    monkeypatch.setattr(ops.subprocess, "run", timeout)
+
+    result = ops.run_host_command(
+        "git", "show", ["--stat", "HEAD"], cwd=str(_sandbox)
+    )
+
+    assert result["success"] is False
+    assert result["status"] == "command_rejected"
+    assert result["audit_logged"] is True
+    record = json.loads(_sandbox_audit().read_text(encoding="utf-8").splitlines()[-1])
+    assert record["event"] == "rejected"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="NTFS path aliases are Windows-specific")
+@pytest.mark.parametrize(
+    "suffix",
+    ["file:stream", "file.", "file ", "CON", "NUL.txt", "COM1.log", "LPT9"],
+)
+def test_resolve_path_rejects_ntfs_aliases(_sandbox, suffix):
+    with pytest.raises(ops.PathNotAllowed):
+        ops.resolve_path(str(_sandbox / suffix))
