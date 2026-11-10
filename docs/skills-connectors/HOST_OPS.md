@@ -17,7 +17,7 @@ This is an owner-controlled feature opt-in, not per-call authorization. The Secu
 | `host_fs_list` | Directory metadata (`path`, `depth`, `max_entries`) | depth 0–4, 1–500 entries, symlinks/junctions reported but not followed, credential-named entries filtered |
 | `host_fs_read_text` | Read one UTF-8 text file (`path`, `max_bytes`, `max_lines`) | ≤ 256 KiB, ≤ 4 000 lines, binary refused, recognized private-key formats refused, token-shaped values redacted |
 | `host_command_profiles` | Effective roots, limits and profile verbs | read-only, no side effects |
-| `host_command_run` | Run one structured command (`profile`, `verb`, `arguments`, `cwd`, `timeout_seconds`) | argv list only, `shell=False`, ≤ 60 s, ≤ 16 000 chars stdout, ≤ 4 000 chars stderr |
+| `host_command_run` | Run one structured command (`profile`, `verb`, `arguments`, `cwd`, `timeout_seconds`) | argv list only, `shell=False`, ≤ 60 s; stdout/stderr are drained concurrently and retained within byte caps before redaction/truncation (16 000/4 000 output characters maximum) |
 | `host_command_request_confirmation` | Issue a single-use token for a confirmable capability | no capability is confirmable today; always returns `confirmation_not_applicable` |
 
 When enabled, all five tools are registered on the existing `Jarvis Desktop` FastMCP server; no new port, listener or credential is introduced.
@@ -83,15 +83,19 @@ This is the safe fallback for the requirement that destructive operations need a
 
 ## Audit
 
-Every attempt (executed, blocked, rejected, timeout, launch failure) appends one JSON line to `JARVIS_HOST_OPS_AUDIT_LOG` (default `~/.local/share/jarvis/host_ops_audit.jsonl`):
+Every command attempt, confirmation request and filesystem list/read attempt (executed, blocked, rejected, timeout, launch failure, not applicable) appends one JSON line to `JARVIS_HOST_OPS_AUDIT_LOG` (default `~/.local/share/jarvis/host_ops_audit.jsonl`). Filesystem paths and command arguments are represented by keyed digests; raw caller values are not persisted. Child-process output is drained concurrently and capped in memory; if a cap cuts through a line, that incomplete trailing line is discarded before redaction.
 
 ```json
 {"ts":"2026-11-10T12:00:00+00:00","audit_id":"…","event":"executed","profile":"git",
- "verb":"status","arguments":["--short"],"digest":"…","cwd":"…","exit_code":0,
+ "verb":"status","argument_count":1,"argument_digest":"…","cwd":"<repository root>","exit_code":0,
  "elapsed_ms":120,"truncated":false,"confirmed":false,"elevated":false}
+{"ts":"2026-11-10T12:00:01+00:00","audit_id":"…","event":"fs_read","status":"read",
+ "path_digest":"…","elevated":false}
+{"ts":"2026-11-10T12:00:02+00:00","audit_id":"…","event":"confirmation","status":"confirmation_not_applicable",
+ "profile":"git","verb":"status","argument_count":0,"argument_digest":"…"}
 ```
 
-Command arguments are never persisted; only a one-way argument digest and count are logged. Audit files are created with owner-only permissions on POSIX. Output content, environment and secrets are never written. If the log cannot be written the call still returns, with `audit_logged: false`.
+Command arguments are never persisted; only a one-way argument digest and count are logged. Filesystem read/list paths are represented by a keyed digest, not the raw path. Credential assignment keys are scanned without a fixed identifier-length cutoff; incomplete final lines at byte/output caps are withheld. Audit files are created with owner-only permissions on POSIX. Output content, environment and secrets are never written. If the log cannot be written the call still returns, with `audit_logged: false`.
 
 ## Activation on the local server
 

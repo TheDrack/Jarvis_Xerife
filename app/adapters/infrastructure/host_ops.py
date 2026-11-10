@@ -34,6 +34,7 @@ import secrets
 import shutil
 import stat
 import subprocess
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -53,6 +54,8 @@ MAX_ARGUMENTS = 24
 MAX_ARGUMENT_CHARS = 512
 MAX_STDOUT_CHARS = 16_000
 MAX_STDERR_CHARS = 4_000
+MAX_CAPTURE_STDOUT_BYTES = MAX_STDOUT_CHARS * 4
+MAX_CAPTURE_STDERR_BYTES = MAX_STDERR_CHARS * 4
 MIN_TIMEOUT_SECONDS = 1
 MAX_TIMEOUT_SECONDS = 60
 _AUDIT_SECRET = secrets.token_bytes(32)
@@ -88,6 +91,28 @@ def _reject_network_path(raw: str | Path) -> None:
                 drive_type = 0
             if drive_type in {0, 1, 4}:
                 raise PathNotAllowed("unknown, unavailable or mapped network drives are not permitted")
+
+
+def _reject_windows_path_aliases(raw: str | Path) -> None:
+    """Reject Windows filesystem aliases that can address objects outside a lexical path."""
+    if os.name != "nt":
+        return
+    text = os.fspath(raw).replace("/", "\\")
+    _drive, tail = os.path.splitdrive(text)
+    for component in tail.split("\\"):
+        if not component or component in {".", ".."}:
+            continue
+        if component.endswith((".", " ")):
+            raise PathNotAllowed("trailing dots and spaces are not permitted in Windows paths")
+        if ":" in component:
+            raise PathNotAllowed("NTFS alternate data streams are not permitted")
+        device_name = component.split(".", 1)[0].casefold().translate(
+            str.maketrans("\u00b9\u00b2\u00b3", "123")
+        )
+        if device_name in {"con", "prn", "aux", "nul"} or re.fullmatch(
+            r"(?:com|lpt)[1-9]", device_name
+        ):
+            raise PathNotAllowed("reserved Windows device names are not permitted")
 
 
 def _reject_link_components(candidate: Path) -> None:
@@ -181,6 +206,9 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
     """
     if not isinstance(raw, str):
         raise PathNotAllowed("path must be a string")
+    # Inspect the original string before strip(): Windows silently aliases
+    # trailing-dot/space path components, so normalization must not erase evidence.
+    _reject_windows_path_aliases(raw)
     text = raw.strip()
     if not text or len(text) > MAX_PATH_CHARS:
         raise PathNotAllowed(f"path must contain 1 to {MAX_PATH_CHARS} characters")
@@ -290,11 +318,48 @@ _BINARY_PROBE = 8192
 # --------------------------------------------------------------------------- #
 # Redaction
 # --------------------------------------------------------------------------- #
-def _redact_credential_value(match: re.Match[str]) -> str:
-    """Replace the complete credential value, preserving its quote style."""
-    value = match.group(2)
-    quote = value[0] if value[:1] in {'"', "'"} else ""
-    return f"{match.group(1)}{quote}[REDACTED]{quote}"
+_CREDENTIAL_KEY_MARKERS = (
+    "APIKEY",
+    "ACCESSKEY",
+    "PRIVATEKEY",
+    "SIGNINGKEY",
+    "AUTHTOKEN",
+    "ACCESSTOKEN",
+    "REFRESHTOKEN",
+    "CLIENTSECRET",
+    "SERVICEROLEKEY",
+    "SECRET",
+    "TOKEN",
+    "PASSWORD",
+    "PASSWD",
+    "PASSPHRASE",
+    "CREDENTIAL",
+)
+
+# The key token is scanned linearly; the callback checks marker membership.
+# This avoids nested, overlapping quantifiers and length-based redaction bypasses.
+_CREDENTIAL_ASSIGNMENT = re.compile(
+    r"""(?i)(?<![A-Z0-9_-])(?P<prefix>(?P<quote>[\"']?)(?P<key>[A-Z0-9_-]+)(?P=quote)[ \t]*[:=][ \t]*)(?P<value>\"[^\"\n]*(?:\"|(?=\n|$))|'[^'\n]*(?:'|(?=\n|$))|[^\"'\s,;}]+)"""
+)
+
+
+def _redact_credential_assignments(value: str) -> tuple[str, int]:
+    """Redact assignment values whenever the complete key contains a secret marker."""
+    replacements = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal replacements
+        key = match.group("key").replace("_", "").replace("-", "").upper()
+        if not any(marker in key for marker in _CREDENTIAL_KEY_MARKERS):
+            return match.group(0)
+
+        raw_value = match.group("value")
+        quote = raw_value[:1] if raw_value[:1] in {'\"', "'"} else ""
+        closing_quote = quote if quote and raw_value.endswith(quote) and len(raw_value) > 1 else ""
+        replacements += 1
+        return f"{match.group('prefix')}{quote}[REDACTED]{closing_quote}"
+
+    return _CREDENTIAL_ASSIGNMENT.sub(replace, value), replacements
 
 
 _REDACTION_RULES: tuple[tuple[re.Pattern[str], Any], ...] = (
@@ -307,19 +372,13 @@ _REDACTION_RULES: tuple[tuple[re.Pattern[str], Any], ...] = (
     (re.compile(r"\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\b"), "[REDACTED_AWS_KEY_ID]"),
     (
         re.compile(
-            r"""(?i)((?:client[_-]?key[_-]?data|certificate[_-]?authority[_-]?data|account[_-]?key)["']?\s*[:=]\s*["']?)([^"'\s,;}]{8,})"""
+            r"""(?i)((?:client[_-]?key[_-]?data|certificate[_-]?authority[_-]?data|account[_-]?key)[\"']?\s*[:=]\s*[\"']?)([^\"'\s,;}]{8,})"""
         ),
         r"\1[REDACTED]",
     ),
     (
-        re.compile(r"""([a-z][a-z0-9+.-]*://[^/\s:@"']*:)([^@\s/"']+)@"""),
+        re.compile(r"""([a-z][a-z0-9+.-]*://[^/\s:@\"']*:)([^@\s/\"']+)@"""),
         r"\1[REDACTED]@",
-    ),
-    (
-        re.compile(
-            r"""(?i)(["']?\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]*|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL)[A-Z0-9_]*["']?[ \t]*[:=][ \t]*)((?:"[^"\n]*"|'[^'\n]*'|[^"'\s,;}]+))"""
-        ),
-        _redact_credential_value,
     ),
 )
 
@@ -331,6 +390,8 @@ def redact(value: str) -> tuple[str, int]:
     for pattern, replacement in _REDACTION_RULES:
         text, count = pattern.subn(replacement, text)
         total += count
+    text, count = _redact_credential_assignments(text)
+    total += count
     return text, total
 
 
@@ -531,6 +592,9 @@ def read_text_file(
     truncated_by_bytes = len(data) > max_bytes
     if truncated_by_bytes:
         text = data[:max_bytes].decode("utf-8", errors="replace")
+        # A byte cap may cut through a credential value. Keep only complete lines.
+        last_complete_line = text.rfind("\n")
+        text = text[: last_complete_line + 1] if last_complete_line >= 0 else ""
     redacted, redactions = redact(text)
     lines = redacted.splitlines()
     truncated_by_lines = len(lines) > max_lines
@@ -784,8 +848,11 @@ def _parse_arguments(
     return parsed
 
 
+_UNICODE_QUOTE_CHARS = "‘’‚‛“”„‟＂＇"
+
+
 def _powershell_quote(value: str) -> str:
-    if "'" in value or "`" in value:
+    if "'" in value or "`" in value or any(char in value for char in _UNICODE_QUOTE_CHARS):
         raise ValueError("PowerShell argument quoting rejected")
     return f"'{value}'"
 
@@ -858,7 +925,7 @@ def _require_commitish(ref: str, workdir: Path) -> None:
             shell=False,
             check=False,
         )
-    except OSError as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         raise ValueError("git show commit validation is unavailable") from exc
     if probe.returncode != 0:
         raise ValueError("git show targets must resolve to a commit")
@@ -980,7 +1047,9 @@ def _audit_argument_digest(arguments: Sequence[Any]) -> str:
         )
     except (TypeError, ValueError):
         payload = f"<{type(arguments).__name__}>"
-    return hmac.new(_AUDIT_SECRET, payload.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+    return hmac.new(
+        _AUDIT_SECRET, payload.encode("utf-8", errors="surrogatepass"), hashlib.sha256
+    ).hexdigest()[:16]
 
 
 def _request_digest(profile: str, verb: str, arguments: Sequence[str], cwd: Path) -> str:
@@ -1086,18 +1155,92 @@ def _consume_confirmation(token: str, digest: str) -> bool:
 def _spawn(
     argv: Sequence[str], cwd: Path, environment: Mapping[str, str], timeout_seconds: int
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    """Run a child while draining pipes and retaining only bounded output."""
+    process = subprocess.Popen(
         list(argv),
         cwd=str(cwd),
         env=dict(environment),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=timeout_seconds,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         shell=False,
-        check=False,
+        bufsize=0,
     )
+    stdout_buffer = bytearray()
+    stderr_buffer = bytearray()
+    stdout_overflow = [False]
+    stderr_overflow = [False]
+
+    def drain(stream: Any, buffer: bytearray, limit: int, overflow: list[bool]) -> None:
+        while True:
+            chunk = stream.read(8192)
+            if not chunk:
+                break
+            remaining = limit - len(buffer)
+            if remaining > 0:
+                buffer.extend(chunk[:remaining])
+            if len(chunk) > max(remaining, 0):
+                overflow[0] = True
+        if overflow[0]:
+            # A truncated final line may contain a value whose closing delimiter
+            # was not captured; discard it before any redaction or return.
+            last_complete_line = buffer.rfind(b"\n")
+            if last_complete_line >= 0:
+                del buffer[last_complete_line + 1 :]
+            else:
+                buffer.clear()
+
+    assert process.stdout is not None and process.stderr is not None
+    readers = (
+        threading.Thread(
+            target=drain,
+            args=(process.stdout, stdout_buffer, MAX_CAPTURE_STDOUT_BYTES, stdout_overflow),
+            daemon=True,
+        ),
+        threading.Thread(
+            target=drain,
+            args=(process.stderr, stderr_buffer, MAX_CAPTURE_STDERR_BYTES, stderr_overflow),
+            daemon=True,
+        ),
+    )
+    for reader in readers:
+        reader.start()
+
+    def decoded(buffer: bytearray) -> str:
+        return bytes(buffer).decode("utf-8", errors="replace")
+
+    try:
+        return_code = process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+        except OSError:
+            pass
+        process.wait()
+        for reader in readers:
+            reader.join(timeout=2)
+        timeout_error = subprocess.TimeoutExpired(
+            list(argv),
+            timeout_seconds,
+            output=decoded(stdout_buffer),
+            stderr=decoded(stderr_buffer),
+        )
+        timeout_error._jarvis_truncated = stdout_overflow[0] or stderr_overflow[0]
+        raise timeout_error
+    finally:
+        for reader in readers:
+            reader.join(timeout=2)
+        for stream in (process.stdout, process.stderr):
+            try:
+                stream.close()
+            except OSError:
+                pass
+
+    completed = subprocess.CompletedProcess(
+        list(argv), return_code, decoded(stdout_buffer), decoded(stderr_buffer)
+    )
+    completed._jarvis_truncated = stdout_overflow[0] or stderr_overflow[0]
+    return completed
 
 
 def _names_credential_entry(token: str) -> bool:
@@ -1173,7 +1316,7 @@ def run_host_command(
             "audit_logged": logged,
             "elevated": False,
         }
-    except (ValueError, RuntimeError) as exc:
+    except (ValueError, RuntimeError, OSError, subprocess.SubprocessError) as exc:
         audit_id, logged = _audit(
             {
                 "event": "rejected",
@@ -1227,11 +1370,17 @@ def run_host_command(
         completed = _spawn(compiled.argv, compiled.cwd, environment, compiled.timeout_seconds)
     except subprocess.TimeoutExpired as exc:
         elapsed_ms = int((time.monotonic() - started) * 1000)
-        stdout, _ = _bound(_as_text(exc.stdout), MAX_STDOUT_CHARS)
-        stderr, _ = _bound(_as_text(exc.stderr), MAX_STDERR_CHARS)
+        stdout, stdout_truncated = _bound(_as_text(exc.stdout), MAX_STDOUT_CHARS)
+        stderr, stderr_truncated = _bound(_as_text(exc.stderr), MAX_STDERR_CHARS)
+        output_truncated = (
+            stdout_truncated
+            or stderr_truncated
+            or bool(getattr(exc, "_jarvis_truncated", False))
+        )
         audit_id, logged = _audit(
             {
                 "event": "timeout",
+                "truncated": output_truncated,
                 "profile": profile,
                 "verb": verb,
                 "argument_count": len(arguments),
@@ -1251,6 +1400,7 @@ def run_host_command(
             "stdout": stdout,
             "stderr": stderr,
             "timed_out": True,
+            "truncated": output_truncated,
             "timeout_seconds": compiled.timeout_seconds,
             "elapsed_ms": elapsed_ms,
             "audit_id": audit_id,
@@ -1282,6 +1432,8 @@ def run_host_command(
     elapsed_ms = int((time.monotonic() - started) * 1000)
     stdout, stdout_truncated = _bound(completed.stdout, MAX_STDOUT_CHARS)
     stderr, stderr_truncated = _bound(completed.stderr, MAX_STDERR_CHARS)
+    capture_truncated = bool(getattr(completed, "_jarvis_truncated", False))
+    output_truncated = stdout_truncated or stderr_truncated or capture_truncated
     success = completed.returncode == 0
     audit_id, logged = _audit(
         {
@@ -1293,7 +1445,7 @@ def run_host_command(
             "cwd": str(compiled.cwd),
             "exit_code": completed.returncode,
             "elapsed_ms": elapsed_ms,
-            "truncated": stdout_truncated or stderr_truncated,
+            "truncated": output_truncated,
             "confirmed": confirmed,
             "elevated": False,
         }
@@ -1311,7 +1463,7 @@ def run_host_command(
         "stderr": stderr,
         "exit_code": completed.returncode,
         "timed_out": False,
-        "truncated": stdout_truncated or stderr_truncated,
+        "truncated": output_truncated,
         "elapsed_ms": elapsed_ms,
         "audit_id": audit_id,
         "audit_logged": logged,

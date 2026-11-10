@@ -23,6 +23,26 @@ TOOL_NAMES = (
 )
 
 
+def _audit_result(event: str, result: dict[str, Any], **details: Any) -> dict[str, Any]:
+    """Return a host-operations result with one structured audit record."""
+    response = dict(result)
+    audit_id, audit_logged = host_ops._audit(
+        {"event": event, "status": response.get("status"), **details}
+    )
+    response["audit_id"] = audit_id
+    response["audit_logged"] = audit_logged
+    return response
+
+
+def _audit_filesystem_result(event: str, path: str, result: dict[str, Any]) -> dict[str, Any]:
+    """Audit filesystem access using a digest, never the caller's raw path."""
+    try:
+        path_digest = host_ops._audit_argument_digest([path])
+    except (UnicodeError, TypeError, ValueError, OverflowError):
+        path_digest = "unavailable"
+    return _audit_result(event, result, path_digest=path_digest)
+
+
 def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
     """Register the host operations tools on ``mcp`` and return their names."""
 
@@ -42,9 +62,10 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
         but never followed. Credential-named entries are filtered out.
         """
         try:
-            return host_ops.list_directory(path, depth=depth, max_entries=max_entries)
+            result = host_ops.list_directory(path, depth=depth, max_entries=max_entries)
         except (ValueError, OSError) as exc:
-            return _rejected("list_rejected", exc)
+            result = _rejected("list_rejected", exc)
+        return _audit_filesystem_result("fs_list", path, result)
 
     @mcp.tool(name="host_fs_read_text")
     def host_fs_read_text(
@@ -56,9 +77,10 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
         redacted before returning. Binary files are refused.
         """
         try:
-            return host_ops.read_text_file(path, max_bytes=max_bytes, max_lines=max_lines)
+            result = host_ops.read_text_file(path, max_bytes=max_bytes, max_lines=max_lines)
         except (ValueError, OSError) as exc:
-            return _rejected("read_rejected", exc)
+            result = _rejected("read_rejected", exc)
+        return _audit_filesystem_result("fs_read", path, result)
 
     @mcp.tool(name="host_command_profiles")
     def host_command_profiles() -> dict[str, Any]:
@@ -100,9 +122,19 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
         confirmation_not_applicable. It never enables a blocked operation.
         """
         try:
-            return host_ops.request_confirmation(profile, verb, arguments, cwd=cwd)
-        except (ValueError, OSError) as exc:
-            return _rejected("confirmation_rejected", exc)
+            argument_values = list(arguments or [])
+            result = host_ops.request_confirmation(profile, verb, argument_values, cwd=cwd)
+        except (TypeError, ValueError, OSError) as exc:
+            argument_values = []
+            result = _rejected("confirmation_rejected", exc)
+        return _audit_result(
+            "confirmation",
+            result,
+            profile=profile,
+            verb=verb,
+            argument_count=len(argument_values),
+            argument_digest=host_ops._audit_argument_digest(argument_values),
+        )
 
     return TOOL_NAMES
 
