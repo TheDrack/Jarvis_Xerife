@@ -70,3 +70,10 @@ def test_harden_network_does_not_expose_ssh_on_public_interfaces():
 
     assert "$SUDO ufw allow in on tailscale0 to any port 22 proto tcp" in script
     assert "$SUDO ufw allow 22/tcp" not in script
+
+
+def test_harden_network_removes_legacy_global_ssh_rules():
+    script = (ROOT / "linux/provision-jarvis-os.sh").read_text(encoding="utf-8")
+
+    assert "$SUDO ufw --force delete allow 22/tcp" in script
+    assert "$SUDO ufw --force delete allow ssh" in script
