@@ -82,6 +82,82 @@ PY
 fi
 
 if [ -f "$ENV_FILE" ]; then
+    if grep -qE '^JARVIS_DESKTOP_AUTH_TOKEN="?[^"]{32,}"?    if [ "$perms" = "600" ]; then pass "ambiente 0600: $ENV_FILE"; else fail "permissões $perms em $ENV_FILE (esperado 600)"; fi
+    for key in JARVIS_DEVICES_DB JARVIS_GEOINT_DB JARVIS_GRAPH_DB; do
+        value="$(sed -n "s/^$key=//p" "$ENV_FILE" | head -n 1)"
+        value="${value#\"}"
+        value="${value%\"}"
+        case "$value" in
+            /*) pass "$key usa caminho absoluto" ;;
+            *) fail "$key não usa caminho absoluto" ;;
+        esac
+    done
+    if grep -qE '^(OPENAI_API_KEY|GROQ_API_KEY|GEMINI_API_KEY)=.+' "$ENV_FILE"; then
+        pass "ao menos um provedor LLM configurado"
+    else
+        warn "nenhuma chave de provedor preenchida (harness sobe; LLM fica indisponível)"
+    fi
+else
+    fail "arquivo de ambiente ausente: $ENV_FILE"
+fi
+
+if [ -f "$UNIT_DIR/jarvis-api.service" ]; then pass "unit jarvis-api instalada"; else fail "unit jarvis-api ausente"; fi
+
+if [ "$CHECK_SERVICES" -eq 1 ]; then
+    command -v systemctl >/dev/null || fail "systemctl indisponível"
+    for unit in jarvis-api.service jarvis-mcp.service; do
+        [ -f "$UNIT_DIR/$unit" ] || { warn "$unit não instalada (pulada)"; continue; }
+        state="$(systemctl --user is-active "$unit" 2>/dev/null || true)"
+        if [ "$state" = "active" ]; then pass "$unit active"; else fail "$unit $state"; fi
+    done
+    api_exec="$(systemctl --user show jarvis-api.service --property=ExecStart --value 2>/dev/null || true)"
+    if printf '%s' "$api_exec" | grep -Fq 'API_HOST=127.0.0.1'; then
+        pass "API efetivamente configurada para loopback"
+    else
+        fail "API_HOST não está fixado em 127.0.0.1 na unit ativa"
+    fi
+    if [ -f "$UNIT_DIR/jarvis-mcp.service" ]; then
+        mcp_exec="$(systemctl --user show jarvis-mcp.service --property=ExecStart --value 2>/dev/null || true)"
+        if printf '%s' "$mcp_exec" | grep -Fq 'jarvis_linux_mcp'; then
+            pass "MCP usa entrypoint com autenticação bearer"
+        else
+            fail "MCP não usa entrypoint autenticado"
+        fi
+        mcp_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 3 -X POST http://127.0.0.1:8765/mcp 2>/dev/null || true)"
+        if [ "$mcp_status" = "401" ]; then
+            pass "MCP recusa requisições sem bearer"
+        else
+            fail "MCP sem bearer respondeu HTTP $mcp_status (esperado 401)"
+        fi
+    fi
+    if command -v ss >/dev/null; then
+        if ss -ltn 2>/dev/null | grep -qE '127\.0\.0\.1:8765\b'; then
+            pass "MCP escutando em 127.0.0.1:8765"
+        else
+            warn "porta 8765 não está em loopback (normal se --with-mcp não foi usado)"
+        fi
+    fi
+fi
+
+if [ "$RUN_TESTS" -eq 1 ]; then
+    if "$VENV_PY" -c 'import pytest' 2>/dev/null; then
+        if (cd "$REPO_ROOT" && "$VENV_PY" -m pytest tests/domain/graph tests/application/test_graph_store_setup.py -q --no-cov -p no:cacheprovider); then
+            pass "testes do grafo OSINT"
+        else
+            fail "testes do grafo OSINT"
+        fi
+    else
+        warn "pytest ausente; rode o provisionamento com --with-dev"
+    fi
+fi
+
+printf '\nResumo: %d falha(s), %d aviso(s)\n' "$FAILED" "$WARNED"
+[ "$FAILED" -eq 0 ]
+ "$ENV_FILE"; then
+        pass "token MCP presente"
+    else
+        fail "token MCP ausente ou curto"
+    fi
     perms="$(stat -c '%a' "$ENV_FILE" 2>/dev/null || echo '?')"
     if [ "$perms" = "600" ]; then pass "ambiente 0600: $ENV_FILE"; else fail "permissões $perms em $ENV_FILE (esperado 600)"; fi
     for key in JARVIS_DEVICES_DB JARVIS_GEOINT_DB JARVIS_GRAPH_DB; do
