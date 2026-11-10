@@ -1175,7 +1175,7 @@ def _spawn(
         while True:
             chunk = stream.read(8192)
             if not chunk:
-                return
+                break
             remaining = limit - len(buffer)
             if remaining > 0:
                 buffer.extend(chunk[:remaining])
