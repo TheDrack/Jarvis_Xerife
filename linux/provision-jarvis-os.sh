@@ -118,10 +118,12 @@ if [ "$WITH_BROWSER" -eq 1 ]; then
     "$VENV_PY" -m playwright install --with-deps chromium
 fi
 
+umask 077
+ENV_DIR="$(dirname "$ENV_FILE")"
+mkdir -p "$ENV_DIR"
+chmod 700 "$ENV_DIR"
 if [ ! -f "$ENV_FILE" ]; then
     log "criando $ENV_FILE (0600) — preencha as chaves depois"
-    mkdir -p "$(dirname "$ENV_FILE")"
-    umask 077
     cat > "$ENV_FILE" <<'ENVEOF'
 # Jarvis — variáveis de ambiente locais. Nunca versione este arquivo.
 # Chaves de provedores (deixe vazio para desabilitar):
@@ -156,11 +158,20 @@ fi
 # Normalize only the three runtime database paths, preserving all existing
 # provider credentials and operator settings in an already-created env file.
 runtime_env_tmp="${ENV_FILE}.tmp.$$"
+trap 'rm -f "$runtime_env_tmp" "${runtime_env_tmp}.next"' EXIT
 awk '!/^JARVIS_(DEVICES|GEOINT|GRAPH)_DB=/' "$ENV_FILE" > "$runtime_env_tmp"
 printf 'JARVIS_DEVICES_DB="%s"\nJARVIS_GEOINT_DB="%s"\nJARVIS_GRAPH_DB="%s"\n' "$HOME/.local/share/jarvis/jarvis.db" "$HOME/.local/share/jarvis/geoint.sqlite" "$HOME/.local/share/jarvis/jarvis_graph.sqlite" >> "$runtime_env_tmp"
+if [ "$WITH_MCP" -eq 1 ] && ! grep -qE '^JARVIS_DESKTOP_AUTH_TOKEN="?[^"]{32,}"?$' "$runtime_env_tmp"; then
+    auth_token="$("$VENV_PY" -c 'import secrets; print(secrets.token_urlsafe(48))')"
+    awk '!/^JARVIS_DESKTOP_AUTH_TOKEN=/' "$runtime_env_tmp" > "${runtime_env_tmp}.next"
+    printf 'JARVIS_DESKTOP_AUTH_TOKEN="%s"\n' "$auth_token" >> "${runtime_env_tmp}.next"
+    mv "${runtime_env_tmp}.next" "$runtime_env_tmp"
+fi
 chmod 600 "$runtime_env_tmp"
 mv "$runtime_env_tmp" "$ENV_FILE"
+chmod 600 "$ENV_FILE"
 mkdir -p "$HOME/.local/share/jarvis"
+chmod 700 "$HOME/.local/share/jarvis"
 
 log "instalando units systemd de usuário em $UNIT_DIR"
 mkdir -p "$UNIT_DIR"
