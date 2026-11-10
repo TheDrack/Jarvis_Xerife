@@ -97,7 +97,7 @@ Comandos suportados:
 
 A ferramenta **não executa um shell genérico**. Não aceita pipelines, encadeamento, variáveis, redirecionamentos, comandos externos arbitrários, escrita, exclusão, checkout, reset, commit, push, instalação ou elevação. Git é invocado como argv com `shell=False`, sem pager/fsmonitor e com timeout limitado; URLs de remotes com credenciais embutidas são sanitizadas.
 
-As raízes autorizadas por padrão são o perfil do usuário e a raiz do repositório Jarvis. Para conceder acesso a outro diretório específico (por exemplo, uma pasta de dados em outro volume), configure `JARVIS_SHELL_ALLOWED_ROOTS` no ambiente do processo MCP como uma lista de diretórios separada pelo separador de caminhos do sistema operacional (no Windows, ponto e vírgula). Reinicie o servidor para carregar a configuração. Não configure a raiz como `C:\\` ou `D:\\` sem necessidade; prefira a menor pasta que atenda à tarefa.
+A raiz autorizada por padrão é somente a raiz do repositório Jarvis; o perfil inteiro do usuário não é incluído. Para conceder acesso a outro diretório específico (por exemplo, uma pasta de dados em outro volume), configure `JARVIS_SHELL_ALLOWED_ROOTS` no ambiente do processo MCP como uma lista de diretórios separada pelo separador de caminhos do sistema operacional (no Windows, ponto e vírgula). Reinicie o servidor para carregar a configuração. Não configure a raiz como `C:\\` ou `D:\\` sem necessidade; prefira a menor pasta que atenda à tarefa.
 
 Exemplo de uso pela sessão MCP:
 ```text
