@@ -26,11 +26,26 @@ def test_provisioner_expands_home_in_generated_database_paths():
     assert '"$HOME/.local/share/jarvis/jarvis_graph.sqlite"' in script
 
 
+def test_linux_api_unit_pins_host_and_port_to_loopback():
+    unit = (ROOT / "linux/systemd/jarvis-api.service").read_text(encoding="utf-8")
+
+    assert "ExecStart=/usr/bin/env API_HOST=127.0.0.1 API_PORT=10000 @PYTHON@ serve.py" in unit
+
+
+def test_provisioner_enforces_environment_permissions_after_atomic_replacement():
+    script = (ROOT / "linux/provision-jarvis-os.sh").read_text(encoding="utf-8")
+
+    replacement = script.index('mv "$runtime_env_tmp" "$ENV_FILE"')
+    permission = script.index('chmod 600 "$ENV_FILE"', replacement)
+    assert permission > replacement
+
+
 def test_linux_verifier_checks_effective_api_bind_address():
     verifier = (ROOT / "linux/verify-jarvis-os.sh").read_text(encoding="utf-8")
 
     assert "systemctl --user show jarvis-api.service" in verifier
-    assert "API_HOST=127.0.0.1" in verifier
+    unit = (ROOT / "linux/systemd/jarvis-api.service").read_text(encoding="utf-8")
+    assert "ExecStart=/usr/bin/env API_HOST=127.0.0.1 API_PORT=10000 @PYTHON@ serve.py" in unit
 
 
 def test_mcp_unit_uses_authenticated_linux_entrypoint():

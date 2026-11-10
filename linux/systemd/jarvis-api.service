@@ -10,7 +10,7 @@ WorkingDirectory=@REPO_ROOT@
 EnvironmentFile=@ENV_FILE@
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-ExecStart=/usr/bin/env API_HOST=127.0.0.1 @PYTHON@ serve.py
+ExecStart=/usr/bin/env API_HOST=127.0.0.1 API_PORT=10000 @PYTHON@ serve.py
 Restart=on-failure
 RestartSec=5
 # O harness é read-only por padrão; sem CAP_SYS_ADMIN nem root.

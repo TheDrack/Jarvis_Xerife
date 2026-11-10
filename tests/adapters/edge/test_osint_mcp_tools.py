@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from app.adapters.edge import osint_mcp_tools
+from app.adapters.infrastructure.graph.store import SQLiteGraphStore
 from app.adapters.edge.osint_mcp_tools import _bbox_to_circle, register_osint_tools
 from app.adapters.infrastructure.osint.expanders import AsnExpander, IPInfoExpander
 from app.domain.graph.edges import Edge, PivotType
@@ -18,6 +21,15 @@ class FakeMCP:
             self.tools[name or function.__name__] = function
             return function
         return decorator
+
+
+@pytest.fixture(autouse=True)
+def _graph_store(tmp_path, monkeypatch) -> SQLiteGraphStore:
+    """Keep every tool call off the repository database."""
+    store = SQLiteGraphStore(tmp_path / "graph.sqlite")
+    monkeypatch.setattr(osint_mcp_tools, "get_graph_store", lambda: store)
+    yield store
+    store.close()
 
 
 def test_remote_mcp_registers_atomic_and_orchestrated_passive_tools_only() -> None:
@@ -123,6 +135,70 @@ def test_ip_enrich_reports_rate_limited_capabilities_without_failing(monkeypatch
     assert second["expanders"] == []
     assert second["rate_limited"] == ["osint.ip.enrich"]
     assert [node["type"] for node in second["nodes"]] == ["ip"]
+
+
+def test_ip_enrich_persists_edges_that_explain_by_id(
+    monkeypatch, _graph_store
+) -> None:
+    registry = _registry(IPInfoExpander(FakeGeo(), FakeResolver()))
+    monkeypatch.setattr(osint_mcp_tools, "get_graph_expander_registry", lambda: registry)
+    mcp = FakeMCP()
+    register_osint_tools(mcp)
+
+    enriched = mcp.tools["osint.ip.enrich"](ip="203.0.113.9", scope_id="case-9")
+
+    assert enriched["success"] is True
+    assert enriched["persisted"]["saved"] is True
+    assert enriched["persisted"]["edges"]["inserted"] == len(enriched["edges"])
+    assert len(_graph_store.edges("case-9")) == len(enriched["edges"])
+
+    explained = mcp.tools["osint.graph.explain"](
+        edge_id=enriched["edges"][0]["id"], scope_id="case-9"
+    )
+
+    assert explained["success"] is True
+    assert explained["resolved_from"] == "store"
+    assert explained["consistent"] is True
+
+    again = mcp.tools["osint.ip.enrich"](ip="203.0.113.9", scope_id="case-9")
+
+    assert again["persisted"]["edges"]["inserted"] == 0
+    assert len(_graph_store.edges("case-9")) == len(enriched["edges"])
+
+
+def test_ip_enrich_can_skip_persistence(monkeypatch, _graph_store) -> None:
+    registry = _registry(IPInfoExpander(FakeGeo(), FakeResolver()))
+    monkeypatch.setattr(osint_mcp_tools, "get_graph_expander_registry", lambda: registry)
+    mcp = FakeMCP()
+    register_osint_tools(mcp)
+
+    result = mcp.tools["osint.ip.enrich"](
+        ip="203.0.113.9", scope_id="case-9", persist=False
+    )
+
+    assert result["success"] is True
+    assert result["persisted"] == {"requested": False, "saved": False}
+    assert _graph_store.edges() == ()
+
+
+def test_ip_enrich_reports_store_failure_without_dropping_evidence(monkeypatch) -> None:
+    registry = _registry(IPInfoExpander(FakeGeo(), FakeResolver()))
+    monkeypatch.setattr(osint_mcp_tools, "get_graph_expander_registry", lambda: registry)
+
+    def broken_store():
+        raise RuntimeError("graph database is read-only")
+
+    monkeypatch.setattr(osint_mcp_tools, "get_graph_store", broken_store)
+    mcp = FakeMCP()
+    register_osint_tools(mcp)
+
+    result = mcp.tools["osint.ip.enrich"](ip="203.0.113.9")
+
+    assert result["success"] is True
+    assert len(result["edges"]) > 0
+    assert result["persisted"]["saved"] is False
+    assert result["persisted"]["error_type"] == "RuntimeError"
+    assert "read-only" in result["persisted"]["error"]
 
 
 def test_ip_enrich_without_ip_expanders_explains_the_gap(monkeypatch) -> None:

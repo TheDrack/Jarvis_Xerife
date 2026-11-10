@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### God's Eye View, clima e grafo OSINT persistente (2026-11-10)
+
+- Corrige o carregamento da configuração GEV em WSL/Windows AppData e a resolução do runtime Node em serviços Linux.
+- Adiciona filtros agrupados OBS/WX/INFRA, painel meteorológico unificado, anéis de área afetada por tempestades e descrições de aeronaves no HUD.
+- O coletor de inteligência incorpora tempestades ativas do NHC como fonte best-effort e o endpoint de clima pontual usa Open-Meteo com cache.
+- `osint.ip.enrich` persiste nós antes das arestas no SQLite durável, retorna métricas de inserção/duplicação e preserva a evidência quando a persistência falha; `persist=false` mantém o modo sem estado.
+- `JARVIS_GRAPH_DB` é aceito na configuração local; o banco SQLite e seu journal permanecem ignorados pelo Git.
+
 #### Host operations somente leitura no MCP — branch feat/secure-tunnel-host-ops (2026-11-10)
 
 - `app/adapters/infrastructure/host_ops.py`: política de raízes com resolução de symlink/junction, listagem limitada, leitura de texto com bloqueio de credenciais/chaves e redação de tokens, perfis de comando estruturado (`powershell_readonly`, `git`, `inspect_d`), execução com `shell=False`, ambiente minimizado, timeout e saída limitados, auditoria JSONL e gate de confirmação HMAC de uso único (inertes por padrão).

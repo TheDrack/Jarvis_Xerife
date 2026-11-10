@@ -43,9 +43,52 @@ from app.adapters.edge.jarvis_geospatial_intelligence import (
 from app.adapters.edge.jarvis_open_cameras import build_open_cameras
 from app.adapters.edge.network_discovery_adapter import discover_devices, network_interfaces
 from app.adapters.infrastructure.routers.intelligence_dashboard import build_intelligence_status
-from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
+from app.domain.intelligence.contracts import (
+    GeoPoint,
+    IntelligenceBatch,
+    IntelligenceEvent,
+    IntelligenceEvidence,
+    SourceHealth,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _weather_cache_get(
+    cache: dict[Any, tuple[float, dict[str, Any]]],
+    key: Any,
+    *,
+    now: float,
+    ttl_seconds: float = 600.0,
+) -> dict[str, Any] | None:
+    entry = cache.get(key)
+    if entry is None:
+        return None
+    if now - entry[0] >= ttl_seconds:
+        cache.pop(key, None)
+        return None
+    cache.pop(key)
+    cache[key] = entry
+    return entry[1]
+
+
+def _weather_cache_set(
+    cache: dict[Any, tuple[float, dict[str, Any]]],
+    key: Any,
+    value: dict[str, Any],
+    *,
+    now: float,
+    max_entries: int,
+    ttl_seconds: float = 600.0,
+) -> None:
+    for old_key, (created_at, _) in list(cache.items()):
+        if now - created_at >= ttl_seconds:
+            cache.pop(old_key, None)
+    cache.pop(key, None)
+    while len(cache) >= max_entries:
+        cache.pop(next(iter(cache)))
+    cache[key] = (now, value)
+
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
@@ -66,6 +109,7 @@ _LOCAL_INTELLIGENCE_KEYS = {
     "JARVIS_GEV_AREA_NORTH",
     "JARVIS_DEVICES_DB",
     "JARVIS_GEOINT_DB",
+    "JARVIS_GRAPH_DB",
 }
 
 
@@ -136,10 +180,28 @@ def _enrich_earthquakes(payload: dict[str, Any]) -> dict[str, Any]:
 def _load_local_intelligence_config(path: Path | None = None) -> int:
     """Load allowlisted local source settings without overriding process env."""
     if path is None:
-        local_app_data = Path(
-            os.getenv("LOCALAPPDATA") or (Path.home() / "AppData" / "Local")
+        candidates: list[Path] = []
+        explicit_path = os.getenv("JARVIS_INTELLIGENCE_ENV")
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
+        env_local = os.getenv("LOCALAPPDATA")
+        if env_local:
+            candidates.append(Path(env_local) / "Jarvis_Xerife" / "intelligence.env")
+        candidates.append(
+            Path.home() / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env"
         )
-        path = local_app_data / "Jarvis_Xerife" / "intelligence.env"
+        # Never enumerate /mnt/c/Users: another Windows profile may be writable
+        # by a different local account and must not supply an executable GEV path.
+        path = None
+        for candidate in candidates:
+            try:
+                if candidate.is_file():
+                    path = candidate
+                    break
+            except OSError:
+                continue
+        if path is None:
+            return 0
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
@@ -921,6 +983,89 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 )
                 osiris_observations = IntelligenceBatch()
 
+            # NHC current storms (best-effort; isolated so a failure never breaks collection)
+            nhc_events: list[IntelligenceEvent] = []
+            nhc_source = None
+            if _osiris_enabled() and os.getenv("JARVIS_NHC_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}:
+                try:
+                    async def _fetch_nhc():
+                        async with httpx.AsyncClient(timeout=10.0) as client:
+                            response = await client.get("https://www.nhc.noaa.gov/CurrentStorms.json")
+                            response.raise_for_status()
+                            return response.json()
+                    nhc_payload = await _fetch_nhc()
+                    active = nhc_payload.get("activeStorms") if isinstance(nhc_payload, dict) else None
+                    if isinstance(active, list):
+                        for storm in active:
+                            if not isinstance(storm, dict):
+                                continue
+                            name = str(storm.get("name") or "").strip()
+                            storm_id = str(storm.get("id") or "").strip()
+                            classification = str(storm.get("classification") or "").strip()
+                            lat = storm.get("latitudeNumeric")
+                            lon = storm.get("longitudeNumeric")
+                            try:
+                                lat_f = float(lat); lon_f = float(lon)
+                            except (TypeError, ValueError):
+                                continue
+                            if not (-90 <= lat_f <= 90 and -180 <= lon_f <= 180):
+                                continue
+                            url = None
+                            fg = storm.get("forecastGraphics")
+                            if isinstance(fg, dict):
+                                url = fg.get("url")
+                            pa = storm.get("publicAdvisory")
+                            if not url and isinstance(pa, dict):
+                                url = pa.get("url")
+                            if not isinstance(url, str) or not url.strip():
+                                url = "https://www.nhc.noaa.gov/"
+                            from urllib.parse import urlparse as _up
+                            if _up(url).scheme not in ("http", "https"):
+                                url = "https://www.nhc.noaa.gov/"
+                            intensity = storm.get("intensity")
+                            pressure = storm.get("pressure")
+                            movement_dir = storm.get("movementDir")
+                            movement_speed = storm.get("movementSpeed")
+                            details = [f"classification={classification}"]
+                            if intensity is not None:
+                                details.append(f"intensity={intensity} kt")
+                            if pressure is not None:
+                                details.append(f"pressure={pressure} mb")
+                            if movement_dir is not None and movement_speed is not None:
+                                details.append(f"movement={movement_dir}° @ {movement_speed} kt")
+                            last_update = storm.get("lastUpdate")
+                            observed = None
+                            if isinstance(last_update, str):
+                                try:
+                                    observed = datetime.fromisoformat(last_update.replace("Z", "+00:00"))
+                                except ValueError:
+                                    observed = None
+                            nhc_events.append(
+                                IntelligenceEvent(
+                                    event_id=f"nhc:{storm_id or name}",
+                                    source_id="nhc",
+                                    domain="climate_disaster",
+                                    category="tropicalCyclone",
+                                    title=f"{classification or 'Storm'} {name}".strip()[:500],
+                                    summary="; ".join(details)[:4000] or None,
+                                    url=url,
+                                    observed_at=observed or datetime.now(timezone.utc),
+                                    location=GeoPoint(latitude=lat_f, longitude=lon_f),
+                                    evidence=IntelligenceEvidence(
+                                        source_id="nhc",
+                                        source_name="NHC",
+                                        url=url,
+                                        publisher="NOAA/NHC",
+                                        published_at=None,
+                                        license_or_terms="NOAA/NHC public advisory data; attribution required.",
+                                    ),
+                                )
+                            )
+                        nhc_source = SourceHealth(source_id="nhc_storms", available=True)
+                except Exception as exc:
+                    logger.warning("NHC collection failed (%s)", type(exc).__name__)
+                    nhc_source = SourceHealth(source_id="nhc_storms", available=False, error_code=type(exc).__name__)
+
             gev_settings = _gev_settings()
             if gev_settings["area"]:
                 try:
@@ -944,13 +1089,14 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 )
 
             batch = IntelligenceBatch(
-                events=tuple(public_batch.events) + tuple(osiris_batch.events),
+                events=tuple(public_batch.events) + tuple(osiris_batch.events) + tuple(nhc_events),
                 observations=tuple(public_batch.observations)
                 + tuple(osiris_observations.observations)
                 + tuple(gev_batch.observations),
                 sources=tuple(public_batch.sources)
                 + tuple(osiris_batch.sources)
                 + tuple(osiris_observations.sources)
+                + ((nhc_source,) if nhc_source is not None else ())
                 + tuple(gev_batch.sources),
             )
             report = engine.process(batch)
@@ -988,6 +1134,274 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 close_osiris = getattr(osiris, "close", None)
                 if callable(close_osiris):
                     close_osiris()
+
+    @app.get("/api/weather/point")
+    async def weather_point(
+        lat: float = Query(..., ge=-90.0, le=90.0, allow_inf_nan=False),
+        lon: float = Query(..., ge=-180.0, le=180.0, allow_inf_nan=False),
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Open-Meteo point sampling (free, no key). Cached 10 min per 0.05° cell."""
+        import time as _t
+        cache_key = (round(lat / 0.05) * 0.05, round(lon / 0.05) * 0.05)
+        cached = getattr(state, "_wx_cache", None)
+        if cached is None:
+            state._wx_cache = {}
+            cached = state._wx_cache
+        now = _t.monotonic()
+        cached_value = _weather_cache_get(cached, cache_key, now=now)
+        if cached_value is not None:
+            return cached_value
+        try:
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                resp = await client.get(
+                    "https://api.open-meteo.com/v1/forecast",
+                    params={
+                        "latitude": cache_key[0],
+                        "longitude": cache_key[1],
+                        "current": "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,cloud_cover",
+                        "hourly": "precipitation,wind_speed_10m,temperature_2m,weather_code,cloud_cover",
+                        "daily": "temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code",
+                        "forecast_hours": 6,
+                        "forecast_days": 7,
+                        "timezone": "auto",
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as exc:
+            logger.warning("Open-Meteo point fetch failed (%s)", type(exc).__name__)
+            return {"success": False, "error": type(exc).__name__, "lat": cache_key[0], "lon": cache_key[1]}
+        cur = data.get("current") or {}
+        hourly = data.get("hourly") or {}
+        daily = data.get("daily") or {}
+        place = await _run_sync_io_off_loop(reverse_place, cache_key[0], cache_key[1])
+        place_obj = None
+        place_label = None
+        if isinstance(place, dict) and place.get("available"):
+            place_obj = {
+                "city": place.get("city"),
+                "state": place.get("state"),
+                "country": place.get("country"),
+            }
+            parts = [place_obj.get("city"), place_obj.get("state") or place_obj.get("country")]
+            place_label = " · ".join(str(p) for p in parts if p)
+        if not place_label:
+            place_label = f"{cache_key[0]:.2f}, {cache_key[1]:.2f}"
+        result = {
+            "success": True,
+            "lat": cache_key[0],
+            "lon": cache_key[1],
+            "elevation": data.get("elevation"),
+            "timezone": data.get("timezone"),
+            "place": place_obj,
+            "place_label": place_label,
+            "current": {
+                "temperature": cur.get("temperature_2m"),
+                "humidity": cur.get("relative_humidity_2m"),
+                "precipitation": cur.get("precipitation"),
+                "wind_speed": cur.get("wind_speed_10m"),
+                "wind_direction": cur.get("wind_direction_10m"),
+                "wind_gusts": cur.get("wind_gusts_10m"),
+                "weather_code": cur.get("weather_code"),
+                "cloud_cover": cur.get("cloud_cover"),
+                "time": cur.get("time"),
+            },
+            "hourly": {
+                "time": (hourly.get("time") or [])[:6],
+                "precipitation": (hourly.get("precipitation") or [])[:6],
+                "wind_speed": (hourly.get("wind_speed_10m") or [])[:6],
+                "temperature": (hourly.get("temperature_2m") or [])[:6],
+                "weather_code": (hourly.get("weather_code") or [])[:6],
+                "cloud_cover": (hourly.get("cloud_cover") or [])[:6],
+            },
+            "daily": {
+                "time": (daily.get("time") or [])[:7],
+                "temperature_max": (daily.get("temperature_2m_max") or [])[:7],
+                "temperature_min": (daily.get("temperature_2m_min") or [])[:7],
+                "precipitation_sum": (daily.get("precipitation_sum") or [])[:7],
+                "weather_code": (daily.get("weather_code") or [])[:7],
+            },
+            "source": "Open-Meteo (best_match, CC BY 4.0)",
+        }
+        _weather_cache_set(cached, cache_key, result, now=_t.monotonic(), max_entries=256)
+        return result
+
+    @app.get("/api/weather/grid")
+    async def weather_grid(
+        lat: float = Query(..., ge=-90.0, le=90.0, allow_inf_nan=False),
+        lon: float = Query(..., ge=-180.0, le=180.0, allow_inf_nan=False),
+        radius: float = Query(8.0, gt=0.0, le=20.0, allow_inf_nan=False),
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Open-Meteo grid sampling for animated weather overlay (free, no key)."""
+        import time as _t
+        # Build a bounded grid; clamp latitude and wrap longitude at the dateline.
+        step = max(1.0, float(radius) / 2.0)
+        lats = [round(max(-90.0, min(90.0, lat + (i - 1) * step)), 2) for i in range(3)]
+        lons = [round(((lon + (j - 1) * step + 180.0) % 360.0) - 180.0, 2) for j in range(3)]
+        grid_lats = []
+        grid_lons = []
+        for la in lats:
+            for lo in lons:
+                grid_lats.append(la)
+                grid_lons.append(lo)
+        cache_key = (round(lat / 0.5) * 0.5, round(lon / 0.5) * 0.5)
+        cached = getattr(state, "_wx_grid_cache", None)
+        if cached is None:
+            state._wx_grid_cache = {}
+            cached = state._wx_grid_cache
+        now = _t.monotonic()
+        cached_value = _weather_cache_get(cached, cache_key, now=now)
+        if cached_value is not None:
+            return cached_value
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(
+                    "https://api.open-meteo.com/v1/forecast",
+                    params={
+                        "latitude": ",".join(str(x) for x in grid_lats),
+                        "longitude": ",".join(str(x) for x in grid_lons),
+                        "current": "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover",
+                        "hourly": "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code,cloud_cover",
+                        "forecast_hours": 6,
+                        "timezone": "auto",
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as exc:
+            logger.warning("Open-Meteo grid fetch failed (%s)", type(exc).__name__)
+            return {"success": False, "error": type(exc).__name__, "lat": lat, "lon": lon}
+        # data may be a list (multiple locations) or dict (single)
+        if isinstance(data, dict):
+            data = [data]
+        points = []
+        for idx_pt, d in enumerate(data):
+            cur = d.get("current") or {}
+            hourly = d.get("hourly") or {}
+            points.append({
+                "lat": grid_lats[idx_pt],
+                "lon": grid_lons[idx_pt],
+                "current": {
+                    "temperature": cur.get("temperature_2m"),
+                    "precipitation": cur.get("precipitation"),
+                    "wind_speed": cur.get("wind_speed_10m"),
+                    "wind_direction": cur.get("wind_direction_10m"),
+                    "weather_code": cur.get("weather_code"),
+                    "cloud_cover": cur.get("cloud_cover"),
+                },
+                "hourly": {
+                    "time": (hourly.get("time") or [])[:7],
+                    "temperature": (hourly.get("temperature_2m") or [])[:7],
+                    "precipitation": (hourly.get("precipitation") or [])[:7],
+                    "wind_speed": (hourly.get("wind_speed_10m") or [])[:7],
+                    "wind_direction": (hourly.get("wind_direction_10m") or [])[:7],
+                    "weather_code": (hourly.get("weather_code") or [])[:7],
+                    "cloud_cover": (hourly.get("cloud_cover") or [])[:7],
+                },
+            })
+        try:
+            _place = await _run_sync_io_off_loop(reverse_place, lat, lon)
+            if isinstance(_place, dict) and _place.get("available"):
+                _parts = [_place.get("city"), _place.get("state") or _place.get("country")]
+                _label = " · ".join(str(p) for p in _parts if p)
+            else:
+                _label = None
+        except Exception:
+            _label = None
+        if not _label:
+            _label = f"{lat:.2f}, {lon:.2f}"
+        result = {"success": True, "center": {"lat": lat, "lon": lon}, "points": points,
+                  "place_label": _label,
+                  "source": "Open-Meteo (best_match, CC BY 4.0)"}
+        _weather_cache_set(cached, cache_key, result, now=_t.monotonic(), max_entries=128)
+        return result
+
+    @app.get("/api/climate/enso")
+    async def climate_enso(_client: str = Depends(require_local_token)) -> dict[str, Any]:
+        """NOAA CPC weekly Niño SST + ONI + SOI (free, no key)."""
+        import re as _re
+        out: dict[str, Any] = {"success": True, "source": "NOAA CPC (free)"}
+        # Weekly SST
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                r = await client.get("https://www.cpc.ncep.noaa.gov/data/indices/wksst9120.for")
+                r.raise_for_status()
+                text = r.text
+            rows = []
+            month_map = {"JAN":1,"FEB":2,"MAR":3,"APR":4,"MAY":5,"JUN":6,"JUL":7,"AUG":8,"SEP":9,"OCT":10,"NOV":11,"DEC":12}
+            for line in text.splitlines():
+                dm = _re.match(r"\s*(\d{2})([A-Z]{3})(\d{4})", line)
+                if not dm: continue
+                day = dm.group(1); mon = month_map.get(dm.group(2)); year = dm.group(3)
+                if not mon: continue
+                nums = _re.findall(r"[+-]?\d+\.\d", line[dm.end():])
+                if len(nums) < 8: continue
+                try:
+                    nino12=float(nums[0]); anom12=float(nums[1])
+                    nino3=float(nums[2]); anom3=float(nums[3])
+                    nino34=float(nums[4]); anom34=float(nums[5])
+                    nino4=float(nums[6]); anom4=float(nums[7])
+                except ValueError:
+                    continue
+                rows.append({
+                    "date": f"{year}-{mon:02d}-{day}",
+                    "nino12": nino12, "nino3": nino3, "nino34": nino34, "nino4": nino4,
+                    "anom12": anom12, "anom3": anom3, "anom34": anom34, "anom4": anom4,
+                })
+            out["weekly_sst"] = rows[-52:]
+            if rows:
+                last = rows[-1]
+                a = last["anom34"]
+                status = "El Nino" if a >= 0.5 else ("La Nina" if a <= -0.5 else "Neutro")
+                out["status"] = status
+                out["latest_anom34"] = a
+                out["latest_date"] = last["date"]
+        except Exception as exc:
+            logger.warning("NOAA CPC weekly SST fetch failed (%s)", type(exc).__name__)
+            out["weekly_sst_error"] = type(exc).__name__
+        # ONI (3-month running mean)
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                r = await client.get("https://www.cpc.ncep.noaa.gov/data/indices/oni.ascii.txt")
+                r.raise_for_status()
+                text = r.text
+            season_month = {"DJF":1,"JFM":2,"FMA":3,"MAM":4,"AMJ":5,"MJJ":6,"JJA":7,"JAS":8,"ASO":9,"SON":10,"OND":11,"NDJ":12}
+            oni_rows = []
+            for line in text.splitlines():
+                parts = line.split()
+                if len(parts) >= 4 and parts[1].isdigit() and len(parts[1]) == 4:
+                    seas = parts[0].upper()
+                    try:
+                        oni_rows.append({"season": seas, "year": int(parts[1]), "oni": float(parts[3]), "month": season_month.get(seas, 1)})
+                    except ValueError:
+                        pass
+            out["oni"] = oni_rows[-36:]
+        except Exception as exc:
+            logger.warning("NOAA CPC ONI fetch failed (%s)", type(exc).__name__)
+            out["oni_error"] = type(exc).__name__
+        # SOI (matrix year x 12 months)
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                r = await client.get("https://www.cpc.ncep.noaa.gov/data/indices/soi")
+                r.raise_for_status()
+                text = r.text
+            soi_rows = []
+            for line in text.splitlines():
+                parts = line.split()
+                if len(parts) >= 13 and parts[0].isdigit() and len(parts[0]) == 4:
+                    year = int(parts[0])
+                    for i in range(12):
+                        try:
+                            soi_rows.append({"year": year, "month": i+1, "soi": float(parts[i+1])})
+                        except ValueError:
+                            pass
+            out["soi"] = soi_rows[-36:]
+        except Exception as exc:
+            logger.warning("NOAA CPC SOI fetch failed (%s)", type(exc).__name__)
+            out["soi_error"] = type(exc).__name__
+        return out
 
     @app.get("/api/intelligence/latest")
     async def latest_intelligence(_client: str = Depends(require_local_token)) -> dict[str, Any]:

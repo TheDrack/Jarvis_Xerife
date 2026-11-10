@@ -324,6 +324,7 @@ def test_intelligence_collection_composes_configured_osiris_and_gev(monkeypatch)
     monkeypatch.setattr(nexus, "resolve", lambda target_id, **_kwargs: services[target_id])
     monkeypatch.setattr(gev_module, "GodsEyeMcpAdapter", FakeGevAdapter)
     monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "true")
+    monkeypatch.setenv("JARVIS_NHC_ENABLED", "false")
     monkeypatch.setenv("JARVIS_GEV_AREA_WEST", "-80")
     monkeypatch.setenv("JARVIS_GEV_AREA_SOUTH", "-40")
     monkeypatch.setenv("JARVIS_GEV_AREA_EAST", "-79")
@@ -462,6 +463,7 @@ def test_local_intelligence_config_loads_only_allowlisted_values(tmp_path, monke
         "JARVIS_GEV_AREA_WEST=-49.0\n"
         "JARVIS_OSIRIS_ENABLED=false\n"
         "JARVIS_DEVICES_DB=C:\\data\\jarvis.db\n"
+        "JARVIS_GRAPH_DB=C:\\data\\jarvis_graph.sqlite\n"
         "SUPABASE_SERVICE_ROLE_KEY=must-not-load\n",
         encoding="utf-8",
     )
@@ -469,16 +471,39 @@ def test_local_intelligence_config_loads_only_allowlisted_values(tmp_path, monke
     monkeypatch.delenv("JARVIS_GEV_AREA_WEST", raising=False)
     monkeypatch.delenv("JARVIS_OSIRIS_ENABLED", raising=False)
     monkeypatch.delenv("JARVIS_DEVICES_DB", raising=False)
+    monkeypatch.delenv("JARVIS_GRAPH_DB", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
 
     loaded = _load_local_intelligence_config(config)
 
-    assert loaded == 4
+    assert loaded == 5
     assert os.environ["JARVIS_GEV_MCP_ENTRYPOINT"].endswith("stdio.js")
     assert os.environ["JARVIS_DEVICES_DB"] == r"C:\data\jarvis.db"
+    assert os.environ["JARVIS_GRAPH_DB"] == r"C:\data\jarvis_graph.sqlite"
     assert os.environ["JARVIS_GEV_AREA_WEST"] == "-49.0"
     assert os.environ["JARVIS_OSIRIS_ENABLED"] == "false"
     assert "SUPABASE_SERVICE_ROLE_KEY" not in os.environ
+
+
+def test_local_intelligence_config_uses_explicit_path_without_scanning_other_profiles(tmp_path, monkeypatch):
+    config = tmp_path / "intelligence.env"
+    config.write_text("JARVIS_GEV_AREA_WEST=-49.0\n", encoding="utf-8")
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.delenv("JARVIS_GEV_AREA_WEST", raising=False)
+    monkeypatch.setenv("JARVIS_INTELLIGENCE_ENV", str(config))
+    original_iterdir = Path.iterdir
+
+    def guarded_iterdir(path):
+        if str(path).replace("\\\\", "/").casefold() == "/mnt/c/users":
+            raise AssertionError("must not enumerate other Windows user profiles")
+        return original_iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", guarded_iterdir)
+
+    loaded = _load_local_intelligence_config()
+
+    assert loaded == 1
+    assert os.environ["JARVIS_GEV_AREA_WEST"] == "-49.0"
 
 
 def test_local_intelligence_config_does_not_override_process_environment(tmp_path, monkeypatch):
@@ -1704,3 +1729,80 @@ def test_aircraft_route_endpoint_works_when_local_gev_rest_is_online_but_mcp_is_
     assert body["available"] is True
     assert body["origin"]["code"] == "NVT"
     assert body["destination"]["code"] == "CGH"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "lat=91&lon=0",
+        "lat=-91&lon=0",
+        "lat=0&lon=181",
+        "lat=0&lon=-181",
+        "lat=nan&lon=0",
+        "lat=inf&lon=0",
+    ],
+)
+def test_weather_point_rejects_invalid_coordinates_before_upstream_io(query, monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    def unexpected_client(*args, **kwargs):
+        raise AssertionError("invalid coordinates must be rejected before upstream I/O")
+
+    monkeypatch.setattr(desktop_local.httpx, "AsyncClient", unexpected_client)
+    client = _client(LocalRuntime())
+    token = client.get("/api/bootstrap").json()["local_token"]
+
+    response = client.get(
+        f"/api/weather/point?{query}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "lat=91&lon=0",
+        "lat=0&lon=181",
+        "lat=nan&lon=0",
+        "lat=0&lon=0&radius=0",
+        "lat=0&lon=0&radius=21",
+        "lat=0&lon=0&radius=inf",
+    ],
+)
+def test_weather_grid_rejects_invalid_coordinates_and_radius_before_upstream_io(query, monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    def unexpected_client(*args, **kwargs):
+        raise AssertionError("invalid grid parameters must be rejected before upstream I/O")
+
+    monkeypatch.setattr(desktop_local.httpx, "AsyncClient", unexpected_client)
+    client = _client(LocalRuntime())
+    token = client.get("/api/bootstrap").json()["local_token"]
+
+    response = client.get(
+        f"/api/weather/grid?{query}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_weather_cache_expires_entries_and_evicts_oldest_when_full():
+    from app.adapters.edge.jarvis_desktop_local import (
+        _weather_cache_get,
+        _weather_cache_set,
+    )
+
+    cache = {}
+    _weather_cache_set(cache, "expired", {"value": 0}, now=0.0, max_entries=2)
+    _weather_cache_set(cache, "oldest", {"value": 1}, now=100.0, max_entries=2)
+    assert _weather_cache_get(cache, "expired", now=601.0) is None
+
+    _weather_cache_set(cache, "newest", {"value": 2}, now=602.0, max_entries=2)
+    _weather_cache_set(cache, "latest", {"value": 3}, now=603.0, max_entries=2)
+
+    assert len(cache) <= 2
+    assert "oldest" not in cache
+    assert _weather_cache_get(cache, "latest", now=604.0) == {"value": 3}

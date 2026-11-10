@@ -29,6 +29,13 @@ a{color:inherit;text-decoration:none}
 .layer-chip.on{color:#02121d;background:var(--mint-soft);border-color:var(--mint);font-weight:700}
 .layer-chip:hover{border-color:var(--mint);color:var(--mint)}
 .layer-chip.on:hover{color:#02121d}
+.layer-chip:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.6)}
+.layer-group-toggle{background:transparent;border:1px solid var(--line);padding:4px 7px;font-size:var(--fs-xs);letter-spacing:.12em;color:var(--muted);border-radius:1px;cursor:pointer;font-weight:700}
+.layer-group-toggle.on{color:#02121d;background:var(--mint-soft);border-color:var(--mint)}
+.layer-group-toggle:hover{border-color:var(--mint);color:var(--mint)}
+.layer-group{display:inline-flex;align-items:center;gap:4px;padding:0 4px;border-left:1px solid var(--line-soft)}
+.layer-group:first-child{border-left:none;padding-left:0}
+.layer-group-label{font-size:var(--fs-2xs);letter-spacing:.16em;color:var(--muted);font-weight:700;margin-right:2px;opacity:.7}
 .icon-btn{width:28px;height:28px;border:1px solid var(--line);border-radius:1px;color:var(--mint);font-size:var(--fs-xl);line-height:1;display:grid;place-items:center}
 .icon-btn:hover{border-color:var(--mint);box-shadow:0 0 16px rgba(84,215,255,.22)}
 .stage{position:relative;display:grid;grid-template-columns:minmax(220px,clamp(220px,18vw,300px)) minmax(0,1fr) minmax(250px,clamp(250px,21vw,340px));gap:clamp(10px,1.1vw,18px);padding:12px clamp(12px,1.4vw,22px) 0;min-height:0;min-width:0}
@@ -327,15 +334,30 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
   <div class="brand"><span class="diamond">◈</span> J.A.R.V.I.S. <span class="slash">//</span> NEURAL INTERFACE</div>
   <div class="hud-meta"><span>HOST <b id="hostTag">--</b></span><span id="svcTag">SVC 0/0</span><span id="clock">--:--:--</span></div>
   <div class="hud-actions">
+   <span class="layer-group" title="Camadas de observação"><button class="layer-group-label layer-group-toggle on" type="button" data-group="obs" aria-pressed="true" title="Ativar/desativar grupo OBS">OBS</button>
    <button class="layer-chip on" type="button" data-layer="satellite" aria-pressed="true" title="Satélites">SAT</button>
    <button class="layer-chip on" type="button" data-layer="aircraft" aria-pressed="true" title="Aeronaves">AIR</button>
    <button class="layer-chip on" type="button" data-layer="vessel" aria-pressed="true" title="Embarcações">SEA</button>
    <button class="layer-chip on" type="button" data-layer="fire" aria-pressed="true" title="Focos de incêndio">FIRE</button>
+   </span>
+   <span class="layer-group" title="Clima e tempestades"><button class="layer-group-label layer-group-toggle on" type="button" data-group="wx" aria-pressed="true" title="Ativar/desativar grupo WX">WX</button>
    <button class="layer-chip on" type="button" data-layer="quake" aria-pressed="true" title="Sismos">QUAKE</button>
+   <button class="layer-chip on" type="button" data-layer="storm" aria-pressed="true" title="Clima severo e tempestades">STORM</button>
+   <button class="layer-chip" type="button" data-layer="radar" aria-pressed="false" title="Radar de precipitação (RainViewer)">RADAR</button>
+   <button class="layer-chip" type="button" data-layer="weatherAnim" aria-pressed="false" title="Animação de clima (massas de ar, vento, chuva, sol)">WX</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="tornado" aria-pressed="true" title="Tornados">TOR</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="hurricane" aria-pressed="true" title="Furacões e ciclones">CYC</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="flood" aria-pressed="true" title="Enchentes e inundações">FLD</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="thunder" aria-pressed="true" title="Tempestades e raios">TRW</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="hail" aria-pressed="true" title="Granizo">HAIL</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="severe" aria-pressed="true" title="Clima severo geral">SEV</button>
+   </span>
+   <span class="layer-group" title="Infraestrutura e mídia"><button class="layer-group-label layer-group-toggle on" type="button" data-group="infra" aria-pressed="true" title="Ativar/desativar grupo INFRA">INFRA</button>
    <button class="layer-chip on" type="button" data-layer="camera" aria-pressed="true" title="Câmeras">CAM</button>
    <button class="layer-chip on" type="button" data-layer="device" aria-pressed="true" title="Dispositivos">DEV</button>
    <button class="layer-chip on" type="button" data-layer="installation" aria-pressed="true" title="Instalações e infraestrutura">SITE</button>
    <button class="layer-chip on" type="button" data-layer="radio_station" aria-pressed="true" title="Estações de rádio">RAD</button>
+   </span>
    <button class="icon-btn" id="fullscreenToggle" type="button" aria-label="Ativar tela cheia" title="Tela cheia (F11)">⛶</button>
   </div>
  </header>
@@ -373,15 +395,13 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
     <article class="panel" data-panel="briefing" id="panelBriefing">
      <div class="panel-head"><span class="tag">L-00</span><span class="title">BRIEFING · DIÁRIO</span><div class="head-actions"><button class="mini" type="button" id="briefingRefresh" title="Atualizar manchetes e clima">SYNC</button><button class="mini" type="button" id="briefingLocate" title="Ancorar o briefing na localização deste dispositivo" aria-label="Usar a localização deste dispositivo">LOC</button><button class="mini" type="button" data-collapse="panelBriefing">MIN</button></div></div>
      <div class="panel-body">
-      <div class="wx" id="weatherCard">
-       <div class="wx-main"><strong id="wxTemp">--</strong><span id="wxCond">sem leitura de clima</span></div>
-       <div class="wx-meta"><span id="wxRange">--/--</span><span id="wxRain">-- mm</span><span id="wxWind">-- km/h</span></div>
-       <div class="wx-days" id="wxDays"></div>
-       <div class="wx-note" id="wxNote">Open-Meteo · leitura local</div>
-      </div>
       <div class="tabs" role="tablist" aria-label="Tópicos do briefing" id="briefingTabs"></div>
       <div id="briefingList" class="briefing-list"><div class="empty">Briefing ainda não carregado. Use SYNC, o orb ou aguarde o ciclo automático.</div></div>
      </div>
+    </article>
+    <article class="panel" data-panel="weather" id="panelWeather">
+     <div class="panel-head"><span class="tag">L-0W</span><span class="title">CLIMA · LOCAL (OPEN-METEO)</span><div class="head-actions"><button class="mini" type="button" id="weatherRefresh" title="Amostrar clima no ponto focado">SYNC</button><button class="mini" type="button" data-collapse="panelWeather">MIN</button></div></div>
+     <div class="panel-body" id="weatherBody"><div class="empty">Use SYNC para amostrar clima no ponto central do globo, ou clique em uma marca para ver o clima local.</div></div>
     </article>
     <article class="panel" data-panel="events" id="panelEvents">
      <div class="panel-head"><span class="tag">L-01</span><span class="title">EVENTOS · LIVE</span><div class="head-actions"><button class="mini" type="button" data-collapse="panelEvents">MIN</button></div></div>
@@ -478,15 +498,31 @@ const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const state={
  token:sessionStorage.getItem(TOKEN_KEY)||'',activeSourceAction:null,
  bootstrap:null,intel:null,status:null,network:null,telemetry:null, briefing:null,cameras:null,openCameras:null,devices:null,busy:false,loadingSources:false,view:'core',topic:'regiao',location:null,locating:false,globeZoom:1,clusterCameras:[],
+ weatherPoint:null,weatherLoading:false,radarFrame:null,radarFrames:[],radarHost:'',radarFrameIndex:0,radarPlaying:false,radarTimer:null,radarImages:new Map(),radarLoading:false,wxGrid:null,wxGridLoading:false,wxHour:0,wxPlaying:false,wxTimer:null,wxParticles:[],
  live:{events:[],observations:[],sources:[],correlations:[],collected_at:null,area:null},
- layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true,radio_station:true,camera:true,device:true,installation:true},
+ layers:{satellite:true,aircraft:true,vessel:true,fire:true,quake:true,storm:true,radar:false,weatherAnim:false,radio_station:true,camera:true,device:true,installation:true},
+ layerGroups:{obs:true,wx:true,infra:true},
+ savedLayers:{},
+ savedWeatherSub:{},
+ weatherSub:{tornado:true,hurricane:true,flood:true,thunder:true,hail:true,severe:true},
  selected:null,
  history:{cpu:[],mem:[],temp:[]}
 };
 const LAYER_OF={satellite:'satellite',aircraft:'aircraft',vessel:'vessel',camera:'camera',alpr_camera:'camera',radio_station:'radio_station',port:'installation',chokepoint:'installation',datacenter:'installation',dam:'installation',infrastructure:'installation',military_site:'installation'};
+const GROUP_LAYERS={obs:['satellite','aircraft','vessel','fire'],wx:['quake','storm','radar','weatherAnim'],infra:['camera','device','installation','radio_station']};
 const LABEL_KINDS=new Set(['aircraft','satellite','device','camera','radio_station','vessel','installation']);
-const EVENT_LAYER={earthquake:'quake',wildfire:'fire',volcano:'fire',seismic:'quake'};
-const COLORS={satellite:'#a5ecff',aircraft:'#54d7ff',vessel:'#ffb45c',quake:'#ff8f7a',fire:'#ffb347',event:'#8be3ff',camera:'#7ef0c8',radio_station:'#e8a6ff',port:'#ffd479',chokepoint:'#ff9f6e',infrastructure:'#c8b6ff',military_site:'#ff8fb1',installation:'#ff9f6e'};
+const EVENT_LAYER={earthquake:'quake',wildfire:'fire',volcano:'fire',seismic:'quake',severeStorms:'storm',weatherAlerts:'storm',severeStorm:'storm',tropicalCyclone:'storm',tornado:'storm',hurricane:'storm',cyclone:'storm',typhoon:'storm',weather_alert:'storm',gdacs:'storm'};
+function weatherSubtype(m){
+ const rec=(m&&m.record)||{};
+ const text=(String(rec.type||'')+ ' ' + String(rec.category||'')+ ' ' + String(rec.title||'')).toLowerCase();
+ if(/tornado|funnel/.test(text))return 'tornado';
+ if(/hurricane|cyclone|typhoon|tropical/.test(text))return 'hurricane';
+ if(/flood|inund|flash flood/.test(text))return 'flood';
+ if(/thunder|lightning|trovoada|relâmpago/.test(text))return 'thunder';
+ if(/hail|granizo/.test(text))return 'hail';
+ return 'severe';
+}
+const COLORS={satellite:'#a5ecff',aircraft:'#54d7ff',vessel:'#ffb45c',quake:'#ff8f7a',fire:'#ffb347',storm:'#ff6b9d',event:'#8be3ff',camera:'#7ef0c8',radio_station:'#e8a6ff',port:'#ffd479',chokepoint:'#ff9f6e',infrastructure:'#c8b6ff',military_site:'#ff8fb1',installation:'#ff9f6e'};
 
 /* ---------------- API ---------------- */
 async function api(path,opts){
@@ -522,7 +558,7 @@ const Globe=(()=>{
  const SINGLE_CLICK_DELAY_MS=220;
  let geo=null,px=null,py=null,pz=null,adminBoundaries=null;
  let municipalityLoadPromise=null,municipalityLoadFailed=false;
- let stars=[],marks=[],area=null,hook=null,hits=[],quakeRings=[],labelBoxes=[];
+ let stars=[],marks=[],area=null,hook=null,hits=[],quakeRings=[],stormRings=[],labelBoxes=[],extraDraw=null;
  let placeCache=new Map(),placeQueue=[],placeQueueByKey=new Map(),placeRunning=false,placeScanAt=0;
  const aircraftTracks=new Map();
  const aircraftRouteCache=new Map();
@@ -759,6 +795,38 @@ const Globe=(()=>{
    }
   }
  }
+ function drawStormRegions(radius,cosR,sinR,cosT,sinT){
+  if(!stormRings.length)return;
+  const total=Math.min(stormRings.length,12);
+  for(let i=0;i<total;i+=1){
+   const q=stormRings[i];
+   ctx.beginPath();let open=false;
+   for(const point of q.ring){
+    const v=sph(point[0],point[1]);
+    const x0=v[0]*cosR+v[2]*sinR,z0=v[2]*cosR-v[0]*sinR;
+    const y2=v[1]*cosT-z0*sinT,z2=v[1]*sinT+z0*cosT;
+    if(z2<=0.02){open=false;continue;}
+    const sx=cx+x0*radius,sy=cy-y2*radius;
+    if(!open){ctx.moveTo(sx,sy);open=true;}else ctx.lineTo(sx,sy);
+   }
+   ctx.closePath();
+   ctx.fillStyle='rgba(255,180,80,.10)';
+   ctx.fill();
+   ctx.setLineDash([4,3]);
+   ctx.strokeStyle='rgba(255,196,120,.55)';
+   ctx.lineWidth=1;ctx.stroke();
+   ctx.setLineDash([]);
+   const c=sph(q.longitude,q.latitude);
+   const cx0=c[0]*cosR+c[2]*sinR,cz0=c[2]*cosR-c[0]*sinR;
+   const cy2=c[1]*cosT-cz0*sinT,cz2=c[1]*sinT+cz0*cosT;
+   if(cz2>0.02){
+    const sx=cx+cx0*radius,sy=cy-cy2*radius;
+    ctx.font='500 9px "Cascadia Mono",ui-monospace,monospace';
+    ctx.fillStyle='rgba(255,210,150,.9)';
+    ctx.fillText(String(q.label||'CLIMA').slice(0,32),sx+6,sy-5);
+   }
+  }
+ }
  function drawMarkGlyph(m,sx,sy,s,color){
   ctx.save();
   ctx.fillStyle=color;
@@ -824,6 +892,31 @@ const Globe=(()=>{
    ctx.moveTo(sx-s*1.6,sy-s*0.35);ctx.lineTo(sx+s*1.6,sy-s*0.35);
    ctx.lineTo(sx+s*0.9,sy+s*0.9);ctx.lineTo(sx-s*0.9,sy+s*0.9);ctx.closePath();ctx.fill();
    ctx.fillRect(sx-s*0.35,sy-s*1.1,s*0.7,s*0.8);
+  }else if(m.kind==='storm'){
+   const rec=m.record||{};
+   const subtype=weatherSubtype(m);
+   ctx.lineWidth=1.2;
+   if(subtype==='hurricane'){
+    ctx.beginPath();ctx.arc(sx,sy,s*0.45,0,TAU);ctx.fillStyle='rgba(2,11,20,.9)';ctx.fill();ctx.strokeStyle=color;ctx.stroke();
+    for(let a=0;a<3;a+=1){
+     ctx.beginPath();ctx.arc(sx,sy,s*(0.9+a*0.55),-0.6+a*0.3,1.6+a*0.3);ctx.stroke();
+    }
+   }else if(subtype==='tornado'){
+    ctx.beginPath();
+    ctx.moveTo(sx-s*1.4,sy-s*1.6);ctx.lineTo(sx+s*1.4,sy-s*1.6);
+    ctx.lineTo(sx+s*0.5,sy+s*1.6);ctx.lineTo(sx-s*0.5,sy+s*1.6);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(2,11,20,.85)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(sx,sy-s*1.2);ctx.lineTo(sx,sy+s*1.2);ctx.stroke();
+   }else if(subtype==='flood'){
+    ctx.beginPath();ctx.moveTo(sx,sy-s*1.6);ctx.quadraticCurveTo(sx+s*1.5,sy,sx,sy+s*1.6);ctx.quadraticCurveTo(sx-s*1.5,sy,sx,sy-s*1.6);ctx.closePath();ctx.fill();
+   }else if(subtype==='thunder'){
+    ctx.beginPath();ctx.moveTo(sx-s*0.3,sy-s*1.7);ctx.lineTo(sx+s*0.5,sy-0.2);ctx.lineTo(sx-s*0.1,sy-0.2);ctx.lineTo(sx+s*0.3,sy+1.7);ctx.lineTo(sx-s*0.5,sy+0.2);ctx.lineTo(sx+s*0.1,sy+0.2);ctx.closePath();ctx.fill();
+   }else if(subtype==='hail'){
+    for(let i=0;i<5;i+=1){const a=i*TAU/5;ctx.beginPath();ctx.arc(sx+Math.cos(a)*s*1.1,sy+Math.sin(a)*s*1.1,s*0.35,0,TAU);ctx.fill();}
+   }else{
+    ctx.beginPath();ctx.arc(sx,sy,s*1.0,0,TAU);ctx.fill();
+    ctx.fillStyle='rgba(2,11,20,.85)';ctx.beginPath();ctx.arc(sx,sy-s*0.1,s*0.45,0,TAU);ctx.fill();
+   }
   }else{
    ctx.beginPath();ctx.arc(sx,sy,Math.max(1.4,s*0.8),0,TAU);ctx.fill();
   }
@@ -922,8 +1015,44 @@ const Globe=(()=>{
    }
    ctx.restore();
   }
+  function drawStormTracks(radius,cosR,sinR,cosT,sinT){
+   const stormMarks=marks.filter(m=>m.kind==='storm');
+   if(!stormMarks.length)return;
+   ctx.save();
+   for(const m of stormMarks){
+    const rec=m.record||{};
+    const track=Array.isArray(rec.track)?rec.track:(Array.isArray(rec.path)?rec.path:[]);
+    if(track.length<2)continue;
+    ctx.beginPath();ctx.setLineDash([4,4]);ctx.lineWidth=1.6;ctx.strokeStyle='rgba(255,107,157,.75)';
+    let started=false;
+    for(const pt of track){
+     const lat=Array.isArray(pt)?pt[0]:num(pt.latitude??pt.lat);
+     const lon=Array.isArray(pt)?pt[1]:num(pt.longitude??pt.lng);
+     const p=sph(lon,lat);const x0=p[0]*cosR+p[2]*sinR;const z0=p[2]*cosR-p[0]*sinR;const y2=p[1]*cosT-z0*sinT;const z2=p[1]*sinT+z0*cosT;
+     if(z2<=0.02){started=false;continue;}
+     const px=cx+x0*radius,py=cy-y2*radius;
+     if(!started){ctx.moveTo(px,py);started=true;}else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+    if(Array.isArray(rec.cone)&&rec.cone.length>=3){
+     ctx.setLineDash([]);ctx.fillStyle='rgba(255,107,157,.12)';ctx.beginPath();
+     let cstarted=false;
+     for(const pt of rec.cone){
+      const lat=Array.isArray(pt)?pt[0]:num(pt.latitude??pt.lat);
+      const lon=Array.isArray(pt)?pt[1]:num(pt.longitude??pt.lng);
+      const p=sph(lon,lat);const x0=p[0]*cosR+p[2]*sinR;const z0=p[2]*cosR-p[0]*sinR;const y2=p[1]*cosT-z0*sinT;const z2=p[1]*sinT+z0*cosT;
+      if(z2<=0.02){cstarted=false;continue;}
+      const px=cx+x0*radius,py=cy-y2*radius;
+      if(!cstarted){ctx.moveTo(px,py);cstarted=true;}else ctx.lineTo(px,py);
+     }
+     ctx.closePath();ctx.fill();
+    }
+   }
+   ctx.setLineDash([]);ctx.restore();
+  }
   function drawMarks(radius,t,cosR,sinR,cosT,sinT){
    drawAircraftRoutes(radius,cosR,sinR,cosT,sinT);
+   drawStormTracks(radius,cosR,sinR,cosT,sinT);
   hits=[];
   const size=Math.max(2,Math.min(4.5,radius/130));
   labelBoxes=[];
@@ -1024,7 +1153,9 @@ const Globe=(()=>{
    drawAdminBoundaries(radius,cosR,sinR,cosT,sinT);
    drawArea(radius,cosR,sinR,cosT,sinT);
    drawQuakeRegions(radius,cosR,sinR,cosT,sinT);
+   drawStormRegions(radius,cosR,sinR,cosT,sinT);
    drawMarks(radius,t,cosR,sinR,cosT,sinT);
+   if(extraDraw)extraDraw(ctx,cx,cy,radius,cosR,sinR,cosT,sinT);
   }
   drawLimb(radius);
   drawTicks(radius,t);
@@ -1350,11 +1481,13 @@ const Globe=(()=>{
  function setData(payload){
   marks=[];
   quakeRings=[];
+  stormRings=[];
   const events=(payload&&payload.events)||[];
   const observations=(payload&&payload.observations)||[];
   for(const e of events){
    if(!e||!e.location)continue;
-   const kind=EVENT_LAYER[e.category]||'event';
+   let kind=EVENT_LAYER[e.category]||'event';
+   if(kind==='event'&&(e.domain==='climate_disaster'||e.domain==='weather'||/storm|cyclone|hurricane|tornado|weather/i.test(String(e.category||'')+String(e.type||''))))kind='storm';
    const v=sph(num(e.location.longitude),num(e.location.latitude));
    marks.push({x:v[0],y:v[1],z:v[2],longitude:num(e.location.longitude),latitude:num(e.location.latitude),kind,label:e.title||e.category||'evento',place:placeText(e,{},num(e.location.latitude),num(e.location.longitude)),meta:(e.source_id||'')+' · '+(e.category||''),record:e,at:new Date(e.observed_at||e.published_at||0).getTime()||0});
    const felt=e.affected?num(e.affected.felt_radius_km):0;
@@ -1367,6 +1500,22 @@ const Globe=(()=>{
     }
     const place=e.place_label||(e.place?[e.place.city,e.place.country].filter(Boolean).join(' · '):'');
     quakeRings.push({ring,inner,latitude:num(e.location.latitude),longitude:num(e.location.longitude),magnitude:e.magnitude,label:String(place||''),radius:felt});
+   }
+   if(kind==='storm'){
+    let r=felt;
+    if(!r||r<5){
+     const txt=(String(e.title||'')+String(e.category||'')+String(e.type||'')).toLowerCase();
+     if(/hurricane|cyclone|typhoon/.test(txt)) r=200;
+     else if(/tornado/.test(txt)) r=40;
+     else if(/flood/.test(txt)) r=80;
+     else if(/thunder|storm/.test(txt)) r=60;
+     else r=50;
+    }
+    if(r>=5){
+     const ring=[];
+     for(let s=0;s<=36;s+=1) ring.push(dest(num(e.location.latitude),num(e.location.longitude),r,s*10));
+     stormRings.push({ring,latitude:num(e.location.latitude),longitude:num(e.location.longitude),radius:r,label:String(e.title||e.category||'clima')});
+    }
    }
   }
   const now=Date.now();
@@ -1547,12 +1696,394 @@ const Globe=(()=>{
   }else{
    window.addEventListener('resize',resize);
   }
- }
- function init(){loadPlaceCache();bind();resize();loadLand();loadAdminBoundaries();requestAnimationFrame(loop);}
- return {init,setData,setDeviceData,getZoom:()=>zoom,reset,zoomOutMax,focusArea,focusTo,panBy,zoomBy,placeFor,onSelect:fn=>{hook=fn;},onZoom:fn=>{zoomHook=fn;}};
+ }  function init(){loadPlaceCache();bind();renderWeatherPanel();resize();loadLand();loadAdminBoundaries();requestAnimationFrame(loop);}
+ return {init,setData,setDeviceData,getZoom:()=>zoom,reset,zoomOutMax,focusArea,focusTo,panBy,zoomBy,placeFor,aircraftTrackFor:key=>aircraftTracks.get(key),enrichPlace:mark=>enrichPlace(mark),enrichAircraftRoute:mark=>enrichAircraftRoute(mark),onSelect:fn=>{hook=fn;},onZoom:fn=>{zoomHook=fn;},setExtraDraw:fn=>{extraDraw=fn;},getCenter:()=>({latitude:tilt/RAD,longitude:(((-rot/RAD)%360)+540)%360-180}),zoomValue:()=>zoom};
 })();
 
 /* ---------------- Panels ---------------- */
+
+const WMO_ICONS={
+ 0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',56:'🌨️',57:'🌨️',
+ 61:'🌧️',63:'🌧️',65:'🌧️',66:'🌨️',67:'🌨️',71:'🌨️',73:'🌨️',75:'❄️',77:'🌨️',80:'🌦️',81:'🌧️',82:'⛈️',
+ 85:'🌨️',86:'❄️',95:'⛈️',96:'⛈️',99:'⛈️'
+};
+const WMO_LABELS={
+ 0:'Céu limpo',1:'Predominantemente limpo',2:'Parcialmente nublado',3:'Nublado',45:'Névoa',48:'Névoa com geada',
+ 51:'Garoa leve',53:'Garoa moderada',55:'Garoa intensa',56:'Garoa congelante',57:'Garoa congelante intensa',
+ 61:'Chuva leve',63:'Chuva moderada',65:'Chuva forte',66:'Chuva congelante',67:'Chuva congelante forte',
+ 71:'Neve leve',73:'Neve moderada',75:'Neve forte',77:'Grãos de neve',80:'Pancadas leves',81:'Pancadas moderadas',
+ 82:'Pancadas violentas',85:'Pancadas de neve leves',86:'Pancadas de neve fortes',95:'Tempestade',96:'Tempestade com granizo',99:'Tempestade forte com granizo'
+};
+function wmoIcon(code){return WMO_ICONS[code]||'🌡️';}
+function wmoLabel(code){return WMO_LABELS[code]||'Condição desconhecida';}
+function windDirLabel(deg){
+ if(deg==null)return '--';
+ const dirs=['N','NE','L','SE','S','SO','O','NO'];
+ return dirs[Math.round(deg/45)%8]+' '+Math.round(deg)+'°';
+}
+async function fetchWeatherPoint(lat,lon){
+ state.weatherLoading=true;
+ renderWeatherPanel();
+ try{
+  const data=await api('/api/weather/point?lat='+encodeURIComponent(lat)+'&lon='+encodeURIComponent(lon));
+  state.weatherPoint=data;
+ }catch(err){
+  state.weatherPoint={success:false,error:String(err&&err.message||err)};
+ }
+ state.weatherLoading=false;
+ renderWeatherPanel();
+}
+function renderWeatherPanel(){
+ const body=$('weatherBody'); if(!body)return;
+ if(state.weatherLoading){body.innerHTML='<div class="empty">Amostrando Open-Meteo…</div>';return;}
+ const w=state.weatherPoint;
+ if(!w||!w.success){
+  let h='<div class="empty">'+(w&&w.error?'Erro: '+esc(w.error):'Sem leitura. Use SYNC.')+'</div>';
+  if(state.layers.radar){
+   const f=state.radarFrame||{}; const t=f.time?new Date(f.time*1000).toLocaleTimeString():'--';
+   const idx=state.radarFrames.length?state.radarFrameIndex+1+'/'+state.radarFrames.length:'0/0';
+   h+='<div style="margin-top:8px;border-top:1px solid var(--line-soft);padding-top:6px;display:grid;gap:4px">';
+   h+='<div style="font-size:10px;color:var(--muted)">RADAR ANIMADO (RainViewer) · frame '+idx+' · '+t+'</div>';
+   h+='<div style="display:flex;gap:4px">';
+   h+='<button class="mini" type="button" onclick="radarStep(-1)">◀</button>';
+   h+='<button class="mini" type="button" onclick="'+(state.radarPlaying?'radarStop()':'radarPlay()')+'">'+(state.radarPlaying?'⏸':'▶')+'</button>';
+   h+='<button class="mini" type="button" onclick="radarStep(1)">▶|</button>';
+   h+='<button class="mini" type="button" onclick="fetchRadarFrames()">SYNC</button>';
+   h+='</div></div>';
+  }
+  if(state.layers.weatherAnim){
+   const grid=state.wxGrid;
+   const times=(grid&&grid.points&&grid.points.length&&grid.points[0].hourly&&grid.points[0].hourly.time)?grid.points[0].hourly.time:[];
+   const t=times[state.wxHour]?new Date(times[state.wxHour]).toLocaleTimeString():'--';
+   h+='<div style="margin-top:8px;border-top:1px solid var(--line-soft);padding-top:6px;display:grid;gap:4px">';
+   const _wxPlace=(state.wxGrid&&state.wxGrid.place_label)?state.wxGrid.place_label:'';
+   h+='<div style="font-size:10px;color:var(--muted)">WX ANIM (Open-Meteo)'+(_wxPlace?' · '+esc(_wxPlace):'')+' · h+'+state.wxHour+' · '+t+'</div>';
+   h+='<div style="display:flex;gap:4px">';
+   h+='<button class="mini" type="button" onclick="wxStep(-1)">◀</button>';
+   h+='<button class="mini" type="button" onclick="'+(state.wxPlaying?'wxStop()':'wxPlay()')+'">'+(state.wxPlaying?'⏸':'▶')+'</button>';
+   h+='<button class="mini" type="button" onclick="wxStep(1)">▶|</button>';
+   h+='<button class="mini" type="button" onclick="fetchWeatherGrid()">SYNC</button>';
+   h+='</div></div>';
+  }
+  body.innerHTML=h; return;
+ }
+ const c=w.current||{};
+ const icon=wmoIcon(c.weather_code);
+ const html=[];
+ html.push('<div style="display:grid;gap:6px">');
+ html.push('<div style="font-size:11px;color:var(--mint);letter-spacing:.08em">REGIÃO: '+esc(w.place_label||((w.lat!=null?w.lat.toFixed(2):'--')+','+(w.lon!=null?w.lon.toFixed(2):'--')))+'</div>');
+ html.push('<div style="display:flex;align-items:center;gap:10px"><span style="font-size:28px">'+icon+'</span><div><strong style="font-size:18px">'+(c.temperature!=null?c.temperature.toFixed(1)+'°C':'--')+'</strong><div style="font-size:11px;color:var(--muted)">'+wmoLabel(c.weather_code)+'</div></div></div>');
+ html.push('<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;font-size:11px">');
+ html.push('<div>💧 Chuva: '+(c.precipitation!=null?esc(c.precipitation)+' mm':'--')+'</div>');
+ html.push('<div>💨 Vento: '+(c.wind_speed!=null?esc(c.wind_speed)+' km/h':'--')+'</div>');
+ html.push('<div>🌪️ Rajadas: '+(c.wind_gusts!=null?esc(c.wind_gusts)+' km/h':'--')+'</div>');
+ html.push('<div>🧭 Dir: '+windDirLabel(c.wind_direction)+'</div>');
+ html.push('<div>💧 Umidade: '+(c.humidity!=null?esc(c.humidity)+'%':'--')+'</div>');
+ html.push('<div>☁️ Nuvens: '+(c.cloud_cover!=null?esc(c.cloud_cover)+'%':'--')+'</div>');
+ html.push('</div>');
+ const h=w.hourly||{};
+ const times=h.time||[],prec=h.precipitation||[],ws=h.wind_speed||[],ts=h.temperature||[],wc=h.weather_code||[],cc=h.cloud_cover||[];
+ if(times.length){
+  html.push('<div style="font-size:10px;color:var(--muted);margin-top:6px">PRÓXIMAS 6H</div>');
+  html.push('<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;font-size:10px;text-align:center">');
+  for(let i=0;i<Math.min(6,times.length);i++){
+   const t=times[i]; const hh=t?String(t).slice(11,16):'--';
+   html.push('<div style="border:1px solid var(--line-soft);padding:2px 1px"><div>'+esc(hh)+'</div><div style="font-size:14px">'+wmoIcon(wc[i])+'</div><div>'+(ts[i]!=null?Math.round(ts[i])+'°':'--')+'</div><div>'+(prec[i]!=null?esc(prec[i])+'mm':'--')+'</div><div>'+(ws[i]!=null?Math.round(ws[i])+'km/h':'--')+'</div></div>');
+  }
+  html.push('</div>');
+ }
+ // daily forecast
+ const d=w.daily||{};
+ const dtimes=d.time||[],dmax=d.temperature_max||[],dmin=d.temperature_min||[],dprec=d.precipitation_sum||[],dw=d.weather_code||[];
+ if(dtimes.length){
+  html.push('<div style="font-size:10px;color:var(--muted);margin-top:6px">PRÓXIMOS 7 DIAS</div>');
+  html.push('<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:9px;text-align:center">');
+  for(let i=0;i<Math.min(7,dtimes.length);i++){
+   const t=dtimes[i]; const dd=t?String(t).slice(5,10):'--';
+   html.push('<div style="border:1px solid var(--line-soft);padding:2px 1px"><div>'+esc(dd)+'</div><div style="font-size:12px">'+wmoIcon(dw[i])+'</div><div>'+(dmax[i]!=null?Math.round(dmax[i])+'°':'--')+'</div><div style="opacity:.7">'+(dmin[i]!=null?Math.round(dmin[i])+'°':'--')+'</div><div>'+(dprec[i]!=null?esc(dprec[i])+'mm':'--')+'</div></div>');
+  }
+  html.push('</div>');
+ }
+ html.push('<div style="font-size:9px;color:var(--muted);margin-top:4px">Fonte: Open-Meteo (best_match, CC BY 4.0) · '+esc(w.lat)+','+esc(w.lon)+' · elev '+esc(w.elevation)+'m</div>');
+ // radar animation controls
+ if(state.layers.radar){
+  const f=state.radarFrame||{}; const t=f.time?new Date(f.time*1000).toLocaleTimeString():'--';
+  const idx=state.radarFrames.length?state.radarFrameIndex+1+'/'+state.radarFrames.length:'0/0';
+  html.push('<div style="margin-top:8px;border-top:1px solid var(--line-soft);padding-top:6px;display:grid;gap:4px">');
+  html.push('<div style="font-size:10px;color:var(--muted)">RADAR ANIMADO (RainViewer) · frame '+idx+' · '+t+'</div>');
+  html.push('<div style="display:flex;gap:4px">');
+  html.push('<button class="mini" type="button" onclick="radarStep(-1)">◀</button>');
+  html.push('<button class="mini" type="button" onclick="'+(state.radarPlaying?'radarStop()':'radarPlay()')+'">'+(state.radarPlaying?'⏸':'▶')+'</button>');
+  html.push('<button class="mini" type="button" onclick="radarStep(1)">▶|</button>');
+  html.push('<button class="mini" type="button" onclick="fetchRadarFrames()">SYNC</button>');
+  html.push('</div>');
+  html.push('</div>');
+ }
+ if(state.layers.weatherAnim){
+  const grid=state.wxGrid;
+  const maxH=(grid&&grid.points&&grid.points.length&&grid.points[0].hourly&&grid.points[0].hourly.time)?grid.points[0].hourly.time.length:7;
+  const h0=grid&&grid.points&&grid.points.length?grid.points[0].hourly:{};
+  const times=h0.time||[];
+  const t=times[state.wxHour]?new Date(times[state.wxHour]).toLocaleTimeString():'--';
+  html.push('<div style="margin-top:8px;border-top:1px solid var(--line-soft);padding-top:6px;display:grid;gap:4px">');
+  const _wxPlace2=(state.wxGrid&&state.wxGrid.place_label)?state.wxGrid.place_label:'';
+  html.push('<div style="font-size:10px;color:var(--muted)">WX ANIM (Open-Meteo)'+(_wxPlace2?' · '+esc(_wxPlace2):'')+' · h+'+state.wxHour+' · '+t+'</div>');
+  html.push('<div style="display:flex;gap:4px">');
+  html.push('<button class="mini" type="button" onclick="wxStep(-1)">◀</button>');
+  html.push('<button class="mini" type="button" onclick="'+(state.wxPlaying?'wxStop()':'wxPlay()')+'">'+(state.wxPlaying?'⏸':'▶')+'</button>');
+  html.push('<button class="mini" type="button" onclick="wxStep(1)">▶|</button>');
+  html.push('<button class="mini" type="button" onclick="fetchWeatherGrid()">SYNC</button>');
+  html.push('</div>');
+  html.push('</div>');
+ }
+ html.push('</div>');
+ body.innerHTML=html.join('');
+}
+function lon2tile(lon,z){return Math.floor((lon+180)/360*Math.pow(2,z));}
+function lat2tile(lat,z){const cl=Math.max(-85,Math.min(85,lat));return Math.floor((1-Math.log(Math.tan(cl*Math.PI/180)+1/Math.cos(cl*Math.PI/180))/Math.PI)/2*Math.pow(2,z));}
+function tile2lon(x,z){return x/Math.pow(2,z)*360-180;}
+function tile2lat(y,z){const n=Math.PI-2*Math.PI*y/Math.pow(2,z);return 180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n)));}
+async function fetchRadarFrames(){
+ if(state.radarLoading)return;
+ state.radarLoading=true;
+ try{
+  const res=await fetch('https://api.rainviewer.com/public/weather-maps.json');
+  const data=await res.json();
+  state.radarHost=(data&&data.host)||'https://tilecache.rainviewer.com';
+  const past=(data&&data.radar&&data.radar.past)||[];
+  const nowcast=(data&&data.radar&&data.radar.nowcast)||[];
+  const frames=past.concat(nowcast);
+  if(frames.length){ state.radarFrames=frames; state.radarFrameIndex=frames.length-1; state.radarFrame=frames[state.radarFrameIndex]; }
+ }catch(e){ state.radarFrames=[]; state.radarFrame=null; }
+ state.radarLoading=false;
+ renderWeatherPanel();
+}
+
+function radarPlay(){
+ if(state.radarPlaying)return;
+ state.radarPlaying=true;
+ state.radarTimer=setInterval(()=>{ if(!state.radarFrames.length)return; state.radarFrameIndex=(state.radarFrameIndex+1)%state.radarFrames.length; state.radarFrame=state.radarFrames[state.radarFrameIndex]; renderWeatherPanel(); }, 600);
+}
+function radarStop(){ state.radarPlaying=false; if(state.radarTimer){clearInterval(state.radarTimer);state.radarTimer=null;} }
+function radarStep(delta){ if(!state.radarFrames.length)return; const n=state.radarFrames.length; state.radarFrameIndex=(state.radarFrameIndex+delta+n)%n; state.radarFrame=state.radarFrames[state.radarFrameIndex]; renderWeatherPanel(); }
+ window.radarPlay=radarPlay; window.radarStop=radarStop; window.radarStep=radarStep; window.fetchRadarFrames=fetchRadarFrames;
+
+function drawRadarOverlay(ctx,cx,cy,radius,cosR,sinR,cosT,sinT){
+ if(!state.layers.radar)return;
+ if(!state.radarFrames.length){fetchRadarFrames();return;}
+ const center=Globe.getCenter?Globe.getCenter():null;
+ if(!center)return;
+ const centerLat=center.latitude, centerLon=center.longitude;
+ const zl=Globe.zoomValue();
+ const pxDeg=Math.max(1,radius*Math.max(0.5,zl)/90);
+ const halfDeg=Math.min(60,radius/pxDeg+5);
+ const z=Math.max(4,Math.min(7,Math.round(Math.log2(Math.max(1,zl)*4)+1)));
+ const minLon=centerLon-halfDeg, maxLon=centerLon+halfDeg;
+ const minLat=centerLat-halfDeg, maxLat=centerLat+halfDeg;
+ const xMin=lon2tile(minLon,z), xMax=lon2tile(maxLon,z);
+ const yMin=lat2tile(maxLat,z), yMax=lat2tile(minLat,z);
+ ctx.save();
+ ctx.beginPath(); ctx.arc(cx,cy,radius,0,Math.PI*2); ctx.clip();
+ for(let x=xMin;x<=xMax;x++){
+  for(let y=yMin;y<=yMax;y++){
+   const f=state.radarFrame||{}; const base=state.radarHost+(f.path||('/v2/radar/'+f.time)); const url=base+'/'+z+'/'+x+'/'+y+'/2/1_1.png';
+   let entry=state.radarImages.get(url);
+   if(!entry){ entry={status:'loading',img:null}; state.radarImages.set(url,entry);
+     fetch(url).then(r=>r.ok?r.blob():null).then(blob=>{
+       if(!blob || blob.size<=200 || blob.size===1370){ entry.status='skip'; return; }
+       const u=URL.createObjectURL(blob);
+       const im=new Image();
+       im.onload=()=>{ entry.img=im; entry.status='ready'; URL.revokeObjectURL(u); };
+       im.onerror=()=>{ entry.status='skip'; };
+       im.src=u;
+     }).catch(()=>{ entry.status='skip'; });
+     continue;
+   }
+   if(entry.status!=='ready' || !entry.img || !entry.img.complete || !entry.img.naturalWidth)continue;
+   const img=entry.img;
+   const tLon0=tile2lon(x,z), tLon1=tile2lon(x+1,z);
+   const tLat0=tile2lat(y,z), tLat1=tile2lat(y+1,z);
+   const sx0=cx+(tLon0-centerLon)*pxDeg;
+   const sx1=cx+(tLon1-centerLon)*pxDeg;
+   const sy0=cy-(tLat0-centerLat)*pxDeg;
+   const sy1=cy-(tLat1-centerLat)*pxDeg;
+   ctx.globalAlpha=0.5;
+   ctx.drawImage(img, Math.min(sx0,sx1), Math.min(sy0,sy1), Math.abs(sx1-sx0), Math.abs(sy1-sy0));
+  }
+ }
+ ctx.globalAlpha=1;
+ ctx.restore();
+ // legend
+ ctx.save();
+ ctx.fillStyle='rgba(84,215,255,.85)';
+ ctx.font='10px Cascadia Mono,Consolas,monospace';
+ ctx.fillText('RADAR RainViewer (z'+z+')', cx-radius+6, cy+radius-6);
+ ctx.restore();
+}
+async function fetchWeatherGrid(){
+ if(state.wxGridLoading)return;
+ state.wxGridLoading=true;
+ const center=Globe.getCenter?Globe.getCenter():null;
+ const lat=center?center.latitude:(state.location&&state.location.latitude)||-15.8;
+ const lon=center?center.longitude:(state.location&&state.location.longitude)||-47.9;
+ try{
+  const data=await api('/api/weather/grid?lat='+encodeURIComponent(lat)+'&lon='+encodeURIComponent(lon)+'&radius=8');
+  if(data&&data.success){ state.wxGrid=data; state.wxHour=0; state.wxParticles=[]; }
+  else { state.wxGrid=null; }
+ }catch(e){ state.wxGrid=null; }
+ state.wxGridLoading=false;
+ renderWeatherPanel();
+}
+function wxPlay(){
+ if(state.wxPlaying)return;
+ state.wxPlaying=true;
+ state.wxTimer=setInterval(()=>{
+  if(!state.wxGrid||!state.wxGrid.points||!state.wxGrid.points.length)return;
+  const maxH=state.wxGrid.points[0].hourly.time.length;
+  state.wxHour=(state.wxHour+1)%Math.max(1,maxH);
+  renderWeatherPanel();
+ }, 800);
+}
+function wxStop(){ state.wxPlaying=false; if(state.wxTimer){clearInterval(state.wxTimer);state.wxTimer=null;} }
+function wxStep(delta){
+ if(!state.wxGrid||!state.wxGrid.points||!state.wxGrid.points.length)return;
+ const maxH=state.wxGrid.points[0].hourly.time.length;
+ state.wxHour=(state.wxHour+delta+maxH)%maxH;
+ renderWeatherPanel();
+}
+window.fetchWeatherGrid=fetchWeatherGrid; window.wxPlay=wxPlay; window.wxStop=wxStop; window.wxStep=wxStep;
+
+function nearestPoint(grid,lat,lon){
+ if(!grid||!grid.points)return null;
+ let best=null,bestD=Infinity;
+ for(const p of grid.points){
+  const d=(p.lat-lat)**2+(p.lon-lon)**2;
+  if(d<bestD){bestD=d;best=p;}
+ }
+ return best;
+}
+
+function drawWeatherAnim(ctx,cx,cy,radius,cosR,sinR,cosT,sinT){
+ if(!state.layers.weatherAnim)return;
+ if(!state.wxGrid){ fetchWeatherGrid(); return; }
+ const grid=state.wxGrid;
+ const center=Globe.getCenter?Globe.getCenter():null;
+ if(!center)return;
+ const centerLat=center.latitude, centerLon=center.longitude;
+ const zl=Globe.zoomValue();
+ const pxDeg=Math.max(1,radius*Math.max(0.5,zl)/90);
+ ctx.save();
+ ctx.beginPath(); ctx.arc(cx,cy,radius,0,Math.PI*2); ctx.clip();
+ const hi=state.wxHour;
+ // temperature color wash per grid point
+ for(const p of grid.points){
+  const h=p.hourly||{};
+  const temps=h.temperature||[];
+  const temp=temps[hi]!=null?temps[hi]:(p.current&&p.current.temperature);
+  if(temp==null)continue;
+  // map temp to color: cold blue -> warm green -> hot red
+  let r=120,g=180,b=220;
+  if(temp<0){ r=80;g=140;b=230; }
+  else if(temp<10){ r=100;g=170;b=210; }
+  else if(temp<20){ r=120;g=200;b=160; }
+  else if(temp<30){ r=220;g=180;b=90; }
+  else { r=230;g=110;b=70; }
+  const sx=cx+(p.lon-centerLon)*pxDeg;
+  const sy=cy-(p.lat-centerLat)*pxDeg;
+  const grad=ctx.createRadialGradient(sx,sy,0,sx,sy,pxDeg*2.2);
+  grad.addColorStop(0,'rgba('+r+','+g+','+b+',0.22)');
+  grad.addColorStop(1,'rgba('+r+','+g+','+b+',0)');
+  ctx.fillStyle=grad;
+  ctx.fillRect(sx-pxDeg*2.2,sy-pxDeg*2.2,pxDeg*4.4,pxDeg*4.4);
+ }
+ // cloud cover overlay
+ for(const p of grid.points){
+  const h=p.hourly||{};
+  const ccs=h.cloud_cover||[];
+  const cc=ccs[hi]!=null?ccs[hi]:(p.current&&p.current.cloud_cover);
+  if(cc==null||cc<30)continue;
+  const sx=cx+(p.lon-centerLon)*pxDeg;
+  const sy=cy-(p.lat-centerLat)*pxDeg;
+  ctx.fillStyle='rgba(180,200,220,'+(cc/100*0.18)+')';
+  ctx.beginPath();ctx.arc(sx,sy,pxDeg*1.6,0,Math.PI*2);ctx.fill();
+ }
+ // rain streaks
+ for(const p of grid.points){
+  const h=p.hourly||{};
+  const pr=h.precipitation||[];
+  const precip=pr[hi]!=null?pr[hi]:(p.current&&p.current.precipitation);
+  if(!precip||precip<0.1)continue;
+  const sx=cx+(p.lon-centerLon)*pxDeg;
+  const sy=cy-(p.lat-centerLat)*pxDeg;
+  ctx.strokeStyle='rgba(84,215,255,0.5)';
+  ctx.lineWidth=1;
+  const n=Math.min(8,Math.ceil(precip*4));
+  for(let i=0;i<n;i++){
+   const ox=(Math.random()-0.5)*pxDeg*1.2;
+   const oy=(Math.random()-0.5)*pxDeg*1.2;
+   ctx.beginPath();
+   ctx.moveTo(sx+ox,sy+oy);
+   ctx.lineTo(sx+ox-2,sy+oy+6);
+   ctx.stroke();
+  }
+ }
+ // wind particles
+ const maxPart=60;
+ if(state.wxParticles.length===0){
+  for(let i=0;i<maxPart;i++){
+   state.wxParticles.push({lat:centerLat+(Math.random()-0.5)*10,lon:centerLon+(Math.random()-0.5)*10,age:Math.random()*40});
+  }
+ }
+ ctx.strokeStyle='rgba(200,230,255,0.35)';
+ ctx.lineWidth=1;
+ for(const pt of state.wxParticles){
+  const p=nearestPoint(grid,pt.lat,pt.lon);
+  const h=p&&p.hourly||{};
+  const ws=h.wind_speed||[];
+  const wd=h.wind_direction||[];
+  const speed=ws[hi]!=null?ws[hi]:(p&&p.current?p.current.wind_speed:5);
+  const dir=wd[hi]!=null?wd[hi]:(p&&p.current?p.current.wind_direction:0);
+  const rad=(dir||0)*Math.PI/180;
+  const step=0.05*(speed||5)/10;
+  const nlat=pt.lat+Math.cos(rad)*step;
+  const nlon=pt.lon+Math.sin(rad)*step;
+  const x0=cx+(pt.lon-centerLon)*pxDeg;
+  const y0=cy-(pt.lat-centerLat)*pxDeg;
+  const x1=cx+(nlon-centerLon)*pxDeg;
+  const y1=cy-(nlat-centerLat)*pxDeg;
+  ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+  pt.lat=nlat; pt.lon=nlon; pt.age+=1;
+  if(pt.age>40||Math.abs(pt.lat-centerLat)>12||Math.abs(pt.lon-centerLon)>12){
+   pt.lat=centerLat+(Math.random()-0.5)*10;
+   pt.lon=centerLon+(Math.random()-0.5)*10;
+   pt.age=0;
+  }
+ }
+ ctx.restore();
+ // legend
+ ctx.save();
+ ctx.fillStyle='rgba(84,215,255,.85)';
+ ctx.font='10px Cascadia Mono,Consolas,monospace';
+ const t0=grid.points[0]&&grid.points[0].hourly&&grid.points[0].hourly.time?grid.points[0].hourly.time[hi]:null;
+ const ts=t0?new Date(t0).toLocaleTimeString():'--';
+ ctx.fillText('WX ANIM (Open-Meteo) · h+'+hi+' · '+ts, cx-radius+6, cy+radius-6);
+ ctx.restore();
+}
+
+function centerLatLon(){
+ // derive center from Globe rotation
+ try{
+  const loc=screenToLocation?screenToLocation(window.innerWidth/2,window.innerHeight/2):null;
+  return loc;
+ }catch(e){return null;}
+}
+async function refreshWeather(){
+ const gc=Globe.getCenter?Globe.getCenter():null;
+ const loc=gc||(centerLatLon());
+ const lat=loc?loc.latitude:(state.location&&state.location.latitude)||-15.8;
+ const lon=loc?loc.longitude:(state.location&&state.location.longitude)||-47.9;
+ await fetchWeatherPoint(lat,lon);
+}
 function spark(el,values,max){
  if(!el)return;
  const data=values.slice(-40);
@@ -1719,29 +2250,6 @@ function fmtDay(iso){
  if(isNaN(d.getTime()))return String(iso||'').slice(5);
  return d.toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','').toUpperCase();
 }
-function renderWeather(){
- const wx=(state.briefing&&state.briefing.weather)||null;
- if(!wx||!wx.available){
-  $('wxTemp').textContent='--';
-  $('wxCond').textContent=wx&&wx.reason?('CLIMA INDISPONÍVEL · '+String(wx.reason).toUpperCase()):'SEM LEITURA DE CLIMA';
-  $('wxRange').textContent='--/--';
-  $('wxRain').textContent='-- mm';
-  $('wxWind').textContent='-- km/h';
-  $('wxDays').innerHTML='';
-  $('wxNote').textContent='OPEN-METEO · LEITURA LOCAL';
-  return;
- }
- const cur=wx.current||{};
- const today=(wx.days||[])[0]||{};
- $('wxTemp').textContent=cur.temperature_c!=null?Math.round(cur.temperature_c)+'°':'--';
- $('wxCond').textContent=String(cur.condition||'—').toUpperCase()+(cur.apparent_c!=null?' · SENSAÇÃO '+Math.round(cur.apparent_c)+'°':'');
- $('wxRange').textContent=(today.min_c!=null?Math.round(today.min_c):'--')+'° / '+(today.max_c!=null?Math.round(today.max_c):'--')+'°';
- $('wxRain').textContent=(today.rain_mm!=null?today.rain_mm:0)+' mm';
- $('wxWind').textContent=(cur.wind_kmh!=null?Math.round(cur.wind_kmh):'--')+' km/h';
- $('wxDays').innerHTML=(wx.days||[]).map(d=>'<div class="wx-day"><b>'+esc(fmtDay(d.date))+'</b><span>'+esc((d.min_c!=null?Math.round(d.min_c):'--')+'°/'+(d.max_c!=null?Math.round(d.max_c):'--')+'°')+'</span><small>'+esc(d.condition||'')+'</small></div>').join('');
- const origin=(state.briefing&&state.briefing.region&&state.briefing.region.source==='device')?'LOCALIZAÇÃO DESTE DISPOSITIVO':'REGIÃO CONFIGURADA';
- $('wxNote').textContent=('OPEN-METEO · '+String(wx.region||'')+' · '+origin+' · '+hhmm(wx.fetched_at)).toUpperCase();
-}
 function renderTabs(){
  const topics=(state.briefing&&state.briefing.topics)||[];
  $('briefingTabs').innerHTML=topics.map(t=>'<button class="tab'+(t.id===state.topic?' active':'')+'" type="button" role="tab" data-topic="'+esc(t.id)+'" aria-selected="'+(t.id===state.topic?'true':'false')+'">'+esc(t.label)+(t.available?'':' !')+'</button>').join('');
@@ -1754,7 +2262,7 @@ function renderBriefingList(){
  if(!topic.items||!topic.items.length){$('briefingList').innerHTML='<div class="empty">Nenhuma manchete neste tópico no momento.</div>';return;}
  $('briefingList').innerHTML=topic.items.slice(0,5).map(item=>'<a class="row" href="'+esc(item.url)+'" target="_blank" rel="noopener noreferrer"><div class="grow"><b>'+esc(item.title)+'</b><small>'+esc((item.source||'veículo')+' · '+(item.published_at?hhmm(item.published_at):'--:--'))+'</small></div><span class="pill idle">'+esc(String(topic.label||'').slice(0,4))+'</span></a>').join('');
 }
-function renderBriefing(){renderWeather();renderTabs();renderBriefingList();}
+function renderBriefing(){renderTabs();renderBriefingList();}
 function requestLocation(){
  if(!navigator.geolocation){
   setFooter('GEOLOCALIZAÇÃO INDISPONÍVEL · REGIÃO CONFIGURADA');
@@ -2188,6 +2696,7 @@ function renderSelection(mark,options={}){
  const sourceUrl=String(aircraftIdent?'https://pt.flightaware.com/live/flight/'+encodeURIComponent(aircraftIdent):(satelliteCatalogId?'https://www.n2yo.com/satellite/?s='+encodeURIComponent(satelliteCatalogId):(record.url||((primaryEvidence||{}).url)||((primaryEvidence||{}).source_url)||'')));
  const sourceName=String((primaryEvidence||{}).source_name||record.source_id||'FONTE ORIGINAL');
  const kind=String(mark.kind||record.entity_type||record.category||'alvo').replaceAll('_',' ').toUpperCase();
+ const wxIcon=mark.kind==='storm'?({tornado:'🌪️',hurricane:'🌀',flood:'💧',thunder:'⛈️',hail:'🧊',severe:'⚡'}[weatherSubtype(mark)]||'⛈️'):'';
  const isCluster=Boolean(mark.cluster);
  const extra=record.status||record.source_id||record.entity_type||record.category||'';
  const latitude=mark.latitude??(record.location||record.position||{}).latitude;
@@ -2199,7 +2708,7 @@ function renderSelection(mark,options={}){
   :record.summary||record.description||attributes.description||attributes.summary||'Sem resumo adicional fornecido pela fonte.';
  const cachedPlace=Globe.placeFor?Globe.placeFor(latitude,longitude):null;
  const placeLabel=cachedPlace&&cachedPlace.label?cachedPlace.label:mark.place;
- $('selectionKind').textContent=kind;
+ $('selectionKind').textContent=(wxIcon?wxIcon+' ':'')+kind;
  $('selectionTitle').textContent=String(mark.label||record.title||record.entity_id||'ALVO');
  $('selectionDetail').textContent=[String(mark.meta||''),String(extra||''),String(placeLabel||''),coords].filter(Boolean).join(' · ');
  $('selectionSummary').textContent=isCluster
@@ -2232,7 +2741,7 @@ function renderSelection(mark,options={}){
  addSection('MOVIMENTO / ROTA');
  const aircraftIdentity=mark.kind==='aircraft'&&window.JarvisGeospatialLayer&&window.JarvisGeospatialLayer.normalizeAircraftIdentity?window.JarvisGeospatialLayer.normalizeAircraftIdentity(record):null;
  const aircraftTrackKey=mark.flightTrackKey||(aircraftIdentity&&aircraftIdentity.key)||'';
- const aircraftTrack=aircraftTrackKey?aircraftTracks.get(aircraftTrackKey):null;
+ const aircraftTrack=aircraftTrackKey&&(Globe.aircraftTrackFor?Globe.aircraftTrackFor(aircraftTrackKey):null);
  addFact('CALLSIGN',attributes.callsign);
  addFact('ICAO24',attributes.icao24||(/^[0-9a-f]{6}$/i.test(String(record.entity_id||''))?record.entity_id:null));
  addFact('MATRÍCULA',attributes.registration);
@@ -2288,6 +2797,15 @@ function renderSelection(mark,options={}){
  addFact('FONTE',sourceName);
  addFact('FONTE / REGISTRO',record.source);
  addFact('OBSERVADO',record.observed_at||record.published_at||record.last_seen);
+ if(mark.kind==='storm'){
+  addSection('CLIMA / TEMPESTADE');
+  addFact('EVENTO',record.type||record.category);
+  addFact('SEVERIDADE',record.severity);
+  addFact('ÁREA',record.area);
+  addFact('EXPIRA',record.expires);
+  addFact('PROVEDOR',record.provider||(primaryEvidence&&primaryEvidence.publisher));
+  addFact('CATEGORIA OSIRIS',record.category);
+ }
  addSection('DADOS ADICIONAIS');
  addFact('MAGNITUDE',record.magnitude!=null?'M'+num(record.magnitude).toFixed(1):null);
  addFact('RAIO ESTIMADO',record.affected?num(record.affected.felt_radius_km)+' KM (ESTIMATIVA)':null);
@@ -2306,8 +2824,8 @@ function renderSelection(mark,options={}){
  $('selectionAction').textContent=(isCluster||mark.kind==='device_cluster')?'APROXIMAR':(mark.copyValue?'COPIAR':mark.kind==='aircraft'?'CENTRALIZAR AERONAVE':'CENTRALIZAR');
  $('selectionAction').disabled=!mark.copyValue&&!(latitude!=null&&longitude!=null&&Number.isFinite(Number(latitude))&&Number.isFinite(Number(longitude)));
  inspector.hidden=false;
- enrichPlace(mark);
- if(!options.skipRouteLookup)enrichAircraftRoute(mark);
+ if(Globe.enrichPlace)Globe.enrichPlace(mark);
+ if(!options.skipRouteLookup&&Globe.enrichAircraftRoute)Globe.enrichAircraftRoute(mark);
  focusSelection(mark);
 }
 function focusSelection(mark){
@@ -2352,9 +2870,15 @@ function renderStatus(){
 }
 function refreshGlobe(){
  const events=(state.live.events||[]).filter(e=>{
-  const layer=EVENT_LAYER[e.category]||'event';
+  let layer=EVENT_LAYER[e.category]||'event';
+  if(layer==='event'&&(e.domain==='climate_disaster'||e.domain==='weather'||/storm|cyclone|hurricane|tornado|weather/i.test(String(e.category||'')+String(e.type||''))))layer='storm';
   if(layer==='quake')return state.layers.quake;
   if(layer==='fire')return state.layers.fire;
+  if(layer==='storm'){
+   if(state.layers.storm===false)return false;
+   const sub=weatherSubtype({record:e});
+   return state.weatherSub[sub]!==false;
+  }
   return true;
  });
  const observations=(state.live.observations||[]).filter(o=>{
@@ -2604,7 +3128,7 @@ async function refreshAll(){
 function setView(view){
  state.view=view;
  $('stage').setAttribute('data-view',view);
- const visible=view==='core'?['briefing','sources']:[view];
+ const visible=view==='core'?['briefing',...(state.layerGroups&&state.layerGroups.wx?['weather']:[]),'sources']:[view];
  document.querySelectorAll('.panel').forEach(panel=>{
   panel.hidden=!visible.includes(panel.getAttribute('data-panel')||'');
  });
@@ -2678,14 +3202,69 @@ function wire(){
  });
  document.querySelectorAll('.layer-chip').forEach(chip=>{
   chip.addEventListener('click',()=>{
+   const wxsub=chip.getAttribute('data-wxsub');
+   if(wxsub){
+    state.weatherSub[wxsub]=!state.weatherSub[wxsub];
+    chip.classList.toggle('on',Boolean(state.weatherSub[wxsub]));
+    chip.setAttribute('aria-pressed',String(Boolean(state.weatherSub[wxsub])));
+    refreshGlobe();
+    return;
+   }
    const layer=chip.getAttribute('data-layer');
    state.layers[layer]=!state.layers[layer];
+   if(layer==='radar'&&state.layers.radar)fetchRadarFrames();
+   if(layer==='weatherAnim'&&state.layers.weatherAnim)fetchWeatherGrid();
    chip.classList.toggle('on',Boolean(state.layers[layer]));
    chip.setAttribute('aria-pressed',String(Boolean(state.layers[layer])));
    refreshGlobe();
   });
  });
+ document.querySelectorAll('.layer-group-toggle').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+   const g=btn.getAttribute('data-group');
+   const now=!state.layerGroups[g];
+   state.layerGroups[g]=now;
+   const layers=GROUP_LAYERS[g]||[];
+   if(now){
+    layers.forEach(l=>{ if(state.savedLayers&&state.savedLayers[l]!==undefined) state.layers[l]=state.savedLayers[l]; else state.layers[l]=true; });
+    if(g==='wx'){ Object.keys(state.weatherSub).forEach(k=>{ if(state.savedWeatherSub&&state.savedWeatherSub[k]!==undefined) state.weatherSub[k]=state.savedWeatherSub[k]; else state.weatherSub[k]=true; }); }
+   }else{
+    state.savedLayers=state.savedLayers||{};
+    layers.forEach(l=>{ state.savedLayers[l]=state.layers[l]; state.layers[l]=false; });
+    if(g==='wx'){ state.savedWeatherSub={...state.weatherSub}; Object.keys(state.weatherSub).forEach(k=>state.weatherSub[k]=false); }
+   }
+   document.querySelectorAll('.layer-chip').forEach(chip=>{
+    const wxsub=chip.getAttribute('data-wxsub');
+    const layer=chip.getAttribute('data-layer');
+    let inGroup=false;
+    if(wxsub&&g==='wx')inGroup=true;
+    if(layer&&layers.includes(layer))inGroup=true;
+    if(!inGroup)return;
+    chip.disabled=!state.layerGroups[g];
+    if(g==='wx'&&wxsub){
+     chip.classList.toggle('on',Boolean(state.weatherSub[wxsub]));
+     chip.setAttribute('aria-pressed',String(Boolean(state.weatherSub[wxsub])));
+    }else if(layer){
+     chip.classList.toggle('on',Boolean(state.layers[layer]));
+     chip.setAttribute('aria-pressed',String(Boolean(state.layers[layer])));
+     if(layer==='radar'&&state.layers.radar)fetchRadarFrames();
+     if(layer==='weatherAnim'&&state.layers.weatherAnim)fetchWeatherGrid();
+    }
+   });
+   btn.classList.toggle('on',Boolean(state.layerGroups[g]));
+   btn.setAttribute('aria-pressed',String(Boolean(state.layerGroups[g])));
+   if(g==='wx')setView(state.view);
+   if(now&&g==='wx'){
+    refreshWeather();
+    if(state.layers.radar)fetchRadarFrames();
+    if(state.layers.weatherAnim)fetchWeatherGrid();
+   }
+   refreshGlobe();
+  });
+ });
  let deviceLayerTimer=null;
+ function drawAllOverlays(ctx,cx,cy,radius,cosR,sinR,cosT,sinT){ drawRadarOverlay(ctx,cx,cy,radius,cosR,sinR,cosT,sinT); drawWeatherAnim(ctx,cx,cy,radius,cosR,sinR,cosT,sinT); }
+ Globe.setExtraDraw(drawAllOverlays);
  Globe.onZoom(value=>{
   state.globeZoom=value;
   $('zoomLevel').textContent=Math.round(value*100)+'%';
@@ -2800,7 +3379,8 @@ document.addEventListener('keydown',ev=>{
   else collectAll();
  });
  $('briefingRefresh').addEventListener('click',refreshBriefing);
- $('briefingLocate').addEventListener('click',async()=>{
+ $('weatherRefresh').addEventListener('click',refreshWeather);
+  $('briefingLocate').addEventListener('click',async()=>{
   const ok=await requestLocation();
   if(ok){await refreshBriefing();buildAreas();}
  });
@@ -2854,6 +3434,9 @@ document.addEventListener('keydown',ev=>{
   state.selected=mark;
   renderSelection(mark);
   renderStatus();
+  const _lat=mark&&(mark.latitude||mark.lat||(mark.position&&mark.position.latitude));
+  const _lon=mark&&(mark.longitude||mark.lon||(mark.position&&mark.position.longitude));
+  if(_lat!=null&&_lon!=null)fetchWeatherPoint(_lat,_lon);
   if(mark.cluster||mark.kind==='device_cluster')setFooter('AGRUPAMENTO ABERTO · SELECIONE UM MEMBRO OU USE APROXIMAR');
  });
 }
