@@ -59,7 +59,7 @@ Read-only subcommands: `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`,
 
 ### `inspect_d`
 
-`Get-ChildItem`, `Get-Item`, `Get-PSDrive` where every path must resolve under `D:\`. Intended for inventorying the second Windows installation without PowerShell string building.
+`Get-ChildItem` and `Get-Item` only; every path must resolve under `D:\`. Intended for inventorying the second Windows installation without PowerShell string building.
 
 ## Hard blocks
 
