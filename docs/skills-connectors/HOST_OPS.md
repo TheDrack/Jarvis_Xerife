@@ -87,11 +87,13 @@ Every command attempt and every filesystem list/read attempt (executed, blocked,
 
 ```json
 {"ts":"2026-11-10T12:00:00+00:00","audit_id":"…","event":"executed","profile":"git",
- "verb":"status","arguments":["--short"],"digest":"…","cwd":"…","exit_code":0,
+ "verb":"status","argument_count":1,"argument_digest":"…","cwd":"<repository root>","exit_code":0,
  "elapsed_ms":120,"truncated":false,"confirmed":false,"elevated":false}
+{"ts":"2026-11-10T12:00:01+00:00","audit_id":"…","event":"fs_read","status":"read",
+ "path_digest":"…","elevated":false}
 ```
 
-Command arguments are never persisted; only a one-way argument digest and count are logged. Audit files are created with owner-only permissions on POSIX. Output content, environment and secrets are never written. If the log cannot be written the call still returns, with `audit_logged: false`.
+Command arguments are never persisted; only a one-way argument digest and count are logged. Filesystem read/list paths are represented by a keyed digest, not the raw path. Command execution records its validated working directory. Audit files are created with owner-only permissions on POSIX. Output content, environment and secrets are never written. If the log cannot be written the call still returns, with `audit_logged: false`.
 
 ## Activation on the local server
 
