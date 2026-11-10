@@ -90,7 +90,8 @@ def test_command_run_executes_through_the_injected_runner(monkeypatch):
     result = _registered().tools["host_command_run"](profile="git", verb="status", arguments=[])
 
     assert result["success"] is True
-    assert captured["argv"][:2] == ["git", "--no-pager"]
+    assert captured["argv"][:2] == ["git", "-c"]
+    assert "core.fsmonitor=false" in captured["argv"]
     assert result["shell"] is False
 
 
