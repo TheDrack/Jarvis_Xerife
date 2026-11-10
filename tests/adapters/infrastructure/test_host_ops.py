@@ -728,3 +728,40 @@ def test_git_profile_rejects_working_directory_outside_repository(tmp_path):
 
     with pytest.raises(ops.PathNotAllowed):
         ops.compile_command("git", "status", [], cwd=str(outside))
+
+
+def test_bound_redacts_sensitive_credential_names():
+    value = r"Directory: C:\\Users\\operator\\.aws\\credentials.json"
+    bounded, _ = ops._bound(value, 4000)
+
+    assert ".aws" not in bounded
+    assert "credentials.json" not in bounded
+    assert "[REDACTED_NAME]" in bounded
+
+
+def test_audit_redacts_unrecognized_profile_and_verb_labels(_sandbox):
+    secret = "AWS_SECRET_ACCESS_KEY=must-not-persist"
+    result = ops.run_host_command(secret, secret, ["ordinary-argument"])
+
+    assert result["success"] is False
+    audit = _sandbox_audit().read_text(encoding="utf-8")
+    assert secret not in audit
+    record = json.loads(audit.splitlines()[-1])
+    assert record["profile"] == "unknown"
+    assert record["verb"] == "unknown"
+
+
+def test_junction_detection_uses_windows_reparse_attribute(monkeypatch):
+    from types import SimpleNamespace
+    import sys
+
+    fake_ctypes = SimpleNamespace(
+        windll=SimpleNamespace(
+            kernel32=SimpleNamespace(GetFileAttributesW=lambda _path: 0x400)
+        )
+    )
+    monkeypatch.setitem(sys.modules, "ctypes", fake_ctypes)
+    monkeypatch.setattr(ops.os, "name", "nt")
+    entry = SimpleNamespace(path="C:/safe/junction", is_symlink=lambda: False)
+
+    assert ops._is_junction(entry) is True
