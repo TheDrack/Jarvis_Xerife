@@ -104,10 +104,10 @@ def _assert_trusted_git_config(git_dir: Path) -> None:
         blocked = (
             (section == "core" and key in {"fsmonitor", "hookspath", "sshcommand", "askpass", "pager", "worktree"}),
             (section.startswith("diff") and key in {"external", "textconv"}),
-            (section.startswith("filter.") and key in {"clean", "smudge", "process"}),
+            (section.startswith("filter") and key in {"clean", "smudge", "process"}),
             (section == "credential" and key == "helper"),
             (section.startswith("gpg") and key == "program"),
-            (section.startswith("merge.") and key == "driver"),
+            (section.startswith("merge") and key == "driver"),
         )
         if any(blocked):
             raise ValueError("repository Git config contains an executable helper setting")
@@ -222,7 +222,7 @@ class ShellNavigator:
 
     def _resolve(self, raw_path: str | None, *, must_exist: bool = True) -> Path:
         raw = "" if raw_path is None else str(raw_path)
-        normalized = raw.replace("/", "\\\\")
+        normalized = raw.replace("/", "\\")
         if normalized.startswith("\\\\\\\\") or normalized.startswith("\\\\?\\\\") or normalized.startswith("\\\\.\\\\"):
             raise PermissionError("UNC and device paths are not permitted")
 
