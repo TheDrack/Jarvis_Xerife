@@ -1000,10 +1000,10 @@ def test_git_commit_probe_timeout_is_audited_rejection(_sandbox, monkeypatch):
         "NUL.txt",
         "COM1.log",
         "LPT9",
-        "COM\\u00b9",
-        "COM\\u00b2.txt",
-        "LPT\\u00b9",
-        "LPT\\u00b3.log",
+        "COM\u00b9",
+        "COM\u00b2.txt",
+        "LPT\u00b9",
+        "LPT\u00b3.log",
     ],
 )
 def test_resolve_path_rejects_ntfs_aliases(_sandbox, suffix):
@@ -1015,12 +1015,12 @@ def test_spawn_caps_child_output_and_discards_partial_secret_line(_sandbox):
     command = [
         sys.executable,
         "-c",
-        "import sys; sys.stdout.write('safe\\nPASSWORD=\\\"' + 'x' * 1000000); sys.stderr.write('y' * 1000000)",
+        "import sys; sys.stdout.write('safe\\nPASSWORD=' + chr(34) + 'x' * 1000000); sys.stderr.write('y' * 1000000)",
     ]
 
     completed = ops._spawn(command, _sandbox, ops._sanitized_environment(), 10)
 
-    assert completed.stdout == "safe\\n"
+    assert completed.stdout == "safe\n"
     assert "PASSWORD=" not in completed.stdout
     assert len(completed.stdout.encode("utf-8")) <= ops.MAX_STDOUT_CHARS * 4
     assert len(completed.stderr.encode("utf-8")) <= ops.MAX_STDERR_CHARS * 4
@@ -1031,10 +1031,10 @@ def test_redact_long_credential_key_names_on_file_and_command_output_paths(_sand
     key = "MY_SUPER_LONG_APPLICATION_CONFIGURATION_ENCRYPTION_PASSWORD"
     secret = "S3cr3t-Pr0d-Passw0rd"
     target = _sandbox / "ordinary-config.yaml"
-    target.write_text(f"{key}: {secret}\\nmode: safe\\n", encoding="utf-8")
+    target.write_text(f"{key}: {secret}\nmode: safe\n", encoding="utf-8")
 
     read_result = ops.read_text_file(str(target))
-    command_output, _ = ops._bound(f"{key}: {secret}\\n", 4_000)
+    command_output, _ = ops._bound(f"{key}: {secret}\n", 4_000)
 
     assert read_result["success"] is True
     assert secret not in read_result["content"]
@@ -1055,8 +1055,8 @@ def test_read_byte_truncation_discards_incomplete_final_line(_sandbox):
     target = _sandbox / "ordinary-config.yaml"
     secret = "long-secret-value-" * 20
     target.write_text(
-        "mode: safe\\nMY_SUPER_LONG_APPLICATION_CONFIGURATION_ENCRYPTION_PASSWORD: "
-        + f'"{secret}"\\n',
+        "mode: safe\nMY_SUPER_LONG_APPLICATION_CONFIGURATION_ENCRYPTION_PASSWORD: "
+        + f'"{secret}"\n',
         encoding="utf-8",
     )
 
