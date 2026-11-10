@@ -651,3 +651,33 @@ def test_entry_kind_detects_ntfs_junction_without_python_312_api(monkeypatch):
     )
 
     assert ops._entry_kind(entry) == "junction"
+
+
+def test_resolve_path_rejects_symlink_components_before_following_them(_sandbox):
+    outside = _sandbox.parent / "outside-link-target"
+    outside.mkdir()
+    link = _sandbox / "link-to-outside"
+    try:
+        os.symlink(outside, link, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation requires privileges on this host")
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.resolve_path(str(link / "secret.txt"))
+
+
+def test_directory_listing_never_follows_nested_symlinks(_sandbox):
+    outside = _sandbox.parent / "outside-list-target"
+    outside.mkdir()
+    (outside / "outside-secret.txt").write_text("not-listed", encoding="utf-8")
+    link = _sandbox / "external-link"
+    try:
+        os.symlink(outside, link, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation requires privileges on this host")
+
+    result = ops.list_directory(str(_sandbox), depth=4, max_entries=100)
+
+    linked = next(entry for entry in result["entries"] if entry["name"] == "external-link")
+    assert linked["kind"] == "symlink"
+    assert "outside-secret.txt" not in {entry["name"] for entry in result["entries"]}
