@@ -124,8 +124,14 @@ def _assert_trusted_git_config(git_dir: Path) -> None:
 
 
 _SECRET_CONTENT = re.compile(
-    rb"""(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|"auths"\s*:|_authToken|npmAuthToken|oauth_token|client[-_]?key[-_]?data|certificate[-_]?authority[-_]?data|account[-_]?key|AGE-SECRET-KEY-|aws_secret_access_key|client_secret|api[_-]?key|access_token|refresh_token|password|passwd|gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{16,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}|<\s*(?:password|token|secret|api[_-]?key)\b[^>]*>\s*[^<]{4,}</\s*(?:password|token|secret|api[_-]?key)\s*>)"""
+    rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|"auths"\s*:|client[-_]?key[-_]?data|"
+    rb"certificate[-_]?authority[-_]?data|account[-_]?key|AGE-SECRET-KEY-|"
+    rb"gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{16,}|"
+    rb"xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{16,}|"
+    rb"AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}|"
+    rb"<\s*(?:password|token|secret|api[_-]?key)\b[^>]*>\s*[^<]{4,}</\s*(?:password|token|secret|api[_-]?key)\s*>)"
 )
+
 
 _TEXT_SUFFIXES = {
     ".txt", ".md", ".rst", ".py", ".ps1", ".sh", ".bat", ".cmd",
