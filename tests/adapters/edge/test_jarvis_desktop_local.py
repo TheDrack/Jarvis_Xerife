@@ -485,6 +485,26 @@ def test_local_intelligence_config_loads_only_allowlisted_values(tmp_path, monke
     assert "SUPABASE_SERVICE_ROLE_KEY" not in os.environ
 
 
+def test_local_intelligence_config_uses_explicit_path_without_scanning_other_profiles(tmp_path, monkeypatch):
+    config = tmp_path / "intelligence.env"
+    config.write_text("JARVIS_GEV_AREA_WEST=-49.0\\n", encoding="utf-8")
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.setenv("JARVIS_INTELLIGENCE_ENV", str(config))
+    original_iterdir = Path.iterdir
+
+    def guarded_iterdir(path):
+        if str(path).replace("\\\\", "/").casefold() == "/mnt/c/users":
+            raise AssertionError("must not enumerate other Windows user profiles")
+        return original_iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", guarded_iterdir)
+
+    loaded = _load_local_intelligence_config()
+
+    assert loaded == 1
+    assert os.environ["JARVIS_GEV_AREA_WEST"] == "-49.0"
+
+
 def test_local_intelligence_config_does_not_override_process_environment(tmp_path, monkeypatch):
     config = tmp_path / "intelligence.env"
     config.write_text("JARVIS_GEV_AREA_WEST=-49.0\n", encoding="utf-8")
