@@ -319,3 +319,18 @@ def test_initial_source_loading_is_failure_isolated():
     assert "Promise.allSettled" in body
     assert "refreshCameras" in body
     assert "await collectAll({startup:true})" in body
+
+
+def test_weather_panel_escapes_every_external_string_before_html_insertion():
+    for expression in (
+        "esc(c.precipitation)",
+        "esc(c.wind_speed)",
+        "esc(c.wind_gusts)",
+        "esc(c.humidity)",
+        "esc(c.cloud_cover)",
+        "esc(hh)",
+        "esc(prec[i])",
+        "esc(dd)",
+        "esc(dprec[i])",
+    ):
+        assert expression in HTML, expression
