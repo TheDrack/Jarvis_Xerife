@@ -60,6 +60,14 @@
 - News country-anchor coordinates and NOAA/NWS polygon centroids are intentionally not treated as exact event coordinates. Point geometry from NASA EONET and GDACS RSS is preserved. Weather source identities remain separate for NASA EONET, NOAA/NWS and GDACS.
 - Unit tests use upstream-shaped fixtures and an injected HTTPX MockTransport. No live OSIRIS deployment is assumed by the adapter's existence.
 
+## Read-only host operations over the MCP tunnel
+
+- Implementation: `app/adapters/infrastructure/host_ops.py` (policy + execution) and `host_ops_mcp_tools.py` (registration). Registered additively on the existing Desktop MCP server; no new port or credential.
+- Tools: `host_fs_list` (bounded directory metadata), `host_fs_read_text` (bounded text, secrets refused/redacted), `host_command_profiles`, `host_command_run` (structured argv, `shell=False`, non-elevated), `host_command_request_confirmation` (inert gate).
+- Profiles: `powershell_readonly`, `git`, `inspect_d` (`D:\` only). Paths must resolve inside the repository root or `D:\` (`JARVIS_HOST_OPS_ROOTS`); `..`, `~`, symlink/junction escapes and credential-named files are rejected.
+- Destructive, installation, boot, ACL, credential and privileged operations are hard-blocked by pattern, audited and never executed — with or without confirmation. No host capability is confirmable today, so the token gate cannot unlock anything.
+- Status: implemented and unit/integration tested in this branch. Runtime availability depends on the deployed MCP server build; verify with `host_command_profiles` before claiming the tools are live. Runbook: [HOST_OPS.md](HOST_OPS.md); skill: [jarvis-host-ops](../../skills/jarvis-host-ops/SKILL.md).
+
 ## Portable Jarvis skills
 
 | Skill | Use it for | Canonical entry point |
@@ -69,6 +77,7 @@
 | Multi-agent coordination | Leader assignment, task envelopes, shared ledger, handoffs, parallel-work controls, evidence | [SKILL.md](../../skills/jarvis-multi-agent-coordination/SKILL.md) and [platform architecture](../architecture/jarvis-multi-agent-platform.md) |
 | Browser portas | Inspect/run declarative macros and observe HTTP(S)/WebSocket traffic on Chromium via local CDP, including dynamic agent-browser sessions; visualization, utilization and traffic-observer tools | [SKILL.md](../../skills/jarvis-portas-browser/SKILL.md) and [portas runbook](../PORTAS_BROWSER.md) |
 | Visual navigation | Windows desktop observation and operation through Jarvis MCP/JSONL bridge, UI Automation, templates, and verified recipes | [SKILL.md](../../skills/jarvis-visual-navigation/SKILL.md) and [visual navigation runbook](../NAVEGACAO_VISUAL.md) |
+| Host operations (read-only) | Directory listing, bounded text reading with secret blocking, and allowlisted structured commands (PowerShell read-only, git, pytest, D:\ inspection) over the authenticated MCP tunnel | [SKILL.md](../../skills/jarvis-host-ops/SKILL.md) and [host ops runbook](HOST_OPS.md) |
 | VIV — Verificação Inicial de Voo | Standard startup/readiness audit: re-read relevant skills, discover live connectors, inspect schemas/permissions, research failures, apply authorized fixes, test, and report evidence | [SKILL.md](../../skills/jarvis-viv/SKILL.md) and [full VIV procedure](../POS_INSTALACAO.md) |
 
 A skill is portable operating guidance, not a connector or a grant of permissions. If a skill references a tool absent from the live registry, use its documented fallback or report the tool as unavailable.
