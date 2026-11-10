@@ -46,7 +46,9 @@ def test_linux_verifier_checks_effective_api_bind_address():
     verifier = (ROOT / "linux/verify-jarvis-os.sh").read_text(encoding="utf-8")
 
     assert "systemctl --user show jarvis-api.service" in verifier
-    assert "API_HOST=127.0.0.1" in verifier
+    unit = (ROOT / "linux/systemd/jarvis-api.service").read_text(encoding="utf-8")
+    assert "Environment=API_HOST=127.0.0.1" in unit
+    assert "Environment=API_PORT=10000" in unit
 
 
 def test_mcp_unit_uses_authenticated_linux_entrypoint():
