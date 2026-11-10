@@ -63,3 +63,10 @@ def test_linux_verifier_checks_mcp_bearer_gate():
     assert "jarvis_linux_mcp" in verifier
     assert "mcp_status" in verifier
     assert 'if [ "$mcp_status" = "401" ]' in verifier
+
+
+def test_harden_network_does_not_expose_ssh_on_public_interfaces():
+    script = (ROOT / "linux/provision-jarvis-os.sh").read_text(encoding="utf-8")
+
+    assert "$SUDO ufw allow in on tailscale0 to any port 22 proto tcp" in script
+    assert "$SUDO ufw allow 22/tcp" not in script
