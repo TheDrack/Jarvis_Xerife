@@ -401,7 +401,7 @@ def test_describe_profiles_reports_boundaries(_sandbox):
 # Security review regressions: Strix findings
 # --------------------------------------------------------------------------- #
 def test_list_filters_credential_directories(_sandbox):
-    for name in (".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store"):
+    for name in (".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store", ".terraform", ".vault"):
         (_sandbox / name).mkdir()
     (_sandbox / "project").mkdir()
 
@@ -409,7 +409,7 @@ def test_list_filters_credential_directories(_sandbox):
 
     names = {entry["name"] for entry in result["entries"]}
     assert names == {"project"}
-    assert result["filtered_secret_entries"] == 7
+    assert result["filtered_secret_entries"] == 9
 
 
 @pytest.mark.parametrize(
@@ -515,7 +515,7 @@ def test_redaction_covers_common_provider_secrets_and_connection_urls():
 
 
 def test_command_output_with_private_key_material_is_withheld(monkeypatch):
-    private_key = "-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAKCAQEA\\n-----END RSA PRIVATE KEY-----"
+    private_key = "PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAKCAQEA\\n-----END RSA PRIVATE KEY-----"
     monkeypatch.setattr(ops, "_spawn", _stub_spawn(stdout=private_key, stderr=private_key))
 
     result = ops.run_host_command("git", "status", [])
