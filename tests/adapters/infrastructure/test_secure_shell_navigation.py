@@ -269,7 +269,7 @@ def test_git_rejects_repository_config_that_can_execute_commands(tmp_path):
     git_dir = repo / ".git"
     git_dir.mkdir(parents=True)
     (git_dir / "config").write_text(
-        "[core]\\n\\tfsmonitor = !touch /tmp/jarvis-should-not-run\\n",
+        "[core]\n\tfsmonitor = !touch /tmp/jarvis-should-not-run\n",
         encoding="utf-8",
     )
     navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
