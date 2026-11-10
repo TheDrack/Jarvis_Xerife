@@ -23,6 +23,7 @@ from mcp.server.fastmcp import FastMCP, Image
 from mcp.types import TextContent
 
 from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
+from app.adapters.infrastructure.secure_shell_navigation import shell_navigate as execute_shell_navigation
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
 from app.core.nexus import nexus
@@ -606,6 +607,22 @@ def run_shell_command(command: str, timeout_seconds: int = 15) -> dict[str, Any]
         return execute(command, timeout_seconds=timeout_seconds)
     except ValueError as exc:
         return {"success": False, "status": "command_rejected", "error": str(exc)}
+
+
+@mcp.tool()
+@tracked_action("Navegando pelo Shell seguro")
+def shell_navigate(command: str, timeout_seconds: int = 10) -> dict[str, Any]:
+    """Navigate allowed host directories and inspect bounded text/Git state through the tunnel.
+
+    Supports pwd, cd, ls/dir, cat/type for approved non-sensitive text files,
+    and a small read-only Git command allowlist. This is not arbitrary shell
+    execution: pipelines, operators, writes, process launches and mutations
+    are rejected. Filesystem access is restricted to configured allowed roots.
+    """
+    try:
+        return execute_shell_navigation(command, timeout_seconds=timeout_seconds)
+    except ValueError as exc:
+        return {"success": False, "status": "command_rejected", "output": "", "error": str(exc)}
 
 
 # Android navigation tools are registered additively on the same MCP server.
