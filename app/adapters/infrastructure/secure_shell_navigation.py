@@ -372,8 +372,15 @@ class ShellNavigator:
                     raw = target.read_bytes()
                     if b"\x00" in raw:
                         return self._failure("binary_file_blocked", "binary files cannot be read through this tool")
-                    if _SECRET_CONTENT.search(raw):
-                        return self._failure("sensitive_file_blocked", "file content looks like a stored credential")
+                    # Structured credential stores and private-key material are refused.
+                    # Ordinary text containing credential assignments is safe to inspect
+                    # only after _redact_text removes the values from the returned output.
+                    non_redactable_secret = re.compile(
+                        rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|"
+                        rb"client[-_]?key[-_]?data|certificate[-_]?authority[-_]?data|AGE-SECRET-KEY-)"
+                    )
+                    if non_redactable_secret.search(raw):
+                        return self._failure("sensitive_file_blocked", "file content contains key material or a credential store")
                     try:
                         output = raw.decode("utf-8")
                     except UnicodeDecodeError:
