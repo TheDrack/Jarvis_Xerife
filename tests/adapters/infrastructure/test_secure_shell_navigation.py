@@ -166,7 +166,7 @@ def test_git_log_supports_a_bounded_commit_count(tmp_path):
         result = navigator.execute("git log --oneline -n 5")
 
     assert result["success"] is True
-    assert run.call_args.args[0][-5:] == ["log", "--oneline", "-n", "5"]
+    assert run.call_args.args[0][-4:] == ["log", "--oneline", "-n", "5"]
 
 
 def test_git_remote_output_redacts_embedded_credentials(tmp_path):
