@@ -264,6 +264,7 @@ class ShellNavigator:
             "success": False,
             "status": status,
             "message": message,
+            "content": "",
             "output": "",
             "cwd": str(self.cwd),
             "read_only": True,
@@ -356,6 +357,7 @@ class ShellNavigator:
             return self._failure("secret_content_blocked", "file contains credential-shaped material")
 
         content = data.decode("utf-8", errors="replace")
+        content = content.replace("\r\n", "\n").replace("\r", "\n")
         if len(content) > MAX_OUTPUT_CHARS:
             content = content[:MAX_OUTPUT_CHARS]
             final_newline = content.rfind("\n")
