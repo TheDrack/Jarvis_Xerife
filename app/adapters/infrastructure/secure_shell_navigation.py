@@ -36,16 +36,21 @@ _TEXT_SUFFIXES = {
     ".service", ".socket", ".timer", ".log", ".sql", ".xml",
     ".html", ".css", ".js", ".ts", ".tsx", ".jsx", ".gitignore",
 }
+
+
 _SPECIAL_TEXT_NAMES = {"readme", "license", "dockerfile", "makefile", "procfile"}
-\n\ndef _redact_text(value: str) -> str:
+
+
+def _redact_text(value: str) -> str:
     """Redact common credential forms before returning file or Git output."""
-    value = re.sub(r"(?i)(Bearer\\s+)[A-Za-z0-9._~+/-]+=*", r"\\1[REDACTED]", value)
-    value = re.sub(r"(?i)\\bsk-[A-Za-z0-9_-]{16,}", "[REDACTED_API_KEY]", value)
+    value = re.sub(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]+=*", r"\1[REDACTED]", value)
+    value = re.sub(r"(?i)\bsk-[A-Za-z0-9_-]{16,}", "[REDACTED_API_KEY]", value)
     return re.sub(
-        r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)["']?\\s*[:=]\\s*["']?)[^"'\\s,}]+""",
-        r"\\1[REDACTED]",
+        r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)["']?\s*[:=]\s*["']?)[^"'\s,}]+""",
+        r"\1[REDACTED]",
         value,
     )
+
 
 _GIT_SIMPLE_ARGS = {
     ("status",): ["status"],
