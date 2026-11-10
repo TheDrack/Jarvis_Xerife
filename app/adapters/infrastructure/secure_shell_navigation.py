@@ -59,6 +59,12 @@ _SENSITIVE_PATH_PREFIXES = (
     ("appdata", "roaming", "github cli"),
     ("appdata", "roaming", "microsoft", "credentials"),
     ("appdata", "local", "microsoft", "credentials"),
+    (".config", "filezilla"),
+    (".terraform.d",),
+    (".local", "share", "powershell"),
+    ("appdata", "roaming", "filezilla"),
+    ("appdata", "roaming", "microsoft", "windows", "powershell"),
+    ("appdata", "local", "microsoft", "windows", "powershell"),
 )
 
 
@@ -92,36 +98,61 @@ def _git_repository_within(root: Path, cwd: Path) -> tuple[Path, Path]:
     raise PermissionError("no Git repository exists inside the allowed root")
 
 
-def _assert_trusted_git_config(git_dir: Path) -> None:
-    """Reject repository config capable of including files or launching helpers."""
-    config = git_dir / "config"
-    if not config.exists():
-        return
-    if config.is_symlink() or config.stat().st_size > 128 * 1024:
-        raise ValueError("repository Git config is not safe to inspect")
-    raw = config.read_text(encoding="utf-8", errors="strict")
+def _repository_config_files(git_dir: Path) -> list[Path]:
+    """Return every repository config file Git may consult."""
+    files = [git_dir / "config"]
+    worktree_config = git_dir / "config.worktree"
+    if worktree_config.exists() or worktree_config.is_symlink():
+        files.append(worktree_config)
+    return files
+
+
+_EXECUTABLE_GIT_KEYS = {
+    "core": frozenset({"fsmonitor", "hookspath", "sshcommand", "askpass", "pager", "worktree", "attributesfile"}),
+    "diff": frozenset({"external", "textconv", "command"}),
+    "filter": frozenset({"clean", "smudge", "process"}),
+    "credential": frozenset({"helper"}),
+    "gpg": frozenset({"program"}),
+    "merge": frozenset({"driver"}),
+    "submodule": frozenset({"update"}),
+}
+
+
+def _parse_git_config(raw: str) -> list[tuple[str, str]]:
+    """Conservatively parse section headers and keys, including same-line entries."""
+    entries: list[tuple[str, str]] = []
     section = ""
-    for line in raw.splitlines():
+    for line in raw.lstrip("\ufeff").splitlines():
         value = line.strip()
+        while value.startswith("["):
+            close = value.find("]")
+            if close < 0:
+                raise ValueError("repository Git config is not parseable")
+            header = value[1:close].strip()
+            section = header.split(None, 1)[0].strip('"').casefold()
+            value = value[close + 1:].strip()
         if not value or value.startswith(("#", ";")):
             continue
-        if value.startswith("[") and "]" in value:
-            section = value[1:value.index("]")].split(None, 1)[0].strip('"').casefold()
+        key = value.split("=", 1)[0].strip().strip('"').casefold()
+        if not key or not key.replace("-", "").isalnum():
+            raise ValueError("repository Git config is not parseable")
+        entries.append((section, key))
+    return entries
+
+
+def _assert_trusted_git_config(git_dir: Path) -> None:
+    """Reject config capable of including files or launching executable helpers."""
+    for config in _repository_config_files(git_dir):
+        if not config.exists():
+            continue
+        if config.is_symlink() or config.stat().st_size > 128 * 1024:
+            raise ValueError("repository Git config is not safe to inspect")
+        raw = config.read_text(encoding="utf-8", errors="strict")
+        for section, key in _parse_git_config(raw):
             if section == "include" or section.startswith("includeif"):
                 raise ValueError("repository Git config includes external configuration")
-            continue
-        key = value.split("=", 1)[0].strip().casefold()
-        blocked = (
-            (section == "core" and key in {"fsmonitor", "hookspath", "sshcommand", "askpass", "pager", "worktree"}),
-            (section.startswith("diff") and key in {"external", "textconv"}),
-            (section.startswith("filter") and key in {"clean", "smudge", "process"}),
-            (section == "credential" and key == "helper"),
-            (section.startswith("gpg") and key == "program"),
-            (section.startswith("merge") and key == "driver"),
-        )
-        if any(blocked):
-            raise ValueError("repository Git config contains an executable helper setting")
-
+            if key in _EXECUTABLE_GIT_KEYS.get(section, frozenset()):
+                raise ValueError("repository Git config contains an executable helper setting")
 
 _SECRET_CONTENT = re.compile(
     rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|oauth[_-]?token|access[_-]?token|refresh[_-]?token|id[_-]?token|session[_-]?token|client[-_]?secret|private[_-]?key|password\s*[:=]|client[-_]?key[-_]?data|"
