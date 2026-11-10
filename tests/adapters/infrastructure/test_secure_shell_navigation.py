@@ -300,9 +300,9 @@ def test_shell_navigation_tool_registers_and_uses_injected_navigator(tmp_path, m
 
 
 def test_parser_preserves_backslashes_in_quoted_windows_paths():
-    assert ShellNavigator._tokens('cat "C:\\Users\\Example\notes.txt"') == [
+    assert ShellNavigator._tokens(r'cat "C:\Users\Example\notes.txt"') == [
         "cat",
-        "C:\\Users\\Example\notes.txt",
+        r"C:\Users\Example\notes.txt",
     ]
 
 
