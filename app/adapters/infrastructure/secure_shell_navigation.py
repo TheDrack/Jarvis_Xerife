@@ -427,7 +427,7 @@ class ShellNavigator:
                         rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|"
                         rb"-----BEGIN PGP PRIVATE KEY BLOCK-----|\"auths\"\s*:|"
                         rb"client[-_]?key[-_]?data|certificate[-_]?authority[-_]?data|AGE-SECRET-KEY-|"
-                        rb"(?:^|[\r\n;])\s*[A-Za-z_][A-Za-z0-9_]*(?:PASS(?:WORD)?|SECRET|TOKEN|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY)[A-Za-z0-9_]*\s*=\s*[^\s\r\n]{4,})"
+                        rb"(?:^|[\r\n;])\s*(?:Environment\s*=\s*)?[A-Za-z_][A-Za-z0-9_]*(?:PASS(?:WORD)?|SECRET|TOKEN|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY)[A-Za-z0-9_]*\s*=\s*[^\s\r\n]{4,})"
                     )
                     if non_redactable_secret.search(raw):
                         return self._failure("sensitive_file_blocked", "file content contains key material or a credential store")
