@@ -266,10 +266,10 @@ _SENSITIVE_OUTPUT_NAME = re.compile(
 )
 
 _SECRET_CONTENT = re.compile(
-    rb"""(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|"auths"\s*:|_authToken|npmAuthToken|oauth_token|AGE-SECRET-KEY-|"
+    rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|_authToken|npmAuthToken|oauth_token|AGE-SECRET-KEY-|"
     rb"gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{16,}|"
     rb"xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,}|"
-    rb"<\s*(?:password|token|secret|api[_-]?key)\b[^>]*>\s*[^<]{4,}</\s*(?:password|token|secret|api[_-]?key)\s*>)"""
+    rb"<\s*(?:password|token|secret|api[_-]?key)\b[^>]*>\s*[^<]{4,}</\s*(?:password|token|secret|api[_-]?key)\s*>)"
 )
 
 _PRIVATE_KEY_BLOCK = re.compile(
