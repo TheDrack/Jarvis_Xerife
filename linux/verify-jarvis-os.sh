@@ -86,6 +86,8 @@ if [ -f "$ENV_FILE" ]; then
     if [ "$perms" = "600" ]; then pass "ambiente 0600: $ENV_FILE"; else fail "permissões $perms em $ENV_FILE (esperado 600)"; fi
     for key in JARVIS_DEVICES_DB JARVIS_GEOINT_DB JARVIS_GRAPH_DB; do
         value="$(sed -n "s/^$key=//p" "$ENV_FILE" | head -n 1)"
+        value="${value#\"}"
+        value="${value%\"}"
         case "$value" in
             /*) pass "$key usa caminho absoluto" ;;
             *) fail "$key não usa caminho absoluto" ;;
