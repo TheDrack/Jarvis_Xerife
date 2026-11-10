@@ -1,0 +1,28 @@
+# Jarvis — dependências de runtime para Linux (X11/Wayland via XWayland).
+#
+# Espelha requirements/edge.txt, exceto pywinauto: é Windows-only e falha no
+# import em Linux. Não adicione pacotes novos aqui sem declará-los no
+# CHANGELOG e cobri-los por verificação.
+
+-r ../requirements/core.txt
+
+# Voz
+pyttsx3>=2.90
+SpeechRecognition>=3.10.0
+
+# Automação local (requer sessão gráfica; sem ela o harness continua útil)
+PyAutoGUI>=0.9.54
+opencv-python>=4.8.0
+Pillow>=10.0.0
+pynput>=1.7.6
+pyperclip>=1.8.2
+
+# MCP e navegador
+mcp>=1.30,<2
+playwright>=1.50,<2
+
+# Integrações opcionais
+google-genai
+paho-mqtt>=2.0,<3
+pandas>=2.0.0
+openpyxl>=3.1.0
