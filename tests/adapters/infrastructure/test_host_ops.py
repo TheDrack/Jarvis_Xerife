@@ -758,10 +758,10 @@ def test_junction_detection_uses_windows_reparse_attribute(monkeypatch):
     fake_ctypes = SimpleNamespace(
         windll=SimpleNamespace(
             kernel32=SimpleNamespace(GetFileAttributesW=lambda _path: 0x400)
-        )
+        ),
+        c_wchar_p=lambda value: value,
     )
     monkeypatch.setitem(sys.modules, "ctypes", fake_ctypes)
-    monkeypatch.setattr(ops.os, "name", "nt")
     entry = SimpleNamespace(path="C:/safe/junction", is_symlink=lambda: False)
 
     assert ops._is_junction(entry) is True
