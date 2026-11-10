@@ -204,6 +204,9 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
     """
     if not isinstance(raw, str):
         raise PathNotAllowed("path must be a string")
+    # Inspect the original string before strip(): Windows silently aliases
+    # trailing-dot/space path components, so normalization must not erase evidence.
+    _reject_windows_path_aliases(raw)
     text = raw.strip()
     if not text or len(text) > MAX_PATH_CHARS:
         raise PathNotAllowed(f"path must contain 1 to {MAX_PATH_CHARS} characters")
@@ -212,7 +215,6 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
     if text.startswith("~"):
         raise PathNotAllowed("home-relative paths are not accepted; use an absolute allowed root")
     _reject_network_path(text)
-    _reject_windows_path_aliases(text)
     # A Windows drive-absolute path must never be reinterpreted as a relative
     # POSIX path (for example, C:/Windows under the repository root).
     if os.name != "nt" and re.match(r"^[A-Za-z]:[\\/]", text):
