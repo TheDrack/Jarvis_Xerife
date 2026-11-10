@@ -176,6 +176,10 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
     if text.startswith("~"):
         raise PathNotAllowed("home-relative paths are not accepted; use an absolute allowed root")
     _reject_network_path(text)
+    # A Windows drive-absolute path must never be reinterpreted as a relative
+    # POSIX path (for example, C:/Windows under the repository root).
+    if os.name != "nt" and re.match(r"^[A-Za-z]:[\\/]", text):
+        raise PathNotAllowed("Windows drive paths are not valid on this host")
     if ":" in text and not re.match(r"^[A-Za-z]:[\\/]", text):
         raise PathNotAllowed("provider-qualified and drive-relative paths are not accepted")
     if re.split(r"[\\/]+", text).count("..") or ".." in re.split(r"[\\/]+", text):
