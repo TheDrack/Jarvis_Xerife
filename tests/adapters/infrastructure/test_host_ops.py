@@ -1020,7 +1020,7 @@ def test_spawn_caps_child_output_and_discards_partial_secret_line(_sandbox):
 
     completed = ops._spawn(command, _sandbox, ops._sanitized_environment(), 10)
 
-    assert completed.stdout == "safe\n"
+    assert completed.stdout.replace("\r\n", "\n") == "safe\n"
     assert "PASSWORD=" not in completed.stdout
     assert len(completed.stdout.encode("utf-8")) <= ops.MAX_STDOUT_CHARS * 4
     assert len(completed.stderr.encode("utf-8")) <= ops.MAX_STDERR_CHARS * 4
