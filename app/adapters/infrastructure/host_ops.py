@@ -54,6 +54,7 @@ MAX_STDOUT_CHARS = 16_000
 MAX_STDERR_CHARS = 4_000
 MIN_TIMEOUT_SECONDS = 1
 MAX_TIMEOUT_SECONDS = 60
+_AUDIT_SECRET = secrets.token_bytes(32)
 
 PROFILES = ("powershell_readonly", "git", "inspect_d")
 
@@ -823,7 +824,7 @@ def _audit_argument_digest(arguments: Sequence[Any]) -> str:
         )
     except (TypeError, ValueError):
         payload = f"<{type(arguments).__name__}>"
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    return hmac.new(_AUDIT_SECRET, payload.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
 
 
 def _request_digest(profile: str, verb: str, arguments: Sequence[str], cwd: Path) -> str:
@@ -1014,8 +1015,7 @@ def run_host_command(
                     "verb": verb,
                     "argument_count": len(arguments),
                     "argument_digest": _audit_argument_digest(arguments),
-                    "digest": digest[:16],
-                    "elevated": False,
+                        "elevated": False,
                 }
             )
             return {
