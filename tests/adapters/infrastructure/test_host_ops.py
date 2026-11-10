@@ -912,7 +912,7 @@ def test_allowed_root_with_trailing_backslash_is_not_treated_as_root(_sandbox):
 
 
 def test_redact_consumes_complete_quoted_multiline_safe_value():
-    value = 'password: "correct horse battery staple"\\nordinary: visible'
+    value = 'password: "correct horse battery staple"\nordinary: visible'
     redacted, count = ops.redact(value)
 
     assert count == 1
@@ -922,7 +922,7 @@ def test_redact_consumes_complete_quoted_multiline_safe_value():
 
 
 def test_redact_does_not_consume_following_line_when_value_is_unquoted():
-    value = "password: first-line-secret\\nordinary: visible"
+    value = "password: first-line-secret\nordinary: visible"
     redacted, count = ops.redact(value)
 
     assert count == 1
