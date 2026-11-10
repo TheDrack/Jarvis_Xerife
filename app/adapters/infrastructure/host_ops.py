@@ -251,6 +251,20 @@ _SECRET_PATH_PREFIXES = (
     (".gem", "credentials"),
 )
 
+_SENSITIVE_OUTPUT_NAME = re.compile(
+    r"(?i)(?<![A-Z0-9_.-])(?:"
+    r"\.env(?:\.[A-Z0-9_-]+)?|\.envrc|\.aws|\.azure|\.ssh|\.gnupg|\.kube|\.docker|"
+    r"\.password-store|\.terraform|\.vault|\.git-credentials|\.npmrc|\.pypirc|\.netrc|_netrc|"
+    r"\.pgpass(?:\.[A-Z0-9_-]+)?|\.htpasswd|\.boto|\.s3cfg|\.my\.cnf|\.m2|"
+    r"gh|glab-cli|github-copilot|composer|age|ngrok|gcloud|rclone|hub|podman|"
+    r"containers|keyrings|globalstorage|github cli|"
+    r"kubeconfig(?:[._-][A-Z0-9_-]+)*|credentials?(?:[._-][A-Z0-9_-]+)*|"
+    r"secrets?(?:[._-][A-Z0-9_-]+)*|tokens?(?:[._-][A-Z0-9_-]+)*|"
+    r"id_(?:rsa|dsa|ecdsa|ed25519)(?:\.[A-Z0-9_-]+)?|"
+    r"client_secret(?:\.[A-Z0-9_-]+)*|application_default_credentials(?:\.[A-Z0-9_-]+)*"
+    r")(?![A-Z0-9_.-])"
+)
+
 _SECRET_CONTENT = re.compile(
     rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|_authToken|npmAuthToken|oauth_token|"
     rb"client[-_]?key[-_]?data|certificate[-_]?authority[-_]?data|account[-_]?key|"
@@ -1065,15 +1079,39 @@ def _spawn(
     )
 
 
+def _names_credential_entry(token: str) -> bool:
+    """Return True when a command-output token names a credential store."""
+    cleaned = token.strip("\"'()[]{}<>,;:")
+    if not cleaned:
+        return False
+    parts = [part for part in re.split(r"[\\/]+", cleaned) if part]
+    if any(part.casefold() in _SECRET_DIRECTORIES for part in parts):
+        return True
+    return bool(parts and _SECRET_FILE_NAME.match(parts[-1]))
+
+
+def _drop_credential_lines(value: str) -> str:
+    """Remove output rows that disclose credential-store names or metadata."""
+    kept: list[str] = []
+    for line in value.splitlines():
+        tokens = line.split()
+        if any(_names_credential_entry(token) for token in tokens):
+            continue
+        if _SENSITIVE_OUTPUT_NAME.search(line):
+            continue
+        kept.append(line)
+    return "\n".join(kept)
+
+
 def _bound(value: str | None, limit: int) -> tuple[str, bool]:
     raw = value or ""
     if _PRIVATE_KEY_BLOCK.search(raw):
         return "[WITHHELD: output contained a private key block]", True
     redacted, _ = redact(raw)
-    redacted = _SENSITIVE_OUTPUT_NAME.sub("[REDACTED_NAME]", redacted)
     if _PRIVATE_KEY_BLOCK.search(redacted):
         return "[WITHHELD: output contained a private key block]", True
-    return redacted[:limit], len(redacted) > limit
+    filtered = _drop_credential_lines(redacted)
+    return filtered[:limit], len(filtered) > limit
 
 
 def run_host_command(
