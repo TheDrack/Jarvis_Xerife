@@ -804,10 +804,10 @@ def _audit(record: Mapping[str, Any]) -> tuple[str, bool]:
         path = _audit_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         descriptor = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o600)
-        if os.name != "nt":
-            os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
+            if os.name != "nt":
+                os.chmod(path, 0o600)
+            handle.write(json.dumps(payload, ensure_ascii=False, default=str) + "\\n")
         return audit_id, True
     except OSError as exc:  # pragma: no cover - filesystem failure
         logger.warning("Host ops audit write failed: %s", type(exc).__name__)
