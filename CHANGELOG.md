@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Jarvis OS — hardening do MCP Linux (2026-11-10)
+
+- `jarvis_linux_mcp`: entrypoint ASGI com autenticação bearer obrigatória, token aleatório gerado pelo provisionador e validação em tempo constante; o serviço continua restrito a loopback e mantém as proteções Host/Origin.
+- O provisionador aplica `umask 077` antes de criar o diretório/arquivo de ambiente, usa diretório 0700, arquivo 0600 e remove cópias temporárias mesmo em falha/interrupção.
+- Os caminhos de bancos são normalizados para diretório de dados do usuário sem sobrescrever chaves/configurações já existentes; o verificador testa bind da API e resposta 401 do MCP sem token.
+- `mcp>=1.30,<2` garante a API ASGI `FastMCP.streamable_http_app()` usada pelo wrapper autenticado.
+
 #### Jarvis OS — kit de provisionamento Linux (2026-11-09)
 
 - `linux/`: inventário verificado desta máquina (dois discos, dois Windows),
