@@ -665,6 +665,9 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
     environment["POWERSHELL_TELEMETRY_OPTOUT"] = "1"
     environment["GIT_PAGER"] = "cat"
     environment["GIT_TERMINAL_PROMPT"] = "0"
+    environment["GIT_CONFIG_NOSYSTEM"] = "1"
+    environment["GIT_CONFIG_GLOBAL"] = os.devnull
+    environment["GIT_OPTIONAL_LOCKS"] = "0"
     environment["PYTHONUNBUFFERED"] = "1"
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     if extra:
@@ -723,7 +726,14 @@ def compile_command(
         metadata_flags = {flag for flag, _value in parsed if flag} & {"--stat", "--name-only"}
         if verb in {"show", "diff"} and not metadata_flags:
             raise ValueError("git show/diff must use metadata-only --stat or --name-only output")
-        argv = ("git", "--no-pager", verb, *[token for pair in parsed for token in pair if token])
+        argv = (
+            "git",
+            "-c", "core.fsmonitor=false",
+            "-c", "core.untrackedCache=false",
+            "--no-pager",
+            verb,
+            *[token for pair in parsed for token in pair if token],
+        )
         return CompiledCommand(profile, verb, argv, workdir, timeout_seconds, joined)
 
     if profile == "pytest":
