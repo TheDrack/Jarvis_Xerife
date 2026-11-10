@@ -76,7 +76,7 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
     ) -> dict[str, Any]:
         """Run one structured, allowlisted, non-elevated command (shell=False).
 
-        profile is powershell_readonly, git, pytest or inspect_d. arguments is a
+        profile is powershell_readonly, git or inspect_d. arguments is a
         list of separate argv tokens, never a command string. Destructive,
         installation, boot, ACL, credential and privileged operations are
         blocked by policy regardless of confirmation.
