@@ -18,7 +18,7 @@ pynput>=1.7.6
 pyperclip>=1.8.2
 
 # MCP e navegador
-mcp>=1.26,<2
+mcp>=1.30,<2
 playwright>=1.50,<2
 
 # Integrações opcionais
