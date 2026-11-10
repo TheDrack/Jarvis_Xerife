@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import shlex
+import stat
 import subprocess
 import threading
 import time
@@ -37,6 +38,81 @@ _SENSITIVE_PART = re.compile(
     r".*\.(?:pem|p12|pfx|key|jks|keystore|ppk|p8)"
     r")$"
 )
+_SENSITIVE_PATH_PREFIXES = (
+    (".config", "gcloud"),
+    (".config", "gh"),
+    (".config", "containers"),
+    (".config", "rclone"),
+    (".local", "share", "keyrings"),
+    ("appdata", "roaming", "code", "user", "globalstorage"),
+    ("appdata", "local", "github cli"),
+    ("appdata", "roaming", "github cli"),
+    ("appdata", "roaming", "microsoft", "credentials"),
+    ("appdata", "local", "microsoft", "credentials"),
+)
+
+
+def _is_sensitive_path(path: Path) -> bool:
+    parts = tuple(part.casefold() for part in path.parts)
+    if any(_SENSITIVE_PART.fullmatch(part) for part in parts):
+        return True
+    for prefix in _SENSITIVE_PATH_PREFIXES:
+        width = len(prefix)
+        if any(parts[index:index + width] == prefix for index in range(len(parts) - width + 1)):
+            return True
+    return False
+
+
+def _git_repository_within(root: Path, cwd: Path) -> tuple[Path, Path]:
+    """Find a normal repository without allowing Git's upward discovery past root."""
+    current = cwd
+    while True:
+        marker = current / ".git"
+        if marker.is_file():
+            raise PermissionError("Git worktrees and external gitdir pointers are not permitted")
+        if marker.is_symlink():
+            raise PermissionError("Git metadata symlinks are not permitted")
+        if marker.is_dir():
+            if (marker / "commondir").exists() or (marker / "objects" / "info" / "alternates").exists():
+                raise PermissionError("shared Git metadata outside the repository root is not permitted")
+            return current, marker
+        if current == root:
+            break
+        current = current.parent
+    raise PermissionError("no Git repository exists inside the allowed root")
+
+
+def _assert_trusted_git_config(git_dir: Path) -> None:
+    """Reject repository config capable of including files or launching helpers."""
+    config = git_dir / "config"
+    if not config.exists():
+        return
+    if config.is_symlink() or config.stat().st_size > 128 * 1024:
+        raise ValueError("repository Git config is not safe to inspect")
+    raw = config.read_text(encoding="utf-8", errors="strict")
+    section = ""
+    for line in raw.splitlines():
+        value = line.strip()
+        if not value or value.startswith(("#", ";")):
+            continue
+        if value.startswith("[") and "]" in value:
+            section = value[1:value.index("]")].split(None, 1)[0].strip('"').casefold()
+            if section == "include" or section.startswith("includeif"):
+                raise ValueError("repository Git config includes external configuration")
+            continue
+        key = value.split("=", 1)[0].strip().casefold()
+        blocked = (
+            (section == "core" and key in {"fsmonitor", "hookspath", "sshcommand", "askpass", "pager", "worktree"}),
+            (section.startswith("diff") and key in {"external", "textconv"}),
+            (section.startswith("filter.") and key in {"clean", "smudge", "process"}),
+            (section == "credential" and key == "helper"),
+            (section.startswith("gpg") and key == "program"),
+            (section.startswith("merge.") and key == "driver"),
+        )
+        if any(blocked):
+            raise ValueError("repository Git config contains an executable helper setting")
+
+
 _TEXT_SUFFIXES = {
     ".txt", ".md", ".rst", ".py", ".ps1", ".sh", ".bat", ".cmd",
     ".json", ".toml", ".yaml", ".yml", ".ini", ".cfg", ".conf",
@@ -145,9 +221,25 @@ class ShellNavigator:
         ]
 
     def _resolve(self, raw_path: str | None, *, must_exist: bool = True) -> Path:
+        raw = "" if raw_path is None else str(raw_path)
+        normalized = raw.replace("/", "\\\\")
+        if normalized.startswith("\\\\\\\\") or normalized.startswith("\\\\?\\\\") or normalized.startswith("\\\\.\\\\"):
+            raise PermissionError("UNC and device paths are not permitted")
+
         candidate = self.cwd if not raw_path else Path(raw_path).expanduser()
         if not candidate.is_absolute():
             candidate = self.cwd / candidate
+        candidate = Path(os.path.abspath(candidate))
+        current = Path(candidate.anchor)
+        reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        for part in candidate.parts[1:]:
+            current = current / part
+            try:
+                metadata = current.lstat()
+            except FileNotFoundError:
+                continue
+            if stat.S_ISLNK(metadata.st_mode) or getattr(metadata, "st_file_attributes", 0) & reparse_point:
+                raise PermissionError("symlink and reparse-point paths are not permitted")
         resolved = candidate.resolve(strict=must_exist)
         if not self._is_allowed(resolved):
             raise PermissionError("path is outside allowed roots")
@@ -197,10 +289,18 @@ class ShellNavigator:
 
                 if verb in {"ls", "dir"} and len(args) <= 1:
                     target = self._resolve(args[0] if args else None)
+                    if _is_sensitive_path(target):
+                        return self._failure("sensitive_file_blocked", "listing sensitive credential paths is blocked")
                     if not target.is_dir():
                         return self._failure("not_a_directory", "target is not a directory")
                     entries = []
-                    for entry in sorted(target.iterdir(), key=lambda item: item.name.casefold())[: self.max_entries]:
+                    truncated = False
+                    for entry in target.iterdir():
+                        if _is_sensitive_path(entry):
+                            continue
+                        if len(entries) >= self.max_entries:
+                            truncated = True
+                            break
                         try:
                             info = entry.lstat()
                             kind = "symlink" if entry.is_symlink() else ("directory" if entry.is_dir() else "file")
@@ -212,19 +312,17 @@ class ShellNavigator:
                             })
                         except OSError:
                             continue
-                    total = sum(1 for _ in target.iterdir())
                     return self._result(
                         json.dumps(entries, ensure_ascii=False),
-                        truncated=total > len(entries),
+                        truncated=truncated,
                         entries=len(entries),
-                        total_entries=total,
                     )
 
                 if verb in {"cat", "type"} and len(args) == 1:
                     target = self._resolve(args[0])
                     if not target.is_file():
                         return self._failure("not_a_file", "target is not a regular file")
-                    if any(_SENSITIVE_PART.search(part) for part in target.parts):
+                    if _is_sensitive_path(target):
                         return self._failure("sensitive_file_blocked", "reading sensitive file names is blocked")
                     if target.suffix.casefold() not in _TEXT_SUFFIXES and target.name.casefold() not in _SPECIAL_TEXT_NAMES:
                         return self._failure("file_type_blocked", "file extension is not approved for text reading")
@@ -242,7 +340,30 @@ class ShellNavigator:
 
                 if verb == "git":
                     argv = self._git_argv(args)
-                    argv = ["git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", *argv[1:]]
+                    boundaries = [root for root in self.allowed_roots if self._is_allowed(self._cwd) and self._cwd.is_relative_to(root)]
+                    if not boundaries:
+                        return self._failure("git_repository_outside_allowed_roots", "working directory has no allowed root")
+                    boundary = max(boundaries, key=lambda root: len(root.parts))
+                    try:
+                        _repo_root, git_dir = _git_repository_within(boundary, self._cwd)
+                    except PermissionError as exc:
+                        return self._failure("git_repository_outside_allowed_roots", str(exc))
+                    try:
+                        _assert_trusted_git_config(git_dir)
+                    except (OSError, UnicodeError, ValueError) as exc:
+                        return self._failure("git_config_rejected", str(exc) or "repository Git config is not trusted")
+
+                    safe_options = [
+                        "-c", "core.fsmonitor=false",
+                        "-c", "core.untrackedCache=false",
+                        "-c", "core.pager=cat",
+                        "-c", "log.showSignature=false",
+                        "--no-pager",
+                    ]
+                    argv = ["git", *safe_options, *argv[1:]]
+                    if args[0] in {"diff", "show"}:
+                        subcommand_index = len(safe_options) + 1
+                        argv[subcommand_index + 1:subcommand_index + 1] = ["--no-ext-diff", "--no-textconv"]
                     started = time.monotonic()
                     completed = subprocess.run(
                         argv,
@@ -256,6 +377,9 @@ class ShellNavigator:
                             "GIT_CONFIG_GLOBAL": os.devnull,
                             "GIT_OPTIONAL_LOCKS": "0",
                             "GIT_TERMINAL_PROMPT": "0",
+                            "GIT_PAGER": "cat",
+                            "PAGER": "cat",
+                            "GIT_CEILING_DIRECTORIES": str(boundary),
                         },
                         capture_output=True,
                         text=True,
@@ -267,10 +391,10 @@ class ShellNavigator:
                     )
                     raw_output = completed.stdout or ""
                     if args[:2] == ["remote", "-v"]:
-                        raw_output = re.sub(r"(https?://)[^/@\s]+:[^/@\s]+@", r"\1[REDACTED]@", raw_output)
-                        raw_output = re.sub(r"(?i)(token|key|password)=([^&\s]+)", r"\1=[REDACTED]", raw_output)
+                        raw_output = re.sub(r"(?i)(https?://)[^/@\\s]+@", r"\\1[REDACTED]@", raw_output)
+                        raw_output = re.sub(r"(?i)(token|key|password)=([^&\\s]+)", r"\\1=[REDACTED]", raw_output)
                     output = _redact_text(raw_output)[:MAX_OUTPUT_CHARS]
-                    error = (completed.stderr or "")[:4_000]
+                    error = _redact_text(completed.stderr or "")[:4_000]
                     return {
                         "success": completed.returncode == 0,
                         "status": "completed" if completed.returncode == 0 else "command_failed",
