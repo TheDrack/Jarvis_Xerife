@@ -339,7 +339,7 @@ _CREDENTIAL_KEY_MARKERS = (
 # The key token is scanned linearly; the callback checks marker membership.
 # This avoids nested, overlapping quantifiers and length-based redaction bypasses.
 _CREDENTIAL_ASSIGNMENT = re.compile(
-    r"""(?i)(?<![A-Z0-9_-])(?P<prefix>(?P<quote>[\"']?)(?P<key>[A-Z0-9_-]+)(?P=quote)[ \\t]*[:=][ \\t]*)(?P<value>\"[^\"\\n]*(?:\"|(?=\\n|$))|'[^'\\n]*(?:'|(?=\\n|$))|[^\"'\\s,;}]+)"""
+    r"""(?i)(?<![A-Z0-9_-])(?P<prefix>(?P<quote>[\"']?)(?P<key>[A-Z0-9_-]+)(?P=quote)[ \t]*[:=][ \t]*)(?P<value>\"[^\"\n]*(?:\"|(?=\n|$))|'[^'\n]*(?:'|(?=\n|$))|[^\"'\s,;}]+)"""
 )
 
 
@@ -363,22 +363,22 @@ def _redact_credential_assignments(value: str) -> tuple[str, int]:
 
 
 _REDACTION_RULES: tuple[tuple[re.Pattern[str], Any], ...] = (
-    (re.compile(r"(?i)(Bearer\\s+)[A-Za-z0-9._~+/-]{8,}=*"), r"\\1[REDACTED]"),
-    (re.compile(r"\\bsk-[A-Za-z0-9_-]{16,}"), "[REDACTED_API_KEY]"),
-    (re.compile(r"\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"), "[REDACTED_TOKEN]"),
-    (re.compile(r"\\bxox[baprs]-[A-Za-z0-9-]{10,}"), "[REDACTED_TOKEN]"),
-    (re.compile(r"\\bglpat-[A-Za-z0-9_-]{16,}|\\bnpm_[A-Za-z0-9]{16,}"), "[REDACTED_TOKEN]"),
-    (re.compile(r"\\bAIza[0-9A-Za-z_-]{30,}"), "[REDACTED_API_KEY]"),
-    (re.compile(r"\\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\\b"), "[REDACTED_AWS_KEY_ID]"),
+    (re.compile(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]{8,}=*"), r"\1[REDACTED]"),
+    (re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"), "[REDACTED_API_KEY]"),
+    (re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"), "[REDACTED_TOKEN]"),
+    (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"), "[REDACTED_TOKEN]"),
+    (re.compile(r"\bglpat-[A-Za-z0-9_-]{16,}|\bnpm_[A-Za-z0-9]{16,}"), "[REDACTED_TOKEN]"),
+    (re.compile(r"\bAIza[0-9A-Za-z_-]{30,}"), "[REDACTED_API_KEY]"),
+    (re.compile(r"\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\b"), "[REDACTED_AWS_KEY_ID]"),
     (
         re.compile(
-            r"""(?i)((?:client[_-]?key[_-]?data|certificate[_-]?authority[_-]?data|account[_-]?key)[\"']?\\s*[:=]\\s*[\"']?)([^\"'\\s,;}]{8,})"""
+            r"""(?i)((?:client[_-]?key[_-]?data|certificate[_-]?authority[_-]?data|account[_-]?key)[\"']?\s*[:=]\s*[\"']?)([^\"'\s,;}]{8,})"""
         ),
-        r"\\1[REDACTED]",
+        r"\1[REDACTED]",
     ),
     (
-        re.compile(r"""([a-z][a-z0-9+.-]*://[^/\\s:@\"']*:)([^@\\s/\"']+)@"""),
-        r"\\1[REDACTED]@",
+        re.compile(r"""([a-z][a-z0-9+.-]*://[^/\s:@\"']*:)([^@\s/\"']+)@"""),
+        r"\1[REDACTED]@",
     ),
 )
 
