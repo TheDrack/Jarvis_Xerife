@@ -33,7 +33,6 @@ import re
 import secrets
 import shutil
 import subprocess
-import sys
 import time
 import uuid
 from dataclasses import dataclass
@@ -55,7 +54,7 @@ MAX_STDERR_CHARS = 4_000
 MIN_TIMEOUT_SECONDS = 1
 MAX_TIMEOUT_SECONDS = 60
 
-PROFILES = ("powershell_readonly", "git", "pytest", "inspect_d")
+PROFILES = ("powershell_readonly", "git", "inspect_d")
 
 
 class PathNotAllowed(ValueError):
@@ -155,7 +154,7 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
 
 
 _SECRET_DIRECTORIES = frozenset(
-    {".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store", ".git"}
+    {".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store", ".git", ".terraform", ".vault"}
 )
 _SECRET_FILE_NAME = re.compile(
     r"""(?ix)^(
@@ -166,12 +165,22 @@ _SECRET_FILE_NAME = re.compile(
         |credentials(\..*)?
         |secrets?(\.(json|ya?ml|txt|toml))?
         |token(s)?\.(json|txt)
-        |.*\.(pem|key|pfx|p12|jks|keystore|kdbx)
-        |.*\.(tfvars|tfstate)
+        |\.pgpass|pgpass\.conf|\.htpasswd|\.boto|\.s3cfg|\.my\.cnf
+        |client[_-]?secret.*\.json|application_default_credentials.*\.json
+        |.*\.(pem|key|pfx|p12|jks|keystore|kdbx|asc|ppk|p8|ovpn|gpg|pgp)
+        |.*\.(tfvars|tfstate)(\..*)?
         |.*\.(sqlite|sqlite3|db)
     )$"""
 )
-_PRIVATE_KEY_BLOCK = re.compile(r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----")
+_PRIVATE_KEY_BLOCK = re.compile(
+    r"(?:-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"
+    r"|-----BEGIN PGP PRIVATE KEY BLOCK-----"
+    r"|---- BEGIN SSH2 ENCRYPTED PRIVATE KEY ----"
+    r"|-----BEGIN OpenVPN Static key V1-----"
+    r"|PuTTY-User-Key-File-\d+:"
+    r"|AGE-SECRET-KEY-1[A-Z0-9]+)",
+    re.IGNORECASE,
+)
 _BINARY_PROBE = 8192
 
 
@@ -547,10 +556,6 @@ def _validate_argument_value(validator: str, value: str) -> None:
         if not _REF_VALIDATOR.match(value):
             raise ValueError("invalid ref or path argument")
         return
-    if validator == "expression":
-        if not _EXPRESSION_VALIDATOR.match(value):
-            raise ValueError("invalid pytest selection expression")
-        return
     if validator in {"path", "d_path"}:
         if not _PATH_VALIDATOR.match(value):
             raise ValueError("invalid path argument")
@@ -711,8 +716,8 @@ def compile_command(
     workdir = resolve_path(cwd, must_exist=True) if cwd else _repository_root()
     if not workdir.is_dir():
         raise ValueError("working directory is not a directory")
-    if profile in {"git", "pytest"} and not _is_within(workdir, _repository_root()):
-        raise PathNotAllowed("git and pytest must run inside the repository root")
+    if profile == "git" and not _is_within(workdir, _repository_root()):
+        raise PathNotAllowed("git must run inside the repository root")
 
     if profile == "git":
         policy = _GIT_POLICIES.get(verb)
@@ -735,9 +740,6 @@ def compile_command(
             *[token for pair in parsed for token in pair if token],
         )
         return CompiledCommand(profile, verb, argv, workdir, timeout_seconds, joined)
-
-    if profile == "pytest":
-        return _compile_pytest(verb, arguments, workdir, timeout_seconds)
 
     policies = _INSPECT_D_POLICIES if profile == "inspect_d" else _POWERSHELL_POLICIES
     policy = policies.get(verb)
@@ -763,64 +765,6 @@ def compile_command(
     return CompiledCommand(profile, verb, argv, workdir, timeout_seconds, command_text)
 
 
-def _compile_pytest(
-    verb: str, arguments: Sequence[str], workdir: Path, timeout_seconds: int
-) -> CompiledCommand:
-    if verb not in {"run", "tests"}:
-        raise ValueError("pytest verb must be 'run'")
-    if len(arguments) > 6:
-        raise ValueError("at most 6 pytest arguments are accepted")
-    targets: list[str] = []
-    extra: list[str] = []
-    index = 0
-    while index < len(arguments):
-        token = arguments[index]
-        if not isinstance(token, str) or not token:
-            raise ValueError("pytest arguments must be non-empty strings")
-        if token.startswith("-") and token not in {"-x", "-q", "-k", "--maxfail"}:
-            raise ValueError(f"pytest option {token} is not allowlisted")
-        if token in {"-x", "-q"}:
-            extra.append(token)
-            index += 1
-            continue
-        if token in {"-k", "--maxfail"}:
-            if index + 1 >= len(arguments):
-                raise ValueError(f"{token} requires a value")
-            value = arguments[index + 1]
-            _validate_argument_value(
-                "expression" if token == "-k" else "integer", value
-            )
-            extra.extend([token, value])
-            index += 2
-            continue
-        target = resolve_path(token, must_exist=True)
-        tests_root = (_repository_root() / "tests").resolve()
-        if not _is_within(target, tests_root):
-            raise PathNotAllowed("pytest targets must live under tests/")
-        if target.suffix != ".py" and not target.is_dir():
-            raise ValueError("pytest targets must be Python files or directories")
-        targets.append(str(target))
-        index += 1
-    if not targets:
-        raise ValueError("at least one tests/ target is required")
-    executable = sys.executable
-    if Path(executable).name.casefold() not in {"python", "python.exe", "python3", "python3.exe"}:
-        raise RuntimeError("pytest profile requires a Python interpreter")
-    argv = (
-        executable,
-        "-m",
-        "pytest",
-        *targets,
-        "-q",
-        "-p",
-        "no:cacheprovider",
-        *extra,
-    )
-    return CompiledCommand(
-        "pytest", "run", argv, workdir, timeout_seconds, "pytest " + " ".join(targets)
-    )
-
-
 # --------------------------------------------------------------------------- #
 # Audit
 # --------------------------------------------------------------------------- #
@@ -829,6 +773,19 @@ def _audit_path() -> Path:
     if configured:
         return Path(configured).expanduser()
     return Path.home() / ".local" / "share" / "jarvis" / "host_ops_audit.jsonl"
+
+
+def _audit_argument_digest(arguments: Sequence[Any]) -> str:
+    try:
+        payload = json.dumps(
+            list(arguments),
+            sort_keys=True,
+            ensure_ascii=False,
+            default=lambda value: f"<{type(value).__name__}>",
+        )
+    except (TypeError, ValueError):
+        payload = f"<{type(arguments).__name__}>"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 def _request_digest(profile: str, verb: str, arguments: Sequence[str], cwd: Path) -> str:
@@ -846,7 +803,10 @@ def _audit(record: Mapping[str, Any]) -> tuple[str, bool]:
     try:
         path = _audit_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as handle:
+        descriptor = os.open(path, os.O_APPEND | os.O_CREAT | os.O_WRONLY, 0o600)
+        if os.name != "nt":
+            os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
         return audit_id, True
     except OSError as exc:  # pragma: no cover - filesystem failure
@@ -938,7 +898,10 @@ def _spawn(
 
 
 def _bound(value: str | None, limit: int) -> tuple[str, bool]:
-    redacted, _ = redact(value or "")
+    raw = value or ""
+    if _PRIVATE_KEY_BLOCK.search(raw):
+        return "[WITHHELD: output contained a private key block]", True
+    redacted, _ = redact(raw)
     if _PRIVATE_KEY_BLOCK.search(redacted):
         return "[WITHHELD: output contained a private key block]", True
     return redacted[:limit], len(redacted) > limit
@@ -965,7 +928,8 @@ def run_host_command(
                 "event": "blocked",
                 "profile": profile,
                 "verb": verb,
-                "arguments": arguments,
+                "argument_count": len(arguments),
+                "argument_digest": _audit_argument_digest(arguments),
                 "reason": str(exc),
                 "elevated": False,
             }
@@ -985,7 +949,8 @@ def run_host_command(
                 "event": "rejected",
                 "profile": profile,
                 "verb": verb,
-                "arguments": arguments,
+                "argument_count": len(arguments),
+                "argument_digest": _audit_argument_digest(arguments),
                 "reason": str(exc),
                 "elevated": False,
             }
@@ -1009,7 +974,8 @@ def run_host_command(
                     "event": "confirmation_required",
                     "profile": profile,
                     "verb": verb,
-                    "arguments": arguments,
+                    "argument_count": len(arguments),
+                    "argument_digest": _audit_argument_digest(arguments),
                     "digest": digest[:16],
                     "elevated": False,
                 }
@@ -1039,7 +1005,8 @@ def run_host_command(
                 "event": "timeout",
                 "profile": profile,
                 "verb": verb,
-                "arguments": arguments,
+                "argument_count": len(arguments),
+                "argument_digest": _audit_argument_digest(arguments),
                 "digest": digest[:16],
                 "elapsed_ms": elapsed_ms,
                 "timeout_seconds": compiled.timeout_seconds,
@@ -1068,7 +1035,8 @@ def run_host_command(
                 "event": "launch_failed",
                 "profile": profile,
                 "verb": verb,
-                "arguments": arguments,
+                "argument_count": len(arguments),
+                "argument_digest": _audit_argument_digest(arguments),
                 "reason": type(exc).__name__,
                 "elevated": False,
             }
@@ -1092,7 +1060,8 @@ def run_host_command(
             "event": "executed",
             "profile": profile,
             "verb": verb,
-            "arguments": arguments,
+            "argument_count": len(arguments),
+            "argument_digest": _audit_argument_digest(arguments),
             "digest": digest[:16],
             "cwd": str(compiled.cwd),
             "exit_code": completed.returncode,
@@ -1157,13 +1126,6 @@ def describe_profiles() -> dict[str, Any]:
             {
                 "name": "git",
                 "verbs": sorted(_GIT_POLICIES),
-                "shell": False,
-                "elevated": False,
-            },
-            {
-                "name": "pytest",
-                "verbs": ["run"],
-                "targets": "tests/ only",
                 "shell": False,
                 "elevated": False,
             },
