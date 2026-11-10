@@ -832,3 +832,40 @@ def test_audit_does_not_persist_rejected_credential_argument(_sandbox):
     assert result["success"] is False
     audit = _sandbox_audit().read_text(encoding="utf-8")
     assert secret not in audit
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        ".config/gh/hosts.yml",
+        ".config/glab-cli/config.yml",
+        ".config/github-copilot/hosts.json",
+        ".config/composer/auth.json",
+        ".config/containers/auth.json",
+        ".config/age/keys.txt",
+        ".config/ngrok/ngrok.yml",
+        ".m2/settings.xml",
+        ".yarnrc.yml",
+    ],
+)
+def test_read_blocks_common_developer_credential_stores(_sandbox, relative):
+    target = _sandbox / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("oauth_token: must-not-leak", encoding="utf-8")
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.read_text_file(str(target))
+
+
+def test_read_blocks_xml_password_content_in_ordinary_config_file(_sandbox):
+    target = _sandbox / "settings.xml"
+    target.write_text(
+        "<settings><servers><server><password>xml-secret-value</password></server></servers></settings>",
+        encoding="utf-8",
+    )
+
+    result = ops.read_text_file(str(target))
+
+    assert result["success"] is False
+    assert result["status"] == "secret_content_blocked"
+    assert "xml-secret-value" not in result.get("content", "")
