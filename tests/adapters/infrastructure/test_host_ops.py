@@ -688,7 +688,7 @@ def test_directory_listing_never_follows_nested_symlinks(_sandbox):
 def test_read_redacts_json_quoted_credential_keys(_sandbox):
     target = _sandbox / "appsettings.json"
     target.write_text(
-        '{"OpenAI_API_Key":"json-secret-value","bot_token":"bot-secret-value"}',
+        '{"OpenAI_API_Key":"json-secret-value","bot_token":"bot-secret-value","client-key-data":"base64-certificate-secret"}',
         encoding="utf-8",
     )
 
@@ -697,7 +697,8 @@ def test_read_redacts_json_quoted_credential_keys(_sandbox):
     assert result["success"] is True
     assert "json-secret-value" not in result["content"]
     assert "bot-secret-value" not in result["content"]
-    assert result["redactions"] >= 2
+    assert "base64-certificate-secret" not in result["content"]
+    assert result["redactions"] >= 3
 
 
 @pytest.mark.parametrize(
