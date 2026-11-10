@@ -301,10 +301,11 @@ def test_shell_navigation_tool_registers_and_uses_injected_navigator(tmp_path, m
 
 
 def test_parser_preserves_backslashes_in_quoted_windows_paths():
-    assert ShellNavigator._tokens(r'cat "C:\Users\Example\notes.txt"') == [
-        "cat",
-        r"C:\Users\Example\notes.txt",
-    ]
+    slash = chr(92)
+    windows_path = "C:" + slash + "Users" + slash + "Example" + slash + "notes.txt"
+    command = 'cat "' + windows_path + '"'
+
+    assert ShellNavigator._tokens(command) == ["cat", windows_path]
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows path aliases are platform-specific")
@@ -395,7 +396,7 @@ def test_cat_blocks_credential_store_filename_variants(tmp_path, filename):
         "hvs." + "a" * 24,
         "sk_live_" + "b" * 24,
         "INSERT INTO users (password) VALUES ('sql-secret-value');",
-        "password: |\\n  first-line-secret-material\\n  second-line-secret-material\\nmode: safe\\n",
+        "password: |\n  first-line-secret-material\n  second-line-secret-material\nmode: safe\n",
     ],
 )
 def test_cat_blocks_additional_credential_shapes(tmp_path, content):
@@ -412,5 +413,5 @@ def test_cat_blocks_additional_credential_shapes(tmp_path, content):
 
 
 def test_secret_scanner_handles_maximum_whitespace_input_without_cross_line_backtracking():
-    assert _SECRET_CONTENT.search(b"\\n" * (64 * 1024)) is None
+    assert _SECRET_CONTENT.search(b"\n" * (64 * 1024)) is None
 
