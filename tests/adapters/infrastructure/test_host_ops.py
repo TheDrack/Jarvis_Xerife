@@ -223,23 +223,6 @@ def test_destructive_and_privileged_verbs_are_hard_blocked(verb, arguments):
         ops.compile_command("powershell_readonly", verb, arguments)
 
 
-def test_pytest_profile_requires_targets_under_tests():
-    with pytest.raises(ops.PathNotAllowed):
-        ops.compile_command("pytest", "run", ["app/adapters/infrastructure/host_ops.py"])
-    with pytest.raises(ValueError):
-        ops.compile_command("pytest", "run", ["tests", "-p", "evil_plugin"])
-
-
-def test_pytest_profile_compiles_without_a_shell():
-    compiled = ops.compile_command(
-        "pytest", "run", ["tests/adapters/infrastructure/test_host_ops.py", "-x"]
-    )
-
-    assert compiled.argv[1:3] == ("-m", "pytest")
-    assert "--no-cov" not in compiled.argv
-    assert "-p" in compiled.argv and "no:cacheprovider" in compiled.argv
-
-
 @pytest.mark.skipif(os.name != "nt", reason="D:\\ inspection is Windows-only")
 def test_inspect_d_profile_confines_paths_to_d_drive(
     _fake_powershell, monkeypatch, tmp_path
@@ -253,9 +236,10 @@ def test_inspect_d_profile_confines_paths_to_d_drive(
     assert "'D:\\'" in compiled.argv[-1] or "'D:/'" in compiled.argv[-1]
 
 
-def test_unknown_profile_is_rejected():
+@pytest.mark.parametrize("profile", ["bash", "pytest"])
+def test_unknown_profile_is_rejected(profile):
     with pytest.raises(ValueError):
-        ops.compile_command("bash", "ls", [])
+        ops.compile_command(profile, "ls", [])
 
 
 @pytest.mark.parametrize("timeout", [0, 61, True])
@@ -357,6 +341,8 @@ def test_execution_is_audited_without_output_content(monkeypatch):
     assert record["event"] == "executed"
     assert record["audit_id"] == result["audit_id"]
     assert "stdout" not in record
+    assert "arguments" not in record
+    assert "argument_digest" in record
     assert record["exit_code"] == 0
 
 
@@ -453,16 +439,6 @@ def test_git_show_and_diff_require_metadata_only_output():
     assert "--name-only" in ops.compile_command("git", "diff", ["--name-only"]).argv
 
 
-def test_git_and_pytest_profiles_cannot_change_working_directory_outside_repo(_sandbox):
-    outside = _sandbox / "other-repository"
-    outside.mkdir()
-
-    with pytest.raises(ops.PathNotAllowed):
-        ops.compile_command("git", "status", [], cwd=str(outside))
-    with pytest.raises(ops.PathNotAllowed):
-        ops.compile_command("pytest", "run", ["tests"], cwd=str(outside))
-
-
 def test_redaction_covers_provider_qualified_secret_environment_names():
     payload = (
         "OPENAI_API_KEY=sk-proj-abcdefghijklmnop "
@@ -478,15 +454,6 @@ def test_redaction_covers_provider_qualified_secret_environment_names():
     assert "eyJhbGciOiJIUzI1NiJ9" not in sanitized
     assert "AKIAIOSFODNN7EXAMPLE" not in sanitized
     assert "supersecret" not in sanitized
-
-
-def test_pytest_profile_does_not_disable_coverage():
-    compiled = ops.compile_command(
-        "pytest", "run", ["tests/adapters/infrastructure/test_host_ops.py"]
-    )
-
-    assert "--no-cov" not in compiled.argv
-    assert "--cov" not in compiled.argv
 
 
 @pytest.mark.parametrize("name", ["prod.env", "kubeconfig", "admin.conf", "prod.tfvars", "terraform.tfstate"])
@@ -580,3 +547,61 @@ def test_git_environment_ignores_user_and_system_configuration():
     assert environment["GIT_CONFIG_NOSYSTEM"] == "1"
     assert environment["GIT_CONFIG_GLOBAL"] == os.devnull
     assert environment["GIT_OPTIONAL_LOCKS"] == "0"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".pgpass", "pgpass.conf", "client_secret.json",
+        "application_default_credentials.json", ".htpasswd",
+        "server.ppk", "server.asc", "client.ovpn", "terraform.tfstate.backup",
+    ],
+)
+def test_read_blocks_additional_credential_store_names(_sandbox, name):
+    target = _sandbox / name
+    target.write_text("credential=value", encoding="utf-8")
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.read_text_file(str(target))
+
+
+@pytest.mark.parametrize(
+    "private_material",
+    [
+        "-----BEGIN PGP PRIVATE KEY BLOCK-----\\nprivate-data\\n-----END PGP PRIVATE KEY BLOCK-----",
+        "PuTTY-User-Key-File-2: ssh-ed25519\\nPrivate-Lines: 1\\nprivate-data",
+        "-----BEGIN OpenVPN Static key V1-----\\nprivate-data\\n-----END OpenVPN Static key V1-----",
+    ],
+)
+def test_read_blocks_non_pem_private_key_formats(_sandbox, private_material):
+    target = _sandbox / "ordinary-notes.txt"
+    target.write_text(private_material, encoding="utf-8")
+
+    result = ops.read_text_file(str(target))
+
+    assert result["success"] is False
+    assert result["status"] == "secret_content_blocked"
+    assert "content" not in result
+
+
+def test_audit_does_not_persist_caller_supplied_secret_arguments(_fake_powershell):
+    secret = "AKIAIOSFODNN7EXAMPLE"
+    result = ops.run_host_command(
+        "powershell_readonly", "Get-ChildItem", ["-Filter", f"token={secret}"]
+    )
+
+    assert result["success"] is True
+    audit = _sandbox_audit().read_text(encoding="utf-8")
+    assert secret not in audit
+    record = json.loads(audit.splitlines()[-1])
+    assert "arguments" not in record
+    assert record["argument_count"] == 2
+    assert record["argument_digest"]
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX mode bits are not portable to Windows ACLs")
+def test_audit_file_is_owner_only(_sandbox):
+    ops._audit({"event": "permission-test"})
+    mode = _sandbox_audit().stat().st_mode & 0o777
+
+    assert mode == 0o600
