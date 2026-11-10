@@ -507,3 +507,96 @@ def test_git_remote_redacts_token_only_url_userinfo(tmp_path):
     assert result["success"] is True
     assert "singleparttoken" not in result["output"]
     assert "[REDACTED]" in result["output"]
+
+
+def test_git_rejects_same_line_executable_config_header(tmp_path):
+    repo = tmp_path / "repo"
+    git_dir = repo / ".git"
+    git_dir.mkdir(parents=True)
+    (git_dir / "config").write_text(
+        '[filter "pwn"] clean = !whoami\n',
+        encoding="utf-8",
+    )
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
+
+    with patch("app.adapters.infrastructure.secure_shell_navigation.subprocess.run") as run:
+        result = navigator.execute("git diff --stat")
+
+    assert result["success"] is False
+    assert result["status"] == "git_config_rejected"
+    run.assert_not_called()
+
+
+def test_git_rejects_bom_prefixed_executable_config(tmp_path):
+    repo = tmp_path / "repo"
+    git_dir = repo / ".git"
+    git_dir.mkdir(parents=True)
+    (git_dir / "config").write_text(
+        '\ufeff[core]\nfsmonitor = !whoami\n',
+        encoding="utf-8",
+    )
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
+
+    with patch("app.adapters.infrastructure.secure_shell_navigation.subprocess.run") as run:
+        result = navigator.execute("git status")
+
+    assert result["success"] is False
+    assert result["status"] == "git_config_rejected"
+    run.assert_not_called()
+
+
+def test_git_rejects_worktree_config_with_executable_helper(tmp_path):
+    repo = tmp_path / "repo"
+    git_dir = repo / ".git"
+    git_dir.mkdir(parents=True)
+    (git_dir / "config").write_text(
+        '[extensions]\nworktreeConfig = true\n',
+        encoding="utf-8",
+    )
+    (git_dir / "config.worktree").write_text(
+        '[core]\nfsmonitor = !whoami\n',
+        encoding="utf-8",
+    )
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
+
+    with patch("app.adapters.infrastructure.secure_shell_navigation.subprocess.run") as run:
+        result = navigator.execute("git status")
+
+    assert result["success"] is False
+    assert result["status"] == "git_config_rejected"
+    run.assert_not_called()
+
+
+def test_git_diff_rejects_filter_attributes(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    (repo / ".gitattributes").write_text("*.txt filter=pwn\n", encoding="utf-8")
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
+
+    with patch("app.adapters.infrastructure.secure_shell_navigation.subprocess.run") as run:
+        result = navigator.execute("git diff --stat")
+
+    assert result["success"] is False
+    assert result["status"] == "git_config_rejected"
+    run.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "relative",
+    (
+        "AppData/Roaming/FileZilla/sitemanager.xml",
+        "AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt",
+        ".terraform.d/credentials.tfrc.json",
+    ),
+)
+def test_cat_blocks_additional_credential_stores(tmp_path, relative):
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("password=do-not-disclose", encoding="utf-8")
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute(f'cat "{relative}"')
+
+    assert result["success"] is False
+    assert result["status"] == "sensitive_file_blocked"
+    assert result["output"] == ""
