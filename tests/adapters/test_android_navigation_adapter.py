@@ -83,7 +83,7 @@ def test_type_text_rejects_control_characters_before_adb(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fail_if_called)
     adapter = AndroidNavigationAdapter(device_address="phone-1")
 
-    for payload in ("line1\\nline2", "line1\\rline2", "nul\\x00byte", "escape\\x1b"):
+    for payload in ("line1\nline2", "line1\rline2", "nul\x00byte", "escape\x1b"):
         result = adapter.type_text(payload)
         assert result["success"] is False
         assert result["status"] == "control_character_rejected"
