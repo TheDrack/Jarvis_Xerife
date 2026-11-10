@@ -300,9 +300,9 @@ def test_shell_navigation_tool_registers_and_uses_injected_navigator(tmp_path, m
 
 
 def test_parser_preserves_backslashes_in_quoted_windows_paths():
-    assert ShellNavigator._tokens('cat "C:\\Users\\Example\\notes.txt"') == [
+    assert ShellNavigator._tokens('cat "C:\\Users\\Example\notes.txt"') == [
         "cat",
-        "C:\\Users\\Example\\notes.txt",
+        "C:\\Users\\Example\notes.txt",
     ]
 
 
@@ -323,9 +323,9 @@ def test_windows_device_and_stream_aliases_are_rejected(tmp_path, suffix):
 @pytest.mark.parametrize(
     "content",
     [
-        "key: base64-private-material-value\\nmode: safe\\n",
-        "Authorization: Bearer opaque-access-token-value\\n",
-        "password: |\\n  first-line-secret-material\\n  second-line-secret-material\\nmode: safe\\n",
+        "key: base64-private-material-value\nmode: safe\n",
+        "Authorization: Bearer opaque-access-token-value\n",
+        "password: |\n  first-line-secret-material\n  second-line-secret-material\nmode: safe\n",
     ],
 )
 def test_cat_blocks_generic_key_bearer_and_yaml_block_secrets(tmp_path, content):
@@ -345,7 +345,7 @@ def test_cat_blocks_git_metadata_directory(tmp_path):
     git_dir = tmp_path / ".git"
     git_dir.mkdir()
     (git_dir / "config").write_text(
-        '[remote "origin"]\\nurl = https://user:token@example.invalid/repo.git\\n',
+        '[remote "origin"]\nurl = https://user:token@example.invalid/repo.git\n',
         encoding="utf-8",
     )
     navigator = make_navigator(tmp_path)
