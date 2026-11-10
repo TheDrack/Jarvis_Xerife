@@ -1774,12 +1774,12 @@ function renderWeatherPanel(){
  html.push('<div style="font-size:11px;color:var(--mint);letter-spacing:.08em">REGIÃO: '+esc(w.place_label||((w.lat!=null?w.lat.toFixed(2):'--')+','+(w.lon!=null?w.lon.toFixed(2):'--')))+'</div>');
  html.push('<div style="display:flex;align-items:center;gap:10px"><span style="font-size:28px">'+icon+'</span><div><strong style="font-size:18px">'+(c.temperature!=null?c.temperature.toFixed(1)+'°C':'--')+'</strong><div style="font-size:11px;color:var(--muted)">'+wmoLabel(c.weather_code)+'</div></div></div>');
  html.push('<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;font-size:11px">');
- html.push('<div>💧 Chuva: '+(c.precipitation!=null?c.precipitation+' mm':'--')+'</div>');
- html.push('<div>💨 Vento: '+(c.wind_speed!=null?c.wind_speed+' km/h':'--')+'</div>');
- html.push('<div>🌪️ Rajadas: '+(c.wind_gusts!=null?c.wind_gusts+' km/h':'--')+'</div>');
+ html.push('<div>💧 Chuva: '+(c.precipitation!=null?esc(c.precipitation)+' mm':'--')+'</div>');
+ html.push('<div>💨 Vento: '+(c.wind_speed!=null?esc(c.wind_speed)+' km/h':'--')+'</div>');
+ html.push('<div>🌪️ Rajadas: '+(c.wind_gusts!=null?esc(c.wind_gusts)+' km/h':'--')+'</div>');
  html.push('<div>🧭 Dir: '+windDirLabel(c.wind_direction)+'</div>');
- html.push('<div>💧 Umidade: '+(c.humidity!=null?c.humidity+'%':'--')+'</div>');
- html.push('<div>☁️ Nuvens: '+(c.cloud_cover!=null?c.cloud_cover+'%':'--')+'</div>');
+ html.push('<div>💧 Umidade: '+(c.humidity!=null?esc(c.humidity)+'%':'--')+'</div>');
+ html.push('<div>☁️ Nuvens: '+(c.cloud_cover!=null?esc(c.cloud_cover)+'%':'--')+'</div>');
  html.push('</div>');
  const h=w.hourly||{};
  const times=h.time||[],prec=h.precipitation||[],ws=h.wind_speed||[],ts=h.temperature||[],wc=h.weather_code||[],cc=h.cloud_cover||[];
@@ -1788,7 +1788,7 @@ function renderWeatherPanel(){
   html.push('<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:2px;font-size:10px;text-align:center">');
   for(let i=0;i<Math.min(6,times.length);i++){
    const t=times[i]; const hh=t?String(t).slice(11,16):'--';
-   html.push('<div style="border:1px solid var(--line-soft);padding:2px 1px"><div>'+hh+'</div><div style="font-size:14px">'+wmoIcon(wc[i])+'</div><div>'+(ts[i]!=null?Math.round(ts[i])+'°':'--')+'</div><div>'+(prec[i]!=null?prec[i]+'mm':'--')+'</div><div>'+(ws[i]!=null?Math.round(ws[i])+'km/h':'--')+'</div></div>');
+   html.push('<div style="border:1px solid var(--line-soft);padding:2px 1px"><div>'+esc(hh)+'</div><div style="font-size:14px">'+wmoIcon(wc[i])+'</div><div>'+(ts[i]!=null?Math.round(ts[i])+'°':'--')+'</div><div>'+(prec[i]!=null?esc(prec[i])+'mm':'--')+'</div><div>'+(ws[i]!=null?Math.round(ws[i])+'km/h':'--')+'</div></div>');
   }
   html.push('</div>');
  }
@@ -1800,7 +1800,7 @@ function renderWeatherPanel(){
   html.push('<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:9px;text-align:center">');
   for(let i=0;i<Math.min(7,dtimes.length);i++){
    const t=dtimes[i]; const dd=t?String(t).slice(5,10):'--';
-   html.push('<div style="border:1px solid var(--line-soft);padding:2px 1px"><div>'+dd+'</div><div style="font-size:12px">'+wmoIcon(dw[i])+'</div><div>'+(dmax[i]!=null?Math.round(dmax[i])+'°':'--')+'</div><div style="opacity:.7">'+(dmin[i]!=null?Math.round(dmin[i])+'°':'--')+'</div><div>'+(dprec[i]!=null?dprec[i]+'mm':'--')+'</div></div>');
+   html.push('<div style="border:1px solid var(--line-soft);padding:2px 1px"><div>'+esc(dd)+'</div><div style="font-size:12px">'+wmoIcon(dw[i])+'</div><div>'+(dmax[i]!=null?Math.round(dmax[i])+'°':'--')+'</div><div style="opacity:.7">'+(dmin[i]!=null?Math.round(dmin[i])+'°':'--')+'</div><div>'+(dprec[i]!=null?esc(dprec[i])+'mm':'--')+'</div></div>');
   }
   html.push('</div>');
  }
