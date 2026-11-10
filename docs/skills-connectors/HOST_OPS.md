@@ -4,6 +4,12 @@ Read-only host tooling for agents that reach the local MCP server through the Se
 
 **Non-goal:** this is not a general remote shell. It never writes files, installs software, changes the boot configuration, edits ACLs, touches credentials or elevates privileges.
 
+## Enablement and trust boundary
+
+Host operations tools are **disabled by default**. The local MCP server registers them only when its process environment contains `JARVIS_HOST_OPS_ENABLED=1` (also accepts `true`, `yes` or `on`). Set this variable in the server's own supervisor/task environment, then restart the MCP server.
+
+This is an owner-controlled feature opt-in, not per-call authorization. The Secure MCP Tunnel is user-scoped and must not be shared with untrusted or multi-tenant clients. Every caller authenticated to this single-user gateway can invoke enabled tools. Do not enable host operations on a gateway shared with other users.
+
 ## Tools
 
 | Tool | Purpose | Limits |
