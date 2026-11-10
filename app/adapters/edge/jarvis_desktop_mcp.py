@@ -683,9 +683,11 @@ registrar_observabilidade_portas(mcp, tracked_action)
 #   machine owner explicitly opts in with JARVIS_HOST_OPS_ENABLED=1.
 from app.adapters.edge.osint_mcp_tools import register_osint_tools
 from app.adapters.infrastructure.host_ops_mcp_tools import register_host_ops_tools
+from app.adapters.infrastructure.secure_shell_navigation import register_shell_navigation_tools
 
 register_osint_tools(mcp)
 register_host_ops_tools(mcp)
+register_shell_navigation_tools(mcp)
 
 
 if __name__ == "__main__":
