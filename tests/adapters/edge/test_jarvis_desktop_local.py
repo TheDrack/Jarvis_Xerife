@@ -1729,3 +1729,80 @@ def test_aircraft_route_endpoint_works_when_local_gev_rest_is_online_but_mcp_is_
     assert body["available"] is True
     assert body["origin"]["code"] == "NVT"
     assert body["destination"]["code"] == "CGH"
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "lat=91&lon=0",
+        "lat=-91&lon=0",
+        "lat=0&lon=181",
+        "lat=0&lon=-181",
+        "lat=nan&lon=0",
+        "lat=inf&lon=0",
+    ],
+)
+def test_weather_point_rejects_invalid_coordinates_before_upstream_io(query, monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    def unexpected_client(*args, **kwargs):
+        raise AssertionError("invalid coordinates must be rejected before upstream I/O")
+
+    monkeypatch.setattr(desktop_local.httpx, "AsyncClient", unexpected_client)
+    client = _client(LocalRuntime())
+    token = client.get("/api/bootstrap").json()["local_token"]
+
+    response = client.get(
+        f"/api/weather/point?{query}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "lat=91&lon=0",
+        "lat=0&lon=181",
+        "lat=nan&lon=0",
+        "lat=0&lon=0&radius=0",
+        "lat=0&lon=0&radius=21",
+        "lat=0&lon=0&radius=inf",
+    ],
+)
+def test_weather_grid_rejects_invalid_coordinates_and_radius_before_upstream_io(query, monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    def unexpected_client(*args, **kwargs):
+        raise AssertionError("invalid grid parameters must be rejected before upstream I/O")
+
+    monkeypatch.setattr(desktop_local.httpx, "AsyncClient", unexpected_client)
+    client = _client(LocalRuntime())
+    token = client.get("/api/bootstrap").json()["local_token"]
+
+    response = client.get(
+        f"/api/weather/grid?{query}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_weather_cache_expires_entries_and_evicts_oldest_when_full():
+    from app.adapters.edge.jarvis_desktop_local import (
+        _weather_cache_get,
+        _weather_cache_set,
+    )
+
+    cache = {}
+    _weather_cache_set(cache, "expired", {"value": 0}, now=0.0, max_entries=2)
+    _weather_cache_set(cache, "oldest", {"value": 1}, now=100.0, max_entries=2)
+    assert _weather_cache_get(cache, "expired", now=601.0) is None
+
+    _weather_cache_set(cache, "newest", {"value": 2}, now=602.0, max_entries=2)
+    _weather_cache_set(cache, "latest", {"value": 3}, now=603.0, max_entries=2)
+
+    assert len(cache) <= 2
+    assert "oldest" not in cache
+    assert _weather_cache_get(cache, "latest", now=604.0) == {"value": 3}
