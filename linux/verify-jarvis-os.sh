@@ -84,6 +84,13 @@ fi
 if [ -f "$ENV_FILE" ]; then
     perms="$(stat -c '%a' "$ENV_FILE" 2>/dev/null || echo '?')"
     if [ "$perms" = "600" ]; then pass "ambiente 0600: $ENV_FILE"; else fail "permissões $perms em $ENV_FILE (esperado 600)"; fi
+    for key in JARVIS_DEVICES_DB JARVIS_GEOINT_DB JARVIS_GRAPH_DB; do
+        value="$(sed -n "s/^$key=//p" "$ENV_FILE" | head -n 1)"
+        case "$value" in
+            /*) pass "$key usa caminho absoluto" ;;
+            *) fail "$key não usa caminho absoluto" ;;
+        esac
+    done
     if grep -qE '^(OPENAI_API_KEY|GROQ_API_KEY|GEMINI_API_KEY)=.+' "$ENV_FILE"; then
         pass "ao menos um provedor LLM configurado"
     else
@@ -102,6 +109,12 @@ if [ "$CHECK_SERVICES" -eq 1 ]; then
         state="$(systemctl --user is-active "$unit" 2>/dev/null || true)"
         if [ "$state" = "active" ]; then pass "$unit active"; else fail "$unit $state"; fi
     done
+    api_exec="$(systemctl --user show jarvis-api.service --property=ExecStart --value 2>/dev/null || true)"
+    if printf '%s' "$api_exec" | grep -Fq 'API_HOST=127.0.0.1'; then
+        pass "API efetivamente configurada para loopback"
+    else
+        fail "API_HOST não está fixado em 127.0.0.1 na unit ativa"
+    fi
     if command -v ss >/dev/null; then
         if ss -ltn 2>/dev/null | grep -qE '127\.0\.0\.1:8765\b'; then
             pass "MCP escutando em 127.0.0.1:8765"
