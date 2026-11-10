@@ -64,7 +64,7 @@
 
 - Implementation: `app/adapters/infrastructure/host_ops.py` (policy + execution) and `host_ops_mcp_tools.py` (registration). Registered additively on the existing Desktop MCP server; no new port or credential.
 - Tools: `host_fs_list` (bounded directory metadata), `host_fs_read_text` (bounded text, secrets refused/redacted), `host_command_profiles`, `host_command_run` (structured argv, `shell=False`, non-elevated), `host_command_request_confirmation` (inert gate).
-- Profiles: `powershell_readonly`, `git`, `pytest` (targets under `tests/`), `inspect_d` (`D:\` only). Paths must resolve inside the repository root or `D:\` (`JARVIS_HOST_OPS_ROOTS`); `..`, `~`, symlink/junction escapes and credential-named files are rejected.
+- Profiles: `powershell_readonly`, `git`, `inspect_d` (`D:\` only). Paths must resolve inside the repository root or `D:\` (`JARVIS_HOST_OPS_ROOTS`); `..`, `~`, symlink/junction escapes and credential-named files are rejected.
 - Destructive, installation, boot, ACL, credential and privileged operations are hard-blocked by pattern, audited and never executed — with or without confirmation. No host capability is confirmable today, so the token gate cannot unlock anything.
 - Status: implemented and unit/integration tested in this branch. Runtime availability depends on the deployed MCP server build; verify with `host_command_profiles` before claiming the tools are live. Runbook: [HOST_OPS.md](HOST_OPS.md); skill: [jarvis-host-ops](../../skills/jarvis-host-ops/SKILL.md).
 
