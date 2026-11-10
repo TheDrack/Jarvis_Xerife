@@ -43,7 +43,7 @@ Each verb has its own parameter allowlist. **Positional or parameter values are 
 
 Repository-scoped profiles (`git` and `pytest`) reject working directories outside the repository root. PowerShell path parameters accept filesystem paths only; provider-qualified paths such as `Registry::`, `Env:`, `Cert:` and `Variable:` are rejected. Listing filters credential directories such as `.ssh`, `.aws`, `.kube` and `.docker`; direct reads inside those directories are blocked.
 
-The `show` and `diff` verbs require `--stat` or `--name-only`. Raw patch/content output is not exposed through this profile. Secret redaction covers provider-prefixed environment variable names, common API tokens, AWS key identifiers and database connection URLs.
+The `show` and `diff` verbs require `--stat` or `--name-only`. Raw patch/content output is not exposed through this profile. Secret redaction covers known provider-prefixed environment variable names, common API tokens, AWS key identifiers, key-data fields and database connection URLs. This is best-effort pattern matching, not a guarantee that arbitrary secrets are detected.
 
 Read-only subcommands: `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`, `branch`, `describe`. `-C`, `--git-dir`, `--work-tree`, `--exec-path`, `--upload-pack` and `-c` are rejected; `--no-pager` is always added and `GIT_TERMINAL_PROMPT=0` prevents interactive credential prompts.
 
@@ -135,10 +135,12 @@ python scripts/check_mcp_tools.py   # or any MCP client: look for the five host_
 Run:
 
 ```powershell
-.venv\Scripts\python.exe -m pytest tests/adapters/infrastructure/test_host_ops.py tests/adapters/infrastructure/test_host_ops_mcp_tools.py -q --no-cov --basetemp=.tmp/pytest-basetemp
+.venv\Scripts\python.exe -m pytest tests/adapters/infrastructure/test_host_ops.py tests/adapters/infrastructure/test_host_ops_mcp_tools.py -q --basetemp=.tmp/pytest-basetemp
 ```
 
 ## Limits to disclose to users
+
+- Secret-name and content filters are defense-in-depth heuristics. Never treat tool output as proven secret-free; avoid reading configuration or deployment files unless needed.
 
 - Read-only: no file writes, no installs, no boot/ACL/credential changes, no elevation.
 - `inspect_d` and `powershell_readonly` require Windows PowerShell; on Linux the profile returns `command_rejected`.
