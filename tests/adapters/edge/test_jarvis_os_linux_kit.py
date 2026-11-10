@@ -1,5 +1,9 @@
 """Static contract tests for the Linux provisioning kit's network and data boundaries."""
 from pathlib import Path
+import shutil
+import subprocess
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -63,3 +67,28 @@ def test_linux_verifier_checks_mcp_bearer_gate():
     assert "jarvis_linux_mcp" in verifier
     assert "mcp_status" in verifier
     assert 'if [ "$mcp_status" = "401" ]' in verifier
+
+
+def test_linux_verifier_has_valid_bash_syntax():
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is unavailable on this runner")
+
+    verifier = ROOT / "linux/verify-jarvis-os.sh"
+    result = subprocess.run(
+        [bash, "-n", str(verifier)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_linux_verifier_contains_one_complete_environment_and_summary_block():
+    verifier = (ROOT / "linux/verify-jarvis-os.sh").read_text(encoding="utf-8")
+
+    assert verifier.count('if [ -f "$ENV_FILE" ]; then') == 1
+    assert verifier.count("printf '\\nResumo:") == 1
+    assert 'if grep -qE \'^JARVIS_DESKTOP_AUTH_TOKEN="?[^\"]{32,}"?$\' "$ENV_FILE"; then' in verifier
+
