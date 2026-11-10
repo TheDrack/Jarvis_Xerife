@@ -23,6 +23,21 @@ TOOL_NAMES = (
 )
 
 
+def _audit_filesystem_result(event: str, path: str, result: dict[str, Any]) -> dict[str, Any]:
+    """Audit filesystem access using a digest, never the caller's raw path."""
+    response = dict(result)
+    audit_id, audit_logged = host_ops._audit(
+        {
+            "event": event,
+            "status": response.get("status"),
+            "path_digest": host_ops._audit_argument_digest([path]),
+        }
+    )
+    response["audit_id"] = audit_id
+    response["audit_logged"] = audit_logged
+    return response
+
+
 def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
     """Register the host operations tools on ``mcp`` and return their names."""
 
@@ -42,9 +57,10 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
         but never followed. Credential-named entries are filtered out.
         """
         try:
-            return host_ops.list_directory(path, depth=depth, max_entries=max_entries)
+            result = host_ops.list_directory(path, depth=depth, max_entries=max_entries)
         except (ValueError, OSError) as exc:
-            return _rejected("list_rejected", exc)
+            result = _rejected("list_rejected", exc)
+        return _audit_filesystem_result("fs_list", path, result)
 
     @mcp.tool(name="host_fs_read_text")
     def host_fs_read_text(
@@ -56,9 +72,10 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
         redacted before returning. Binary files are refused.
         """
         try:
-            return host_ops.read_text_file(path, max_bytes=max_bytes, max_lines=max_lines)
+            result = host_ops.read_text_file(path, max_bytes=max_bytes, max_lines=max_lines)
         except (ValueError, OSError) as exc:
-            return _rejected("read_rejected", exc)
+            result = _rejected("read_rejected", exc)
+        return _audit_filesystem_result("fs_read", path, result)
 
     @mcp.tool(name="host_command_profiles")
     def host_command_profiles() -> dict[str, Any]:
