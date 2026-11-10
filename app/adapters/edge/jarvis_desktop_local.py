@@ -43,7 +43,13 @@ from app.adapters.edge.jarvis_geospatial_intelligence import (
 from app.adapters.edge.jarvis_open_cameras import build_open_cameras
 from app.adapters.edge.network_discovery_adapter import discover_devices, network_interfaces
 from app.adapters.infrastructure.routers.intelligence_dashboard import build_intelligence_status
-from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth, IntelligenceEvent, GeoPoint
+from app.domain.intelligence.contracts import (
+    GeoPoint,
+    IntelligenceBatch,
+    IntelligenceEvent,
+    IntelligenceEvidence,
+    SourceHealth,
+)
 
 logger = logging.getLogger(__name__)
 
