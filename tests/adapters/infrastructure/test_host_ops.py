@@ -557,3 +557,8 @@ def test_command_output_with_private_key_material_is_withheld(monkeypatch):
     assert "MIIEowIBAAKCAQEA" not in result["stderr"]
     assert result["stdout"].startswith("[WITHHELD:")
     assert result["stderr"].startswith("[WITHHELD:")
+
+
+def test_inspect_d_profile_does_not_expose_other_drive_metadata():
+    with pytest.raises(ValueError):
+        ops.compile_command("inspect_d", "Get-PSDrive", ["-Name", "C"])
