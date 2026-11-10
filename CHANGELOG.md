@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Host operations somente leitura no MCP — branch feat/secure-tunnel-host-ops (2026-11-10)
 
-- `app/adapters/infrastructure/host_ops.py`: política de raízes com resolução de symlink/junction, listagem limitada, leitura de texto com bloqueio de credenciais/chaves e redação de tokens, perfis de comando estruturado (`powershell_readonly`, `git`, `pytest`, `inspect_d`), execução com `shell=False`, ambiente minimizado, timeout e saída limitados, auditoria JSONL e gate de confirmação HMAC de uso único (inertes por padrão).
+- `app/adapters/infrastructure/host_ops.py`: política de raízes com resolução de symlink/junction, listagem limitada, leitura de texto com bloqueio de credenciais/chaves e redação de tokens, perfis de comando estruturado (`powershell_readonly`, `git`, `inspect_d`), execução com `shell=False`, ambiente minimizado, timeout e saída limitados, auditoria JSONL e gate de confirmação HMAC de uso único (inertes por padrão).
 - `host_ops_mcp_tools.py` + registro aditivo em `jarvis_desktop_mcp.py`: cinco ferramentas `host_*` na mesma superfície autenticada, sem nova porta ou credencial.
 - Operações destrutivas, de instalação, boot, ACL, credenciais e privilégio continuam bloqueadas por padrão, por padrão textual, mesmo com token.
 - Documentação (runbook + skill) e testes unitários/integrados simulados adicionados; nenhuma permissão de host ampliada.
