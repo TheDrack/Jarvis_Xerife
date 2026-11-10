@@ -355,3 +355,13 @@ def test_cat_blocks_git_metadata_directory(tmp_path):
     assert result["success"] is False
     assert result["status"] == "sensitive_file_blocked"
     assert result["content"] == ""
+
+
+def test_relative_initial_directory_is_resolved_from_first_allowed_root(tmp_path):
+    child = tmp_path / "workspace"
+    child.mkdir()
+
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory="workspace")
+
+    assert navigator.cwd == child.resolve()
+    assert navigator.execute("pwd")["output"] == str(child.resolve())
