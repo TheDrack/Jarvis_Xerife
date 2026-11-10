@@ -584,7 +584,9 @@ def test_read_blocks_non_pem_private_key_formats(_sandbox, private_material):
     assert "content" not in result
 
 
-def test_audit_does_not_persist_caller_supplied_secret_arguments(_fake_powershell):
+def test_audit_does_not_persist_caller_supplied_secret_arguments(_fake_powershell, monkeypatch):
+    # This test verifies audit redaction, not host PowerShell availability.
+    monkeypatch.setattr(ops, "_spawn", _stub_spawn())
     secret = "AKIAIOSFODNN7EXAMPLE"
     result = ops.run_host_command(
         "powershell_readonly", "Get-ChildItem", ["-Filter", f"token={secret}"]
