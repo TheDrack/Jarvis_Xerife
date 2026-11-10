@@ -330,3 +330,79 @@ def test_mixed_separator_unc_is_rejected_before_path_resolution(tmp_path, monkey
 
     assert result["success"] is False
     assert result["status"] == "path_outside_allowed_roots"
+
+
+def test_cat_blocks_additional_developer_credential_store_paths(tmp_path):
+    relative_paths = (
+        ".config/glab-cli/config.yml",
+        ".config/github-copilot/hosts.json",
+        ".config/composer/auth.json",
+        ".config/age/keys.txt",
+        ".config/ngrok/ngrok.yml",
+        ".m2/settings.xml",
+        ".yarnrc.yml",
+    )
+    for relative in relative_paths:
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("oauth_token: do-not-disclose", encoding="utf-8")
+
+    navigator = make_navigator(tmp_path)
+    for relative in relative_paths:
+        result = navigator.execute(f'cat "{relative}"')
+        assert result["success"] is False
+        assert result["status"] == "sensitive_file_blocked"
+
+
+def test_cat_blocks_files_containing_stored_credential_markers(tmp_path):
+    target = tmp_path / "settings.xml"
+    target.write_text(
+        "<settings><password>xml-secret-value</password></settings>",
+        encoding="utf-8",
+    )
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute("cat settings.xml")
+
+    assert result["success"] is False
+    assert result["status"] == "sensitive_file_blocked"
+    assert "xml-secret-value" not in result["output"]
+
+
+def test_git_show_rejects_blob_object_targets(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
+    failed_probe = subprocess.CompletedProcess(
+        args=["git", "rev-parse"], returncode=1, stdout="", stderr=""
+    )
+    with patch(
+        "app.adapters.infrastructure.secure_shell_navigation.subprocess.run",
+        return_value=failed_probe,
+    ) as run:
+        result = navigator.execute("git show --stat deadbeef")
+
+    assert result["success"] is False
+    assert result["status"] == "command_rejected"
+    run.assert_called_once()
+
+
+def test_git_show_accepts_commit_targets_and_keeps_metadata_only_flags(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
+    probe = subprocess.CompletedProcess(
+        args=["git", "rev-parse"], returncode=0, stdout="deadbeef", stderr=""
+    )
+    command = subprocess.CompletedProcess(
+        args=["git", "show"], returncode=0, stdout="commit 123\n 1 file changed", stderr=""
+    )
+    with patch(
+        "app.adapters.infrastructure.secure_shell_navigation.subprocess.run",
+        side_effect=[probe, command],
+    ) as run:
+        result = navigator.execute("git show --stat HEAD")
+
+    assert result["success"] is True
+    assert "1 file changed" in result["output"]
+    assert run.call_count == 2
