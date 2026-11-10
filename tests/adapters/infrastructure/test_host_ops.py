@@ -486,3 +486,74 @@ def test_pytest_profile_does_not_disable_coverage():
 
     assert "--no-cov" not in compiled.argv
     assert "--cov" not in compiled.argv
+
+
+@pytest.mark.parametrize("name", ["prod.env", "kubeconfig", "admin.conf", "prod.tfvars", "terraform.tfstate"])
+def test_read_blocks_additional_credential_and_state_file_names(_sandbox, name):
+    target = _sandbox / name
+    target.write_text("credential=value", encoding="utf-8")
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.read_text_file(str(target))
+
+
+@pytest.mark.parametrize(
+    "provider_path",
+    [
+        "Env:PATH",
+        "Variable:HOME",
+        "Cert:\\CurrentUser\\My",
+        "HKCU:\\Software",
+        "Registry::HKEY_LOCAL_MACHINE\\Software",
+        "FileSystem::C:\\Windows",
+        "D:",
+    ],
+)
+def test_shared_path_resolver_rejects_provider_and_drive_relative_paths(provider_path):
+    with pytest.raises(ops.PathNotAllowed):
+        ops.resolve_path(provider_path)
+
+
+def test_listing_secret_directory_directly_is_blocked(_sandbox):
+    ssh = _sandbox / ".ssh"
+    ssh.mkdir()
+    (ssh / "known_hosts").write_text("host-key", encoding="utf-8")
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.list_directory(str(ssh))
+
+
+def test_redaction_covers_common_provider_secrets_and_connection_urls():
+    payload = (
+        "AWS_SECRET_ACCESS_KEY=aws-secret-value "
+        "SECRET_KEY=secret-key-value "
+        "SERVICE_TOKEN=service-token-value "
+        "client-key-data: BASE64PRIVATEKEYMATERIAL "
+        "certificate-authority-data: BASE64CERTDATA "
+        "postgres://user:dbpassword@db.example.test/app "
+        "redis://:redispassword@cache.example.test/0 "
+        "github_pat_abcdefghijklmnopqrstuvwxyz123456"
+    )
+
+    sanitized, count = ops.redact(payload)
+
+    assert count >= 8
+    for secret in (
+        "aws-secret-value", "secret-key-value", "service-token-value",
+        "BASE64PRIVATEKEYMATERIAL", "BASE64CERTDATA", "dbpassword",
+        "redispassword", "github_pat_abcdefghijklmnopqrstuvwxyz123456",
+    ):
+        assert secret not in sanitized
+
+
+def test_command_output_with_private_key_material_is_withheld(monkeypatch):
+    private_key = "-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAKCAQEA\\n-----END RSA PRIVATE KEY-----"
+    monkeypatch.setattr(ops, "_spawn", _stub_spawn(stdout=private_key, stderr=private_key))
+
+    result = ops.run_host_command("git", "status", [])
+
+    assert result["success"] is True
+    assert "MIIEowIBAAKCAQEA" not in result["stdout"]
+    assert "MIIEowIBAAKCAQEA" not in result["stderr"]
+    assert result["stdout"].startswith("[WITHHELD:")
+    assert result["stderr"].startswith("[WITHHELD:")
