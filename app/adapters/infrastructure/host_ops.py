@@ -252,10 +252,11 @@ _SECRET_PATH_PREFIXES = (
 )
 
 _SECRET_CONTENT = re.compile(
-    rb"""(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|_authToken|npmAuthToken|oauth_token|"
+    rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|_authToken|npmAuthToken|oauth_token|
     rb"client[-_]?key[-_]?data|certificate[-_]?authority[-_]?data|account[-_]?key|"
     rb"AGE-SECRET-KEY-|<\s*(?:password|token|secret|api[_-]?key)\b[^>]*>\s*[^<]{4,}</\s*(?:password|token|secret|api[_-]?key)\s*>)"
 )
+
 _PRIVATE_KEY_BLOCK = re.compile(
     r"(?:-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"
     r"|-----BEGIN PGP PRIVATE KEY BLOCK-----"
