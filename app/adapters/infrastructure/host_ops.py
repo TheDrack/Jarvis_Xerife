@@ -88,6 +88,25 @@ def _reject_network_path(raw: str | Path) -> None:
                 raise PathNotAllowed("mapped network drives are not permitted")
 
 
+def _reject_link_components(candidate: Path) -> None:
+    """Reject symlinks and NTFS reparse points before resolving their targets."""
+    absolute = candidate if candidate.is_absolute() else candidate.absolute()
+    current = Path(absolute.anchor)
+    reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    for part in absolute.parts[1:]:
+        current = current / part
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise PathNotAllowed("path component could not be inspected safely") from exc
+        if stat.S_ISLNK(metadata.st_mode):
+            raise PathNotAllowed("symlink path components are not permitted")
+        if getattr(metadata, "st_file_attributes", 0) & reparse_point:
+            raise PathNotAllowed("NTFS reparse-point path components are not permitted")
+
+
 def allowed_roots() -> tuple[Path, ...]:
     """Return the effective allowlist of filesystem roots.
 
@@ -108,7 +127,10 @@ def allowed_roots() -> tuple[Path, ...]:
     roots: list[Path] = []
     for candidate in candidates:
         try:
+            if not candidate.is_absolute():
+                raise PathNotAllowed("allowed roots must be absolute local paths")
             _reject_network_path(candidate)
+            _reject_link_components(candidate)
             resolved = candidate.resolve()
         except OSError:
             continue
@@ -162,6 +184,7 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
     candidate = Path(text)
     if not candidate.is_absolute():
         candidate = _repository_root() / candidate
+    _reject_link_components(candidate)
     try:
         resolved = candidate.resolve()
     except OSError as exc:  # pragma: no cover - platform specific failures
@@ -308,7 +331,11 @@ def list_directory(
             return
         try:
             children = sorted(
-                os.scandir(current), key=lambda item: (not item.is_dir(), item.name.casefold())
+                os.scandir(current),
+                key=lambda item: (
+                    not item.is_dir(follow_symlinks=False),
+                    item.name.casefold(),
+                ),
             )
         except PermissionError:
             entries.append(
