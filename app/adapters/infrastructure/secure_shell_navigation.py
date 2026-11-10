@@ -143,9 +143,10 @@ class ShellNavigator:
         self.allowed_roots = tuple(resolved_roots)
         self.max_entries = min(max(max_entries, 1), MAX_ENTRIES)
         self.max_read_bytes = min(max(max_read_bytes, 1), MAX_READ_BYTES)
-        self._initial_directory = self._resolve(
-            str(initial_directory) if initial_directory is not None else str(self.allowed_roots[0])
-        )
+        initial = Path(initial_directory) if initial_directory is not None else self.allowed_roots[0]
+        if not initial.is_absolute():
+            initial = self.allowed_roots[0] / initial
+        self._initial_directory = self._resolve(str(initial))
         if not self._initial_directory.is_dir():
             raise ValueError("initial directory must be a directory")
         self._cwd = self._initial_directory
