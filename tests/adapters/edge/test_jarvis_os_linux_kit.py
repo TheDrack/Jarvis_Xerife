@@ -54,3 +54,12 @@ def test_mcp_asgi_wrapper_dependency_is_available_in_linux_profile():
 
     assert "mcp>=1.30,<2" in requirements
     assert "mcp>=1.30,<2" in edge_requirements
+
+
+def test_linux_verifier_checks_mcp_bearer_gate():
+    verifier = (ROOT / "linux/verify-jarvis-os.sh").read_text(encoding="utf-8")
+
+    assert "JARVIS_DESKTOP_AUTH_TOKEN" in verifier
+    assert "jarvis_linux_mcp" in verifier
+    assert "mcp_status" in verifier
+    assert 'if [ "$mcp_status" = "401" ]' in verifier
