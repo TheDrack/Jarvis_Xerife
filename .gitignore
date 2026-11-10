@@ -81,6 +81,7 @@ data/audit_osint.jrvs
 *.txt
 !requirements.txt
 !requirements/*.txt
+!linux/requirements-linux.txt
 
 # Airflow
 airflow.cfg

@@ -1,0 +1,25 @@
+[Unit]
+Description=Jarvis MCP (streamable HTTP, loopback)
+Documentation=file://@REPO_ROOT@/linux/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@REPO_ROOT@
+EnvironmentFile=@ENV_FILE@
+Environment=PYTHONUNBUFFERED=1
+Environment=JARVIS_DESKTOP_TRANSPORT=streamable-http
+Environment=JARVIS_DESKTOP_HTTP_PORT=8765
+Environment=JARVIS_DESKTOP_ALLOWED_HOSTS=127.0.0.1:8765,localhost:8765
+Environment=JARVIS_DESKTOP_ALLOWED_ORIGINS=http://127.0.0.1:8765,http://localhost:8765
+ExecStart=@PYTHON@ -m app.adapters.edge.jarvis_desktop_mcp
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

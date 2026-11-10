@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Jarvis OS — kit de provisionamento Linux (2026-11-09)
+
+- `linux/`: inventário verificado desta máquina (dois discos, dois Windows),
+  provisionamento idempotente do harness em Ubuntu 24.04 LTS, units systemd de
+  usuário (`jarvis-api`, `jarvis-mcp` em loopback), requirements Linux sem
+  `pywinauto` e verificação pós-instalação read-only com `--services`/`--tests`.
+- O kit não formata disco, não instala bootloader e não altera o Windows: a
+  validação em VM descartável precede a instalação física no disco 0, conforme
+  `docs/JARVIS_OS_FOUNDATION.md` e `docs/architecture/JARVIS_CONTINUAL_LEARNING.md`.
+- `linux/README.md` documenta inventário, rota VM, runbook físico, gaps de
+  portabilidade (win32/ETW/overlay) e critérios de aceitação.
+
 #### Grafo OSINT — aresta persistida por escopo (2026-11-06)
 
 - `GraphStorePort.get_edge(edge_id, scope_id=None)` e

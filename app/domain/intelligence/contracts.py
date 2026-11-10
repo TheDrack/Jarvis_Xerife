@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from math import isfinite
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
@@ -43,6 +43,8 @@ class IntelligenceEvent(BaseModel):
     occurred_at: Optional[datetime] = None
     observed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     location: Optional[GeoPoint] = None
+    track: Optional[Any] = None
+    cone: Optional[Any] = None
     magnitude: Optional[float] = None
     magnitude_unit: Optional[str] = Field(default=None, max_length=40)
     evidence: IntelligenceEvidence
