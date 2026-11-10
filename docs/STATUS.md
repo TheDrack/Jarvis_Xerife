@@ -1,8 +1,8 @@
 # JARVIS — Status do Projeto
 
 **Versão:** 2.0.0  
-**Revisão documental:** 2026-11-09
-**Escopo desta revisão:** revalidação pós-merge #792–#794; CI, autoevolução agendada, baseline C0, Supabase read-only e Render. Runtime/produção só são declarados com evidência direta.
+**Revisão documental:** 2026-11-10
+**Escopo desta revisão:** revalidação pós-merge #805; CI do último commit de código, autoevolução agendada, Self Healing, C0, PRs/issues e branch protection. Runtime/produção só são declarados com evidência direta.
 
 ## Visão geral e qualidade da evidência
 
@@ -364,3 +364,43 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 **Operações de ambiente:** consultas somente leitura no Supabase e Render; nenhum DDL/DML, migration, deploy manual, alteração de secret/flag, mudança de permissão ou alteração de produção foi executado. **Mutação GitHub:** somente branch isolada e atualização destes dois documentos; sem alteração de código/workflows, commit na main ou merge.
 
 - Achado C0 adicional: `CognitiveRouter` aparece no registro Nexus e em `config/pipelines/jarvis_chat.yml`, mas a busca não encontrou teste de `execute()` nem prova de execução ponta a ponta do pipeline. `assistant_curiosity.py` chama `CuriosityEngine.execute()` com ações `detect_gaps` e `store_answer`, enquanto o engine só aceita `analyze`, `explore` e `suggest`; a captura de resposta também retorna `(False, None)` em falha, descartando o `pending_need_id`. Não foram encontrados callsites dos helpers nem testes comportamentais dedicados. É defeito de contrato confirmado no código, mas impacto em runtime permanece provável/não confirmado porque o consumidor não foi localizado. Não corrigir por adivinhação antes de identificar a composição pretendida.
+
+
+## Delta de auditoria — 2026-11-10 — PR #805, CI e revalidação C0
+
+**HEAD consultado:** `main` em `956583a9fa69728b40613ceb81133e60b8da3cde`. O commit `dd7af8d06b9bc562669503dda2423939c159ac82` é o merge da PR #805 e o pai direto do HEAD atual. A comparação confirma que o commit posterior `956583a` altera somente `ARCHITECTURE.md` (atualização automática, mensagem `[skip ci]`); portanto o último código executável foi validado no pai `dd7af8d`.
+
+### PRs, issues e CI
+
+- Não havia PRs abertas na consulta `GET /pulls?state=open`.
+- **PR #805 — merged em 2026-11-10 21:36:20 UTC:** correções do GEV/HUD, clima e persistência OSINT. Head final: `9ccc318b42b8795e211f3b5459f0751df5456546`.
+- PR Validation run [42905716363](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42905716363): success no head final; **3.143 passed, 34 skipped, 8 warnings**, 64,02 s.
+- Task Queue run [42905716297](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42905716297): success no head final.
+- Main Task Queue run [42906674072](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42906674072): success no merge commit `dd7af8d`; **3.160 passed, 17 skipped, 181 warnings**, 114,52 s. Auto-Documentation run [42906674081](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42906674081): success.
+- **Falha real corrigida dentro da PR #805:** run [42903577636](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42903577636), SHA `a53e9622942f1b1d1a4d80ceb656856a39fac47b`, falhou em `tests/test_regression_guards.py::TestNoUndefinedNames::test_pyflakes_reports_no_undefined_names_in_app`: `IntelligenceEvidence` indefinido em `app/adapters/edge/jarvis_desktop_local.py:1011`. A PR adicionou o import ausente; os checks do head final e da main passaram. Classificação: defeito determinístico de código, corrigido na mesma PR; não flakiness/infraestrutura.
+
+### Segurança e revisão da PR #805
+
+- O finding de descoberta cross-profile do `intelligence.env` não corresponde ao código final: a configuração usa somente caminho explicitamente indicado, `LOCALAPPDATA` e o home do usuário; não enumera `/mnt/c/Users`.
+- O finding de permissão do arquivo de ambiente não considera a normalização posterior: o provisioner faz `chmod 600` depois da substituição atômica do arquivo, e `test_provisioner_enforces_environment_permissions_after_atomic_replacement` verifica essa ordem.
+- Os campos meteorológicos apontados pelo finding XSS são escapados por `esc()`, que codifica `& < > " '`; `test_weather_panel_escapes_every_external_string_before_html_insertion` verifica os nove campos/expressões citados. O thread Strix permanece sem resolução no GitHub; a evidência do código final não confirma o sink descrito.
+- A PR também registra como resolvidos os achados de bind da API, coordenadas não finitas e crescimento ilimitado do cache. Não foi identificado nesta revisão um finding de segurança confirmado que justifique uma nova PR corretiva.
+
+### Autoevolução e Self Healing
+
+- Workflow agendado [42905628673](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42905628673): gate executado com sucesso, mas `EVOLUTION_ENABLED` estava vazio. Geração/validação isolada e publicação privilegiada foram skipped.
+- `data/roadmap_missions.json` continua com `missions: []` e hold reason explícito: C0 aberto, sem mapeamento revisado de critério → alvo Python → testes.
+- Self Healing V3 permanece versionado e não foi alterado. Run [42905657841](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/42905657841) ficou skipped. `homeostase.yml` observa somente os workflows listados, em eventos confiáveis de `main`; não lista JARVIS PR Validation nem Jarvis Task Queue Tests. Logo, não declarar que o healer corrige falhas originadas em branches de PR. A trilha de correção automática permanece preservada, sem conceder ao executor de PR credenciais de publicação.
+
+### Governança e pendências externas
+
+- Consulta atual da API: `main.protected=false`, `protection.enabled=false`, required checks com enforcement `off`, listas de checks vazias e `rulesets=[]`. Issue [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) permanece aberta. O conector disponível nesta execução oferece leitura desses endpoints, mas não uma operação de escrita para branch protection/rulesets; nenhuma configuração administrativa foi alterada.
+- Issues abertas: [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682), [#723](https://github.com/TheDrack/Jarvis_Xerife/issues/723) e [#732](https://github.com/TheDrack/Jarvis_Xerife/issues/732). #723 mantém o guard provider-aware já implantado; a reconciliação do histórico/Preview continua rastreada em #732. Nenhuma issue foi criada.
+
+### Estado C0 após esta revalidação
+
+- Os três critérios `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` continuam **pending**. C1 permanece bloqueado.
+- `CognitiveRouter`: `config/pipelines/jarvis_chat.yml` referencia `cognitive_router`, mas `data/nexus_registry.json` não contém mapeamento explícito para esse ID. O Nexus pode tentar descoberta por filesystem quando não está em strict mode; isso não prova consumo. Graphify não encontrou callers estritos nem testes ligados a `CognitiveRouter.execute()`. O grafo de `run_pipeline()` mostra apenas o CLI do próprio módulo e testes, sem consumidor de aplicação identificado. Além disso, o contexto inicial de `run_pipeline` não cria `metadata`, enquanto `CognitiveRouter.execute()` acessa `context["metadata"]`; há incompatibilidade potencial se o pipeline for chamado sem `inputs.metadata`. Runtime externo permanece não verificado.
+- `CuriosityIntake` é distinto de `CuriosityEngine`: está registrado no Nexus; `curiosity_capture` e `curiosity_list_recent` são funções `@mcp.tool` que resolvem `curiosity_intake` e chamam `execute()`. Os testes atuais cobrem o componente diretamente e verificam estaticamente o contrato MCP, mas não invocam os wrappers via MCP.
+- `assistant_curiosity.py` ainda envia `detect_gaps` e `store_answer`; `CuriosityEngine.execute()` aceita somente `analyze`, `explore` e `suggest`. A correção da PR #796 preserva `pending_need_id` após falha e tem cinco testes diretos, mas não implementa armazenamento de respostas. Graphify encontra somente testes como callers de `capture_curiosity_answer()`; não localiza consumidor de produção para esses helpers. O impacto operacional permanece não confirmado.
+- Próximo critério: fechar o mapa de composição/consumidores e o contrato de entrada do `CognitiveRouter`; adicionar teste de integração pelo consumidor real ou documentar formalmente que o pipeline é legado/não utilizado. Separadamente, testar os wrappers MCP reais e decidir se os helpers de `CuriosityEngine` devem receber ações válidas e um consumidor, sem criar outro motor. Não iniciar C1 antes da aceitação C0.
