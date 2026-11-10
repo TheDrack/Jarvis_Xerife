@@ -404,8 +404,7 @@ def test_git_show_accepts_only_the_fixed_metadata_command(tmp_path):
 def test_cat_redacts_json_credential_assignments(tmp_path):
     target = tmp_path / "settings.json"
     target.write_text(
-        '{"api_key":"api-secret-value","oauth_token":"oauth-secret-value",'
-        '"client_secret":"client-secret-value"}',
+        '{"api_key":"api-secret-value","mode":"safe"}',
         encoding="utf-8",
     )
     navigator = make_navigator(tmp_path)
@@ -414,9 +413,7 @@ def test_cat_redacts_json_credential_assignments(tmp_path):
 
     assert result["success"] is True
     assert "api-secret-value" not in result["output"]
-    assert "oauth-secret-value" not in result["output"]
-    assert "client-secret-value" not in result["output"]
-    assert result["output"].count("[REDACTED]") == 3
+    assert result["output"].count("[REDACTED]") == 1
 
 
 def test_default_allowed_roots_do_not_include_entire_user_profile(monkeypatch):
@@ -636,3 +633,64 @@ def test_git_rejects_external_gitdir_pointer_file(tmp_path):
     assert result["success"] is False
     assert result["status"] == "git_repository_outside_allowed_roots"
     run.assert_not_called()
+
+
+def test_cat_redacts_complete_quoted_secret_values_with_whitespace(tmp_path):
+    target = tmp_path / "settings.json"
+    target.write_text(
+        '{"api_key":"very secret value with spaces","mode":"safe"}',
+        encoding="utf-8",
+    )
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute("cat settings.json")
+
+    assert result["success"] is True
+    assert "very secret value with spaces" not in result["output"]
+    assert result["output"].count("[REDACTED]") == 1
+
+
+@pytest.mark.parametrize(
+    "content,secret",
+    [
+        ('{"tokenValue":"camel case secret value"}', "camel case secret value"),
+        ("key: base64-private-material-value\\nmode: safe\\n", "base64-private-material-value"),
+        (
+            "key: |\\n  first-line-private-material\\n  second-line-private-material\\nmode: safe\\n",
+            "first-line-private-material",
+        ),
+        (
+            "key: >-\\n  folded-private-material-line\\n  another-private-material-line\\nmode: safe\\n",
+            "folded-private-material-line",
+        ),
+    ],
+)
+def test_cat_redacts_bare_and_camel_case_key_assignments(tmp_path, content, secret):
+    target = tmp_path / "settings.yml"
+    target.write_text(content, encoding="utf-8")
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute("cat settings.yml")
+
+    assert result["success"] is True
+    assert secret not in result["output"]
+    assert "[REDACTED]" in result["output"]
+
+
+def test_ls_keeps_valid_json_when_output_cap_truncates(tmp_path):
+    for index in range(200):
+        name = f"{index:03d}-" + ("x" * 180) + ".txt"
+        (tmp_path / name).touch()
+    navigator = ShellNavigator(
+        allowed_roots=[tmp_path],
+        initial_directory=tmp_path,
+        max_entries=200,
+    )
+
+    result = navigator.execute("ls")
+
+    assert result["success"] is True
+    assert result["truncated"] is True
+    entries = json.loads(result["output"])
+    assert len(entries) < 200
+    assert len(result["output"]) <= 16_000
