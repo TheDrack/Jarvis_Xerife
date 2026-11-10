@@ -97,7 +97,7 @@ def test_rejects_shell_composition_and_unlisted_commands(tmp_path, command):
 
 def test_git_status_runs_as_argv_without_shell_and_uses_current_directory(tmp_path):
     repo = tmp_path / "repo"
-    repo.mkdir()
+    (repo / ".git").mkdir(parents=True)
     navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
     completed = subprocess.CompletedProcess(
         args=["git"], returncode=0, stdout="## main", stderr=""
@@ -119,6 +119,7 @@ def test_git_status_runs_as_argv_without_shell_and_uses_current_directory(tmp_pa
     assert kwargs["shell"] is False
     assert kwargs["cwd"] == str(repo)
     assert kwargs["timeout"] <= 15
+    assert kwargs["env"]["GIT_CEILING_DIRECTORIES"] == str(tmp_path)
 
 
 def test_git_rejects_mutating_subcommands(tmp_path):
@@ -155,6 +156,7 @@ def test_ls_caps_number_of_entries(tmp_path):
 
 
 def test_git_log_supports_a_bounded_commit_count(tmp_path):
+    (tmp_path / ".git").mkdir()
     navigator = make_navigator(tmp_path)
     completed = subprocess.CompletedProcess(
         args=["git"], returncode=0, stdout="abc123 initial", stderr=""
@@ -170,6 +172,7 @@ def test_git_log_supports_a_bounded_commit_count(tmp_path):
 
 
 def test_git_remote_output_redacts_embedded_credentials(tmp_path):
+    (tmp_path / ".git").mkdir()
     navigator = make_navigator(tmp_path)
     completed = subprocess.CompletedProcess(
         args=["git"], returncode=0,
@@ -294,6 +297,7 @@ def test_git_does_not_discover_repository_above_allowed_root(tmp_path):
 
 
 def test_git_remote_redacts_token_only_url_userinfo(tmp_path):
+    (tmp_path / ".git").mkdir()
     navigator = make_navigator(tmp_path)
     completed = subprocess.CompletedProcess(
         args=["git"], returncode=0,
