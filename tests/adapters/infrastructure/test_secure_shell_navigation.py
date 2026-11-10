@@ -267,13 +267,13 @@ def test_git_and_unknown_commands_are_rejected(tmp_path):
         assert result["status"] == "command_rejected"
 
 
-def test_invalid_timeout_is_rejected(tmp_path):
+def test_command_length_is_bounded(tmp_path):
     navigator = make_navigator(tmp_path)
 
-    result = navigator.execute("pwd", timeout_seconds=0)
+    result = navigator.execute("x" * 2049)
 
     assert result["success"] is False
-    assert result["status"] == "invalid_timeout"
+    assert result["status"] == "command_rejected"
 
 
 def test_shell_navigation_tool_is_disabled_without_explicit_opt_in(monkeypatch):
