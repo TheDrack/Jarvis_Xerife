@@ -95,7 +95,7 @@ Por padrão, as ferramentas `host_*` não são registradas. Para habilitá-las, 
 | `host_fs_list` | metadados de diretório, profundidade ≤ 4, ≤ 500 entradas, symlink/junction não seguidos |
 | `host_fs_read_text` | texto UTF-8 ≤ 256 KiB/4 000 linhas; binário, chave privada e arquivos de credencial recusados; tokens redigidos |
 | `host_command_profiles` | raízes, limites e verbos efetivos |
-| `host_command_run` | argv estruturado, perfis `powershell_readonly`, `git`, `pytest`, `inspect_d`; `shell=False`, sem elevação, timeout 1–60 s |
+| `host_command_run` | argv estruturado, perfis `powershell_readonly`, `git`, `inspect_d`; `shell=False`, sem elevação, timeout 1–60 s |
 | `host_command_request_confirmation` | token HMAC de uso único; inerte enquanto nenhuma capacidade for confirmável |
 
 Raízes: raiz do repositório e `D:\` (ou `JARVIS_HOST_OPS_ROOTS`). Travessia `..`, `~`, escape por link simbólico/junction e nomes de credencial são rejeitados após resolução. Escrita, instalação, boot, ACL, credenciais, controle de serviço e privilégio são bloqueados por padrão e auditados em `~/.local/share/jarvis/host_ops_audit.jsonl`, sem conteúdo de saída. Detalhes, ativação e testes: [HOST_OPS.md](skills-connectors/HOST_OPS.md).
