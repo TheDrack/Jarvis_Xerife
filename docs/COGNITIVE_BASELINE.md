@@ -511,7 +511,52 @@ O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remota
 - PR #790 merged: adiciona teste integrado para collect_live_intelligence, IntelligenceCore, IntelligenceRecurringWorker e SupabaseIntelligenceHistoryAdapter. Usa doubles determinísticos e não chama serviços externos. CI final: PR Validation run 42641924299 success; Task Queue run 42641924074 success. Isso comprova composição local em CI, não ativação do worker ou persistência em produção.
 - PR #791 merged: corrige a corrida observada no Auto-Documentation com concurrency group e checkout do main atual. CI final: PR Validation run 42642600559 success. O workflow permanece ativo; a correção evita a corrida entre execuções desse workflow, não serializa todos os possíveis escritores de main.
 - O código atual de RoadmapMissionSelector já lê o ledger estruturado em docs/STATUS.md. Missão complete exige estado verified e referências de commit, Actions, implementação, consumidor e testes existentes, com correspondência entre target/testes e STATUS. O parser não autentica remotamente os commits nem os checks; revisão humana continua obrigatória.
-- A nota histórica que dizia que RoadmapMissionSelector não lia STATUS foi supersedida pela PR #782 merged. O teste real do repositório para manifesto vazio ainda retorna antes de exercitar o parser de STATUS. A branch test/c0-real-status-ledger-contract adiciona teste específico para o ledger real e confirma os três critérios C0 como pending; aguarda CI.
+- A nota histórica que dizia que RoadmapMissionSelector não lia STATUS foi supersedida pela PR #782 merged. O teste real do repositório para manifesto vazio ainda retorna antes de exercitar o parser de STATUS. PR #792 foi merged: `tests/application/test_roadmap_mission_selector.py` exercita `_load_status_evidence` contra o STATUS real e confirma os três critérios C0 como pending. PR Validation run 42647241982 e Task Queue run 42647241960 passaram. O teste do manifesto vazio continua sendo um no-op separado.
 - data/roadmap_missions.json continua vazio. Nenhuma missão foi aprovada. Os critérios C0-CAPABILITY-MAP, C0-GAPS-RECORDED e C0-NO-NAME-BASED-COMPLETION continuam pending. C1 não deve iniciar.
 - Issues abertas verificadas: #682, #723 e #732. Branch protection continua bloqueada por configuração administrativa; histórico de migrations exige validação schema-aware/Preview/rollback; não fazer repair ou alteração de produção como atalho.
 - Self Healing V3 permanece ativo e separado de PR Validation. A documentação confirma que o healer privilegiado só processa falhas de workflows da main, não execuções de PR. Qualquer extensão deve manter isolamento entre código não confiável de PR e credenciais de escrita.
+
+
+## Delta pós-snapshot — 2026-11-09 — PRs #792–#794 e runtime revalidado
+
+**HEAD atual:** `main` em `1ac9186eedb6ab0825d6254aaa8c3204582f4a11` (PR #794). O snapshot original em #774 e os adendos anteriores são históricos; este bloco os supersede para estado atual sem reescrever a evidência original.
+
+### Mudanças e CI posteriores a #791
+
+- **PR #792 — merged:** adiciona teste no repositório real para `RoadmapMissionSelector._load_status_evidence`, confirmando que os três IDs C0 da produção continuam `pending`. PR Validation run 42647241982 e Task Queue run 42647241960 passaram. O teste de manifesto vazio continua um no-op intencional; a cobertura do parser é separada.
+- **PR #793 — merged:** adiciona inventário de armazenamento limitado e somente leitura, com metadados de filesystem, limites de profundidade/entradas/tempo e exclusão de symlinks/reparse points. Inclui testes em `tests/adapters/edge/test_host_storage_diagnostics.py` e projeção PowerShell em `tests/adapters/infrastructure/test_secure_shell_executor.py`.
+- **PR #794 — merged:** expõe o inventário como opção `include_storage_inventory` no diagnóstico de recursos já concedido, mantendo-o opt-in. Testes em `tests/adapters/edge/test_host_resource_diagnostics.py`. PR Validation run 42693842123, Task Queue run 42693842031 e Browser Tests run 42693842090 passaram. Full pytest Linux: 2.888 passed, 15 skipped, 8 warnings. Após merge, Task Queue run 42694784471 no HEAD #794: 2.888 passed, 15 skipped, 181 warnings em Windows/Python 3.12.10. Auto-Documentation run 42694785391 passou.
+- Main run 42646055614 falhou apenas porque `Get-Date` excedeu 10 segundos no teste end-to-end do executor PowerShell. O teste direcionado passou; o full pytest posterior no HEAD #794 passou sem mudança do timeout. Evidência compatível com lentidão transitória do runner/PowerShell, não com defeito determinístico. Não houve redução de cobertura.
+- No início da auditoria não havia PRs abertas; esta revalidação abriu a PR documental #795. Issues abertas: #682, #723 e #732. A PR #757 e as PRs #789–#794 relevantes foram confirmadas merged.
+
+### Revalidação de execução e autoevolução
+
+- O workflow `auto_evolution_triggerV2.yml` está integrado ao `RoadmapMissionSelector`, mas o run agendado 42669010758 encontrou `EVOLUTION_ENABLED` vazio e encerrou no gate com a autoevolução pausada. Os jobs de geração e publicação foram skipped.
+- `data/roadmap_missions.json` continua vazio. O no-op é seguro: não há missão C0 revisada com target/testes/dependências aprovados. Não inferir target a partir de nomes ou saída do LLM.
+- `homeostase.yml` continua presente. O Self Healing V3 observa apenas os workflows listados e execuções originadas em `main`; JARVIS PR Validation e Jarvis Task Queue Tests não estão na lista. Logo, o mecanismo não auto-corrige falhas de branches de PR. Uma extensão deve preservar a separação entre leitura/análise de PR não confiável e publisher privilegiado.
+- A API do GitHub retorna `main.protected=false`, required checks `off` e rulesets vazios. Issue #682 permanece aberta e requer ação administrativa fora do escopo do conector.
+
+### Snapshot Supabase/Render — 2026-11-09
+
+- Supabase: projeto ACTIVE_HEALTHY, PostgreSQL 17.6.1.063; 30 migrations remotas e 30 arquivos locais com correspondência exata version/name 30/30. Última migration: `20261108193000 durable_tool_approvals`. #732 continua aberta porque Preview, comparação schema-aware e rollback ainda não foram validados; somente a branch `main` aparece na lista de branches.
+- Tarefas: 13 registros, 0 `owner_id`, 0 `created_by`; 5 agentes (3 available, 2 offline); 0 credenciais ativas; 0 approvals; 0 vector memories.
+- Universal Intelligence: 0 snapshots de eventos, 0 snapshots de observações e 0 worker runs. Lease sem worker/expiração. As 1.755 observações ambientais estão todas expiradas; última ingestão 2026-11-03 15:11:28 UTC.
+- Render: serviço Jarvis-api implantou automaticamente o commit #794 e está `live`. Logs até 2026-11-09 20:43:31 UTC continuam dizendo que o recurring worker está desabilitado por feature flags. Deploy bem-sucedido não significa worker ativo.
+- Security Advisor: 31 tabelas com RLS sem policy (INFO); grants de tabela para anon/authenticated são zero para SELECT/INSERT/UPDATE/DELETE. Service role tem ao menos um privilégio DML em 30/31. Health Advisor sem findings. Performance Advisor lista 43 índices unused (INFO); não remover sem medir workload.
+
+### Estado C0 e próximo critério
+
+- O teste integrado da PR #790 cobre composição local de `collect_live_intelligence`, Core, worker e history adapter com doubles; o teste da PR #792 exercita o ledger real. Nenhum deles comprova worker recorrente ativo, gravação/readback real ou consumer autenticado de ponta a ponta.
+- Os três critérios C0 permanecem pending. A prioridade continua **C0-CAPABILITY-MAP**: fechar o mapa de consumidores e testes comportamentais ausentes (em especial roteamento cognitivo, iniciativa e a ausência explícita do World Model canônico), distinguindo código, teste, CI e runtime.
+- **C0-GAPS-RECORDED** e **C0-NO-NAME-BASED-COMPLETION** também permanecem pending até revisão explícita da matriz completa e evidências. Não promover status por PR merged, documentação isolada ou CI isolado.
+- C1 não começa nesta revalidação. O próximo trabalho de World Model só deve ser contratos canônicos após a aceitação formal de C0.
+
+
+### Achado C0 — roteamento e iniciativa ainda sem comportamento integrado
+
+- `app/domain/gears/cognitive_router.py` define `CognitiveRouter.execute()`; `data/nexus_registry.json` registra o componente e `config/pipelines/jarvis_chat.yml` o referencia. A busca de código encontrou o teste `tests/test_nexus_registry_sync.py`, que valida apenas sincronização do registro; não foi encontrado teste de execução do router nem prova de que o pipeline completo consome esse passo em runtime. Classificação: registro/configuração confirmados; consumo dinâmico e comportamento ponta a ponta não verificados.
+- `app/application/services/assistant_curiosity.py` define `maybe_inject_curiosity_question()` e `capture_curiosity_answer()`. A primeira envia `action=detect_gaps` e a segunda `action=store_answer` ao `CuriosityEngine`.
+- `app/application/services/curiosity_engine.py::execute()` aceita somente `analyze`, `explore` e `suggest`; portanto as duas ações chamadas pelo helper são rejeitadas como desconhecidas. Além disso, `capture_curiosity_answer()` termina em `(False, None)` quando não consegue armazenar a resposta, em vez de preservar `pending_need_id`.
+- A busca por `maybe_inject_curiosity_question`, `capture_curiosity_answer` e `maybe_get_proactive_suggestion` não encontrou callsites fora das próprias definições; também não foram encontrados testes específicos para esses helpers ou para `CuriosityEngine`. O efeito em runtime é **provável, não confirmado**, pois o caminho não foi ligado a um consumidor observado.
+- Não promover Curiosity/Initiative nem CognitiveRouter a capacidade operacional. Próximo passo C0: identificar o composition root e o consumidor pretendido; depois adicionar teste de contrato para as ações válidas e teste de integração pelo consumidor real. Não criar um segundo motor de curiosidade nem inferir um consumer a partir do registro Nexus.
+
