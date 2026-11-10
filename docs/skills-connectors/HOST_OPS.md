@@ -15,12 +15,12 @@ This is an owner-controlled feature opt-in, not per-call authorization. The Secu
 | Tool | Purpose | Limits |
 |---|---|---|
 | `host_fs_list` | Directory metadata (`path`, `depth`, `max_entries`) | depth 0–4, 1–500 entries, symlinks/junctions reported but not followed, credential-named entries filtered |
-| `host_fs_read_text` | Read one UTF-8 text file (`path`, `max_bytes`, `max_lines`) | ≤ 256 KiB, ≤ 4 000 lines, binary refused, private keys refused, token-shaped values redacted |
+| `host_fs_read_text` | Read one UTF-8 text file (`path`, `max_bytes`, `max_lines`) | ≤ 256 KiB, ≤ 4 000 lines, binary refused, recognized private-key formats refused, token-shaped values redacted |
 | `host_command_profiles` | Effective roots, limits and profile verbs | read-only, no side effects |
 | `host_command_run` | Run one structured command (`profile`, `verb`, `arguments`, `cwd`, `timeout_seconds`) | argv list only, `shell=False`, ≤ 60 s, ≤ 16 000 chars stdout, ≤ 4 000 chars stderr |
 | `host_command_request_confirmation` | Issue a single-use token for a confirmable capability | no capability is confirmable today; always returns `confirmation_not_applicable` |
 
-All five are registered on the existing `Jarvis Desktop` FastMCP server; no new port, listener or credential exists.
+When enabled, all five tools are registered on the existing `Jarvis Desktop` FastMCP server; no new port, listener or credential is introduced.
 
 ## Allowed roots
 
