@@ -408,3 +408,81 @@ def test_describe_profiles_reports_boundaries(_sandbox):
     assert description["confirmable_profiles"] == []
     assert "filesystem writes" in description["blocked_capabilities"]
     assert any(Path(root) == _sandbox.resolve() for root in description["roots"])
+
+
+# --------------------------------------------------------------------------- #
+# Security review regressions: Strix findings
+# --------------------------------------------------------------------------- #
+def test_list_filters_credential_directories(_sandbox):
+    for name in (".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store"):
+        (_sandbox / name).mkdir()
+    (_sandbox / "project").mkdir()
+
+    result = ops.list_directory(str(_sandbox), depth=1, max_entries=100)
+
+    names = {entry["name"] for entry in result["entries"]}
+    assert names == {"project"}
+    assert result["filtered_secret_entries"] == 7
+
+
+@pytest.mark.parametrize(
+    "provider_path",
+    [
+        "Registry::HKEY_LOCAL_MACHINE\\Software",
+        "FileSystem::C:/Windows",
+        "Env:PATH",
+        "Variable:HOME",
+        "Cert:\\CurrentUser\\My",
+    ],
+)
+def test_powershell_path_arguments_reject_non_filesystem_providers(provider_path):
+    with pytest.raises((ValueError, ops.PathNotAllowed)):
+        ops.compile_command(
+            "powershell_readonly", "Get-ChildItem", ["-Path", provider_path]
+        )
+
+
+def test_git_show_and_diff_require_metadata_only_output():
+    with pytest.raises(ValueError):
+        ops.compile_command("git", "show", ["HEAD"])
+    with pytest.raises(ValueError):
+        ops.compile_command("git", "diff", [])
+
+    assert "--stat" in ops.compile_command("git", "show", ["--stat", "HEAD"]).argv
+    assert "--name-only" in ops.compile_command("git", "diff", ["--name-only"]).argv
+
+
+def test_git_and_pytest_profiles_cannot_change_working_directory_outside_repo(_sandbox):
+    outside = _sandbox / "other-repository"
+    outside.mkdir()
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.compile_command("git", "status", [], cwd=str(outside))
+    with pytest.raises(ops.PathNotAllowed):
+        ops.compile_command("pytest", "run", ["tests"], cwd=str(outside))
+
+
+def test_redaction_covers_provider_qualified_secret_environment_names():
+    payload = (
+        "OPENAI_API_KEY=sk-proj-abcdefghijklmnop "
+        "SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiJ9 "
+        "AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE "
+        "DATABASE_URL=postgresql://user:supersecret@db.example.test/app"
+    )
+
+    sanitized, count = ops.redact(payload)
+
+    assert count >= 4
+    assert "sk-proj-abcdefghijklmnop" not in sanitized
+    assert "eyJhbGciOiJIUzI1NiJ9" not in sanitized
+    assert "AKIAIOSFODNN7EXAMPLE" not in sanitized
+    assert "supersecret" not in sanitized
+
+
+def test_pytest_profile_does_not_disable_coverage():
+    compiled = ops.compile_command(
+        "pytest", "run", ["tests/adapters/infrastructure/test_host_ops.py"]
+    )
+
+    assert "--no-cov" not in compiled.argv
+    assert "--cov" not in compiled.argv
