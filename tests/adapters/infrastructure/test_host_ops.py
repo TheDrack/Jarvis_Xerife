@@ -173,7 +173,7 @@ def _fake_powershell(monkeypatch):
 def test_git_profile_builds_structured_argv(_fake_powershell):
     compiled = ops.compile_command("git", "status", ["--short"])
 
-    assert compiled.argv == ("git", "--no-pager", "status", "--short")
+    assert compiled.argv == ("git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "--no-pager", "status", "--short")
     assert compiled.timeout_seconds == 20
     assert compiled.display == "status --short"
 
@@ -288,7 +288,8 @@ def test_run_uses_argv_without_shell_and_sanitizes_environment(monkeypatch):
     assert result["success"] is True
     assert result["shell"] is False
     assert result["elevated"] is False
-    assert capture["argv"][:3] == ["git", "--no-pager", "status"]
+    assert capture["argv"][:2] == ["git", "-c"]
+    assert "core.fsmonitor=false" in capture["argv"]
     assert capture["timeout"] == 9
     assert "SECRET_TOKEN" not in capture["env"]
     assert capture["env"]["GIT_TERMINAL_PROMPT"] == "0"
@@ -573,7 +574,7 @@ def test_git_profile_disables_repo_fsmonitor_and_optional_index_cache():
     )
 
 
-def test_git_environment_ignores_user_and_system_configuration(monkeypatch):
+def test_git_environment_ignores_user_and_system_configuration():
     environment = ops._sanitized_environment()
 
     assert environment["GIT_CONFIG_NOSYSTEM"] == "1"
