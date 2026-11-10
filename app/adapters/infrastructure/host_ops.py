@@ -39,6 +39,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from itertools import islice
 from typing import Any, Iterable, Mapping, Sequence
 
 logger = logging.getLogger(__name__)
@@ -395,8 +396,16 @@ def list_directory(
         if truncated:
             return
         try:
+            scanner = os.scandir(current)
+            try:
+                children = list(islice(scanner, max_entries + 1))
+            finally:
+                close = getattr(scanner, "close", None)
+                if close is not None:
+                    close()
+            scan_truncated = len(children) > max_entries
             children = sorted(
-                os.scandir(current),
+                children[:max_entries],
                 key=lambda item: (
                     not item.is_dir(follow_symlinks=False),
                     item.name.casefold(),
@@ -438,6 +447,8 @@ def list_directory(
             )
             if kind == "directory" and level < depth:
                 walk(Path(entry.path), level + 1)
+        if scan_truncated:
+            truncated = True
 
     walk(root, 0)
     return {
