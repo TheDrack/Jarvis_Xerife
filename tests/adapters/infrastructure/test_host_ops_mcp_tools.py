@@ -203,6 +203,6 @@ def test_filesystem_tools_audit_unpaired_surrogate_paths(tmp_path, monkeypatch):
     assert len(records) == 2
     assert [record["event"] for record in records] == ["fs_list", "fs_read"]
     assert all(record["path_digest"] for record in records)
-    assert "\\ud800" not in audit_path.read_text(encoding="utf-8")
+    assert "\ud800" not in audit_path.read_text(encoding="utf-8")
 
 
