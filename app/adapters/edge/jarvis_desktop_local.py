@@ -138,16 +138,17 @@ def _load_local_intelligence_config(path: Path | None = None) -> int:
     """Load allowlisted local source settings without overriding process env."""
     if path is None:
         candidates: list[Path] = []
+        explicit_path = os.getenv("JARVIS_INTELLIGENCE_ENV")
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
         env_local = os.getenv("LOCALAPPDATA")
         if env_local:
             candidates.append(Path(env_local) / "Jarvis_Xerife" / "intelligence.env")
-        candidates.append(Path.home() / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env")
-        # WSL fallback: Windows user profiles mounted under /mnt/c/Users.
-        try:
-            for user_dir in Path("/mnt/c/Users").iterdir():
-                candidates.append(user_dir / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env")
-        except OSError:
-            pass
+        candidates.append(
+            Path.home() / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env"
+        )
+        # Never enumerate /mnt/c/Users: another Windows profile may be writable
+        # by a different local account and must not supply an executable GEV path.
         path = None
         for candidate in candidates:
             try:
