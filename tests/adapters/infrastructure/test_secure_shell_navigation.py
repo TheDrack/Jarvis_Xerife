@@ -227,3 +227,101 @@ def test_cat_blocks_secret_store_directory_components(tmp_path):
     assert result["success"] is False
     assert result["status"] == "sensitive_file_blocked"
     assert "must-not-leak" not in result["output"]
+
+
+def test_ls_hides_cloud_credential_store_directories(tmp_path):
+    config = tmp_path / ".config"
+    gcloud = config / "gcloud"
+    gh = config / "gh"
+    gcloud.mkdir(parents=True)
+    gh.mkdir()
+    (gcloud / "credentials.db").write_text("cloud-secret", encoding="utf-8")
+    (gh / "hosts.yml").write_text("oauth_token: secret", encoding="utf-8")
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute("ls .config")
+
+    assert result["success"] is True
+    names = {entry["name"] for entry in json.loads(result["output"])}
+    assert "gcloud" not in names
+    assert "gh" not in names
+
+
+def test_cat_blocks_cloud_credential_store_paths(tmp_path):
+    credentials = tmp_path / ".config" / "gcloud"
+    credentials.mkdir(parents=True)
+    (credentials / "credentials.db").write_text("cloud-secret", encoding="utf-8")
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute("cat .config/gcloud/credentials.db")
+
+    assert result["success"] is False
+    assert result["status"] == "sensitive_file_blocked"
+    assert "cloud-secret" not in result["output"]
+
+
+def test_git_rejects_repository_config_that_can_execute_commands(tmp_path):
+    repo = tmp_path / "repo"
+    git_dir = repo / ".git"
+    git_dir.mkdir(parents=True)
+    (git_dir / "config").write_text(
+        "[core]\\n\\tfsmonitor = !touch /tmp/jarvis-should-not-run\\n",
+        encoding="utf-8",
+    )
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=repo)
+
+    with patch("app.adapters.infrastructure.secure_shell_navigation.subprocess.run") as run:
+        result = navigator.execute("git status")
+
+    assert result["success"] is False
+    assert result["status"] == "git_config_rejected"
+    run.assert_not_called()
+
+
+def test_git_does_not_discover_repository_above_allowed_root(tmp_path):
+    outer_repo = tmp_path / "outer"
+    (outer_repo / ".git").mkdir(parents=True)
+    allowed = outer_repo / "allowed"
+    allowed.mkdir()
+    navigator = ShellNavigator(allowed_roots=[allowed], initial_directory=allowed)
+
+    with patch("app.adapters.infrastructure.secure_shell_navigation.subprocess.run") as run:
+        result = navigator.execute("git status")
+
+    assert result["success"] is False
+    assert result["status"] == "git_repository_outside_allowed_roots"
+    run.assert_not_called()
+
+
+def test_git_remote_redacts_token_only_url_userinfo(tmp_path):
+    navigator = make_navigator(tmp_path)
+    completed = subprocess.CompletedProcess(
+        args=["git"], returncode=0,
+        stdout="origin https://ghp_supersecretvalue@github.com/org/repo.git (fetch)",
+        stderr="",
+    )
+    with patch(
+        "app.adapters.infrastructure.secure_shell_navigation.subprocess.run",
+        return_value=completed,
+    ):
+        result = navigator.execute("git remote -v")
+
+    assert result["success"] is True
+    assert "ghp_supersecretvalue" not in result["output"]
+    assert "[REDACTED]" in result["output"]
+
+
+def test_mixed_separator_unc_is_rejected_before_path_resolution(tmp_path, monkeypatch):
+    navigator = make_navigator(tmp_path)
+    original = Path.resolve
+
+    def guarded_resolve(path, *args, **kwargs):
+        if str(path).startswith("\\\\") or str(path).startswith("//"):
+            raise AssertionError("network path resolution must not be attempted")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", guarded_resolve)
+    result = navigator.execute('cat "\\\\attacker.example/share/secret.txt"')
+
+    assert result["success"] is False
+    assert result["status"] == "path_outside_allowed_roots"
