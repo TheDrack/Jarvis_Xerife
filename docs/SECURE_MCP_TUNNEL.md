@@ -97,6 +97,9 @@ Por padrão, as ferramentas `host_*` não são registradas. Para habilitá-las, 
 | `host_command_profiles` | raízes, limites e verbos efetivos |
 | `host_command_run` | argv estruturado, perfis `powershell_readonly`, `git`, `inspect_d`; `shell=False`, sem elevação, timeout 1–60 s |
 | `host_command_request_confirmation` | token HMAC de uso único; inerte enquanto nenhuma capacidade for confirmável |
+| `shell_navigate` | navegação `pwd`, `cd`, `ls`, `cat`; sem shell, Git ou subprocessos; leitura UTF-8 limitada e bloqueio de arquivos/conteúdo sensível |
+
+Navegação `shell_navigate`: recurso separado, desabilitado por padrão e habilitado somente com `JARVIS_SHELL_NAVIGATION_ENABLED=1`. A raiz padrão é o repositório; raízes adicionais exigem `JARVIS_SHELL_ALLOWED_ROOTS`. O parser aceita somente `pwd`, `cd`, `ls` e `cat`; comandos Git, shell, pipelines e executáveis são recusados. Leituras são limitadas a 64 KiB e 16 000 caracteres; arquivos ou conteúdo com padrões de credenciais são bloqueados integralmente. A ferramenta não executa subprocessos.
 
 Raízes: raiz do repositório e `D:\` (ou `JARVIS_HOST_OPS_ROOTS`). Travessia `..`, `~`, escape por link simbólico/junction e nomes de credencial são rejeitados após resolução. Escrita, instalação, boot, ACL, credenciais, controle de serviço e privilégio são bloqueados por padrão e auditados em `~/.local/share/jarvis/host_ops_audit.jsonl`, sem conteúdo de saída. Detalhes, ativação e testes: [HOST_OPS.md](skills-connectors/HOST_OPS.md).
 

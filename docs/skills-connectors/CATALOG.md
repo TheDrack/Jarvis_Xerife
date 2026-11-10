@@ -68,6 +68,14 @@
 - Destructive, installation, boot, ACL, credential and privileged operations are hard-blocked by pattern, audited and never executed — with or without confirmation. No host capability is confirmable today, so the token gate cannot unlock anything.
 - Status: implemented and unit/integration tested in this branch. Runtime availability depends on the deployed MCP server build; verify with `host_command_profiles` before claiming the tools are live. Runbook: [HOST_OPS.md](HOST_OPS.md); skill: [jarvis-host-ops](../../skills/jarvis-host-ops/SKILL.md).
 
+## Secure shell navigation over the MCP tunnel
+
+- Implementation: `app/adapters/infrastructure/secure_shell_navigation.py`; registered additively by `app/adapters/edge/jarvis_desktop_mcp.py`.
+- Tool: `shell_navigate`; supported commands are only `pwd`, `cd`, `ls`, and `cat`. It does not invoke a shell, Git, subprocesses, or arbitrary executables.
+- Disabled by default. Explicit local opt-in: `JARVIS_SHELL_NAVIGATION_ENABLED=1`. The default root is the repository; additional roots require `JARVIS_SHELL_ALLOWED_ROOTS`.
+- Directory listings and UTF-8 reads are bounded. Symlinks, junctions, traversal, sensitive credential stores, binary files, and credential-shaped content are refused or filtered.
+- Status: implemented on the rebuild branch; CI and independent security review are required. Runtime availability requires the deployed MCP server to include the change and the local opt-in to be enabled. Runbook: [Secure MCP Tunnel](../SECURE_MCP_TUNNEL.md).
+
 ## Portable Jarvis skills
 
 | Skill | Use it for | Canonical entry point |
