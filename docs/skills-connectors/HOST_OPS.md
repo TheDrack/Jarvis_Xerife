@@ -21,7 +21,7 @@ All five are registered on the existing `Jarvis Desktop` FastMCP server; no new 
 Default on Windows: the repository root and `D:\`. On other platforms: the repository root only. Override explicitly:
 
 ```powershell
-$env:JARVIS_HOST_OPS_ROOTS = "D:\;C:\Users\USER\Documents\GitHub\Jarvis_Xerife"
+$env:JARVIS_HOST_OPS_ROOTS = "D:\\"
 ```
 
 The repository root is always appended. Paths are resolved with `Path.resolve()` (which follows junctions) and re-checked against the roots, so a link cannot escape. `..` segments, `~` paths and control characters are rejected before resolution.
