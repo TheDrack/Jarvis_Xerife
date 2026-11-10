@@ -324,6 +324,7 @@ def test_windows_device_and_stream_aliases_are_rejected(tmp_path, suffix):
     "content",
     [
         "key: base64-private-material-value\nmode: safe\n",
+        '{"key":"generic secret material with spaces"}',
         "Authorization: Bearer opaque-access-token-value\n",
         "password: |\n  first-line-secret-material\n  second-line-secret-material\nmode: safe\n",
     ],
