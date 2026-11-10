@@ -17,7 +17,7 @@ This is an owner-controlled feature opt-in, not per-call authorization. The Secu
 | `host_fs_list` | Directory metadata (`path`, `depth`, `max_entries`) | depth 0–4, 1–500 entries, symlinks/junctions reported but not followed, credential-named entries filtered |
 | `host_fs_read_text` | Read one UTF-8 text file (`path`, `max_bytes`, `max_lines`) | ≤ 256 KiB, ≤ 4 000 lines, binary refused, recognized private-key formats refused, token-shaped values redacted |
 | `host_command_profiles` | Effective roots, limits and profile verbs | read-only, no side effects |
-| `host_command_run` | Run one structured command (`profile`, `verb`, `arguments`, `cwd`, `timeout_seconds`) | argv list only, `shell=False`, ≤ 60 s, ≤ 16 000 chars stdout, ≤ 4 000 chars stderr |
+| `host_command_run` | Run one structured command (`profile`, `verb`, `arguments`, `cwd`, `timeout_seconds`) | argv list only, `shell=False`, ≤ 60 s; stdout/stderr are drained concurrently and retained within byte caps before redaction/truncation (16 000/4 000 output characters maximum) |
 | `host_command_request_confirmation` | Issue a single-use token for a confirmable capability | no capability is confirmable today; always returns `confirmation_not_applicable` |
 
 When enabled, all five tools are registered on the existing `Jarvis Desktop` FastMCP server; no new port, listener or credential is introduced.
@@ -83,7 +83,7 @@ This is the safe fallback for the requirement that destructive operations need a
 
 ## Audit
 
-Every attempt (executed, blocked, rejected, timeout, launch failure) appends one JSON line to `JARVIS_HOST_OPS_AUDIT_LOG` (default `~/.local/share/jarvis/host_ops_audit.jsonl`):
+Every command attempt and every filesystem list/read attempt (executed, blocked, rejected, timeout, launch failure) appends one JSON line to `JARVIS_HOST_OPS_AUDIT_LOG` (default `~/.local/share/jarvis/host_ops_audit.jsonl`). Filesystem paths are represented by a keyed digest; raw caller paths are not persisted. Child-process output is drained concurrently and capped in memory before redaction:
 
 ```json
 {"ts":"2026-11-10T12:00:00+00:00","audit_id":"…","event":"executed","profile":"git",
