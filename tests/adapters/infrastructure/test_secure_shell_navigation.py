@@ -112,7 +112,10 @@ def test_git_status_runs_as_argv_without_shell_and_uses_current_directory(tmp_pa
     assert result["success"] is True
     assert result["output"] == "## main"
     args, kwargs = run.call_args
-    assert args[0] == ["git", "status", "--short", "--branch"]
+    assert args[0] == [
+        "git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
+        "status", "--short", "--branch",
+    ]
     assert kwargs["shell"] is False
     assert kwargs["cwd"] == str(repo)
     assert kwargs["timeout"] <= 15
@@ -148,3 +151,37 @@ def test_ls_caps_number_of_entries(tmp_path):
     assert result["success"] is True
     assert len(json.loads(result["output"])) == 2
     assert result["truncated"] is True
+
+
+
+def test_git_log_supports_a_bounded_commit_count(tmp_path):
+    navigator = make_navigator(tmp_path)
+    completed = subprocess.CompletedProcess(
+        args=["git"], returncode=0, stdout="abc123 initial", stderr=""
+    )
+    with patch(
+        "app.adapters.infrastructure.secure_shell_navigation.subprocess.run",
+        return_value=completed,
+    ) as run:
+        result = navigator.execute("git log --oneline -n 5")
+
+    assert result["success"] is True
+    assert run.call_args.args[0][-5:] == ["log", "--oneline", "-n", "5"]
+
+
+def test_git_remote_output_redacts_embedded_credentials(tmp_path):
+    navigator = make_navigator(tmp_path)
+    completed = subprocess.CompletedProcess(
+        args=["git"], returncode=0,
+        stdout="origin https://user:supersecret@example.com/org/repo.git (fetch)",
+        stderr="",
+    )
+    with patch(
+        "app.adapters.infrastructure.secure_shell_navigation.subprocess.run",
+        return_value=completed,
+    ):
+        result = navigator.execute("git remote -v")
+
+    assert result["success"] is True
+    assert "supersecret" not in result["output"]
+    assert "[REDACTED]" in result["output"]
