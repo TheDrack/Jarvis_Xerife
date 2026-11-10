@@ -1,0 +1,26 @@
+[Unit]
+Description=Jarvis API (FastAPI/uvicorn)
+Documentation=file://@REPO_ROOT@/linux/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@REPO_ROOT@
+EnvironmentFile=@ENV_FILE@
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=@PYTHON@ serve.py
+Restart=on-failure
+RestartSec=5
+# O harness é read-only por padrão; sem CAP_SYS_ADMIN nem root.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=@REPO_ROOT@ /home/%u/.local/share/jarvis /home/%u/.config/jarvis
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
