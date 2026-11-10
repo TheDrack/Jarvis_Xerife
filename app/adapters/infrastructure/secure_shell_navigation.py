@@ -223,7 +223,7 @@ class ShellNavigator:
     def _resolve(self, raw_path: str | None, *, must_exist: bool = True) -> Path:
         raw = "" if raw_path is None else str(raw_path)
         normalized = raw.replace("/", "\\")
-        if normalized.startswith("\\\\\\\\") or normalized.startswith("\\\\?\\\\") or normalized.startswith("\\\\.\\\\"):
+        if raw.startswith(("\\\\", "//")) or normalized.startswith("\\\\"):
             raise PermissionError("UNC and device paths are not permitted")
 
         candidate = self.cwd if not raw_path else Path(raw_path).expanduser()
