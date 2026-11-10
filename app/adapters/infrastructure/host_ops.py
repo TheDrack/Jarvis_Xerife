@@ -199,7 +199,7 @@ _REDACTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(
             r"""(?i)(\b[A-Z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?KEY|PRIVATE[_-]?KEY|SIGNING[_-]?KEY|AUTH[_-]?TOKEN|ACCESS[_-]?TOKEN|REFRESH[_-]?TOKEN|CLIENT[_-]?SECRET|SERVICE[_-]?ROLE[_-]?KEY|SECRET[A-Z0-9_-]*|TOKEN|PASSWORD|PASSWD|PASSPHRASE|CREDENTIAL)[A-Z0-9_]*\s*[:=]\s*["']?)([^"'\s,;}]+)"""
-        ),,
+        ),
         r"\1[REDACTED]",
     ),
 )
