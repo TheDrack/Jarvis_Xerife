@@ -213,10 +213,13 @@ if [ "$WITH_TAILSCALE" -eq 1 ]; then
 fi
 
 if [ "$HARDEN" -eq 1 ]; then
-    log "aplicando UFW (default deny; SSH e tailscale0 liberados)"
+    log "aplicando UFW (default deny; SSH e tráfego Tailscale liberados somente em tailscale0)"
     $SUDO ufw --force default deny incoming
     $SUDO ufw --force default allow outgoing
-    $SUDO ufw allow 22/tcp comment 'ssh'
+    # Remove legacy global SSH rules left by previous provisioner versions.
+    $SUDO ufw --force delete allow 22/tcp >/dev/null 2>&1 || true
+    $SUDO ufw --force delete allow ssh >/dev/null 2>&1 || true
+    $SUDO ufw allow in on tailscale0 to any port 22 proto tcp comment 'ssh over tailscale'
     $SUDO ufw allow in on tailscale0 comment 'tailscale'
     $SUDO ufw --force enable
     $SUDO ufw status verbose

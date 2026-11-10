@@ -92,3 +92,16 @@ def test_linux_verifier_contains_one_complete_environment_and_summary_block():
     assert verifier.count("printf '\\nResumo:") == 1
     assert 'if grep -qE \'^JARVIS_DESKTOP_AUTH_TOKEN="?[^\"]{32,}"?$\' "$ENV_FILE"; then' in verifier
 
+
+def test_harden_network_does_not_expose_ssh_on_public_interfaces():
+    script = (ROOT / "linux/provision-jarvis-os.sh").read_text(encoding="utf-8")
+
+    assert "$SUDO ufw allow in on tailscale0 to any port 22 proto tcp" in script
+    assert "$SUDO ufw allow 22/tcp" not in script
+
+
+def test_harden_network_removes_legacy_global_ssh_rules():
+    script = (ROOT / "linux/provision-jarvis-os.sh").read_text(encoding="utf-8")
+
+    assert "$SUDO ufw --force delete allow 22/tcp" in script
+    assert "$SUDO ufw --force delete allow ssh" in script
