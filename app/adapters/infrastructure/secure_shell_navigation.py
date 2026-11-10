@@ -31,7 +31,7 @@ _SENSITIVE_PART = re.compile(
     r"(?i)^(?:"
     r"\.env(?:\..*)?|\.envrc|\.npmrc|\.netrc|\.git-credentials|"
     r"\.ssh|\.aws|\.azure|\.gnupg|\.kube|\.docker|"
-    r"\.password-store|\.terraform|\.vault|"
+    r"\.password-store|\.terraform|\.vault|\.m2|\.yarnrc\.yml|\.pgpass|\.my\.cnf|\.pypirc|"
     r"\.?credentials?(?:[._-].*)?|\.?secrets?(?:[._-].*)?|"
     r"\.?tokens?(?:[._-].*)?|\.?passwords?(?:[._-].*)?|"
     r"id_(?:rsa|dsa|ecdsa|ed25519)(?:\..*)?|authorized_keys|"
@@ -43,6 +43,16 @@ _SENSITIVE_PATH_PREFIXES = (
     (".config", "gh"),
     (".config", "containers"),
     (".config", "rclone"),
+    (".config", "glab-cli"),
+    (".config", "github-copilot"),
+    (".config", "composer"),
+    (".config", "age"),
+    (".config", "ngrok"),
+    (".config", "op"),
+    (".config", "sops"),
+    (".config", "hub"),
+    (".config", "podman"),
+    (".gem", "credentials"),
     (".local", "share", "keyrings"),
     ("appdata", "roaming", "code", "user", "globalstorage"),
     ("appdata", "local", "github cli"),
@@ -113,6 +123,10 @@ def _assert_trusted_git_config(git_dir: Path) -> None:
             raise ValueError("repository Git config contains an executable helper setting")
 
 
+_SECRET_CONTENT = re.compile(
+    rb"""(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|"auths"\s*:|_authToken|npmAuthToken|oauth_token|client[-_]?key[-_]?data|certificate[-_]?authority[-_]?data|account[-_]?key|AGE-SECRET-KEY-|aws_secret_access_key|client_secret|api[_-]?key|access_token|refresh_token|password|passwd|gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{16,}|xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}|<\s*(?:password|token|secret|api[_-]?key)\b[^>]*>\s*[^<]{4,}</\s*(?:password|token|secret|api[_-]?key)\s*>)"""
+)
+
 _TEXT_SUFFIXES = {
     ".txt", ".md", ".rst", ".py", ".ps1", ".sh", ".bat", ".cmd",
     ".json", ".toml", ".yaml", ".yml", ".ini", ".cfg", ".conf",
@@ -125,11 +139,25 @@ _SPECIAL_TEXT_NAMES = {"readme", "license", "dockerfile", "makefile", "procfile"
 
 
 def _redact_text(value: str) -> str:
-    """Redact common credential forms before returning file or Git output."""
+    """Redact provider tokens, key material, URL userinfo and credential assignments."""
     value = re.sub(r"(?i)(Bearer\s+)[A-Za-z0-9._~+/-]+=*", r"\1[REDACTED]", value)
-    value = re.sub(r"(?i)\bsk-[A-Za-z0-9_-]{16,}", "[REDACTED_API_KEY]", value)
+    value = re.sub(
+        r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----",
+        "[REDACTED_PRIVATE_KEY]",
+        value,
+        flags=re.DOTALL,
+    )
+    value = re.sub(
+        r"(?i)\b(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|"
+        r"glpat-[A-Za-z0-9_-]{16,}|xox[abposr]-[A-Za-z0-9-]{10,}|"
+        r"AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{16,}|AIza[0-9A-Za-z_-]{30,}|"
+        r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})",
+        "[REDACTED_SECRET]",
+        value,
+    )
+    value = re.sub(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s]+@", r"\1[REDACTED]@", value)
     return re.sub(
-        r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)["']?\s*[:=]\s*["']?)[^"'\s,}]+""",
+        r"""(?i)(["']?[A-Za-z0-9_.-]*(?:api[_-]?key|access[_-]?key|secret[_-]?key|private[_-]?key|client[_-]?secret|secret|passwd|password|passphrase|pwd|token|credential|authorization|auth|pat)["']?\s*[:=]\s*["']?)[^"'\s,}]+""",
         r"\1[REDACTED]",
         value,
     )
@@ -332,6 +360,8 @@ class ShellNavigator:
                     raw = target.read_bytes()
                     if b"\x00" in raw:
                         return self._failure("binary_file_blocked", "binary files cannot be read through this tool")
+                    if _SECRET_CONTENT.search(raw):
+                        return self._failure("sensitive_file_blocked", "file content looks like a stored credential")
                     try:
                         output = raw.decode("utf-8")
                     except UnicodeDecodeError:
