@@ -78,7 +78,7 @@ class AndroidNavigationAdapter:
         if any(
             ord(char) < 0x20
             or 0x7F <= ord(char) <= 0x9F
-            or char in {"\\u2028", "\\u2029"}
+            or ord(char) in {0x2028, 0x2029}
             for char in text
         ):
             return {"success": False, "status": "control_character_rejected"}
