@@ -168,6 +168,7 @@ class ShellNavigator:
         normalized = raw.replace("\\", "/")
         if any(part == ".." for part in normalized.split("/")):
             raise PermissionError("parent traversal is not permitted")
+        self._validate_windows_path_syntax(raw)
 
         candidate = Path(raw).expanduser()
         if not candidate.is_absolute():
@@ -198,6 +199,29 @@ class ShellNavigator:
         return resolved
 
     @staticmethod
+    def _validate_windows_path_syntax(raw: str) -> None:
+        if os.name != "nt":
+            return
+        normalized = raw.replace("/", "\\")
+        drive, tail = os.path.splitdrive(normalized)
+        if drive and not Path(normalized).is_absolute():
+            raise PermissionError("drive-relative paths are not permitted")
+        for component in tail.split("\\"):
+            if not component or component in {".", ".."}:
+                continue
+            if component.endswith((".", " ")):
+                raise PermissionError("Windows trailing-dot and trailing-space aliases are not permitted")
+            if ":" in component:
+                raise PermissionError("NTFS alternate data streams are not permitted")
+            device = component.split(".", 1)[0].casefold().translate(
+                str.maketrans("\u00b9\u00b2\u00b3", "123")
+            )
+            if device in {"con", "prn", "aux", "nul"} or re.fullmatch(
+                r"(?:com|lpt)[1-9]", device
+            ):
+                raise PermissionError("reserved Windows device names are not permitted")
+
+    @staticmethod
     def _is_lexically_within(path: Path, root: Path) -> bool:
         try:
             path.relative_to(root)
@@ -215,12 +239,20 @@ class ShellNavigator:
         if _FORBIDDEN_SYNTAX.search(normalized):
             raise ValueError("shell operators and control characters are not permitted")
         try:
-            tokens = shlex.split(normalized, posix=True)
+            lexer = shlex.shlex(normalized, posix=False)
+            lexer.whitespace_split = True
+            lexer.commenters = ""
+            tokens = list(lexer)
         except ValueError:
             raise ValueError("command quoting is invalid") from None
         if not tokens:
             raise ValueError("command is empty")
-        return tokens
+        return [
+            token[1:-1]
+            if len(token) >= 2 and token[0] == token[-1] and token[0] in {"'", '"'}
+            else token
+            for token in tokens
+        ]
 
     def _failure(self, status: str, message: str) -> dict[str, Any]:
         return {
@@ -310,14 +342,13 @@ class ShellNavigator:
 
         if b"\x00" in data[:8192]:
             return self._failure("binary_file", "binary content is not returned")
-        if _SECRET_CONTENT.search(data):
-            return self._failure("secret_content_blocked", "file contains credential-shaped material")
-
         truncated = len(data) > self.max_read_bytes
         if truncated:
             data = data[: self.max_read_bytes]
             final_newline = data.rfind(b"\n")
             data = data[: final_newline + 1] if final_newline >= 0 else b""
+        if _SECRET_CONTENT.search(data):
+            return self._failure("secret_content_blocked", "file contains credential-shaped material")
 
         content = data.decode("utf-8", errors="replace")
         if len(content) > MAX_OUTPUT_CHARS:
