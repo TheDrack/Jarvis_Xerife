@@ -47,7 +47,7 @@ Each verb has its own parameter allowlist. **Positional or parameter values are 
 
 ### `git`
 
-Repository-scoped profiles (`git` and `pytest`) reject working directories outside the repository root. PowerShell path parameters accept filesystem paths only; provider-qualified paths such as `Registry::`, `Env:`, `Cert:` and `Variable:` are rejected. Listing filters credential directories such as `.ssh`, `.aws`, `.kube` and `.docker`; direct reads inside those directories are blocked.
+The Git profile rejects working directories outside the repository root. Test execution is deliberately left to GitHub Actions: running arbitrary test code on the host would violate the read-only boundary. PowerShell path parameters accept filesystem paths only; provider-qualified paths such as `Registry::`, `Env:`, `Cert:` and `Variable:` are rejected. Listing filters credential directories such as `.ssh`, `.aws`, `.kube` and `.docker`; direct reads inside those directories are blocked.
 
 The `show` and `diff` verbs require `--stat` or `--name-only`. Raw patch/content output is not exposed through this profile. Secret redaction covers known provider-prefixed environment variable names, common API tokens, AWS key identifiers, key-data fields and database connection URLs. This is best-effort pattern matching, not a guarantee that arbitrary secrets are detected.
 
@@ -56,10 +56,6 @@ Read-only subcommands: `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`,
 ```json
 {"profile": "git", "verb": "log", "arguments": ["-n", "5", "--oneline"]}
 ```
-
-### `pytest`
-
-Targets must resolve inside `<repo>/tests` (files or directories, ≤ 6 arguments). The fixed suffix is `-q -p no:cacheprovider`; repository coverage configuration remains active. optional `-x`, `-q`, `-k <expr>` (validated character set) and `--maxfail <n>`. Plugin injection (`-p`), rootdir changes and arbitrary paths are rejected.
 
 ### `inspect_d`
 
@@ -95,7 +91,7 @@ Every attempt (executed, blocked, rejected, timeout, launch failure) appends one
  "elapsed_ms":120,"truncated":false,"confirmed":false,"elevated":false}
 ```
 
-Output content, environment and secrets are never written. If the log cannot be written the call still returns, with `audit_logged: false`.
+Command arguments are never persisted; only a one-way argument digest and count are logged. Audit files are created with owner-only permissions on POSIX. Output content, environment and secrets are never written. If the log cannot be written the call still returns, with `audit_logged: false`.
 
 ## Activation on the local server
 
@@ -120,8 +116,6 @@ python scripts/check_mcp_tools.py   # or any MCP client: look for the five host_
 {"tool": "host_fs_list", "path": "D:/", "depth": 1, "max_entries": 50}
 {"tool": "host_fs_read_text", "path": "README.md", "max_bytes": 4096}
 {"tool": "host_command_run", "profile": "git", "verb": "status", "arguments": ["--short"]}
-{"tool": "host_command_run", "profile": "pytest", "verb": "run",
- "arguments": ["tests/adapters/infrastructure/test_host_ops.py"]}
 ```
 
 4. Negative checks (must fail closed):
@@ -146,7 +140,7 @@ Run:
 
 ## Limits to disclose to users
 
-- Secret-name and content filters are defense-in-depth heuristics. Never treat tool output as proven secret-free; avoid reading configuration or deployment files unless needed.
+- Secret-name and content filters are defense-in-depth heuristics. The denylist covers common cloud, database, SSH, PGP, PuTTY, OpenVPN, Kubernetes and Terraform credential stores, but is not exhaustive. Never treat tool output as proven secret-free; avoid reading configuration or deployment files unless needed.
 
 - Read-only: no file writes, no installs, no boot/ACL/credential changes, no elevation.
 - `inspect_d` and `powershell_readonly` require Windows PowerShell; on Linux the profile returns `command_rejected`.
