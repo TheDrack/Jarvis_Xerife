@@ -554,9 +554,39 @@ O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remota
 
 ### Achado C0 — roteamento e iniciativa ainda sem comportamento integrado
 
-- `app/domain/gears/cognitive_router.py` define `CognitiveRouter.execute()`; `data/nexus_registry.json` registra o componente e `config/pipelines/jarvis_chat.yml` o referencia. A busca de código encontrou o teste `tests/test_nexus_registry_sync.py`, que valida apenas sincronização do registro; não foi encontrado teste de execução do router nem prova de que o pipeline completo consome esse passo em runtime. Classificação: registro/configuração confirmados; consumo dinâmico e comportamento ponta a ponta não verificados.
-- `app/application/services/assistant_curiosity.py` define `maybe_inject_curiosity_question()` e `capture_curiosity_answer()`. A primeira envia `action=detect_gaps` e a segunda `action=store_answer` ao `CuriosityEngine`.
-- `app/application/services/curiosity_engine.py::execute()` aceita somente `analyze`, `explore` e `suggest`; portanto as duas ações chamadas pelo helper são rejeitadas como desconhecidas. Além disso, `capture_curiosity_answer()` termina em `(False, None)` quando não consegue armazenar a resposta, em vez de preservar `pending_need_id`.
-- A busca por `maybe_inject_curiosity_question`, `capture_curiosity_answer` e `maybe_get_proactive_suggestion` não encontrou callsites fora das próprias definições; também não foram encontrados testes específicos para esses helpers ou para `CuriosityEngine`. O efeito em runtime é **provável, não confirmado**, pois o caminho não foi ligado a um consumidor observado.
+- `app/domain/gears/cognitive_router.py` define `CognitiveRouter.execute()` e `config/pipelines/jarvis_chat.yml` o referencia, mas `data/nexus_registry.json` não contém mapeamento explícito para `cognitive_router`. O Nexus pode descobri-lo por filesystem quando não está em strict mode; isso não prova consumo. Graphify não encontrou callers estritos nem testes ligados a `CognitiveRouter.execute()`. O grafo de `run_pipeline()` mostra apenas o CLI do próprio módulo e testes, sem consumidor de aplicação identificado. O contexto inicial do runner não cria `metadata`, enquanto o router acessa `context["metadata"]`; há incompatibilidade potencial se o pipeline for chamado sem `inputs.metadata`. Runtime externo não verificado. Esta redação supersede a afirmação anterior de que o JSON registrava o componente.
+- `app/application/services/assistant_curiosity.py` define `maybe_inject_curiosity_question()` e `capture_curiosity_answer()`. A primeira envia `action=detect_gaps` e a segunda `action=store_answer` ao `CuriosityEngine`. A correção da PR #796 preserva `pending_need_id` em falha e o limpa somente após sucesso.
+- `app/application/services/curiosity_engine.py::execute()` aceita somente `analyze`, `explore` e `suggest`; logo, `detect_gaps` e `store_answer` são rejeitadas. A PR #796 adicionou cinco testes diretos para o helper de captura, incluindo rejeição pelo engine real; isso valida retry do identificador, não persistência da resposta.
+- Graphify encontra somente os testes como callers estáticos de `capture_curiosity_answer()` e nenhum caller para `maybe_inject_curiosity_question()`; não foi localizado consumidor de produção nem teste específico de `maybe_inject_curiosity_question()`/`CuriosityEngine.execute()`. A ausência no grafo não prova ausência de dispatch dinâmico; runtime permanece não verificado.
 - Não promover Curiosity/Initiative nem CognitiveRouter a capacidade operacional. Próximo passo C0: identificar o composition root e o consumidor pretendido; depois adicionar teste de contrato para as ações válidas e teste de integração pelo consumidor real. Não criar um segundo motor de curiosidade nem inferir um consumer a partir do registro Nexus.
 
+
+
+## Revalidação C0 — 2026-11-10 — evidência pós-PR #805
+
+**HEAD de referência:** `956583a9fa69728b40613ceb81133e60b8da3cde`. O índice Graphify consultado corresponde ao mesmo SHA. Esta seção supersede snapshots anteriores de CI/PR e corrige as afirmações históricas explicitadas acima; não altera critérios de aceitação.
+
+### Roteamento cognitivo e PipelineRunner
+
+- `config/pipelines/jarvis_chat.yml` contém os passos `cognitive_router` e `llm_engine`. O arquivo `data/nexus_registry.json` não contém entrada `cognitive_router`; a resolução por descoberta de filesystem só é possível quando o Nexus não está em strict mode.
+- `run_pipeline()` carrega YAML, resolve cada ID pelo Nexus e chama `execute()`. Seus callers estáticos localizados são o CLI do próprio módulo e testes; não foi localizado consumidor de aplicação para `jarvis_chat`.
+- O contexto criado pelo runner contém `pipeline`, `strict`, `results` e `artifacts`, acrescido dos `inputs` do chamador. Não injeta `metadata` por padrão. `CognitiveRouter.execute()` lê `context["metadata"]` antes do bloco de fallback LLM. Portanto, um pipeline chamado sem `inputs.metadata` falha nesse passo; não há teste integrado do caminho `jarvis_chat`.
+- Classificação: configuração existente; descoberta potencial; consumidor de produção e comportamento ponta a ponta não verificados. O próximo teste deve partir do composition root real, não de uma instância isolada do router.
+
+### Curiosity: dois componentes diferentes
+
+- `CuriosityIntake` tem entrada no Nexus registry. `curiosity_capture` e `curiosity_list_recent` em `app/adapters/edge/jarvis_desktop_mcp.py` são decoradas com `@mcp.tool`, resolvem `curiosity_intake` e chamam `execute()`.
+- `tests/application/test_curiosity_intake.py` cobre persistência JSONL, deduplicação, validação de entrada, normalização de evidência e redação de segredos no componente. `tests/test_curiosity_mcp_contract.py` verifica registro e presença textual dos wrappers, mas não executa os wrappers/MCP com uma instância injetada. Não declarar integração MCP ponta a ponta concluída.
+- `CuriosityEngine` permanece separado e aceita `analyze`, `explore` e `suggest`. Os helpers antigos de `assistant_curiosity.py` enviam `detect_gaps` e `store_answer`, incompatíveis com o contrato atual. `capture_curiosity_answer()` tem cinco testes diretos após PR #796 e preserva o ID pendente em falha; não há armazenamento real da resposta nem consumidor de produção localizado. `maybe_inject_curiosity_question()` não tem teste comportamental identificado nem caller estático.
+- Classificação: intake observacional exposto por funções MCP e testado no componente; wrapper MCP sem teste de execução; motor de curiosidade conversacional e helpers não integrados/compatíveis. Não fundir os dois componentes nem criar um terceiro motor.
+
+### CI, manutenção e segurança — pós-PR #805
+
+- PR #805 foi merged com head `9ccc318b42b8795e211f3b5459f0751df5456546`; PR Validation run 42905716363 passou (3.143 passed, 34 skipped, 8 warnings) e Task Queue run 42905716297 passou. No merge commit `dd7af8d`, Task Queue run 42906674072 passou (3.160 passed, 17 skipped, 181 warnings). O HEAD atual `956583a` é uma atualização documental de `ARCHITECTURE.md` com `[skip ci]`.
+- O run 42903577636 falhou em um guard pyflakes por import ausente de `IntelligenceEvidence` em `jarvis_desktop_local.py`; a PR #805 adicionou o import e os checks finais passaram. Defeito de código corrigido na mesma PR, não falha transitória.
+- Os findings Strix de cross-profile e permissão 0600 não se reproduzem no código final: a descoberta não enumera perfis Windows alheios; o provisioner aplica `chmod 600` após a substituição atômica e há teste que verifica essa ordem. Os campos meteorológicos citados no finding XSS usam `esc()`, que codifica caracteres HTML, e o teste `test_weather_panel_escapes_every_external_string_before_html_insertion` cobre os campos listados. Os threads Strix ainda aparecem sem resolução no GitHub; esta seção registra a verificação de código, não altera o estado da revisão.
+- Self Healing V3 continua versionado, mas seu `workflow_run` observa a lista de workflows confiáveis de `main`, não JARVIS PR Validation nem Jarvis Task Queue Tests. A autoevolução agendada 42905628673 parou no gate: `EVOLUTION_ENABLED` vazio; geração e publicação skipped. `data/roadmap_missions.json` permanece vazio.
+
+### Estado e próximo critério
+
+`C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem **pending**. C1 continua bloqueado. Próximo trabalho: confirmar composition root e consumidor de `jarvis_chat`/CognitiveRouter, estabelecer contrato explícito de `metadata`, e testar os wrappers MCP reais de CuriosityIntake. Depois, reconciliar as ações inválidas de CuriosityEngine com um consumidor comprovado. Nenhuma capacidade foi promovida por registro, documentação, PR merged ou teste isolado.
