@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -996,3 +997,17 @@ def test_git_commit_probe_timeout_is_audited_rejection(_sandbox, monkeypatch):
 def test_resolve_path_rejects_ntfs_aliases(_sandbox, suffix):
     with pytest.raises(ops.PathNotAllowed):
         ops.resolve_path(str(_sandbox / suffix))
+
+
+def test_spawn_caps_child_output_instead_of_buffering_unbounded_streams(_sandbox):
+    command = [
+        sys.executable,
+        "-c",
+        "import sys; sys.stdout.write('x' * 1000000); sys.stderr.write('y' * 1000000)",
+    ]
+
+    completed = ops._spawn(command, _sandbox, ops._sanitized_environment(), 10)
+
+    assert len(completed.stdout.encode("utf-8")) <= ops.MAX_STDOUT_CHARS * 4
+    assert len(completed.stderr.encode("utf-8")) <= ops.MAX_STDERR_CHARS * 4
+    assert completed._jarvis_truncated is True
