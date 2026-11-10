@@ -933,7 +933,7 @@ def test_redact_does_not_consume_following_line_when_value_is_unquoted():
 # --------------------------------------------------------------------------- #
 # Security review regressions: follow-up hardening
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("quote", ["\\u2018", "\\u2019", "\\u201a", "\\u201b", "\\u201c", "\\u201d", "\\u201e", "\\u201f", "\\uff02", "\\uff07"])
+@pytest.mark.parametrize("quote", ["‘", "’", "‚", "‛", "“", "”", "„", "‟", "＂", "＇"])
 def test_powershell_rejects_unicode_quote_delimiters(_fake_powershell, quote):
     with pytest.raises(ValueError, match="quot"):
         ops.compile_command(
