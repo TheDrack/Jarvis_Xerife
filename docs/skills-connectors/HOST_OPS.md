@@ -83,7 +83,7 @@ This is the safe fallback for the requirement that destructive operations need a
 
 ## Audit
 
-Every command attempt, confirmation request and filesystem list/read attempt (executed, blocked, rejected, timeout, launch failure, not applicable) appends one JSON line to `JARVIS_HOST_OPS_AUDIT_LOG` (default `~/.local/share/jarvis/host_ops/host_ops_audit.jsonl`). Filesystem paths and command arguments are represented by keyed digests; raw caller values are not persisted. Child-process output is drained concurrently and capped in memory; if a cap cuts through a line, that incomplete trailing line is discarded before redaction.
+Every command attempt, confirmation request and filesystem list/read attempt (executed, blocked, rejected, timeout, launch failure, not applicable) appends one JSON line to `JARVIS_HOST_OPS_AUDIT_LOG` (default `~/.local/share/jarvis/host_ops_audit.jsonl`). Filesystem paths and command arguments are represented by keyed digests; raw caller values are not persisted. Child-process output is drained concurrently and capped in memory; if a cap cuts through a line, that incomplete trailing line is discarded before redaction.
 
 ```json
 {"ts":"2026-11-10T12:00:00+00:00","audit_id":"…","event":"executed","profile":"git",
