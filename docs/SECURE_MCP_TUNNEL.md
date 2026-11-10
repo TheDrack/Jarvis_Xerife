@@ -88,6 +88,8 @@ A ferramenta não permite parar processos/serviços, apagar ou editar arquivos, 
 
 Além do `run_shell_command` (uma string PowerShell validada por AST), o servidor registra cinco ferramentas aditivas que nunca constroem linha de shell a partir da entrada:
 
+Por padrão, as ferramentas `host_*` não são registradas. Para habilitá-las, configure `JARVIS_HOST_OPS_ENABLED=1` no ambiente do processo MCP e reinicie o servidor. Esta é uma opção local do proprietário, não autorização por chamada. O túnel é individual; não compartilhe o gateway com usuários ou clientes não confiáveis. Todos os clientes autenticados no mesmo gateway podem usar as ferramentas habilitadas.
+
 | Ferramenta | Escopo |
 |---|---|
 | `host_fs_list` | metadados de diretório, profundidade ≤ 4, ≤ 500 entradas, symlink/junction não seguidos |
