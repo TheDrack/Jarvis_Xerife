@@ -154,6 +154,23 @@ def _assert_trusted_git_config(git_dir: Path) -> None:
             if key in _EXECUTABLE_GIT_KEYS.get(section, frozenset()):
                 raise ValueError("repository Git config contains an executable helper setting")
 
+def _assert_safe_attributes(repo_root: Path) -> None:
+    """Reject repository attributes that could activate external filters during diff."""
+    inspected = 0
+    for current, directories, files in os.walk(repo_root, followlinks=False):
+        directories[:] = [name for name in directories if not (Path(current) / name).is_symlink()]
+        inspected += len(directories) + len(files)
+        if inspected > 10_000:
+            raise ValueError("repository is too large to validate Git attributes safely")
+        if ".gitattributes" in files:
+            attributes = Path(current) / ".gitattributes"
+            if attributes.is_symlink() or attributes.stat().st_size > 64 * 1024:
+                raise ValueError("repository Git attributes are not safe to inspect")
+            content = attributes.read_text(encoding="utf-8", errors="strict")
+            if re.search(r"(?im)(?:^|\s)(?:filter|diff|merge)\s*=", content):
+                raise ValueError("repository Git attributes can activate external helpers")
+
+
 _SECRET_CONTENT = re.compile(
     rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|oauth[_-]?token|access[_-]?token|refresh[_-]?token|id[_-]?token|session[_-]?token|client[-_]?secret|private[_-]?key|password\s*[:=]|client[-_]?key[-_]?data|"
     rb"certificate[-_]?authority[-_]?data|account[-_]?key|AGE-SECRET-KEY-|"
@@ -430,6 +447,8 @@ class ShellNavigator:
                         return self._failure("git_repository_outside_allowed_roots", str(exc))
                     try:
                         _assert_trusted_git_config(git_dir)
+                        if args[0] == "diff":
+                            _assert_safe_attributes(_repo_root)
                     except (OSError, UnicodeError, ValueError) as exc:
                         return self._failure("git_config_rejected", str(exc) or "repository Git config is not trusted")
 
