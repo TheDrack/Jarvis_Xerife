@@ -124,7 +124,7 @@ def _assert_trusted_git_config(git_dir: Path) -> None:
 
 
 _SECRET_CONTENT = re.compile(
-    rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|client[-_]?key[-_]?data|"
+    rb"(?i)(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|\"auths\"\s*:|oauth[_-]?token|access[_-]?token|refresh[_-]?token|id[_-]?token|session[_-]?token|client[-_]?secret|private[_-]?key|password\s*[:=]|client[-_]?key[-_]?data|"
     rb"certificate[-_]?authority[-_]?data|account[-_]?key|AGE-SECRET-KEY-|"
     rb"gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{16,}|"
     rb"xox[abposr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{16,}|"
@@ -199,7 +199,9 @@ class ShellNavigator:
         max_read_bytes: int = MAX_READ_BYTES,
     ) -> None:
         if allowed_roots is None:
-            roots = [Path.home(), Path(__file__).resolve().parents[3]]
+            # Default to the repository only. Additional roots require an explicit
+            # operator opt-in through JARVIS_SHELL_ALLOWED_ROOTS.
+            roots = [Path(__file__).resolve().parents[3]]
             configured = os.environ.get("JARVIS_SHELL_ALLOWED_ROOTS", "")
             roots.extend(Path(item) for item in configured.split(os.pathsep) if item.strip())
         else:
@@ -329,23 +331,27 @@ class ShellNavigator:
                         return self._failure("not_a_directory", "target is not a directory")
                     entries = []
                     truncated = False
-                    for entry in target.iterdir():
-                        if _is_sensitive_path(entry):
-                            continue
-                        if len(entries) >= self.max_entries:
-                            truncated = True
-                            break
-                        try:
-                            info = entry.lstat()
-                            kind = "symlink" if entry.is_symlink() else ("directory" if entry.is_dir() else "file")
-                            entries.append({
-                                "name": entry.name,
-                                "type": kind,
-                                "size": info.st_size,
-                                "modified_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(info.st_mtime)),
-                            })
-                        except OSError:
-                            continue
+                    scanned = 0
+                    with os.scandir(target) as iterator:
+                        for entry in iterator:
+                            scanned += 1
+                            if scanned > self.max_entries:
+                                truncated = True
+                                break
+                            entry_path = target / entry.name
+                            if _is_sensitive_path(entry_path):
+                                continue
+                            try:
+                                info = entry.stat(follow_symlinks=False)
+                                kind = "symlink" if stat.S_ISLNK(info.st_mode) else ("directory" if stat.S_ISDIR(info.st_mode) else "file")
+                                entries.append({
+                                    "name": entry.name,
+                                    "type": kind,
+                                    "size": info.st_size,
+                                    "modified_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(info.st_mtime)),
+                                })
+                            except OSError:
+                                continue
                     return self._result(
                         json.dumps(entries, ensure_ascii=False),
                         truncated=truncated,
