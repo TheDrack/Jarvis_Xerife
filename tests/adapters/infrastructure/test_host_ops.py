@@ -124,8 +124,8 @@ def test_read_redacts_tokens_and_reports_replacements(_sandbox):
 
     assert result["success"] is True
     assert result["redactions"] >= 2
-    assert "super-secret-value-123" not in result["content"]
-    assert "sk-abcdefghijklmnopqrstuvwx" not in result["content"]
+    assert "ordinary-secret-value-123" not in result["content"]
+    assert "ordinary-token-value-123" not in result["content"]
     assert "[REDACTED" in result["content"]
 
 
@@ -173,7 +173,7 @@ def _fake_powershell(monkeypatch):
 def test_git_profile_builds_structured_argv(_fake_powershell):
     compiled = ops.compile_command("git", "status", ["--short"])
 
-    assert compiled.argv == ("git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "--no-pager", "status", "--short")
+    assert compiled.argv == ("git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "log.showSignature=false", "--no-pager", "status", "--short")
     assert compiled.timeout_seconds == 20
     assert compiled.display == "status --short"
 
@@ -537,7 +537,7 @@ def test_git_profile_disables_repo_fsmonitor_and_optional_index_cache():
 
     assert compiled.argv[:8] == (
         "git", "-c", "core.fsmonitor=false",
-        "-c", "core.untrackedCache=false", "--no-pager",
+        "-c", "core.untrackedCache=false", "-c", "log.showSignature=false", "--no-pager",
     )
 
 
