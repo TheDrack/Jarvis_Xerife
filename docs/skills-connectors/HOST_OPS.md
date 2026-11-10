@@ -45,7 +45,7 @@ Repository-scoped profiles (`git` and `pytest`) reject working directories outsi
 
 The `show` and `diff` verbs require `--stat` or `--name-only`. Raw patch/content output is not exposed through this profile. Secret redaction covers known provider-prefixed environment variable names, common API tokens, AWS key identifiers, key-data fields and database connection URLs. This is best-effort pattern matching, not a guarantee that arbitrary secrets are detected.
 
-Read-only subcommands: `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`, `branch`, `describe`. `-C`, `--git-dir`, `--work-tree`, `--exec-path`, `--upload-pack` and `-c` are rejected; `--no-pager` is always added and `GIT_TERMINAL_PROMPT=0` prevents interactive credential prompts.
+Read-only subcommands: `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`, `branch`, `describe`. `-C`, `--git-dir`, `--work-tree`, `--exec-path`, `--upload-pack` and `-c` are rejected; `-c core.fsmonitor=false` and `-c core.untrackedCache=false` override repository settings that could execute helper programs; system/global Git configuration and optional index writes are disabled. `--no-pager` is always added and `GIT_TERMINAL_PROMPT=0` prevents interactive credential prompts.
 
 ```json
 {"profile": "git", "verb": "log", "arguments": ["-n", "5", "--oneline"]}
