@@ -32,6 +32,7 @@ import os
 import re
 import secrets
 import shutil
+import stat
 import subprocess
 import time
 import uuid
@@ -263,14 +264,12 @@ def _is_junction(entry: os.DirEntry[str]) -> bool:
                 return True
         except OSError:
             return False
-    if os.name == "nt":
-        try:
-            attributes = entry.stat(follow_symlinks=False).st_file_attributes
-            reparse_point = getattr(__import__("stat"), "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
-            return bool(attributes & reparse_point) and not entry.is_symlink()
-        except (AttributeError, OSError):
-            return False
-    return False
+    try:
+        attributes = entry.stat(follow_symlinks=False).st_file_attributes
+        reparse_point = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+        return bool(attributes & reparse_point) and not entry.is_symlink()
+    except (AttributeError, OSError):
+        return False
 
 
 def _entry_kind(entry: os.DirEntry[str]) -> str:
