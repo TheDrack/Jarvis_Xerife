@@ -610,10 +610,10 @@ def test_audit_file_is_owner_only(_sandbox):
 @pytest.mark.parametrize(
     "network_path",
     [
-        r"\\\\attacker.example\\share\\secret.txt",
+        r"\\attacker.example\share\secret.txt",
         "//attacker.example/share/secret.txt",
-        r"\\\\?\\UNC\\attacker.example\\share\\secret.txt",
-        r"\\\\.\\C$\\Windows\\win.ini",
+        r"\\?\UNC\attacker.example\share\secret.txt",
+        r"\\.\C$\Windows\win.ini",
     ],
 )
 def test_resolve_path_rejects_unc_and_device_paths_before_resolution(network_path):
@@ -622,7 +622,7 @@ def test_resolve_path_rejects_unc_and_device_paths_before_resolution(network_pat
 
 
 def test_allowed_roots_rejects_unc_configuration_before_resolution(monkeypatch):
-    monkeypatch.setenv("JARVIS_HOST_OPS_ROOTS", r"\\\\attacker.example\\share")
+    monkeypatch.setenv("JARVIS_HOST_OPS_ROOTS", r"\\attacker.example\share")
 
     with pytest.raises(ops.PathNotAllowed):
         ops.allowed_roots()
