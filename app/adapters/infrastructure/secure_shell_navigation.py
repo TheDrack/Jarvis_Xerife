@@ -138,6 +138,8 @@ class ShellNavigator:
             return ["git", "log", "--oneline", args[2]]
         if len(args) == 3 and args[0] == "log" and re.fullmatch(r"-n(?:[1-9]|[12][0-9]|30)", args[1]) and args[2] == "--oneline":
             return ["git", "log", args[1], "--oneline"]
+        if len(args) == 4 and args[0] == "log" and args[1] == "--oneline" and args[2] == "-n" and re.fullmatch(r"[1-9]|[12][0-9]|30", args[3]):
+            return ["git", "log", "--oneline", "-n", args[3]]
         raise ValueError("Git command is not in the read-only allowlist")
 
     def execute(self, command: str, *, timeout_seconds: int = 10) -> dict[str, Any]:
@@ -218,6 +220,7 @@ class ShellNavigator:
 
                 if verb == "git":
                     argv = self._git_argv(args)
+                    argv = ["git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", *argv[1:]]
                     started = time.monotonic()
                     completed = subprocess.run(
                         argv,
@@ -240,7 +243,11 @@ class ShellNavigator:
                         shell=False,
                         check=False,
                     )
-                    output = (completed.stdout or "")[:MAX_OUTPUT_CHARS]
+                    raw_output = completed.stdout or ""
+                    if args[:2] == ["remote", "-v"]:
+                        raw_output = re.sub(r"(https?://)[^/@\\s]+:[^/@\\s]+@", r"\\1[REDACTED]@", raw_output)
+                        raw_output = re.sub(r"(?i)(token|key|password)=([^&\\s]+)", r"\\1=[REDACTED]", raw_output)
+                    output = raw_output[:MAX_OUTPUT_CHARS]
                     error = (completed.stderr or "")[:4_000]
                     return {
                         "success": completed.returncode == 0,
