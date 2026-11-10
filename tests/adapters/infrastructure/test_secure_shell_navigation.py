@@ -417,3 +417,93 @@ def test_cat_redacts_json_credential_assignments(tmp_path):
     assert "oauth-secret-value" not in result["output"]
     assert "client-secret-value" not in result["output"]
     assert result["output"].count("[REDACTED]") == 3
+
+
+def test_default_allowed_roots_do_not_include_entire_user_profile(monkeypatch):
+    from app.adapters.infrastructure import secure_shell_navigation as module
+
+    monkeypatch.delenv("JARVIS_SHELL_ALLOWED_ROOTS", raising=False)
+    navigator = ShellNavigator()
+    repository_root = Path(module.__file__).resolve().parents[3]
+
+    assert repository_root in navigator.allowed_roots
+    assert Path.home().resolve() not in navigator.allowed_roots
+
+
+def test_ls_bounds_raw_scandir_work_even_when_entries_are_sensitive(tmp_path, monkeypatch):
+    from app.adapters.infrastructure import secure_shell_navigation as module
+
+    for index in range(20):
+        (tmp_path / f".env.secret-{index}").touch()
+    (tmp_path / "visible.txt").touch()
+    navigator = ShellNavigator(allowed_roots=[tmp_path], initial_directory=tmp_path, max_entries=4)
+
+    original_scandir = module.os.scandir
+    observed = {"count": 0}
+
+    class BoundedIterator:
+        def __init__(self, path):
+            self._iterator = original_scandir(path)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self._iterator.close()
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            observed["count"] += 1
+            return next(self._iterator)
+
+    monkeypatch.setattr(module.os, "scandir", BoundedIterator)
+    result = navigator.execute("ls")
+
+    assert result["success"] is True
+    assert result["truncated"] is True
+    assert observed["count"] == 5
+    assert json.loads(result["output"]) == []
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        '{"oauth_token": "ordinary-oauth-secret-value"}',
+        '{"accessToken": "ordinary-access-secret-value"}',
+        '{"refresh_token": "ordinary-refresh-secret-value"}',
+        '{"client_secret": "ordinary-client-secret-value"}',
+        '{"private_key": "ordinary-private-key-value"}',
+        '{"auths": {"registry.example": {"auth": "encoded-secret"}}}',
+    ],
+)
+def test_cat_rejects_common_credential_store_content(tmp_path, content):
+    target = tmp_path / "config.json"
+    target.write_text(content, encoding="utf-8")
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute("cat config.json")
+
+    assert result["success"] is False
+    assert result["status"] == "sensitive_file_blocked"
+    assert result["output"] == ""
+
+
+def test_git_remote_redacts_token_only_url_userinfo(tmp_path):
+    (tmp_path / ".git").mkdir()
+    navigator = make_navigator(tmp_path)
+    completed = subprocess.CompletedProcess(
+        args=["git"], returncode=0,
+        stdout="origin https://singleparttoken@example.com/org/repo.git (fetch)",
+        stderr="",
+    )
+    with patch(
+        "app.adapters.infrastructure.secure_shell_navigation.subprocess.run",
+        return_value=completed,
+    ):
+        result = navigator.execute("git remote -v")
+
+    assert result["success"] is True
+    assert "singleparttoken" not in result["output"]
+    assert "[REDACTED]" in result["output"]
