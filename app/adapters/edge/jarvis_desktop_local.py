@@ -53,6 +53,43 @@ from app.domain.intelligence.contracts import (
 
 logger = logging.getLogger(__name__)
 
+
+def _weather_cache_get(
+    cache: dict[Any, tuple[float, dict[str, Any]]],
+    key: Any,
+    *,
+    now: float,
+    ttl_seconds: float = 600.0,
+) -> dict[str, Any] | None:
+    entry = cache.get(key)
+    if entry is None:
+        return None
+    if now - entry[0] >= ttl_seconds:
+        cache.pop(key, None)
+        return None
+    cache.pop(key)
+    cache[key] = entry
+    return entry[1]
+
+
+def _weather_cache_set(
+    cache: dict[Any, tuple[float, dict[str, Any]]],
+    key: Any,
+    value: dict[str, Any],
+    *,
+    now: float,
+    max_entries: int,
+    ttl_seconds: float = 600.0,
+) -> None:
+    for old_key, (created_at, _) in list(cache.items()):
+        if now - created_at >= ttl_seconds:
+            cache.pop(old_key, None)
+    cache.pop(key, None)
+    while len(cache) >= max_entries:
+        cache.pop(next(iter(cache)))
+    cache[key] = (now, value)
+
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
 _WORLD_LAND_PATH = _REPO_ROOT / "app" / "static" / "world-land.json"
@@ -1099,7 +1136,11 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                     close_osiris()
 
     @app.get("/api/weather/point")
-    async def weather_point(lat: float, lon: float, _client: str = Depends(require_local_token)) -> dict[str, Any]:
+    async def weather_point(
+        lat: float = Query(..., ge=-90.0, le=90.0, allow_inf_nan=False),
+        lon: float = Query(..., ge=-180.0, le=180.0, allow_inf_nan=False),
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
         """Open-Meteo point sampling (free, no key). Cached 10 min per 0.05° cell."""
         import time as _t
         cache_key = (round(lat / 0.05) * 0.05, round(lon / 0.05) * 0.05)
@@ -1107,9 +1148,10 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         if cached is None:
             state._wx_cache = {}
             cached = state._wx_cache
-        entry = cached.get(cache_key)
-        if entry and (_t.time() - entry[0]) < 600:
-            return entry[1]
+        now = _t.monotonic()
+        cached_value = _weather_cache_get(cached, cache_key, now=now)
+        if cached_value is not None:
+            return cached_value
         try:
             async with httpx.AsyncClient(timeout=12.0) as client:
                 resp = await client.get(
@@ -1182,20 +1224,22 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             },
             "source": "Open-Meteo (best_match, CC BY 4.0)",
         }
-        cached[cache_key] = (_t.time(), result)
+        _weather_cache_set(cached, cache_key, result, now=_t.monotonic(), max_entries=256)
         return result
 
     @app.get("/api/weather/grid")
     async def weather_grid(
-        lat: float, lon: float, radius: float = 8.0,
+        lat: float = Query(..., ge=-90.0, le=90.0, allow_inf_nan=False),
+        lon: float = Query(..., ge=-180.0, le=180.0, allow_inf_nan=False),
+        radius: float = Query(8.0, gt=0.0, le=20.0, allow_inf_nan=False),
         _client: str = Depends(require_local_token),
     ) -> dict[str, Any]:
         """Open-Meteo grid sampling for animated weather overlay (free, no key)."""
         import time as _t
-        # Build a small lat/lon grid around the center.
+        # Build a bounded grid; clamp latitude and wrap longitude at the dateline.
         step = max(1.0, float(radius) / 2.0)
-        lats = [round(lat + (i - 1) * step, 2) for i in range(3)]
-        lons = [round(lon + (j - 1) * step, 2) for j in range(3)]
+        lats = [round(max(-90.0, min(90.0, lat + (i - 1) * step)), 2) for i in range(3)]
+        lons = [round(((lon + (j - 1) * step + 180.0) % 360.0) - 180.0, 2) for j in range(3)]
         grid_lats = []
         grid_lons = []
         for la in lats:
@@ -1207,9 +1251,10 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         if cached is None:
             state._wx_grid_cache = {}
             cached = state._wx_grid_cache
-        entry = cached.get(cache_key)
-        if entry and (_t.time() - entry[0]) < 600:
-            return entry[1]
+        now = _t.monotonic()
+        cached_value = _weather_cache_get(cached, cache_key, now=now)
+        if cached_value is not None:
+            return cached_value
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(
@@ -1270,7 +1315,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         result = {"success": True, "center": {"lat": lat, "lon": lon}, "points": points,
                   "place_label": _label,
                   "source": "Open-Meteo (best_match, CC BY 4.0)"}
-        cached[cache_key] = (_t.time(), result)
+        _weather_cache_set(cached, cache_key, result, now=_t.monotonic(), max_entries=128)
         return result
 
     @app.get("/api/climate/enso")
