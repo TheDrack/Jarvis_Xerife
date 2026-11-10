@@ -72,6 +72,16 @@ class AndroidNavigationAdapter:
     def type_text(self, text: str) -> dict[str, Any]:
         if len(text) > 2000:
             return {"success": False, "status": "input_too_long"}
+        # ADB shell joins arguments into a device-side command string. Reject
+        # control characters and Unicode line separators before escaping so
+        # input cannot terminate the remote command and append another one.
+        if any(
+            ord(char) < 0x20
+            or 0x7F <= ord(char) <= 0x9F
+            or char in {"\\u2028", "\\u2029"}
+            for char in text
+        ):
+            return {"success": False, "status": "control_character_rejected"}
         # Escape remote-shell metacharacters as well as Android's text escapes.
         escaped = text.replace("%", "%25").replace(" ", "%s")
         shell_metacharacters = {chr(code) for code in (92, 34, 39, 36, 96, 59, 38, 124, 60, 62, 40, 41, 91, 93, 123, 125, 42, 33, 63, 126, 35)}
