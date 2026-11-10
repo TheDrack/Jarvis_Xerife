@@ -122,7 +122,7 @@ if [ ! -f "$ENV_FILE" ]; then
     log "criando $ENV_FILE (0600) — preencha as chaves depois"
     mkdir -p "$(dirname "$ENV_FILE")"
     umask 077
-    cat > "$ENV_FILE" <<'ENVEOF'
+    cat > "$ENV_FILE" <<ENVEOF
 # Jarvis — variáveis de ambiente locais. Nunca versione este arquivo.
 # Chaves de provedores (deixe vazio para desabilitar):
 # OPENAI_API_KEY=
@@ -138,11 +138,12 @@ if [ ! -f "$ENV_FILE" ]; then
 PYTHON_ENV=production
 LANGUAGE=pt-BR
 WAKE_WORD=xerife
+API_HOST=127.0.0.1
 
 # Bancos locais
-JARVIS_DEVICES_DB=$HOME/.local/share/jarvis/jarvis.db
-JARVIS_GEOINT_DB=$HOME/.local/share/jarvis/geoint.sqlite
-JARVIS_GRAPH_DB=$HOME/.local/share/jarvis/jarvis_graph.sqlite
+JARVIS_DEVICES_DB=${HOME}/.local/share/jarvis/jarvis.db
+JARVIS_GEOINT_DB=${HOME}/.local/share/jarvis/geoint.sqlite
+JARVIS_GRAPH_DB=${HOME}/.local/share/jarvis/jarvis_graph.sqlite
 
 # MCP (loopback; publique via Tailscale Serve, nunca em 0.0.0.0)
 JARVIS_DESKTOP_HTTP_PORT=8765
