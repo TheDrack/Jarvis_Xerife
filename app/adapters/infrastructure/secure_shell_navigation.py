@@ -176,7 +176,7 @@ class ShellNavigator:
                 continue
         return False
 
-    def _resolve(self, raw_path: str | None) -> Path:
+    def _resolve(self, raw_path: str | None, *, base: Path | None = None) -> Path:
         raw = "." if raw_path is None or raw_path == "" else str(raw_path)
         if "\x00" in raw or raw.startswith(("~", "\\\\", "//")):
             raise PermissionError("path syntax is not permitted")
@@ -187,7 +187,7 @@ class ShellNavigator:
 
         candidate = Path(raw).expanduser()
         if not candidate.is_absolute():
-            candidate = self._cwd / candidate
+            candidate = (base if base is not None else self.cwd) / candidate
         candidate = Path(os.path.abspath(candidate))
 
         matching_root = next(
@@ -280,8 +280,10 @@ class ShellNavigator:
             "read_only": True,
         }
 
-    def _list_directory(self, raw_path: str | None) -> dict[str, Any]:
-        directory = self._resolve(raw_path)
+    def _list_directory(
+        self, raw_path: str | None, *, base: Path | None = None
+    ) -> dict[str, Any]:
+        directory = self._resolve(raw_path, base=base)
         if _is_sensitive_path(directory):
             return self._failure("sensitive_path_blocked", "sensitive directories cannot be listed")
         if not directory.is_dir():
@@ -340,8 +342,8 @@ class ShellNavigator:
             "read_only": True,
         }
 
-    def _read_text(self, raw_path: str) -> dict[str, Any]:
-        target = self._resolve(raw_path)
+    def _read_text(self, raw_path: str, *, base: Path | None = None) -> dict[str, Any]:
+        target = self._resolve(raw_path, base=base)
         if _is_sensitive_path(target):
             return self._failure("sensitive_file_blocked", "credential stores and sensitive files are blocked")
         if not target.is_file():
@@ -395,44 +397,53 @@ class ShellNavigator:
             return self._failure("command_rejected", str(exc))
 
         verb, *arguments = tokens
-        with self._lock:
-            try:
-                if verb == "pwd" and not arguments:
+        try:
+            if verb == "pwd" and not arguments:
+                with self._lock:
                     current = str(self._cwd)
-                    return {
-                        "success": True,
-                        "status": "ok",
-                        "cwd": current,
-                        "output": current,
-                        "read_only": True,
-                    }
-                if verb == "cd" and len(arguments) <= 1:
-                    destination = self._initial_directory if not arguments else self._resolve(arguments[0])
+                return {
+                    "success": True,
+                    "status": "ok",
+                    "cwd": current,
+                    "output": current,
+                    "read_only": True,
+                }
+
+            if verb == "cd" and len(arguments) <= 1:
+                with self._lock:
+                    destination = (
+                        self._initial_directory
+                        if not arguments
+                        else self._resolve(arguments[0], base=self._cwd)
+                    )
                     if not destination.is_dir():
                         return self._failure("not_a_directory", "path is not a directory")
                     self._cwd = destination
-                    return {
-                        "success": True,
-                        "status": "directory_changed",
-                        "cwd": str(self._cwd),
-                        "output": str(self._cwd),
-                        "read_only": True,
-                    }
-                if verb == "ls" and len(arguments) <= 1:
-                    return self._list_directory(arguments[0] if arguments else None)
-                if verb == "cat" and len(arguments) == 1:
-                    return self._read_text(arguments[0])
-                return self._failure(
-                    "command_rejected",
-                    "only pwd, cd [path], ls [path], and cat <text-file> are supported",
-                )
-            except PermissionError:
-                return self._failure("path_rejected", "path is outside the permitted filesystem scope")
-            except FileNotFoundError:
-                return self._failure("path_rejected", "path does not exist")
-            except OSError:
-                return self._failure("filesystem_error", "filesystem operation failed")
+                    current = str(self._cwd)
+                return {
+                    "success": True,
+                    "status": "directory_changed",
+                    "cwd": current,
+                    "output": current,
+                    "read_only": True,
+                }
 
+            with self._lock:
+                base = self._cwd
+            if verb == "ls" and len(arguments) <= 1:
+                return self._list_directory(arguments[0] if arguments else None, base=base)
+            if verb == "cat" and len(arguments) == 1:
+                return self._read_text(arguments[0], base=base)
+            return self._failure(
+                "command_rejected",
+                "only pwd, cd [path], ls [path], and cat <text-file> are supported",
+            )
+        except PermissionError:
+            return self._failure("path_rejected", "path is outside the permitted filesystem scope")
+        except FileNotFoundError:
+            return self._failure("path_rejected", "path does not exist")
+        except OSError:
+            return self._failure("filesystem_error", "filesystem operation failed")
 
 def register_shell_navigation_tools(
     mcp: Any, *, navigator: ShellNavigator | None = None
