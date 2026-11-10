@@ -185,3 +185,16 @@ def test_git_remote_output_redacts_embedded_credentials(tmp_path):
     assert result["success"] is True
     assert "supersecret" not in result["output"]
     assert "[REDACTED]" in result["output"]
+
+
+def test_cat_redacts_common_secret_values(tmp_path):
+    (tmp_path / "settings.json").write_text(
+        '{"api_key":"very-secret-value","mode":"safe"}', encoding="utf-8"
+    )
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute("cat settings.json")
+
+    assert result["success"] is True
+    assert "very-secret-value" not in result["output"]
+    assert "[REDACTED]" in result["output"]
