@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from pathlib import Path
 
 import pytest
@@ -414,4 +415,40 @@ def test_cat_blocks_additional_credential_shapes(tmp_path, content):
 
 def test_secret_scanner_handles_maximum_whitespace_input_without_cross_line_backtracking():
     assert _SECRET_CONTENT.search(b"\n" * (64 * 1024)) is None
+
+def test_blocked_file_read_does_not_hold_the_navigator_lock(tmp_path, monkeypatch):
+    (tmp_path / "notes.txt").write_text("safe content\\n", encoding="utf-8")
+    navigator = make_navigator(tmp_path)
+    read_started = threading.Event()
+    release_read = threading.Event()
+    pwd_finished = threading.Event()
+    pwd_result = {}
+
+    original_read = navigator._read_text
+
+    def blocked_read(raw_path, *, base=None):
+        read_started.set()
+        assert release_read.wait(2)
+        return original_read(raw_path, base=base)
+
+    monkeypatch.setattr(navigator, "_read_text", blocked_read)
+    read_thread = threading.Thread(target=lambda: navigator.execute("cat notes.txt"))
+    read_thread.start()
+    assert read_started.wait(1)
+
+    def read_pwd():
+        pwd_result.update(navigator.execute("pwd"))
+        pwd_finished.set()
+
+    pwd_thread = threading.Thread(target=read_pwd)
+    pwd_thread.start()
+    completed_without_waiting_for_io = pwd_finished.wait(0.25)
+    release_read.set()
+    read_thread.join(1)
+    pwd_thread.join(1)
+
+    assert completed_without_waiting_for_io is True
+    assert pwd_result["success"] is True
+    assert not read_thread.is_alive()
+    assert not pwd_thread.is_alive()
 
