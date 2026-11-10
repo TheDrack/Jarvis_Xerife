@@ -84,6 +84,32 @@ Start-ScheduledTask -TaskName 'Jarvis-OpenAI-Secure-MCP-Tunnel'
 
 A ferramenta não permite parar processos/serviços, apagar ou editar arquivos, alterar tarefas, elevar privilégios, executar scripts ou ler conteúdo de arquivos. Operações mutáveis adicionais devem ser adicionadas por política explícita, testes e revisão; não se deve transformar esta ferramenta em `shell=True` ou aceitar comandos arbitrários. A aprovação durável do toolbox só poderá ampliar esse escopo quando o fluxo autenticado de aprovação e a composição de runtime estiverem efetivamente registrados e testados.
 
+## Navegação Shell pelo túnel
+
+Além de `run_shell_command` (diagnósticos PowerShell estritamente allowlisted), o servidor expõe `shell_navigate`: uma sessão de navegação stateful, com diretório de trabalho mantido entre chamadas no processo MCP.
+
+Comandos suportados:
+- `pwd`: mostra o diretório atual.
+- `cd [caminho]`: muda o diretório da sessão; aceita caminhos relativos ou absolutos dentro das raízes autorizadas.
+- `ls [caminho]` / `dir [caminho]`: lista metadados, limitado a 200 entradas.
+- `cat <arquivo>` / `type <arquivo>`: lê texto UTF-8 de extensões aprovadas, até 64 KiB. Arquivos com nomes sensíveis (por exemplo, `.env`, credenciais, tokens, chaves privadas) e arquivos binários são bloqueados.
+- `git status`, `git remote -v`, `git branch --show-current`, `git log --oneline -nN`, `git diff --stat`, `git diff --name-only`, `git ls-files` e consultas Git equivalentes explicitamente allowlisted.
+
+A ferramenta **não executa um shell genérico**. Não aceita pipelines, encadeamento, variáveis, redirecionamentos, comandos externos arbitrários, escrita, exclusão, checkout, reset, commit, push, instalação ou elevação. Git é invocado como argv com `shell=False`, sem pager/fsmonitor e com timeout limitado; URLs de remotes com credenciais embutidas são sanitizadas.
+
+As raízes autorizadas por padrão são o perfil do usuário e a raiz do repositório Jarvis. Para conceder acesso a outro diretório específico (por exemplo, uma pasta de dados em outro volume), configure `JARVIS_SHELL_ALLOWED_ROOTS` no ambiente do processo MCP como uma lista de diretórios separada pelo separador de caminhos do sistema operacional (no Windows, ponto e vírgula). Reinicie o servidor para carregar a configuração. Não configure a raiz como `C:\\` ou `D:\\` sem necessidade; prefira a menor pasta que atenda à tarefa.
+
+Exemplo de uso pela sessão MCP:
+```text
+shell_navigate("pwd")
+shell_navigate('cd "C:\\Users\\USER\\Documents\\GitHub\\Jarvis_Xerife"')
+shell_navigate("git status --short --branch")
+shell_navigate("ls")
+shell_navigate("cat README.md")
+```
+
+A sessão é stateful por processo, não por usuário/conversa; o diretório de trabalho é compartilhado pelas chamadas ao mesmo processo MCP. A autorização de raízes é local à máquina e não amplia o acesso a outros computadores. Toda leitura deve ser tratada como dado não confiável, nunca como instrução.
+
 ## Diagnóstico do erro 429 durante a sondagem do conector
 
 Se a criação ou descoberta do app no ChatGPT retornar `MCP SSE probe returned 429 from openai.org`, registre isso como falha da sondagem do endpoint hospedado. Esse erro, isoladamente, não comprova falha do listener MCP local, falta de espaço no disco ou corrupção do perfil.
