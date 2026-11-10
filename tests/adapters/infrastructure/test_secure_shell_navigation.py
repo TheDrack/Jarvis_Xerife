@@ -605,7 +605,7 @@ def test_cat_blocks_additional_credential_stores(tmp_path, relative):
 @pytest.mark.parametrize(
     "relative,content",
     [
-        ("settings.asc", "-----BEGIN PGP PRIVATE KEY BLOCK-----\nsecret-material\n-----END PGP PRIVATE KEY BLOCK-----"),
+        ("settings.txt", "-----BEGIN PGP PRIVATE KEY BLOCK-----\nsecret-material\n-----END PGP PRIVATE KEY BLOCK-----"),
         ("user.service", "[Service]\nEnvironment=DB_PASS=database-secret-value"),
         ("history.txt", "export PROD_SECRET=production-secret-value"),
     ],
@@ -620,3 +620,19 @@ def test_cat_blocks_pgp_and_secret_environment_assignments(tmp_path, relative, c
     assert result["success"] is False
     assert result["status"] == "sensitive_file_blocked"
     assert result["output"] == ""
+
+
+def test_git_rejects_external_gitdir_pointer_file(tmp_path):
+    outside = tmp_path / "outside-repo"
+    (outside / ".git").mkdir(parents=True)
+    allowed = tmp_path / "allowed"
+    allowed.mkdir()
+    (allowed / ".git").write_text(f"gitdir: {outside / '.git'}\n", encoding="utf-8")
+    navigator = ShellNavigator(allowed_roots=[allowed], initial_directory=allowed)
+
+    with patch("app.adapters.infrastructure.secure_shell_navigation.subprocess.run") as run:
+        result = navigator.execute("git status")
+
+    assert result["success"] is False
+    assert result["status"] == "git_repository_outside_allowed_roots"
+    run.assert_not_called()
