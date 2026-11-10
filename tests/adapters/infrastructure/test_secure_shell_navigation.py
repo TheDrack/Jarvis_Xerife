@@ -399,3 +399,21 @@ def test_git_show_accepts_only_the_fixed_metadata_command(tmp_path):
     assert result["success"] is True
     assert "1 file changed" in result["output"]
     run.assert_called_once()
+
+
+def test_cat_redacts_json_credential_assignments(tmp_path):
+    target = tmp_path / "settings.json"
+    target.write_text(
+        '{"api_key":"api-secret-value","oauth_token":"oauth-secret-value",'
+        '"client_secret":"client-secret-value"}',
+        encoding="utf-8",
+    )
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute("cat settings.json")
+
+    assert result["success"] is True
+    assert "api-secret-value" not in result["output"]
+    assert "oauth-secret-value" not in result["output"]
+    assert "client-secret-value" not in result["output"]
+    assert result["output"].count("[REDACTED]") == 3
