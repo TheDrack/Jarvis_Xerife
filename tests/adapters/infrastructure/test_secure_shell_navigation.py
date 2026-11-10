@@ -309,7 +309,7 @@ def test_parser_preserves_backslashes_in_quoted_windows_paths():
 @pytest.mark.skipif(os.name != "nt", reason="Windows path aliases are platform-specific")
 @pytest.mark.parametrize(
     "suffix",
-    ["file:stream", "file.", "file ", "COM1", "NUL.txt", "COM\\u00b9", "LPT\\u00b2.txt"],
+    ["file:stream", "file.", "file ", "COM1", "NUL.txt", "COM¹", "LPT².txt"],
 )
 def test_windows_device_and_stream_aliases_are_rejected(tmp_path, suffix):
     navigator = make_navigator(tmp_path)
