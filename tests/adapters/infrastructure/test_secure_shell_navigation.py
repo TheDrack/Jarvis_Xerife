@@ -8,6 +8,7 @@ import pytest
 
 from app.adapters.infrastructure.secure_shell_navigation import (
     ShellNavigator,
+    _SECRET_CONTENT,
     register_shell_navigation_tools,
 )
 
@@ -367,3 +368,49 @@ def test_relative_initial_directory_is_resolved_from_first_allowed_root(tmp_path
 
     assert navigator.cwd == child.resolve()
     assert navigator.execute("pwd")["output"] == str(child.resolve())
+
+@pytest.mark.parametrize(
+    "filename",
+    ["kubeconfig.yaml", "netrc.txt", "pgpass.txt", "htpasswd.txt", "terraform.tfstate.json"],
+)
+def test_cat_blocks_credential_store_filename_variants(tmp_path, filename):
+    target = tmp_path / filename
+    target.write_text("ordinary-looking content", encoding="utf-8")
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute(f'cat "{filename}"')
+
+    assert result["success"] is False
+    assert result["status"] == "sensitive_file_blocked"
+    assert result["content"] == ""
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "client-key-data: " + "A" * 48,
+        "bindpw: directory-secret-value",
+        "SMTP_PASS=mail-secret-value",
+        "DATABASE_URL=postgresql://user:secret-value@db.internal/app",
+        "hvs." + "a" * 24,
+        "sk_live_" + "b" * 24,
+        "INSERT INTO users (password) VALUES ('sql-secret-value');",
+        "password: |\\n  first-line-secret-material\\n  second-line-secret-material\\nmode: safe\\n",
+    ],
+)
+def test_cat_blocks_additional_credential_shapes(tmp_path, content):
+    target = tmp_path / "ordinary-config.yaml"
+    target.write_text(content, encoding="utf-8")
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute("cat ordinary-config.yaml")
+
+    assert result["success"] is False
+    assert result["status"] == "secret_content_blocked"
+    assert result["content"] == ""
+    assert content not in json.dumps(result)
+
+
+def test_secret_scanner_handles_maximum_whitespace_input_without_cross_line_backtracking():
+    assert _SECRET_CONTENT.search(b"\\n" * (64 * 1024)) is None
+
