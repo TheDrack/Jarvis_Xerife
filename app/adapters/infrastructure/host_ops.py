@@ -494,7 +494,6 @@ _INSPECT_D_POLICIES: dict[str, ArgumentPolicy] = {
         positional="d_path",
     ),
     "Get-Item": ArgumentPolicy(values={"Path": "d_path"}, flags=frozenset(), positional="d_path"),
-    "Get-PSDrive": ArgumentPolicy(values={"Name": "text"}, flags=frozenset()),
 }
 
 _HARD_BLOCK_PATTERNS = re.compile(
