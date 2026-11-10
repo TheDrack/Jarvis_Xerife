@@ -600,3 +600,23 @@ def test_cat_blocks_additional_credential_stores(tmp_path, relative):
     assert result["success"] is False
     assert result["status"] == "sensitive_file_blocked"
     assert result["output"] == ""
+
+
+@pytest.mark.parametrize(
+    "relative,content",
+    [
+        ("settings.asc", "-----BEGIN PGP PRIVATE KEY BLOCK-----\nsecret-material\n-----END PGP PRIVATE KEY BLOCK-----"),
+        ("user.service", "[Service]\nEnvironment=DB_PASS=database-secret-value"),
+        ("history.txt", "export PROD_SECRET=production-secret-value"),
+    ],
+)
+def test_cat_blocks_pgp_and_secret_environment_assignments(tmp_path, relative, content):
+    target = tmp_path / relative
+    target.write_text(content, encoding="utf-8")
+    navigator = make_navigator(tmp_path)
+
+    result = navigator.execute(f'cat "{relative}"')
+
+    assert result["success"] is False
+    assert result["status"] == "sensitive_file_blocked"
+    assert result["output"] == ""
