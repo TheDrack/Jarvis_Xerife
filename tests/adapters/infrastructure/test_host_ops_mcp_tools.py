@@ -1,6 +1,8 @@
 """Integration tests for the MCP registration of host operations tools."""
 from __future__ import annotations
 
+from typing import get_type_hints
+
 from app.adapters.infrastructure import host_ops
 from app.adapters.infrastructure.host_ops_mcp_tools import TOOL_NAMES, register_host_ops_tools
 
@@ -102,3 +104,10 @@ def test_confirmation_tool_never_unlocks_blocked_operations():
 
     assert not_applicable["status"] == "confirmation_not_applicable"
     assert blocked["success"] is False
+
+
+def test_registered_tool_annotations_resolve_like_fastmcp():
+    mcp = _registered()
+
+    for function in mcp.tools.values():
+        get_type_hints(function)
