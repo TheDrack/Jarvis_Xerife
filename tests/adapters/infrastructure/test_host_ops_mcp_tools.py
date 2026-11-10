@@ -130,3 +130,40 @@ def test_host_ops_tools_are_not_registered_without_explicit_local_opt_in(monkeyp
 
     assert registered == ()
     assert mcp.tools == {}
+
+
+def test_list_tool_writes_audit_record_without_raw_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_HOST_OPS_ROOTS", str(tmp_path))
+    audit_path = tmp_path / "audit.jsonl"
+    monkeypatch.setenv("JARVIS_HOST_OPS_AUDIT_LOG", str(audit_path))
+    (tmp_path / "readme.txt").write_text("hello", encoding="utf-8")
+
+    result = _registered().tools["host_fs_list"](
+        path=str(tmp_path), depth=1, max_entries=10
+    )
+
+    assert result["success"] is True
+    assert result["audit_logged"] is True
+    assert result["audit_id"]
+    record = __import__("json").loads(audit_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert record["event"] == "fs_list"
+    assert record["path_digest"]
+    assert str(tmp_path) not in audit_path.read_text(encoding="utf-8")
+
+
+def test_read_tool_writes_audit_record_without_raw_path(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_HOST_OPS_ROOTS", str(tmp_path))
+    audit_path = tmp_path / "audit.jsonl"
+    monkeypatch.setenv("JARVIS_HOST_OPS_AUDIT_LOG", str(audit_path))
+    target = tmp_path / "readme.txt"
+    target.write_text("hello", encoding="utf-8")
+
+    result = _registered().tools["host_fs_read_text"](path=str(target))
+
+    assert result["success"] is True
+    assert result["audit_logged"] is True
+    assert result["audit_id"]
+    record = __import__("json").loads(audit_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert record["event"] == "fs_read"
+    assert record["path_digest"]
+    assert str(target) not in audit_path.read_text(encoding="utf-8")
