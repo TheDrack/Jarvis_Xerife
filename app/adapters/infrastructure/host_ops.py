@@ -84,8 +84,8 @@ def _reject_network_path(raw: str | Path) -> None:
                 drive_type = ctypes.windll.kernel32.GetDriveTypeW(f"{drive}\\")
             except (AttributeError, OSError):
                 drive_type = 0
-            if drive_type == 4:
-                raise PathNotAllowed("mapped network drives are not permitted")
+            if drive_type in {0, 1, 4}:
+                raise PathNotAllowed("unknown, unavailable or mapped network drives are not permitted")
 
 
 def _reject_link_components(candidate: Path) -> None:
