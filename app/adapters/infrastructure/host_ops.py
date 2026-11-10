@@ -802,6 +802,33 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
     return environment
 
 
+def _require_commitish(ref: str, workdir: Path) -> None:
+    """Reject blob/tree targets that would make git show disclose raw content."""
+    environment = _sanitized_environment()
+    environment["GIT_CEILING_DIRECTORIES"] = str(_repository_root())
+    try:
+        probe = subprocess.run(
+            [
+                "git", "-c", "core.fsmonitor=false",
+                "-c", "core.untrackedCache=false",
+                "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}",
+            ],
+            cwd=str(workdir),
+            env=environment,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=MIN_TIMEOUT_SECONDS,
+            shell=False,
+            check=False,
+        )
+    except OSError as exc:
+        raise ValueError("git show commit validation is unavailable") from exc
+    if probe.returncode != 0:
+        raise ValueError("git show targets must resolve to a commit")
+
+
 def _powershell_executable() -> str | None:
     for name in ("powershell.exe", "pwsh.exe", "pwsh"):
         found = shutil.which(name)
@@ -855,12 +882,21 @@ def compile_command(
         metadata_flags = {flag for flag, _value in parsed if flag} & {"--stat", "--name-only"}
         if verb in {"show", "diff"} and not metadata_flags:
             raise ValueError("git show/diff must use metadata-only --stat or --name-only output")
+        if verb == "show":
+            for parameter, value in parsed:
+                if parameter == "" and value is not None:
+                    _require_commitish(value, workdir)
         argv = (
             "git",
             "-c", "core.fsmonitor=false",
             "-c", "core.untrackedCache=false",
+            "-c", "log.showSignature=false",
             "--no-pager",
-            verb,
+            *(
+                (verb, "--no-ext-diff", "--no-textconv")
+                if verb in {"show", "diff"}
+                else (verb,)
+            ),
             *[token for pair in parsed for token in pair if token],
         )
         return CompiledCommand(profile, verb, argv, workdir, timeout_seconds, joined)
