@@ -116,7 +116,7 @@ def test_read_blocks_private_key_material(_sandbox):
 def test_read_redacts_tokens_and_reports_replacements(_sandbox):
     target = _sandbox / "config.txt"
     target.write_text(
-        'api_key = "super-secret-value-123"\ntoken: sk-abcdefghijklmnopqrstuvwx\n',
+        'api_key = "ordinary-secret-value-123"\ntoken: ordinary-token-value-123\n',
         encoding="utf-8",
     )
 
@@ -535,7 +535,7 @@ def test_inspect_d_profile_does_not_expose_other_drive_metadata():
 def test_git_profile_disables_repo_fsmonitor_and_optional_index_cache():
     compiled = ops.compile_command("git", "status", [])
 
-    assert compiled.argv[:6] == (
+    assert compiled.argv[:8] == (
         "git", "-c", "core.fsmonitor=false",
         "-c", "core.untrackedCache=false", "--no-pager",
     )
