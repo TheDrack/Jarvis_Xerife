@@ -84,6 +84,20 @@ Start-ScheduledTask -TaskName 'Jarvis-OpenAI-Secure-MCP-Tunnel'
 
 A ferramenta não permite parar processos/serviços, apagar ou editar arquivos, alterar tarefas, elevar privilégios, executar scripts ou ler conteúdo de arquivos. Operações mutáveis adicionais devem ser adicionadas por política explícita, testes e revisão; não se deve transformar esta ferramenta em `shell=True` ou aceitar comandos arbitrários. A aprovação durável do toolbox só poderá ampliar esse escopo quando o fluxo autenticado de aprovação e a composição de runtime estiverem efetivamente registrados e testados.
 
+## Operações de host somente leitura (aditivas)
+
+Além do `run_shell_command` (uma string PowerShell validada por AST), o servidor registra cinco ferramentas aditivas que nunca constroem linha de shell a partir da entrada:
+
+| Ferramenta | Escopo |
+|---|---|
+| `host_fs_list` | metadados de diretório, profundidade ≤ 4, ≤ 500 entradas, symlink/junction não seguidos |
+| `host_fs_read_text` | texto UTF-8 ≤ 256 KiB/4 000 linhas; binário, chave privada e arquivos de credencial recusados; tokens redigidos |
+| `host_command_profiles` | raízes, limites e verbos efetivos |
+| `host_command_run` | argv estruturado, perfis `powershell_readonly`, `git`, `pytest`, `inspect_d`; `shell=False`, sem elevação, timeout 1–60 s |
+| `host_command_request_confirmation` | token HMAC de uso único; inerte enquanto nenhuma capacidade for confirmável |
+
+Raízes: raiz do repositório e `D:\` (ou `JARVIS_HOST_OPS_ROOTS`). Travessia `..`, `~`, escape por link simbólico/junction e nomes de credencial são rejeitados após resolução. Escrita, instalação, boot, ACL, credenciais, controle de serviço e privilégio são bloqueados por padrão e auditados em `~/.local/share/jarvis/host_ops_audit.jsonl`, sem conteúdo de saída. Detalhes, ativação e testes: [HOST_OPS.md](skills-connectors/HOST_OPS.md).
+
 ## Diagnóstico do erro 429 durante a sondagem do conector
 
 Se a criação ou descoberta do app no ChatGPT retornar `MCP SSE probe returned 429 from openai.org`, registre isso como falha da sondagem do endpoint hospedado. Esse erro, isoladamente, não comprova falha do listener MCP local, falta de espaço no disco ou corrupção do perfil.

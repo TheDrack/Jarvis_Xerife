@@ -680,8 +680,12 @@ registrar_observabilidade_portas(mcp, tracked_action)
 # Remote-capable MCP surface: passive OSINT only. Active tools live in the
 # separate local-only OSINT server and are never registered on this gateway.
 from app.adapters.edge.osint_mcp_tools import register_osint_tools
+from app.adapters.infrastructure.host_ops_mcp_tools import register_host_ops_tools
 
 register_osint_tools(mcp)
+
+# Read-only host operations (paths, text files, allowlisted argv profiles).
+register_host_ops_tools(mcp)
 
 
 if __name__ == "__main__":
