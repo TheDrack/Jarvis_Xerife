@@ -282,7 +282,7 @@ _REDACTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(?:AKIA|ASIA|ABIA|ACCA|AGPA|AIDA|AIPA|ANPA|ANVA|APKA|AROA)[A-Z0-9]{16}\b"), "[REDACTED_AWS_KEY_ID]"),
     (
         re.compile(
-            r"(?i)((?:client[_-]?key[_-]?data|certificate[_-]?authority[_-]?data|account[_-]?key)\s*[:=]\s*)(\S{8,})"
+            r"""(?i)((?:client[_-]?key[_-]?data|certificate[_-]?authority[_-]?data|account[_-]?key)["']?\s*[:=]\s*["']?)([^"'\s,;}]{8,})"""
         ),
         r"\1[REDACTED]",
     ),
