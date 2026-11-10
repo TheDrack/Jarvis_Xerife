@@ -193,7 +193,8 @@ _REDACTION_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(r"(?i)\b(postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis)://([^:/@\s]+):([^@/\s]+)@"),
         r"\1://\2:[REDACTED]@",
-    ),    (
+    ),
+    (
         re.compile(
             r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|password|passwd|secret)["']?\s*[:=]\s*["']?)([^"'\s,}]{4,})"""
         ),
