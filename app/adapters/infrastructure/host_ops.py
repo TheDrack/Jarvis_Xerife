@@ -9,9 +9,9 @@ policy, and launches the process with ``shell=False``.
 Boundaries enforced here:
 
 * every filesystem path must resolve inside an explicit allowed root (repository
-  root plus ``D:\\`` on Windows, or ``JARVIS_HOST_OPS_ROOTS``); ``..`` segments
-  are rejected before resolution and symlinks/junctions are resolved and
-  re-checked, so a link cannot escape a root;
+  root plus ``D:\\`` on Windows, or ``JARVIS_HOST_OPS_ROOTS``); UNC/device paths,
+  mapped drives, ``..`` segments, symlinks and NTFS reparse points are rejected
+  before resolution, so caller-controlled links are never followed;
 * directories can only be listed (bounded depth/entries) and regular text files
   read (bounded bytes/lines) — credentials by name, private-key blocks and
   API-token shapes are refused/redacted;
