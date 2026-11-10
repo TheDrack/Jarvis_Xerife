@@ -683,3 +683,48 @@ def test_directory_listing_never_follows_nested_symlinks(_sandbox):
     linked = next(entry for entry in result["entries"] if entry["name"] == "external-link")
     assert linked["kind"] == "symlink"
     assert "outside-secret.txt" not in {entry["name"] for entry in result["entries"]}
+
+
+def test_read_redacts_json_quoted_credential_keys(_sandbox):
+    target = _sandbox / "appsettings.json"
+    target.write_text(
+        '{"OpenAI_API_Key":"json-secret-value","bot_token":"bot-secret-value"}',
+        encoding="utf-8",
+    )
+
+    result = ops.read_text_file(str(target))
+
+    assert result["success"] is True
+    assert "json-secret-value" not in result["content"]
+    assert "bot-secret-value" not in result["content"]
+    assert result["redactions"] >= 2
+
+
+@pytest.mark.parametrize("name", [".envrc", "_netrc", "credential.json"])
+def test_read_blocks_additional_credential_filenames(_sandbox, name):
+    target = _sandbox / name
+    target.write_text("password=must-not-leak", encoding="utf-8")
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.read_text_file(str(target))
+
+
+def test_mixed_separator_unc_is_rejected_before_resolution(_sandbox, monkeypatch):
+    original = Path.resolve
+
+    def guarded_resolve(path, *args, **kwargs):
+        if str(path).replace("/", "\\\\").startswith("\\\\\\\\"):
+            raise AssertionError("UNC path resolution must not be attempted")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", guarded_resolve)
+    with pytest.raises(ops.PathNotAllowed):
+        ops.resolve_path("\\\\attacker.example/share/secret.txt")
+
+
+def test_git_profile_rejects_working_directory_outside_repository(tmp_path):
+    outside = tmp_path / "other-repository"
+    outside.mkdir()
+
+    with pytest.raises(ops.PathNotAllowed):
+        ops.compile_command("git", "status", [], cwd=str(outside))
