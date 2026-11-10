@@ -807,7 +807,7 @@ def _audit(record: Mapping[str, Any]) -> tuple[str, bool]:
         with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
             if os.name != "nt":
                 os.chmod(path, 0o600)
-            handle.write(json.dumps(payload, ensure_ascii=False, default=str) + "\\n")
+            handle.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
         return audit_id, True
     except OSError as exc:  # pragma: no cover - filesystem failure
         logger.warning("Host ops audit write failed: %s", type(exc).__name__)
