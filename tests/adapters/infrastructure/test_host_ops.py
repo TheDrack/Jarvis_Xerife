@@ -869,3 +869,35 @@ def test_read_blocks_xml_password_content_in_ordinary_config_file(_sandbox):
     assert result["success"] is False
     assert result["status"] == "secret_content_blocked"
     assert "xml-secret-value" not in result.get("content", "")
+
+
+def test_directory_listing_bounds_scandir_before_sorting(_sandbox, monkeypatch):
+    for index in range(30):
+        (_sandbox / f"entry-{index:02d}.txt").write_text("x", encoding="utf-8")
+
+    original_scandir = os.scandir
+    observed = {"count": 0}
+
+    def bounded_scandir(path):
+        for entry in original_scandir(path):
+            observed["count"] += 1
+            yield entry
+            if observed["count"] >= 4:
+                break
+
+    monkeypatch.setattr(ops.os, "scandir", bounded_scandir)
+    result = ops.list_directory(str(_sandbox), max_entries=3)
+
+    assert result["truncated"] is True
+    assert result["entry_count"] == 3
+    assert observed["count"] == 4
+
+
+def test_git_show_and_diff_are_metadata_only():
+    for verb, arguments in (
+        ("show", ["--stat", "HEAD"]),
+        ("diff", ["--name-only", "HEAD", "HEAD~1"]),
+    ):
+        compiled = ops.compile_command("git", verb, arguments)
+        assert "--no-ext-diff" in compiled.argv
+        assert "--no-textconv" in compiled.argv
