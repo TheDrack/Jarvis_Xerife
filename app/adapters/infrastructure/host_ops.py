@@ -1108,8 +1108,10 @@ def _drop_credential_lines(value: str) -> str:
     for line in value.splitlines():
         tokens = line.split()
         if any(_names_credential_entry(token) for token in tokens):
+            kept.append("[REDACTED_NAME]")
             continue
         if _SENSITIVE_OUTPUT_NAME.search(line):
+            kept.append("[REDACTED_LINE]")
             continue
         kept.append(line)
     return "\n".join(kept)
@@ -1123,7 +1125,7 @@ def _bound(value: str | None, limit: int) -> tuple[str, bool]:
     if _PRIVATE_KEY_BLOCK.search(redacted):
         return "[WITHHELD: output contained a private key block]", True
     filtered = _drop_credential_lines(redacted)
-    return filtered[:limit], len(filtered) > limit
+    return filtered[:limit], len(raw) > limit or len(filtered) > limit
 
 
 def run_host_command(
