@@ -1162,16 +1162,21 @@ def _spawn(
     try:
         return_code = process.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
-        process.kill()
+        try:
+            process.kill()
+        except OSError:
+            pass
         process.wait()
         for reader in readers:
             reader.join(timeout=2)
-        raise subprocess.TimeoutExpired(
+        timeout_error = subprocess.TimeoutExpired(
             list(argv),
             timeout_seconds,
             output=decoded(stdout_buffer),
             stderr=decoded(stderr_buffer),
         )
+        timeout_error._jarvis_truncated = stdout_overflow[0] or stderr_overflow[0]
+        raise timeout_error
     finally:
         for reader in readers:
             reader.join(timeout=2)
@@ -1315,11 +1320,17 @@ def run_host_command(
         completed = _spawn(compiled.argv, compiled.cwd, environment, compiled.timeout_seconds)
     except subprocess.TimeoutExpired as exc:
         elapsed_ms = int((time.monotonic() - started) * 1000)
-        stdout, _ = _bound(_as_text(exc.stdout), MAX_STDOUT_CHARS)
-        stderr, _ = _bound(_as_text(exc.stderr), MAX_STDERR_CHARS)
+        stdout, stdout_truncated = _bound(_as_text(exc.stdout), MAX_STDOUT_CHARS)
+        stderr, stderr_truncated = _bound(_as_text(exc.stderr), MAX_STDERR_CHARS)
+        output_truncated = (
+            stdout_truncated
+            or stderr_truncated
+            or bool(getattr(exc, "_jarvis_truncated", False))
+        )
         audit_id, logged = _audit(
             {
                 "event": "timeout",
+                "truncated": output_truncated,
                 "profile": profile,
                 "verb": verb,
                 "argument_count": len(arguments),
@@ -1339,6 +1350,7 @@ def run_host_command(
             "stdout": stdout,
             "stderr": stderr,
             "timed_out": True,
+            "truncated": output_truncated,
             "timeout_seconds": compiled.timeout_seconds,
             "elapsed_ms": elapsed_ms,
             "audit_id": audit_id,
