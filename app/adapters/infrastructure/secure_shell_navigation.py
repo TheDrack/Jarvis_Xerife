@@ -368,7 +368,7 @@ class ShellNavigator:
             "cwd": str(self.cwd),
             "content": content,
             "output": content,
-            "bytes_returned": len(data),
+            "bytes_returned": len(content.encode("utf-8")),
             "total_bytes": total_bytes,
             "truncated": truncated,
             "read_only": True,
