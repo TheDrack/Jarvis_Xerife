@@ -37,6 +37,16 @@ _TEXT_SUFFIXES = {
     ".html", ".css", ".js", ".ts", ".tsx", ".jsx", ".gitignore",
 }
 _SPECIAL_TEXT_NAMES = {"readme", "license", "dockerfile", "makefile", "procfile"}
+\n\ndef _redact_text(value: str) -> str:
+    """Redact common credential forms before returning file or Git output."""
+    value = re.sub(r"(?i)(Bearer\\s+)[A-Za-z0-9._~+/-]+=*", r"\\1[REDACTED]", value)
+    value = re.sub(r"(?i)\\bsk-[A-Za-z0-9_-]{16,}", "[REDACTED_API_KEY]", value)
+    return re.sub(
+        r"""(?i)(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)["']?\\s*[:=]\\s*["']?)[^"'\\s,}]+""",
+        r"\\1[REDACTED]",
+        value,
+    )
+
 _GIT_SIMPLE_ARGS = {
     ("status",): ["status"],
     ("status", "--short", "--branch"): ["status", "--short", "--branch"],
@@ -216,7 +226,7 @@ class ShellNavigator:
                         output = raw.decode("utf-8")
                     except UnicodeDecodeError:
                         return self._failure("encoding_unsupported", "file is not valid UTF-8 text")
-                    return self._result(output, bytes_read=len(raw))
+                    return self._result(_redact_text(output), bytes_read=len(raw))
 
                 if verb == "git":
                     argv = self._git_argv(args)
@@ -247,7 +257,7 @@ class ShellNavigator:
                     if args[:2] == ["remote", "-v"]:
                         raw_output = re.sub(r"(https?://)[^/@\s]+:[^/@\s]+@", r"\1[REDACTED]@", raw_output)
                         raw_output = re.sub(r"(?i)(token|key|password)=([^&\s]+)", r"\1=[REDACTED]", raw_output)
-                    output = raw_output[:MAX_OUTPUT_CHARS]
+                    output = _redact_text(raw_output)[:MAX_OUTPUT_CHARS]
                     error = (completed.stderr or "")[:4_000]
                     return {
                         "success": completed.returncode == 0,
