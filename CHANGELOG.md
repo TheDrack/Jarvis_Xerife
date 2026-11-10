@@ -9,24 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Jarvis OS — hardening do MCP Linux (2026-11-10)
+#### Host operations somente leitura no MCP — branch feat/secure-tunnel-host-ops (2026-11-10)
 
-- `jarvis_linux_mcp`: entrypoint ASGI com autenticação bearer obrigatória, token aleatório gerado pelo provisionador e validação em tempo constante; o serviço continua restrito a loopback e mantém as proteções Host/Origin.
-- O provisionador aplica `umask 077` antes de criar o diretório/arquivo de ambiente, usa diretório 0700, arquivo 0600 e remove cópias temporárias mesmo em falha/interrupção.
-- Os caminhos de bancos são normalizados para diretório de dados do usuário sem sobrescrever chaves/configurações já existentes; o verificador testa bind da API e resposta 401 do MCP sem token.
-- `mcp>=1.30,<2` garante a API ASGI `FastMCP.streamable_http_app()` usada pelo wrapper autenticado.
-
-#### Jarvis OS — kit de provisionamento Linux (2026-11-09)
-
-- `linux/`: inventário verificado desta máquina (dois discos, dois Windows),
-  provisionamento idempotente do harness em Ubuntu 24.04 LTS, units systemd de
-  usuário (`jarvis-api`, `jarvis-mcp` em loopback), requirements Linux sem
-  `pywinauto` e verificação pós-instalação read-only com `--services`/`--tests`.
-- O kit não formata disco, não instala bootloader e não altera o Windows: a
-  validação em VM descartável precede a instalação física no disco 0, conforme
-  `docs/JARVIS_OS_FOUNDATION.md` e `docs/architecture/JARVIS_CONTINUAL_LEARNING.md`.
-- `linux/README.md` documenta inventário, rota VM, runbook físico, gaps de
-  portabilidade (win32/ETW/overlay) e critérios de aceitação.
+- `app/adapters/infrastructure/host_ops.py`: política de raízes com resolução de symlink/junction, listagem limitada, leitura de texto com bloqueio de credenciais/chaves e redação de tokens, perfis de comando estruturado (`powershell_readonly`, `git`, `inspect_d`), execução com `shell=False`, ambiente minimizado, timeout e saída limitados, auditoria JSONL e gate de confirmação HMAC de uso único (inertes por padrão).
+- `host_ops_mcp_tools.py` + registro aditivo em `jarvis_desktop_mcp.py`: cinco ferramentas `host_*` na mesma superfície autenticada, sem nova porta ou credencial.
+- Operações destrutivas, de instalação, boot, ACL, credenciais e privilégio continuam bloqueadas por padrão, por padrão textual, mesmo com token.
+- Documentação (runbook + skill) e testes unitários/integrados simulados adicionados; nenhuma permissão de host ampliada.
 
 #### Grafo OSINT — aresta persistida por escopo (2026-11-06)
 
