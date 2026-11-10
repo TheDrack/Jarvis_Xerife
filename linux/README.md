@@ -118,7 +118,7 @@ linux/verify-jarvis-os.sh --services --tests
 - Serviços de usuário; para sobreviver ao logout: `sudo loginctl enable-linger $USER`.
 - MCP Linux usa `jarvis_linux_mcp`: loopback + autenticação obrigatória `Authorization: Bearer`. O provisionador gera `JARVIS_DESKTOP_AUTH_TOKEN` aleatório quando `--with-mcp` é usado e o guarda no arquivo 0600. Configure esse token no cliente MCP; nunca o imprima em logs, chat ou commit.
 - Host/Origin allowlists continuam ativos. Para Tailscale Serve, inclua explicitamente o hostname privado nos allowlists e configure o cliente com o bearer token. Nunca use Funnel nem `0.0.0.0`.
-- `--harden-network` é opt-in porque muda firewall; sem ele, nada de rede é alterado.
+- `--harden-network` é opt-in porque muda firewall; sem ele, nada de rede é alterado. Quando ativado, SSH (TCP/22) e demais entradas são permitidos apenas pela interface `tailscale0`; não há regra SSH global em interfaces públicas.
 
 ## 7. Gaps de portabilidade Linux conhecidos
 
