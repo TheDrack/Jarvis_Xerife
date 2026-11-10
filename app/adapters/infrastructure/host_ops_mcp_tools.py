@@ -7,6 +7,7 @@ credential is introduced.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Sequence
 
 from app.adapters.infrastructure import host_ops
@@ -24,6 +25,14 @@ TOOL_NAMES = (
 
 def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
     """Register the host operations tools on ``mcp`` and return their names."""
+
+    # Host filesystem and command tools are an explicit local opt-in. The
+    # authenticated tunnel is single-user; do not expose this gateway to
+    # untrusted or multi-tenant MCP clients.
+    enabled = os.environ.get("JARVIS_HOST_OPS_ENABLED", "").strip().casefold()
+    if enabled not in {"1", "true", "yes", "on"}:
+        logger.info("Host operations tools are disabled; set JARVIS_HOST_OPS_ENABLED=1 to opt in")
+        return ()
 
     @mcp.tool(name="host_fs_list")
     def host_fs_list(path: str = ".", depth: int = 1, max_entries: int = 200) -> dict[str, Any]:
