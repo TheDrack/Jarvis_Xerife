@@ -22,7 +22,6 @@ MAX_COMMAND_CHARS = 2048
 MAX_OUTPUT_CHARS = 16_000
 MAX_READ_BYTES = 64 * 1024
 MAX_ENTRIES = 200
-MAX_TIMEOUT_SECONDS = 15
 
 _FORBIDDEN_SYNTAX = re.compile(r"[\x00-\x1f;|&`$<>]")
 _TEXT_SUFFIXES = frozenset(
@@ -375,13 +374,8 @@ class ShellNavigator:
             "read_only": True,
         }
 
-    def execute(self, command: str, *, timeout_seconds: int = 10) -> dict[str, Any]:
+    def execute(self, command: str) -> dict[str, Any]:
         """Execute one command from the pwd/cd/ls/cat allowlist; never starts a process."""
-        if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int):
-            return self._failure("invalid_timeout", "timeout_seconds must be an integer")
-        if not 1 <= timeout_seconds <= MAX_TIMEOUT_SECONDS:
-            return self._failure("invalid_timeout", "timeout_seconds is outside the allowed range")
-
         try:
             tokens = self._tokens(command)
         except ValueError as exc:
@@ -445,8 +439,8 @@ def register_shell_navigation_tools(
         return ()
 
     @mcp.tool(name="shell_navigate")
-    def shell_navigate(command: str, timeout_seconds: int = 10) -> dict[str, Any]:
+    def shell_navigate(command: str) -> dict[str, Any]:
         """Navigate allowed directories using pwd/cd/ls/cat only; no shell or Git execution."""
-        return active_navigator.execute(command, timeout_seconds=timeout_seconds)
+        return active_navigator.execute(command)
 
     return ("shell_navigate",)
