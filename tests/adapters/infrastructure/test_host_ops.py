@@ -906,7 +906,7 @@ def test_git_show_and_diff_are_metadata_only():
 
 @pytest.mark.skipif(os.name == "nt", reason="backslash is a path separator on Windows")
 def test_allowed_root_with_trailing_backslash_is_not_treated_as_root(_sandbox):
-    candidate = Path(f"{_sandbox}\\\\")
+    candidate = Path(f"{_sandbox}" + chr(92))
     assert ops._is_within(_sandbox, _sandbox) is True
     assert ops._is_within(candidate, _sandbox) is False
 
