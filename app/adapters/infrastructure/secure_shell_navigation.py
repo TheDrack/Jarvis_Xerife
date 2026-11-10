@@ -27,8 +27,15 @@ MAX_TIMEOUT_SECONDS = 15
 
 _FORBIDDEN_SYNTAX = re.compile(r"[\x00\r\n;|&`$<>{}()]")
 _SENSITIVE_PART = re.compile(
-    r"(?i)(^\.env(?:\..*)?$|credentials?|secrets?|token|password|"
-    r"id_(rsa|ed25519)|\.pem$|\.p12$|\.pfx$|\.key$|authorized_keys)"
+    r"(?i)^(?:"
+    r"\\.env(?:\\..*)?|\\.envrc|\\.npmrc|\\.netrc|\\.git-credentials|"
+    r"\\.ssh|\\.aws|\\.azure|\\.gnupg|\\.kube|\\.docker|"
+    r"\\.password-store|\\.terraform|\\.vault|"
+    r"\\.?credentials?(?:[._-].*)?|\\.?secrets?(?:[._-].*)?|"
+    r"\\.?tokens?(?:[._-].*)?|\\.?passwords?(?:[._-].*)?|"
+    r"id_(?:rsa|dsa|ecdsa|ed25519)(?:\\..*)?|authorized_keys|"
+    r".*\\.(?:pem|p12|pfx|key|jks|keystore|ppk|p8)"
+    r")$"
 )
 _TEXT_SUFFIXES = {
     ".txt", ".md", ".rst", ".py", ".ps1", ".sh", ".bat", ".cmd",
