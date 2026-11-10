@@ -236,7 +236,7 @@ def test_pytest_profile_compiles_without_a_shell():
     )
 
     assert compiled.argv[1:3] == ("-m", "pytest")
-    assert "--no-cov" in compiled.argv
+    assert "--no-cov" not in compiled.argv
     assert "-p" in compiled.argv and "no:cacheprovider" in compiled.argv
 
 
