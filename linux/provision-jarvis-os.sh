@@ -122,7 +122,7 @@ if [ ! -f "$ENV_FILE" ]; then
     log "criando $ENV_FILE (0600) — preencha as chaves depois"
     mkdir -p "$(dirname "$ENV_FILE")"
     umask 077
-    cat > "$ENV_FILE" <<'ENVEOF
+    cat > "$ENV_FILE" <<'ENVEOF'
 # Jarvis — variáveis de ambiente locais. Nunca versione este arquivo.
 # Chaves de provedores (deixe vazio para desabilitar):
 # OPENAI_API_KEY=
@@ -155,12 +155,9 @@ fi
 
 # Normalize only the three runtime database paths, preserving all existing
 # provider credentials and operator settings in an already-created env file.
-runtime_env_tmp="${ENV_FILE}.tmp.$"
+runtime_env_tmp="${ENV_FILE}.tmp.$$"
 awk '!/^JARVIS_(DEVICES|GEOINT|GRAPH)_DB=/' "$ENV_FILE" > "$runtime_env_tmp"
-printf 'JARVIS_DEVICES_DB="%s"\\nJARVIS_GEOINT_DB="%s"\\nJARVIS_GRAPH_DB="%s"\\n' \\
-    "$HOME/.local/share/jarvis/jarvis.db" \\
-    "$HOME/.local/share/jarvis/geoint.sqlite" \\
-    "$HOME/.local/share/jarvis/jarvis_graph.sqlite" >> "$runtime_env_tmp"
+printf 'JARVIS_DEVICES_DB="%s"\nJARVIS_GEOINT_DB="%s"\nJARVIS_GRAPH_DB="%s"\n' "$HOME/.local/share/jarvis/jarvis.db" "$HOME/.local/share/jarvis/geoint.sqlite" "$HOME/.local/share/jarvis/jarvis_graph.sqlite" >> "$runtime_env_tmp"
 chmod 600 "$runtime_env_tmp"
 mv "$runtime_env_tmp" "$ENV_FILE"
 mkdir -p "$HOME/.local/share/jarvis"
