@@ -92,6 +92,8 @@ logs/
 # Docker
 *.pid
 jarvis.db
+jarvis_graph.sqlite
+jarvis_graph.sqlite-journal
 
 # Self-healing tracking (to prevent infinite loops)
 .github/healing_attempts.json

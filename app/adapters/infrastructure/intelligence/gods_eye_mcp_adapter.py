@@ -278,9 +278,28 @@ class GodsEyeMcpAdapter(IntelligenceObservationSource):
         from mcp.client.session import ClientSession
         from mcp.client.stdio import StdioServerParameters, stdio_client
 
+        # Resolve the node binary robustly: the adapter is often launched from a
+        # service context (e.g. systemd) where ``node`` is not on PATH. The
+        # command stays fixed to the node runtime (never user-supplied) for
+        # security, but we allow resolving its absolute location.
+        import shutil
+        node_command = shutil.which("node")
+        if node_command is None:
+            for candidate in (
+                "/usr/local/bin/node",
+                "/opt/node-v20.18.1-linux-x64/bin/node",
+            ):
+                if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+                    node_command = candidate
+                    break
+        if node_command is None:
+            raise RuntimeError(
+                "node runtime not found; install Node.js or add it to PATH"
+            )
+
         script = self._entrypoint.resolve()
         server = StdioServerParameters(
-            command="node",
+            command=node_command,
             args=[str(script), "--api-base", self._api_base],
             cwd=str(script.parents[2]),
         )

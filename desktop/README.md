@@ -150,6 +150,20 @@ The HUD plots located devices as amber hexagons (bright when `online`, dim when
 `offline`) and lists all registered/discovered devices in the DISPOSITIVOS
 panel, where a row recenters the globe when coordinates are available.
 
+## Durable OSINT graph
+
+`osint.ip.enrich` upserts its one-hop evidence into a local SQLite graph
+(`jarvis_graph.sqlite` at the repository root, override with
+`JARVIS_GRAPH_DB`, also accepted in `intelligence.env`). Nodes and edges are
+written only for the requested `scope_id`; `persist=false` keeps the call
+stateless. A storage failure is reported in `persisted` without discarding the
+expansion, and re-running the same enrichment inserts nothing new.
+
+The returned `edges[].id` can then be explained without resending the dump:
+`osint.graph.explain(edge_id=..., scope_id=...)` reloads the edge and both
+endpoints from the store, recomputes the canonical confidence and refuses ids
+from another scope. The database stays local; nothing is uploaded.
+
 ## Briefing anchored on the accessing device
 
 `GET /api/briefing?lat=<latitude>&lon=<longitude>` anchors the briefing on the
