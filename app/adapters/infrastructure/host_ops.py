@@ -204,7 +204,7 @@ def resolve_path(raw: str, *, must_exist: bool = False) -> Path:
 
 
 _SECRET_DIRECTORIES = frozenset(
-    {".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store", ".git", ".terraform", ".vault"}
+    {".ssh", ".aws", ".azure", ".gnupg", ".kube", ".docker", ".password-store", ".git", ".terraform", ".vault", "credentials", "secrets", "tokens", "passwords", "gcloud", "gh", "containers", "keyrings", "globalstorage", "github cli"}
 )
 _SECRET_FILE_NAME = re.compile(
     r"""(?ix)^(
@@ -224,7 +224,7 @@ _SECRET_FILE_NAME = re.compile(
 )
 _SENSITIVE_OUTPUT_NAME = re.compile(
     r"(?i)(?<![A-Z0-9_.-])(?:"
-    r"\.aws|\.azure|\.ssh|\.gnupg|\.kube|\.docker|\.npmrc|\.pypirc|\.netrc|_netrc|\.envrc|"
+    r"\.aws|\.azure|\.ssh|\.gnupg|\.kube|\.docker|\.npmrc|\.pypirc|\.netrc|_netrc|\.envrc|gcloud|github cli|globalstorage|keyrings|"
     r"\.git-credentials|credentials?(?:\.(?:json|db|ya?ml|txt))?|"
     r"secrets?(?:\.(?:json|db|ya?ml|txt))?|tokens?(?:\.(?:json|db|ya?ml|txt))?|"
     r"id_(?:rsa|dsa|ecdsa|ed25519)|client_secret\.json|application_default_credentials\.json"
@@ -299,7 +299,7 @@ def _is_junction(entry: os.DirEntry[str]) -> bool:
         try:
             import ctypes
 
-            attributes = ctypes.windll.kernel32.GetFileAttributesW(entry.path)
+            attributes = ctypes.windll.kernel32.GetFileAttributesW(ctypes.c_wchar_p(entry.path))
             if attributes != 0xFFFFFFFF and attributes & reparse_point:
                 return not entry.is_symlink()
         except (AttributeError, OSError):
