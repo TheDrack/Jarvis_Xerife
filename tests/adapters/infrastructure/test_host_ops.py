@@ -533,13 +533,33 @@ def test_inspect_d_profile_does_not_expose_other_drive_metadata():
         ops.compile_command("inspect_d", "Get-PSDrive", ["-Name", "C"])
 
 
-def test_git_profile_disables_repo_fsmonitor_and_optional_index_cache():
+def test_git_profile_disables_repository_config_execution_surfaces():
     compiled = ops.compile_command("git", "status", [])
+    argv_pairs = set(zip(compiled.argv[1::2], compiled.argv[2::2]))
 
-    assert compiled.argv[:8] == (
-        "git", "-c", "core.fsmonitor=false",
-        "-c", "core.untrackedCache=false", "-c", "log.showSignature=false", "--no-pager",
-    )
+    assert ("-c", "core.fsmonitor=false") in argv_pairs
+    assert ("-c", "core.untrackedCache=false") in argv_pairs
+    assert ("-c", f"core.hooksPath={os.devnull}") in argv_pairs
+    assert ("-c", "diff.external=") in argv_pairs
+    assert ("-c", "core.pager=cat") in argv_pairs
+    assert ("-c", f"core.attributesFile={os.devnull}") in argv_pairs
+    assert ("-c", "log.showSignature=false") in argv_pairs
+    assert "--no-pager" in compiled.argv
+
+
+def test_git_commit_probe_uses_the_same_safety_overrides(monkeypatch):
+    captured = {}
+
+    def fake_run(argv, **kwargs):
+        captured["argv"] = list(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="abc123\\n", stderr="")
+
+    monkeypatch.setattr(ops.subprocess, "run", fake_run)
+    ops._require_commitish("HEAD", ops._repository_root())
+
+    assert ("-c", "core.fsmonitor=false") in set(zip(captured["argv"][1::2], captured["argv"][2::2]))
+    assert ("-c", f"core.hooksPath={os.devnull}") in set(zip(captured["argv"][1::2], captured["argv"][2::2]))
+    assert ("-c", "diff.external=") in set(zip(captured["argv"][1::2], captured["argv"][2::2]))
 
 
 def test_git_environment_ignores_user_and_system_configuration():
@@ -548,6 +568,8 @@ def test_git_environment_ignores_user_and_system_configuration():
     assert environment["GIT_CONFIG_NOSYSTEM"] == "1"
     assert environment["GIT_CONFIG_GLOBAL"] == os.devnull
     assert environment["GIT_OPTIONAL_LOCKS"] == "0"
+    assert environment["GIT_NO_REPLACE_OBJECTS"] == "1"
+    assert environment["GIT_ATTR_NOSYSTEM"] == "1"
 
 
 @pytest.mark.parametrize(
