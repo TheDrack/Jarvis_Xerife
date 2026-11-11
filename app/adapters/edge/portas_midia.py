@@ -26,7 +26,7 @@ _MEDIA_URL_HINTS = re.compile(
     re.I,
 )
 _MEDIA_CONTENT_TYPES = re.compile(
-    r"(video/|audio/|application/(vnd\.apple\.mpegurl|dash\+xml|x-mpegurl)|octet-stream)",
+    r"(video/|audio/|application/(vnd\.apple\.mpegurl|dash\+xml|x-mpegurl|vnd\.yt-ump)|octet-stream)",
     re.I,
 )
 
