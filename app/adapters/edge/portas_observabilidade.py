@@ -42,6 +42,7 @@ _MEDIA_MANIFEST_MIME_TYPES = {
 _MEDIA_CHUNK_BYTES = 256 * 1024
 _MEDIA_CHUNK_BUFFER_SIZE = 128
 _MEDIA_STREAM_LIMIT = 64
+_MEDIA_STREAM_MAX_BYTES = 8 * 1024 * 1024
 
 
 def sanitizar_url(url: str) -> tuple[str, str]:
@@ -159,16 +160,20 @@ class BrowserTrafficObserver:
         )
 
     def _store_media_bytes(self, stream_id: str, payload: bytes, timestamp: float | None = None) -> int:
-        """Armazena bytes sem transformação, em chunks base64 com orçamento global fixo."""
+        """Store a bounded prefix of a media stream in fixed-size base64 chunks."""
         if not isinstance(payload, bytes) or not payload:
-            return 0
-        if stream_id not in self._media_streams:
             return 0
         captured = 0
         stamp = timestamp if timestamp is not None else time.monotonic()
         with self._lock:
-            for offset in range(0, len(payload), _MEDIA_CHUNK_BYTES):
-                chunk = payload[offset:offset + _MEDIA_CHUNK_BYTES]
+            stream = self._media_streams.get(stream_id)
+            if stream is None:
+                return 0
+            current_bytes = self._media_offsets.get(stream_id, 0)
+            remaining = max(0, _MEDIA_STREAM_MAX_BYTES - current_bytes)
+            bounded_payload = payload[:remaining]
+            for offset in range(0, len(bounded_payload), _MEDIA_CHUNK_BYTES):
+                chunk = bounded_payload[offset:offset + _MEDIA_CHUNK_BYTES]
                 sequence = self._media_sequences.get(stream_id, 0) + 1
                 stream_offset = self._media_offsets.get(stream_id, 0)
                 self._media_sequences[stream_id] = sequence
@@ -182,10 +187,46 @@ class BrowserTrafficObserver:
                     "data": base64.b64encode(chunk).decode("ascii"),
                 })
                 captured += len(chunk)
-            stream = self._media_streams[stream_id]
             stream["bytes_received"] = self._media_offsets[stream_id]
             stream["chunks_received"] = self._media_sequences[stream_id]
+            if len(payload) > remaining:
+                stream["status"] = "truncated"
+                stream["truncation_reason"] = "stream_byte_limit"
         return captured
+
+    def _store_media_base64(self, stream_id: str, encoded: str, timestamp: float | None = None) -> int:
+        """Decode incrementally so oversized CDP buffers are never copied wholesale."""
+        if not isinstance(encoded, str) or not encoded:
+            return 0
+        with self._lock:
+            stream = self._media_streams.get(stream_id)
+            if stream is None:
+                return 0
+            remaining = max(0, _MEDIA_STREAM_MAX_BYTES - self._media_offsets.get(stream_id, 0))
+        max_encoded = ((remaining + 2) // 3) * 4
+        bounded = encoded[:max_encoded]
+        total = 0
+        # Keep each transient decode below one storage chunk; preserve base64
+        # quartet boundaries between slices.
+        slice_chars = ((_MEDIA_CHUNK_BYTES + 2) // 3) * 4
+        for offset in range(0, len(bounded), slice_chars):
+            part = bounded[offset:offset + slice_chars]
+            part = part[: len(part) - (len(part) % 4)]
+            if not part:
+                continue
+            try:
+                total += self._store_media_bytes(
+                    stream_id, base64.b64decode(part, validate=False), timestamp
+                )
+            except (ValueError, TypeError):
+                break
+        if len(encoded) > max_encoded:
+            with self._lock:
+                stream = self._media_streams.get(stream_id)
+                if stream is not None:
+                    stream["status"] = "truncated"
+                    stream["truncation_reason"] = "stream_byte_limit"
+        return total
 
     def media_chunks(self, stream_id: str, *, after_sequence: int = 0, limit: int = 16) -> dict[str, Any]:
         bounded_limit = max(1, min(int(limit), 32))
@@ -333,12 +374,7 @@ class BrowserTrafficObserver:
         encoded = params.get("data")
         if not stream_id or not isinstance(encoded, str) or not encoded:
             return
-        try:
-            payload = base64.b64decode(encoded, validate=False)
-        except (ValueError, TypeError):
-            self._emit("media_stream_error", stream_id=stream_id, error="invalid_base64_chunk")
-            return
-        self._store_media_bytes(stream_id, payload, params.get("timestamp"))
+        self._store_media_base64(stream_id, encoded, params.get("timestamp"))
 
     def _on_media_loading_finished(self, session: Any, params: dict[str, Any]) -> None:
         request_id = str(params.get("requestId") or "")
@@ -418,7 +454,7 @@ class BrowserTrafficObserver:
             result = await session.send("Network.streamResourceContent", {"requestId": request_id})
             buffered = result.get("bufferedData") if isinstance(result, dict) else None
             if isinstance(buffered, str) and buffered:
-                self._store_media_bytes(stream_id, base64.b64decode(buffered, validate=False))
+                self._store_media_base64(stream_id, buffered)
         except Exception as exc:
             with self._lock:
                 current = self._media_streams.get(stream_id)
