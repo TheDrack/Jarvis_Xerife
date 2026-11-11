@@ -190,6 +190,64 @@ def test_cdp_endpoint_accepts_local_websocket_and_rejects_remote_hosts(monkeypat
     monkeypatch.setattr(portas_core, "CDP_URL", original)
 
 
+def test_media_response_capture_rejects_unbounded_and_manifest_bodies(monkeypatch):
+    import asyncio
+    import app.adapters.edge.portas_observabilidade as module
+
+    class Response:
+        url = "https://video.example/file?token=private"
+        headers = {"content-length": str(module._MEDIA_RESPONSE_BODY_LIMIT + 1)}
+        async def body(self):
+            raise AssertionError("oversized response must be rejected before body materialization")
+
+    observer = BrowserTrafficObserver()
+    asyncio.run(observer._capture_response_body(Response(), 1, "video/mp4"))
+
+    class ManifestResponse(Response):
+        headers = {"content-length": "128"}
+        async def body(self):
+            raise AssertionError("manifest bodies must never be materialized")
+
+    asyncio.run(
+        observer._capture_response_body(
+            ManifestResponse(), 2, "application/vnd.apple.mpegurl"
+        )
+    )
+
+
+def test_media_response_capture_redacts_url_before_opening_stream(monkeypatch):
+    import asyncio
+    import app.adapters.edge.portas_observabilidade as module
+
+    seen = {}
+
+    class Engine:
+        def open_stream(self, url, **kwargs):
+            seen["url"] = url
+            seen["kwargs"] = kwargs
+            return "stream-1"
+        def append(self, stream_id, body, **kwargs):
+            seen["body"] = body
+            return True
+        def close_stream(self, stream_id):
+            seen["closed"] = stream_id
+
+    class Response:
+        url = "https://video.example/file?token=private"
+        headers = {"content-length": "4", "content-encoding": "identity"}
+        async def body(self):
+            return b"data"
+
+    monkeypatch.setattr(module, "media_engine", Engine())
+    observer = BrowserTrafficObserver()
+    asyncio.run(observer._capture_response_body(Response(), 3, "video/mp4"))
+
+    assert "private" not in seen["url"]
+    assert "[REDACTED]" in seen["url"]
+    assert seen["body"] == b"data"
+    assert seen["closed"] == "stream-1"
+
+
 def test_request_finished_reports_duration_and_same_request_id():
     class FakeRequest:
         url = "https://api.example.test/camera"
