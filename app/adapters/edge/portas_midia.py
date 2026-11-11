@@ -617,6 +617,64 @@ def dash_adapter(stream: MediaStream, data: bytes) -> None:
     stream.dash_manifest = parsed  # type: ignore[attr-defined]
 
 
+def decode_available() -> bool:
+    import shutil
+    return shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+
+
+def decode_stream(stream_id: str, *, mode: str = "probe", output_dir: str | None = None) -> dict[str, Any]:
+    """Tenta decodificar um stream capturado. Requer ffmpeg/ffprobe no PATH.
+
+    mode: 'probe' (metadados), 'audio' (wav PCM), 'frames' (png sequence).
+    """
+    import shutil
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    if not decode_available():
+        return {"success": False, "available": False, "reason": "ffmpeg/ffprobe não encontrados no PATH"}
+    eng = engine
+    with eng._lock:
+        stream = eng._streams.get(stream_id)
+    if stream is None:
+        return {"success": False, "error": "stream não encontrado"}
+    # gather bytes
+    data = bytearray()
+    for c in stream.chunks:
+        data.extend(c.data)
+    if not data:
+        return {"success": False, "error": "stream sem bytes"}
+    tmp = Path(tempfile.mkdtemp(prefix="jarvis-media-"))
+    src = tmp / "input.bin"
+    src.write_bytes(bytes(data))
+    out: dict[str, Any] = {"success": True, "stream_id": stream_id, "mode": mode, "input_bytes": len(data), "work_dir": str(tmp)}
+    try:
+        if mode == "probe":
+            r = subprocess.run(["ffprobe", "-v", "error", "-show_format", "-show_streams", "-of", "json", str(src)], capture_output=True, text=True, timeout=60)
+            out["ffprobe"] = r.stdout[:4000]
+            out["stderr"] = r.stderr[:1000]
+        elif mode == "audio":
+            dst = tmp / "audio.wav"
+            r = subprocess.run(["ffmpeg", "-y", "-i", str(src), "-vn", "-acodec", "pcm_s16le", str(dst)], capture_output=True, text=True, timeout=120)
+            out["output"] = str(dst) if dst.exists() else None
+            out["stderr"] = r.stderr[-1000:]
+        elif mode == "frames":
+            pattern = tmp / "frame_%04d.png"
+            r = subprocess.run(["ffmpeg", "-y", "-i", str(src), str(pattern)], capture_output=True, text=True, timeout=120)
+            frames = sorted(tmp.glob("frame_*.png"))
+            out["frames"] = [str(p) for p in frames[:50]]
+            out["frame_count"] = len(frames)
+            out["stderr"] = r.stderr[-1000:]
+        else:
+            out["error"] = "mode inválido (probe|audio|frames)"
+    except subprocess.TimeoutExpired:
+        out["error"] = "timeout"
+    except Exception as exc:
+        out["error"] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
 engine = MediaCaptureEngine()
 engine.register_adapter("ump", ump_adapter)
 engine.register_adapter("hls", hls_adapter)

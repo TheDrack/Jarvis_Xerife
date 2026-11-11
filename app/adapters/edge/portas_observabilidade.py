@@ -17,7 +17,7 @@ from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.adapters.edge import portas_core
-from app.adapters.edge.portas_midia import engine as media_engine, is_media_request
+from app.adapters.edge.portas_midia import engine as media_engine, is_media_request, decode_stream, decode_available
 
 
 _REDACT_KEYS = re.compile(r"(pass(word)?|token|secret|auth|cookie|api.?key|credential|session)", re.I)
@@ -527,6 +527,18 @@ def registrar_observabilidade_portas(mcp: Any, tracked_action: Any) -> None:
     def portas_midia_dash(stream_id: str) -> dict[str, Any]:
         """Retorna manifesto DASH parseado de um stream."""
         return media_engine.dash_manifest(stream_id)
+
+    @mcp.tool()
+    @tracked_action("Decodificando stream de mídia")
+    def portas_midia_decode(stream_id: str, mode: str = "probe") -> dict[str, Any]:
+        """Tenta decodificar um stream capturado (requer ffmpeg/ffprobe). mode: probe|audio|frames."""
+        return decode_stream(stream_id, mode=mode)
+
+    @mcp.tool()
+    @tracked_action("Verificando disponibilidade de decodificação")
+    def portas_midia_decode_status() -> dict[str, Any]:
+        """Informa se ffmpeg/ffprobe estão disponíveis para decodificação."""
+        return {"success": True, "available": decode_available()}
 
     @mcp.tool()
     @tracked_action("Limpando streams de mídia")
