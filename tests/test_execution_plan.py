@@ -316,3 +316,22 @@ def test_lifecycle_events_never_include_raw_args_or_result_payloads():
     assert result.status == "completed"
     assert all("args" not in event and "result" not in event for event in events)
     assert secret not in repr(events)
+
+def test_verifier_receives_raw_result_not_plan_selected_projection():
+    observed = []
+    interpreter = DeclarativePlanInterpreter(
+        {"lookup": lambda _args: {"ok": True, "failure_marker": "must_remain_visible"}},
+        allow_all,
+        verifiers={
+            "lookup": lambda _args, raw: observed.append(raw) or raw["failure_marker"] == "must_remain_visible"
+        },
+    )
+
+    result = interpreter.execute(make_plan(
+        make_step("read", output_fields=["ok"]),
+    ))
+
+    assert result.status == "completed"
+    assert observed == [{"ok": True, "failure_marker": "must_remain_visible"}]
+    assert result.steps[0].result == {"ok": True}
+
