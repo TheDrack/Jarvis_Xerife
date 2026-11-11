@@ -397,7 +397,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
   <div class="panels">
    <div class="col col-left">
     <article class="panel" data-panel="briefing" id="panelBriefing">
-     <div class="panel-head"><span class="tag">L-00</span><span class="title">BRIEFING · DIÁRIO</span><div class="head-actions"><button class="mini" type="button" id="briefingRefresh" title="Atualizar manchetes e clima">SYNC</button><button class="mini" type="button" id="briefingLocate" title="Ancorar o briefing na localização deste dispositivo" aria-label="Usar a localização deste dispositivo">LOC</button><button class="mini" type="button" data-collapse="panelBriefing">MIN</button></div></div>
+     <div class="panel-head"><span class="tag">L-00</span><span class="title">BRIEFING · DIÁRIO</span><div class="head-actions"><button class="mini" type="button" id="briefingRefresh" title="Atualizar manchetes e clima">SYNC</button><button class="mini" type="button" id="briefingLocate" title="Ancorar o briefing na localização deste dispositivo" aria-label="Usar a localização deste dispositivo">LOC</button><button class="mini" type="button" id="briefingSaveLoc" title="Fixar localização na posição atual do globo" aria-label="Fixar localização atual do globo">FIXAR</button><button class="mini" type="button" data-collapse="panelBriefing">MIN</button></div></div>
      <div class="panel-body">
       <div class="tabs" role="tablist" aria-label="Tópicos do briefing" id="briefingTabs"></div>
       <div id="briefingList" class="briefing-list"><div class="empty">Briefing ainda não carregado. Use SYNC, o orb ou aguarde o ciclo automático.</div></div>
@@ -2299,6 +2299,15 @@ function renderBriefingList(){
  $('briefingList').innerHTML=topic.items.slice(0,5).map(item=>'<a class="row" href="'+esc(item.url)+'" target="_blank" rel="noopener noreferrer"><div class="grow"><b>'+esc(item.title)+'</b><small>'+esc((item.source||'veículo')+' · '+(item.published_at?hhmm(item.published_at):'--:--'))+'</small></div><span class="pill idle">'+esc(String(topic.label||'').slice(0,4))+'</span></a>').join('');
 }
 function renderBriefing(){renderTabs();renderBriefingList();}
+function saveCurrentLocation(){
+ const gc=Globe.getCenter?Globe.getCenter():null;
+ if(!gc||!Number.isFinite(gc.latitude)||!Number.isFinite(gc.longitude)){ setFooter('SEM CENTRO DO GLOBO'); return; }
+ state.location={latitude:gc.latitude,longitude:gc.longitude,accuracy_m:0,manual:true};
+ try{ localStorage.setItem('jarvis.manualLocation',JSON.stringify(state.location)); }catch(e){}
+ setFooter('LOCALIZAÇÃO FIXADA · '+gc.latitude.toFixed(3)+','+gc.longitude.toFixed(3));
+ refreshBriefing().then(buildAreas).catch(()=>{});
+ fetchWeatherPoint(gc.latitude,gc.longitude).then(()=>{ if(state.layers.weatherAnim)buildWxGridFromPoint(state.weatherPoint); renderWeatherPanel(); }).catch(()=>{});
+}
 function requestLocation(){
  if(!navigator.geolocation){
   setFooter('GEOLOCALIZAÇÃO INDISPONÍVEL · REGIÃO CONFIGURADA');
@@ -3417,9 +3426,11 @@ document.addEventListener('keydown',ev=>{
  $('briefingRefresh').addEventListener('click',refreshBriefing);
  $('weatherRefresh').addEventListener('click',refreshWeather);
   $('briefingLocate').addEventListener('click',async()=>{
+  try{ localStorage.removeItem('jarvis.manualLocation'); }catch(e){}
   const ok=await requestLocation();
   if(ok){await refreshBriefing();buildAreas();}
  });
+ $('briefingSaveLoc').addEventListener('click',saveCurrentLocation);
  $('briefingTabs').addEventListener('click',ev=>{
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-topic]'):null;
   if(!target)return;
@@ -3502,7 +3513,15 @@ setView('core');
  if(state.token){
   await refreshAll();
   startPolling();
+  let manualLoc=null;
+ try{ manualLoc=JSON.parse(localStorage.getItem('jarvis.manualLocation')||'null'); }catch(e){ manualLoc=null; }
+ if(manualLoc&&Number.isFinite(manualLoc.latitude)&&Number.isFinite(manualLoc.longitude)){
+  state.location=manualLoc;
+  refreshBriefing().then(buildAreas).catch(()=>{});
+  fetchWeatherPoint(manualLoc.latitude,manualLoc.longitude).then(()=>{ if(state.layers.weatherAnim)buildWxGridFromPoint(state.weatherPoint); renderWeatherPanel(); }).catch(()=>{});
+ }else{
   requestLocation().then(ok=>{if(ok)refreshBriefing().then(buildAreas).catch(()=>{});}).catch(()=>{});
+ }
  }
 })();
 })();
