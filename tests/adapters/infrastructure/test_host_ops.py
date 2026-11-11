@@ -174,7 +174,19 @@ def _fake_powershell(monkeypatch):
 def test_git_profile_builds_structured_argv(_fake_powershell):
     compiled = ops.compile_command("git", "status", ["--short"])
 
-    assert compiled.argv == ("git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "log.showSignature=false", "--no-pager", "status", "--short")
+    assert compiled.argv == (
+        "git",
+        "-c", "core.fsmonitor=false",
+        "-c", "core.untrackedCache=false",
+        "-c", f"core.hooksPath={os.devnull}",
+        "-c", "diff.external=",
+        "-c", "core.pager=cat",
+        "-c", f"core.attributesFile={os.devnull}",
+        "-c", "log.showSignature=false",
+        "--no-pager",
+        "status",
+        "--short",
+    )
     assert compiled.timeout_seconds == 20
     assert compiled.display == "status --short"
 
