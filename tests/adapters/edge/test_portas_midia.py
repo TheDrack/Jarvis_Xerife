@@ -1,12 +1,66 @@
 from app.adapters.edge.portas_midia import MediaCaptureEngine, is_media_request, UmpReader
 
 
-def test_is_media_request_detects_patterns():
-    assert is_media_request("https://example.com/videoplayback?id=1") is True
-    assert is_media_request("https://example.com/playlist.m3u8") is True
-    assert is_media_request("https://example.com/manifest.mpd") is True
+def test_is_media_request_requires_response_declared_media_type():
+    assert is_media_request("https://example.com/videoplayback?id=1") is False
+    assert is_media_request("https://example.com/playlist.m3u8") is False
+    assert is_media_request("https://example.com/manifest.mpd") is False
     assert is_media_request("https://example.com/api/foo", "video/mp4") is True
+    assert is_media_request("https://example.com/api/foo", "application/vnd.apple.mpegurl") is True
+    assert is_media_request("https://example.com/api/foo", "application/octet-stream") is False
     assert is_media_request("https://example.com/api/foo", "application/json") is False
+
+
+def test_media_stream_status_redacts_query_values():
+    engine = MediaCaptureEngine()
+    engine.enable()
+    engine.open_stream(
+        "https://video.example/videoplayback?token=secret-token&expire=123",
+        content_type="video/mp4",
+    )
+    status = engine.streams()[0]
+
+    assert status["url"] == (
+        "https://video.example/videoplayback?token=%5BREDACTED%5D&expire=%5BREDACTED%5D"
+    )
+    assert "secret-token" not in str(status)
+
+
+def test_hls_manifest_metadata_redacts_signed_segment_urls():
+    engine = MediaCaptureEngine()
+    engine.enable()
+    sid = engine.open_stream(
+        "https://video.example/master.m3u8?token=manifest-secret",
+        content_type="application/vnd.apple.mpegurl",
+        adapter="hls",
+    )
+    stream = engine.get(sid)
+    stream.hls_playlist = {
+        "segments": [
+            {"uri": "https://video.example/segment.ts?token=segment-secret&part=1"}
+        ]
+    }
+
+    result = engine.hls_playlist(sid)
+    assert result["success"] is True
+    assert "segment-secret" not in str(result)
+    assert "manifest-secret" not in str(result)
+    assert "%5BREDACTED%5D" in str(result)
+
+
+def test_manifest_bytes_are_not_exposed_by_read_bytes():
+    engine = MediaCaptureEngine()
+    engine.enable()
+    sid = engine.open_stream(
+        "https://video.example/master.m3u8?token=manifest-secret",
+        content_type="application/vnd.apple.mpegurl",
+        adapter="hls",
+    )
+    engine.append(sid, b"#EXTM3U\\nhttps://video.example/segment.ts?token=segment-secret")
+
+    result = engine.read_bytes(sid)
+    assert result["success"] is False
+    assert "segment-secret" not in str(result)
 
 
 def test_engine_disabled_by_default():
