@@ -98,6 +98,46 @@ class MediaDeliveryBus:
                 "video_queued": len(self._video),
             }
 
+    def to_multimodal_content(self, *, video_limit: int = 4, include_audio: bool = True) -> list[dict[str, Any]]:
+        """Monta conteúdo multimodal (text + image_url) pronto para o AI gateway.
+
+        Lê os PNGs decodificados e os embute como data URLs base64, no formato
+        OpenAI/Gemini multimodal. Retorna lista de content parts.
+        """
+        import base64
+        from pathlib import Path
+        parts: list[dict[str, Any]] = []
+        with self._lock:
+            videos = list(self._video)[-max(1, min(int(video_limit), 16)):]
+        for vf in videos:
+            try:
+                p = Path(vf.image_path)
+                if not p.exists():
+                    continue
+                b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+                parts.append({"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}})
+            except Exception:
+                continue
+        if include_audio:
+            with self._lock:
+                audios = list(self._audio)[-2:]
+            for af in audios:
+                parts.append({"type": "text", "text": f"[audio] {af.pcm_path}"})
+        return parts
+
+    def send_to_ai_gateway(self, gateway: Any, prompt: str, *, video_limit: int = 4) -> dict[str, Any]:
+        """Envia os frames capturados ao AI gateway como requisição multimodal.
+
+        Requer um gateway com método generate_completion(messages, multimodal=True).
+        """
+        content = [{"type": "text", "text": prompt}] + self.to_multimodal_content(video_limit=video_limit)
+        messages = [{"role": "user", "content": content}]
+        try:
+            result = gateway.generate_completion(messages, multimodal=True)
+            return {"success": True, "result": result}
+        except Exception as exc:
+            return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+
     def status(self) -> dict[str, Any]:
         with self._lock:
             return {
@@ -168,6 +208,12 @@ def registrar_entrega_midia(mcp: Any, tracked_action: Any) -> None:
     def portas_midia_entrega_limpar() -> dict[str, Any]:
         """Limpa filas de entrega."""
         return bus.clear()
+
+    @mcp.tool()
+    @tracked_action("Conteúdo multimodal para IA")
+    def portas_midia_entrega_multimodal(video_limit: int = 4) -> dict[str, Any]:
+        """Retorna content parts (text+image_url) prontos para o AI gateway."""
+        return {"success": True, "parts": bus.to_multimodal_content(video_limit=video_limit)}
 
 
 def ingest_decoded(stream_id: str) -> dict[str, Any]:

@@ -617,7 +617,33 @@ def dash_adapter(stream: MediaStream, data: bytes) -> None:
     stream.dash_manifest = parsed  # type: ignore[attr-defined]
 
 
+def _ensure_ffmpeg_path() -> None:
+    """Adiciona o diretório do ffmpeg (WinGet) ao PATH se necessário."""
+    import os
+    if os.environ.get("_JARVIS_FFMPEG_PATH_FIXED"):
+        return
+    try:
+        import glob
+        candidates = [
+            r"C:\Users\USER\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.2-full_build\bin",
+        ]
+        # also glob any version
+        for base in glob.glob(r"C:\Users\*\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg*"):
+            for bin_dir in glob.glob(base + r"\*\bin"):
+                candidates.append(bin_dir)
+        current = os.environ.get("PATH", "")
+        for c in candidates:
+            import os as _os
+            if _os.path.isdir(c) and c not in current:
+                os.environ["PATH"] = c + os.pathsep + current
+                current = os.environ["PATH"]
+    except Exception:
+        pass
+    os.environ["_JARVIS_FFMPEG_PATH_FIXED"] = "1"
+
+
 def decode_available() -> bool:
+    _ensure_ffmpeg_path()
     import shutil
     return shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
 
