@@ -559,6 +559,38 @@ def test_git_profile_disables_repository_config_execution_surfaces():
     assert "--no-pager" in compiled.argv
 
 
+@pytest.mark.parametrize(
+    "config",
+    [
+        '[filter "evil"]\\n    clean = cmd /c whoami\\n',
+        '[core]\\n    sshCommand = cmd /c whoami\\n',
+        '[core]\\n    worktree = C:/outside\\n',
+        '[include]\\n    path = C:/outside/config\\n',
+        '[diff "evil"]\\n    textconv = cmd /c whoami\\n',
+    ],
+)
+def test_git_profile_rejects_repository_config_with_execution_or_worktree_overrides(tmp_path, config):
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "config").write_text(config, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="repository config contains"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_profile_allows_inert_repository_config(tmp_path):
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "config").write_text(
+        '[core]\\n    repositoryformatversion = 0\\n    filemode = true\\n',
+        encoding="utf-8",
+    )
+
+    ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_environment_disables_lazy_fetch():
+    assert ops._sanitized_environment()["GIT_NO_LAZY_FETCH"] == "1"
+
+
 def test_git_commit_probe_uses_the_same_safety_overrides(monkeypatch):
     captured = {}
 
