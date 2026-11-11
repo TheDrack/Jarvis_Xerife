@@ -243,7 +243,7 @@ def test_media_response_capture_redacts_url_before_opening_stream(monkeypatch):
     asyncio.run(observer._capture_response_body(Response(), 3, "video/mp4"))
 
     assert "private" not in seen["url"]
-    assert "[REDACTED]" in seen["url"]
+    assert "%5BREDACTED%5D" in seen["url"]
     assert seen["body"] == b"data"
     assert seen["closed"] == "stream-1"
 

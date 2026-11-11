@@ -473,8 +473,8 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 <div class="window" id="liveWindow" role="dialog" aria-modal="true" aria-labelledby="liveTitle">
  <div class="window-card live-card">
   <div class="window-head"><span class="badge">◈</span><span class="title" id="liveTitle">CÂMERA · AO VIVO</span><button class="mini" type="button" data-close="liveWindow">FECHAR ×</button></div>
-  <div class="window-body live-body" id="liveBody"><div class="empty">Selecione uma câmera com transmissão disponível.</div></div>
-  <div class="window-foot"><span id="liveFoot">FONTE · --</span><a class="mini" id="liveSource" target="_blank" rel="noopener noreferrer" hidden>ABRIR NA FONTE ↗</a></div>
+  <div class="window-body live-body" id="liveBody"><div class="empty">Selecione uma câmera com transmissão disponível ou cole uma URL de stream HLS/MP4 abaixo.</div></div>
+  <div class="window-foot"><span id="liveFoot">FONTE · --</span><input id="liveUrlInput" type="text" placeholder="https://...m3u8" style="flex:1;min-width:120px" aria-label="URL de stream"><button class="mini" type="button" id="livePlayButton">PLAY</button><a class="mini" id="liveSource" target="_blank" rel="noopener noreferrer" hidden>ABRIR NA FONTE ↗</a></div>
  </div>
 </div>
 
@@ -489,6 +489,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 </div>
 <script src="/static/jarvis-geospatial-layer.js"></script>
 <script src="/static/jarvis-intelligence-status.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
 <script>
 (()=>{
 'use strict';
@@ -2427,7 +2428,23 @@ function openLiveMedia(info){
    img.src=next.href;
   },5000);
  }else if(info.type==='video'||info.type==='hls'){
-  body.innerHTML='<video controls autoplay muted playsinline src="'+esc(url)+'"></video>';
+  const isHls=/\.m3u8(\?|$)/i.test(url)||info.type==='hls';
+  body.innerHTML='<video controls autoplay muted playsinline id="liveVideo"></video>';
+  const video=body.querySelector('#liveVideo');
+  if(window.liveHls){try{window.liveHls.destroy();}catch(e){}window.liveHls=null;}
+  if(isHls&&window.Hls&&window.Hls.isSupported()){
+   const hls=new window.Hls({enableWorker:true,lowLatencyMode:true});
+   window.liveHls=hls;
+   hls.loadSource(url);
+   hls.attachMedia(video);
+   hls.on(window.Hls.Events.ERROR,(ev,data)=>{
+    if(data&&data.fatal){
+     $('liveFoot').textContent='HLS · ERRO '+(data.type||'')+' '+(data.details||'');
+    }
+   });
+  }else{
+   video.src=url;
+  }
  }else if(info.type==='audio'){
   body.innerHTML='<audio controls autoplay src="'+esc(url)+'" style="width:100%"></audio>';
  }else{
@@ -3211,8 +3228,7 @@ function openWindow(id){const el=$(id);if(el)el.classList.add('show');}
 function closeWindow(id){
  const el=$(id);
  if(el)el.classList.remove('show');
- if(id==='cameraWindow')stopCameraTimer();
- if(id==='liveWindow'){stopLiveTimer();const body=$('liveBody');if(body)body.innerHTML='';}
+ if(id==='cameraWindow')stopCameraTimer();  if(id==='liveWindow'){stopLiveTimer();if(window.liveHls){try{window.liveHls.destroy();}catch(e){}window.liveHls=null;}const body=$('liveBody');if(body)body.innerHTML='';}
 }
 
 const fullscreenButton=$('fullscreenToggle');
@@ -3469,6 +3485,13 @@ document.addEventListener('keydown',ev=>{
  $('camerasButton').addEventListener('click',()=>{openWindow('cameraWindow');refreshCameras();});
  $('universalButton').addEventListener('click',()=>{openWindow('intelWindow');refreshIntelStatus();refreshDevices();refreshCameras();});
  $('cameraWindow').addEventListener('click',ev=>{if(ev.target===$('cameraWindow'))closeWindow('cameraWindow');});
+ $('livePlayButton').addEventListener('click',()=>{
+  const url=safeCamUrl(($('liveUrlInput').value||'').trim());
+  if(!url){setFooter('AO VIVO · URL INVÁLIDA');return;}
+  const info={url,type:/\.m3u8(\?|$)/i.test(url)?'hls':(/\.(mp4|webm)(\?|$)/i.test(url)?'video':'iframe'),label:'STREAM',source:'MANUAL'};
+  openLiveMedia(info);
+ });
+ $('liveUrlInput').addEventListener('keydown',ev=>{if(ev.key==='Enter')$('livePlayButton').click();});
  $('intelWindow').addEventListener('click',ev=>{if(ev.target===$('intelWindow'))closeWindow('intelWindow');});
  $('pairButton').addEventListener('click',pair);
  $('pairCode').addEventListener('keydown',ev=>{if(ev.key==='Enter')pair();});
