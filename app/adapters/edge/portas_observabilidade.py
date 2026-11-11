@@ -137,6 +137,7 @@ class BrowserTrafficObserver:
         if mime.startswith(_MEDIA_MIME_PREFIXES) or mime in _MEDIA_MIME_TYPES:
             return True
         headers = response.get("headers") or {}
+        content_type = ""
         if isinstance(headers, dict):
             content_type = next(
                 (str(value) for key, value in headers.items() if str(key).lower() == "content-type"),
@@ -144,6 +145,11 @@ class BrowserTrafficObserver:
             ).split(";", 1)[0].strip().lower()
             if content_type.startswith(_MEDIA_MIME_PREFIXES) or content_type in _MEDIA_MIME_TYPES:
                 return True
+        # A URL hint is only useful when the response itself is untyped or
+        # generic binary. It must never override an explicit non-media type.
+        generic_mimes = {"application/octet-stream", "application/x-octet-stream", "binary/octet-stream"}
+        if any(value and value not in generic_mimes for value in (mime, content_type)):
+            return False
         # Some streaming endpoints report application/octet-stream while the
         # URL carries a declared media MIME (e.g. YouTube's mime=audio/mp4).
         try:
