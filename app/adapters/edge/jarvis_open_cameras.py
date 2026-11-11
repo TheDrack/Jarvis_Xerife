@@ -32,6 +32,7 @@ import httpx
 
 TFL_URL = "https://api.tfl.gov.uk/Place/Type/JamCam"
 DATUMFEED_URL = "https://datumfeed.com/api/cameras"
+WINDY_URL = "https://api.windy.com/webcams/api/v3/webcams"
 USER_AGENT = "Jarvis-Xerife/0.1 (local desktop HUD; public camera layer)"
 
 TIMEOUT_SECONDS = 12.0
@@ -245,6 +246,73 @@ def _datumfeed(latitude: float, longitude: float, radius_km: float, limit: int) 
     return _cached(f"datumfeed:{bbox}:{limit}", produce)
 
 
+def _windy(latitude: float, longitude: float, radius_km: float, limit: int) -> dict[str, Any]:
+    key = os.getenv("JARVIS_WINDY_API_KEY", "").strip()
+    if not key:
+        return {"available": False, "reason": "missing_key", "cameras": []}
+
+    def produce() -> dict[str, Any]:
+        try:
+            payload = _fetch_json(
+                WINDY_URL,
+                {
+                    "nearby": f"{latitude},{longitude},{int(radius_km)}",
+                    "limit": str(min(50, max(limit, 1))),
+                    "include": "location,images,urls,player",
+                    "lang": "en",
+                },
+            )
+        except (httpx.HTTPError, ValueError) as exc:
+            return {"available": False, "reason": _fail(exc), "cameras": []}
+        rows = payload.get("webcams") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            return {"available": False, "reason": "malformed", "cameras": []}
+        cameras: list[dict[str, Any]] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            loc = row.get("location") if isinstance(row.get("location"), dict) else {}
+            cam_lat = _coordinate(loc.get("latitude", loc.get("lat")), 90.0)
+            cam_lon = _coordinate(loc.get("longitude", loc.get("lon")), 180.0)
+            if cam_lat is None or cam_lon is None:
+                continue
+            images = row.get("images") if isinstance(row.get("images"), dict) else {}
+            current = images.get("current") if isinstance(images.get("current"), dict) else {}
+            preview = current.get("preview") or current.get("thumbnail") or current.get("original")
+            urls = row.get("urls") if isinstance(row.get("urls"), dict) else {}
+            page_url = urls.get("detail") or urls.get("edit")
+            player = row.get("player") if isinstance(row.get("player"), dict) else {}
+            live_url = player.get("live") or player.get("day")
+            url = preview or live_url
+            if not url:
+                continue
+            cameras.append(
+                {
+                    "id": f"windy:{row.get('webcamId') or row.get('id') or len(cameras)}",
+                    "label": str(row.get("title") or "Windy webcam")[:80],
+                    "url": url,
+                    "kind": "snapshot" if preview else "iframe",
+                    "refresh_seconds": 600,
+                    "provider": "windy",
+                    "latitude": cam_lat,
+                    "longitude": cam_lon,
+                    "place": {
+                        "city": loc.get("city"),
+                        "state": loc.get("region"),
+                        "country": loc.get("country"),
+                    },
+                    "attribution": "Windy Webcams API",
+                    "license": "Windy Webcams terms",
+                    "license_url": "https://api.windy.com/webcams",
+                    "page_url": page_url,
+                    "live": {"status": "unknown"},
+                }
+            )
+        return {"available": True, "reason": None, "cameras": cameras}
+
+    return _cached(f"windy:{latitude}:{longitude}:{radius_km}:{limit}", produce)
+
+
 def build_open_cameras(
     latitude: Any = None,
     longitude: Any = None,
@@ -296,6 +364,7 @@ def build_open_cameras(
     )
 
     datumfeed: dict[str, Any] | None = None
+    windy: dict[str, Any] | None = None
     if lat is not None and lon is not None:
         datumfeed = _datumfeed(lat, lon, radius, limit)
         providers.append(
@@ -311,6 +380,20 @@ def build_open_cameras(
                 "reported_cameras": len(datumfeed.get("cameras") or []),
             }
         )
+        windy = _windy(lat, lon, radius, limit)
+        providers.append(
+            {
+                "id": "windy",
+                "label": "Windy Webcams",
+                "attribution": "Windy Webcams API",
+                "license": "Windy Webcams terms",
+                "requires_key": True,
+                "key_configured": bool(os.getenv("JARVIS_WINDY_API_KEY", "").strip()),
+                "available": bool(windy["available"]),
+                "error": windy.get("reason"),
+                "reported_cameras": len(windy.get("cameras") or []),
+            }
+        )
 
     payload["providers"] = providers
     if lat is None or lon is None:
@@ -321,11 +404,20 @@ def build_open_cameras(
 
     payload["located"] = True
     payload["location"] = {"latitude": lat, "longitude": lon}
-    candidates = list(tfl.get("cameras") or []) + list((datumfeed or {}).get("cameras") or [])
+    candidates = list(tfl.get("cameras") or []) + list((datumfeed or {}).get("cameras") or []) + list((windy or {}).get("cameras") or [])
     for camera in candidates:
         camera["distance_km"] = _haversine_km(
             lat, lon, float(camera["latitude"]), float(camera["longitude"])
         )
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for camera in candidates:
+        key = f"{camera.get('latitude')},{camera.get('longitude')},{str(camera.get('label','')).lower()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(camera)
+    candidates = unique
     nearby = [
         camera
         for camera in candidates
