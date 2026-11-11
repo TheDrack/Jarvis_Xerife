@@ -4,7 +4,7 @@ from app.application.services.task_runner import TaskRunner
 
 
 class FakeAuthorizer:
-    _allowlist = {"lookup", "dangerous"}
+    _allowlist = {"lookup", "dangerous", "visual_navigation_adapter"}
     _sensitive = {"dangerous"}
 
     def __init__(self, deny=False, approval=False):
@@ -50,6 +50,8 @@ def build_runner(
         if name == "lookup":
             return capability
         if name == "dangerous":
+            return capability
+        if name == "visual_navigation_adapter":
             return capability
         return None
     monkeypatch.setattr(task_runner_module.nexus, "resolve", resolve)
@@ -137,3 +139,30 @@ def test_task_runner_does_not_report_success_when_postcondition_fails(monkeypatc
     assert result["verification_status"] == "failed"
     assert result["steps"][0]["verified"] is False
     assert len(capability.calls) == 1
+
+def test_navigation_alias_uses_canonical_required_verifier(monkeypatch):
+    capability = FakeCapability(result={"ok": False})
+    observed = []
+    runner, _ = build_runner(
+        monkeypatch,
+        capability=capability,
+        sink=lambda event: None,
+        plan_verifiers={
+            "visual_navigation_adapter": lambda args, result:
+                observed.append((args, result)) or result["ok"] is True
+        },
+        required_plan_verifiers={"visual_navigation_adapter"},
+    )
+
+    result = runner.execute_plan({
+        "plan": plan("observe_screen"),
+        "user": "test-user",
+    })
+
+    assert result["success"] is False
+    assert result["status"] == "verification_failed"
+    assert capability.calls == [{"action": "observe_screen", "params": {}}]
+    assert observed == [
+        ({"action": "observe_screen", "params": {}}, {"ok": False})
+    ]
+
