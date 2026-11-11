@@ -936,6 +936,8 @@ def _reject_repository_execution_config(workdir: Path) -> None:
         if config_path.stat().st_size > 256 * 1024:
             raise ValueError("repository config exceeds inspection limit")
         content = config_path.read_text(encoding="utf-8", errors="replace")
+        if "\ufeff" in content:
+            raise ValueError("repository config contains an unexpected BOM")
     except OSError as exc:
         raise ValueError("repository config could not be inspected") from exc
     if _REPOSITORY_EXECUTION_CONFIG.search(content):
