@@ -262,9 +262,14 @@ def test_media_capture_classifies_ump_and_declared_media_mime():
         "mimeType": "application/octet-stream",
         "resourceType": "XHR",
     })
-    assert observer._is_media_response({
+    assert not observer._is_media_response({
         "url": "https://video.example/videoplayback?mime=audio%2Fmp4&token=secret",
         "mimeType": "application/octet-stream",
+        "resourceType": "Media",
+    })
+    assert observer._is_media_response({
+        "url": "https://video.example/videoplayback",
+        "mimeType": "video/mp4",
         "resourceType": "Media",
     })
     assert not observer._is_media_response({
