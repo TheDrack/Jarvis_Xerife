@@ -659,7 +659,7 @@ def test_git_profile_config_guard_accepts_large_benign_config(tmp_path):
     git_dir = tmp_path / ".git"
     git_dir.mkdir()
     (git_dir / "config").write_text(
-        "[core]\\n" + ("# harmless setting\\n" * 12000),
+        "[core]\n" + ("# harmless setting\n" * 12000),
         encoding="utf-8",
     )
 
