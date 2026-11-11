@@ -142,12 +142,8 @@ def _load_local_intelligence_config(path: Path | None = None) -> int:
         if env_local:
             candidates.append(Path(env_local) / "Jarvis_Xerife" / "intelligence.env")
         candidates.append(Path.home() / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env")
-        # WSL fallback: Windows user profiles mounted under /mnt/c/Users.
-        try:
-            for user_dir in Path("/mnt/c/Users").iterdir():
-                candidates.append(user_dir / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env")
-        except OSError:
-            pass
+        # Do not enumerate other Windows profiles from WSL: their writable
+        # configuration must never supply an executable MCP entrypoint.
         path = None
         for candidate in candidates:
             try:
