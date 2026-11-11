@@ -265,6 +265,11 @@ def test_media_capture_classifies_ump_and_declared_media_mime():
         "url": "https://api.example/data",
         "mimeType": "application/json",
     })
+    assert not observer._is_media_response({
+        "url": "https://api.example/data?mime=audio%2Fmp4",
+        "mimeType": "application/json",
+        "headers": {"content-type": "application/json"},
+    })
 
 
 def test_media_data_received_event_preserves_binary_response_bytes():
