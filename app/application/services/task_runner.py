@@ -260,12 +260,29 @@ class TaskRunner(NexusComponent):
         executors = {name: make_dispatch(name) for name in allowlist}
         executors.update({name: make_dispatch(name) for name in navigation_aliases})
 
+        # The interpreter receives plan-facing aliases as executor keys.
+        # Mirror canonical host verifiers onto those aliases and normalize the
+        # arguments exactly as the dispatch path does.
+        plan_verifiers = dict(self._plan_verifiers)
+        required_plan_verifiers = set(self._required_plan_verifiers)
+        for alias in navigation_aliases:
+            canonical = canonical_tool(alias)
+            if canonical in self._required_plan_verifiers or alias in self._required_plan_verifiers:
+                required_plan_verifiers.add(alias)
+            verifier = self._plan_verifiers.get(alias) or self._plan_verifiers.get(canonical)
+            if verifier is None:
+                continue
+            plan_verifiers[alias] = (
+                lambda args, result, _verifier=verifier, _alias=alias:
+                _verifier(_navigation_plan_args(_alias, dict(args)), result)
+            )
+
         interpreter = DeclarativePlanInterpreter(
             executors,
             policy,
             event_sink=self._plan_event_sink,
-            verifiers=self._plan_verifiers,
-            required_verifiers=self._required_plan_verifiers,
+            verifiers=plan_verifiers,
+            required_verifiers=required_plan_verifiers,
         )
         outcome = interpreter.execute(plan)
         return {"success": outcome.status == "completed", **outcome.to_dict()}
