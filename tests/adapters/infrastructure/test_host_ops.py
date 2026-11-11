@@ -183,6 +183,9 @@ def test_git_profile_builds_structured_argv(_fake_powershell):
         "-c", "diff.external=",
         "-c", "core.pager=cat",
         "-c", f"core.attributesFile={os.devnull}",
+        "-c", f"gpg.program={os.devnull}",
+        "-c", f"gpg.ssh.program={os.devnull}",
+        "-c", "format.pretty=oneline",
         "-c", "log.showSignature=false",
         "--no-pager",
         "status",
@@ -571,6 +574,7 @@ def test_git_profile_disables_repository_config_execution_surfaces():
         '[include]\n    path = C:/outside/config\n',
         '\ufeff[include]\n    path = C:/outside/config\n',
         '[core]\n    repositoryformatversion = 0\n\ufeff[include]\n    path = C:/outside/config\n',
+        '[gpg]\n    program = cmd /c whoami\n',
         '[diff "evil"]\n    textconv = cmd /c whoami\n',
     ],
 )
