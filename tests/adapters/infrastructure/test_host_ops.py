@@ -598,6 +598,21 @@ def test_git_profile_rejects_worktree_config_execution_helpers(tmp_path):
         ops._reject_repository_execution_config(tmp_path)
 
 
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO support is unavailable")
+def test_git_profile_rejects_non_regular_repository_config(tmp_path, monkeypatch):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    config = git_dir / "config"
+    os.mkfifo(config)
+
+    def forbidden_read(*_args, **_kwargs):
+        pytest.fail("non-regular repository config must not be read")
+
+    monkeypatch.setattr(Path, "read_text", forbidden_read)
+    with pytest.raises(ValueError, match="regular file"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
 def test_git_profile_allows_inert_repository_config(tmp_path):
     (tmp_path / ".git").mkdir()
     (tmp_path / ".git" / "config").write_text(
