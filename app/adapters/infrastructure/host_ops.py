@@ -908,9 +908,9 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
 
 
 _REPOSITORY_EXECUTION_CONFIG = re.compile(
-    r"(?im)^\s*(?:\[\s*(?:filter|include(?:if)?|gpg)\b|"
-    r"(?:clean|smudge|process|command|textconv|sshCommand|worktree)\s*=|"
-    r"\[[^\]\r\n]+\][ \t]*(?:clean|smudge|process|command|textconv|sshCommand|worktree)\s*=)"
+    r"(?im)^\s*(?:\[\s*(?:filter|include(?:if)?|gpg|credential)\b|"
+    r"(?:clean|smudge|process|command|textconv|sshCommand|worktree|promisor|uploadpack|partialClone|vcs)\s*=|"
+    r"\[[^\]\r\n]+\][ \t]*(?:clean|smudge|process|command|textconv|sshCommand|worktree|promisor|uploadpack|partialClone|vcs)\s*=)"
 )
 
 
@@ -971,6 +971,8 @@ def _git_safety_overrides(workdir: Path) -> tuple[str, ...]:
         "-c", f"gpg.program={os.devnull}",
         "-c", f"gpg.ssh.program={os.devnull}",
         "-c", "format.pretty=oneline",
+        "-c", "credential.helper=",
+        "-c", "protocol.ext.allow=never",
         "-c", "log.showSignature=false",
     )
 
