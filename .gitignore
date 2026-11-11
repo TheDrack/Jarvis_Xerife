@@ -92,6 +92,7 @@ logs/
 # Docker
 *.pid
 jarvis.db
+geoint.sqlite
 jarvis_graph.sqlite
 jarvis_graph.sqlite-journal
 *.sqlite-wal
