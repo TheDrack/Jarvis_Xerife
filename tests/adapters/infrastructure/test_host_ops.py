@@ -1082,7 +1082,7 @@ def test_spawn_caps_child_output_and_discards_partial_secret_line(_sandbox):
     command = [
         sys.executable,
         "-c",
-        "import sys; sys.stdout.write('safe\nPASSWORD=' + chr(34) + 'x' * 1000000); sys.stderr.write('y' * 1000000)",
+        "import sys; sys.stdout.write('safe\\nPASSWORD=' + chr(34) + 'x' * 1000000); sys.stderr.write('y' * 1000000)",
     ]
 
     completed = ops._spawn(command, _sandbox, ops._sanitized_environment(), 10)
