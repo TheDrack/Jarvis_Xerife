@@ -897,11 +897,31 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
     environment["GIT_CONFIG_NOSYSTEM"] = "1"
     environment["GIT_CONFIG_GLOBAL"] = os.devnull
     environment["GIT_OPTIONAL_LOCKS"] = "0"
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+    environment["GIT_ATTR_NOSYSTEM"] = "1"
     environment["PYTHONUNBUFFERED"] = "1"
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     if extra:
         environment.update(extra)
     return environment
+
+
+def _git_safety_overrides() -> tuple[str, ...]:
+    """Neutralize repository-local Git settings that can execute external programs.
+
+    These command-line overrides take precedence over the untrusted repository
+    config. Environment-level system/global config is disabled separately.
+    Keep this list shared by every Git subprocess, including commit probes.
+    """
+    return (
+        "-c", "core.fsmonitor=false",
+        "-c", "core.untrackedCache=false",
+        "-c", f"core.hooksPath={os.devnull}",
+        "-c", "diff.external=",
+        "-c", "core.pager=cat",
+        "-c", f"core.attributesFile={os.devnull}",
+        "-c", "log.showSignature=false",
+    )
 
 
 def _require_commitish(ref: str, workdir: Path) -> None:
@@ -911,8 +931,7 @@ def _require_commitish(ref: str, workdir: Path) -> None:
     try:
         probe = subprocess.run(
             [
-                "git", "-c", "core.fsmonitor=false",
-                "-c", "core.untrackedCache=false",
+                "git", *_git_safety_overrides(),
                 "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}",
             ],
             cwd=str(workdir),
@@ -990,9 +1009,7 @@ def compile_command(
                     _require_commitish(value, workdir)
         argv = (
             "git",
-            "-c", "core.fsmonitor=false",
-            "-c", "core.untrackedCache=false",
-            "-c", "log.showSignature=false",
+            *_git_safety_overrides(),
             "--no-pager",
             *(
                 (verb, "--no-ext-diff", "--no-textconv")
