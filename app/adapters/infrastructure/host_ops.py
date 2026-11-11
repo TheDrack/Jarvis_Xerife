@@ -907,11 +907,56 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
     return environment
 
 
-_REPOSITORY_EXECUTION_CONFIG = re.compile(
-    r"(?im)^\s*(?:\[\s*(?:filter|include(?:if)?|gpg|credential)\b|"
-    r"(?:clean|smudge|process|command|textconv|sshCommand|worktree|promisor|uploadpack|partialClone|vcs)\s*=|"
-    r"\[[^\]\r\n]+\][ \t]*(?:clean|smudge|process|command|textconv|sshCommand|worktree|promisor|uploadpack|partialClone|vcs)\s*=)"
+_REPOSITORY_EXECUTION_SECTIONS = frozenset(
+    {"filter", "include", "includeif", "gpg", "credential"}
 )
+_REPOSITORY_EXECUTION_KEYS = frozenset(
+    {
+        "clean",
+        "smudge",
+        "process",
+        "command",
+        "textconv",
+        "sshcommand",
+        "worktree",
+        "promisor",
+        "uploadpack",
+        "partialclone",
+        "vcs",
+        "fsmonitor",
+        "external",
+        "pager",
+        "helper",
+    }
+)
+
+
+def _repository_config_has_execution_settings(content: str) -> bool:
+    """Inspect Git config linearly; avoid regex backtracking on untrusted files."""
+    for raw_line in content.splitlines():
+        line = raw_line.lstrip(" \\t")
+        if not line or line.startswith(("#", ";")):
+            continue
+        if line.startswith("["):
+            closing = line.find("]")
+            if closing < 0:
+                return True
+            header = line[1:closing].strip()
+            section = header.split(None, 1)[0].casefold() if header else ""
+            if section in _REPOSITORY_EXECUTION_SECTIONS:
+                return True
+            remainder = line[closing + 1 :].strip()
+            if remainder and _repository_config_key(remainder) in _REPOSITORY_EXECUTION_KEYS:
+                return True
+            continue
+        if _repository_config_key(line) in _REPOSITORY_EXECUTION_KEYS:
+            return True
+    return False
+
+
+def _repository_config_key(line: str) -> str:
+    key = line.split("=", 1)[0].strip() if "=" in line else line.split(None, 1)[0]
+    return key.casefold()
 
 
 def _repository_config_path(workdir: Path) -> Path | None:
@@ -953,7 +998,7 @@ def _reject_repository_execution_config(workdir: Path) -> None:
                 raise ValueError("repository config contains an unexpected BOM")
         except OSError as exc:
             raise ValueError("repository config could not be inspected") from exc
-        if _REPOSITORY_EXECUTION_CONFIG.search(content):
+        if _repository_config_has_execution_settings(content):
             raise ValueError("repository config contains an executable helper or worktree override")
 
 
