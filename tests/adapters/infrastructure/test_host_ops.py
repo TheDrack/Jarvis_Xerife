@@ -599,6 +599,36 @@ def test_git_profile_rejects_worktree_config_execution_helpers(tmp_path):
 
 
 @pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO support is unavailable")
+def test_git_profile_rejects_symlinked_git_directory(tmp_path):
+    external_git_dir = tmp_path / "external.git"
+    external_git_dir.mkdir()
+    (external_git_dir / "config").write_text(
+        '[core]\\n    repositoryformatversion = 0\\n',
+        encoding="utf-8",
+    )
+    marker = tmp_path / ".git"
+    try:
+        marker.symlink_to(external_git_dir, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("directory symlinks are unavailable")
+
+    with pytest.raises(ValueError, match="repository metadata symlink"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_profile_rejects_common_git_directory_pointer(tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(
+        '[core]\\n    repositoryformatversion = 0\\n',
+        encoding="utf-8",
+    )
+    (git_dir / "commondir").write_text("../external.git\\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="common Git directory"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
 def test_git_profile_rejects_non_regular_repository_config(tmp_path, monkeypatch):
     git_dir = tmp_path / ".git"
     git_dir.mkdir()
