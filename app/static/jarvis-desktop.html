@@ -1721,6 +1721,26 @@ function windDirLabel(deg){
  const dirs=['N','NE','L','SE','S','SO','O','NO'];
  return dirs[Math.round(deg/45)%8]+' '+Math.round(deg)+'°';
 }
+function buildWxGridFromPoint(w){
+ // Single central sphere synced with the lateral weather box (no 3x3 grid).
+ if(!w||!w.success){ state.wxGrid=null; return; }
+ const h=w.hourly||{};
+ const p={
+  lat:w.lat, lon:w.lon,
+  current:w.current||{},
+  hourly:{
+   time:h.time||[],
+   temperature:h.temperature||[],
+   precipitation:h.precipitation||[],
+   wind_speed:h.wind_speed||[],
+   wind_direction:h.wind_direction||[],
+   weather_code:h.weather_code||[],
+   cloud_cover:h.cloud_cover||[]
+  }
+ };
+ state.wxGrid={success:true, center:{lat:w.lat,lon:w.lon}, points:[p], place_label:w.place_label};
+ state.wxHour=0; state.wxParticles=[];
+}
 async function fetchWeatherPoint(lat,lon){
  state.weatherLoading=true;
  renderWeatherPanel();
@@ -1730,6 +1750,7 @@ async function fetchWeatherPoint(lat,lon){
  }catch(err){
   state.weatherPoint={success:false,error:String(err&&err.message||err)};
  }
+ if(state.layers.weatherAnim) buildWxGridFromPoint(state.weatherPoint);
  state.weatherLoading=false;
  renderWeatherPanel();
 }
@@ -1926,11 +1947,7 @@ async function fetchWeatherGrid(){
  const center=Globe.getCenter?Globe.getCenter():null;
  const lat=center?center.latitude:(state.location&&state.location.latitude)||-15.8;
  const lon=center?center.longitude:(state.location&&state.location.longitude)||-47.9;
- try{
-  const data=await api('/api/weather/grid?lat='+encodeURIComponent(lat)+'&lon='+encodeURIComponent(lon)+'&radius=8');
-  if(data&&data.success){ state.wxGrid=data; state.wxHour=0; state.wxParticles=[]; }
-  else { state.wxGrid=null; }
- }catch(e){ state.wxGrid=null; }
+ await fetchWeatherPoint(lat,lon);
  state.wxGridLoading=false;
  renderWeatherPanel();
 }
