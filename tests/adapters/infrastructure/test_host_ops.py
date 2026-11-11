@@ -566,6 +566,8 @@ def test_git_profile_disables_repository_config_execution_surfaces():
         '[filter "evil"]\n    clean = cmd /c whoami\n',
         '[core]\n    sshCommand = cmd /c whoami\n',
         '[core]\n    worktree = C:/outside\n',
+        '[core] worktree = C:/outside\n',
+        '[core]sshCommand = cmd /c whoami\n',
         '[include]\n    path = C:/outside/config\n',
         '\ufeff[include]\n    path = C:/outside/config\n',
         '[core]\n    repositoryformatversion = 0\n\ufeff[include]\n    path = C:/outside/config\n',
@@ -575,6 +577,22 @@ def test_git_profile_disables_repository_config_execution_surfaces():
 def test_git_profile_rejects_repository_config_with_execution_or_worktree_overrides(tmp_path, config):
     (tmp_path / ".git").mkdir()
     (tmp_path / ".git" / "config").write_text(config, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="repository config contains"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_profile_rejects_worktree_config_execution_helpers(tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(
+        '[extensions]\n    worktreeConfig = true\n',
+        encoding="utf-8",
+    )
+    (git_dir / "config.worktree").write_text(
+        '[filter "evil"]\n    clean = cmd /c whoami\n',
+        encoding="utf-8",
+    )
 
     with pytest.raises(ValueError, match="repository config contains"):
         ops._reject_repository_execution_config(tmp_path)
