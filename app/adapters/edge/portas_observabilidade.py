@@ -34,6 +34,11 @@ _MEDIA_MIME_TYPES = {
     "application/x-mpegurl",
     "application/vnd.yt-ump",
 }
+_MEDIA_MANIFEST_MIME_TYPES = {
+    "application/dash+xml",
+    "application/vnd.apple.mpegurl",
+    "application/x-mpegurl",
+}
 _MEDIA_CHUNK_BYTES = 256 * 1024
 _MEDIA_CHUNK_BUFFER_SIZE = 128
 _MEDIA_STREAM_LIMIT = 64
@@ -132,10 +137,8 @@ class BrowserTrafficObserver:
 
     @staticmethod
     def _is_media_response(response: dict[str, Any]) -> bool:
-        """Classifica respostas de mídia sem depender do domínio/provedor."""
+        """Classifica mídia por metadados da resposta/CDP, nunca por hints da URL."""
         mime = str(response.get("mimeType") or "").split(";", 1)[0].strip().lower()
-        if mime.startswith(_MEDIA_MIME_PREFIXES) or mime in _MEDIA_MIME_TYPES:
-            return True
         headers = response.get("headers") or {}
         content_type = ""
         if isinstance(headers, dict):
@@ -143,21 +146,22 @@ class BrowserTrafficObserver:
                 (str(value) for key, value in headers.items() if str(key).lower() == "content-type"),
                 "",
             ).split(";", 1)[0].strip().lower()
-            if content_type.startswith(_MEDIA_MIME_PREFIXES) or content_type in _MEDIA_MIME_TYPES:
-                return True
-        # A URL hint is only useful when the response itself is untyped or
-        # generic binary. It must never override an explicit non-media type.
-        generic_mimes = {"application/octet-stream", "application/x-octet-stream", "binary/octet-stream"}
-        if any(value and value not in generic_mimes for value in (mime, content_type)):
+
+        explicit_types = tuple(value for value in (mime, content_type) if value)
+        if any(value in _MEDIA_MANIFEST_MIME_TYPES for value in explicit_types):
             return False
-        # Some streaming endpoints report application/octet-stream while the
-        # URL carries a declared media MIME (e.g. YouTube's mime=audio/mp4).
-        try:
-            query = dict(parse_qsl(urlsplit(str(response.get("url") or "")).query, keep_blank_values=True))
-        except ValueError:
-            query = {}
-        declared = str(query.get("mime") or "").split(";", 1)[0].strip().lower()
-        return declared.startswith(_MEDIA_MIME_PREFIXES) or declared in _MEDIA_MIME_TYPES
+        if any(
+            value.startswith(_MEDIA_MIME_PREFIXES) or value in _MEDIA_MIME_TYPES
+            for value in explicit_types
+        ):
+            return True
+
+        generic_mimes = {"application/octet-stream", "application/x-octet-stream", "binary/octet-stream"}
+        if any(value not in generic_mimes for value in explicit_types):
+            return False
+        # CDP's resource type is browser-derived. Unlike a query parameter, a
+        # page cannot promote an arbitrary XHR/JSON response by editing its URL.
+        return str(response.get("resourceType") or "").casefold() == "media"
 
     def _store_media_bytes(self, stream_id: str, payload: bytes, timestamp: float | None = None) -> int:
         """Armazena bytes sem transformação, em chunks base64 com orçamento global fixo."""
@@ -365,7 +369,8 @@ class BrowserTrafficObserver:
 
     async def _start_media_stream(self, session: Any, params: dict[str, Any]) -> None:
         response = params.get("response") or {}
-        if not self._is_media_response(response):
+        classification = {**response, "resourceType": params.get("type")}
+        if not self._is_media_response(classification):
             return
         request_id = str(params.get("requestId") or "")
         if not request_id:
