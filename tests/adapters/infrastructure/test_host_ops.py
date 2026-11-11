@@ -667,6 +667,16 @@ def test_git_profile_config_guard_accepts_large_benign_config(tmp_path):
     ops._reject_repository_execution_config(tmp_path)
 
 
+def test_git_profile_config_inspection_is_linear_for_whitespace_padding(tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(" \t\n" * (128 * 1024), encoding="utf-8")
+
+    assert ops._repository_config_has_execution_settings(
+        (git_dir / "config").read_text(encoding="utf-8")
+    ) is False
+
+
 def test_git_profile_allows_inert_repository_config(tmp_path):
     (tmp_path / ".git").mkdir()
     (tmp_path / ".git" / "config").write_text(
