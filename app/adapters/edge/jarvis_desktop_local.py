@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from app.adapters.edge.jarvis_daily_briefing import (
     build_briefing,
     build_camera_registry,
+    forward_place,
     geocode_enabled,
     reverse_place,
 )
@@ -1190,25 +1191,22 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             lat = float(m.group(1))
             lon = float(m.group(2))
             return {"success": True, "lat": lat, "lon": lon, "label": f"{lat:.4f}, {lon:.4f}"}
-        try:
-            async with httpx.AsyncClient(timeout=12.0, headers={"User-Agent": "Jarvis/1.0"}) as client:
-                resp = await client.get(
-                    "https://nominatim.openstreetmap.org/search",
-                    params={"q": text, "format": "json", "limit": 1},
-                )
-                resp.raise_for_status()
-                data = resp.json()
-            if isinstance(data, list) and data:
-                r = data[0]
-                return {
-                    "success": True,
-                    "lat": float(r.get("lat")),
-                    "lon": float(r.get("lon")),
-                    "label": r.get("display_name") or text,
-                }
-        except Exception as exc:
-            logger.warning("Geocode failed (%s)", type(exc).__name__)
-        return {"success": False, "error": "not_found", "query": text}
+        result = await asyncio.to_thread(forward_place, text)
+        if result.get("available"):
+            return {
+                "success": True,
+                "lat": result["latitude"],
+                "lon": result["longitude"],
+                "label": result.get("display_name") or text,
+            }
+        payload = {
+            "success": False,
+            "error": result.get("reason") or "not_found",
+            "query": text,
+        }
+        if result.get("retry_after_seconds") is not None:
+            payload["retry_after_seconds"] = result["retry_after_seconds"]
+        return payload
 
     @app.get("/api/weather/grid")
     async def weather_grid(
