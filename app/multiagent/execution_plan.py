@@ -30,6 +30,7 @@ class StepOutcome:
     result: Any = None
     error: str | None = None
     duration_ms: int = 0
+    verified: bool | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -39,6 +40,7 @@ class StepOutcome:
             "result": self.result,
             "error": self.error,
             "duration_ms": self.duration_ms,
+            "verified": self.verified,
         }
 
 
@@ -47,12 +49,14 @@ class PlanOutcome:
     execution_id: str
     status: str
     steps: tuple[StepOutcome, ...]
+    verification_status: str = "unverified"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "execution_id": self.execution_id,
             "status": self.status,
             "steps": [step.to_dict() for step in self.steps],
+            "verification_status": self.verification_status,
         }
 
 
@@ -229,6 +233,8 @@ class DeclarativePlanInterpreter:
         max_plan_bytes: int = MAX_PLAN_BYTES,
         max_elapsed_seconds: float = 30.0,
         event_sink: Callable[[Mapping[str, Any]], None] | None = None,
+        verifiers: Mapping[str, Callable[[Mapping[str, Any], Any], bool]] | None = None,
+        required_verifiers: frozenset[str] | set[str] = frozenset(),
     ) -> None:
         if not math.isfinite(max_elapsed_seconds) or max_elapsed_seconds <= 0:
             raise ValueError("max_elapsed_seconds must be finite and positive")
@@ -238,6 +244,16 @@ class DeclarativePlanInterpreter:
         self._max_plan_bytes = max_plan_bytes
         self._max_elapsed_seconds = max_elapsed_seconds
         self._event_sink = event_sink
+        self._verifiers = dict(verifiers or {})
+        if any(not isinstance(name, str) or not name.strip() or not callable(check)
+               for name, check in self._verifiers.items()):
+            raise ValueError("verifiers must map non-empty tool names to callables")
+        self._required_verifiers = frozenset(required_verifiers)
+        if any(not isinstance(name, str) or not name.strip() for name in self._required_verifiers):
+            raise ValueError("required_verifiers must contain non-empty tool names")
+        missing_verifiers = self._required_verifiers - self._verifiers.keys()
+        if missing_verifiers:
+            raise ValueError("required verification is missing a trusted verifier")
 
     def _record(self, event: Mapping[str, Any]) -> bool:
         """Append an execution event; fail closed if the configured journal is unavailable."""
@@ -321,24 +337,80 @@ class DeclarativePlanInterpreter:
                     outcome = StepOutcome(step_id, tool, "unknown", error="journal_unavailable",
                                           duration_ms=duration)
                 outcomes.append(outcome)
-                return PlanOutcome(execution_id, "unknown", tuple(outcomes))
+                return PlanOutcome(execution_id, "unknown", tuple(outcomes), "unknown")
+
+            verified: bool | None = None
+            verifier = self._verifiers.get(tool)
+            if verifier is None and tool in self._required_verifiers:
+                duration = int((time.monotonic() - started) * 1000)
+                outcome = StepOutcome(step_id, tool, "blocked", error="verifier_not_configured",
+                                      duration_ms=duration)
+                self._record({"event": "step_finished", "execution_id": execution_id,
+                              "step_id": step_id, "tool": tool, "status": outcome.status,
+                              "error": outcome.error, "duration_ms": duration})
+                outcomes.append(outcome)
+                return PlanOutcome(execution_id, "blocked", tuple(outcomes))
+            if verifier is not None:
+                try:
+                    # Verify the complete connector result. Plan-selected output_fields
+                    # only controls downstream/model visibility, never trusted evidence.
+                    verdict = verifier(args, raw_result)
+                    if not isinstance(verdict, bool):
+                        raise TypeError("verifier must return bool")
+                    verified = verdict
+                except Exception:
+                    duration = int((time.monotonic() - started) * 1000)
+                    outcome = StepOutcome(step_id, tool, "unknown", projected,
+                                          error="verification_error", duration_ms=duration)
+                    if not self._record({"event": "step_finished", "execution_id": execution_id,
+                                         "step_id": step_id, "tool": tool, "status": outcome.status,
+                                         "error": outcome.error, "duration_ms": duration,
+                                         "verified": None}):
+                        outcome = StepOutcome(step_id, tool, "unknown", projected,
+                                              error="journal_unavailable", duration_ms=duration)
+                    outcomes.append(outcome)
+                    return PlanOutcome(execution_id, "unknown", tuple(outcomes), "unknown")
+                if not verified:
+                    duration = int((time.monotonic() - started) * 1000)
+                    outcome = StepOutcome(step_id, tool, "verification_failed", projected,
+                                          error="postcondition_failed", duration_ms=duration,
+                                          verified=False)
+                    if not self._record({"event": "step_finished", "execution_id": execution_id,
+                                         "step_id": step_id, "tool": tool, "status": outcome.status,
+                                         "error": outcome.error, "duration_ms": duration,
+                                         "verified": False}):
+                        outcome = StepOutcome(step_id, tool, "unknown", projected,
+                                              error="journal_unavailable", duration_ms=duration)
+                        outcomes.append(outcome)
+                        return PlanOutcome(execution_id, "unknown", tuple(outcomes), "unknown")
+                    outcomes.append(outcome)
+                    return PlanOutcome(execution_id, "verification_failed", tuple(outcomes), "failed")
 
             duration = int((time.monotonic() - started) * 1000)
-            outcome = StepOutcome(step_id, tool, "completed", projected, duration_ms=duration)
+            outcome = StepOutcome(step_id, tool, "completed", projected,
+                                  duration_ms=duration, verified=verified)
             if not self._record({"event": "step_finished", "execution_id": execution_id,
-                                 "step_id": step_id, "tool": tool, "status": outcome.status, "error": outcome.error, "duration_ms": duration}):
+                                 "step_id": step_id, "tool": tool, "status": outcome.status,
+                                 "error": outcome.error, "duration_ms": duration,
+                                 "verified": verified}):
                 # The connector may have changed external state, but durable completion
                 # could not be recorded. Never report success or retry blindly.
                 outcome = StepOutcome(step_id, tool, "unknown", error="journal_unavailable",
-                                      duration_ms=duration)
+                                      duration_ms=duration, verified=verified)
                 outcomes.append(outcome)
-                return PlanOutcome(execution_id, "unknown", tuple(outcomes))
+                return PlanOutcome(execution_id, "unknown", tuple(outcomes), "unknown")
             outcomes.append(outcome)
             results[step_id] = projected
         if not self._record({"event": "execution_finished", "execution_id": execution_id,
                              "status": "completed"}):
             return PlanOutcome(execution_id, "unknown", tuple(outcomes[:-1]) + (
                 StepOutcome(outcomes[-1].step_id, outcomes[-1].tool, "unknown",
-                            error="journal_unavailable", duration_ms=outcomes[-1].duration_ms),
-            ))
-        return PlanOutcome(execution_id, "completed", tuple(outcomes))
+                            error="journal_unavailable", duration_ms=outcomes[-1].duration_ms,
+                            verified=outcomes[-1].verified),
+            ), "unknown")
+        verified_count = sum(step.verified is True for step in outcomes)
+        verification_status = (
+            "verified" if verified_count == len(outcomes)
+            else "partial" if verified_count else "unverified"
+        )
+        return PlanOutcome(execution_id, "completed", tuple(outcomes), verification_status)

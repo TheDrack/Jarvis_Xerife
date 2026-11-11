@@ -94,6 +94,85 @@ def test_connector_exception_is_unknown_and_never_retried():
     assert calls == ["called"]
 
 
+def test_registered_verifier_runs_after_dispatch_and_marks_result_verified():
+    order = []
+    interpreter = DeclarativePlanInterpreter(
+        {"mutate": lambda args: order.append("execute") or {"changed": True}},
+        allow_all,
+        verifiers={"mutate": lambda args, result: order.append("verify") or result["changed"]},
+        required_verifiers={"mutate"},
+    )
+
+    result = interpreter.execute(make_plan(make_step("write", "mutate")))
+
+    assert order == ["execute", "verify"]
+    assert result.status == "completed"
+    assert result.verification_status == "verified"
+    assert result.steps[0].verified is True
+    assert result.to_dict()["steps"][0]["verified"] is True
+
+
+def test_registered_verifier_failure_stops_downstream_steps():
+    calls = []
+    interpreter = DeclarativePlanInterpreter(
+        {"mutate": lambda args: {"changed": False},
+         "lookup": lambda args: calls.append("lookup") or {"ok": True}},
+        allow_all,
+        verifiers={"mutate": lambda _args, result: result["changed"]},
+        required_verifiers={"mutate"},
+    )
+
+    result = interpreter.execute(make_plan(
+        make_step("write", "mutate"),
+        make_step("read", "lookup"),
+    ))
+
+    assert result.status == "verification_failed"
+    assert result.verification_status == "failed"
+    assert result.steps[0].status == "verification_failed"
+    assert result.steps[0].verified is False
+    assert calls == []
+
+
+def test_verifier_exception_is_unknown_and_never_retries():
+    calls = []
+
+    def verifier(_args, _result):
+        calls.append("verify")
+        raise TimeoutError("verification unavailable")
+
+    result = DeclarativePlanInterpreter(
+        {"mutate": lambda _args: {"changed": True}},
+        allow_all,
+        verifiers={"mutate": verifier},
+    ).execute(make_plan(make_step("write", "mutate")))
+
+    assert result.status == "unknown"
+    assert result.verification_status == "unknown"
+    assert result.steps[0].error == "verification_error"
+    assert calls == ["verify"]
+
+
+def test_required_verifier_must_be_configured_before_execution():
+    with pytest.raises(ValueError, match="missing a trusted verifier"):
+        DeclarativePlanInterpreter(
+            {"mutate": lambda _args: {"changed": True}},
+            allow_all,
+            required_verifiers={"mutate"},
+        )
+
+
+def test_unverified_tools_are_explicitly_distinguished():
+    result = DeclarativePlanInterpreter(
+        {"lookup": lambda _args: {"ok": True}},
+        allow_all,
+    ).execute(make_plan(make_step("read", "lookup")))
+
+    assert result.status == "completed"
+    assert result.verification_status == "unverified"
+    assert result.steps[0].verified is None
+
+
 def test_bad_reference_blocks_downstream_step():
     calls = []
     interpreter = DeclarativePlanInterpreter(
@@ -237,3 +316,22 @@ def test_lifecycle_events_never_include_raw_args_or_result_payloads():
     assert result.status == "completed"
     assert all("args" not in event and "result" not in event for event in events)
     assert secret not in repr(events)
+
+def test_verifier_receives_raw_result_not_plan_selected_projection():
+    observed = []
+    interpreter = DeclarativePlanInterpreter(
+        {"lookup": lambda _args: {"ok": True, "failure_marker": "must_remain_visible"}},
+        allow_all,
+        verifiers={
+            "lookup": lambda _args, raw: observed.append(raw) or raw["failure_marker"] == "must_remain_visible"
+        },
+    )
+
+    result = interpreter.execute(make_plan(
+        make_step("read", output_fields=["ok"]),
+    ))
+
+    assert result.status == "completed"
+    assert observed == [{"ok": True, "failure_marker": "must_remain_visible"}]
+    assert result.steps[0].result == {"ok": True}
+

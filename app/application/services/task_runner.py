@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from app.core.nexus import nexus, NexusComponent
 from app.domain.models.mission import Mission, MissionResult
@@ -52,6 +52,8 @@ class TaskRunner(NexusComponent):
         sandbox_mode: bool = False,
         budget_cap_usd: Optional[float] = None,
         plan_event_sink=None,
+        plan_verifiers: Optional[Mapping[str, Callable[[Mapping[str, Any], Any], bool]]] = None,
+        required_plan_verifiers: Optional[set[str]] = None,
     ):
         super().__init__()
         self.cache_dir: Path = Path(cache_dir) if cache_dir else Path(tempfile.gettempdir()) / "task_runner_cache"
@@ -72,6 +74,9 @@ class TaskRunner(NexusComponent):
             except Exception as exc:
                 logger.warning("Durable plan journal unavailable; declarative plans remain blocked: %s", type(exc).__name__)
         self._plan_event_sink = plan_event_sink
+        # Verifiers are trusted host configuration; plans cannot register or replace them.
+        self._plan_verifiers = dict(plan_verifiers or {})
+        self._required_plan_verifiers = frozenset(required_plan_verifiers or ())
         self.total_cost_usd: float = 0.0
         self._mission_costs: Dict[str, float] = {}
 
@@ -255,10 +260,29 @@ class TaskRunner(NexusComponent):
         executors = {name: make_dispatch(name) for name in allowlist}
         executors.update({name: make_dispatch(name) for name in navigation_aliases})
 
+        # The interpreter receives plan-facing aliases as executor keys.
+        # Mirror canonical host verifiers onto those aliases and normalize the
+        # arguments exactly as the dispatch path does.
+        plan_verifiers = dict(self._plan_verifiers)
+        required_plan_verifiers = set(self._required_plan_verifiers)
+        for alias in navigation_aliases:
+            canonical = canonical_tool(alias)
+            if canonical in self._required_plan_verifiers or alias in self._required_plan_verifiers:
+                required_plan_verifiers.add(alias)
+            verifier = self._plan_verifiers.get(alias) or self._plan_verifiers.get(canonical)
+            if verifier is None:
+                continue
+            plan_verifiers[alias] = (
+                lambda args, result, _verifier=verifier, _alias=alias:
+                _verifier(_navigation_plan_args(_alias, dict(args)), result)
+            )
+
         interpreter = DeclarativePlanInterpreter(
             executors,
             policy,
             event_sink=self._plan_event_sink,
+            verifiers=plan_verifiers,
+            required_verifiers=required_plan_verifiers,
         )
         outcome = interpreter.execute(plan)
         return {"success": outcome.status == "completed", **outcome.to_dict()}
