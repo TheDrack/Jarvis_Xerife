@@ -79,6 +79,9 @@ def _fetch_json(url: str, params: dict[str, Any] | None = None) -> Any:
     key = os.getenv("JARVIS_DATUMFEED_KEY", "").strip()
     if key and url.startswith(DATUMFEED_URL):
         headers["Authorization"] = f"Bearer {key}"
+    windy_key = os.getenv("JARVIS_WINDY_API_KEY", "").strip()
+    if windy_key and url.startswith(WINDY_URL):
+        headers["x-windy-api-key"] = windy_key
     response = httpx.get(
         url,
         params=params,
