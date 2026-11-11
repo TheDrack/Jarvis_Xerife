@@ -235,7 +235,7 @@ def test_media_capture_preserves_binary_bytes_in_base64_chunks():
 def test_media_capture_enforces_per_stream_byte_limit():
     from app.adapters.edge.portas_observabilidade import _MEDIA_STREAM_MAX_BYTES
 
-    observer = PortasObserver()
+    observer = BrowserTrafficObserver()
     observer._media_streams["stream-limit"] = {
         "stream_id": "stream-limit",
         "mime_type": "video/mp4",
