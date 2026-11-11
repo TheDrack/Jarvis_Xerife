@@ -1,7 +1,7 @@
 # JARVIS — Status do Projeto
 
 **Versão:** 2.0.0  
-**Revisão documental:** 2026-11-10
+**Revisão documental:** 2026-11-11
 **Escopo desta revisão:** revalidação pós-merge #805; CI do último commit de código, autoevolução agendada, Self Healing, C0, PRs/issues e branch protection. Runtime/produção só são declarados com evidência direta.
 
 ## Visão geral e qualidade da evidência
@@ -404,3 +404,38 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 - `CuriosityIntake` é distinto de `CuriosityEngine`: está registrado no Nexus; `curiosity_capture` e `curiosity_list_recent` são funções `@mcp.tool` que resolvem `curiosity_intake` e chamam `execute()`. Os testes atuais cobrem o componente diretamente e verificam estaticamente o contrato MCP, mas não invocam os wrappers via MCP.
 - `assistant_curiosity.py` ainda envia `detect_gaps` e `store_answer`; `CuriosityEngine.execute()` aceita somente `analyze`, `explore` e `suggest`. A correção da PR #796 preserva `pending_need_id` após falha e tem cinco testes diretos, mas não implementa armazenamento de respostas. Graphify encontra somente testes como callers de `capture_curiosity_answer()`; não localiza consumidor de produção para esses helpers. O impacto operacional permanece não confirmado.
 - Próximo critério: fechar o mapa de composição/consumidores e o contrato de entrada do `CognitiveRouter`; adicionar teste de integração pelo consumidor real ou documentar formalmente que o pipeline é legado/não utilizado. Separadamente, testar os wrappers MCP reais e decidir se os helpers de `CuriosityEngine` devem receber ações válidas e um consumidor, sem criar outro motor. Não iniciar C1 antes da aceitação C0.
+
+## Delta de auditoria técnica — 2026-11-11 — PR #811 e revalidação C0
+
+**Base auditada:** `main` em `00c69fd8437f24ee3518e147a8476baf3c544e2a`. O último commit principal continua sendo a integração da captura binária CDP da PR #810.
+
+### PRs, CI e continuidade
+
+- PR [#811 — limpar metadados retidos dos fluxos de mídia](https://github.com/TheDrack/Jarvis_Xerife/pull/811) está aberta, mergeable e não merged. A branch `fix/portas-clear-media-state-20261111` contém a correção e seu teste de regressão. O commit de código/teste `ee7e0e21f59a339916dc9f577a05ec22704023e3` passou nos três workflows abaixo; esta atualização documental é um commit separado e terá checks próprios.
+- PR Validation run [43106444703](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43106444703): success; pytest Linux/Python 3.11: **3.184 passed, 34 skipped, 8 warnings**, 80,23 s. Build do sandbox hardened também passou.
+- Task Queue run [43106444689](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43106444689): success; pytest Windows/Python 3.12: **3.200 passed, 18 skipped, 181 warnings**, 136,07 s.
+- Portas browser run [43106444669](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43106444669): success; testes unitários **31 passed, 1 warning** e integração Chromium/CDP **7 passed, 1 warning**. O novo teste `test_clear_removes_media_stream_metadata_and_indexes_without_stopping_capture` passou.
+- Graphify review da PR #811: gate `pass`, zero findings bloqueantes e um advisory de fan-out do teste (7 chamadas); Graphify não executou testes. A validação comportamental vem dos workflows acima.
+- PR #809 continua aberta, `mergeable=false`, com 37 commits à frente e 69 atrás da `main`; o head atual não tem workflow run associado. O review Graphify disponível para #809 está ligado a outro SHA (`2105870`), não ao head atual (`1a60d368`), portanto não é evidência de revisão do estado atual. Não atualizar nem integrar essa branch divergente sem reconciliação de diff e revalidação.
+- PRs #807, #808 e #810 estão merged. Na #810, PR Validation [43065158699](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43065158699) passou com **3.157 passed, 34 skipped, 8 warnings**; Task Queue [43065158870](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43065158870) passou com **3.174 passed, 17 skipped, 181 warnings**; Portas browser [43065158904](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43065158904) passou com **31 unit tests e 7 integração**.
+
+### Correção de retenção no observador Portas
+
+- O tool MCP `portas_trafego_limpar` chama `BrowserTrafficObserver.clear()`. Na `main` anterior à PR #811, `clear()` removia `_events` e `_media_chunks`, mas mantinha `_media_streams`, `_media_request_streams`, `_media_sequences` e `_media_offsets`. Assim, após limpar, `portas_media_eventos` ainda podia expor metadados antigos de fluxo e `portas_media_chunks(stream_id)` ainda reconhecia um stream cujo buffer havia sido apagado. O achado é de retenção/consistência de estado; os valores de query das URLs já eram redigidos.
+- A PR #811 limpa os metadados e índices de mídia sob o mesmo lock, informa a quantidade de streams removidos e mantém `_active`, `_capture_media` e as sessões CDP intactas. O teste confirma que eventos/chunks/metadados/índices ficam vazios, que o stream anterior retorna `stream_not_found` e que a captura continua ativa. A mudança ainda não está na `main` nem em produção.
+- Achado independente ainda pendente: `_on_media_loading_finished()` define `status="finished"` incondicionalmente e pode sobrescrever `status="truncated"` quando o limite de bytes foi atingido. Isso pode reportar como completo um stream parcial. Não foi incluído na PR #811 para manter uma única melhoria por execução.
+- A revisão Graphify da #810 também levantou uma possível corrida em que `_attach_media_page()` poderia registrar uma sessão após shutdown; permanece hipótese não reproduzida, não uma falha confirmada.
+
+### C0 — estado e próximos critérios
+
+- Os critérios `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem **pending** no ledger. `data/roadmap_missions.json` continua com `missions: []`; não há missão C0 revisada com target/testes aprovada. C1 — World Model — continua bloqueado.
+- Graphify, indexado em `00c69fd`, confirma que os callers estritos de `run_pipeline()` são o próprio CLI e testes; não foi localizado consumidor de aplicação para `run_pipeline("jarvis_chat")`. `config/pipelines/jarvis_chat.yml` referencia `cognitive_router`, mas `CognitiveRouter.execute()` não tem caller estrito nem teste ligado no grafo. O runner aceita `inputs`, mas não injeta `metadata` por padrão; a execução sem esse input pode falhar no acesso `context["metadata"]`. Runtime de aplicação permanece não verificado.
+- `CuriosityIntake` está registrado no Nexus e seus wrappers `curiosity_capture`/`curiosity_list_recent` são tools MCP reais que resolvem o componente e chamam `execute()`. O teste atual ainda verifica o contrato MCP estaticamente e testa o serviço isolado; não invoca os wrappers. `assistant_curiosity.py` continua enviando `detect_gaps` e `store_answer`, ações não suportadas pelo `CuriosityEngine` atual (`analyze`, `explore`, `suggest`), sem consumidor de produção identificado.
+- Próximo passo C0: fechar o mapa de composition root/consumidores e provar o contrato do router pelo consumidor real, ou documentar o pipeline como legado/não utilizado; em paralelo, testar os wrappers MCP reais e reconciliar os contratos de curiosidade sem criar outro motor. Não iniciar C1 nem adicionar um segundo grafo, memória, event bus ou scheduler.
+
+### Issues, governança e automações
+
+- Issues abertas: [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682), [#723](https://github.com/TheDrack/Jarvis_Xerife/issues/723) e [#732](https://github.com/TheDrack/Jarvis_Xerife/issues/732). #732 ainda exige equivalência schema-aware, Preview descartável e plano de rollback; #723 mantém a reconciliação histórica/Preview pendente.
+- A última evidência direta registrada para branch protection é de 2026-11-05: `main.protected=false` e rulesets vazios. Não foi reconsultada nesta execução porque o conector GitHub disponível não expõe a ação de leitura/escrita administrativa de branch protection/rulesets; não afirmar que o estado atual foi revalidado.
+- `.github/workflows/homeostase.yml` e `.github/workflows/auto_evolution_triggerV2.yml` foram inspecionados e não modificados. Self Healing V3 continua restrito a workflows confiáveis originados na `main`; não observa os runs de PR Validation/Task Queue. A autoevolução é horária e fail-closed, mas o manifesto está vazio. Não habilitar flags, criar missão inferida ou entregar credenciais privilegiadas ao executor.
+- Nenhum merge, deploy, migration, alteração de secrets/flags, DDL/DML, escrita em produção ou issue nova foi executado nesta auditoria.
