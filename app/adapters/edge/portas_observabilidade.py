@@ -25,6 +25,8 @@ _REDACT_BEARER = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/-]+=*")
 _REDACT_ASSIGNMENT = re.compile(
     r"(?i)((?:token|secret|password|passwd|authorization|api[_-]?key|cookie)\s*[:=]\s*)[^\s,;&]+"
 )
+_MEDIA_RESPONSE_BODY_LIMIT = 16 * 1024 * 1024
+_MEDIA_RESPONSE_BODY_CONCURRENCY = 2
 
 
 def sanitizar_url(url: str) -> tuple[str, str]:
@@ -89,6 +91,7 @@ class BrowserTrafficObserver:
         self._active = False
         self._capture_payloads = False
         self._capture_media = False
+        self._media_capture_semaphore = asyncio.Semaphore(_MEDIA_RESPONSE_BODY_CONCURRENCY)
         self._started_at: str | None = None
         self._cdp_url = portas_core.CDP_URL
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -177,27 +180,38 @@ class BrowserTrafficObserver:
                     pass
 
     async def _capture_response_body(self, response: Any, request_id: Any, content_type: Any) -> None:
+        # Playwright's response.body() materializes the complete body. Only read
+        # bounded, identity-encoded binary media with an explicit HTTP length.
         try:
-            body = await response.body()
+            headers = response.headers or {}
+            declared_length = int(headers.get("content-length", ""))
+            content_encoding = str(headers.get("content-encoding") or "identity").strip().lower()
+        except (AttributeError, TypeError, ValueError):
+            return
+        if (
+            declared_length <= 0
+            or declared_length > _MEDIA_RESPONSE_BODY_LIMIT
+            or content_encoding not in {"", "identity"}
+        ):
+            return
+
+        mime = str(content_type or "").split(";", 1)[0].strip().lower()
+        if mime in {"application/vnd.apple.mpegurl", "application/x-mpegurl", "application/dash+xml"}:
+            # Text manifests can contain signed segment URLs and AES key URIs.
+            return
+
+        try:
+            async with self._media_capture_semaphore:
+                body = await response.body()
         except Exception:
             return
-        if not body:
+        if not body or len(body) > _MEDIA_RESPONSE_BODY_LIMIT:
             return
-        url = response.url
-        host = ""
-        try:
-            host = urlsplit(url).hostname or ""
-        except Exception:
-            host = ""
-        # Adapter selection by content/URL.
-        adapter = "raw"
-        lowered = (content_type or "").lower() + " " + str(url).lower()
-        if "m3u8" in lowered or "mpegurl" in lowered:
-            adapter = "hls"
-        elif "mpd" in lowered or "dash" in lowered:
-            adapter = "dash"
-        elif "videoplayback" in lowered:
-            adapter = "ump"
+
+        raw_url = str(response.url)
+        url, host = sanitizar_url(raw_url)
+        # Adapter selection uses declared MIME only; URL paths are not trusted.
+        adapter = "ump" if mime == "application/vnd.yt-ump" else "raw"
         sid = media_engine.open_stream(url, host=host, content_type=content_type, adapter=adapter)
         if sid is None:
             return
