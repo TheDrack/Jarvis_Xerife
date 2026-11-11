@@ -17,6 +17,7 @@ from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.adapters.edge import portas_core
+from app.adapters.edge.portas_midia import engine as media_engine, is_media_request
 
 
 _REDACT_KEYS = re.compile(r"(pass(word)?|token|secret|auth|cookie|api.?key|credential|session)", re.I)
@@ -87,6 +88,7 @@ class BrowserTrafficObserver:
         self._attached_pages: set[int] = set()
         self._active = False
         self._capture_payloads = False
+        self._capture_media = False
         self._started_at: str | None = None
         self._cdp_url = portas_core.CDP_URL
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -148,6 +150,7 @@ class BrowserTrafficObserver:
         url, host = sanitizar_url(response.url)
         with self._lock:
             request_id = self._request_ids.get(self._request_key(response.request))
+            capture_media = self._capture_media
         try:
             content_type = response.headers.get("content-type")
         except Exception:
@@ -161,6 +164,45 @@ class BrowserTrafficObserver:
             status_text=response.status_text,
             content_type=content_type,
         )
+        if capture_media and response.status and 200 <= response.status < 300:
+            if is_media_request(response.url, content_type):
+                try:
+                    loop = self._loop
+                    if loop is not None:
+                        asyncio.run_coroutine_threadsafe(
+                            self._capture_response_body(response, request_id, content_type),
+                            loop,
+                        )
+                except Exception:
+                    pass
+
+    async def _capture_response_body(self, response: Any, request_id: Any, content_type: Any) -> None:
+        try:
+            body = await response.body()
+        except Exception:
+            return
+        if not body:
+            return
+        url = response.url
+        host = ""
+        try:
+            host = urlsplit(url).hostname or ""
+        except Exception:
+            host = ""
+        # Adapter selection by content/URL.
+        adapter = "raw"
+        lowered = (content_type or "").lower() + " " + str(url).lower()
+        if "m3u8" in lowered or "mpegurl" in lowered:
+            adapter = "hls"
+        elif "mpd" in lowered or "dash" in lowered:
+            adapter = "dash"
+        elif "videoplayback" in lowered:
+            adapter = "ump"
+        sid = media_engine.open_stream(url, host=host, content_type=content_type, adapter=adapter)
+        if sid is None:
+            return
+        media_engine.append(sid, body, direction="response", adapter_hint=adapter)
+        media_engine.close_stream(sid)
 
     def _on_request_finished(self, request: Any) -> None:
         url, host = sanitizar_url(request.url)
@@ -210,6 +252,13 @@ class BrowserTrafficObserver:
             host=host,
             payload=sanitizar_payload(payload, self._capture_payloads),
         )
+        if self._capture_media and isinstance(payload, (bytes, bytearray)) and len(payload) > 0:
+            try:
+                sid = media_engine.open_stream(url, host=host, content_type="application/octet-stream", adapter="raw")
+                if sid is not None:
+                    media_engine.append(sid, bytes(payload), direction=direction)
+            except Exception:
+                pass
 
     def _attach_page(self, page: Any) -> None:
         marker = id(page)
@@ -277,11 +326,14 @@ class BrowserTrafficObserver:
                 pass
             loop.close()
 
-    def start(self, *, cdp_url: str | None = None, capture_payloads: bool = False, max_events: int = 2000) -> dict[str, Any]:
+    def start(self, *, cdp_url: str | None = None, capture_payloads: bool = False, capture_media: bool = False, max_events: int = 2000) -> dict[str, Any]:
         with self._lock:
             if self._active:
                 return self.status()
             self._capture_payloads = bool(capture_payloads)
+            self._capture_media = bool(capture_media)
+            if self._capture_media:
+                media_engine.enable()
             self._events = deque(maxlen=max(100, min(int(max_events), 10000)))
             self._next_id = 1
             cdp_url = cdp_url or portas_core.CDP_URL
@@ -313,7 +365,9 @@ class BrowserTrafficObserver:
             loop.call_soon_threadsafe(loop.stop)
             thread.join(timeout=10)
         except Exception as exc:
+            media_engine.disable()
             return {"success": False, "active": self._active, "error": f"{type(exc).__name__}: {exc}"}
+        media_engine.disable()
         return {"success": True, "active": False, "events_buffered": len(self._events)}
 
     def status(self) -> dict[str, Any]:
@@ -399,13 +453,14 @@ def registrar_observabilidade_portas(mcp: Any, tracked_action: Any) -> None:
 
     @mcp.tool()
     @tracked_action("Iniciando observabilidade do navegador")
-    def portas_trafego_iniciar(capturar_payloads: bool = False, limite_eventos: int = 2000) -> dict[str, Any]:
+    def portas_trafego_iniciar(capturar_payloads: bool = False, capturar_midia: bool = False, limite_eventos: int = 2000) -> dict[str, Any]:
         """Começa a observar HTTP(S) e frames WebSocket em todas as abas CDP abertas.
 
         Por padrão, payloads não são armazenados; capturar_payloads=True habilita
-        previews limitados com redação de campos sensíveis.
+        previews limitados com redação de campos sensíveis. capturar_midia=True
+        habilita a captura binária de respostas/streams de mídia (memória limitada).
         """
-        return observer.start(capture_payloads=capturar_payloads, max_events=limite_eventos)
+        return observer.start(capture_payloads=capturar_payloads, capture_media=capturar_midia, max_events=limite_eventos)
 
     @mcp.tool()
     @tracked_action("Parando observabilidade do navegador")
@@ -430,3 +485,33 @@ def registrar_observabilidade_portas(mcp: Any, tracked_action: Any) -> None:
     def portas_trafego_limpar() -> dict[str, Any]:
         """Limpa o buffer em memória sem interromper a captura."""
         return observer.clear()
+
+    @mcp.tool()
+    @tracked_action("Consultando streams de mídia capturados")
+    def portas_midia_status() -> dict[str, Any]:
+        """Estado do motor de captura de mídia (streams, bytes, limites)."""
+        return media_engine.status()
+
+    @mcp.tool()
+    @tracked_action("Listando streams de mídia")
+    def portas_midia_streams() -> dict[str, Any]:
+        """Lista streams de mídia capturados (metadados)."""
+        return {"success": True, "streams": media_engine.streams()}
+
+    @mcp.tool()
+    @tracked_action("Consultando chunks de mídia")
+    def portas_midia_chunks(stream_id: str, after_sequence: int = -1, limit: int = 64) -> dict[str, Any]:
+        """Consulta chunks de um stream de mídia (metadados por chunk)."""
+        return media_engine.chunks(stream_id, after_sequence=after_sequence, limit=limit)
+
+    @mcp.tool()
+    @tracked_action("Lendo bytes de mídia")
+    def portas_midia_bytes(stream_id: str, max_bytes: int = 65536) -> dict[str, Any]:
+        """Lê bytes brutos de um stream (hex), limitado."""
+        return media_engine.read_bytes(stream_id, max_bytes=max_bytes)
+
+    @mcp.tool()
+    @tracked_action("Limpando streams de mídia")
+    def portas_midia_limpar() -> dict[str, Any]:
+        """Limpa streams de mídia capturados."""
+        return media_engine.clear()
