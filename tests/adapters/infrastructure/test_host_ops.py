@@ -567,8 +567,8 @@ def test_git_profile_disables_repository_config_execution_surfaces():
         '[core]\n    sshCommand = cmd /c whoami\n',
         '[core]\n    worktree = C:/outside\n',
         '[include]\n    path = C:/outside/config\n',
-        '\\ufeff[include]\\n    path = C:/outside/config\\n',
-        '[core]\\n    repositoryformatversion = 0\\n\\ufeff[include]\\n    path = C:/outside/config\\n',
+        '\ufeff[include]\n    path = C:/outside/config\n',
+        '[core]\n    repositoryformatversion = 0\n\ufeff[include]\n    path = C:/outside/config\n',
         '[diff "evil"]\n    textconv = cmd /c whoami\n',
     ],
 )
