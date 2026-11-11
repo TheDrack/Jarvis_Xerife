@@ -908,8 +908,8 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
 
 
 _REPOSITORY_EXECUTION_CONFIG = re.compile(
-    r"(?im)^\\s*(?:\\[\\s*(?:filter|include(?:if)?)\\b|"
-    r"(?:clean|smudge|process|command|textconv|sshCommand|worktree)\\s*=)"
+    r"(?im)^\s*(?:\[\s*(?:filter|include(?:if)?)\b|"
+    r"(?:clean|smudge|process|command|textconv|sshCommand|worktree)\s*=)"
 )
 
 
