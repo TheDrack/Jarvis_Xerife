@@ -34,6 +34,7 @@ import httpx
 NEWS_RSS_URL = "https://news.google.com/rss/search"
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 GEOCODE_URL = "https://nominatim.openstreetmap.org/reverse"
+GEOCODE_SEARCH_URL = "https://nominatim.openstreetmap.org/search"
 USER_AGENT = "Jarvis-Xerife/0.1 (local desktop briefing; read-only)"
 NEWS_TTL_SECONDS = 600.0
 WEATHER_TTL_SECONDS = 600.0
@@ -329,6 +330,86 @@ def reverse_place(latitude: Any, longitude: Any, zoom: int = 10) -> dict[str, An
         return {"available": False, "reason": "invalid_coordinate"}
     with httpx.Client(timeout=12.0, follow_redirects=False) as client:
         return _reverse_geocode(client, lat, lon, zoom=zoom)
+
+
+def forward_place(query: Any) -> dict[str, Any]:
+    """Resolve a place name through Nominatim using the shared opt-out and throttle."""
+    if not geocode_enabled():
+        return {"available": False, "reason": "disabled"}
+    text = " ".join(str(query or "").split())[:256]
+    if not text:
+        return {"available": False, "reason": "empty_query"}
+    key = f"geocode:forward:{text.casefold()}"
+    now = time.monotonic()
+    cached = _CACHE.get(key)
+    if cached:
+        value = cached[1]
+        ttl = (
+            GEOCODE_TTL_SECONDS if value.get("available")
+            else GEOCODE_NEGATIVE_TTL_SECONDS if value.get("reason") == "no_address"
+            else 0.0
+        )
+        if ttl and now - cached[0] < ttl:
+            return value
+        _CACHE.pop(key, None)
+
+    global _GEOCODE_COOLDOWN_UNTIL
+    with _client() as client:
+        with _GEOCODE_LOCK:
+            now = time.monotonic()
+            if _GEOCODE_COOLDOWN_UNTIL > now:
+                return {
+                    "available": False,
+                    "reason": "http_429",
+                    "retry_after_seconds": max(1, int(_GEOCODE_COOLDOWN_UNTIL - now + 0.999)),
+                }
+            wait = GEOCODE_MIN_INTERVAL_SECONDS - (time.monotonic() - _GEOCODE_CLOCK[0])
+            if wait > 0:
+                time.sleep(wait)
+            try:
+                response = client.get(
+                    GEOCODE_SEARCH_URL,
+                    params={
+                        "q": text,
+                        "format": "jsonv2",
+                        "limit": 1,
+                        "addressdetails": 0,
+                        "accept-language": "pt-BR",
+                    },
+                    headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+                )
+                response.raise_for_status()
+                data = response.json()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 429:
+                    retry_after = _retry_after_seconds(exc.response.headers.get("Retry-After"))
+                    _GEOCODE_COOLDOWN_UNTIL = time.monotonic() + retry_after
+                    return {"available": False, "reason": "http_429", "retry_after_seconds": retry_after}
+                return {"available": False, "reason": _fail(exc)}
+            except (httpx.HTTPError, ValueError) as exc:
+                return {"available": False, "reason": _fail(exc)}
+            finally:
+                _GEOCODE_CLOCK[0] = time.monotonic()
+
+    if not isinstance(data, list) or not data or not isinstance(data[0], dict):
+        result = {"available": False, "reason": "no_address"}
+    else:
+        try:
+            latitude = float(data[0].get("lat"))
+            longitude = float(data[0].get("lon"))
+        except (TypeError, ValueError):
+            return {"available": False, "reason": "malformed"}
+        if not -90.0 <= latitude <= 90.0 or not -180.0 <= longitude <= 180.0:
+            return {"available": False, "reason": "malformed"}
+        result = {
+            "available": True,
+            "latitude": latitude,
+            "longitude": longitude,
+            "display_name": str(data[0].get("display_name") or text)[:512],
+        }
+    if result.get("available") or result.get("reason") == "no_address":
+        _CACHE[key] = (time.monotonic(), result)
+    return result
 
 
 def device_region(
