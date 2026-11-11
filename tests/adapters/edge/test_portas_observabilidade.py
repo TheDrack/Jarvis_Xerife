@@ -1,3 +1,6 @@
+import base64
+from collections import deque
+
 from app.adapters.edge.portas_observabilidade import (
     BrowserTrafficObserver,
     sanitizar_payload,
@@ -82,7 +85,7 @@ def test_websocket_payload_opt_in_still_redacts_secrets():
 
 def test_event_buffer_is_bounded_and_supports_incremental_filtering():
     observer = BrowserTrafficObserver(max_events=100)
-    observer._events = __import__("collections").deque(maxlen=100)
+    observer._events = deque(maxlen=100)
     observer._emit("http_request", host="camera.example", method="GET")
     observer._emit("http_response", host="other.example", status=200)
 
@@ -151,6 +154,7 @@ def test_binary_websocket_payload_never_exposes_raw_bytes():
     assert payload == {"kind": "binary", "bytes": len(b"\x00private-binary-token")}
     assert "preview_hex" not in payload
 
+
 def test_request_response_correlation_survives_distinct_playwright_wrappers():
     implementation = object()
 
@@ -177,6 +181,7 @@ def test_request_response_correlation_survives_distinct_playwright_wrappers():
     observer._on_response(FakeResponse())
     response_event = observer.events()["events"][1]
     assert response_event["request_id"] == request_event["request_id"]
+
 
 def test_cdp_endpoint_accepts_local_websocket_and_rejects_remote_hosts(monkeypatch):
     from app.adapters.edge import portas_core
@@ -207,3 +212,121 @@ def test_request_finished_reports_duration_and_same_request_id():
     assert finished_event["type"] == "http_request_finished"
     assert finished_event["request_id"] == request_event["request_id"]
     assert finished_event["duration_ms"] is not None
+
+
+def test_media_capture_preserves_binary_bytes_in_base64_chunks():
+    observer = BrowserTrafficObserver()
+    observer._media_streams["stream-1"] = {
+        "stream_id": "stream-1",
+        "mime_type": "audio/mp4",
+        "status": "streaming",
+    }
+    payload = b"\x00\xffftypisom\x00binary-media\x80"
+    observer._store_media_bytes("stream-1", payload)
+
+    result = observer.media_chunks("stream-1", after_sequence=0, limit=10)
+    assert result["success"] is True
+    assert result["count"] == 1
+    assert base64.b64decode(result["chunks"][0]["data"]) == payload
+    assert result["chunks"][0]["sequence"] == 1
+    assert result["chunks"][0]["offset"] == 0
+
+
+def test_media_capture_enforces_per_stream_byte_limit():
+    from app.adapters.edge.portas_observabilidade import _MEDIA_STREAM_MAX_BYTES
+
+    observer = BrowserTrafficObserver()
+    observer._media_streams["stream-limit"] = {
+        "stream_id": "stream-limit",
+        "mime_type": "video/mp4",
+        "status": "streaming",
+    }
+
+    captured = observer._store_media_bytes(
+        "stream-limit", b"x" * (_MEDIA_STREAM_MAX_BYTES + 1024)
+    )
+
+    assert captured == _MEDIA_STREAM_MAX_BYTES
+    result = observer.media_chunks("stream-limit", limit=32)
+    assert result["success"] is True
+    assert sum(chunk["bytes"] for chunk in result["chunks"]) == _MEDIA_STREAM_MAX_BYTES
+    assert result["status"] == "truncated"
+
+
+def test_media_capture_buffer_is_bounded_and_reports_evicted_sequence_gap():
+    observer = BrowserTrafficObserver()
+    observer._media_streams["stream-1"] = {
+        "stream_id": "stream-1",
+        "mime_type": "video/mp4",
+        "status": "streaming",
+    }
+    observer._media_chunks = deque(maxlen=2)
+    observer._store_media_bytes("stream-1", b"chunk-1")
+    observer._store_media_bytes("stream-1", b"chunk-2")
+    observer._store_media_bytes("stream-1", b"chunk-3")
+
+    result = observer.media_chunks("stream-1", after_sequence=0, limit=10)
+    assert [chunk["sequence"] for chunk in result["chunks"]] == [2, 3]
+    assert result["first_available_sequence"] == 2
+    assert result["gap"] is True
+    assert base64.b64decode(result["chunks"][0]["data"]) == b"chunk-2"
+
+
+def test_media_capture_classifies_ump_and_declared_media_mime():
+    observer = BrowserTrafficObserver()
+    assert observer._is_media_response({
+        "url": "https://video.example/videoplayback",
+        "mimeType": "application/vnd.yt-ump",
+    })
+    assert not observer._is_media_response({
+        "url": "https://video.example/videoplayback?mime=audio%2Fmp4&token=secret",
+        "mimeType": "application/octet-stream",
+        "resourceType": "XHR",
+    })
+    assert not observer._is_media_response({
+        "url": "https://video.example/videoplayback?mime=audio%2Fmp4&token=secret",
+        "mimeType": "application/octet-stream",
+        "resourceType": "Media",
+    })
+    assert observer._is_media_response({
+        "url": "https://video.example/videoplayback",
+        "mimeType": "video/mp4",
+        "resourceType": "Media",
+    })
+    assert not observer._is_media_response({
+        "url": "https://video.example/master.m3u8",
+        "mimeType": "application/vnd.apple.mpegurl",
+        "resourceType": "Manifest",
+    })
+    assert not observer._is_media_response({
+        "url": "https://api.example/data",
+        "mimeType": "application/json",
+    })
+    assert not observer._is_media_response({
+        "url": "https://api.example/data?mime=audio%2Fmp4",
+        "mimeType": "application/json",
+        "headers": {"content-type": "application/json"},
+    })
+
+
+def test_media_data_received_event_preserves_binary_response_bytes():
+    observer = BrowserTrafficObserver()
+    session = object()
+    payload = b"\x00\xff\x00ftypisom\x01\x02"
+    observer._media_streams["stream-2"] = {
+        "stream_id": "stream-2",
+        "mime_type": "application/vnd.yt-ump",
+        "protocol": "ump",
+        "status": "streaming",
+    }
+    observer._media_request_streams[(id(session), "request-7")] = "stream-2"
+
+    observer._on_media_data_received(session, {
+        "requestId": "request-7",
+        "timestamp": 123.5,
+        "data": base64.b64encode(payload).decode("ascii"),
+    })
+
+    result = observer.media_chunks("stream-2", after_sequence=0, limit=10)
+    assert result["protocol"] == "ump"
+    assert base64.b64decode(result["chunks"][0]["data"]) == payload
