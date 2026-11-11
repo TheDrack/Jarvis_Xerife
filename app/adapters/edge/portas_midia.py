@@ -17,31 +17,52 @@ import time
 from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 from typing import Any, Callable, Iterable
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-import re
+_MEDIA_MANIFEST_CONTENT_TYPES = {
+    "application/vnd.apple.mpegurl",
+    "application/x-mpegurl",
+    "application/dash+xml",
+}
+_MEDIA_CONTENT_TYPES = {"application/vnd.yt-ump"}
 
-_MEDIA_URL_HINTS = re.compile(
-    r"(videoplayback|\.m3u8|\.mpd|\.ts(?:\?|$)|\.m4s(?:\?|$)|/media/|/stream/)",
-    re.I,
-)
-_MEDIA_CONTENT_TYPES = re.compile(
-    r"(video/|audio/|application/(vnd\.apple\.mpegurl|dash\+xml|x-mpegurl|vnd\.yt-ump)|octet-stream)",
-    re.I,
-)
+
+def _sanitize_media_url(url: str) -> str:
+    """Redact credentials and every query value before exposing a stream URL."""
+    try:
+        parsed = urlsplit(str(url))
+        host = parsed.hostname or ""
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        if parsed.port:
+            host = f"{host}:{parsed.port}"
+        query = urlencode(
+            [(key, "[REDACTED]") for key, _ in parse_qsl(parsed.query, keep_blank_values=True)]
+        )
+        return urlunsplit((parsed.scheme, host, parsed.path, query, ""))
+    except (TypeError, ValueError):
+        return "<invalid-url>"
+
+
+def _sanitize_manifest_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return _sanitize_media_url(value) if "?" in value or "://" in value else value
+    if isinstance(value, list):
+        return [_sanitize_manifest_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _sanitize_manifest_value(item) for key, item in value.items()}
+    return value
 
 
 def is_media_request(url: str, content_type: str | None = None) -> bool:
-    """Heurística para decidir se uma resposta merece captura binária."""
-    try:
-        path = urlsplit(str(url)).path
-    except Exception:
-        path = str(url)
-    if _MEDIA_URL_HINTS.search(str(url)):
-        return True
-    if content_type and _MEDIA_CONTENT_TYPES.search(str(content_type)):
-        return True
-    return False
+    """Classify from the response's declared MIME type, never from URL hints."""
+    del url
+    mime = str(content_type or "").split(";", 1)[0].strip().lower()
+    return (
+        mime.startswith(("audio/", "video/"))
+        or mime in _MEDIA_CONTENT_TYPES
+        or mime in _MEDIA_MANIFEST_CONTENT_TYPES
+    )
 
 
 @dataclass
@@ -73,7 +94,7 @@ class MediaStream:
     def to_status(self) -> dict[str, Any]:
         return {
             "stream_id": self.stream_id,
-            "url": self.url,
+            "url": _sanitize_media_url(self.url),
             "host": self.host,
             "content_type": self.content_type,
             "adapter": self.adapter,
@@ -262,7 +283,7 @@ class MediaCaptureEngine:
             pl = getattr(stream, "hls_playlist", None)
             if pl is None:
                 return {"success": False, "error": "playlist HLS não capturada"}
-            return {"success": True, "stream_id": stream_id, "playlist": pl}
+            return {"success": True, "stream_id": stream_id, "playlist": _sanitize_manifest_value(pl)}
 
     def dash_manifest(self, stream_id: str) -> dict[str, Any]:
         with self._lock:
@@ -272,7 +293,7 @@ class MediaCaptureEngine:
             mn = getattr(stream, "dash_manifest", None)
             if mn is None:
                 return {"success": False, "error": "manifesto DASH não capturado"}
-            return {"success": True, "stream_id": stream_id, "manifest": mn}
+            return {"success": True, "stream_id": stream_id, "manifest": _sanitize_manifest_value(mn)}
 
     def ump_parts(self, stream_id: str) -> dict[str, Any]:
         with self._lock:
@@ -297,6 +318,12 @@ class MediaCaptureEngine:
             stream = self._streams.get(stream_id)
             if stream is None:
                 return {"success": False, "error": "stream não encontrado"}
+            if stream.adapter in {"hls", "dash"} or stream.content_type in _MEDIA_MANIFEST_CONTENT_TYPES:
+                return {
+                    "success": False,
+                    "error": "bytes de manifestos permanecem locais; use os metadados sanitizados",
+                    "stream_id": stream_id,
+                }
             data = bytearray()
             for c in stream.chunks:
                 if len(data) + len(c.data) > max_bytes:
