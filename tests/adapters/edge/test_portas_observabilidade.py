@@ -249,3 +249,42 @@ def test_media_capture_buffer_is_bounded_and_reports_evicted_sequence_gap():
     assert result["first_available_sequence"] == 2
     assert result["gap"] is True
     assert base64.b64decode(result["chunks"][0]["data"]) == b"chunk-2"
+
+
+def test_media_capture_classifies_ump_and_declared_media_mime():
+    observer = BrowserTrafficObserver()
+    assert observer._is_media_response({
+        "url": "https://video.example/videoplayback",
+        "mimeType": "application/vnd.yt-ump",
+    })
+    assert observer._is_media_response({
+        "url": "https://video.example/videoplayback?mime=audio%2Fmp4&token=secret",
+        "mimeType": "application/octet-stream",
+    })
+    assert not observer._is_media_response({
+        "url": "https://api.example/data",
+        "mimeType": "application/json",
+    })
+
+
+def test_media_data_received_event_preserves_binary_response_bytes():
+    observer = BrowserTrafficObserver()
+    session = object()
+    payload = b"\x00\xff\x00ftypisom\x01\x02"
+    observer._media_streams["stream-2"] = {
+        "stream_id": "stream-2",
+        "mime_type": "application/vnd.yt-ump",
+        "protocol": "ump",
+        "status": "streaming",
+    }
+    observer._media_request_streams[(id(session), "request-7")] = "stream-2"
+
+    observer._on_media_data_received(session, {
+        "requestId": "request-7",
+        "timestamp": 123.5,
+        "data": base64.b64encode(payload).decode("ascii"),
+    })
+
+    result = observer.media_chunks("stream-2", after_sequence=0, limit=10)
+    assert result["protocol"] == "ump"
+    assert base64.b64decode(result["chunks"][0]["data"]) == payload
