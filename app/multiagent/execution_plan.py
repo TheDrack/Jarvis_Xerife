@@ -352,7 +352,9 @@ class DeclarativePlanInterpreter:
                 return PlanOutcome(execution_id, "blocked", tuple(outcomes))
             if verifier is not None:
                 try:
-                    verdict = verifier(args, projected)
+                    # Verify the complete connector result. Plan-selected output_fields
+                    # only controls downstream/model visibility, never trusted evidence.
+                    verdict = verifier(args, raw_result)
                     if not isinstance(verdict, bool):
                         raise TypeError("verifier must return bool")
                     verified = verdict
