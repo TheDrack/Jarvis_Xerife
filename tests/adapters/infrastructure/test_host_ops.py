@@ -581,6 +581,8 @@ def test_git_profile_disables_repository_config_execution_surfaces():
         '[remote "origin"]\n    promisor = true\n',
         '[remote "origin"]\n    uploadpack = cmd /c whoami\n',
         '[extensions]\n    partialClone = origin\n',
+        '[core]\n    fsmonitor = cmd /c whoami\n',
+        '[diff]\n    external = cmd /c whoami\n',
         '[diff "evil"]\n    textconv = cmd /c whoami\n',
     ],
 )
@@ -651,6 +653,17 @@ def test_git_profile_rejects_non_regular_repository_config(tmp_path, monkeypatch
     monkeypatch.setattr(Path, "read_text", forbidden_read)
     with pytest.raises(ValueError, match="regular file"):
         ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_profile_config_guard_accepts_large_benign_config(tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(
+        "[core]\\n" + ("# harmless setting\\n" * 12000),
+        encoding="utf-8",
+    )
+
+    ops._reject_repository_execution_config(tmp_path)
 
 
 def test_git_profile_allows_inert_repository_config(tmp_path):
