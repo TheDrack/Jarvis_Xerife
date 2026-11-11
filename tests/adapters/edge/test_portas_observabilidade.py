@@ -232,6 +232,27 @@ def test_media_capture_preserves_binary_bytes_in_base64_chunks():
     assert result["chunks"][0]["offset"] == 0
 
 
+def test_media_capture_enforces_per_stream_byte_limit():
+    from app.adapters.edge.portas_observabilidade import _MEDIA_STREAM_MAX_BYTES
+
+    observer = PortasObserver()
+    observer._media_streams["stream-limit"] = {
+        "stream_id": "stream-limit",
+        "mime_type": "video/mp4",
+        "status": "streaming",
+    }
+
+    captured = observer._store_media_bytes(
+        "stream-limit", b"x" * (_MEDIA_STREAM_MAX_BYTES + 1024)
+    )
+
+    assert captured == _MEDIA_STREAM_MAX_BYTES
+    result = observer.media_chunks("stream-limit", limit=32)
+    assert result["success"] is True
+    assert sum(chunk["bytes"] for chunk in result["chunks"]) == _MEDIA_STREAM_MAX_BYTES
+    assert result["status"] == "truncated"
+
+
 def test_media_capture_buffer_is_bounded_and_reports_evicted_sequence_gap():
     observer = BrowserTrafficObserver()
     observer._media_streams["stream-1"] = {
