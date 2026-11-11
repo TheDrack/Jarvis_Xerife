@@ -174,7 +174,25 @@ def _fake_powershell(monkeypatch):
 def test_git_profile_builds_structured_argv(_fake_powershell):
     compiled = ops.compile_command("git", "status", ["--short"])
 
-    assert compiled.argv == ("git", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "log.showSignature=false", "--no-pager", "status", "--short")
+    assert compiled.argv == (
+        "git",
+        "-c", "core.fsmonitor=false",
+        "-c", "core.untrackedCache=false",
+        "-c", f"core.hooksPath={os.devnull}",
+        "-c", f"core.sshCommand={os.devnull}",
+        "-c", "diff.external=",
+        "-c", "core.pager=cat",
+        "-c", f"core.attributesFile={os.devnull}",
+        "-c", f"gpg.program={os.devnull}",
+        "-c", f"gpg.ssh.program={os.devnull}",
+        "-c", "format.pretty=oneline",
+        "-c", "credential.helper=",
+        "-c", "protocol.ext.allow=never",
+        "-c", "log.showSignature=false",
+        "--no-pager",
+        "status",
+        "--short",
+    )
     assert compiled.timeout_seconds == 20
     assert compiled.display == "status --short"
 
@@ -516,7 +534,7 @@ def test_redaction_covers_common_provider_secrets_and_connection_urls():
 
 
 def test_command_output_with_private_key_material_is_withheld(monkeypatch):
-    private_key = "PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAKCAQEA\\n-----END RSA PRIVATE KEY-----"
+    private_key = "PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----"
     monkeypatch.setattr(ops, "_spawn", _stub_spawn(stdout=private_key, stderr=private_key))
 
     result = ops.run_host_command("git", "status", [])
@@ -533,13 +551,159 @@ def test_inspect_d_profile_does_not_expose_other_drive_metadata():
         ops.compile_command("inspect_d", "Get-PSDrive", ["-Name", "C"])
 
 
-def test_git_profile_disables_repo_fsmonitor_and_optional_index_cache():
+def test_git_profile_disables_repository_config_execution_surfaces():
     compiled = ops.compile_command("git", "status", [])
+    argv_pairs = set(zip(compiled.argv[1::2], compiled.argv[2::2]))
 
-    assert compiled.argv[:8] == (
-        "git", "-c", "core.fsmonitor=false",
-        "-c", "core.untrackedCache=false", "-c", "log.showSignature=false", "--no-pager",
+    assert ("-c", "core.fsmonitor=false") in argv_pairs
+    assert ("-c", "core.untrackedCache=false") in argv_pairs
+    assert ("-c", f"core.hooksPath={os.devnull}") in argv_pairs
+    assert ("-c", "diff.external=") in argv_pairs
+    assert ("-c", "core.pager=cat") in argv_pairs
+    assert ("-c", f"core.attributesFile={os.devnull}") in argv_pairs
+    assert ("-c", "log.showSignature=false") in argv_pairs
+    assert "--no-pager" in compiled.argv
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        '[filter "evil"]\n    clean = cmd /c whoami\n',
+        '[core]\n    sshCommand = cmd /c whoami\n',
+        '[core]\n    worktree = C:/outside\n',
+        '[core] worktree = C:/outside\n',
+        '[core]sshCommand = cmd /c whoami\n',
+        "[core]\n    work" + "\\\n" + "    tree = C:/outside\n",
+        '[include]\n    path = C:/outside/config\n',
+        '\ufeff[include]\n    path = C:/outside/config\n',
+        '[core]\n    repositoryformatversion = 0\n\ufeff[include]\n    path = C:/outside/config\n',
+        '[gpg]\n    program = cmd /c whoami\n',
+        '[credential]\n    helper = !cmd /c whoami\n',
+        '[remote "origin"]\n    promisor = true\n',
+        '[remote "origin"]\n    uploadpack = cmd /c whoami\n',
+        '[extensions]\n    partialClone = origin\n',
+        '[core]\n    fsmonitor = cmd /c whoami\n',
+        '[diff]\n    external = cmd /c whoami\n',
+        '[diff "evil"]\n    textconv = cmd /c whoami\n',
+    ],
+)
+def test_git_profile_rejects_repository_config_with_execution_or_worktree_overrides(tmp_path, config):
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "config").write_text(config, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="repository config contains"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_profile_rejects_worktree_config_execution_helpers(tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(
+        '[extensions]\n    worktreeConfig = true\n',
+        encoding="utf-8",
     )
+    (git_dir / "config.worktree").write_text(
+        '[filter "evil"]\n    clean = cmd /c whoami\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="repository config contains"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO support is unavailable")
+def test_git_profile_rejects_symlinked_git_directory(tmp_path):
+    external_git_dir = tmp_path / "external.git"
+    external_git_dir.mkdir()
+    (external_git_dir / "config").write_text(
+        '[core]\\n    repositoryformatversion = 0\\n',
+        encoding="utf-8",
+    )
+    marker = tmp_path / ".git"
+    try:
+        marker.symlink_to(external_git_dir, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("directory symlinks are unavailable")
+
+    with pytest.raises(ValueError, match="repository metadata symlink"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_profile_rejects_common_git_directory_pointer(tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(
+        '[core]\\n    repositoryformatversion = 0\\n',
+        encoding="utf-8",
+    )
+    (git_dir / "commondir").write_text("../external.git\\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="common Git directory"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_profile_rejects_non_regular_repository_config(tmp_path, monkeypatch):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    config = git_dir / "config"
+    config.mkdir()
+
+    def forbidden_read(*_args, **_kwargs):
+        pytest.fail("non-regular repository config must not be read")
+
+    monkeypatch.setattr(Path, "read_text", forbidden_read)
+    with pytest.raises(ValueError, match="regular file"):
+        ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_profile_config_guard_accepts_large_benign_config(tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(
+        "[core]\n" + ("# harmless setting\n" * 12000),
+        encoding="utf-8",
+    )
+
+    ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_profile_config_inspection_is_linear_for_whitespace_padding(tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (git_dir / "config").write_text(" \t\n" * (128 * 1024), encoding="utf-8")
+
+    assert ops._repository_config_has_execution_settings(
+        (git_dir / "config").read_text(encoding="utf-8")
+    ) is False
+
+
+def test_git_profile_allows_inert_repository_config(tmp_path):
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "config").write_text(
+        '[core]\n    repositoryformatversion = 0\n    filemode = true\n',
+        encoding="utf-8",
+    )
+
+    ops._reject_repository_execution_config(tmp_path)
+
+
+def test_git_environment_disables_lazy_fetch():
+    assert ops._sanitized_environment()["GIT_NO_LAZY_FETCH"] == "1"
+
+
+def test_git_commit_probe_uses_the_same_safety_overrides(monkeypatch):
+    captured = {}
+
+    def fake_run(argv, **kwargs):
+        captured["argv"] = list(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="abc123\n", stderr="")
+
+    monkeypatch.setattr(ops.subprocess, "run", fake_run)
+    ops._require_commitish("HEAD", ops._repository_root())
+
+    assert ("-c", "core.fsmonitor=false") in set(zip(captured["argv"][1::2], captured["argv"][2::2]))
+    assert ("-c", f"core.hooksPath={os.devnull}") in set(zip(captured["argv"][1::2], captured["argv"][2::2]))
+    assert ("-c", "diff.external=") in set(zip(captured["argv"][1::2], captured["argv"][2::2]))
 
 
 def test_git_environment_ignores_user_and_system_configuration():
@@ -548,6 +712,8 @@ def test_git_environment_ignores_user_and_system_configuration():
     assert environment["GIT_CONFIG_NOSYSTEM"] == "1"
     assert environment["GIT_CONFIG_GLOBAL"] == os.devnull
     assert environment["GIT_OPTIONAL_LOCKS"] == "0"
+    assert environment["GIT_NO_REPLACE_OBJECTS"] == "1"
+    assert environment["GIT_ATTR_NOSYSTEM"] == "1"
 
 
 @pytest.mark.parametrize(
@@ -569,9 +735,9 @@ def test_read_blocks_additional_credential_store_names(_sandbox, name):
 @pytest.mark.parametrize(
     "private_material",
     [
-        "-----BEGIN PGP PRIVATE KEY BLOCK-----\\nprivate-data\\n-----END PGP PRIVATE KEY BLOCK-----",
-        "PuTTY-User-Key-File-2: ssh-ed25519\\nPrivate-Lines: 1\\nprivate-data",
-        "-----BEGIN OpenVPN Static key V1-----\\nprivate-data\\n-----END OpenVPN Static key V1-----",
+        "-----BEGIN PGP PRIVATE KEY BLOCK-----\nprivate-data\n-----END PGP PRIVATE KEY BLOCK-----",
+        "PuTTY-User-Key-File-2: ssh-ed25519\nPrivate-Lines: 1\nprivate-data",
+        "-----BEGIN OpenVPN Static key V1-----\nprivate-data\n-----END OpenVPN Static key V1-----",
     ],
 )
 def test_read_blocks_non_pem_private_key_formats(_sandbox, private_material):

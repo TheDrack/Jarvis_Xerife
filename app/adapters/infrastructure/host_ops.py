@@ -897,11 +897,131 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
     environment["GIT_CONFIG_NOSYSTEM"] = "1"
     environment["GIT_CONFIG_GLOBAL"] = os.devnull
     environment["GIT_OPTIONAL_LOCKS"] = "0"
+    environment["GIT_NO_REPLACE_OBJECTS"] = "1"
+    environment["GIT_ATTR_NOSYSTEM"] = "1"
+    environment["GIT_NO_LAZY_FETCH"] = "1"
     environment["PYTHONUNBUFFERED"] = "1"
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     if extra:
         environment.update(extra)
     return environment
+
+
+_REPOSITORY_EXECUTION_SECTIONS = frozenset(
+    {"filter", "include", "includeif", "gpg", "credential"}
+)
+_REPOSITORY_EXECUTION_KEYS = frozenset(
+    {
+        "clean",
+        "smudge",
+        "process",
+        "command",
+        "textconv",
+        "sshcommand",
+        "worktree",
+        "promisor",
+        "uploadpack",
+        "partialclone",
+        "vcs",
+        "fsmonitor",
+        "external",
+        "pager",
+        "helper",
+    }
+)
+
+
+def _repository_config_has_execution_settings(content: str) -> bool:
+    """Inspect Git config linearly; avoid regex backtracking on untrusted files."""
+    for raw_line in content.splitlines():
+        if raw_line.rstrip(" \t").endswith("\\"):
+            return True
+        line = raw_line.lstrip(" \t")
+        if not line or line.startswith(("#", ";")):
+            continue
+        if line.startswith("["):
+            closing = line.find("]")
+            if closing < 0:
+                return True
+            header = line[1:closing].strip()
+            section = header.split(None, 1)[0].casefold() if header else ""
+            if section in _REPOSITORY_EXECUTION_SECTIONS:
+                return True
+            remainder = line[closing + 1 :].strip()
+            if remainder and _repository_config_key(remainder) in _REPOSITORY_EXECUTION_KEYS:
+                return True
+            continue
+        if _repository_config_key(line) in _REPOSITORY_EXECUTION_KEYS:
+            return True
+    return False
+
+
+def _repository_config_key(line: str) -> str:
+    key = line.split("=", 1)[0].strip() if "=" in line else line.split(None, 1)[0]
+    return key.casefold()
+
+
+def _repository_config_path(workdir: Path) -> Path | None:
+    """Locate repository-local config; reject linked-worktree pointers fail-closed."""
+    for directory in (workdir, *workdir.parents):
+        marker = directory / ".git"
+        try:
+            if marker.is_symlink():
+                raise ValueError("repository metadata symlink is not supported")
+            if marker.is_dir():
+                if (marker / "commondir").exists():
+                    raise ValueError("common Git directory pointers are not supported")
+                return marker / "config"
+            if marker.is_file():
+                raise ValueError("linked worktree metadata is not supported by the read-only Git profile")
+        except OSError as exc:
+            raise ValueError("repository metadata could not be inspected") from exc
+    return None
+
+
+def _reject_repository_execution_config(workdir: Path) -> None:
+    """Fail closed when local Git config can load includes or execute helpers."""
+    config_path = _repository_config_path(workdir)
+    if config_path is None:
+        return
+    config_paths = (config_path, config_path.with_name("config.worktree"))
+    for candidate in config_paths:
+        try:
+            if not candidate.exists():
+                continue
+            if candidate.is_symlink():
+                raise ValueError("repository config must not be a symlink")
+            if not candidate.is_file():
+                raise ValueError("repository config must be a regular file")
+            if candidate.stat().st_size > 256 * 1024:
+                raise ValueError("repository config exceeds inspection limit")
+            content = candidate.read_text(encoding="utf-8", errors="replace")
+            if "\ufeff" in content:
+                raise ValueError("repository config contains an unexpected BOM")
+        except OSError as exc:
+            raise ValueError("repository config could not be inspected") from exc
+        if _repository_config_has_execution_settings(content):
+            raise ValueError("repository config contains an executable helper or worktree override")
+
+
+def _git_safety_overrides(workdir: Path) -> tuple[str, ...]:
+    """Neutralize Git helpers and reject repository-local execution configuration."""
+    _reject_repository_execution_config(workdir)
+    return (
+        "-c", "core.fsmonitor=false",
+        "-c", "core.untrackedCache=false",
+        "-c", f"core.hooksPath={os.devnull}",
+        "-c", f"core.sshCommand={os.devnull}",
+        "-c", "diff.external=",
+        "-c", "core.pager=cat",
+        "-c", f"core.attributesFile={os.devnull}",
+        "-c", f"gpg.program={os.devnull}",
+        "-c", f"gpg.ssh.program={os.devnull}",
+        "-c", "format.pretty=oneline",
+        "-c", "credential.helper=",
+        "-c", "protocol.ext.allow=never",
+        "-c", "log.showSignature=false",
+    )
 
 
 def _require_commitish(ref: str, workdir: Path) -> None:
@@ -911,8 +1031,7 @@ def _require_commitish(ref: str, workdir: Path) -> None:
     try:
         probe = subprocess.run(
             [
-                "git", "-c", "core.fsmonitor=false",
-                "-c", "core.untrackedCache=false",
+                "git", *_git_safety_overrides(workdir),
                 "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}",
             ],
             cwd=str(workdir),
@@ -990,9 +1109,7 @@ def compile_command(
                     _require_commitish(value, workdir)
         argv = (
             "git",
-            "-c", "core.fsmonitor=false",
-            "-c", "core.untrackedCache=false",
-            "-c", "log.showSignature=false",
+            *_git_safety_overrides(workdir),
             "--no-pager",
             *(
                 (verb, "--no-ext-diff", "--no-textconv")
@@ -1218,7 +1335,7 @@ def _spawn(
             pass
         process.wait()
         for reader in readers:
-            reader.join(timeout=2)
+            reader.join(timeout=5)
         timeout_error = subprocess.TimeoutExpired(
             list(argv),
             timeout_seconds,
@@ -1229,7 +1346,7 @@ def _spawn(
         raise timeout_error
     finally:
         for reader in readers:
-            reader.join(timeout=2)
+            reader.join(timeout=5)
         for stream in (process.stdout, process.stderr):
             try:
                 stream.close()
