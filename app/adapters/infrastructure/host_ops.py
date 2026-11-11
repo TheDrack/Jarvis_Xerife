@@ -1268,7 +1268,7 @@ def _spawn(
             pass
         process.wait()
         for reader in readers:
-            reader.join(timeout=2)
+            reader.join(timeout=5)
         timeout_error = subprocess.TimeoutExpired(
             list(argv),
             timeout_seconds,
@@ -1279,7 +1279,7 @@ def _spawn(
         raise timeout_error
     finally:
         for reader in readers:
-            reader.join(timeout=2)
+            reader.join(timeout=5)
         for stream in (process.stdout, process.stderr):
             try:
                 stream.close()
