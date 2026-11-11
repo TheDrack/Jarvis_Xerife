@@ -64,6 +64,8 @@ class MediaStream:
     total_bytes: int = 0
     chunks: deque[MediaChunk] = field(default_factory=lambda: deque(maxlen=1024))
     ump_parts: list = field(default_factory=list)
+    hls_playlist: Any = None
+    dash_manifest: Any = None
     truncated: bool = False
     closed: bool = False
     last_activity: float = field(default_factory=time.monotonic)
@@ -77,6 +79,8 @@ class MediaStream:
             "adapter": self.adapter,
             "chunks": len(self.chunks),
             "ump_parts": len(self.ump_parts),
+            "hls": self.hls_playlist is not None,
+            "dash": self.dash_manifest is not None,
             "total_bytes": self.total_bytes,
             "truncated": self.truncated,
             "closed": self.closed,
@@ -249,6 +253,26 @@ class MediaCaptureEngine:
                 "truncated": stream.truncated,
                 "closed": stream.closed,
             }
+
+    def hls_playlist(self, stream_id: str) -> dict[str, Any]:
+        with self._lock:
+            stream = self._streams.get(stream_id)
+            if stream is None:
+                return {"success": False, "error": "stream não encontrado"}
+            pl = getattr(stream, "hls_playlist", None)
+            if pl is None:
+                return {"success": False, "error": "playlist HLS não capturada"}
+            return {"success": True, "stream_id": stream_id, "playlist": pl}
+
+    def dash_manifest(self, stream_id: str) -> dict[str, Any]:
+        with self._lock:
+            stream = self._streams.get(stream_id)
+            if stream is None:
+                return {"success": False, "error": "stream não encontrado"}
+            mn = getattr(stream, "dash_manifest", None)
+            if mn is None:
+                return {"success": False, "error": "manifesto DASH não capturado"}
+            return {"success": True, "stream_id": stream_id, "manifest": mn}
 
     def ump_parts(self, stream_id: str) -> dict[str, Any]:
         with self._lock:
@@ -459,12 +483,138 @@ def ump_adapter(stream: MediaStream, data: bytes) -> None:
         assembler.handle(ptype, payload)
 
 
+def parse_hls_playlist(text: str, base_url: str = "") -> dict[str, Any]:
+    """Parseia uma playlist HLS (m3u8) e retorna segmentos e metadados."""
+    import os
+    from urllib.parse import urljoin
+
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    segments: list[dict[str, Any]] = []
+    target_duration: float | None = None
+    media_sequence: int = 0
+    is_master = False
+    variants: list[dict[str, str]] = []
+    current_duration: float | None = None
+    init_segment: str | None = None
+    for ln in lines:
+        if ln.startswith("#EXTM3U"):
+            continue
+        if ln.startswith("#EXT-X-STREAM-INF"):
+            is_master = True
+            variants.append({"attributes": ln.split(":", 1)[1] if ":" in ln else ""})
+            continue
+        if ln.startswith("#EXT-X-TARGETDURATION"):
+            try:
+                target_duration = float(ln.split(":", 1)[1])
+            except (ValueError, IndexError):
+                pass
+            continue
+        if ln.startswith("#EXT-X-MEDIA-SEQUENCE"):
+            try:
+                media_sequence = int(ln.split(":", 1)[1])
+            except (ValueError, IndexError):
+                pass
+            continue
+        if ln.startswith("#EXT-X-MAP"):
+            # INIT segment
+            for part in ln.split(","):
+                part = part.strip()
+                if part.startswith("URI="):
+                    init_segment = part.split("=", 1)[1].strip('"')
+            continue
+        if ln.startswith("#EXTINF"):
+            try:
+                current_duration = float(ln.split(":", 1)[1].split(",")[0])
+            except (ValueError, IndexError):
+                current_duration = None
+            continue
+        if ln.startswith("#"):
+            continue
+        # segment or variant URI
+        uri = ln
+        if base_url:
+            uri = urljoin(base_url + ("/" if not base_url.endswith("/") else ""), uri)
+        if is_master and variants and not segments:
+            # variant playlist entry
+            if variants:
+                variants[-1]["uri"] = uri
+        else:
+            segments.append({"uri": uri, "duration": current_duration, "sequence": media_sequence + len(segments)})
+            current_duration = None
+    if is_master:
+        return {"type": "master", "variants": variants, "segments": []}
+    return {
+        "type": "media",
+        "target_duration": target_duration,
+        "media_sequence": media_sequence,
+        "init_segment": init_segment,
+        "segments": segments,
+    }
+
+
+def parse_dash_manifest(text: str, base_url: str = "") -> dict[str, Any]:
+    """Parseia um manifesto DASH (MPD) e retorna períodos/representações/segmentos."""
+    import xml.etree.ElementTree as ET
+    from urllib.parse import urljoin
+
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return {"error": "mpd_parse_error"}
+    ns = {"mpd": "urn:mpeg:dash:schema:mpd:2011"}
+    # handle default namespace
+    if "}" in root.tag:
+        ns_uri = root.tag.split("}")[0].strip("{")
+        ns = {"mpd": ns_uri}
+    periods = []
+    for period in root.findall(".//{%s}Period" % ns["mpd"]):
+        pid = period.get("id")
+        adaptations = []
+        for aset in period.findall("{%s}AdaptationSet" % ns["mpd"]):
+            mime = aset.get("mimeType")
+            reps = []
+            for rep in aset.findall("{%s}Representation" % ns["mpd"]):
+                reps.append({
+                    "id": rep.get("id"),
+                    "bandwidth": rep.get("bandwidth"),
+                    "codecs": rep.get("codecs"),
+                    "width": rep.get("width"),
+                    "height": rep.get("height"),
+                })
+            # segment template
+            segtpl = aset.find("{%s}SegmentTemplate" % ns["mpd"])
+            template = None
+            if segtpl is not None:
+                template = {
+                    "media": segtpl.get("media"),
+                    "initialization": segtpl.get("initialization"),
+                    "timescale": segtpl.get("timescale"),
+                    "duration": segtpl.get("duration"),
+                    "startNumber": segtpl.get("startNumber"),
+                }
+            adaptations.append({"mimeType": mime, "representations": reps, "segmentTemplate": template})
+        periods.append({"id": pid, "adaptations": adaptations})
+    return {"type": "mpd", "periods": periods}
+
+
 def hls_adapter(stream: MediaStream, data: bytes) -> None:
-    return None
+    """Parseia playlist HLS e armazena metadados no stream."""
+    try:
+        text = data.decode("utf-8", errors="replace")
+    except Exception:
+        return
+    parsed = parse_hls_playlist(text, base_url=stream.url)
+    stream.hls_playlist = parsed  # type: ignore[attr-defined]
 
 
 def dash_adapter(stream: MediaStream, data: bytes) -> None:
-    return None
+    """Parseia manifesto DASH e armazena metadados no stream."""
+    try:
+        text = data.decode("utf-8", errors="replace")
+    except Exception:
+        return
+    parsed = parse_dash_manifest(text, base_url=stream.url)
+    stream.dash_manifest = parsed  # type: ignore[attr-defined]
 
 
 engine = MediaCaptureEngine()

@@ -517,6 +517,18 @@ def registrar_observabilidade_portas(mcp: Any, tracked_action: Any) -> None:
         return media_engine.ump_parts(stream_id)
 
     @mcp.tool()
+    @tracked_action("Consultando playlist HLS")
+    def portas_midia_hls(stream_id: str) -> dict[str, Any]:
+        """Retorna playlist HLS parseada de um stream."""
+        return media_engine.hls_playlist(stream_id)
+
+    @mcp.tool()
+    @tracked_action("Consultando manifesto DASH")
+    def portas_midia_dash(stream_id: str) -> dict[str, Any]:
+        """Retorna manifesto DASH parseado de um stream."""
+        return media_engine.dash_manifest(stream_id)
+
+    @mcp.tool()
     @tracked_action("Limpando streams de mídia")
     def portas_midia_limpar() -> dict[str, Any]:
         """Limpa streams de mídia capturados."""
