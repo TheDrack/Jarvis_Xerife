@@ -179,6 +179,7 @@ def test_git_profile_builds_structured_argv(_fake_powershell):
         "-c", "core.fsmonitor=false",
         "-c", "core.untrackedCache=false",
         "-c", f"core.hooksPath={os.devnull}",
+        "-c", f"core.sshCommand={os.devnull}",
         "-c", "diff.external=",
         "-c", "core.pager=cat",
         "-c", f"core.attributesFile={os.devnull}",
