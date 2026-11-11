@@ -899,6 +899,7 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
     environment["GIT_OPTIONAL_LOCKS"] = "0"
     environment["GIT_NO_REPLACE_OBJECTS"] = "1"
     environment["GIT_ATTR_NOSYSTEM"] = "1"
+    environment["GIT_NO_LAZY_FETCH"] = "1"
     environment["PYTHONUNBUFFERED"] = "1"
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     if extra:
@@ -906,17 +907,49 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
     return environment
 
 
-def _git_safety_overrides() -> tuple[str, ...]:
-    """Neutralize repository-local Git settings that can execute external programs.
+_REPOSITORY_EXECUTION_CONFIG = re.compile(
+    r"(?im)^\\s*(?:\\[\\s*(?:filter|include(?:if)?)\\b|"
+    r"(?:clean|smudge|process|command|textconv|sshCommand|worktree)\\s*=)"
+)
 
-    These command-line overrides take precedence over the untrusted repository
-    config. Environment-level system/global config is disabled separately.
-    Keep this list shared by every Git subprocess, including commit probes.
-    """
+
+def _repository_config_path(workdir: Path) -> Path | None:
+    """Locate repository-local config; reject linked-worktree pointers fail-closed."""
+    for directory in (workdir, *workdir.parents):
+        marker = directory / ".git"
+        try:
+            if marker.is_dir():
+                return marker / "config"
+            if marker.is_file():
+                raise ValueError("linked worktree metadata is not supported by the read-only Git profile")
+        except OSError as exc:
+            raise ValueError("repository metadata could not be inspected") from exc
+    return None
+
+
+def _reject_repository_execution_config(workdir: Path) -> None:
+    """Fail closed when local Git config can load includes or execute helpers."""
+    config_path = _repository_config_path(workdir)
+    if config_path is None:
+        return
+    try:
+        if config_path.stat().st_size > 256 * 1024:
+            raise ValueError("repository config exceeds inspection limit")
+        content = config_path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        raise ValueError("repository config could not be inspected") from exc
+    if _REPOSITORY_EXECUTION_CONFIG.search(content):
+        raise ValueError("repository config contains an executable helper or worktree override")
+
+
+def _git_safety_overrides(workdir: Path) -> tuple[str, ...]:
+    """Neutralize Git helpers and reject repository-local execution configuration."""
+    _reject_repository_execution_config(workdir)
     return (
         "-c", "core.fsmonitor=false",
         "-c", "core.untrackedCache=false",
         "-c", f"core.hooksPath={os.devnull}",
+        "-c", f"core.sshCommand={os.devnull}",
         "-c", "diff.external=",
         "-c", "core.pager=cat",
         "-c", f"core.attributesFile={os.devnull}",
@@ -931,7 +964,7 @@ def _require_commitish(ref: str, workdir: Path) -> None:
     try:
         probe = subprocess.run(
             [
-                "git", *_git_safety_overrides(),
+                "git", *_git_safety_overrides(workdir),
                 "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}",
             ],
             cwd=str(workdir),
@@ -1009,7 +1042,7 @@ def compile_command(
                     _require_commitish(value, workdir)
         argv = (
             "git",
-            *_git_safety_overrides(),
+            *_git_safety_overrides(workdir),
             "--no-pager",
             *(
                 (verb, "--no-ext-diff", "--no-textconv")
