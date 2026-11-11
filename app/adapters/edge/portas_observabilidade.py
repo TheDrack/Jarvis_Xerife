@@ -150,18 +150,13 @@ class BrowserTrafficObserver:
         explicit_types = tuple(value for value in (mime, content_type) if value)
         if any(value in _MEDIA_MANIFEST_MIME_TYPES for value in explicit_types):
             return False
-        if any(
+        # Only an actual media Content-Type may enter the raw byte channel.
+        # Generic octet-stream and page-controlled URL hints are intentionally
+        # excluded because they can describe sensitive non-media responses.
+        return any(
             value.startswith(_MEDIA_MIME_PREFIXES) or value in _MEDIA_MIME_TYPES
             for value in explicit_types
-        ):
-            return True
-
-        generic_mimes = {"application/octet-stream", "application/x-octet-stream", "binary/octet-stream"}
-        if any(value not in generic_mimes for value in explicit_types):
-            return False
-        # CDP's resource type is browser-derived. Unlike a query parameter, a
-        # page cannot promote an arbitrary XHR/JSON response by editing its URL.
-        return str(response.get("resourceType") or "").casefold() == "media"
+        )
 
     def _store_media_bytes(self, stream_id: str, payload: bytes, timestamp: float | None = None) -> int:
         """Armazena bytes sem transformação, em chunks base64 com orçamento global fixo."""
@@ -369,8 +364,7 @@ class BrowserTrafficObserver:
 
     async def _start_media_stream(self, session: Any, params: dict[str, Any]) -> None:
         response = params.get("response") or {}
-        classification = {**response, "resourceType": params.get("type")}
-        if not self._is_media_response(classification):
+        if not self._is_media_response(response):
             return
         request_id = str(params.get("requestId") or "")
         if not request_id:
