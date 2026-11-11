@@ -511,6 +511,12 @@ def registrar_observabilidade_portas(mcp: Any, tracked_action: Any) -> None:
         return media_engine.read_bytes(stream_id, max_bytes=max_bytes)
 
     @mcp.tool()
+    @tracked_action("Consultando partes UMP de mídia")
+    def portas_midia_ump(stream_id: str) -> dict[str, Any]:
+        """Retorna partes UMP parseadas de um stream (tipos, tamanhos, segmentos)."""
+        return media_engine.ump_parts(stream_id)
+
+    @mcp.tool()
     @tracked_action("Limpando streams de mídia")
     def portas_midia_limpar() -> dict[str, Any]:
         """Limpa streams de mídia capturados."""

@@ -1,4 +1,4 @@
-from app.adapters.edge.portas_midia import MediaCaptureEngine, is_media_request
+from app.adapters.edge.portas_midia import MediaCaptureEngine, is_media_request, UmpReader
 
 
 def test_is_media_request_detects_patterns():
@@ -36,6 +36,29 @@ def test_backpressure_truncates_stream():
     assert engine.append(sid, b"a" * 1024) is True
     assert engine.append(sid, b"x") is False
     assert engine.get(sid).truncated is True
+
+
+def test_ump_reader_parses_parts():
+    def varint(v):
+        return bytes([v])
+
+    buf = varint(20) + varint(3) + b"abc" + varint(21) + varint(4) + b"wxyz"
+    r = UmpReader()
+    parts = r.feed(buf)
+    assert len(parts) == 2
+    assert parts[0][0] == 20
+    assert parts[1][0] == 21
+
+
+def test_ump_reader_handles_split():
+    def varint(v):
+        return bytes([v])
+
+    buf = varint(20) + varint(3) + b"abc" + varint(21) + varint(4) + b"wxyz"
+    r = UmpReader()
+    p1 = r.feed(buf[:5])
+    p2 = r.feed(buf[5:])
+    assert len(p1) + len(p2) == 2
 
 
 def test_clear_resets():
