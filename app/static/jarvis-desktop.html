@@ -2357,11 +2357,19 @@ const safeCamUrl=value=>{
 };
 let liveTimer=null;
 function stopLiveTimer(){if(liveTimer){clearInterval(liveTimer);liveTimer=null;}}
+function normalizeYouTubeUrl(url){
+ if(!url)return url;
+ let m=url.match(/youtube\.com\/watch\?v=([\w-]+)/i)||url.match(/youtu\.be\/([\w-]+)/i)||url.match(/youtube\.com\/shorts\/([\w-]+)/i);
+ if(m)return 'https://www.youtube.com/embed/'+m[1];
+ m=url.match(/youtube\.com\/embed\/([\w-]+)/i);
+ if(m)return 'https://www.youtube.com/embed/'+m[1];
+ return url;
+}
 function liveInfo(mark){
  const record=mark&&(mark.record||mark.device)||{};
  const attrs=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
  const raw=mark&&mark.live&&mark.live.url?mark.live.url:(attrs.stream_url||record.stream_url||record.url||'');
- const url=safeCamUrl(raw);
+ const url=safeCamUrl(normalizeYouTubeUrl(raw));
  if(!url)return null;
  const streamable=['camera','radio_station'].includes(record.entity_type)||mark.kind==='camera'||Boolean(mark.live);
  if(!streamable)return null;
@@ -2374,6 +2382,7 @@ function liveInfo(mark){
   else type='iframe';
  }
  if(type==='mjpeg'||type==='snapshot')type='image';
+ if(/youtube\.com\/embed\//i.test(url))type='iframe';
  if(!['image','video','hls','iframe','audio','snapshot-api'].includes(type))type='iframe';
  return {url,type,label:mark.label||attrs.name||record.label||'CÂMERA',source:attrs.source||record.source_id||record.source||'FONTE'};
 }

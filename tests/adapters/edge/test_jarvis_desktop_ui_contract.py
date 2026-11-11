@@ -274,7 +274,7 @@ def test_geospatial_camera_and_radio_observations_use_the_existing_media_viewer(
     assert "liveInfo(state.selected)" in HTML
     assert "info.type==='audio'" in HTML
     assert "<audio controls autoplay src=" in HTML
-    assert "safeCamUrl(raw)" in HTML
+    assert "safeCamUrl(normalizeYouTubeUrl(raw))" in HTML
 
 
 def test_hud_reports_the_served_repository_file():
