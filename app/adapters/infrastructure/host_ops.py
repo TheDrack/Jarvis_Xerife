@@ -940,6 +940,8 @@ def _reject_repository_execution_config(workdir: Path) -> None:
                 continue
             if candidate.is_symlink():
                 raise ValueError("repository config must not be a symlink")
+            if not candidate.is_file():
+                raise ValueError("repository config must be a regular file")
             if candidate.stat().st_size > 256 * 1024:
                 raise ValueError("repository config exceeds inspection limit")
             content = candidate.read_text(encoding="utf-8", errors="replace")
