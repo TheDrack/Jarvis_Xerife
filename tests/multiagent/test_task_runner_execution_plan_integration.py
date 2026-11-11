@@ -38,7 +38,10 @@ def plan(tool="lookup", args=None):
     }
 
 
-def build_runner(monkeypatch, *, authorizer=None, capability=None, sink=None):
+def build_runner(
+    monkeypatch, *, authorizer=None, capability=None, sink=None,
+    plan_verifiers=None, required_plan_verifiers=None,
+):
     authorizer = authorizer or FakeAuthorizer()
     capability = capability or FakeCapability()
     def resolve(name):
@@ -50,8 +53,12 @@ def build_runner(monkeypatch, *, authorizer=None, capability=None, sink=None):
             return capability
         return None
     monkeypatch.setattr(task_runner_module.nexus, "resolve", resolve)
-    return TaskRunner(cache_dir=__import__("pathlib").Path("/tmp/jarvis-plan-integration-tests"),
-                      plan_event_sink=sink), capability
+    return TaskRunner(
+        cache_dir=__import__("pathlib").Path("/tmp/jarvis-plan-integration-tests"),
+        plan_event_sink=sink,
+        plan_verifiers=plan_verifiers,
+        required_plan_verifiers=required_plan_verifiers,
+    ), capability
 
 
 def test_task_runner_executes_plan_through_nexus_capability(monkeypatch):
@@ -96,3 +103,37 @@ def test_journal_failure_blocks_before_nexus_dispatch(monkeypatch):
     result = runner.execute_plan({"plan": plan()})
     assert result["status"] == "blocked"
     assert capability.calls == []
+
+
+
+def test_task_runner_exposes_host_configured_independent_verification(monkeypatch):
+    runner, capability = build_runner(
+        monkeypatch,
+        sink=lambda event: None,
+        plan_verifiers={"lookup": lambda _args, result: result["ok"] is True},
+        required_plan_verifiers={"lookup"},
+    )
+
+    result = runner.execute_plan({"plan": plan(), "user": "test-user"})
+
+    assert result["success"] is True
+    assert result["verification_status"] == "verified"
+    assert result["steps"][0]["verified"] is True
+    assert len(capability.calls) == 1
+
+
+def test_task_runner_does_not_report_success_when_postcondition_fails(monkeypatch):
+    runner, capability = build_runner(
+        monkeypatch,
+        sink=lambda event: None,
+        plan_verifiers={"lookup": lambda _args, _result: False},
+        required_plan_verifiers={"lookup"},
+    )
+
+    result = runner.execute_plan({"plan": plan(), "user": "test-user"})
+
+    assert result["success"] is False
+    assert result["status"] == "verification_failed"
+    assert result["verification_status"] == "failed"
+    assert result["steps"][0]["verified"] is False
+    assert len(capability.calls) == 1
