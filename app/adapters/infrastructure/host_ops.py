@@ -919,7 +919,11 @@ def _repository_config_path(workdir: Path) -> Path | None:
     for directory in (workdir, *workdir.parents):
         marker = directory / ".git"
         try:
+            if marker.is_symlink():
+                raise ValueError("repository metadata symlink is not supported")
             if marker.is_dir():
+                if (marker / "commondir").exists():
+                    raise ValueError("common Git directory pointers are not supported")
                 return marker / "config"
             if marker.is_file():
                 raise ValueError("linked worktree metadata is not supported by the read-only Git profile")
