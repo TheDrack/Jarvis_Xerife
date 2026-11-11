@@ -643,7 +643,7 @@ def test_git_profile_rejects_non_regular_repository_config(tmp_path, monkeypatch
     git_dir = tmp_path / ".git"
     git_dir.mkdir()
     config = git_dir / "config"
-    os.mkfifo(config)
+    config.mkdir()
 
     def forbidden_read(*_args, **_kwargs):
         pytest.fail("non-regular repository config must not be read")
