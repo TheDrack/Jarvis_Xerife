@@ -909,7 +909,8 @@ def _sanitized_environment(extra: Mapping[str, str] | None = None) -> dict[str, 
 
 _REPOSITORY_EXECUTION_CONFIG = re.compile(
     r"(?im)^\s*(?:\[\s*(?:filter|include(?:if)?)\b|"
-    r"(?:clean|smudge|process|command|textconv|sshCommand|worktree)\s*=)"
+    r"(?:clean|smudge|process|command|textconv|sshCommand|worktree)\s*=|"
+    r"\][ \t]*(?:clean|smudge|process|command|textconv|sshCommand|worktree)\s*=)"
 )
 
 
@@ -932,16 +933,22 @@ def _reject_repository_execution_config(workdir: Path) -> None:
     config_path = _repository_config_path(workdir)
     if config_path is None:
         return
-    try:
-        if config_path.stat().st_size > 256 * 1024:
-            raise ValueError("repository config exceeds inspection limit")
-        content = config_path.read_text(encoding="utf-8", errors="replace")
-        if "\ufeff" in content:
-            raise ValueError("repository config contains an unexpected BOM")
-    except OSError as exc:
-        raise ValueError("repository config could not be inspected") from exc
-    if _REPOSITORY_EXECUTION_CONFIG.search(content):
-        raise ValueError("repository config contains an executable helper or worktree override")
+    config_paths = (config_path, config_path.with_name("config.worktree"))
+    for candidate in config_paths:
+        try:
+            if not candidate.exists():
+                continue
+            if candidate.is_symlink():
+                raise ValueError("repository config must not be a symlink")
+            if candidate.stat().st_size > 256 * 1024:
+                raise ValueError("repository config exceeds inspection limit")
+            content = candidate.read_text(encoding="utf-8", errors="replace")
+            if "\ufeff" in content:
+                raise ValueError("repository config contains an unexpected BOM")
+        except OSError as exc:
+            raise ValueError("repository config could not be inspected") from exc
+        if _REPOSITORY_EXECUTION_CONFIG.search(content):
+            raise ValueError("repository config contains an executable helper or worktree override")
 
 
 def _git_safety_overrides(workdir: Path) -> tuple[str, ...]:
