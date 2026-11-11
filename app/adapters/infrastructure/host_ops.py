@@ -934,7 +934,7 @@ _REPOSITORY_EXECUTION_KEYS = frozenset(
 def _repository_config_has_execution_settings(content: str) -> bool:
     """Inspect Git config linearly; avoid regex backtracking on untrusted files."""
     for raw_line in content.splitlines():
-        line = raw_line.lstrip(" \\t")
+        line = raw_line.lstrip(" \t")
         if not line or line.startswith(("#", ";")):
             continue
         if line.startswith("["):
