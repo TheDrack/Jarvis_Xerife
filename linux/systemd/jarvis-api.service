@@ -8,6 +8,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=@REPO_ROOT@
 EnvironmentFile=@ENV_FILE@
+Environment=API_HOST=127.0.0.1
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=@PYTHON@ serve.py
