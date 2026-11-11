@@ -2469,7 +2469,8 @@ function openCamerasHtml(open){
   const media='<img alt="'+esc(cam.label)+'" src="'+esc(cam.safe)+'" data-cam="o'+index+'" data-src="'+esc(cam.safe)+'" data-refresh="'+esc(cam.refresh_seconds)+'" data-at="'+Date.now()+'" loading="lazy" onerror="this.dataset.failed=\'1\';this.alt=\'câmera indisponível nesta leitura\'">';
   const origin=cam.provider?String(cam.provider).toUpperCase():'';
   const lastImage=cam.live&&cam.live.last_frame_at?String(cam.live.last_frame_at):'';
-  return '<figure class="cam" data-open-camera="'+index+'" title="'+esc(cam.attribution||cam.provider)+'">'+media+'<figcaption><b>'+esc(cam.label)+'</b><small>'+esc(origin+(cam.distance_km!=null?' · '+num(cam.distance_km)+' KM':'')+(place?' · '+place:'')+(lastImage?' · ÚLT. IMAGEM '+lastImage:'')+' · '+String(cam.attribution||'')+' · '+String(cam.license||'licença não declarada'))+'</small></figcaption></figure>';
+  const liveBtn=cam.stream_url?'<button class="mini cam-live" type="button" data-cam-live-url="'+esc(cam.stream_url)+'">AO VIVO</button>':'';
+  return '<figure class="cam" data-open-camera="'+index+'" title="'+esc(cam.attribution||cam.provider)+'">'+media+'<figcaption><b>'+esc(cam.label)+'</b><small>'+esc(origin+(cam.distance_km!=null?' · '+num(cam.distance_km)+' KM':'')+(place?' · '+place:'')+(lastImage?' · ÚLT. IMAGEM '+lastImage:'')+' · '+String(cam.attribution||'')+' · '+String(cam.license||'licença não declarada'))+'</small>'+liveBtn+'</figcaption></figure>';
  }).join('');
  return html;
 }
@@ -3470,6 +3471,15 @@ document.addEventListener('keydown',ev=>{
    if(item){
     const attrs=item.attributes||{};
     const info=liveInfo({kind:'camera',label:attrs.name||item.entity_id,record:item,live:{url:attrs.stream_url,type:attrs.stream_type}});
+    if(info)openLiveMedia(info);
+   }
+   return;
+  }
+  const liveCamTarget=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-cam-live-url]'):null;
+  if(liveCamTarget){
+   const url=liveCamTarget.getAttribute('data-cam-live-url');
+   if(url){
+    const info=liveInfo({kind:'camera',label:'Câmera ao vivo',record:{attributes:{name:'Câmera ao vivo',source:'Windy',stream_url:url,stream_type:/\.m3u8(\?|$)/i.test(url)?'hls':(/\.(mp4|webm)(\?|$)/i.test(url)?'video':'iframe')}},live:{url:url}});
     if(info)openLiveMedia(info);
    }
    return;

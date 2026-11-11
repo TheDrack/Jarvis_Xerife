@@ -295,6 +295,7 @@ def _windy(latitude: float, longitude: float, radius_km: float, limit: int) -> d
                     "label": str(row.get("title") or "Windy webcam")[:80],
                     "url": url,
                     "kind": "snapshot" if preview else "iframe",
+                    "stream_url": live_url,
                     "refresh_seconds": 600,
                     "provider": "windy",
                     "latitude": cam_lat,
