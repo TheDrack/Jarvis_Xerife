@@ -528,7 +528,7 @@ def test_redaction_covers_common_provider_secrets_and_connection_urls():
 
 
 def test_command_output_with_private_key_material_is_withheld(monkeypatch):
-    private_key = "PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAKCAQEA\\n-----END RSA PRIVATE KEY-----"
+    private_key = "PRIVATE_KEY=-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA\n-----END RSA PRIVATE KEY-----"
     monkeypatch.setattr(ops, "_spawn", _stub_spawn(stdout=private_key, stderr=private_key))
 
     result = ops.run_host_command("git", "status", [])
@@ -562,11 +562,11 @@ def test_git_profile_disables_repository_config_execution_surfaces():
 @pytest.mark.parametrize(
     "config",
     [
-        '[filter "evil"]\\n    clean = cmd /c whoami\\n',
-        '[core]\\n    sshCommand = cmd /c whoami\\n',
-        '[core]\\n    worktree = C:/outside\\n',
-        '[include]\\n    path = C:/outside/config\\n',
-        '[diff "evil"]\\n    textconv = cmd /c whoami\\n',
+        '[filter "evil"]\n    clean = cmd /c whoami\n',
+        '[core]\n    sshCommand = cmd /c whoami\n',
+        '[core]\n    worktree = C:/outside\n',
+        '[include]\n    path = C:/outside/config\n',
+        '[diff "evil"]\n    textconv = cmd /c whoami\n',
     ],
 )
 def test_git_profile_rejects_repository_config_with_execution_or_worktree_overrides(tmp_path, config):
@@ -580,7 +580,7 @@ def test_git_profile_rejects_repository_config_with_execution_or_worktree_overri
 def test_git_profile_allows_inert_repository_config(tmp_path):
     (tmp_path / ".git").mkdir()
     (tmp_path / ".git" / "config").write_text(
-        '[core]\\n    repositoryformatversion = 0\\n    filemode = true\\n',
+        '[core]\n    repositoryformatversion = 0\n    filemode = true\n',
         encoding="utf-8",
     )
 
@@ -596,7 +596,7 @@ def test_git_commit_probe_uses_the_same_safety_overrides(monkeypatch):
 
     def fake_run(argv, **kwargs):
         captured["argv"] = list(argv)
-        return subprocess.CompletedProcess(argv, 0, stdout="abc123\\n", stderr="")
+        return subprocess.CompletedProcess(argv, 0, stdout="abc123\n", stderr="")
 
     monkeypatch.setattr(ops.subprocess, "run", fake_run)
     ops._require_commitish("HEAD", ops._repository_root())
@@ -635,9 +635,9 @@ def test_read_blocks_additional_credential_store_names(_sandbox, name):
 @pytest.mark.parametrize(
     "private_material",
     [
-        "-----BEGIN PGP PRIVATE KEY BLOCK-----\\nprivate-data\\n-----END PGP PRIVATE KEY BLOCK-----",
-        "PuTTY-User-Key-File-2: ssh-ed25519\\nPrivate-Lines: 1\\nprivate-data",
-        "-----BEGIN OpenVPN Static key V1-----\\nprivate-data\\n-----END OpenVPN Static key V1-----",
+        "-----BEGIN PGP PRIVATE KEY BLOCK-----\nprivate-data\n-----END PGP PRIVATE KEY BLOCK-----",
+        "PuTTY-User-Key-File-2: ssh-ed25519\nPrivate-Lines: 1\nprivate-data",
+        "-----BEGIN OpenVPN Static key V1-----\nprivate-data\n-----END OpenVPN Static key V1-----",
     ],
 )
 def test_read_blocks_non_pem_private_key_formats(_sandbox, private_material):
@@ -1081,7 +1081,7 @@ def test_spawn_caps_child_output_and_discards_partial_secret_line(_sandbox):
     command = [
         sys.executable,
         "-c",
-        "import sys; sys.stdout.write('safe\\nPASSWORD=' + chr(34) + 'x' * 1000000); sys.stderr.write('y' * 1000000)",
+        "import sys; sys.stdout.write('safe\nPASSWORD=' + chr(34) + 'x' * 1000000); sys.stderr.write('y' * 1000000)",
     ]
 
     completed = ops._spawn(command, _sandbox, ops._sanitized_environment(), 10)
