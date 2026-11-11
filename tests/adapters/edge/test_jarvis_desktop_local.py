@@ -1279,6 +1279,37 @@ def test_earthquake_radii_are_an_explicit_estimate():
     assert earthquake_radii(42) is None
 
 
+def test_forward_geocode_endpoint_uses_shared_helper(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    calls = []
+    monkeypatch.setattr(
+        desktop_local,
+        "forward_place",
+        lambda query: (
+            calls.append(query)
+            or {
+                "available": True,
+                "latitude": -25.4284,
+                "longitude": -49.2733,
+                "display_name": "Curitiba, Paraná, Brasil",
+            }
+        ),
+    )
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    token = client.get("/api/bootstrap").json()["local_token"]
+    response = client.get(
+        "/api/geocode?q=Curitiba",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["lat"] == pytest.approx(-25.4284)
+    assert calls == ["Curitiba"]
+
+
 def test_reverse_geocode_endpoint_returns_label_and_full_address(monkeypatch):
     import app.adapters.edge.jarvis_desktop_local as desktop_local
 
