@@ -94,6 +94,10 @@ logs/
 jarvis.db
 jarvis_graph.sqlite
 jarvis_graph.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
 jarvis_graph.sqlite-wal
 jarvis_graph.sqlite-shm
 
