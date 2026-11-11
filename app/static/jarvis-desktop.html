@@ -336,27 +336,27 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
   <div class="hud-actions">
    <span class="layer-group" title="Camadas de observação"><button class="layer-group-label layer-group-toggle on" type="button" data-group="obs" aria-pressed="true" title="Ativar/desativar grupo OBS">OBS</button>
    <button class="layer-chip on" type="button" data-layer="satellite" aria-pressed="true" title="Satélites">SAT</button>
-   <button class="layer-chip on" type="button" data-layer="aircraft" aria-pressed="true" title="Aeronaves">AIR</button>
-   <button class="layer-chip on" type="button" data-layer="vessel" aria-pressed="true" title="Embarcações">SEA</button>
-   <button class="layer-chip on" type="button" data-layer="fire" aria-pressed="true" title="Focos de incêndio">FIRE</button>
+   <button class="layer-chip on" type="button" data-layer="aircraft" aria-pressed="true" title="Aeronaves">AER</button>
+   <button class="layer-chip on" type="button" data-layer="vessel" aria-pressed="true" title="Embarcações">MAR</button>
+   <button class="layer-chip on" type="button" data-layer="fire" aria-pressed="true" title="Focos de incêndio">FOGO</button>
    </span>
-   <span class="layer-group" title="Clima e tempestades"><button class="layer-group-label layer-group-toggle on" type="button" data-group="wx" aria-pressed="true" title="Ativar/desativar grupo WX">WX</button>
-   <button class="layer-chip on" type="button" data-layer="quake" aria-pressed="true" title="Sismos">QUAKE</button>
-   <button class="layer-chip on" type="button" data-layer="storm" aria-pressed="true" title="Clima severo e tempestades">STORM</button>
+   <span class="layer-group" title="Clima e tempestades"><button class="layer-group-label layer-group-toggle on" type="button" data-group="wx" aria-pressed="true" title="Ativar/desativar grupo CLIMA">CLIMA</button>
+   <button class="layer-chip on" type="button" data-layer="quake" aria-pressed="true" title="Sismos">SISMO</button>
+   <button class="layer-chip on" type="button" data-layer="storm" aria-pressed="true" title="Clima severo e tempestades">TEMP</button>
    <button class="layer-chip" type="button" data-layer="radar" aria-pressed="false" title="Radar de precipitação (RainViewer)">RADAR</button>
-   <button class="layer-chip" type="button" data-layer="weatherAnim" aria-pressed="false" title="Animação de clima (massas de ar, vento, chuva, sol)">WX</button>
-   <button class="layer-chip on wx-sub" type="button" data-wxsub="tornado" aria-pressed="true" title="Tornados">TOR</button>
-   <button class="layer-chip on wx-sub" type="button" data-wxsub="hurricane" aria-pressed="true" title="Furacões e ciclones">CYC</button>
-   <button class="layer-chip on wx-sub" type="button" data-wxsub="flood" aria-pressed="true" title="Enchentes e inundações">FLD</button>
-   <button class="layer-chip on wx-sub" type="button" data-wxsub="thunder" aria-pressed="true" title="Tempestades e raios">TRW</button>
-   <button class="layer-chip on wx-sub" type="button" data-wxsub="hail" aria-pressed="true" title="Granizo">HAIL</button>
+   <button class="layer-chip" type="button" data-layer="weatherAnim" aria-pressed="false" title="Animação de clima (massas de ar, vento, chuva, sol)">ANIM</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="tornado" aria-pressed="true" title="Tornados">TORN</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="hurricane" aria-pressed="true" title="Furacões e ciclones">CICL</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="flood" aria-pressed="true" title="Enchentes e inundações">ENCH</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="thunder" aria-pressed="true" title="Tempestades e raios">RAIO</button>
+   <button class="layer-chip on wx-sub" type="button" data-wxsub="hail" aria-pressed="true" title="Granizo">GRAN</button>
    <button class="layer-chip on wx-sub" type="button" data-wxsub="severe" aria-pressed="true" title="Clima severo geral">SEV</button>
    </span>
    <span class="layer-group" title="Infraestrutura e mídia"><button class="layer-group-label layer-group-toggle on" type="button" data-group="infra" aria-pressed="true" title="Ativar/desativar grupo INFRA">INFRA</button>
-   <button class="layer-chip on" type="button" data-layer="camera" aria-pressed="true" title="Câmeras">CAM</button>
-   <button class="layer-chip on" type="button" data-layer="device" aria-pressed="true" title="Dispositivos">DEV</button>
-   <button class="layer-chip on" type="button" data-layer="installation" aria-pressed="true" title="Instalações e infraestrutura">SITE</button>
-   <button class="layer-chip on" type="button" data-layer="radio_station" aria-pressed="true" title="Estações de rádio">RAD</button>
+   <button class="layer-chip on" type="button" data-layer="camera" aria-pressed="true" title="Câmeras">CAMS</button>
+   <button class="layer-chip on" type="button" data-layer="device" aria-pressed="true" title="Dispositivos">DISP</button>
+   <button class="layer-chip on" type="button" data-layer="installation" aria-pressed="true" title="Instalações e infraestrutura">INST</button>
+   <button class="layer-chip on" type="button" data-layer="radio_station" aria-pressed="true" title="Estações de rádio">RÁDIO</button>
    </span>
    <button class="icon-btn" id="fullscreenToggle" type="button" aria-label="Ativar tela cheia" title="Tela cheia (F11)">⛶</button>
   </div>
@@ -366,6 +366,10 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
   <div class="center">
    <div class="status"><div class="rules"><i></i>◈<i></i></div><b id="statusLabel" role="status" aria-live="polite">STANDBY</b><small id="statusDetail">NÚCLEO LOCAL · AGUARDANDO PRIMEIRA LEITURA</small></div>
    <div class="globe-wrap"><div class="reactor" aria-hidden="true"><i class="r2"></i><i class="r1"></i><i class="sweep"></i><i class="r3"></i></div><canvas id="globe" aria-label="Globo de eventos, observações, câmeras, dispositivos e agrupamentos por proximidade"></canvas><div class="reticle"></div><section class="selection-inspector" id="selectionInspector" hidden aria-live="polite"><button class="mini selection-close" id="selectionClose" type="button" aria-label="Fechar descrição" title="Fechar descrição">×</button><div class="selection-kicker">SELEÇÃO ATIVA <span id="selectionKind">—</span></div><strong id="selectionTitle">—</strong><small id="selectionDetail">—</small><p id="selectionSummary" class="selection-summary"></p><div id="selectionFacts" class="selection-facts"></div><div class="selection-actions"><a class="mini" id="selectionSource" hidden target="_blank" rel="noopener noreferrer">ABRIR FONTE ↗</a><button class="mini" id="selectionLive" type="button" hidden>AO VIVO</button><button class="mini" id="selectionAction" type="button">FOCAR</button></div></section><div class="globe-zoom" id="zoomLevel">100%</div><div class="globe-tools"><div class="globe-pan" role="group" aria-label="Mover o globo"><button type="button" data-pan="up" aria-label="Mover para norte">↑</button><div><button type="button" data-pan="left" aria-label="Mover para oeste">←</button><button type="button" data-pan="down" aria-label="Mover para sul">↓</button><button type="button" data-pan="right" aria-label="Mover para leste">→</button></div></div><button type="button" id="zoomIn" aria-label="Aproximar o globo" title="Aproximar">+</button><button type="button" id="zoomOut" aria-label="Afastar o globo" title="Afastar">−</button><button type="button" id="zoomReset" aria-label="Recentralizar o globo" title="Recentralizar">⤢</button></div><div class="globe-hint">arraste · scroll/pinça para zoom · clique no agrupamento aproxima</div></div>
+   <div class="location-search" role="search" style="display:flex;gap:6px;align-items:center;margin:6px 0 4px 0">
+    <input id="locationSearch" type="search" placeholder="Buscar local ou lat,lon" aria-label="Buscar localização no globo" style="flex:1;min-width:120px;padding:4px 8px;font-size:var(--fs-xs);background:rgba(6,17,31,.8);border:1px solid var(--line);color:var(--text);border-radius:2px">
+    <button type="button" id="locationSearchBtn" aria-label="Buscar localização" title="Buscar" style="padding:4px 8px;font-size:var(--fs-xs)">Ir</button>
+   </div>
    <nav class="areas" id="areaBar" aria-label="Focar uma área no globo"></nav>
    <nav class="dock" aria-label="Seções">
     <div class="dock-group" role="group" aria-label="Inteligência">
@@ -2101,6 +2105,21 @@ async function refreshWeather(){
  const lon=loc?loc.longitude:(state.location&&state.location.longitude)||-47.9;
  await fetchWeatherPoint(lat,lon);
 }
+async function searchLocation(){
+ const input=$('locationSearch');
+ const q=(input&&input.value?input.value:'').trim();
+ if(!q)return;
+ const res=await api('/api/geocode?q='+encodeURIComponent(q));
+ if(res&&res.success&&Number.isFinite(res.lat)&&Number.isFinite(res.lon)){
+  Globe.focusTo(res.lat,res.lon,3);
+  await fetchWeatherPoint(res.lat,res.lon);
+  if(state.layers.weatherAnim)buildWxGridFromPoint(state.weatherPoint);
+  renderWeatherPanel();
+  if(input)input.value=res.label||q;
+ }else{
+  if(input){ input.style.borderColor='var(--danger,#ff6b6b)'; setTimeout(()=>{input.style.borderColor='';},1200); }
+ }
+}
 function spark(el,values,max){
  if(!el)return;
  const data=values.slice(-40);
@@ -3431,6 +3450,8 @@ document.addEventListener('keydown',ev=>{
  $('intelWindow').addEventListener('click',ev=>{if(ev.target===$('intelWindow'))closeWindow('intelWindow');});
  $('pairButton').addEventListener('click',pair);
  $('pairCode').addEventListener('keydown',ev=>{if(ev.key==='Enter')pair();});
+ if($('locationSearchBtn'))$('locationSearchBtn').addEventListener('click',searchLocation);
+ if($('locationSearch'))$('locationSearch').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();searchLocation();}});
  fullscreenButton.addEventListener('click',toggleFullscreen);
  document.addEventListener('fullscreenchange',()=>syncFullscreenControl(Boolean(document.fullscreenElement)));
  document.addEventListener('keydown',ev=>{

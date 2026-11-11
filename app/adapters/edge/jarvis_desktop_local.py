@@ -1178,6 +1178,41 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         cached[cache_key] = (_t.time(), result)
         return result
 
+    @app.get("/api/geocode")
+    async def geocode(
+        q: str,
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Forward geocode a place name or coordinates (Nominatim, free)."""
+        import re as _re
+        text = (q or "").strip()
+        if not text:
+            return {"success": False, "error": "empty_query"}
+        m = _re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$", text)
+        if m:
+            lat = float(m.group(1))
+            lon = float(m.group(2))
+            return {"success": True, "lat": lat, "lon": lon, "label": f"{lat:.4f}, {lon:.4f}"}
+        try:
+            async with httpx.AsyncClient(timeout=12.0, headers={"User-Agent": "Jarvis/1.0"}) as client:
+                resp = await client.get(
+                    "https://nominatim.openstreetmap.org/search",
+                    params={"q": text, "format": "json", "limit": 1},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+            if isinstance(data, list) and data:
+                r = data[0]
+                return {
+                    "success": True,
+                    "lat": float(r.get("lat")),
+                    "lon": float(r.get("lon")),
+                    "label": r.get("display_name") or text,
+                }
+        except Exception as exc:
+            logger.warning("Geocode failed (%s)", type(exc).__name__)
+        return {"success": False, "error": "not_found", "query": text}
+
     @app.get("/api/weather/grid")
     async def weather_grid(
         lat: float, lon: float, radius: float = 8.0,
