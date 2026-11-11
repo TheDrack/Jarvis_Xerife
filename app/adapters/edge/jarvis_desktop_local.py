@@ -140,6 +140,9 @@ def _load_local_intelligence_config(path: Path | None = None) -> int:
     """Load allowlisted local source settings without overriding process env."""
     if path is None:
         candidates: list[Path] = []
+        explicit_path = os.getenv("JARVIS_INTELLIGENCE_ENV")
+        if explicit_path:
+            candidates.append(Path(explicit_path).expanduser())
         env_local = os.getenv("LOCALAPPDATA")
         if env_local:
             candidates.append(Path(env_local) / "Jarvis_Xerife" / "intelligence.env")
