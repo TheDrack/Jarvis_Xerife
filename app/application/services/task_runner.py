@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from app.core.nexus import nexus, NexusComponent
 from app.domain.models.mission import Mission, MissionResult
@@ -52,6 +52,8 @@ class TaskRunner(NexusComponent):
         sandbox_mode: bool = False,
         budget_cap_usd: Optional[float] = None,
         plan_event_sink=None,
+        plan_verifiers: Optional[Mapping[str, Callable[[Mapping[str, Any], Any], bool]]] = None,
+        required_plan_verifiers: Optional[set[str]] = None,
     ):
         super().__init__()
         self.cache_dir: Path = Path(cache_dir) if cache_dir else Path(tempfile.gettempdir()) / "task_runner_cache"
@@ -72,6 +74,9 @@ class TaskRunner(NexusComponent):
             except Exception as exc:
                 logger.warning("Durable plan journal unavailable; declarative plans remain blocked: %s", type(exc).__name__)
         self._plan_event_sink = plan_event_sink
+        # Verifiers are trusted host configuration; plans cannot register or replace them.
+        self._plan_verifiers = dict(plan_verifiers or {})
+        self._required_plan_verifiers = frozenset(required_plan_verifiers or ())
         self.total_cost_usd: float = 0.0
         self._mission_costs: Dict[str, float] = {}
 
@@ -259,6 +264,8 @@ class TaskRunner(NexusComponent):
             executors,
             policy,
             event_sink=self._plan_event_sink,
+            verifiers=self._plan_verifiers,
+            required_verifiers=self._required_plan_verifiers,
         )
         outcome = interpreter.execute(plan)
         return {"success": outcome.status == "completed", **outcome.to_dict()}
