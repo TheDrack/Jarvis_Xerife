@@ -364,6 +364,51 @@ def test_reverse_geocode_rate_limit_uses_retry_after_without_caching_failure(mon
     client.close()
 
 
+def test_forward_geocode_respects_opt_out(monkeypatch):
+    monkeypatch.setenv("JARVIS_BRIEFING_GEOCODE", "off")
+    calls = []
+    _mock_client(monkeypatch, lambda request: calls.append(str(request.url)))
+    result = briefing.forward_place("Curitiba")
+
+    assert result == {"available": False, "reason": "disabled"}
+    assert calls == []
+
+
+def test_forward_geocode_shares_nominatim_cooldown(monkeypatch):
+    clock = [100.0]
+    calls = []
+    monkeypatch.setattr(briefing.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(
+        briefing.time,
+        "sleep",
+        lambda seconds: clock.__setitem__(0, clock[0] + seconds),
+    )
+    monkeypatch.setattr(briefing, "_GEOCODE_CLOCK", [0.0])
+    monkeypatch.setattr(briefing, "_GEOCODE_COOLDOWN_UNTIL", 0.0)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        if len(calls) == 1:
+            return httpx.Response(429, text="slow down", headers={"Retry-After": "2"})
+        return httpx.Response(
+            200,
+            json=[{"lat": "-25.4284", "lon": "-49.2733", "display_name": "Curitiba"}],
+        )
+
+    _mock_client(monkeypatch, handler)
+    first = briefing.forward_place("Curitiba")
+    second = briefing.forward_place("Curitiba")
+    assert first["reason"] == "http_429"
+    assert second["reason"] == "http_429"
+    assert len(calls) == 1
+
+    clock[0] += 2.1
+    third = briefing.forward_place("Curitiba")
+    assert third["available"] is True
+    assert third["latitude"] == pytest.approx(-25.4284)
+    assert len(calls) == 2
+
+
 def test_reverse_geocode_cache_uses_street_level_coordinate_precision(monkeypatch):
     calls = []
     monkeypatch.setattr(briefing.time, "sleep", lambda _seconds: None)
