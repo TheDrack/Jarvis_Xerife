@@ -122,7 +122,7 @@ if [ ! -f "$ENV_FILE" ]; then
     log "criando $ENV_FILE (0600) — preencha as chaves depois"
     mkdir -p "$(dirname "$ENV_FILE")"
     umask 077
-    cat > "$ENV_FILE" <<'ENVEOF'
+    cat > "$ENV_FILE" <<ENVEOF
 # Jarvis — variáveis de ambiente locais. Nunca versione este arquivo.
 # Chaves de provedores (deixe vazio para desabilitar):
 # OPENAI_API_KEY=
@@ -140,17 +140,17 @@ LANGUAGE=pt-BR
 WAKE_WORD=xerife
 
 # Bancos locais
-JARVIS_DEVICES_DB=$HOME/.local/share/jarvis/jarvis.db
-JARVIS_GEOINT_DB=$HOME/.local/share/jarvis/geoint.sqlite
-JARVIS_GRAPH_DB=$HOME/.local/share/jarvis/jarvis_graph.sqlite
+JARVIS_DEVICES_DB="$HOME/.local/share/jarvis/jarvis.db"
+JARVIS_GEOINT_DB="$HOME/.local/share/jarvis/geoint.sqlite"
+JARVIS_GRAPH_DB="$HOME/.local/share/jarvis/jarvis_graph.sqlite"
 
 # MCP (loopback; publique via Tailscale Serve, nunca em 0.0.0.0)
 JARVIS_DESKTOP_HTTP_PORT=8765
 ENVEOF
-    chmod 600 "$ENV_FILE"
 else
     log "mantendo $ENV_FILE existente"
 fi
+chmod 600 "$ENV_FILE"
 mkdir -p "$HOME/.local/share/jarvis"
 
 log "instalando units systemd de usuário em $UNIT_DIR"
