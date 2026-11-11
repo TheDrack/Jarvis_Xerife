@@ -2448,9 +2448,11 @@ function openCamerasHtml(open){
   return html;
  }
  html+=cameras.map((cam,index)=>{
-  const place=cam.place?[cam.place.city,cam.place.country].filter(Boolean).join(' · '):'';
-  const media='<img alt="'+esc(cam.label)+'" src="'+esc(cam.safe)+'" data-cam="o'+index+'" data-src="'+esc(cam.safe)+'" data-refresh="'+esc(cam.refresh_seconds)+'" data-at="'+Date.now()+'" loading="lazy">';
-  return '<figure class="cam" data-open-camera="'+index+'" title="'+esc(cam.attribution||cam.provider)+'">'+media+'<figcaption><b>'+esc(cam.label)+'</b><small>'+esc(String(cam.provider).toUpperCase()+' · '+num(cam.distance_km)+' KM'+(place?' · '+place:'')+' · '+String(cam.attribution||'')+' · '+String(cam.license||'licença não declarada'))+'</small></figcaption></figure>';
+  const place=cam.place?[cam.place.city,cam.place.state,cam.place.country].filter(Boolean).join(' · '):'';
+  const media='<img alt="'+esc(cam.label)+'" src="'+esc(cam.safe)+'" data-cam="o'+index+'" data-src="'+esc(cam.safe)+'" data-refresh="'+esc(cam.refresh_seconds)+'" data-at="'+Date.now()+'" loading="lazy" onerror="this.dataset.failed=\'1\';this.alt=\'câmera indisponível nesta leitura\'">';
+  const origin=cam.provider?String(cam.provider).toUpperCase():'';
+  const lastImage=cam.live&&cam.live.last_frame_at?String(cam.live.last_frame_at):'';
+  return '<figure class="cam" data-open-camera="'+index+'" title="'+esc(cam.attribution||cam.provider)+'">'+media+'<figcaption><b>'+esc(cam.label)+'</b><small>'+esc(origin+(cam.distance_km!=null?' · '+num(cam.distance_km)+' KM':'')+(place?' · '+place:'')+(lastImage?' · ÚLT. IMAGEM '+lastImage:'')+' · '+String(cam.attribution||'')+' · '+String(cam.license||'licença não declarada'))+'</small></figcaption></figure>';
  }).join('');
  return html;
 }
