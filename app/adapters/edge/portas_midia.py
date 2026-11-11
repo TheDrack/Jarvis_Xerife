@@ -129,6 +129,11 @@ class MediaCaptureEngine:
         self._next_chunk: dict[str, int] = {}
         self._adapters: dict[str, Callable[[MediaStream, bytes], None]] = {}
         self._enabled = False
+        # default adapters
+        self._adapters["ump"] = ump_adapter
+        self._adapters["hls"] = hls_adapter
+        self._adapters["dash"] = dash_adapter
+        self._adapters["raw"] = lambda s, d: None
 
     # ------------------------------------------------------------------ #
     # Lifecycle
