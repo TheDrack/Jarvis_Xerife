@@ -1957,6 +1957,7 @@ def test_nhc_storms_are_collected_independently_with_official_coordinate_fields(
             assert event.location.latitude == pytest.approx(20.5)
             assert event.location.longitude == pytest.approx(-60.2)
             assert event.evidence.source_name == "NHC"
+            assert "movement=280° @ 12 mph" in event.summary
             assert any(
                 source.source_id == "nhc_storms" and source.available
                 for source in batch.sources

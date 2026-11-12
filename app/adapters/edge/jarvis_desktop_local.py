@@ -1039,7 +1039,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                             if pressure is not None:
                                 details.append(f"pressure={pressure} mb")
                             if movement_dir is not None and movement_speed is not None:
-                                details.append(f"movement={movement_dir}° @ {movement_speed} kt")
+                                details.append(f"movement={movement_dir}° @ {movement_speed} mph")
                             last_update = storm.get("lastUpdate")
                             observed = None
                             if isinstance(last_update, str):
