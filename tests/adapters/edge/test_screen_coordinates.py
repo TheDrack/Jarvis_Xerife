@@ -1,6 +1,6 @@
 import pytest
 
-from app.adapters.edge.screen_coordinates import normalized_to_screen_point
+from app.adapters.edge.screen_coordinates import normalized_to_screen_point, screen_dimensions_match
 
 
 @pytest.mark.parametrize(
@@ -38,3 +38,18 @@ def test_normalized_point_rejects_invalid_ratios_and_dimensions(
 ):
     with pytest.raises(ValueError):
         normalized_to_screen_point(x_ratio, y_ratio, *screen_size)
+
+
+@pytest.mark.parametrize(
+    ("screenshot_size", "input_size", "expected"),
+    [
+        ((1920, 1080), (1920, 1080), True),
+        ((1648, 928), (1920, 1080), False),
+        ((1920, 1080), (1536, 864), False),
+        ((0, 1080), (0, 1080), False),
+    ],
+)
+def test_capture_and_pointer_dimensions_must_match(
+    screenshot_size, input_size, expected
+):
+    assert screen_dimensions_match(screenshot_size, input_size) is expected
