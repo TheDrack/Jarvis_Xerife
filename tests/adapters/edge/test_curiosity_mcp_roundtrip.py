@@ -3,6 +3,12 @@
 import json
 
 import pytest
+
+pytest.importorskip(
+    "mcp",
+    reason="The MCP SDK is installed by the Windows edge integration test workflow.",
+)
+
 from mcp.shared.memory import create_connected_server_and_client_session
 
 from app.adapters.edge import jarvis_desktop_mcp
