@@ -430,9 +430,10 @@ def click_at_normalized(
 
     This is invariant to screenshot display scaling: x_ratio/y_ratio are fractions
     of the image, not pixel coordinates. The server maps them to the live capture.
-    Windows DPI awareness is requested before PyAutoGUI initializes. If screenshot
-    and pointer API dimensions disagree, the action fails closed rather than clicking
-    a potentially incorrect location. Observe immediately before calling.
+    Windows DPI awareness is requested before PyAutoGUI initializes. The normalized
+    point is mapped into the pointer API's pixel dimensions; incompatible aspect
+    ratios fail closed because they may indicate a crop or another display region.
+    Ratios must refer to the complete, uncropped screenshot. Observe immediately before calling.
     """
     if not user_confirmed:
         return [{
@@ -454,7 +455,9 @@ def click_at_normalized(
             "detail": str(exc),
             **navigator._save_observation(screenshot),
         })
-    if not screen_coordinate_spaces_compatible((screenshot.width, screenshot.height), (input_width, input_height)):
+    if not screen_coordinate_spaces_compatible(
+        (screenshot.width, screenshot.height), (input_width, input_height)
+    ):
         return _content({
             "success": False,
             "status": "coordinate_space_mismatch",
