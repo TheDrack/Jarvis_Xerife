@@ -23,6 +23,7 @@ from mcp.server.fastmcp import FastMCP, Image
 from mcp.types import TextContent
 
 from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
+from app.adapters.edge.screen_coordinates import normalized_to_screen_point
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
 from app.core.nexus import nexus
@@ -66,7 +67,7 @@ mcp = FastMCP(
         "When reconnecting after an absence, use reconnection_briefing for recent discoveries, verified changes, "
         "pull requests, and test status. Check live sources before supplying PR/workflow states and distinguish "
         "ideas from implemented/tested work. Always observe before acting, prefer accessibility elements or image "
-        "templates over raw coordinates, perform one action at a time, and verify the post-action "
+        "templates over raw coordinates; when visual coordinates are needed, use click_at_normalized with 0..1 image ratios instead of pixel coordinates, perform one action at a time, and verify the post-action "
         "state. Preserve existing behavior, test changes, and never claim success without evidence."
     ),
 )
@@ -391,7 +392,7 @@ def click_at(
     target_description: str,
     user_confirmed: bool,
 ) -> list[Any]:
-    """One-off coordinate fallback; use only after observing and with explicit user approval."""
+    """Legacy pixel-coordinate fallback; use click_at_normalized for scaled screenshots."""
     if not user_confirmed:
         return [{
             "success": False,
@@ -414,6 +415,78 @@ def click_at(
         "target_description": target_description,
         "x": x,
         "y": y,
+    }))
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Clique por coordenadas normalizadas")
+def click_at_normalized(
+    x_ratio: float,
+    y_ratio: float,
+    target_description: str,
+    user_confirmed: bool,
+) -> list[Any]:
+    """Click a point expressed as ratios of the latest full-screen image (0.0..1.0).
+
+    This is invariant to screenshot display scaling: x_ratio/y_ratio are fractions
+    of the image, not pixel coordinates. The server maps them to the live capture.
+    Windows DPI awareness is requested before PyAutoGUI initializes. If screenshot
+    and pointer API dimensions disagree, the action fails closed rather than clicking
+    a potentially incorrect location. Observe immediately before calling.
+    """
+    if not user_confirmed:
+        return [{
+            "success": False,
+            "status": "confirmation_required",
+            "message": "Peça autorização explícita para o clique por coordenadas.",
+        }]
+    screenshot = navigator._capture()
+    gui = navigator._gui()
+    try:
+        input_size = gui.size()
+        input_width, input_height = int(input_size.width), int(input_size.height)
+    except Exception as exc:
+        return _content({
+            "success": False,
+            "status": "input_dimensions_unavailable",
+            "target_description": target_description,
+            "message": "Não foi possível confirmar as dimensões do sistema de entrada; clique não executado.",
+            "detail": str(exc),
+            **navigator._save_observation(screenshot),
+        })
+    if (input_width, input_height) != (screenshot.width, screenshot.height):
+        return _content({
+            "success": False,
+            "status": "coordinate_space_mismatch",
+            "target_description": target_description,
+            "screenshot_size": [screenshot.width, screenshot.height],
+            "input_size": [input_width, input_height],
+            "message": "A captura e a API de mouse usam dimensões diferentes; clique bloqueado para evitar atingir outro controle.",
+            **navigator._save_observation(screenshot),
+        })
+    try:
+        x, y = normalized_to_screen_point(
+            x_ratio, y_ratio, screenshot.width, screenshot.height
+        )
+    except (TypeError, ValueError) as exc:
+        return [{
+            "success": False,
+            "status": "invalid_normalized_coordinates",
+            "target_description": target_description,
+            "message": str(exc),
+        }]
+    _show_agent_target(x, y)
+    gui.click(x, y, button="left")
+    return _content(_observe_after_action({
+        "success": True,
+        "status": "clicked",
+        "coordinate_mode": "normalized_image_ratio",
+        "target_description": target_description,
+        "x_ratio": x_ratio,
+        "y_ratio": y_ratio,
+        "x": x,
+        "y": y,
+        "screen_size": [screenshot.width, screenshot.height],
     }))
 
 
