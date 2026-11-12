@@ -1858,3 +1858,25 @@ def test_weather_cache_expires_entries_and_evicts_oldest_when_full():
     assert len(cache) <= 2
     assert "oldest" not in cache
     assert _weather_cache_get(cache, "latest", now=604.0) == {"value": 3}
+
+
+
+def test_weather_grid_cache_key_distinguishes_center_and_radius():
+    from app.adapters.edge.jarvis_desktop_local import _weather_grid_cache_key
+
+    original = _weather_grid_cache_key(
+        [-34.0, -30.0, -26.0], [-55.0, -51.0, -47.0]
+    )
+    same_grid = _weather_grid_cache_key(
+        [-34.0, -30.0, -26.0], [-55.0, -51.0, -47.0]
+    )
+    wider_radius = _weather_grid_cache_key(
+        [-36.0, -30.0, -24.0], [-57.0, -51.0, -45.0]
+    )
+    shifted_center = _weather_grid_cache_key(
+        [-33.0, -29.0, -25.0], [-54.0, -50.0, -46.0]
+    )
+
+    assert original == same_grid
+    assert original != wider_radius
+    assert original != shifted_center

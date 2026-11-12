@@ -91,6 +91,13 @@ def _weather_cache_set(
     cache[key] = (now, value)
 
 
+def _weather_grid_cache_key(
+    grid_lats: list[float], grid_lons: list[float]
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Key grid results by the exact sampled points, including center and radius."""
+    return tuple(grid_lats), tuple(grid_lons)
+
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
 _WORLD_LAND_PATH = _REPO_ROOT / "app" / "static" / "world-land.json"
@@ -1246,7 +1253,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             for lo in lons:
                 grid_lats.append(la)
                 grid_lons.append(lo)
-        cache_key = (round(lat / 0.5) * 0.5, round(lon / 0.5) * 0.5)
+        cache_key = _weather_grid_cache_key(grid_lats, grid_lons)
         cached = getattr(state, "_wx_grid_cache", None)
         if cached is None:
             state._wx_grid_cache = {}
@@ -1403,15 +1410,13 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             out["soi_error"] = type(exc).__name__
         return out
 
-    async def weather_point(lat: float, lon: float, _client: str = Depends(require_local_token)) -> dict[str, Any]:
-        entry = cached.get(cache_key)
-        if entry and (_t.time() - entry[0]) < 600:
-            return entry[1]
-        cached[cache_key] = (_t.time(), result)
     @app.get("/api/geocode")
     async def geocode(
         q: str,
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
         """Forward geocode a place name or coordinates (Nominatim, free)."""
+        import re as _re
         text = (q or "").strip()
         if not text:
             return {"success": False, "error": "empty_query"}
@@ -1427,21 +1432,17 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 "lat": result["latitude"],
                 "lon": result["longitude"],
                 "label": result.get("display_name") or text,
+            }
         payload = {
             "success": False,
             "error": result.get("reason") or "not_found",
             "query": text,
+        }
         if result.get("retry_after_seconds") is not None:
             payload["retry_after_seconds"] = result["retry_after_seconds"]
         return payload
-        lat: float, lon: float, radius: float = 8.0,
-        # Build a small lat/lon grid around the center.
-        lats = [round(lat + (i - 1) * step, 2) for i in range(3)]
-        lons = [round(lon + (j - 1) * step, 2) for j in range(3)]
-        entry = cached.get(cache_key)
-        if entry and (_t.time() - entry[0]) < 600:
-            return entry[1]
-        cached[cache_key] = (_t.time(), result)
+
+
     @app.get("/api/intelligence/latest")
     async def latest_intelligence(_client: str = Depends(require_local_token)) -> dict[str, Any]:
         from app.adapters.infrastructure.intelligence.supabase_intelligence_history_adapter import (
