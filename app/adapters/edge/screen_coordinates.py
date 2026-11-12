@@ -37,3 +37,39 @@ def normalized_to_screen_point(
         round(x_ratio * (screen_width - 1)),
         round(y_ratio * (screen_height - 1)),
     )
+
+def enable_windows_per_monitor_dpi_awareness() -> bool:
+    """Request per-monitor-v2 DPI awareness before GUI libraries initialize.
+
+    Returns False off Windows or when Windows refuses the process-level change
+    (for example, because an application manifest already fixed the awareness).
+    Callers must still compare screenshot and input dimensions before clicking.
+    """
+    import os
+
+    if os.name != "nt":
+        return False
+
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    try:
+        # DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 == (HANDLE)-4
+        if user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4)):
+            return True
+    except (AttributeError, OSError):
+        pass
+
+    try:
+        # PROCESS_PER_MONITOR_DPI_AWARE == 2
+        shcore = ctypes.windll.shcore
+        result = shcore.SetProcessDpiAwareness(2)
+        if result == 0:
+            return True
+    except (AttributeError, OSError):
+        pass
+
+    try:
+        return bool(user32.SetProcessDPIAware())
+    except (AttributeError, OSError):
+        return False
