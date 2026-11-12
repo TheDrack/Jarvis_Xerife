@@ -31,158 +31,20 @@ class TestTaskRunner(NexusComponent):
         assert task_runner.cache_dir.exists()
         assert task_runner.use_venv is False
 
-    def test_execute_simple_mission(self, task_runner):
-        """Test executing a simple mission without dependencies"""
+    def test_execute_mission_fails_closed_without_isolated_executor(self, task_runner):
+        """Mission code is rejected before it is written or executed on the host."""
         mission = Mission(
-            mission_id="test_001",
-            code="print('Hello, World!')",
+            mission_id="untrusted_mission",
+            code="print('must not execute')",
             requirements=[],
             browser_interaction=False,
             keep_alive=False,
         )
 
-        result = task_runner.execute_mission(mission)
+        with pytest.raises(RuntimeError, match="isolated_mission_executor_unavailable"):
+            task_runner.execute_mission(mission)
 
-        assert result is not None
-        assert isinstance(result, MissionResult)
-        assert result.mission_id == "test_001"
-        assert result.success is True
-        assert "Hello, World!" in result.stdout
-        assert result.exit_code == 0
-
-    def test_execute_mission_with_error(self, task_runner):
-        """Test executing a mission that raises an error"""
-        mission = Mission(
-            mission_id="test_002",
-            code="raise ValueError('Test error')",
-            requirements=[],
-            browser_interaction=False,
-            keep_alive=False,
-        )
-
-        result = task_runner.execute_mission(mission)
-
-        assert result is not None
-        assert result.success is False
-        assert result.exit_code == 1
-        assert "ValueError" in result.stderr or "Test error" in result.stderr
-
-    def test_execute_mission_with_variables(self, task_runner):
-        """Test executing a mission that uses variables"""
-        mission = Mission(
-            mission_id="test_003",
-            code="""
-x = 10
-y = 20
-print(f"Sum: {x + y}")
-""",
-            requirements=[],
-            browser_interaction=False,
-            keep_alive=False,
-        )
-
-        result = task_runner.execute_mission(mission)
-
-        assert result is not None
-        assert result.success is True
-        assert "Sum: 30" in result.stdout
-
-    def test_execute_mission_with_stderr(self, task_runner):
-        """Test capturing stderr from a mission"""
-        mission = Mission(
-            mission_id="test_004",
-            code="""
-import sys
-print("stdout message")
-print("stderr message", file=sys.stderr)
-""",
-            requirements=[],
-            browser_interaction=False,
-            keep_alive=False,
-        )
-
-        result = task_runner.execute_mission(mission)
-
-        assert result is not None
-        assert result.success is True
-        assert "stdout message" in result.stdout
-        assert "stderr message" in result.stderr
-
-    def test_execute_mission_timeout(self, task_runner):
-        """Test mission execution timeout"""
-        mission = Mission(
-            mission_id="test_005",
-            code="""
-import time
-time.sleep(10)
-print("This should not execute")
-""",
-            requirements=[],
-            browser_interaction=False,
-            keep_alive=False,
-            timeout=1,  # 1 second timeout
-        )
-
-        result = task_runner.execute_mission(mission)
-
-        assert result is not None
-        assert result.success is False
-        assert result.exit_code == 124  # Timeout exit code
-
-    def test_mission_result_metadata(self, task_runner):
-        """Test that mission result includes metadata"""
-        mission = Mission(
-            mission_id="test_006",
-            code="print('test')",
-            requirements=[],
-            browser_interaction=False,
-            keep_alive=False,
-        )
-
-        result = task_runner.execute_mission(mission)
-
-        assert result is not None
-        assert result.metadata is not None
-        assert "script_path" in result.metadata
-        assert "persistent" in result.metadata
-        assert result.metadata["persistent"] is False
-
-    def test_mission_with_keep_alive(self, task_runner):
-        """Test mission with keep_alive flag"""
-        mission = Mission(
-            mission_id="test_007",
-            code="print('persistent mission')",
-            requirements=[],
-            browser_interaction=False,
-            keep_alive=True,
-        )
-
-        result = task_runner.execute_mission(mission)
-
-        assert result is not None
-        assert result.success is True
-        assert result.metadata["persistent"] is True
-
-    def test_execution_time_tracking(self, task_runner):
-        """Test that execution time is tracked"""
-        mission = Mission(
-            mission_id="test_008",
-            code="""
-import time
-time.sleep(0.1)
-print('done')
-""",
-            requirements=[],
-            browser_interaction=False,
-            keep_alive=False,
-        )
-
-        result = task_runner.execute_mission(mission)
-
-        assert result is not None
-        assert result.success is True
-        assert result.execution_time > 0
-        assert result.execution_time >= 0.1
+        assert not (task_runner.cache_dir / "untrusted_mission.py").exists()
 
     def test_mission_to_dict(self):
         """Test Mission to_dict conversion"""

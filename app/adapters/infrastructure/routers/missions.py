@@ -30,38 +30,15 @@ def create_missions_router(get_current_user) -> APIRouter:
         background_tasks: BackgroundTasks,
         current_user: User = Depends(get_current_user),
     ) -> api_models.MissionResponse:
-        """Execute a serverless task mission in an isolated environment (Protected endpoint)."""
-        try:
-            from app.application.services.task_runner import TaskRunner
-            from app.domain.models.mission import Mission
-
-            logger.info(f"User '{current_user.username}' executing mission: {request.mission_id}")
-
-            mission = Mission(
-                mission_id=request.mission_id,
-                code=request.code,
-                requirements=request.requirements,
-                browser_interaction=request.browser_interaction,
-                keep_alive=request.keep_alive,
-                target_device_id=request.target_device_id,
-                timeout=request.timeout,
-                metadata=request.metadata,
-            )
-            result = TaskRunner().execute_mission(mission)
-
-            return api_models.MissionResponse(
-                mission_id=result.mission_id,
-                success=result.success,
-                stdout=result.stdout,
-                stderr=result.stderr,
-                exit_code=result.exit_code,
-                execution_time=result.execution_time,
-                error=result.error,
-                metadata=result.metadata,
-            )
-        except Exception as e:
-            logger.error(f"Error executing mission: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Mission execution failed: {str(e)}")
+        """Reject arbitrary code until a dedicated isolated executor is configured."""
+        logger.warning(
+            "Mission execution rejected for user '%s': isolated executor unavailable",
+            current_user.username,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Isolated mission execution is unavailable",
+        )
 
     @router.post("/v1/browser/control", response_model=api_models.BrowserControlResponse)
     async def control_browser(
