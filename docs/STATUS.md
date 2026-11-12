@@ -498,3 +498,17 @@ O ledger estruturado abaixo permanece inalterado: `C0-CAPABILITY-MAP`, `C0-GAPS-
 ### Decisão desta execução
 
 Nenhum novo componente cognitivo foi criado e nenhum critério C0 foi promovido. A atualização documental registra os merges e a evidência nova da PR #818, sem alterar o ledger. A próxima implementação de código continua sendo a conclusão do mapa C0; a correção conversacional de curiosidade deve aguardar contrato de usuário/persistência e consumidor real. Não foram executados probes de rede, operações de banco, deploy, alterações de secrets/flags, mudanças administrativas, merge ou deploy manual.
+
+## Delta de pesquisa técnica — 2026-11-12 — PR #820
+
+**Base de código:** `main` em `128ec1378569d82155a42d3c234ad61a8ea0d514`.  
+**Objetivo:** registrar a nova PR de interação desktop e a evidência de CI/revisão sem promover comportamento operacional não demonstrado.
+
+- **PR [#820 — coordenadas normalizadas para clique desktop](https://github.com/TheDrack/Jarvis_Xerife/pull/820):** aberta, head `57369d1b2a59eb1408d82043ca9e20cc242fd1c0`, base `main`. Adiciona coordenadas relativas à imagem (0..1), solicita DPI awareness por monitor no Windows e bloqueia o clique quando dimensões da captura e da API de entrada divergem. O clique legado por pixels permanece disponível.
+- CI do head atual: [PR Validation 43248575750](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43248575750), [Task Queue 43248576534](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43248576534) e [Portas Browser 43248575794](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43248575794) concluíram com sucesso. Isso comprova os workflows, não validação física do clique em desktop real.
+- A revisão Graphify do SHA atual terminou com gate `pass`, zero findings bloqueantes e um advisory MEDIUM: o parâmetro `user_confirmed` é fornecido pelo chamador e pode não representar aprovação independente. O review classifica o cenário como hipótese não verificada; não declarar exploração confirmada. O clique legado já usa o mesmo padrão, portanto tratar como risco de contrato/autorização a resolver antes de ampliar o uso.
+- Graphify não executou testes nem prova formal. A revisão Codex não concluiu por limite de uso; a revisão Strix não foi executada por limite do plano. A descrição da PR informa que a validação interativa em desktop real permanece pendente. Não considerar a PR revisada ou pronta para merge somente pelos checks verdes.
+- **Governança de `main`:** a leitura atual de `/branches/main/protection` retornou HTTP 403 (`Resource not accessible by integration`); a leitura de rulesets retornou `[]`. A proteção atual não pôde ser confirmada. A última evidência direta de `protected=false` permanece a registrada na issue [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682), em 2026-11-05.
+- **Self Healing:** `.github/workflows/homeostase.yml` permanece ativo e restrito a falhas de workflows confiáveis da `main`; sua lista não inclui PR Validation nem Task Queue. O run [43226701132](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43226701132) ficou `skipped`. Não ampliar permissões ou expor secrets a código não confiável de PR.
+- **Autoevolução:** o run [43226679688](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43226679688) concluiu o gate com sucesso, mas geração/validação isolada e publicação foram `skipped`. Nenhuma missão ou execução foi criada nesta atualização.
+- Nenhuma alteração foi feita em `main`, workflows, secrets, flags, produção ou dispositivos. Nenhum merge ou deploy foi executado.
