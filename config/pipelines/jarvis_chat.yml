@@ -1,6 +1,7 @@
 components:
   router:
     id: "cognitive_router"
+    hint_path: "app/domain/gears/cognitive_router.py"
     config:
       maestro_model: "openai/gpt-4o-mini"
   engine:
