@@ -650,29 +650,34 @@ def dash_adapter(stream: MediaStream, data: bytes) -> None:
 
 
 def _ensure_ffmpeg_path() -> None:
-    """Adiciona o diretório do ffmpeg (WinGet) ao PATH se necessário."""
+    """Add the current user's WinGet ffmpeg directory to PATH when available."""
     import os
+    from pathlib import Path
+
     if os.environ.get("_JARVIS_FFMPEG_PATH_FIXED"):
         return
     try:
-        import glob
-        candidates = [
-            r"C:\Users\USER\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-9.0.2-full_build\bin",
-        ]
-        # also glob any version
-        for base in glob.glob(r"C:\Users\*\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg*"):
-            for bin_dir in glob.glob(base + r"\*\bin"):
-                candidates.append(bin_dir)
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if not local_app_data and os.name == "nt":
+            local_app_data = str(Path.home() / "AppData" / "Local")
+        packages = (
+            Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
+            if local_app_data
+            else None
+        )
+        candidates = sorted(packages.glob("Gyan.FFmpeg*/*/bin")) if packages else []
         current = os.environ.get("PATH", "")
-        for c in candidates:
-            import os as _os
-            if _os.path.isdir(c) and c not in current:
-                os.environ["PATH"] = c + os.pathsep + current
-                current = os.environ["PATH"]
-    except Exception:
+        path_entries = set(current.split(os.pathsep))
+        for candidate in candidates:
+            if candidate.is_dir():
+                value = str(candidate)
+                if value not in path_entries:
+                    current = value + os.pathsep + current
+                    os.environ["PATH"] = current
+                    path_entries.add(value)
+    except OSError:
         pass
     os.environ["_JARVIS_FFMPEG_PATH_FIXED"] = "1"
-
 
 def decode_available() -> bool:
     _ensure_ffmpeg_path()
