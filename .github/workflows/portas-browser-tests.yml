@@ -6,9 +6,14 @@ on:
     paths:
       - "app/adapters/edge/portas_*.py"
       - "app/adapters/edge/jarvis_desktop_mcp.py"
+      - "app/adapters/edge/visual_navigation_adapter.py"
+      - "app/adapters/edge/jarvis_local_agent.py"
+      - "app/adapters/edge/visual_navigation_adapter.py"
+      - "app/adapters/edge/jarvis_local_agent.py"
       - "data/portas/**"
       - "tests/adapters/edge/test_portas_*.py"
       - "tests/adapters/edge/test_screen_coordinates.py"
+      - "tests/adapters/edge/test_visual_navigation_adapter.py"
       - "tests/adapters/edge/test_desktop_click_authorization.py"
       - "tests/fixtures/portas/**"
       - ".github/workflows/portas-browser-tests.yml"
@@ -20,6 +25,7 @@ on:
       - "data/portas/**"
       - "tests/adapters/edge/test_portas_*.py"
       - "tests/adapters/edge/test_screen_coordinates.py"
+      - "tests/adapters/edge/test_visual_navigation_adapter.py"
       - "tests/adapters/edge/test_desktop_click_authorization.py"
       - "tests/fixtures/portas/**"
       - ".github/workflows/portas-browser-tests.yml"
@@ -48,6 +54,7 @@ jobs:
             tests/adapters/edge/test_portas_utilizacao.py \
             tests/adapters/edge/test_portas_observabilidade.py \
             tests/adapters/edge/test_screen_coordinates.py \
+            tests/adapters/edge/test_visual_navigation_adapter.py \\
             tests/adapters/edge/test_desktop_click_authorization.py -v -o addopts=""
 
   integration:
