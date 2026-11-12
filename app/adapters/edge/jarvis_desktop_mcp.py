@@ -23,7 +23,7 @@ from mcp.server.fastmcp import FastMCP, Image
 from mcp.types import TextContent
 
 from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
-from app.adapters.edge.screen_coordinates import normalized_to_screen_point, screen_dimensions_match
+from app.adapters.edge.screen_coordinates import normalized_to_screen_point, screen_coordinate_spaces_compatible
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
 from app.core.nexus import nexus
@@ -454,19 +454,19 @@ def click_at_normalized(
             "detail": str(exc),
             **navigator._save_observation(screenshot),
         })
-    if not screen_dimensions_match((screenshot.width, screenshot.height), (input_width, input_height)):
+    if not screen_coordinate_spaces_compatible((screenshot.width, screenshot.height), (input_width, input_height)):
         return _content({
             "success": False,
             "status": "coordinate_space_mismatch",
             "target_description": target_description,
             "screenshot_size": [screenshot.width, screenshot.height],
             "input_size": [input_width, input_height],
-            "message": "A captura e a API de mouse usam dimensões diferentes; clique bloqueado para evitar atingir outro controle.",
+            "message": "A captura e a API de mouse parecem representar áreas diferentes (proporções incompatíveis); clique bloqueado.",
             **navigator._save_observation(screenshot),
         })
     try:
         x, y = normalized_to_screen_point(
-            x_ratio, y_ratio, screenshot.width, screenshot.height
+            x_ratio, y_ratio, input_width, input_height
         )
     except (TypeError, ValueError) as exc:
         return [{
@@ -486,7 +486,8 @@ def click_at_normalized(
         "y_ratio": y_ratio,
         "x": x,
         "y": y,
-        "screen_size": [screenshot.width, screenshot.height],
+        "screenshot_size": [screenshot.width, screenshot.height],
+        "input_size": [input_width, input_height],
     }))
 
 
