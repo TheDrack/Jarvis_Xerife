@@ -18,6 +18,7 @@ from typing import Any, Dict, Iterable, Optional
 from app.application.ports.visual_navigation import VisualNavigationPort
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import agent_activity, tracked_action
+from app.adapters.edge.screen_coordinates import enable_windows_per_monitor_dpi_awareness
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
@@ -126,6 +127,8 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
 
     def _gui(self) -> Any:
         if self._pyautogui is None:
+            # Align Windows screenshot and pointer APIs before PyAutoGUI initializes.
+            enable_windows_per_monitor_dpi_awareness()
             import pyautogui
             self._pyautogui = pyautogui
         self._pyautogui.FAILSAFE = True
