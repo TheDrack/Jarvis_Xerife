@@ -82,6 +82,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
     ) -> None:
         self._pyautogui = pyautogui_module
         self._tracked_gui = None
+        self._dpi_awareness_requested = False
         local_app_data = Path(os.getenv("LOCALAPPDATA", Path.home() / ".local" / "share"))
         self.template_dir = Path(
             template_dir or os.getenv("JARVIS_TEMPLATE_DIR", local_app_data / "Jarvis_Xerife" / "templates")
@@ -126,9 +127,11 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
             }
 
     def _gui(self) -> Any:
-        if self._pyautogui is None:
-            # Align Windows screenshot and pointer APIs before PyAutoGUI initializes.
+        if not self._dpi_awareness_requested:
+            # Also cover callers that inject an already-imported PyAutoGUI module.
             enable_windows_per_monitor_dpi_awareness()
+            self._dpi_awareness_requested = True
+        if self._pyautogui is None:
             import pyautogui
             self._pyautogui = pyautogui
         self._pyautogui.FAILSAFE = True
