@@ -23,5 +23,3 @@ StandardError=journal
 
 [Install]
 WantedBy=default.target
-
-ExecStart=@PYTHON@ -m app.adapters.edge.jarvis_desktop_mcp

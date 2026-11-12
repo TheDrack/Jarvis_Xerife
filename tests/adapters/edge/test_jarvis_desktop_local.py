@@ -511,9 +511,9 @@ def test_local_intelligence_config_never_scans_other_windows_profiles(tmp_path, 
     current_local_app_data = tmp_path / "current" / "AppData" / "Local"
     config = current_local_app_data / "Jarvis_Xerife" / "intelligence.env"
     config.parent.mkdir(parents=True)
-    config.write_text("JARVIS_GEV_AREA_LAT=12.5\\n", encoding="utf-8")
+    config.write_text("JARVIS_GEV_AREA_WEST=12.5\\n", encoding="utf-8")
     monkeypatch.setenv("LOCALAPPDATA", str(current_local_app_data))
-    monkeypatch.delenv("JARVIS_GEV_AREA_LAT", raising=False)
+    monkeypatch.delenv("JARVIS_GEV_AREA_WEST", raising=False)
 
     original_iterdir = Path.iterdir
 
@@ -525,7 +525,7 @@ def test_local_intelligence_config_never_scans_other_windows_profiles(tmp_path, 
     monkeypatch.setattr(Path, "iterdir", guarded_iterdir)
 
     assert _load_local_intelligence_config() == 1
-    assert os.environ["JARVIS_GEV_AREA_LAT"] == "12.5"
+    assert os.environ["JARVIS_GEV_AREA_WEST"] == "12.5"
 
 
 def test_local_intelligence_config_does_not_override_process_environment(tmp_path, monkeypatch):
