@@ -23,7 +23,6 @@ from mcp.server.fastmcp import FastMCP, Image
 from mcp.types import TextContent
 
 from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
-from app.adapters.edge.screen_coordinates import normalized_to_screen_point, screen_coordinate_spaces_compatible
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
 from app.core.nexus import nexus
@@ -67,7 +66,7 @@ mcp = FastMCP(
         "When reconnecting after an absence, use reconnection_briefing for recent discoveries, verified changes, "
         "pull requests, and test status. Check live sources before supplying PR/workflow states and distinguish "
         "ideas from implemented/tested work. Always observe before acting, prefer accessibility elements or image "
-        "templates over raw coordinates; when visual coordinates are needed, use click_at_normalized with 0..1 image ratios instead of pixel coordinates, perform one action at a time, and verify the post-action "
+        "templates over raw coordinates, perform one action at a time, and verify the post-action "
         "state. Preserve existing behavior, test changes, and never claim success without evidence."
     ),
 )
@@ -384,114 +383,50 @@ def click_window_background_at(
     return click_window_background(window_title_contains, x, y, coordinates_are_screen=True)
 
 
+def _coordinate_click_denied() -> list[Any]:
+    """Fail closed until the desktop MCP has a trusted host-approval composition root."""
+    return _content({
+        "success": False,
+        "status": "host_approval_unavailable",
+        "message": (
+            "Clique físico bloqueado: este servidor MCP não resolve uma identidade "
+            "autenticada nem verifica uma aprovação confiável no host. O argumento "
+            "user_confirmed é controlado pelo chamador e não constitui autorização."
+        ),
+    })
+
+
 @mcp.tool(structured_output=False)
-@tracked_action("Clique fÃƒÂ­sico autorizado")
+@tracked_action("Clique físico bloqueado sem aprovação do host")
 def click_at(
     x: int,
     y: int,
     target_description: str,
     user_confirmed: bool,
 ) -> list[Any]:
-    """Legacy pixel-coordinate fallback; use click_at_normalized for scaled screenshots."""
-    if not user_confirmed:
-        return [{
-            "success": False,
-            "status": "confirmation_required",
-            "message": "PeÃƒÂ§a autorizaÃƒÂ§ÃƒÂ£o explÃƒÂ­cita para o clique por coordenadas.",
-        }]
-    screenshot = navigator._capture()
-    if x < 0 or y < 0 or x >= screenshot.width or y >= screenshot.height:
-        return _content({
-            "success": False,
-            "status": "coordinates_out_of_bounds",
-            "target_description": target_description,
-            **navigator._save_observation(screenshot),
-        })
-    _show_agent_target(x, y)
-    navigator._gui().click(x, y, button="left")
-    return _content(_observe_after_action({
-        "success": True,
-        "status": "clicked",
-        "target_description": target_description,
-        "x": x,
-        "y": y,
-    }))
+    """Legacy pixel-coordinate tool; blocked until host-backed approval is composed.
+
+    user_confirmed remains in the schema for client compatibility only. Its value
+    is never trusted and cannot authorize a physical click.
+    """
+    return _coordinate_click_denied()
 
 
 @mcp.tool(structured_output=False)
-@tracked_action("Clique por coordenadas normalizadas")
+@tracked_action("Clique normalizado bloqueado sem aprovação do host")
 def click_at_normalized(
     x_ratio: float,
     y_ratio: float,
     target_description: str,
     user_confirmed: bool,
 ) -> list[Any]:
-    """Click a point expressed as ratios of the latest full-screen image (0.0..1.0).
+    """Normalized coordinate tool; execution remains fail-closed.
 
-    This is invariant to screenshot display scaling: x_ratio/y_ratio are fractions
-    of the image, not pixel coordinates. The server maps them to the live capture.
-    Windows DPI awareness is requested before PyAutoGUI initializes. The normalized
-    point is mapped into the pointer API's pixel dimensions; incompatible aspect
-    ratios fail closed because they may indicate a crop or another display region.
-    Ratios must refer to the complete, uncropped screenshot. Observe immediately before calling.
+    Coordinate conversion is available as a pure helper, but this MCP server has
+    no trusted host-approval composition root. user_confirmed is compatibility-only
+    and never authorizes physical input.
     """
-    if not user_confirmed:
-        return [{
-            "success": False,
-            "status": "confirmation_required",
-            "message": "Peça autorização explícita para o clique por coordenadas.",
-        }]
-    screenshot = navigator._capture()
-    gui = navigator._gui()
-    try:
-        input_size = gui.size()
-        input_width, input_height = int(input_size.width), int(input_size.height)
-    except Exception as exc:
-        return _content({
-            "success": False,
-            "status": "input_dimensions_unavailable",
-            "target_description": target_description,
-            "message": "Não foi possível confirmar as dimensões do sistema de entrada; clique não executado.",
-            "detail": str(exc),
-            **navigator._save_observation(screenshot),
-        })
-    if not screen_coordinate_spaces_compatible(
-        (screenshot.width, screenshot.height), (input_width, input_height)
-    ):
-        return _content({
-            "success": False,
-            "status": "coordinate_space_mismatch",
-            "target_description": target_description,
-            "screenshot_size": [screenshot.width, screenshot.height],
-            "input_size": [input_width, input_height],
-            "message": "A captura e a API de mouse parecem representar áreas diferentes (proporções incompatíveis); clique bloqueado.",
-            **navigator._save_observation(screenshot),
-        })
-    try:
-        x, y = normalized_to_screen_point(
-            x_ratio, y_ratio, input_width, input_height
-        )
-    except (TypeError, ValueError) as exc:
-        return [{
-            "success": False,
-            "status": "invalid_normalized_coordinates",
-            "target_description": target_description,
-            "message": str(exc),
-        }]
-    _show_agent_target(x, y)
-    gui.click(x, y, button="left")
-    return _content(_observe_after_action({
-        "success": True,
-        "status": "clicked",
-        "coordinate_mode": "normalized_image_ratio",
-        "target_description": target_description,
-        "x_ratio": x_ratio,
-        "y_ratio": y_ratio,
-        "x": x,
-        "y": y,
-        "screenshot_size": [screenshot.width, screenshot.height],
-        "input_size": [input_width, input_height],
-    }))
+    return _coordinate_click_denied()
 
 
 @mcp.tool(structured_output=False)
