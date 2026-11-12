@@ -469,6 +469,8 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 
 O ledger estruturado abaixo permanece inalterado: `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` continuam **pending**. C1 — World Model — continua bloqueada.
 
+`docs/COGNITIVE_BASELINE.md` continua sendo snapshot de 2026-11-07 no commit `82ca2ac70f67e8418f62079f7d94e3fc8b4d1230`; suas linhas de CognitiveRouter, Curiosity, worker e Toolbox não foram reconciliadas integralmente com os merges #815–#817 e a PR #818. Não usar esse snapshot como mapa corrente. A conclusão de C0 exige reconciliar a matriz detalhada com a main atual e então preencher o ledger com commit, checks, implementation paths, consumer paths e test paths reais.
+
 - A PR #816 elimina a falha de contexto conhecida do CognitiveRouter. Graphify ainda não encontra consumidor de aplicação para `run_pipeline("jarvis_chat")`; o uso identificado permanece no CLI/testes. A capacidade deve ser classificada como implementação corrigida, mas consumo de aplicação/runtime não verificado.
 - A PR #818 acrescenta evidência comportamental real para os wrappers MCP de `CuriosityIntake`. O teste usa armazenamento temporário e comprova o caminho cliente/servidor → wrapper → Nexus → componente → JSONL. Não comprova persistência de produção, nem o ciclo separado de resposta conversacional.
 - `CuriosityIntake` continua sendo um intake observacional de cartões de descoberta. Não deve ser confundido com `CuriosityEngine` ou com respostas vinculadas a usuário.
