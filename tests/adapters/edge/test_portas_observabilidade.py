@@ -330,3 +330,45 @@ def test_media_data_received_event_preserves_binary_response_bytes():
     result = observer.media_chunks("stream-2", after_sequence=0, limit=10)
     assert result["protocol"] == "ump"
     assert base64.b64decode(result["chunks"][0]["data"]) == payload
+
+
+def test_clear_removes_media_stream_metadata_and_indexes_without_stopping_capture():
+    observer = BrowserTrafficObserver()
+    observer._active = True
+    observer._capture_media = True
+    observer._emit("http_request", host="media.example", method="GET")
+    observer._media_streams["stream-clear"] = {
+        "stream_id": "stream-clear",
+        "url": "https://media.example/video?token=%5BREDACTED%5D",
+        "host": "media.example",
+        "mime_type": "video/mp4",
+        "status": "streaming",
+    }
+    observer._media_request_streams[(123, "request-clear")] = "stream-clear"
+    observer._media_sequences["stream-clear"] = 1
+    observer._media_offsets["stream-clear"] = 6
+    observer._media_chunks.append({
+        "stream_id": "stream-clear",
+        "sequence": 1,
+        "offset": 0,
+        "bytes": 6,
+        "data": base64.b64encode(b"secret").decode("ascii"),
+    })
+
+    result = observer.clear()
+
+    assert result["success"] is True
+    assert result["cleared"] == 1
+    assert result["media_chunks_cleared"] is True
+    assert result["media_streams_cleared"] == 1
+    assert result["media_indexes_cleared"] is True
+    assert observer.events()["count"] == 0
+    media_events = observer.media_events()
+    assert media_events["streams"] == []
+    assert media_events["buffered_chunks"] == 0
+    assert observer.media_chunks("stream-clear")["error"] == "stream_not_found"
+    assert observer._media_request_streams == {}
+    assert observer._media_sequences == {}
+    assert observer._media_offsets == {}
+    assert observer.status()["active"] is True
+    assert observer.status()["media_capture"] is True

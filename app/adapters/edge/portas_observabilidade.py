@@ -662,9 +662,20 @@ class BrowserTrafficObserver:
     def clear(self) -> dict[str, Any]:
         with self._lock:
             removed = len(self._events)
+            removed_media_streams = len(self._media_streams)
             self._events.clear()
             self._media_chunks.clear()
-            return {"success": True, "cleared": removed, "media_chunks_cleared": True}
+            self._media_request_streams.clear()
+            self._media_sequences.clear()
+            self._media_offsets.clear()
+            self._media_streams.clear()
+            return {
+                "success": True,
+                "cleared": removed,
+                "media_chunks_cleared": True,
+                "media_streams_cleared": removed_media_streams,
+                "media_indexes_cleared": True,
+            }
 
 
 observer = BrowserTrafficObserver()
