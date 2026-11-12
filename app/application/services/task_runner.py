@@ -2,9 +2,7 @@
 """TaskRunner – executes Mission payloads in ephemeral subprocesses."""
 
 import logging
-import subprocess
 import tempfile
-import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
@@ -99,47 +97,12 @@ class TaskRunner(NexusComponent):
     # ------------------------------------------------------------------
 
     def execute_mission(self, mission: Mission) -> MissionResult:
-        """Execute a Mission payload in an ephemeral subprocess."""
-        script_path = self.cache_dir / f"{mission.mission_id}.py"
-        script_path.write_text(mission.code, encoding="utf-8")
+        """Fail closed: raw mission code must never execute on the API host.
 
-        python_exec = "python"
-
-        start = time.monotonic()
-        try:
-            result = subprocess.run(
-                [python_exec, str(script_path)],
-                capture_output=True,
-                text=True,
-                timeout=mission.timeout,
-            )
-            elapsed = time.monotonic() - start
-            return MissionResult(
-                mission_id=mission.mission_id,
-                success=result.returncode == 0,
-                stdout=result.stdout,
-                stderr=result.stderr,
-                exit_code=result.returncode,
-                execution_time=elapsed,
-                metadata={
-                    "script_path": str(script_path),
-                    "persistent": mission.keep_alive,
-                },
-            )
-        except subprocess.TimeoutExpired:
-            elapsed = time.monotonic() - start
-            return MissionResult(
-                mission_id=mission.mission_id,
-                success=False,
-                stdout="",
-                stderr="Execution timed out.",
-                exit_code=124,
-                execution_time=elapsed,
-                metadata={
-                    "script_path": str(script_path),
-                    "persistent": mission.keep_alive,
-                },
-            )
+        A dedicated container-backed executor must replace this method before
+        arbitrary mission code can be enabled again.
+        """
+        raise RuntimeError("isolated_mission_executor_unavailable")
 
     # ------------------------------------------------------------------
     # Cost tracking
