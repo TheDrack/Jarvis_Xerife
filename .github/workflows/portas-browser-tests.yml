@@ -8,14 +8,19 @@ on:
       - "app/adapters/edge/jarvis_desktop_mcp.py"
       - "data/portas/**"
       - "tests/adapters/edge/test_portas_*.py"
+      - "tests/adapters/edge/test_screen_coordinates.py"
+      - "tests/adapters/edge/test_desktop_click_authorization.py"
       - "tests/fixtures/portas/**"
       - ".github/workflows/portas-browser-tests.yml"
   push:
     branches: [main]
     paths:
       - "app/adapters/edge/portas_*.py"
+      - "app/adapters/edge/jarvis_desktop_mcp.py"
       - "data/portas/**"
       - "tests/adapters/edge/test_portas_*.py"
+      - "tests/adapters/edge/test_screen_coordinates.py"
+      - "tests/adapters/edge/test_desktop_click_authorization.py"
       - "tests/fixtures/portas/**"
       - ".github/workflows/portas-browser-tests.yml"
 
@@ -41,7 +46,9 @@ jobs:
         run: |
           xvfb-run -a python -m pytest tests/adapters/edge/test_portas_visualizacao.py \
             tests/adapters/edge/test_portas_utilizacao.py \
-            tests/adapters/edge/test_portas_observabilidade.py -v -o addopts=""
+            tests/adapters/edge/test_portas_observabilidade.py \\
+            tests/adapters/edge/test_screen_coordinates.py \\
+            tests/adapters/edge/test_desktop_click_authorization.py -v -o addopts=""
 
   integration:
     name: Integração (Chromium via CDP)
