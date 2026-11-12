@@ -23,7 +23,7 @@ from mcp.server.fastmcp import FastMCP, Image
 from mcp.types import TextContent
 
 from app.adapters.edge.visual_navigation_adapter import VisualNavigationAdapter
-from app.adapters.edge.screen_coordinates import normalized_to_screen_point
+from app.adapters.edge.screen_coordinates import normalized_to_screen_point, screen_dimensions_match
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import set_agent_cursor_target, tracked_action
 from app.core.nexus import nexus
@@ -454,7 +454,7 @@ def click_at_normalized(
             "detail": str(exc),
             **navigator._save_observation(screenshot),
         })
-    if (input_width, input_height) != (screenshot.width, screenshot.height):
+    if not screen_dimensions_match((screenshot.width, screenshot.height), (input_width, input_height)):
         return _content({
             "success": False,
             "status": "coordinate_space_mismatch",
