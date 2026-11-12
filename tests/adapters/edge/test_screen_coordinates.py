@@ -1,6 +1,6 @@
 import pytest
 
-from app.adapters.edge.screen_coordinates import normalized_to_screen_point, screen_dimensions_match
+from app.adapters.edge.screen_coordinates import normalized_to_screen_point, screen_coordinate_spaces_compatible
 
 
 @pytest.mark.parametrize(
@@ -44,12 +44,16 @@ def test_normalized_point_rejects_invalid_ratios_and_dimensions(
     ("screenshot_size", "input_size", "expected"),
     [
         ((1920, 1080), (1920, 1080), True),
-        ((1648, 928), (1920, 1080), False),
-        ((1920, 1080), (1536, 864), False),
+        # DPI scaling / client-side image resizing changes pixel dimensions, not the view.
+        ((1648, 928), (1920, 1080), True),
+        ((1920, 1080), (1536, 864), True),
+        # Different aspect ratios may indicate a crop or a different display region.
+        ((1920, 1080), (1280, 1024), False),
         ((0, 1080), (0, 1080), False),
+        ((1920, 1080), (1920, 0), False),
     ],
 )
-def test_capture_and_pointer_dimensions_must_match(
+def test_coordinate_spaces_must_describe_same_full_screen_view(
     screenshot_size, input_size, expected
 ):
-    assert screen_dimensions_match(screenshot_size, input_size) is expected
+    assert screen_coordinate_spaces_compatible(screenshot_size, input_size) is expected
