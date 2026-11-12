@@ -75,24 +75,38 @@ def enable_windows_per_monitor_dpi_awareness() -> bool:
         return False
 
 
-def screen_dimensions_match(
+def screen_coordinate_spaces_compatible(
     screenshot_size: tuple[int, int],
     input_size: tuple[int, int],
+    *,
+    aspect_tolerance: float = 0.005,
 ) -> bool:
-    """Return whether screenshot pixels and pointer-input pixels share one space."""
+    """Check that screenshot and pointer APIs describe the same full-screen view.
+
+    Pixel dimensions may differ because the screenshot is resized or Windows
+    exposes logical input pixels. Equal aspect ratio (within rounding tolerance)
+    is the invariant needed to map normalized full-screen points between them.
+    Cropped screenshots must not be passed to this API.
+    """
     try:
         screenshot_width, screenshot_height = screenshot_size
         input_width, input_height = input_size
-        return (
-            int(screenshot_width) == screenshot_width
-            and int(screenshot_height) == screenshot_height
-            and int(input_width) == input_width
-            and int(input_height) == input_height
-            and screenshot_width > 0
-            and screenshot_height > 0
-            and input_width > 0
-            and input_height > 0
-            and (screenshot_width, screenshot_height) == (input_width, input_height)
+        values = (
+            screenshot_width, screenshot_height, input_width, input_height,
+            aspect_tolerance,
         )
-    except (TypeError, ValueError):
+        if any(isinstance(value, bool) for value in values):
+            return False
+        if any(not math.isfinite(float(value)) for value in values):
+            return False
+        if any(int(value) != value for value in values[:4]):
+            return False
+        if min(screenshot_width, screenshot_height, input_width, input_height) <= 0:
+            return False
+        if aspect_tolerance < 0:
+            return False
+        screenshot_ratio = screenshot_width / screenshot_height
+        input_ratio = input_width / input_height
+        return abs(screenshot_ratio - input_ratio) <= aspect_tolerance
+    except (TypeError, ValueError, OverflowError, ZeroDivisionError):
         return False
