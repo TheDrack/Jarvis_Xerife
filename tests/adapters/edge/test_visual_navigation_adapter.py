@@ -263,3 +263,40 @@ def test_cli_keeps_screenshot_fallback_when_semantic_result_is_uncertain():
     )
     assert result["screenshot_path"] == "captured.jpg"
     assert result["status"] == "postcondition_failed"
+
+
+def test_gui_requests_dpi_awareness_even_when_pyautogui_is_injected(
+    monkeypatch, tmp_path
+):
+    from app.adapters.edge import visual_navigation_adapter
+
+    calls = []
+    monkeypatch.setattr(
+        visual_navigation_adapter,
+        "enable_windows_per_monitor_dpi_awareness",
+        lambda: calls.append("dpi"),
+    )
+    gui = FakePyAutoGUI(Image.new("RGB", (160, 90), (30, 80, 150)))
+    adapter = VisualNavigationAdapter(
+        pyautogui_module=gui,
+        template_dir=tmp_path / "templates",
+        screenshot_dir=tmp_path / "captures",
+    )
+
+    tracked_gui = adapter._gui()
+
+    assert calls == ["dpi"]
+    assert tracked_gui._gui is gui
+
+
+def test_local_agent_requests_dpi_awareness_before_pyautogui_import():
+    from pathlib import Path
+
+    source = Path("app/adapters/edge/jarvis_local_agent.py").read_text(
+        encoding="utf-8"
+    )
+    dpi_call = source.index("enable_windows_per_monitor_dpi_awareness()")
+    pyautogui_import = source.index("import pyautogui")
+
+    assert dpi_call < pyautogui_import
+
