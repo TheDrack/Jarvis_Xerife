@@ -993,7 +993,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             # NHC current storms (best-effort; isolated so a failure never breaks collection)
             nhc_events: list[IntelligenceEvent] = []
             nhc_source = None
-            if _osiris_enabled() and os.getenv("JARVIS_NHC_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}:
+            if os.getenv("JARVIS_NHC_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}:
                 try:
                     async def _fetch_nhc():
                         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1009,8 +1009,8 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                             name = str(storm.get("name") or "").strip()
                             storm_id = str(storm.get("id") or "").strip()
                             classification = str(storm.get("classification") or "").strip()
-                            lat = storm.get("latitudeNumeric")
-                            lon = storm.get("longitudeNumeric")
+                            lat = storm.get("latitude_numeric", storm.get("latitudeNumeric"))
+                            lon = storm.get("longitude_numeric", storm.get("longitudeNumeric"))
                             try:
                                 lat_f = float(lat); lon_f = float(lon)
                             except (TypeError, ValueError):

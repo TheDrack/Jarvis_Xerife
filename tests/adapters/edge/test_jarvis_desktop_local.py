@@ -214,6 +214,7 @@ def test_intelligence_collection_resolves_local_services_through_nexus(monkeypat
 
     monkeypatch.setattr(nexus, "resolve", fake_resolve)
     monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "false")
+    monkeypatch.setenv("JARVIS_NHC_ENABLED", "false")
     runtime = LocalRuntime()
     client = _client(runtime)
     response = client.post(
@@ -1880,3 +1881,113 @@ def test_weather_grid_cache_key_distinguishes_center_and_radius():
     assert original == same_grid
     assert original != wider_radius
     assert original != shifted_center
+
+
+def test_nhc_storms_are_collected_independently_with_official_coordinate_fields(monkeypatch):
+    from app.core.nexus import nexus
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+    from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
+
+    class FakePublicAdapter:
+        def collect_public_events(self, limit):
+            assert limit == 20
+            return IntelligenceBatch()
+
+        def close(self):
+            pass
+
+    class FakeNHCResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "activeStorms": [
+                    {
+                        "id": "al112026",
+                        "name": "Example",
+                        "classification": "TS",
+                        "latitude_numeric": 20.5,
+                        "longitude_numeric": -60.2,
+                        "intensity": 55,
+                        "pressure": 998,
+                        "movementDir": 280,
+                        "movementSpeed": 12,
+                        "lastUpdate": "2026-11-12T10:00:00.000Z",
+                        "publicAdvisory": {
+                            "url": "https://www.nhc.noaa.gov/text/MIATCPAT1.shtml"
+                        },
+                    }
+                ]
+            }
+
+    class FakeNHCClient:
+        def __init__(self, timeout):
+            assert timeout == 10.0
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+        async def get(self, url):
+            assert url == "https://www.nhc.noaa.gov/CurrentStorms.json"
+            return FakeNHCResponse()
+
+    class FakeReport:
+        def __init__(self, batch):
+            self.batch = batch
+
+        def model_dump(self, mode):
+            assert mode == "json"
+            return {
+                "events": [event.model_dump(mode="json") for event in self.batch.events],
+                "observations": [],
+                "sources": [source.model_dump(mode="json") for source in self.batch.sources],
+                "unique_event_count": len(self.batch.events),
+                "unique_observation_count": 0,
+            }
+
+    class FakeEngine:
+        def process(self, batch):
+            assert len(batch.events) == 1
+            event = batch.events[0]
+            assert event.source_id == "nhc"
+            assert event.location.latitude == pytest.approx(20.5)
+            assert event.location.longitude == pytest.approx(-60.2)
+            assert event.evidence.source_name == "NHC"
+            assert any(
+                source.source_id == "nhc_storms" and source.available
+                for source in batch.sources
+            )
+            return FakeReport(batch)
+
+    services = {
+        "PublicIntelligenceAdapter": FakePublicAdapter(),
+        "IntelligenceCore": FakeEngine(),
+    }
+    monkeypatch.setattr(nexus, "resolve", lambda target_id, **_kwargs: services[target_id])
+    monkeypatch.setattr(desktop_local.httpx, "AsyncClient", FakeNHCClient)
+    monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "false")
+    monkeypatch.setenv("JARVIS_NHC_ENABLED", "true")
+    for key in (
+        "JARVIS_GEV_AREA_WEST",
+        "JARVIS_GEV_AREA_SOUTH",
+        "JARVIS_GEV_AREA_EAST",
+        "JARVIS_GEV_AREA_NORTH",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    response = client.post(
+        "/api/intelligence/collect",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["events"][0]["source_id"] == "nhc"
+    assert payload["events"][0]["location"]["latitude"] == pytest.approx(20.5)
+    assert payload["events"][0]["location"]["longitude"] == pytest.approx(-60.2)
