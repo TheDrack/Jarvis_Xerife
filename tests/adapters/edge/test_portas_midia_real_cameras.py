@@ -60,7 +60,7 @@ def test_real_camera_url_is_media():
 
 
 def test_real_ts_segment_decode():
-    seg_path = Path(r"C:\Users\USER\AppData\Local\Temp\scratchpad\segment.ts")
+    seg_path = Path(tempfile.gettempdir()) / "scratchpad" / "segment.ts"
     if not seg_path.exists():
         pytest.skip("segment.ts not captured")
     data = seg_path.read_bytes()
