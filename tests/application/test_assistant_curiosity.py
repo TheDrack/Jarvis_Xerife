@@ -1,4 +1,4 @@
-""""Regression tests for pending curiosity-answer retry semantics."""
+"""Regression tests for pending curiosity-answer retry semantics."""
 
 from datetime import datetime, timedelta
 
