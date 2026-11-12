@@ -54,7 +54,7 @@ jobs:
             tests/adapters/edge/test_portas_utilizacao.py \
             tests/adapters/edge/test_portas_observabilidade.py \
             tests/adapters/edge/test_screen_coordinates.py \
-            tests/adapters/edge/test_visual_navigation_adapter.py \\
+            tests/adapters/edge/test_visual_navigation_adapter.py \
             tests/adapters/edge/test_desktop_click_authorization.py -v -o addopts=""
 
   integration:
