@@ -24,6 +24,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Operações destrutivas, de instalação, boot, ACL, credenciais e privilégio continuam bloqueadas por padrão, por padrão textual, mesmo com token.
 - Documentação (runbook + skill) e testes unitários/integrados simulados adicionados; nenhuma permissão de host ampliada.
 
+#### Jarvis OS — kit de provisionamento Linux (2026-11-09)
+- `linux/`: inventário verificado desta máquina (dois discos, dois Windows),
+  provisionamento idempotente do harness em Ubuntu 24.04 LTS, units systemd de
+  usuário (`jarvis-api`, `jarvis-mcp` em loopback), requirements Linux sem
+  `pywinauto` e verificação pós-instalação read-only com `--services`/`--tests`.
+- O kit não formata disco, não instala bootloader e não altera o Windows: a
+  validação em VM descartável precede a instalação física no disco 0, conforme
+  `docs/JARVIS_OS_FOUNDATION.md` e `docs/architecture/JARVIS_CONTINUAL_LEARNING.md`.
+- `linux/README.md` documenta inventário, rota VM, runbook físico, gaps de
+  portabilidade (win32/ETW/overlay) e critérios de aceitação.
 #### Grafo OSINT — aresta persistida por escopo (2026-11-06)
 
 - `GraphStorePort.get_edge(edge_id, scope_id=None)` e
@@ -42,6 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Testes: busca escopada no store, wiring singleton/caminho e resolução da
   aresta persistida com recálculo, isolamento de escopo e exclusividade da
   fonte.
+- `osint.ip.enrich` passa a persistir o delta (nós antes das arestas) no store
+  durável e devolve `persisted` com inseridos/duplicados; `persist=false`
+  mantém a chamada sem estado. Falha de disco não descarta a evidência: a
+  expansão continua em `success: true` e o erro aparece em `persisted`.
+- `JARVIS_GRAPH_DB` entra na allowlist de `intelligence.env` do desktop e é
+  documentado em `desktop/README.md`.
 
 #### Grafo OSINT — `osint.graph.explain` via MCP (2026-11-06)
 

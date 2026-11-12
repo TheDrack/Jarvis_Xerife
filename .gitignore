@@ -94,6 +94,13 @@ logs/
 jarvis.db
 jarvis_graph.sqlite
 jarvis_graph.sqlite-journal
+geoint.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db-wal
+*.db-shm
+jarvis_graph.sqlite-wal
+jarvis_graph.sqlite-shm
 
 # Self-healing tracking (to prevent infinite loops)
 .github/healing_attempts.json

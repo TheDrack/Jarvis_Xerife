@@ -143,3 +143,10 @@ Nenhum desses itens deve ser declarado funcional em Linux sem a checagem corresp
 - [ ] Persistência do grafo + `edge_id` funcionando no Linux.
 - [ ] Inventário físico reconferido (serial/capacidade) imediatamente antes da Rota B.
 - [ ] Rota B só com autorização explícita e backup/renúncia registrada.
+
+  p3 (era D:)  ~214 GB → apagar, criar ext4 /
+  p4 Recovery 866 MB  → apagar, virar swap 8 GB (ou manter como /home)
+- Ambiente: `~/.config/jarvis/jarvis.env` (0600). Preencha as chaves de provedor **ali**, nunca em chat, commit ou unit.
+- Dados: `~/.local/share/jarvis/` (`JARVIS_DEVICES_DB`, `JARVIS_GEOINT_DB`, `JARVIS_GRAPH_DB`).
+- MCP continua loopback. Exposição remota segue `docs/INSTALACAO_WINDOWS.md`: Tailscale Serve, nunca Funnel, nunca `0.0.0.0`.
+- `--harden-network` é opt-in porque muda firewall; sem ele, nada de rede é alterado.

@@ -214,6 +214,7 @@ def test_intelligence_collection_resolves_local_services_through_nexus(monkeypat
 
     monkeypatch.setattr(nexus, "resolve", fake_resolve)
     monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "false")
+    monkeypatch.setenv("JARVIS_NHC_ENABLED", "false")
     runtime = LocalRuntime()
     client = _client(runtime)
     response = client.post(
@@ -504,6 +505,27 @@ def test_local_intelligence_config_uses_explicit_path_without_scanning_other_pro
 
     assert loaded == 1
     assert os.environ["JARVIS_GEV_AREA_WEST"] == "-49.0"
+
+
+def test_local_intelligence_config_never_scans_other_windows_profiles(tmp_path, monkeypatch):
+    current_local_app_data = tmp_path / "current" / "AppData" / "Local"
+    config = current_local_app_data / "Jarvis_Xerife" / "intelligence.env"
+    config.parent.mkdir(parents=True)
+    config.write_text("JARVIS_GEV_AREA_WEST=12.5\n", encoding="utf-8")
+    monkeypatch.setenv("LOCALAPPDATA", str(current_local_app_data))
+    monkeypatch.delenv("JARVIS_GEV_AREA_WEST", raising=False)
+
+    original_iterdir = Path.iterdir
+
+    def guarded_iterdir(path):
+        if path == Path("/mnt/c/Users"):
+            raise AssertionError("must not enumerate other Windows profiles")
+        return original_iterdir(path)
+
+    monkeypatch.setattr(Path, "iterdir", guarded_iterdir)
+
+    assert _load_local_intelligence_config() == 1
+    assert os.environ["JARVIS_GEV_AREA_WEST"] == "12.5"
 
 
 def test_local_intelligence_config_does_not_override_process_environment(tmp_path, monkeypatch):
@@ -1279,6 +1301,37 @@ def test_earthquake_radii_are_an_explicit_estimate():
     assert earthquake_radii(42) is None
 
 
+def test_forward_geocode_endpoint_uses_shared_helper(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    calls = []
+    monkeypatch.setattr(
+        desktop_local,
+        "forward_place",
+        lambda query: (
+            calls.append(query)
+            or {
+                "available": True,
+                "latitude": -25.4284,
+                "longitude": -49.2733,
+                "display_name": "Curitiba, Paraná, Brasil",
+            }
+        ),
+    )
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    token = client.get("/api/bootstrap").json()["local_token"]
+    response = client.get(
+        "/api/geocode?q=Curitiba",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["lat"] == pytest.approx(-25.4284)
+    assert calls == ["Curitiba"]
+
+
 def test_reverse_geocode_endpoint_returns_label_and_full_address(monkeypatch):
     import app.adapters.edge.jarvis_desktop_local as desktop_local
 
@@ -1806,3 +1859,136 @@ def test_weather_cache_expires_entries_and_evicts_oldest_when_full():
     assert len(cache) <= 2
     assert "oldest" not in cache
     assert _weather_cache_get(cache, "latest", now=604.0) == {"value": 3}
+
+
+
+def test_weather_grid_cache_key_distinguishes_center_and_radius():
+    from app.adapters.edge.jarvis_desktop_local import _weather_grid_cache_key
+
+    original = _weather_grid_cache_key(
+        [-34.0, -30.0, -26.0], [-55.0, -51.0, -47.0]
+    )
+    same_grid = _weather_grid_cache_key(
+        [-34.0, -30.0, -26.0], [-55.0, -51.0, -47.0]
+    )
+    wider_radius = _weather_grid_cache_key(
+        [-36.0, -30.0, -24.0], [-57.0, -51.0, -45.0]
+    )
+    shifted_center = _weather_grid_cache_key(
+        [-33.0, -29.0, -25.0], [-54.0, -50.0, -46.0]
+    )
+
+    assert original == same_grid
+    assert original != wider_radius
+    assert original != shifted_center
+
+
+def test_nhc_storms_are_collected_independently_with_official_coordinate_fields(monkeypatch):
+    from app.core.nexus import nexus
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+    from app.domain.intelligence.contracts import IntelligenceBatch, SourceHealth
+
+    class FakePublicAdapter:
+        def collect_public_events(self, limit):
+            assert limit == 20
+            return IntelligenceBatch()
+
+        def close(self):
+            pass
+
+    class FakeNHCResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "activeStorms": [
+                    {
+                        "id": "al112026",
+                        "name": "Example",
+                        "classification": "TS",
+                        "latitude_numeric": 20.5,
+                        "longitude_numeric": -60.2,
+                        "intensity": 55,
+                        "pressure": 998,
+                        "movementDir": 280,
+                        "movementSpeed": 12,
+                        "lastUpdate": "2026-11-12T10:00:00.000Z",
+                        "publicAdvisory": {
+                            "url": "https://www.nhc.noaa.gov/text/MIATCPAT1.shtml"
+                        },
+                    }
+                ]
+            }
+
+    class FakeNHCClient:
+        def __init__(self, timeout):
+            assert timeout == 10.0
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return False
+
+        async def get(self, url):
+            assert url == "https://www.nhc.noaa.gov/CurrentStorms.json"
+            return FakeNHCResponse()
+
+    class FakeReport:
+        def __init__(self, batch):
+            self.batch = batch
+
+        def model_dump(self, mode):
+            assert mode == "json"
+            return {
+                "events": [event.model_dump(mode="json") for event in self.batch.events],
+                "observations": [],
+                "sources": [source.model_dump(mode="json") for source in self.batch.sources],
+                "unique_event_count": len(self.batch.events),
+                "unique_observation_count": 0,
+            }
+
+    class FakeEngine:
+        def process(self, batch):
+            assert len(batch.events) == 1
+            event = batch.events[0]
+            assert event.source_id == "nhc"
+            assert event.location.latitude == pytest.approx(20.5)
+            assert event.location.longitude == pytest.approx(-60.2)
+            assert event.evidence.source_name == "NHC"
+            assert "movement=280° @ 12 mph" in event.summary
+            assert any(
+                source.source_id == "nhc_storms" and source.available
+                for source in batch.sources
+            )
+            return FakeReport(batch)
+
+    services = {
+        "PublicIntelligenceAdapter": FakePublicAdapter(),
+        "IntelligenceCore": FakeEngine(),
+    }
+    monkeypatch.setattr(nexus, "resolve", lambda target_id, **_kwargs: services[target_id])
+    monkeypatch.setattr(desktop_local.httpx, "AsyncClient", FakeNHCClient)
+    monkeypatch.setenv("JARVIS_OSIRIS_ENABLED", "false")
+    monkeypatch.setenv("JARVIS_NHC_ENABLED", "true")
+    for key in (
+        "JARVIS_GEV_AREA_WEST",
+        "JARVIS_GEV_AREA_SOUTH",
+        "JARVIS_GEV_AREA_EAST",
+        "JARVIS_GEV_AREA_NORTH",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    response = client.post(
+        "/api/intelligence/collect",
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["events"][0]["source_id"] == "nhc"
+    assert payload["events"][0]["location"]["latitude"] == pytest.approx(20.5)
+    assert payload["events"][0]["location"]["longitude"] == pytest.approx(-60.2)

@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from app.adapters.edge.jarvis_daily_briefing import (
     build_briefing,
     build_camera_registry,
+    forward_place,
     geocode_enabled,
     reverse_place,
 )
@@ -90,6 +91,13 @@ def _weather_cache_set(
     cache[key] = (now, value)
 
 
+def _weather_grid_cache_key(
+    grid_lats: list[float], grid_lons: list[float]
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
+    """Key grid results by the exact sampled points, including center and radius."""
+    return tuple(grid_lats), tuple(grid_lons)
+
+
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _HTML_PATH = _REPO_ROOT / "app" / "static" / "jarvis-desktop.html"
 _WORLD_LAND_PATH = _REPO_ROOT / "app" / "static" / "world-land.json"
@@ -110,6 +118,7 @@ _LOCAL_INTELLIGENCE_KEYS = {
     "JARVIS_DEVICES_DB",
     "JARVIS_GEOINT_DB",
     "JARVIS_GRAPH_DB",
+    "JARVIS_WINDY_API_KEY",
 }
 
 
@@ -187,9 +196,7 @@ def _load_local_intelligence_config(path: Path | None = None) -> int:
         env_local = os.getenv("LOCALAPPDATA")
         if env_local:
             candidates.append(Path(env_local) / "Jarvis_Xerife" / "intelligence.env")
-        candidates.append(
-            Path.home() / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env"
-        )
+        candidates.append(Path.home() / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env")
         # Never enumerate /mnt/c/Users: another Windows profile may be writable
         # by a different local account and must not supply an executable GEV path.
         path = None
@@ -986,7 +993,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             # NHC current storms (best-effort; isolated so a failure never breaks collection)
             nhc_events: list[IntelligenceEvent] = []
             nhc_source = None
-            if _osiris_enabled() and os.getenv("JARVIS_NHC_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}:
+            if os.getenv("JARVIS_NHC_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}:
                 try:
                     async def _fetch_nhc():
                         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -1002,8 +1009,8 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                             name = str(storm.get("name") or "").strip()
                             storm_id = str(storm.get("id") or "").strip()
                             classification = str(storm.get("classification") or "").strip()
-                            lat = storm.get("latitudeNumeric")
-                            lon = storm.get("longitudeNumeric")
+                            lat = storm.get("latitude_numeric", storm.get("latitudeNumeric"))
+                            lon = storm.get("longitude_numeric", storm.get("longitudeNumeric"))
                             try:
                                 lat_f = float(lat); lon_f = float(lon)
                             except (TypeError, ValueError):
@@ -1032,7 +1039,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                             if pressure is not None:
                                 details.append(f"pressure={pressure} mb")
                             if movement_dir is not None and movement_speed is not None:
-                                details.append(f"movement={movement_dir}° @ {movement_speed} kt")
+                                details.append(f"movement={movement_dir}° @ {movement_speed} mph")
                             last_update = storm.get("lastUpdate")
                             observed = None
                             if isinstance(last_update, str):
@@ -1246,7 +1253,7 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             for lo in lons:
                 grid_lats.append(la)
                 grid_lons.append(lo)
-        cache_key = (round(lat / 0.5) * 0.5, round(lon / 0.5) * 0.5)
+        cache_key = _weather_grid_cache_key(grid_lats, grid_lons)
         cached = getattr(state, "_wx_grid_cache", None)
         if cached is None:
             state._wx_grid_cache = {}
@@ -1402,6 +1409,39 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             logger.warning("NOAA CPC SOI fetch failed (%s)", type(exc).__name__)
             out["soi_error"] = type(exc).__name__
         return out
+
+    @app.get("/api/geocode")
+    async def geocode(
+        q: str,
+        _client: str = Depends(require_local_token),
+    ) -> dict[str, Any]:
+        """Forward geocode a place name or coordinates (Nominatim, free)."""
+        import re as _re
+        text = (q or "").strip()
+        if not text:
+            return {"success": False, "error": "empty_query"}
+        m = _re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$", text)
+        if m:
+            lat = float(m.group(1))
+            lon = float(m.group(2))
+            return {"success": True, "lat": lat, "lon": lon, "label": f"{lat:.4f}, {lon:.4f}"}
+        result = await asyncio.to_thread(forward_place, text)
+        if result.get("available"):
+            return {
+                "success": True,
+                "lat": result["latitude"],
+                "lon": result["longitude"],
+                "label": result.get("display_name") or text,
+            }
+        payload = {
+            "success": False,
+            "error": result.get("reason") or "not_found",
+            "query": text,
+        }
+        if result.get("retry_after_seconds") is not None:
+            payload["retry_after_seconds"] = result["retry_after_seconds"]
+        return payload
+
 
     @app.get("/api/intelligence/latest")
     async def latest_intelligence(_client: str = Depends(require_local_token)) -> dict[str, Any]:
