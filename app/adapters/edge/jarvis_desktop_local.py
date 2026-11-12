@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 from app.adapters.edge.jarvis_daily_briefing import (
     build_briefing,
     build_camera_registry,
+    forward_place,
     geocode_enabled,
     reverse_place,
 )
@@ -110,6 +111,7 @@ _LOCAL_INTELLIGENCE_KEYS = {
     "JARVIS_DEVICES_DB",
     "JARVIS_GEOINT_DB",
     "JARVIS_GRAPH_DB",
+    "JARVIS_WINDY_API_KEY",
 }
 
 
@@ -187,9 +189,19 @@ def _load_local_intelligence_config(path: Path | None = None) -> int:
         env_local = os.getenv("LOCALAPPDATA")
         if env_local:
             candidates.append(Path(env_local) / "Jarvis_Xerife" / "intelligence.env")
-        candidates.append(
-            Path.home() / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env"
-        )
+        candidates.append(Path.home() / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env")
+        # Do not enumerate other Windows profiles from WSL: their writable
+        # configuration must never supply an executable MCP entrypoint.
+        path = None
+        for candidate in candidates:
+            try:
+                if candidate.is_file():
+                    path = candidate
+                    break
+            except OSError:
+                continue
+        if path is None:
+            return 0
         # Never enumerate /mnt/c/Users: another Windows profile may be writable
         # by a different local account and must not supply an executable GEV path.
         path = None
@@ -1403,6 +1415,45 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
             out["soi_error"] = type(exc).__name__
         return out
 
+    async def weather_point(lat: float, lon: float, _client: str = Depends(require_local_token)) -> dict[str, Any]:
+        entry = cached.get(cache_key)
+        if entry and (_t.time() - entry[0]) < 600:
+            return entry[1]
+        cached[cache_key] = (_t.time(), result)
+    @app.get("/api/geocode")
+    async def geocode(
+        q: str,
+        """Forward geocode a place name or coordinates (Nominatim, free)."""
+        text = (q or "").strip()
+        if not text:
+            return {"success": False, "error": "empty_query"}
+        m = _re.match(r"^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$", text)
+        if m:
+            lat = float(m.group(1))
+            lon = float(m.group(2))
+            return {"success": True, "lat": lat, "lon": lon, "label": f"{lat:.4f}, {lon:.4f}"}
+        result = await asyncio.to_thread(forward_place, text)
+        if result.get("available"):
+            return {
+                "success": True,
+                "lat": result["latitude"],
+                "lon": result["longitude"],
+                "label": result.get("display_name") or text,
+        payload = {
+            "success": False,
+            "error": result.get("reason") or "not_found",
+            "query": text,
+        if result.get("retry_after_seconds") is not None:
+            payload["retry_after_seconds"] = result["retry_after_seconds"]
+        return payload
+        lat: float, lon: float, radius: float = 8.0,
+        # Build a small lat/lon grid around the center.
+        lats = [round(lat + (i - 1) * step, 2) for i in range(3)]
+        lons = [round(lon + (j - 1) * step, 2) for j in range(3)]
+        entry = cached.get(cache_key)
+        if entry and (_t.time() - entry[0]) < 600:
+            return entry[1]
+        cached[cache_key] = (_t.time(), result)
     @app.get("/api/intelligence/latest")
     async def latest_intelligence(_client: str = Depends(require_local_token)) -> dict[str, Any]:
         from app.adapters.infrastructure.intelligence.supabase_intelligence_history_adapter import (

@@ -247,3 +247,12 @@ Próximo passo obrigatório:
 
 Nada de disco, partição, bootloader ou Windows foi alterado.
 SUMMARY
+
+    mkdir -p "$(dirname "$ENV_FILE")"
+    umask 077
+    cat > "$ENV_FILE" <<ENVEOF
+JARVIS_DEVICES_DB="$HOME/.local/share/jarvis/jarvis.db"
+JARVIS_GEOINT_DB="$HOME/.local/share/jarvis/geoint.sqlite"
+JARVIS_GRAPH_DB="$HOME/.local/share/jarvis/jarvis_graph.sqlite"
+    log "aplicando UFW (default deny; SSH e tailscale0 liberados)"
+    $SUDO ufw allow 22/tcp comment 'ssh'

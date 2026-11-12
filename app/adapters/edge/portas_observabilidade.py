@@ -20,6 +20,7 @@ from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.adapters.edge import portas_core
+from app.adapters.edge.portas_midia import engine as media_engine, is_media_request, decode_stream, decode_available
 
 
 _REDACT_KEYS = re.compile(r"(pass(word)?|token|secret|auth|cookie|api.?key|credential|session)", re.I)
@@ -43,6 +44,8 @@ _MEDIA_CHUNK_BYTES = 256 * 1024
 _MEDIA_CHUNK_BUFFER_SIZE = 128
 _MEDIA_STREAM_LIMIT = 64
 _MEDIA_STREAM_MAX_BYTES = 8 * 1024 * 1024
+_MEDIA_RESPONSE_BODY_LIMIT = 16 * 1024 * 1024
+_MEDIA_RESPONSE_BODY_CONCURRENCY = 2
 
 
 def sanitizar_url(url: str) -> tuple[str, str]:
@@ -112,6 +115,7 @@ class BrowserTrafficObserver:
         self._media_sequences: dict[str, int] = {}
         self._media_offsets: dict[str, int] = {}
         self._media_chunks: deque[dict[str, Any]] = deque(maxlen=_MEDIA_CHUNK_BUFFER_SIZE)
+        self._media_capture_semaphore = asyncio.Semaphore(_MEDIA_RESPONSE_BODY_CONCURRENCY)
         self._started_at: str | None = None
         self._cdp_url = portas_core.CDP_URL
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -304,6 +308,7 @@ class BrowserTrafficObserver:
         url, host = sanitizar_url(response.url)
         with self._lock:
             request_id = self._request_ids.get(self._request_key(response.request))
+            capture_media = self._capture_media
         try:
             content_type = response.headers.get("content-type")
         except Exception:
@@ -317,6 +322,56 @@ class BrowserTrafficObserver:
             status_text=response.status_text,
             content_type=content_type,
         )
+        if capture_media and response.status and 200 <= response.status < 300:
+            if is_media_request(response.url, content_type):
+                try:
+                    loop = self._loop
+                    if loop is not None:
+                        asyncio.run_coroutine_threadsafe(
+                            self._capture_response_body(response, request_id, content_type),
+                            loop,
+                        )
+                except Exception:
+                    pass
+
+    async def _capture_response_body(self, response: Any, request_id: Any, content_type: Any) -> None:
+        # Playwright's response.body() materializes the complete body. Only read
+        # bounded, identity-encoded binary media with an explicit HTTP length.
+        try:
+            headers = response.headers or {}
+            declared_length = int(headers.get("content-length", ""))
+            content_encoding = str(headers.get("content-encoding") or "identity").strip().lower()
+        except (AttributeError, TypeError, ValueError):
+            return
+        if (
+            declared_length <= 0
+            or declared_length > _MEDIA_RESPONSE_BODY_LIMIT
+            or content_encoding not in {"", "identity"}
+        ):
+            return
+
+        mime = str(content_type or "").split(";", 1)[0].strip().lower()
+        if mime in {"application/vnd.apple.mpegurl", "application/x-mpegurl", "application/dash+xml"}:
+            # Text manifests can contain signed segment URLs and AES key URIs.
+            return
+
+        try:
+            async with self._media_capture_semaphore:
+                body = await response.body()
+        except Exception:
+            return
+        if not body or len(body) > _MEDIA_RESPONSE_BODY_LIMIT:
+            return
+
+        raw_url = str(response.url)
+        url, host = sanitizar_url(raw_url)
+        # Adapter selection uses declared MIME only; URL paths are not trusted.
+        adapter = "ump" if mime == "application/vnd.yt-ump" else "raw"
+        sid = media_engine.open_stream(url, host=host, content_type=content_type, adapter=adapter)
+        if sid is None:
+            return
+        media_engine.append(sid, body, direction="response", adapter_hint=adapter)
+        media_engine.close_stream(sid)
 
     def _on_request_finished(self, request: Any) -> None:
         url, host = sanitizar_url(request.url)
@@ -366,6 +421,13 @@ class BrowserTrafficObserver:
             host=host,
             payload=sanitizar_payload(payload, self._capture_payloads),
         )
+        if self._capture_media and isinstance(payload, (bytes, bytearray)) and len(payload) > 0:
+            try:
+                sid = media_engine.open_stream(url, host=host, content_type="application/octet-stream", adapter="raw")
+                if sid is not None:
+                    media_engine.append(sid, bytes(payload), direction=direction)
+            except Exception:
+                pass
 
     def _on_media_data_received(self, session: Any, params: dict[str, Any]) -> None:
         request_id = str(params.get("requestId") or "")
@@ -586,6 +648,8 @@ class BrowserTrafficObserver:
                 return self.status()
             self._capture_payloads = bool(capture_payloads)
             self._capture_media = bool(capture_media)
+            if self._capture_media:
+                media_engine.enable()
             self._events = deque(maxlen=max(100, min(int(max_events), 10000)))
             self._next_id = 1
             self._media_streams.clear()
@@ -622,7 +686,9 @@ class BrowserTrafficObserver:
             loop.call_soon_threadsafe(loop.stop)
             thread.join(timeout=10)
         except Exception as exc:
+            media_engine.disable()
             return {"success": False, "active": self._active, "error": f"{type(exc).__name__}: {exc}"}
+        media_engine.disable()
         return {"success": True, "active": False, "events_buffered": len(self._events)}
 
     def status(self) -> dict[str, Any]:
@@ -771,3 +837,63 @@ def registrar_observabilidade_portas(mcp: Any, tracked_action: Any) -> None:
     def portas_trafego_limpar() -> dict[str, Any]:
         """Limpa buffers em memória sem interromper a captura."""
         return observer.clear()
+
+    @mcp.tool()
+    @tracked_action("Consultando streams de mídia capturados")
+    def portas_midia_status() -> dict[str, Any]:
+        """Estado do motor de captura de mídia (streams, bytes, limites)."""
+        return media_engine.status()
+
+    @mcp.tool()
+    @tracked_action("Listando streams de mídia")
+    def portas_midia_streams() -> dict[str, Any]:
+        """Lista streams de mídia capturados (metadados)."""
+        return {"success": True, "streams": media_engine.streams()}
+
+    @mcp.tool()
+    @tracked_action("Consultando chunks de mídia")
+    def portas_midia_chunks(stream_id: str, after_sequence: int = -1, limit: int = 64) -> dict[str, Any]:
+        """Consulta chunks de um stream de mídia (metadados por chunk)."""
+        return media_engine.chunks(stream_id, after_sequence=after_sequence, limit=limit)
+
+    @mcp.tool()
+    @tracked_action("Lendo bytes de mídia")
+    def portas_midia_bytes(stream_id: str, max_bytes: int = 65536) -> dict[str, Any]:
+        """Lê bytes brutos de um stream (hex), limitado."""
+        return media_engine.read_bytes(stream_id, max_bytes=max_bytes)
+
+    @mcp.tool()
+    @tracked_action("Consultando partes UMP de mídia")
+    def portas_midia_ump(stream_id: str) -> dict[str, Any]:
+        """Retorna partes UMP parseadas de um stream (tipos, tamanhos, segmentos)."""
+        return media_engine.ump_parts(stream_id)
+
+    @mcp.tool()
+    @tracked_action("Consultando playlist HLS")
+    def portas_midia_hls(stream_id: str) -> dict[str, Any]:
+        """Retorna playlist HLS parseada de um stream."""
+        return media_engine.hls_playlist(stream_id)
+
+    @mcp.tool()
+    @tracked_action("Consultando manifesto DASH")
+    def portas_midia_dash(stream_id: str) -> dict[str, Any]:
+        """Retorna manifesto DASH parseado de um stream."""
+        return media_engine.dash_manifest(stream_id)
+
+    @mcp.tool()
+    @tracked_action("Decodificando stream de mídia")
+    def portas_midia_decode(stream_id: str, mode: str = "probe") -> dict[str, Any]:
+        """Tenta decodificar um stream capturado (requer ffmpeg/ffprobe). mode: probe|audio|frames."""
+        return decode_stream(stream_id, mode=mode)
+
+    @mcp.tool()
+    @tracked_action("Verificando disponibilidade de decodificação")
+    def portas_midia_decode_status() -> dict[str, Any]:
+        """Informa se ffmpeg/ffprobe estão disponíveis para decodificação."""
+        return {"success": True, "available": decode_available()}
+
+    @mcp.tool()
+    @tracked_action("Limpando streams de mídia")
+    def portas_midia_limpar() -> dict[str, Any]:
+        """Limpa streams de mídia capturados."""
+        return media_engine.clear()

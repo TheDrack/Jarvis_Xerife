@@ -506,6 +506,17 @@ def test_local_intelligence_config_uses_explicit_path_without_scanning_other_pro
     assert os.environ["JARVIS_GEV_AREA_WEST"] == "-49.0"
 
 
+def test_local_intelligence_config_never_scans_other_windows_profiles(tmp_path, monkeypatch):
+    current_local_app_data = tmp_path / "current" / "AppData" / "Local"
+    config = current_local_app_data / "Jarvis_Xerife" / "intelligence.env"
+    config.parent.mkdir(parents=True)
+    config.write_text("JARVIS_GEV_AREA_LAT=12.5\\n", encoding="utf-8")
+    monkeypatch.setenv("LOCALAPPDATA", str(current_local_app_data))
+    monkeypatch.delenv("JARVIS_GEV_AREA_LAT", raising=False)
+        if path == Path("/mnt/c/Users"):
+            raise AssertionError("must not enumerate other Windows profiles")
+    assert _load_local_intelligence_config() == 1
+    assert os.environ["JARVIS_GEV_AREA_LAT"] == "12.5"
 def test_local_intelligence_config_does_not_override_process_environment(tmp_path, monkeypatch):
     config = tmp_path / "intelligence.env"
     config.write_text("JARVIS_GEV_AREA_WEST=-49.0\n", encoding="utf-8")
@@ -1277,6 +1288,37 @@ def test_earthquake_radii_are_an_explicit_estimate():
     assert earthquake_radii(None) is None
     assert earthquake_radii("forte") is None
     assert earthquake_radii(42) is None
+
+
+def test_forward_geocode_endpoint_uses_shared_helper(monkeypatch):
+    import app.adapters.edge.jarvis_desktop_local as desktop_local
+
+    calls = []
+    monkeypatch.setattr(
+        desktop_local,
+        "forward_place",
+        lambda query: (
+            calls.append(query)
+            or {
+                "available": True,
+                "latitude": -25.4284,
+                "longitude": -49.2733,
+                "display_name": "Curitiba, Paraná, Brasil",
+            }
+        ),
+    )
+    runtime = LocalRuntime()
+    client = _client(runtime)
+    token = client.get("/api/bootstrap").json()["local_token"]
+    response = client.get(
+        "/api/geocode?q=Curitiba",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert response.json()["lat"] == pytest.approx(-25.4284)
+    assert calls == ["Curitiba"]
 
 
 def test_reverse_geocode_endpoint_returns_label_and_full_address(monkeypatch):

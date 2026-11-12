@@ -676,6 +676,8 @@ def _portas_content(meta: dict[str, Any], png: bytes | None = None) -> list[Any]
 registrar_visualizacao_portas(mcp, tracked_action, _portas_content)
 registrar_utilizacao_portas(mcp, tracked_action)
 registrar_observabilidade_portas(mcp, tracked_action)
+from app.adapters.edge.portas_midia_entrega import registrar_entrega_midia
+registrar_entrega_midia(mcp, tracked_action)
 
 # Remote-capable MCP surface:
 # - OSINT tools are passive; active OSINT remains on the separate local server.

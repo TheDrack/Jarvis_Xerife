@@ -366,6 +366,10 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
   <div class="center">
    <div class="status"><div class="rules"><i></i>◈<i></i></div><b id="statusLabel" role="status" aria-live="polite">STANDBY</b><small id="statusDetail">NÚCLEO LOCAL · AGUARDANDO PRIMEIRA LEITURA</small></div>
    <div class="globe-wrap"><div class="reactor" aria-hidden="true"><i class="r2"></i><i class="r1"></i><i class="sweep"></i><i class="r3"></i></div><canvas id="globe" aria-label="Globo de eventos, observações, câmeras, dispositivos e agrupamentos por proximidade"></canvas><div class="reticle"></div><section class="selection-inspector" id="selectionInspector" hidden aria-live="polite"><button class="mini selection-close" id="selectionClose" type="button" aria-label="Fechar descrição" title="Fechar descrição">×</button><div class="selection-kicker">SELEÇÃO ATIVA <span id="selectionKind">—</span></div><strong id="selectionTitle">—</strong><small id="selectionDetail">—</small><p id="selectionSummary" class="selection-summary"></p><div id="selectionFacts" class="selection-facts"></div><div class="selection-actions"><a class="mini" id="selectionSource" hidden target="_blank" rel="noopener noreferrer">ABRIR FONTE ↗</a><button class="mini" id="selectionLive" type="button" hidden>AO VIVO</button><button class="mini" id="selectionAction" type="button">FOCAR</button></div></section><div class="globe-zoom" id="zoomLevel">100%</div><div class="globe-tools"><div class="globe-pan" role="group" aria-label="Mover o globo"><button type="button" data-pan="up" aria-label="Mover para norte">↑</button><div><button type="button" data-pan="left" aria-label="Mover para oeste">←</button><button type="button" data-pan="down" aria-label="Mover para sul">↓</button><button type="button" data-pan="right" aria-label="Mover para leste">→</button></div></div><button type="button" id="zoomIn" aria-label="Aproximar o globo" title="Aproximar">+</button><button type="button" id="zoomOut" aria-label="Afastar o globo" title="Afastar">−</button><button type="button" id="zoomReset" aria-label="Recentralizar o globo" title="Recentralizar">⤢</button></div><div class="globe-hint">arraste · scroll/pinça para zoom · clique no agrupamento aproxima</div></div>
+   <div class="location-search" role="search" style="display:flex;gap:6px;align-items:center;margin:6px 0 4px 0">
+    <input id="locationSearch" type="search" placeholder="Buscar local ou lat,lon" aria-label="Buscar localização no globo" style="flex:1;min-width:120px;padding:4px 8px;font-size:var(--fs-xs);background:rgba(6,17,31,.8);border:1px solid var(--line);color:var(--text);border-radius:2px">
+    <button type="button" id="locationSearchBtn" aria-label="Buscar localização" title="Buscar" style="padding:4px 8px;font-size:var(--fs-xs)">Ir</button>
+   </div>
    <nav class="areas" id="areaBar" aria-label="Focar uma área no globo"></nav>
    <nav class="dock" aria-label="Seções">
     <div class="dock-group" role="group" aria-label="Inteligência">
@@ -393,7 +397,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
   <div class="panels">
    <div class="col col-left">
     <article class="panel" data-panel="briefing" id="panelBriefing">
-     <div class="panel-head"><span class="tag">L-00</span><span class="title">BRIEFING · DIÁRIO</span><div class="head-actions"><button class="mini" type="button" id="briefingRefresh" title="Atualizar manchetes e clima">SYNC</button><button class="mini" type="button" id="briefingLocate" title="Ancorar o briefing na localização deste dispositivo" aria-label="Usar a localização deste dispositivo">LOC</button><button class="mini" type="button" data-collapse="panelBriefing">MIN</button></div></div>
+     <div class="panel-head"><span class="tag">L-00</span><span class="title">BRIEFING · DIÁRIO</span><div class="head-actions"><button class="mini" type="button" id="briefingRefresh" title="Atualizar manchetes e clima">SYNC</button><button class="mini" type="button" id="briefingLocate" title="Ancorar o briefing na localização deste dispositivo" aria-label="Usar a localização deste dispositivo">LOC</button><button class="mini" type="button" id="briefingSaveLoc" title="Fixar localização na posição atual do globo" aria-label="Fixar localização atual do globo">FIXAR</button><button class="mini" type="button" data-collapse="panelBriefing">MIN</button></div></div>
      <div class="panel-body">
       <div class="tabs" role="tablist" aria-label="Tópicos do briefing" id="briefingTabs"></div>
       <div id="briefingList" class="briefing-list"><div class="empty">Briefing ainda não carregado. Use SYNC, o orb ou aguarde o ciclo automático.</div></div>
@@ -469,8 +473,8 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 <div class="window" id="liveWindow" role="dialog" aria-modal="true" aria-labelledby="liveTitle">
  <div class="window-card live-card">
   <div class="window-head"><span class="badge">◈</span><span class="title" id="liveTitle">CÂMERA · AO VIVO</span><button class="mini" type="button" data-close="liveWindow">FECHAR ×</button></div>
-  <div class="window-body live-body" id="liveBody"><div class="empty">Selecione uma câmera com transmissão disponível.</div></div>
-  <div class="window-foot"><span id="liveFoot">FONTE · --</span><a class="mini" id="liveSource" target="_blank" rel="noopener noreferrer" hidden>ABRIR NA FONTE ↗</a></div>
+  <div class="window-body live-body" id="liveBody"><div class="empty">Selecione uma câmera com transmissão disponível ou cole uma URL de stream HLS/MP4 abaixo.</div></div>
+  <div class="window-foot"><span id="liveFoot">FONTE · --</span><input id="liveUrlInput" type="text" placeholder="https://...m3u8" style="flex:1;min-width:120px" aria-label="URL de stream"><button class="mini" type="button" id="livePlayButton">PLAY</button><a class="mini" id="liveSource" target="_blank" rel="noopener noreferrer" hidden>ABRIR NA FONTE ↗</a></div>
  </div>
 </div>
 
@@ -485,6 +489,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 </div>
 <script src="/static/jarvis-geospatial-layer.js"></script>
 <script src="/static/jarvis-intelligence-status.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
 <script>
 (()=>{
 'use strict';
@@ -2084,6 +2089,43 @@ async function refreshWeather(){
  const lon=loc?loc.longitude:(state.location&&state.location.longitude)||-47.9;
  await fetchWeatherPoint(lat,lon);
 }
+function buildWxGridFromPoint(w){
+ // Single central sphere synced with the lateral weather box (no 3x3 grid).
+ if(!w||!w.success){ state.wxGrid=null; return; }
+ const p={
+  lat:w.lat, lon:w.lon,
+  current:w.current||{},
+  hourly:{
+   time:h.time||[],
+   temperature:h.temperature||[],
+   precipitation:h.precipitation||[],
+   wind_speed:h.wind_speed||[],
+   wind_direction:h.wind_direction||[],
+   weather_code:h.weather_code||[],
+   cloud_cover:h.cloud_cover||[]
+ };
+ state.wxGrid={success:true, center:{lat:w.lat,lon:w.lon}, points:[p], place_label:w.place_label};
+ state.wxHour=0; state.wxParticles=[];
+ if(state.layers.weatherAnim) buildWxGridFromPoint(state.weatherPoint);
+ html.push('<div>💧 Chuva: '+(c.precipitation!=null?c.precipitation+' mm':'--')+'</div>');
+ html.push('<div>💨 Vento: '+(c.wind_speed!=null?c.wind_speed+' km/h':'--')+'</div>');
+ html.push('<div>🌪️ Rajadas: '+(c.wind_gusts!=null?c.wind_gusts+' km/h':'--')+'</div>');
+ html.push('<div>💧 Umidade: '+(c.humidity!=null?c.humidity+'%':'--')+'</div>');
+ html.push('<div>☁️ Nuvens: '+(c.cloud_cover!=null?c.cloud_cover+'%':'--')+'</div>');
+   html.push('<div style="border:1px solid var(--line-soft);padding:2px 1px"><div>'+hh+'</div><div style="font-size:14px">'+wmoIcon(wc[i])+'</div><div>'+(ts[i]!=null?Math.round(ts[i])+'°':'--')+'</div><div>'+(prec[i]!=null?prec[i]+'mm':'--')+'</div><div>'+(ws[i]!=null?Math.round(ws[i])+'km/h':'--')+'</div></div>');
+   html.push('<div style="border:1px solid var(--line-soft);padding:2px 1px"><div>'+dd+'</div><div style="font-size:12px">'+wmoIcon(dw[i])+'</div><div>'+(dmax[i]!=null?Math.round(dmax[i])+'°':'--')+'</div><div style="opacity:.7">'+(dmin[i]!=null?Math.round(dmin[i])+'°':'--')+'</div><div>'+(dprec[i]!=null?dprec[i]+'mm':'--')+'</div></div>');
+async function searchLocation(){
+ const input=$('locationSearch');
+ const q=(input&&input.value?input.value:'').trim();
+ if(!q)return;
+ const res=await api('/api/geocode?q='+encodeURIComponent(q));
+ if(res&&res.success&&Number.isFinite(res.lat)&&Number.isFinite(res.lon)){
+  Globe.focusTo(res.lat,res.lon,3);
+  await fetchWeatherPoint(res.lat,res.lon);
+  if(state.layers.weatherAnim)buildWxGridFromPoint(state.weatherPoint);
+  if(input)input.value=res.label||q;
+ }else{
+  if(input){ input.style.borderColor='var(--danger,#ff6b6b)'; setTimeout(()=>{input.style.borderColor='';},1200); }
 function spark(el,values,max){
  if(!el)return;
  const data=values.slice(-40);
@@ -2263,6 +2305,15 @@ function renderBriefingList(){
  $('briefingList').innerHTML=topic.items.slice(0,5).map(item=>'<a class="row" href="'+esc(item.url)+'" target="_blank" rel="noopener noreferrer"><div class="grow"><b>'+esc(item.title)+'</b><small>'+esc((item.source||'veículo')+' · '+(item.published_at?hhmm(item.published_at):'--:--'))+'</small></div><span class="pill idle">'+esc(String(topic.label||'').slice(0,4))+'</span></a>').join('');
 }
 function renderBriefing(){renderTabs();renderBriefingList();}
+function saveCurrentLocation(){
+ const gc=Globe.getCenter?Globe.getCenter():null;
+ if(!gc||!Number.isFinite(gc.latitude)||!Number.isFinite(gc.longitude)){ setFooter('SEM CENTRO DO GLOBO'); return; }
+ state.location={latitude:gc.latitude,longitude:gc.longitude,accuracy_m:0,manual:true};
+ try{ localStorage.setItem('jarvis.manualLocation',JSON.stringify(state.location)); }catch(e){}
+ setFooter('LOCALIZAÇÃO FIXADA · '+gc.latitude.toFixed(3)+','+gc.longitude.toFixed(3));
+ refreshBriefing().then(buildAreas).catch(()=>{});
+ fetchWeatherPoint(gc.latitude,gc.longitude).then(()=>{ if(state.layers.weatherAnim)buildWxGridFromPoint(state.weatherPoint); renderWeatherPanel(); }).catch(()=>{});
+}
 function requestLocation(){
  if(!navigator.geolocation){
   setFooter('GEOLOCALIZAÇÃO INDISPONÍVEL · REGIÃO CONFIGURADA');
@@ -2312,11 +2363,19 @@ const safeCamUrl=value=>{
 };
 let liveTimer=null;
 function stopLiveTimer(){if(liveTimer){clearInterval(liveTimer);liveTimer=null;}}
+function normalizeYouTubeUrl(url){
+ if(!url)return url;
+ let m=url.match(/youtube\.com\/watch\?v=([\w-]+)/i)||url.match(/youtu\.be\/([\w-]+)/i)||url.match(/youtube\.com\/shorts\/([\w-]+)/i);
+ if(m)return 'https://www.youtube.com/embed/'+m[1];
+ m=url.match(/youtube\.com\/embed\/([\w-]+)/i);
+ if(m)return 'https://www.youtube.com/embed/'+m[1];
+ return url;
+}
 function liveInfo(mark){
  const record=mark&&(mark.record||mark.device)||{};
  const attrs=record.attributes&&typeof record.attributes==='object'?record.attributes:{};
  const raw=mark&&mark.live&&mark.live.url?mark.live.url:(attrs.stream_url||record.stream_url||record.url||'');
- const url=safeCamUrl(raw);
+ const url=safeCamUrl(normalizeYouTubeUrl(raw));
  if(!url)return null;
  const streamable=['camera','radio_station'].includes(record.entity_type)||mark.kind==='camera'||Boolean(mark.live);
  if(!streamable)return null;
@@ -2329,6 +2388,7 @@ function liveInfo(mark){
   else type='iframe';
  }
  if(type==='mjpeg'||type==='snapshot')type='image';
+ if(/youtube\.com\/embed\//i.test(url))type='iframe';
  if(!['image','video','hls','iframe','audio','snapshot-api'].includes(type))type='iframe';
  return {url,type,label:mark.label||attrs.name||record.label||'CÂMERA',source:attrs.source||record.source_id||record.source||'FONTE'};
 }
@@ -2373,7 +2433,23 @@ function openLiveMedia(info){
    img.src=next.href;
   },5000);
  }else if(info.type==='video'||info.type==='hls'){
-  body.innerHTML='<video controls autoplay muted playsinline src="'+esc(url)+'"></video>';
+  const isHls=/\.m3u8(\?|$)/i.test(url)||info.type==='hls';
+  body.innerHTML='<video controls autoplay muted playsinline id="liveVideo"></video>';
+  const video=body.querySelector('#liveVideo');
+  if(window.liveHls){try{window.liveHls.destroy();}catch(e){}window.liveHls=null;}
+  if(isHls&&window.Hls&&window.Hls.isSupported()){
+   const hls=new window.Hls({enableWorker:true,lowLatencyMode:true});
+   window.liveHls=hls;
+   hls.loadSource(url);
+   hls.attachMedia(video);
+   hls.on(window.Hls.Events.ERROR,(ev,data)=>{
+    if(data&&data.fatal){
+     $('liveFoot').textContent='HLS · ERRO '+(data.type||'')+' '+(data.details||'');
+    }
+   });
+  }else{
+   video.src=url;
+  }
  }else if(info.type==='audio'){
   body.innerHTML='<audio controls autoplay src="'+esc(url)+'" style="width:100%"></audio>';
  }else{
@@ -2394,9 +2470,12 @@ function openCamerasHtml(open){
   return html;
  }
  html+=cameras.map((cam,index)=>{
-  const place=cam.place?[cam.place.city,cam.place.country].filter(Boolean).join(' · '):'';
-  const media='<img alt="'+esc(cam.label)+'" src="'+esc(cam.safe)+'" data-cam="o'+index+'" data-src="'+esc(cam.safe)+'" data-refresh="'+esc(cam.refresh_seconds)+'" data-at="'+Date.now()+'" loading="lazy">';
-  return '<figure class="cam" data-open-camera="'+index+'" title="'+esc(cam.attribution||cam.provider)+'">'+media+'<figcaption><b>'+esc(cam.label)+'</b><small>'+esc(String(cam.provider).toUpperCase()+' · '+num(cam.distance_km)+' KM'+(place?' · '+place:'')+' · '+String(cam.attribution||'')+' · '+String(cam.license||'licença não declarada'))+'</small></figcaption></figure>';
+  const place=cam.place?[cam.place.city,cam.place.state,cam.place.country].filter(Boolean).join(' · '):'';
+  const media='<img alt="'+esc(cam.label)+'" src="'+esc(cam.safe)+'" data-cam="o'+index+'" data-src="'+esc(cam.safe)+'" data-refresh="'+esc(cam.refresh_seconds)+'" data-at="'+Date.now()+'" loading="lazy" onerror="this.dataset.failed=\'1\';this.alt=\'câmera indisponível nesta leitura\'">';
+  const origin=cam.provider?String(cam.provider).toUpperCase():'';
+  const lastImage=cam.live&&cam.live.last_frame_at?String(cam.live.last_frame_at):'';
+  const liveBtn=cam.stream_url?'<button class="mini cam-live" type="button" data-cam-live-url="'+esc(cam.stream_url)+'">AO VIVO</button>':'';
+  return '<figure class="cam" data-open-camera="'+index+'" title="'+esc(cam.attribution||cam.provider)+'">'+media+'<figcaption><b>'+esc(cam.label)+'</b><small>'+esc(origin+(cam.distance_km!=null?' · '+num(cam.distance_km)+' KM':'')+(place?' · '+place:'')+(lastImage?' · ÚLT. IMAGEM '+lastImage:'')+' · '+String(cam.attribution||'')+' · '+String(cam.license||'licença não declarada'))+'</small>'+liveBtn+'</figcaption></figure>';
  }).join('');
  return html;
 }
@@ -3155,8 +3234,7 @@ function openWindow(id){const el=$(id);if(el)el.classList.add('show');}
 function closeWindow(id){
  const el=$(id);
  if(el)el.classList.remove('show');
- if(id==='cameraWindow')stopCameraTimer();
- if(id==='liveWindow'){stopLiveTimer();const body=$('liveBody');if(body)body.innerHTML='';}
+ if(id==='cameraWindow')stopCameraTimer();  if(id==='liveWindow'){stopLiveTimer();if(window.liveHls){try{window.liveHls.destroy();}catch(e){}window.liveHls=null;}const body=$('liveBody');if(body)body.innerHTML='';}
 }
 
 const fullscreenButton=$('fullscreenToggle');
@@ -3381,9 +3459,11 @@ document.addEventListener('keydown',ev=>{
  $('briefingRefresh').addEventListener('click',refreshBriefing);
  $('weatherRefresh').addEventListener('click',refreshWeather);
   $('briefingLocate').addEventListener('click',async()=>{
+  try{ localStorage.removeItem('jarvis.manualLocation'); }catch(e){}
   const ok=await requestLocation();
   if(ok){await refreshBriefing();buildAreas();}
  });
+ $('briefingSaveLoc').addEventListener('click',saveCurrentLocation);
  $('briefingTabs').addEventListener('click',ev=>{
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-topic]'):null;
   if(!target)return;
@@ -3400,6 +3480,15 @@ document.addEventListener('keydown',ev=>{
    }
    return;
   }
+  const liveCamTarget=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-cam-live-url]'):null;
+  if(liveCamTarget){
+   const url=liveCamTarget.getAttribute('data-cam-live-url');
+   if(url){
+    const info=liveInfo({kind:'camera',label:'Câmera ao vivo',record:{attributes:{name:'Câmera ao vivo',source:'Windy',stream_url:url,stream_type:/\.m3u8(\?|$)/i.test(url)?'hls':(/\.(mp4|webm)(\?|$)/i.test(url)?'video':'iframe')}},live:{url:url}});
+    if(info)openLiveMedia(info);
+   }
+   return;
+  }
   if(ev.target&&typeof ev.target.closest==='function'&&ev.target.closest('video,button,a'))return;
   const target=ev.target&&typeof ev.target.closest==='function'?ev.target.closest('[data-camera-index]'):null;
   if(!target)return;
@@ -3411,9 +3500,18 @@ document.addEventListener('keydown',ev=>{
  $('camerasButton').addEventListener('click',()=>{openWindow('cameraWindow');refreshCameras();});
  $('universalButton').addEventListener('click',()=>{openWindow('intelWindow');refreshIntelStatus();refreshDevices();refreshCameras();});
  $('cameraWindow').addEventListener('click',ev=>{if(ev.target===$('cameraWindow'))closeWindow('cameraWindow');});
+ $('livePlayButton').addEventListener('click',()=>{
+  const url=safeCamUrl(($('liveUrlInput').value||'').trim());
+  if(!url){setFooter('AO VIVO · URL INVÁLIDA');return;}
+  const info={url,type:/\.m3u8(\?|$)/i.test(url)?'hls':(/\.(mp4|webm)(\?|$)/i.test(url)?'video':'iframe'),label:'STREAM',source:'MANUAL'};
+  openLiveMedia(info);
+ });
+ $('liveUrlInput').addEventListener('keydown',ev=>{if(ev.key==='Enter')$('livePlayButton').click();});
  $('intelWindow').addEventListener('click',ev=>{if(ev.target===$('intelWindow'))closeWindow('intelWindow');});
  $('pairButton').addEventListener('click',pair);
  $('pairCode').addEventListener('keydown',ev=>{if(ev.key==='Enter')pair();});
+ if($('locationSearchBtn'))$('locationSearchBtn').addEventListener('click',searchLocation);
+ if($('locationSearch'))$('locationSearch').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();searchLocation();}});
  fullscreenButton.addEventListener('click',toggleFullscreen);
  document.addEventListener('fullscreenchange',()=>syncFullscreenControl(Boolean(document.fullscreenElement)));
  document.addEventListener('keydown',ev=>{
@@ -3464,7 +3562,15 @@ setView('core');
  if(state.token){
   await refreshAll();
   startPolling();
+  let manualLoc=null;
+ try{ manualLoc=JSON.parse(localStorage.getItem('jarvis.manualLocation')||'null'); }catch(e){ manualLoc=null; }
+ if(manualLoc&&Number.isFinite(manualLoc.latitude)&&Number.isFinite(manualLoc.longitude)){
+  state.location=manualLoc;
+  refreshBriefing().then(buildAreas).catch(()=>{});
+  fetchWeatherPoint(manualLoc.latitude,manualLoc.longitude).then(()=>{ if(state.layers.weatherAnim)buildWxGridFromPoint(state.weatherPoint); renderWeatherPanel(); }).catch(()=>{});
+ }else{
   requestLocation().then(ok=>{if(ok)refreshBriefing().then(buildAreas).catch(()=>{});}).catch(()=>{});
+ }
  }
 })();
 })();

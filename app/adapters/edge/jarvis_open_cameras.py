@@ -32,6 +32,7 @@ import httpx
 
 TFL_URL = "https://api.tfl.gov.uk/Place/Type/JamCam"
 DATUMFEED_URL = "https://datumfeed.com/api/cameras"
+WINDY_URL = "https://api.windy.com/webcams/api/v3/webcams"
 USER_AGENT = "Jarvis-Xerife/0.1 (local desktop HUD; public camera layer)"
 
 TIMEOUT_SECONDS = 12.0
@@ -46,11 +47,11 @@ _LOCK = threading.Lock()
 _CACHE: dict[str, tuple[float, Any]] = {}
 
 
-def _cached(key: str, produce):
+def _cached(key: str, produce, ttl: float = CACHE_TTL_SECONDS):
     now = time.monotonic()
     with _LOCK:
         entry = _CACHE.get(key)
-        if entry and now - entry[0] < CACHE_TTL_SECONDS:
+        if entry and now - entry[0] < ttl:
             return entry[1]
     value = produce()
     with _LOCK:
@@ -78,6 +79,9 @@ def _fetch_json(url: str, params: dict[str, Any] | None = None) -> Any:
     key = os.getenv("JARVIS_DATUMFEED_KEY", "").strip()
     if key and url.startswith(DATUMFEED_URL):
         headers["Authorization"] = f"Bearer {key}"
+    windy_key = os.getenv("JARVIS_WINDY_API_KEY", "").strip()
+    if windy_key and url.startswith(WINDY_URL):
+        headers["x-windy-api-key"] = windy_key
     response = httpx.get(
         url,
         params=params,
@@ -245,6 +249,135 @@ def _datumfeed(latitude: float, longitude: float, radius_km: float, limit: int) 
     return _cached(f"datumfeed:{bbox}:{limit}", produce)
 
 
+def _windy(latitude: float, longitude: float, radius_km: float, limit: int) -> dict[str, Any]:
+    key = os.getenv("JARVIS_WINDY_API_KEY", "").strip()
+    if not key:
+        return {"available": False, "reason": "missing_key", "cameras": []}
+
+    def produce() -> dict[str, Any]:
+        try:
+            payload = _fetch_json(
+                WINDY_URL,
+                {
+                    "nearby": f"{latitude},{longitude},{int(radius_km)}",
+                    "limit": str(min(50, max(limit, 1))),
+                    "include": "location,images,urls,player",
+                    "lang": "en",
+                },
+            )
+        except (httpx.HTTPError, ValueError) as exc:
+            return {"available": False, "reason": _fail(exc), "cameras": []}
+        rows = payload.get("webcams") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            return {"available": False, "reason": "malformed", "cameras": []}
+        cameras: list[dict[str, Any]] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            loc = row.get("location") if isinstance(row.get("location"), dict) else {}
+            cam_lat = _coordinate(loc.get("latitude", loc.get("lat")), 90.0)
+            cam_lon = _coordinate(loc.get("longitude", loc.get("lon")), 180.0)
+            if cam_lat is None or cam_lon is None:
+                continue
+            images = row.get("images") if isinstance(row.get("images"), dict) else {}
+            current = images.get("current") if isinstance(images.get("current"), dict) else {}
+            preview = current.get("preview") or current.get("thumbnail") or current.get("original")
+            urls = row.get("urls") if isinstance(row.get("urls"), dict) else {}
+            page_url = urls.get("detail") or urls.get("edit")
+            player = row.get("player") if isinstance(row.get("player"), dict) else {}
+            live_url = player.get("live") or player.get("day")
+            url = preview or live_url
+            if not url:
+                continue
+            cameras.append(
+                {
+                    "id": f"windy:{row.get('webcamId') or row.get('id') or len(cameras)}",
+                    "label": str(row.get("title") or "Windy webcam")[:80],
+                    "url": url,
+                    "kind": "snapshot" if preview else "iframe",
+                    "stream_url": live_url,
+                    "refresh_seconds": 600,
+                    "provider": "windy",
+                    "latitude": cam_lat,
+                    "longitude": cam_lon,
+                    "place": {
+                        "city": loc.get("city"),
+                        "state": loc.get("region"),
+                        "country": loc.get("country"),
+                    },
+                    "attribution": "Windy Webcams API",
+                    "license": "Windy Webcams terms",
+                    "license_url": "https://api.windy.com/webcams",
+                    "page_url": page_url,
+                    "live": {"status": "unknown"},
+                }
+            )
+        return {"available": True, "reason": None, "cameras": cameras}
+
+    return _cached(f"windy:{latitude}:{longitude}:{radius_km}:{limit}", produce, ttl=300.0)
+
+
+# ---------------------------------------------------------------------------
+# Extensible provider registry.
+#
+# New providers (CET-SP, DER-SP, etc.) are added here without touching the
+# globe core: implement a fetch function returning
+# {"available": bool, "reason": str|None, "cameras": [dict]} and append a
+# descriptor. The descriptor declares whether the provider needs coordinates.
+# ---------------------------------------------------------------------------
+
+
+def _tfl_fetch(lat, lon, radius, limit):
+    return _tfl(limit)
+
+
+def _datumfeed_fetch(lat, lon, radius, limit):
+    return _datumfeed(lat, lon, radius, limit)
+
+
+def _windy_fetch(lat, lon, radius, limit):
+    return _windy(lat, lon, radius, limit)
+
+
+CAMERA_PROVIDERS: list[dict[str, Any]] = [
+    {
+        "id": "tfl",
+        "label": "Transport for London · JamCams",
+        "attribution": "© Transport for London",
+        "license": "TfL Open Data terms",
+        "requires_key": False,
+        "key_env": None,
+        "location_required": False,
+        "cache_ttl": CACHE_TTL_SECONDS,
+        "fetch": _tfl_fetch,
+    },
+    {
+        "id": "datumfeed",
+        "label": "Datumfeed · registros oficiais",
+        "attribution": "Datumfeed e as agências de trânsito de cada registro",
+        "license": "varia por registro",
+        "requires_key": False,
+        "key_env": "JARVIS_DATUMFEED_KEY",
+        "location_required": True,
+        "cache_ttl": CACHE_TTL_SECONDS,
+        "fetch": _datumfeed_fetch,
+    },
+    {
+        "id": "windy",
+        "label": "Windy Webcams",
+        "attribution": "Windy Webcams API",
+        "license": "Windy Webcams terms",
+        "requires_key": True,
+        "key_env": "JARVIS_WINDY_API_KEY",
+        # Windy free-tier image tokens expire after ~10 minutes: keep metadata
+        # cache shorter so URLs are refreshed before expiry (auto-renew).
+        "location_required": True,
+        "cache_ttl": 300.0,
+        "fetch": _windy_fetch,
+    },
+]
+
+
 def build_open_cameras(
     latitude: Any = None,
     longitude: Any = None,
@@ -252,7 +385,11 @@ def build_open_cameras(
     radius_km: Any = DEFAULT_RADIUS_KM,
     limit: int = MAX_CAMERAS,
 ) -> dict[str, Any]:
-    """Return public cameras near a coordinate, with provenance and attribution."""
+    """Return public cameras near a coordinate, with provenance and attribution.
+
+    Providers are resolved through :data:`CAMERA_PROVIDERS`, so new sources can be
+    added without modifying this function or the globe core.
+    """
     payload: dict[str, Any] = {
         "success": True,
         "location": None,
@@ -281,36 +418,50 @@ def build_open_cameras(
     limit = max(1, min(MAX_CAMERAS, int(limit) if str(limit).isdigit() else MAX_CAMERAS))
 
     providers: list[dict[str, Any]] = []
-    tfl = _tfl(limit)
-    providers.append(
-        {
-            "id": "tfl",
-            "label": "Transport for London · JamCams",
-            "attribution": "© Transport for London",
-            "license": "TfL Open Data terms",
-            "requires_key": False,
-            "available": bool(tfl["available"]),
-            "error": tfl.get("reason"),
-            "reported_cameras": len(tfl.get("cameras") or []),
-        }
-    )
-
-    datumfeed: dict[str, Any] | None = None
-    if lat is not None and lon is not None:
-        datumfeed = _datumfeed(lat, lon, radius, limit)
-        providers.append(
-            {
-                "id": "datumfeed",
-                "label": "Datumfeed · registros oficiais",
-                "attribution": "Datumfeed e as agências de trânsito de cada registro",
-                "license": "varia por registro",
-                "requires_key": False,
-                "key_configured": bool(os.getenv("JARVIS_DATUMFEED_KEY", "").strip()),
-                "available": bool(datumfeed["available"]),
-                "error": datumfeed.get("reason"),
-                "reported_cameras": len(datumfeed.get("cameras") or []),
+    results: dict[str, dict[str, Any]] = {}
+    for descriptor in CAMERA_PROVIDERS:
+        pid = descriptor["id"]
+        key_configured = None
+        if descriptor.get("key_env"):
+            key_configured = bool(os.getenv(descriptor["key_env"], "").strip())
+        location_required = bool(descriptor.get("location_required"))
+        if location_required and (lat is None or lon is None):
+            # Provider needs coordinates; report as unavailable without calling.
+            meta = {
+                "id": pid,
+                "label": descriptor["label"],
+                "attribution": descriptor["attribution"],
+                "license": descriptor["license"],
+                "requires_key": bool(descriptor.get("requires_key")),
+                "available": False,
+                "error": "location_required",
+                "reported_cameras": 0,
             }
-        )
+            if key_configured is not None:
+                meta["key_configured"] = key_configured
+            providers.append(meta)
+            results[pid] = {"available": False, "reason": "location_required", "cameras": []}
+            continue
+        try:
+            result = descriptor["fetch"](lat, lon, radius, limit)
+        except Exception as exc:  # noqa: BLE001 - provider isolation
+            result = {"available": False, "reason": _fail(exc), "cameras": []}
+        if not isinstance(result, dict):
+            result = {"available": False, "reason": "malformed", "cameras": []}
+        results[pid] = result
+        meta = {
+            "id": pid,
+            "label": descriptor["label"],
+            "attribution": descriptor["attribution"],
+            "license": descriptor["license"],
+            "requires_key": bool(descriptor.get("requires_key")),
+            "available": bool(result.get("available")),
+            "error": result.get("reason"),
+            "reported_cameras": len(result.get("cameras") or []),
+        }
+        if key_configured is not None:
+            meta["key_configured"] = key_configured
+        providers.append(meta)
 
     payload["providers"] = providers
     if lat is None or lon is None:
@@ -321,16 +472,43 @@ def build_open_cameras(
 
     payload["located"] = True
     payload["location"] = {"latitude": lat, "longitude": lon}
-    candidates = list(tfl.get("cameras") or []) + list((datumfeed or {}).get("cameras") or [])
+    candidates: list[dict[str, Any]] = []
+    for descriptor in CAMERA_PROVIDERS:
+        pid = descriptor["id"]
+        result = results.get(pid) or {}
+        for camera in result.get("cameras") or []:
+            if isinstance(camera, dict):
+                candidates.append(camera)
+
     for camera in candidates:
         camera["distance_km"] = _haversine_km(
             lat, lon, float(camera["latitude"]), float(camera["longitude"])
         )
-    nearby = [
-        camera
-        for camera in candidates
-        if camera["distance_km"] <= radius
-    ]
+
+    # Dedup by exact coordinate+label, then by proximity (< 30 m) across providers.
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for camera in sorted(candidates, key=lambda c: c["distance_km"]):
+        key = f"{round(float(camera['latitude']), 4)},{round(float(camera['longitude']), 4)},{str(camera.get('label', '')).lower()}"
+        if key in seen:
+            continue
+        # proximity dedup across providers: only collapse cameras that are
+        # essentially at the same spot AND share a (normalized) label.
+        duplicate = False
+        cam_label = str(camera.get("label", "")).strip().lower()
+        for kept in unique:
+            if _haversine_km(
+                float(kept["latitude"]), float(kept["longitude"]),
+                float(camera["latitude"]), float(camera["longitude"]),
+            ) < 0.03 and str(kept.get("label", "")).strip().lower() == cam_label:
+                duplicate = True
+                break
+        if duplicate:
+            continue
+        seen.add(key)
+        unique.append(camera)
+    candidates = unique
+    nearby = [camera for camera in candidates if camera["distance_km"] <= radius]
     nearby.sort(key=lambda camera: camera["distance_km"])
     payload["cameras"] = nearby[:limit]
     payload["total"] = len(nearby)
@@ -345,6 +523,7 @@ def build_open_cameras(
         payload["reason"] = "no_camera_in_radius"
         payload["notice"] += (
             " Nenhuma câmera pública dos provedores integrados cobre este raio; "
-            "a cobertura atual é Londres (TfL) e registros dos EUA/Canadá (Datumfeed)."
+            "a cobertura atual inclui Londres (TfL), registros dos EUA/Canadá (Datumfeed) "
+            "e Windy Webcams (com chave)."
         )
     return payload

@@ -24,3 +24,6 @@ StandardError=journal
 
 [Install]
 WantedBy=default.target
+
+Environment=API_HOST=127.0.0.1
+ExecStart=@PYTHON@ serve.py
