@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""TaskRunner – executes Mission payloads in ephemeral subprocesses."""
+"""TaskRunner – orchestrates capabilities; raw mission execution is disabled until isolated."""
 
 import logging
 import tempfile
@@ -39,8 +39,10 @@ def _navigation_plan_args(tool: str, args: Dict[str, Any]) -> Dict[str, Any]:
 
 class TaskRunner(NexusComponent):
     """
-    Executes Mission payloads by writing scripts to disk and running them
-    in isolated subprocesses.  Also tracks per-mission cost.
+    Coordinates trusted Nexus capabilities and tracks per-mission cost.
+
+    Raw Mission code execution is deliberately disabled until a dedicated,
+    hardened container-backed executor is implemented.
     """
 
     def __init__(
