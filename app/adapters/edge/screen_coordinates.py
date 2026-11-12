@@ -73,3 +73,26 @@ def enable_windows_per_monitor_dpi_awareness() -> bool:
         return bool(user32.SetProcessDPIAware())
     except (AttributeError, OSError):
         return False
+
+
+def screen_dimensions_match(
+    screenshot_size: tuple[int, int],
+    input_size: tuple[int, int],
+) -> bool:
+    """Return whether screenshot pixels and pointer-input pixels share one space."""
+    try:
+        screenshot_width, screenshot_height = screenshot_size
+        input_width, input_height = input_size
+        return (
+            int(screenshot_width) == screenshot_width
+            and int(screenshot_height) == screenshot_height
+            and int(input_width) == input_width
+            and int(input_height) == input_height
+            and screenshot_width > 0
+            and screenshot_height > 0
+            and input_width > 0
+            and input_height > 0
+            and (screenshot_width, screenshot_height) == (input_width, input_height)
+        )
+    except (TypeError, ValueError):
+        return False
