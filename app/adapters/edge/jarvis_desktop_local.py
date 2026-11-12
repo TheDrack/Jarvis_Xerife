@@ -190,18 +190,6 @@ def _load_local_intelligence_config(path: Path | None = None) -> int:
         if env_local:
             candidates.append(Path(env_local) / "Jarvis_Xerife" / "intelligence.env")
         candidates.append(Path.home() / "AppData" / "Local" / "Jarvis_Xerife" / "intelligence.env")
-        # Do not enumerate other Windows profiles from WSL: their writable
-        # configuration must never supply an executable MCP entrypoint.
-        path = None
-        for candidate in candidates:
-            try:
-                if candidate.is_file():
-                    path = candidate
-                    break
-            except OSError:
-                continue
-        if path is None:
-            return 0
         # Never enumerate /mnt/c/Users: another Windows profile may be writable
         # by a different local account and must not supply an executable GEV path.
         path = None
