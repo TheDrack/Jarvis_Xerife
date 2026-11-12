@@ -1,6 +1,11 @@
 """Regression tests for pending curiosity-answer retry semantics."""
 
-from app.application.services.assistant_curiosity import capture_curiosity_answer
+from datetime import datetime, timedelta
+
+from app.application.services.assistant_curiosity import (
+    capture_curiosity_answer,
+    maybe_inject_curiosity_question,
+)
 
 
 class FakeCuriosityEngine:
@@ -89,3 +94,24 @@ def test_real_curiosity_engine_rejection_preserves_pending_need_id():
     # silently discard the pending need. This does not claim answer persistence.
     assert captured is False
     assert pending_need_id == "need-real-engine"
+
+
+def test_curiosity_cooldown_prevents_engine_execution(monkeypatch):
+    monkeypatch.setattr(
+        "app.application.services.assistant_curiosity.random.random",
+        lambda: 0.0,
+    )
+    engine = FakeCuriosityEngine(result={"success": True, "question_to_ask": "Why?"})
+    last_asked = datetime.now() - timedelta(minutes=5)
+
+    question, asked_at = maybe_inject_curiosity_question(
+        user_id="user-1",
+        command="test command",
+        response="test response",
+        last_curiosity_asked_at=last_asked,
+        curiosity_engine=engine,
+    )
+
+    assert question is None
+    assert asked_at == last_asked
+    assert engine.context is None

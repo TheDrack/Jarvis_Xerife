@@ -30,36 +30,38 @@ def maybe_inject_curiosity_question(
 ) -> tuple[Optional[str], Optional[datetime]]:
     """
     Decide se deve fazer pergunta de curiosidade baseada no contexto.
-    
+
     Só pergunta 10% das vezes para não ser intrusivo.
-    Usa CuriosityEngine para detectar gaps relevantes.
-    
+    Usa CuriosityEngine para detectar gaps.
+
     Args:
         user_id: Identificador do usuário
         command: Comando do usuário
         response: Resposta gerada
         last_curiosity_asked_at: Última vez que perguntou
         curiosity_engine: Instância do CuriosityEngine (opcional)
-        
+
     Returns:
         Tuple (pergunta, novo_timestamp) ou (None, timestamp_atual)
     """
-    # Só pergunta 10% das vezes para não ser intrusivo
-    if random.random() > _CURIOSITY_QUESTION_CHANCE:
-        return None, last_curiosity_asked_at
-        # Verifica cooldown (não perguntar se já perguntou há menos de 30 min)
+    # Cooldown é uma restrição temporal determinística e deve ser avaliado
+    # antes da amostragem aleatória ou de qualquer chamada ao engine.
     if last_curiosity_asked_at:
         elapsed = (datetime.now() - last_curiosity_asked_at).total_seconds() / 60
         if elapsed < _CURIOSITY_COOLDOWN_MINUTES:
             return None, last_curiosity_asked_at
-    
+
+    # Só pergunta 10% das vezes para não ser intrusivo.
+    if random.random() > _CURIOSITY_QUESTION_CHANCE:
+        return None, last_curiosity_asked_at
+
     try:
         if curiosity_engine is None:
             curiosity_engine = nexus.resolve("curiosity_engine")
-        
+
         if curiosity_engine and not getattr(curiosity_engine, "__is_cloud_mock__", False):
             config_snapshot = _get_config_snapshot()
-            
+
             result = curiosity_engine.execute({
                 "action": "detect_gaps",
                 "command": command,
@@ -67,15 +69,15 @@ def maybe_inject_curiosity_question(
                 "config_snapshot": config_snapshot,
                 "success": True,
             })
-            
+
             question = result.get("question_to_ask")
             if question:
-                logger.info(f"🤔 Curiosidade injetada: {question[:100]}")
+                logger.info("🤔 Curiosidade injetada: %s", question[:100])
                 return question, datetime.now()
-        
+
     except Exception as e:
-        logger.debug(f"Erro ao injetar curiosidade: {e}")
-    
+        logger.debug("Erro ao injetar curiosidade: %s", e)
+
     return None, last_curiosity_asked_at
 
 
@@ -86,12 +88,12 @@ def capture_curiosity_answer(
 ) -> tuple[bool, Optional[str]]:
     """
     Verifica se comando atual é resposta para pergunta de curiosidade pendente.
-    
+
     Args:
         command: Comando do usuário (provavelmente resposta)
         pending_need_id: ID da necessidade pendente
         curiosity_engine: Instância do CuriosityEngine (opcional)
-        
+
     Returns:
         Tuple (capturado, novo_need_id). O ID pendente só é limpo após
         confirmação de sucesso; em falha permanece disponível para retry.
@@ -101,21 +103,21 @@ def capture_curiosity_answer(
     try:
         if curiosity_engine is None:
             curiosity_engine = nexus.resolve("curiosity_engine")
-        
+
         if curiosity_engine and not getattr(curiosity_engine, "__is_cloud_mock__", False):
             result = curiosity_engine.execute({
                 "action": "store_answer",
                 "need_id": pending_need_id,
                 "user_answer": command,
             })
-            
+
             if result.get("success"):
-                logger.info(f"✅ Resposta de curiosidade capturada: need_id={pending_need_id}")
+                logger.info("Resposta de curiosidade capturada: need_id=%s", pending_need_id)
                 return True, None
-        
+
     except Exception as e:
-        logger.debug(f"Falha ao capturar resposta: {e}")
-    
+        logger.debug("Falha ao capturar resposta: %s", e)
+
     # Preserve the pending ID so a transient failure can be retried safely.
     return False, pending_need_id
 
@@ -123,7 +125,7 @@ def capture_curiosity_answer(
 def _get_config_snapshot() -> Dict[str, Any]:
     """
     Captura snapshot da configuração atual para análise.
-    
+
     Returns:
         Dict com configuração do sistema
     """
@@ -135,7 +137,7 @@ def _get_config_snapshot() -> Dict[str, Any]:
         "preferences_set": False,
         "channel": "api",
     }
-    
+
     # Verifica providers configurados
     try:
         gateway = nexus.resolve("ai_gateway")
@@ -146,5 +148,5 @@ def _get_config_snapshot() -> Dict[str, Any]:
                 config["llm_providers"].append("groq")
     except Exception:
         pass
-    
+
     return config
