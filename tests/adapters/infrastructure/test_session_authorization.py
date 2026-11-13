@@ -1,8 +1,6 @@
 """Tests for the temporary Jarvis Session Bridge authorization gateway."""
 from __future__ import annotations
 
-import time
-
 import pytest
 
 from app.adapters.infrastructure.session_authorization import (
@@ -30,8 +28,46 @@ def test_session_secret_is_single_use_and_returns_scoped_token():
 
     assert session["authenticated"] is True
     assert session["access_level"] == "observer"
-    assert gateway.authorize(session["session_token"], "host.fs.read") is True
-    assert gateway.authorize(session["session_token"], "host.process.inspect") is False
+    assert gateway.authorize(
+        session["session_token"],
+        "host.fs.read",
+        device_id="DESKTOP-HPJ82UA",
+        tunnel_instance_id="tunnel-1",
+    ) is True
+    assert gateway.authorize(
+        session["session_token"],
+        "host.command.git.read",
+        device_id="DESKTOP-HPJ82UA",
+        tunnel_instance_id="tunnel-1",
+    ) is False
+
+
+def test_authorize_requires_the_original_device_and_tunnel_binding():
+    gateway = SessionAuthorizationGateway(clock=lambda: 100.0)
+    challenge = gateway.open_session(
+        secret="one-time-session-secret",
+        device_id="desktop",
+        tunnel_instance_id="tunnel",
+    )
+    session = gateway.authenticate(
+        challenge_id=challenge["challenge_id"],
+        secret="one-time-session-secret",
+        device_id="desktop",
+        tunnel_instance_id="tunnel",
+    )
+    token = session["session_token"]
+
+    assert gateway.authorize(
+        token, "host.fs.read", device_id="desktop", tunnel_instance_id="tunnel"
+    ) is True
+    assert gateway.authorize(
+        token, "host.fs.read", device_id="other-device", tunnel_instance_id="tunnel"
+    ) is False
+    assert gateway.authorize(
+        token, "host.fs.read", device_id="desktop", tunnel_instance_id="other-tunnel"
+    ) is False
+    with pytest.raises(TypeError):
+        gateway.authorize(token, "host.fs.read")
 
 
 def test_challenge_cannot_be_replayed():
@@ -97,9 +133,13 @@ def test_session_expiry_and_revocation_revoke_capabilities():
         tunnel_instance_id="tunnel",
     )
     token = session["session_token"]
-    assert gateway.authorize(token, "host.command.git.read") is True
+    assert gateway.authorize(
+        token, "host.command.git.read", device_id="desktop", tunnel_instance_id="tunnel"
+    ) is True
     assert gateway.revoke(token) is True
-    assert gateway.authorize(token, "host.command.git.read") is False
+    assert gateway.authorize(
+        token, "host.command.git.read", device_id="desktop", tunnel_instance_id="tunnel"
+    ) is False
 
     challenge = gateway.open_session(
         secret="another-one-time-secret",
@@ -115,7 +155,12 @@ def test_session_expiry_and_revocation_revoke_capabilities():
         tunnel_instance_id="tunnel",
     )
     now[0] = 131.0
-    assert gateway.authorize(session["session_token"], "host.fs.read") is False
+    assert gateway.authorize(
+        session["session_token"],
+        "host.fs.read",
+        device_id="desktop",
+        tunnel_instance_id="tunnel",
+    ) is False
 
 
 def test_invalid_secret_does_not_consume_challenge_and_is_rate_limited():
