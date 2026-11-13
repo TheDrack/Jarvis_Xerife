@@ -18,15 +18,17 @@ from app.adapters.infrastructure.session_authorization import (
 
 logger = logging.getLogger(__name__)
 
+SESSION_TOOL_NAMES = (
+    "host_session_authenticate",
+    "host_session_status",
+    "host_session_revoke",
+)
 TOOL_NAMES = (
     "host_fs_list",
     "host_fs_read_text",
     "host_command_profiles",
     "host_command_run",
     "host_command_request_confirmation",
-    "host_session_authenticate",
-    "host_session_status",
-    "host_session_revoke",
 )
 
 
@@ -55,14 +57,8 @@ def _audit_filesystem_result(
 def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
     """Register the host operations tools on ``mcp`` and return their names."""
 
-    # Host filesystem and command tools are an explicit local opt-in. The
-    # authenticated tunnel is single-user; do not expose this gateway to
-    # untrusted or multi-tenant MCP clients.
-    enabled = os.environ.get("JARVIS_HOST_OPS_ENABLED", "").strip().casefold()
-    if enabled not in {"1", "true", "yes", "on"}:
-        logger.info("Host operations tools are disabled; set JARVIS_HOST_OPS_ENABLED=1 to opt in")
-        return ()
-
+    # Pairing controls are always registered so a remote client can authenticate
+    # even while host filesystem/command tools remain locally opted out.
     @mcp.tool(name="host_session_authenticate")
     def host_session_authenticate(pairing_code: str) -> dict[str, Any]:
         """Consume the one-time code issued locally by the Jarvis session CLI."""
@@ -82,6 +78,12 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
     def host_session_revoke() -> dict[str, Any]:
         """Revoke the active session immediately; safe to call without a session."""
         return SESSION_GATEWAY.revoke()
+
+    # Host filesystem and command tools remain an explicit local opt-in.
+    enabled = os.environ.get("JARVIS_HOST_OPS_ENABLED", "").strip().casefold()
+    if enabled not in {"1", "true", "yes", "on"}:
+        logger.info("Host operations tools are disabled; session controls remain available")
+        return SESSION_TOOL_NAMES
 
     def _authorize(capability: str) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         try:
@@ -214,7 +216,7 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
             argument_digest=host_ops._audit_argument_digest(argument_values),
         )
 
-    return TOOL_NAMES
+    return SESSION_TOOL_NAMES + TOOL_NAMES
 
 
 def _rejected(status: str, exc: Exception) -> dict[str, Any]:
