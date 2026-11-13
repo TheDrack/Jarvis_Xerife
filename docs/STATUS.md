@@ -603,3 +603,20 @@ A próxima implementação de maior valor continua sendo concluir **C0-CAPABILIT
 - `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` continuam **pending**; C1 continua bloqueado.
 - Próxima capacidade pendente: fechar a matriz C0 e identificar o composition root/consumer pretendido de `jarvis_chat`/CognitiveRouter; em seguida validar o contrato de metadata pelo consumer real. Não iniciar C1 antes do gate C0.
 
+
+
+### Correção automática de PR — lacuna funcional confirmada (2026-11-13)
+
+A manutenção automática de PRs permanece uma capacidade transversal obrigatória, mas a implementação atual **não comprova um ciclo automático ponta a ponta para corrigir CI de uma PR existente**:
+
+- `GatewayLLMCommandAdapter` herda `AutoRepairMixin`; em falhas conversacionais o mixin gera um plano e chama `GitHubAdapter.dispatch_auto_fix()`.
+- `dispatch_auto_fix()` envia `repository_dispatch` com `event_type=auto_fix` e retorna sucesso quando GitHub responde HTTP 204. O URL informado pelo adapter aponta para `jarvis_code_fixer.yml`.
+- Inventário completo de `.github/workflows` em `main`: não existe `jarvis_code_fixer.yml` nem listener `repository_dispatch: types: [auto_fix]`. O único listener repository_dispatch encontrado é `sync_to_drive.yml` com `types: [jarvis_order]`. Portanto, HTTP 204 não comprova que um corretor de PR foi executado.
+- O endpoint autenticado `POST /v1/github/ci-heal/{run_id}` chama `GitHubWorker.auto_heal_ci_failure()`; o método baixa logs, registra tentativas no ThoughtLog e retorna `logs_analyzed=true`. Não aplica patch, não cria branch e não atualiza a PR. Os testes cobrem download/escalonamento, não correção.
+- `GitHubCorrectionAdapter` permanece registrado em `data/nexus_registry.json`, mas Graphify não encontrou caller ativo em `main`; o único caller estrito identificado está em `.backups/`. `GitHubAdapter.report_for_auto_correction()` cria uma branch/PR com `autonomous_instruction.json`, mas não foi localizado listener de workflow que consuma essa instrução.
+- `jarvis-pr-validation.yml` apenas valida. `repo_lifecycle.yml` é manual e preview-only. `homeostase.yml` atende falhas de workflows confiáveis originados na `main`; não cobre diretamente falhas de PR Validation/Task Queue de branches de PR.
+- A separação atual de Self Healing mantém `GIT_PAT` fora do step `jarvis_healer.py`; o PAT aparece somente no step posterior de publicação. O healer recebe chaves de provedores, executa sobre checkout confiável de `main` e não é o executor de código de uma PR não confiável. O workflow foi preservado e não foi alterado nesta auditoria.
+
+**Conclusão:** a correção automática de CI de PR não está confirmada como operacional. O dispatch `auto_fix` é uma rota sem consumidor de workflow; o endpoint `ci-heal` é diagnóstico, não reparo. Isso é uma lacuna de implementação, não motivo para remover/desativar os mecanismos existentes.
+
+**Próxima correção transversal (não implementada nesta PR):** restaurar o fluxo por etapas — evento de falha de PR; coleta de logs read-only; geração/aplicação candidata em worktree/container descartável sem credenciais de publicação; testes focados e suíte aplicável; publisher separado com credencial restrita à branch exata da PR; atualização da mesma PR; sem merge automático. Antes de implementar, definir proteção contra PRs de fork, prompt injection em logs e alteração de arquivos fora do escopo. Nenhum workflow, segredo, permissão ou mecanismo foi modificado nesta execução.
