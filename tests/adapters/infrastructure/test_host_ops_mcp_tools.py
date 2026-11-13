@@ -4,16 +4,26 @@ from __future__ import annotations
 import json
 from typing import get_type_hints
 
-from app.adapters.infrastructure import host_ops
-from app.adapters.infrastructure.host_ops_mcp_tools import TOOL_NAMES, register_host_ops_tools
+from app.adapters.infrastructure import host_ops, host_ops_mcp_tools, session_authorization
+from app.adapters.infrastructure.host_ops_mcp_tools import (
+    SESSION_TOOL_NAMES,
+    TOOL_NAMES,
+    register_host_ops_tools,
+)
+from app.adapters.infrastructure.session_authorization import SessionAuthorizationGateway
 
 
 import pytest
 
 
 @pytest.fixture(autouse=True)
-def _enable_host_ops_for_tests(monkeypatch):
+def _enable_host_ops_for_tests(monkeypatch, tmp_path):
     monkeypatch.setenv("JARVIS_HOST_OPS_ENABLED", "1")
+    gateway = SessionAuthorizationGateway(tmp_path.parent / f"{tmp_path.name}-session-state" / "session.json")
+    pairing = gateway.create_session(profile="developer")
+    gateway.authenticate(pairing["pairing_code"])
+    monkeypatch.setattr(session_authorization, "SESSION_GATEWAY", gateway)
+    monkeypatch.setattr(host_ops_mcp_tools, "SESSION_GATEWAY", gateway)
 
 
 class FakeMCP:
@@ -37,7 +47,7 @@ def _registered() -> FakeMCP:
 def test_registers_only_the_declared_read_only_tools():
     mcp = _registered()
 
-    assert set(mcp.tools) == set(TOOL_NAMES)
+    assert set(mcp.tools) == set(TOOL_NAMES) | set(SESSION_TOOL_NAMES)
     assert not any(name.endswith(("_write", "_delete", "_install")) for name in mcp.tools)
 
 
@@ -114,20 +124,17 @@ def test_confirmation_tool_never_unlocks_blocked_operations(tmp_path, monkeypatc
         profile="powershell_readonly", verb="Remove-Item", arguments=["-Path", "C:/x"]
     )
 
-    assert not_applicable["status"] == "confirmation_not_applicable"
+    assert not_applicable["success"] is False
     assert blocked["success"] is False
-    assert blocked["status"] == "confirmation_rejected"
+    assert not_applicable["status"] == "session_authorization_denied"
+    assert blocked["status"] == "session_authorization_denied"
     assert not_applicable["audit_logged"] is True
     assert blocked["audit_logged"] is True
 
     records = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
     assert len(records) == 2
-    assert all(record["event"] == "confirmation" for record in records)
-    assert [record["status"] for record in records] == [
-        "confirmation_not_applicable",
-        "confirmation_rejected",
-    ]
-    assert all(record["argument_digest"] for record in records)
+    assert all(record["event"] == "session_authorization_denied" for record in records)
+    assert all(record["status"] == "session_authorization_denied" for record in records)
     assert "C:/x" not in audit_path.read_text(encoding="utf-8")
 
 
@@ -138,14 +145,14 @@ def test_registered_tool_annotations_resolve_like_fastmcp():
         get_type_hints(function)
 
 
-def test_host_ops_tools_are_not_registered_without_explicit_local_opt_in(monkeypatch):
+def test_host_ops_remain_disabled_without_explicit_local_opt_in(monkeypatch):
     monkeypatch.delenv("JARVIS_HOST_OPS_ENABLED", raising=False)
     mcp = FakeMCP()
 
     registered = register_host_ops_tools(mcp)
 
-    assert registered == ()
-    assert mcp.tools == {}
+    assert registered == SESSION_TOOL_NAMES
+    assert set(mcp.tools) == set(SESSION_TOOL_NAMES)
 
 
 def test_list_tool_writes_audit_record_without_raw_path(tmp_path, monkeypatch):
@@ -206,3 +213,30 @@ def test_filesystem_tools_audit_unpaired_surrogate_paths(tmp_path, monkeypatch):
     assert "\ud800" not in audit_path.read_text(encoding="utf-8")
 
 
+
+
+def test_session_pairing_and_revocation_are_audited_without_the_pairing_code(tmp_path, monkeypatch):
+    audit_path = tmp_path / "audit.jsonl"
+    monkeypatch.setenv("JARVIS_HOST_OPS_AUDIT_LOG", str(audit_path))
+    gateway = SessionAuthorizationGateway(tmp_path / "session.json")
+    pairing = gateway.create_session(profile="observer")
+    monkeypatch.setattr(session_authorization, "SESSION_GATEWAY", gateway)
+    monkeypatch.setattr(host_ops_mcp_tools, "SESSION_GATEWAY", gateway)
+    tools = _registered().tools
+
+    authenticated = tools["host_session_authenticate"](pairing["pairing_code"])
+    status = tools["host_session_status"]()
+    revoked = tools["host_session_revoke"]()
+
+    assert authenticated["success"] is True
+    assert authenticated["audit_logged"] is True
+    assert status["authenticated"] is True
+    assert revoked["status"] == "revoked"
+    assert revoked["audit_logged"] is True
+    audit_text = audit_path.read_text(encoding="utf-8")
+    assert pairing["pairing_code"] not in audit_text
+    records = [json.loads(line) for line in audit_text.splitlines()]
+    assert [record["event"] for record in records] == [
+        "session_authenticated",
+        "session_revocation",
+    ]
