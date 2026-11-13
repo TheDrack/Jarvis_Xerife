@@ -142,6 +142,9 @@ graph LR
     class migrations support
     docs["<b>docs</b>"]
     class docs support
+    docs_security["<b>security</b>"]
+    class docs_security support
+    docs --> docs_security
     docs_architecture["<b>architecture</b>"]
     class docs_architecture support
     docs --> docs_architecture
