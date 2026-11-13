@@ -214,3 +214,30 @@ def test_filesystem_tools_audit_unpaired_surrogate_paths(tmp_path, monkeypatch):
     assert "\ud800" not in audit_path.read_text(encoding="utf-8")
 
 
+
+
+def test_session_pairing_and_revocation_are_audited_without_the_pairing_code(tmp_path, monkeypatch):
+    audit_path = tmp_path / "audit.jsonl"
+    monkeypatch.setenv("JARVIS_HOST_OPS_AUDIT_LOG", str(audit_path))
+    gateway = SessionAuthorizationGateway(tmp_path / "session.json")
+    pairing = gateway.create_session(profile="observer")
+    monkeypatch.setattr(session_authorization, "SESSION_GATEWAY", gateway)
+    monkeypatch.setattr(host_ops_mcp_tools, "SESSION_GATEWAY", gateway)
+    tools = _registered().tools
+
+    authenticated = tools["host_session_authenticate"](pairing["pairing_code"])
+    status = tools["host_session_status"]()
+    revoked = tools["host_session_revoke"]()
+
+    assert authenticated["success"] is True
+    assert authenticated["audit_logged"] is True
+    assert status["authenticated"] is True
+    assert revoked["status"] == "revoked"
+    assert revoked["audit_logged"] is True
+    audit_text = audit_path.read_text(encoding="utf-8")
+    assert pairing["pairing_code"] not in audit_text
+    records = [json.loads(line) for line in audit_text.splitlines()]
+    assert [record["event"] for record in records] == [
+        "session_authenticated",
+        "session_revocation",
+    ]
