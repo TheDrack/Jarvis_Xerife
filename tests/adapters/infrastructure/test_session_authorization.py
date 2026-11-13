@@ -99,7 +99,7 @@ def test_corrupt_state_fails_closed(tmp_path):
     gateway = SessionAuthorizationGateway(path, clock=_clock)
 
     with pytest.raises(SessionAuthorizationError, match="invalid"):
-        gateway.require("host.fs.list")
+        gateway.authenticate("not-the-code")
 
 
 def test_capability_tampering_in_state_fails_closed(tmp_path):
