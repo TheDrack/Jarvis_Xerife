@@ -50,4 +50,4 @@ Host-operation audit records include the session ID, profile, capability or comm
 
 ## Remaining integration boundary
 
-This increment gates the opt-in host filesystem and structured host-command tools. It is not yet a global authorization middleware for every desktop/Android navigation tool registered by the Desktop MCP server. Those tools must not be described as covered by this session gateway until their own capability checks are composed into the server's request dispatch path.
+This increment gates the opt-in host filesystem and structured host-command tools, the bounded shell navigator, and the restricted Desktop MCP PowerShell command tool. It is not yet a global authorization middleware for every desktop/Android input or browser-navigation tool registered by the Desktop MCP server. Those tools must not be described as covered by this session gateway until their own capability checks are composed into the server's request dispatch path. Starting the tunnel task requires a separate `host.tunnel.control` capability, which neither profile grants.
