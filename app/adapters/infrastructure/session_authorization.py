@@ -60,6 +60,7 @@ class _Challenge:
     tunnel_instance_id: str
     access_level: str
     expires_at: float
+    ttl_seconds: int
     attempts: int = 0
     consumed: bool = False
 
@@ -154,6 +155,7 @@ class SessionAuthorizationGateway:
             tunnel_instance_id=tunnel_instance_id,
             access_level=access_level,
             expires_at=self._clock() + CHALLENGE_TTL_SECONDS,
+            ttl_seconds=ttl_seconds,
         )
         with self._lock:
             self._purge_expired()
@@ -204,12 +206,9 @@ class SessionAuthorizationGateway:
             challenge.consumed = True
             token = secrets.token_urlsafe(32)
             token_digest = hashlib.sha256(token.encode("ascii")).digest()
-            expires_at = min(
-                self._clock() + MAX_TTL_SECONDS,
-                self._clock() + max(1, int(challenge.expires_at - (self._clock() - CHALLENGE_TTL_SECONDS))),
-            )
-            # Session lifetime is independently bounded; challenge lifetime is not reused.
-            expires_at = self._clock() + 900
+            # The authenticated session receives the owner-selected TTL, independently
+            # bounded by open_session(). Challenge expiry does not extend the session.
+            expires_at = self._clock() + challenge.ttl_seconds
             self._sessions[token_digest] = _Session(
                 token_digest=token_digest,
                 device_id=challenge.device_id,
@@ -223,7 +222,7 @@ class SessionAuthorizationGateway:
                 "authenticated": True,
                 "session_token": token,
                 "access_level": challenge.access_level,
-                "expires_in_seconds": 900,
+                "expires_in_seconds": challenge.ttl_seconds,
             }
 
     def authorize(self, session_token: str, capability: str, *, device_id: str | None = None, tunnel_instance_id: str | None = None) -> bool:
