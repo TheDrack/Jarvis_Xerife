@@ -184,8 +184,11 @@ class SessionAuthorizationGateway:
                 return {"status": "no_session"}
             try:
                 self._validate_live_state(state)
-            except SessionAuthorizationError:
-                return self._public_state(state, authenticated=False) | {"status": "inactive"}
+            except SessionAuthorizationError as exc:
+                try:
+                    return self._public_state(state, authenticated=False) | {"status": "inactive"}
+                except (KeyError, TypeError):
+                    return {"status": "inactive", "error": str(exc)}
             authenticated = (
                 bool(state.get("pairing_consumed_at"))
                 and self._authenticated_session_id == state.get("session_id")
