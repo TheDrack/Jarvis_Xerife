@@ -274,6 +274,10 @@ class SessionAuthorizationGateway:
         }
 
 
+
+# Shared by all MCP tool modules inside this server process.
+SESSION_GATEWAY = SessionAuthorizationGateway()
+
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Issue or revoke a local one-time Jarvis remote session."
