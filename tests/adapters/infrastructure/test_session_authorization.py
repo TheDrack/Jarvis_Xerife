@@ -51,6 +51,7 @@ def test_wrong_pairing_code_is_rate_limited_and_never_authenticates(tmp_path):
     with pytest.raises(SessionAuthorizationError, match="locked"):
         gateway.authenticate("wrong-code")
     assert gateway.status()["authenticated"] is False
+    assert gateway.status()["status"] == "pairing_locked"
 
 
 def test_expired_session_is_denied(tmp_path):
@@ -112,3 +113,11 @@ def test_capability_tampering_in_state_fails_closed(tmp_path):
 
     with pytest.raises(SessionAuthorizationError, match="capability state"):
         client.authenticate("not-the-code")
+
+
+def test_status_handles_structurally_corrupt_state_without_crashing(tmp_path):
+    path = tmp_path / "session.json"
+    path.write_text(json.dumps({"schema_version": 1}), encoding="utf-8")
+    gateway = SessionAuthorizationGateway(path, clock=_clock)
+
+    assert gateway.status()["status"] == "inactive"
