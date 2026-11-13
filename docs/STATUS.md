@@ -627,3 +627,9 @@ A manutenção automática de PRs permanece uma capacidade transversal obrigató
 - A branch `docs/c0-capability-map-revalidation-20261113` foi sincronizada com `main` (`152a7f87d213c158be7658371581b466fec78be0`) por merge commit `e4303c95b585c2b2f435c8eae11fba9230e438b2`.
 - A árvore resultante preserva os arquivos de segurança/session authorization já integrados em main, substitui apenas `docs/COGNITIVE_BASELINE.md` e `docs/STATUS.md` pela revisão documental, e mantém os dois registros C0 novos no `data/curiosity/inbox.jsonl` sem perder os registros já presentes em main.
 - Comparação após sincronização: branch documental 7 commits à frente e 0 atrás; `main` não foi alterada. A validação CI precisa corresponder ao head posterior à sincronização; não reutilizar checks de heads anteriores.
+
+### Correção de precisão — CognitiveRouter e metadata (2026-11-13)
+
+A leitura anterior que dizia que `CognitiveRouter.execute()` acessa diretamente `context["metadata"]` e poderia lançar `KeyError` estava incorreta para o HEAD auditado. Em `app/domain/gears/cognitive_router.py`, o método usa `context.setdefault("metadata", {})` e valida que o valor seja um dicionário. Quando o campo não é fornecido, ele é criado; não há `KeyError` nesse caminho.
+
+A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user_input=""` e classifica uma entrada vazia. O CLI de `app/runtime/pipeline_runner.py` chama `run_pipeline(p_name, global_strict=g_strict)` sem `inputs`. Não foi localizado consumidor de aplicação para `jarvis_chat`, nem teste integrado que prove entrada do usuário → CognitiveRouter → LlmEngine. Portanto, a classificação permanece **implementado, consumo de aplicação não verificado**; o risco é comportamento vazio/não útil no caminho CLI, não exceção de metadata. O teste `test_execute_initializes_missing_metadata` confirma somente a inicialização do dicionário.
