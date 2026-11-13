@@ -191,7 +191,11 @@ class SessionAuthorizationGateway:
                 and self._authenticated_session_id == state.get("session_id")
             )
             status = "authenticated" if authenticated else (
-                "paired_elsewhere_or_restart" if state.get("pairing_consumed_at") else "awaiting_pairing"
+                "paired_elsewhere_or_restart"
+                if state.get("pairing_consumed_at")
+                else "pairing_locked"
+                if state.get("failed_attempts", 0) >= MAX_PAIRING_ATTEMPTS
+                else "awaiting_pairing"
             )
             return self._public_state(state, authenticated=authenticated) | {"status": status}
 
@@ -230,6 +234,12 @@ class SessionAuthorizationGateway:
         attempts = state.get("failed_attempts")
         if isinstance(attempts, bool) or not isinstance(attempts, int) or not 0 <= attempts <= MAX_PAIRING_ATTEMPTS:
             raise SessionAuthorizationError("pairing attempt state is invalid")
+        if state.get("revoked_at"):
+            try:
+                _parse_timestamp(state["revoked_at"])
+            except (KeyError, TypeError, ValueError):
+                raise SessionAuthorizationError("session revocation timestamp is invalid") from None
+            raise SessionAuthorizationError("remote session was revoked")
         consumed_at = state.get("pairing_consumed_at")
         secret_digest = state.get("secret_sha256")
         if consumed_at:
@@ -239,6 +249,9 @@ class SessionAuthorizationGateway:
                 raise SessionAuthorizationError("pairing consumption timestamp is invalid") from None
             if secret_digest is not None:
                 raise SessionAuthorizationError("consumed pairing secret was not cleared")
+        elif attempts >= MAX_PAIRING_ATTEMPTS:
+            if secret_digest is not None:
+                raise SessionAuthorizationError("locked pairing digest was not cleared")
         elif (
             not isinstance(secret_digest, str)
             or len(secret_digest) != 64
@@ -253,8 +266,6 @@ class SessionAuthorizationGateway:
         now = self._now()
         if created_at > now or expires_at <= created_at or expires_at - created_at > timedelta(minutes=MAX_TTL_MINUTES):
             raise SessionAuthorizationError("session time window is invalid")
-        if state.get("revoked_at"):
-            raise SessionAuthorizationError("remote session was revoked")
         if expires_at <= now:
             raise SessionAuthorizationError("remote session expired")
 
