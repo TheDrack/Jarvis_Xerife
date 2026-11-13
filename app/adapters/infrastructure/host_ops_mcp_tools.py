@@ -64,10 +64,18 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
         """Consume the one-time code issued locally by the Jarvis session CLI."""
         try:
             result = SESSION_GATEWAY.authenticate(pairing_code)
-            return {"success": True, "status": "authenticated", **result}
+            return _audit_result(
+                "session_authenticated",
+                {"success": True, "status": "authenticated", **result},
+                session_id=result["session_id"],
+                profile=result["profile"],
+            )
         except SessionAuthorizationError as exc:
             logger.warning("Remote session pairing rejected: %s", str(exc))
-            return {"success": False, "status": "authentication_denied", "error": str(exc)}
+            return _audit_result(
+                "session_authentication_denied",
+                {"success": False, "status": "authentication_denied", "error": str(exc)},
+            )
 
     @mcp.tool(name="host_session_status")
     def host_session_status() -> dict[str, Any]:
@@ -77,7 +85,12 @@ def register_host_ops_tools(mcp: Any) -> tuple[str, ...]:
     @mcp.tool(name="host_session_revoke")
     def host_session_revoke() -> dict[str, Any]:
         """Revoke the active session immediately; safe to call without a session."""
-        return SESSION_GATEWAY.revoke()
+        result = SESSION_GATEWAY.revoke()
+        return _audit_result(
+            "session_revocation",
+            result,
+            session_id=result.get("session_id"),
+        )
 
     # Host filesystem and command tools remain an explicit local opt-in.
     enabled = os.environ.get("JARVIS_HOST_OPS_ENABLED", "").strip().casefold()
