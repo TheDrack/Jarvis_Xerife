@@ -607,9 +607,34 @@ def run_shell_command(command: str, timeout_seconds: int = 15) -> dict[str, Any]
     process termination and privilege changes are denied.
     """
     from app.adapters.infrastructure.secure_shell_executor import run_shell_command as execute
+    from app.adapters.infrastructure.session_authorization import (
+        SESSION_GATEWAY,
+        SessionAuthorizationError,
+    )
+
+    normalized_command = command.strip().casefold()
+    capability = (
+        "host.tunnel.control"
+        if normalized_command.startswith("start-scheduledtask")
+        else "host.command.readonly"
+    )
+    try:
+        authorization = SESSION_GATEWAY.require(capability)
+    except SessionAuthorizationError as exc:
+        return {
+            "success": False,
+            "status": "session_authorization_denied",
+            "error": str(exc),
+            "required_capability": capability,
+        }
 
     try:
-        return execute(command, timeout_seconds=timeout_seconds)
+        result = execute(command, timeout_seconds=timeout_seconds)
+        return {
+            **result,
+            "session_id": authorization["session_id"],
+            "session_profile": authorization["profile"],
+        }
     except ValueError as exc:
         return {"success": False, "status": "command_rejected", "error": str(exc)}
 

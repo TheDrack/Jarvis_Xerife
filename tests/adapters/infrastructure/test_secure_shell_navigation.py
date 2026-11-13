@@ -12,6 +12,8 @@ from app.adapters.infrastructure.secure_shell_navigation import (
     _SECRET_CONTENT,
     register_shell_navigation_tools,
 )
+from app.adapters.infrastructure import session_authorization
+from app.adapters.infrastructure.session_authorization import SessionAuthorizationGateway
 
 
 class FakeMCP:
@@ -290,6 +292,10 @@ def test_shell_navigation_tool_is_disabled_without_explicit_opt_in(monkeypatch):
 
 def test_shell_navigation_tool_registers_and_uses_injected_navigator(tmp_path, monkeypatch):
     monkeypatch.setenv("JARVIS_SHELL_NAVIGATION_ENABLED", "1")
+    gateway = SessionAuthorizationGateway(tmp_path / "session.json")
+    pairing = gateway.create_session(profile="observer")
+    gateway.authenticate(pairing["pairing_code"])
+    monkeypatch.setattr(session_authorization, "SESSION_GATEWAY", gateway)
     mcp = FakeMCP()
     navigator = make_navigator(tmp_path)
 
@@ -299,6 +305,20 @@ def test_shell_navigation_tool_registers_and_uses_injected_navigator(tmp_path, m
     assert registered == ("shell_navigate",)
     assert result["success"] is True
     assert result["output"] == str(tmp_path.resolve())
+    assert result["session_id"] == pairing["session_id"]
+
+
+def test_shell_navigation_tool_fails_closed_without_session(tmp_path, monkeypatch):
+    monkeypatch.setenv("JARVIS_SHELL_NAVIGATION_ENABLED", "1")
+    gateway = SessionAuthorizationGateway(tmp_path / "session.json")
+    monkeypatch.setattr(session_authorization, "SESSION_GATEWAY", gateway)
+    mcp = FakeMCP()
+
+    register_shell_navigation_tools(mcp, navigator=make_navigator(tmp_path))
+    result = mcp.tools["shell_navigate"]("pwd")
+
+    assert result["success"] is False
+    assert result["status"] == "session_authorization_denied"
 
 
 def test_parser_preserves_backslashes_in_quoted_windows_paths():
