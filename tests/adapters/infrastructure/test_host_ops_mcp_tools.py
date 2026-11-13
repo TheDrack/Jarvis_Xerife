@@ -136,7 +136,6 @@ def test_confirmation_tool_never_unlocks_blocked_operations(tmp_path, monkeypatc
     assert all(record["event"] == "session_authorization_denied" for record in records)
     assert all(record["status"] == "session_authorization_denied" for record in records)
     assert "C:/x" not in audit_path.read_text(encoding="utf-8")
-    assert "C:/x" not in audit_path.read_text(encoding="utf-8")
 
 
 def test_registered_tool_annotations_resolve_like_fastmcp():
@@ -146,7 +145,7 @@ def test_registered_tool_annotations_resolve_like_fastmcp():
         get_type_hints(function)
 
 
-def test_host_ops_tools_are_not_registered_without_explicit_local_opt_in(monkeypatch):
+def test_host_ops_remain_disabled_without_explicit_local_opt_in(monkeypatch):
     monkeypatch.delenv("JARVIS_HOST_OPS_ENABLED", raising=False)
     mcp = FakeMCP()
 
