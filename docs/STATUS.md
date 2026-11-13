@@ -1,8 +1,8 @@
 # JARVIS — Status do Projeto
 
 **Versão:** 2.0.0  
-**Revisão documental:** 2026-11-12
-**Escopo desta revisão:** revalidação pós-merge #817 e acompanhamento da PR #818; C0, integrações, multiagente, CI, segurança e workflows. Runtime/produção só são declarados com evidência direta e datada.
+**Revisão documental:** 2026-11-13
+**Escopo desta revisão:** revalidação pós-merge das PRs #818–#820 e pesquisa C0 das capacidades cognitivas, integrações, multiagente, CI, segurança e workflows. Runtime/produção só são declarados com evidência direta e datada.
 
 ## Visão geral e qualidade da evidência
 
@@ -17,13 +17,13 @@
 | Memória vetorial | SupabaseVectorMemoryStore, escopo por usuário e redaction recursiva estão integrados; RLS está habilitado. | Consulta read-only em 2026-11-09 confirmou 0 linhas em jarvis_vector_memories. Os grants observados são service_role-only, sem grants anon/authenticated; insert/readback real do runtime continua não comprovado. |
 | Inventário de capabilities | data/capabilities.json mantém 102 registros legados; 34 pendentes, 34 com auto=true e nenhum target_file no snapshot anterior. | O catálogo legado não seleciona missões cognitivas; serve apenas para validar o CAP de compatibilidade quando uma missão do manifesto existe. A seleção agendada usa data/roadmap_missions.json, atualmente vazio. |
 | Soldier Mesh / edge | Há modelos, registry, adapters e testes relacionados | Continua parcial até existir validação ponta a ponta com dispositivos reais |
-| Otimização econômica | CostTrackerAdapter está descrito como integrado ao llm_router | ResourceOptimizer não foi encontrado pela auditoria; não marcar fase como completa |
+| Otimização econômica | CostTrackerAdapter existe; LLMRouter e RewardAdapter consultam resumos | Nenhum writer de produção para CostTrackerAdapter.log() foi localizado; LLMRouter.execute() só tem callers de teste; ResourceOptimizer ausente; telemetria real não comprovada |
 | Coordenação multiagente | PR #776 persiste created_by/owner_id a partir da identidade autenticada para novos enqueues e usa owner persistido no sinal task_blocked. PR #773 implementa credenciais opacas por agente; PR #779 implementa HostToolAuthorizationPolicy. | Snapshot Supabase 2026-11-09: 5 agentes, 13 tarefas e **0/13 tarefas com owner_id ou created_by**; 0 credenciais individuais ativas. A migration de ownership está aplicada, mas os registros existentes continuam sem owner. A policy host-backed ainda não tem composition root de produção localizado; workers não têm identidade individual runtime-verified. |
 | Planos declarativos | Interpretador, integração no orquestrador, autorizador e adaptador de diário estão no repositório | Execução exige plano estruturado, allowlist e diário durável. Ações sensíveis permanecem bloqueadas até existir protocolo confiável de aprovação/retomada |
 | Diário de planos no Supabase | Migrations e grants registrados; ledger local/remoto tem 29/29 versões/names correspondentes em 2026-11-08. | Insert/readback pelo adaptador em runtime ainda precisa de prova; existência de tabela/migration não comprova integração operacional. |
 | Catálogo comum de agentes | Catálogo de skills/connectors e protocolo de memória existem; quatro skills portáteis foram localizadas no repositório | A leitura automática no início de toda conversa depende de cada host/harness e precisa ser validada por runtime |
 | Deploy Render | `Jarvis-api` está live no commit `1ad74752a6393cb8f0de3614d74be0994ece940b`; deploy concluído em 2026-11-07 19:01:33 UTC e inclui o merge da PR #773. | Logs após o deploy confirmam fallback legado Supabase service-role para os três workers e Universal Intelligence recurring worker desabilitado por feature flags. A identidade HTTP individual está no código, mas não foi ativada no runtime. Memória vetorial segue sem linhas. |
-| Governança da branch main | **Proteção ausente — confirmado em 2026-11-09** | API da branch main retornou protected=false e a consulta de rulesets retornou lista vazia. Issue #682 permanece aberta; a API de proteção administrativa não está acessível ao conector. |
+| Governança da branch main | **Proteção ausente — revalidado em 2026-11-13** | API da branch main retornou protected=false. Issue #682 permanece aberta; nenhuma configuração administrativa foi alterada. |
 | Segurança Supabase / RLS legado | Mitigação legacy aplicada em produção; issue #726 fechada. | Advisor de 2026-11-09 reportou 31 tabelas com RLS habilitado sem policy (INFO), incluindo `jarvis_tool_approvals`. Nesta tabela, anon/authenticated não têm SELECT/INSERT/UPDATE/DELETE e service_role tem os quatro privilégios; não extrapolar essa verificação às demais tabelas. Manter revisão de ACL e não criar policies de cliente sem modelo de ownership. |
 
 ### Evidência operacional Supabase — 2026-11-07 (snapshot histórico)
@@ -536,3 +536,32 @@ Nenhum novo componente cognitivo foi criado e nenhum critério C0 foi promovido.
 - **Auditoria horária:** run [43284692734](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43284692734) concluiu com pytest `3203 passed, 36 skipped, 8 warnings`. O artifact [13972924401](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43284692734) contém relatório read-only: resumo de fases do roadmap e amostra limitada a 80 marcadores TODO/FIXME. Não executa correções nem prova runtime de capacidades.
 - **Task Queue da main:** push do SHA `128ec137` [43239828678](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43239828678) concluiu com sucesso.
 - A main continua em `128ec1378569d82155a42d3c234ad61a8ea0d514`. Nenhum workflow, flag, secret, configuração de produção ou branch protection foi alterado nesta auditoria.
+
+## Delta de pesquisa técnica — 2026-11-13 — revalidação C0 e frentes transversais
+
+**HEAD de main:** `ee9f4ba3173af05ee052182b4266bae2fd076202`.  
+**Referências:** PRs #818–#820 merged; Graphify indexado no mesmo SHA; workflows, logs e arquivos listados no adendo de `docs/COGNITIVE_BASELINE.md`.  
+**Limite:** pesquisa estática + CI. Nenhum probe de produção, consulta nova a Supabase/Render, execução de dispositivo ou alteração de serviço externo foi realizado.
+
+### PRs, CI e correção de falhas
+
+- #818, #819 e #820 estão merged. No início desta pesquisa não havia PR aberta; a branch de revalidação criada nesta execução é documental e não foi integrada à main.
+- PR #819 teve falha intermediária no head `ff3954d`: `tests/test_docs_references.py` apontou referência a `screen_coordinates.py` antes de a PR #820 ser integrada ao base. Após a integração da dependência e atualização do head para `0fe8afba`, a validação final [43315025475](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43315025475) passou com **3.204 passed, 35 skipped, 8 warnings**. Nenhum teste foi removido ou afrouxado.
+- PR #820 passou PR Validation [43314215786](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43314215786), Task Queue [43314215853](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43314215853) e Portas Browser [43314215851](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43314215851). Após a sequência de merges, Task Queue da main [43421396627](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43421396627) passou com **3.246 passed, 19 skipped, 181 warnings**; Portas Browser [43421307021](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43421307021) e Auto-Documentation [43421307115](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43421307115) também passaram.
+- A auditoria horária [43389368283](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43389368283) passou com **3.203 passed, 36 skipped, 8 warnings** no SHA anterior `128ec137`; é evidência histórica e não foi repetida para evitar duplicar a execução diária principal.
+- Self Healing V3 continua ativo e restrito a workflows confiáveis da main. O run [43407367827](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43407367827) ficou skipped por ausência de gatilho elegível. A autoevolução [43407344709](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43407344709) executou o gate, mas `EVOLUTION_ENABLED` estava vazio; geração/validação/publisher foram skipped. `data/roadmap_missions.json` segue vazio. Não alterar flags ou secrets.
+- Issues abertas: #682, #723 e #732. A branch API confirmou `main.protected=false`; #682 já registra a lacuna. Nenhuma issue duplicada foi criada.
+
+### Novas correções do mapa de capacidades
+
+- **Initiative:** não é mais correto dizer que falta consumer/teste. `create_api_server()` inicia e encerra `AssistantService.start_proactive_monitor()` no lifespan; `process_command()` e `on_event()` registram usuário/sinais; o monitor é proposal-only. `tests/adapters/infrastructure/test_api_server.py::test_api_lifespan_starts_and_stops_proactive_monitor` prova o vínculo com o composition root. Limite confirmado: active users, sinais, propostas pendentes, engines e cooldown são process-local; runtime/delivery de produção não foram verificados.
+- **Curiosity:** PR #818 comprova o round-trip MCP de `CuriosityIntake` com store temporário. Isso não integra o ciclo conversacional separado de `CuriosityEngine`, cujos helpers seguem sem consumer estrito de produção e com ações incompatíveis.
+- **Strategic Planner:** `StrategistService.execute()` está implementado e testado; a classificação antiga como `not_implemented` está supersedida. Graphify não encontrou caller de produção para esse método; o router atual expõe gestão/aprovação de propostas, não criação de objetivos nem replanejamento durável.
+- **CognitiveRouter:** há teste unitário de inicialização de metadata, mas `data/nexus_registry.json` não contém `cognitive_router`; `run_pipeline()` tem callers estáticos no CLI e testes, sem consumer de aplicação localizado.
+- **Cost/performance:** `CostTrackerAdapter.log()` não tem writer de produção localizado; `LLMRouter.execute()` só tem callers de teste e `ResourceOptimizer` não foi encontrado. Não tratar tabela/adapter/testes isolados como telemetria de custo operacional.
+- **Desktop security:** #820 bloqueia os dois handlers de clique por coordenadas sem aprovação host-backed. Outros side effects desktop ainda não usam essa policy no handler: `type_text`, `scroll`, `press_key`, `click_accessibility`, `set_accessibility_value`, `click_window_background_at` e `run_visual_recipe`. O risco de exploração depende do transporte/host, não avaliado nesta pesquisa. Não ampliar uso remoto até existir uma fronteira de autorização consistente; não desabilitar ferramentas por esta atualização documental.
+- **Curiosity protocol:** a tentativa de consultar/capturar via MCP Jarvis Secure Tunnel expirou; como fallback, dois registros novos e deduplicados foram adicionados a `data/curiosity/inbox.jsonl` nesta branch: Initiative com estado process-local e CostTracker sem producer de uso. Eles ainda não estão na main até eventual merge.
+
+### Decisão desta execução
+
+A próxima implementação de maior valor continua sendo concluir **C0-CAPABILITY-MAP**: atualizar composição, consumidores e testes reais, sem adicionar outro motor de curiosidade, World Model, scheduler, fila, registry ou memória. Os três critérios C0 permanecem `pending`; C1 continua bloqueado. Esta branch altera documentação e cartões de pesquisa apenas; não altera código executável, workflows, secrets, flags, migrations, banco ou produção.
