@@ -465,6 +465,27 @@ def register_shell_navigation_tools(
     @mcp.tool(name="shell_navigate")
     def shell_navigate(command: str) -> dict[str, Any]:
         """Navigate allowed directories using pwd/cd/ls/cat only; no shell or Git execution."""
-        return active_navigator.execute(command)
+        from app.adapters.infrastructure.session_authorization import (
+            SESSION_GATEWAY,
+            SessionAuthorizationError,
+        )
+
+        normalized = command.strip().split(maxsplit=1)[0].casefold() if command.strip() else ""
+        capability = "host.fs.read" if normalized == "cat" else "host.fs.list"
+        try:
+            authorization = SESSION_GATEWAY.require(capability)
+        except SessionAuthorizationError as exc:
+            return {
+                "success": False,
+                "status": "session_authorization_denied",
+                "error": str(exc),
+                "required_capability": capability,
+            }
+        result = active_navigator.execute(command)
+        return {
+            **result,
+            "session_id": authorization["session_id"],
+            "session_profile": authorization["profile"],
+        }
 
     return ("shell_navigate",)
