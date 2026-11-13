@@ -565,3 +565,41 @@ Nenhum novo componente cognitivo foi criado e nenhum critério C0 foi promovido.
 ### Decisão desta execução
 
 A próxima implementação de maior valor continua sendo concluir **C0-CAPABILITY-MAP**: atualizar composição, consumidores e testes reais, sem adicionar outro motor de curiosidade, World Model, scheduler, fila, registry ou memória. Os três critérios C0 permanecem `pending`; C1 continua bloqueado. Esta branch altera documentação e cartões de pesquisa apenas; não altera código executável, workflows, secrets, flags, migrations, banco ou produção.
+
+
+## Auditoria técnica — 2026-11-13 — continuidade C0 e segurança de sessão
+
+**Main:** `152a7f87d213c158be7658371581b466fec78be0` (commit de código pai: `7b6bcfa269390a17b844edc8d7e37cdf1e746f77`).
+
+### Continuidade de PRs e CI
+
+- PRs #818, #819 e #820 foram merged após a auditoria anterior.
+- PR #823 foi merged em `7b6bcfa`: gateway de sessão efêmera integrado às ferramentas host MCP, shell navigation e PowerShell restrito. PR Validation [43469987699](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43469987699) passou (**3.225 passed, 37 skipped, 8 warnings**); Task Queue [43469987694](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43469987694) passou; Portas Browser [43469987723](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43469987723) passou em Unit e Chromium/CDP.
+- Task Queue da main no parent de documentação [43470644826](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43470644826) passou (**3.264 passed, 19 skipped, 181 warnings**). `keepalive` [43510734149](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43510734149) passou no SHA `152a7f87`.
+- PR #821 permanece aberta. O head anterior `b05e01d0fb3ec97e4fa5c233fcccedc86f4f0088` passou PR Validation [43449655657](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43449655657): **3.225 passed, 37 skipped, 8 warnings**. Esta atualização documental cria um novo head; não presumir que o CI anterior valida o novo head.
+- PR #822 foi fechada como duplicata/supersedida por #823. A branch conflitava nos mesmos caminhos `session_authorization.py` e teste; nenhuma alteração de #822 foi integrada.
+- Issues abertas: #682, #723 e #732. A issue #682 recebeu comentário com nova evidência de branch protection.
+
+### Segurança e sessão efêmera
+
+- PR #823 implementa pairing code local de uso único, digest SHA-256 persistido, lockout após cinco tentativas, TTL de 5–120 minutos, revogação e estado local com lock cross-process.
+- As capabilities cobertas são limitadas: host filesystem, comandos estruturados, shell navigation e PowerShell restrito. Host filesystem/commands exigem `JARVIS_HOST_OPS_ENABLED` como opt-in local.
+- O gateway não cobre globalmente todos os inputs desktop/Android nem browser navigation. Inspeção dos handlers de `jarvis_desktop_mcp.py` confirmou que `click_accessibility`, `set_accessibility_value`, `click_window_background_at`, `type_text`, `scroll`, `press_key` e `run_visual_recipe` não consultam `SESSION_GATEWAY`; `click_at` e `click_at_normalized` permanecem bloqueados por `host_approval_unavailable`.
+- O gateway é process-local e não vincula a sessão a um principal individual por conexão MCP. O pairing code é bearer credential e pode aparecer no histórico de chat/tool. Não habilitar em endpoint multi-tenant/não confiável; não descrever como acesso irrestrito.
+- Nenhum secret, flag, serviço, listener, configuração de produção ou dispositivo foi alterado nesta auditoria.
+
+### Governança e autoevolução
+
+- `GET /branches/main` retornou `protected=false`, `protection.enabled=false`, required checks `enforcement_level=off`, contexts/checks vazios; `GET /rulesets` retornou `[]`. Endpoint administrativo de protection retornou 403. A issue #682 foi atualizada com esta evidência; nenhuma configuração foi alterada.
+- Autoevolução [43480459455](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43480459455): Gate concluiu com sucesso, mas log confirma `EVOLUTION_ENABLED` vazio; geração/validação isolada e publicação privilegiada ficaram `skipped`.
+- Self Healing V3 [43480488537](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43480488537) ficou `skipped`. O workflow permanece versionado/ativo e limitado aos gatilhos confiáveis de main; não foi alterado.
+- O manifesto `data/roadmap_missions.json` permanece sem missões aprovadas; nenhuma missão/candidato foi gerado.
+
+### Estado do Cognitive Roadmap
+
+- C0 permanece aberto. A matriz foi reconciliada com o código/Graphify: CognitiveRouter sem consumer de aplicação; StrategistService.execute implementado, mas sem caller estrito de produção; Initiative com composition root/teste de lifespan, mas estado process-local e sem prova de runtime/entrega em produção.
+- PR #818 comprova somente o round-trip MCP de CuriosityIntake com store temporário; não integra o ciclo conversacional de CuriosityEngine.
+- World Model canônico não foi localizado. Não criar novo grafo/event bus/scheduler/memória antes de C0.
+- `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` continuam **pending**; C1 continua bloqueado.
+- Próxima capacidade pendente: fechar a matriz C0 e identificar o composition root/consumer pretendido de `jarvis_chat`/CognitiveRouter; em seguida validar o contrato de metadata pelo consumer real. Não iniciar C1 antes do gate C0.
+
