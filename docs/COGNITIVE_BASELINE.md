@@ -651,3 +651,8 @@ O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remota
 - O pairing code é bearer credential e pode permanecer no histórico de chat/tool call; usar uma vez, com TTL curto, e revogar se houver suspeita de exposição. Não equivale a acesso irrestrito nem substitui Tailscale/TLS.
 - PR #822 foi fechada como duplicata/supersedida por #823; seus commits não foram integrados. Não manter dois gateways de sessão.
 
+### Correção de precisão — CognitiveRouter e metadata (2026-11-13)
+
+A leitura anterior que dizia que `CognitiveRouter.execute()` acessa diretamente `context["metadata"]` e poderia lançar `KeyError` estava incorreta para o HEAD auditado. Em `app/domain/gears/cognitive_router.py`, o método usa `context.setdefault("metadata", {})` e valida que o valor seja um dicionário. Quando o campo não é fornecido, ele é criado; não há `KeyError` nesse caminho.
+
+A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user_input=""` e classifica uma entrada vazia. O CLI de `app/runtime/pipeline_runner.py` chama `run_pipeline(p_name, global_strict=g_strict)` sem `inputs`. Não foi localizado consumidor de aplicação para `jarvis_chat`, nem teste integrado que prove entrada do usuário → CognitiveRouter → LlmEngine. Portanto, a classificação permanece **implementado, consumo de aplicação não verificado**; o risco é comportamento vazio/não útil no caminho CLI, não exceção de metadata. O teste `test_execute_initializes_missing_metadata` confirma somente a inicialização do dicionário.
