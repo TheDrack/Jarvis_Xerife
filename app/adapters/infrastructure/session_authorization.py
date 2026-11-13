@@ -262,11 +262,15 @@ class SessionAuthorizationGateway:
     def _exclusive_file_lock(self) -> Iterator[None]:
         """Serialize state transitions across the CLI and MCP server processes."""
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        if os.name != "nt":
+            self.state_path.parent.chmod(0o700)
         lock_path = self.state_path.with_name(self.state_path.name + ".lock")
         with lock_path.open("a+b") as lock_file:
+            if os.name != "nt":
+                os.chmod(lock_path, 0o600)
             lock_file.seek(0, os.SEEK_END)
             if lock_file.tell() == 0:
-                lock_file.write(b"\\0")
+                lock_file.write(b"\0")
                 lock_file.flush()
             lock_file.seek(0)
             if os.name == "nt":
