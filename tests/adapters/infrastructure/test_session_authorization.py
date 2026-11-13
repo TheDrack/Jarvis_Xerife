@@ -99,3 +99,16 @@ def test_corrupt_state_fails_closed(tmp_path):
 
     with pytest.raises(SessionAuthorizationError, match="invalid"):
         gateway.require("host.fs.list")
+
+
+def test_capability_tampering_in_state_fails_closed(tmp_path):
+    path = tmp_path / "session.json"
+    gateway = SessionAuthorizationGateway(path, clock=_clock)
+    gateway.create_session(profile="observer")
+    state = json.loads(path.read_text(encoding="utf-8"))
+    state["capabilities"].append("host.command.git_read")
+    path.write_text(json.dumps(state), encoding="utf-8")
+    client = SessionAuthorizationGateway(path, clock=_clock)
+
+    with pytest.raises(SessionAuthorizationError, match="capability state"):
+        client.authenticate("not-the-code")
