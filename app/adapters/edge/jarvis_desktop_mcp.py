@@ -383,38 +383,50 @@ def click_window_background_at(
     return click_window_background(window_title_contains, x, y, coordinates_are_screen=True)
 
 
+def _coordinate_click_denied() -> list[Any]:
+    """Fail closed until the desktop MCP has a trusted host-approval composition root."""
+    return _content({
+        "success": False,
+        "status": "host_approval_unavailable",
+        "message": (
+            "Clique físico bloqueado: este servidor MCP não resolve uma identidade "
+            "autenticada nem verifica uma aprovação confiável no host. O argumento "
+            "user_confirmed é controlado pelo chamador e não constitui autorização."
+        ),
+    })
+
+
 @mcp.tool(structured_output=False)
-@tracked_action("Clique fÃƒÂ­sico autorizado")
+@tracked_action("Clique físico bloqueado sem aprovação do host")
 def click_at(
     x: int,
     y: int,
     target_description: str,
     user_confirmed: bool,
 ) -> list[Any]:
-    """One-off coordinate fallback; use only after observing and with explicit user approval."""
-    if not user_confirmed:
-        return [{
-            "success": False,
-            "status": "confirmation_required",
-            "message": "PeÃƒÂ§a autorizaÃƒÂ§ÃƒÂ£o explÃƒÂ­cita para o clique por coordenadas.",
-        }]
-    screenshot = navigator._capture()
-    if x < 0 or y < 0 or x >= screenshot.width or y >= screenshot.height:
-        return _content({
-            "success": False,
-            "status": "coordinates_out_of_bounds",
-            "target_description": target_description,
-            **navigator._save_observation(screenshot),
-        })
-    _show_agent_target(x, y)
-    navigator._gui().click(x, y, button="left")
-    return _content(_observe_after_action({
-        "success": True,
-        "status": "clicked",
-        "target_description": target_description,
-        "x": x,
-        "y": y,
-    }))
+    """Legacy pixel-coordinate tool; blocked until host-backed approval is composed.
+
+    user_confirmed remains in the schema for client compatibility only. Its value
+    is never trusted and cannot authorize a physical click.
+    """
+    return _coordinate_click_denied()
+
+
+@mcp.tool(structured_output=False)
+@tracked_action("Clique normalizado bloqueado sem aprovação do host")
+def click_at_normalized(
+    x_ratio: float,
+    y_ratio: float,
+    target_description: str,
+    user_confirmed: bool,
+) -> list[Any]:
+    """Normalized coordinate tool; execution remains fail-closed.
+
+    Coordinate conversion is available as a pure helper, but this MCP server has
+    no trusted host-approval composition root. user_confirmed is compatibility-only
+    and never authorizes physical input.
+    """
+    return _coordinate_click_denied()
 
 
 @mcp.tool(structured_output=False)

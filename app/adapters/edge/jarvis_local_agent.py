@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from app.adapters.edge.screen_coordinates import enable_windows_per_monitor_dpi_awareness
 from app.adapters.edge.jarvis_agent_status import tracked_action
 from app.adapters.edge.environment_observation_publisher import (
     build_desktop_observations,
@@ -48,6 +49,9 @@ except ImportError:
     print("❌ Error: 'websockets' not installed")
     print("Install with: pip install websockets")
     sys.exit(1)
+
+# Windows DPI awareness must be requested before PyAutoGUI initializes.
+enable_windows_per_monitor_dpi_awareness()
 
 try:
     import pyautogui

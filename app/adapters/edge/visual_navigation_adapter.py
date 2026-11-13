@@ -18,6 +18,7 @@ from typing import Any, Dict, Iterable, Optional
 from app.application.ports.visual_navigation import VisualNavigationPort
 from app.adapters.edge.background_window_input import click_window_background
 from app.adapters.edge.jarvis_agent_status import agent_activity, tracked_action
+from app.adapters.edge.screen_coordinates import enable_windows_per_monitor_dpi_awareness
 from app.core.nexus import NexusComponent
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
     ) -> None:
         self._pyautogui = pyautogui_module
         self._tracked_gui = None
+        self._dpi_awareness_requested = False
         local_app_data = Path(os.getenv("LOCALAPPDATA", Path.home() / ".local" / "share"))
         self.template_dir = Path(
             template_dir or os.getenv("JARVIS_TEMPLATE_DIR", local_app_data / "Jarvis_Xerife" / "templates")
@@ -125,6 +127,10 @@ class VisualNavigationAdapter(NexusComponent, VisualNavigationPort):
             }
 
     def _gui(self) -> Any:
+        if not self._dpi_awareness_requested:
+            # Also cover callers that inject an already-imported PyAutoGUI module.
+            enable_windows_per_monitor_dpi_awareness()
+            self._dpi_awareness_requested = True
         if self._pyautogui is None:
             import pyautogui
             self._pyautogui = pyautogui
