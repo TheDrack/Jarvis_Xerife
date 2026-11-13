@@ -216,9 +216,19 @@ class SessionAuthorizationGateway:
     def _validate_live_state(self, state: dict[str, Any]) -> None:
         if state.get("schema_version") != SCHEMA_VERSION:
             raise SessionAuthorizationError("unsupported session state version")
+        profile = state.get("profile")
+        if profile not in PROFILES or state.get("capabilities") != sorted(PROFILES[profile]):
+            raise SessionAuthorizationError("session capability state is invalid")
+        if not isinstance(state.get("session_id"), str) or not state["session_id"]:
+            raise SessionAuthorizationError("session identity is invalid")
+        try:
+            expires_at = _parse_timestamp(state["expires_at"])
+            _parse_timestamp(state["created_at"])
+        except (KeyError, TypeError, ValueError):
+            raise SessionAuthorizationError("session timestamps are invalid") from None
         if state.get("revoked_at"):
             raise SessionAuthorizationError("remote session was revoked")
-        if _parse_timestamp(state["expires_at"]) <= self._now():
+        if expires_at <= self._now():
             raise SessionAuthorizationError("remote session expired")
 
     def _read_state(self, *, required: bool) -> dict[str, Any] | None:
