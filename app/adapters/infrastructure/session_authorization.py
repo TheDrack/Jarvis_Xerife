@@ -104,6 +104,14 @@ class SessionAuthorizationGateway:
         return value.strip()
 
     @staticmethod
+    def _same_identity(supplied: str, expected: str) -> bool:
+        """Compare validated UTF-8 identities without leaking mismatch position."""
+        return hmac.compare_digest(
+            supplied.encode("utf-8"),
+            expected.encode("utf-8"),
+        )
+
+    @staticmethod
     def _secret_digest(secret: str, salt: bytes) -> bytes:
         return hashlib.scrypt(
             secret.encode("utf-8"),
@@ -187,15 +195,22 @@ class SessionAuthorizationGateway:
                 challenge.consumed = True
                 raise SessionError("challenge attempt limit exceeded")
             challenge.attempts += 1
-            supplied_device = str(device_id)
-            supplied_tunnel = str(tunnel_instance_id)
+            try:
+                supplied_device = self._validate_identity(device_id, "device_id")
+                supplied_tunnel = self._validate_identity(tunnel_instance_id, "tunnel_instance_id")
+            except ValueError:
+                self._record("authentication_rejected", device_id=challenge.device_id)
+                if challenge.attempts >= self._max_attempts:
+                    challenge.consumed = True
+                raise SessionError("authentication failed") from None
+
             valid_secret = hmac.compare_digest(
                 self._secret_digest(secret, challenge.secret_salt),
                 challenge.secret_digest,
             )
             valid_binding = (
-                hmac.compare_digest(supplied_device, challenge.device_id)
-                and hmac.compare_digest(supplied_tunnel, challenge.tunnel_instance_id)
+                self._same_identity(supplied_device, challenge.device_id)
+                and self._same_identity(supplied_tunnel, challenge.tunnel_instance_id)
             )
             if not (valid_secret and valid_binding):
                 self._record("authentication_rejected", device_id=challenge.device_id)
@@ -225,18 +240,36 @@ class SessionAuthorizationGateway:
                 "expires_in_seconds": challenge.ttl_seconds,
             }
 
-    def authorize(self, session_token: str, capability: str, *, device_id: str | None = None, tunnel_instance_id: str | None = None) -> bool:
-        """Return true only for an active token bound to its original host and capability."""
-        if not isinstance(session_token, str) or not session_token or not isinstance(capability, str):
+    def authorize(
+        self,
+        session_token: str,
+        capability: str,
+        *,
+        device_id: str,
+        tunnel_instance_id: str,
+    ) -> bool:
+        """Authorize only when the token, capability, device and tunnel all match."""
+        if (
+            not isinstance(session_token, str)
+            or not session_token
+            or not isinstance(capability, str)
+            or not capability
+        ):
             return False
+        try:
+            device_id = self._validate_identity(device_id, "device_id")
+            tunnel_instance_id = self._validate_identity(tunnel_instance_id, "tunnel_instance_id")
+        except ValueError:
+            return False
+
         digest = hashlib.sha256(session_token.encode("utf-8")).digest()
         with self._lock:
             session = self._sessions.get(digest)
             if session is None or session.revoked or session.expires_at <= self._clock():
                 return False
-            if device_id is not None and not hmac.compare_digest(device_id, session.device_id):
+            if not self._same_identity(device_id, session.device_id):
                 return False
-            if tunnel_instance_id is not None and not hmac.compare_digest(tunnel_instance_id, session.tunnel_instance_id):
+            if not self._same_identity(tunnel_instance_id, session.tunnel_instance_id):
                 return False
             return capability in session.capabilities
 
