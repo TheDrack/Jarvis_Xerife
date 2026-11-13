@@ -91,7 +91,7 @@ class SessionAuthorizationGateway:
         self._authenticated_session_id: str | None = None
 
     def create_session(self, *, profile: str = "observer", ttl_minutes: int = 30) -> dict[str, Any]:
-        if profile not in PROFILES:
+        if not isinstance(profile, str) or profile not in PROFILES:
             raise ValueError(f"unsupported profile: {profile}")
         if isinstance(ttl_minutes, bool) or not isinstance(ttl_minutes, int):
             raise ValueError("ttl_minutes must be an integer")
@@ -132,7 +132,7 @@ class SessionAuthorizationGateway:
     def authenticate(self, pairing_code: str) -> dict[str, Any]:
         if not isinstance(pairing_code, str) or not pairing_code or len(pairing_code) > 256:
             raise SessionAuthorizationError("invalid or expired pairing code")
-        with self._lock:
+        with self._lock, self._exclusive_file_lock():
             state = self._read_state(required=True)
             self._validate_live_state(state)
             expected = state.get("secret_sha256")
@@ -156,7 +156,7 @@ class SessionAuthorizationGateway:
             return self._public_state(state, authenticated=True)
 
     def require(self, capability: str) -> dict[str, Any]:
-        with self._lock:
+        with self._lock, self._exclusive_file_lock():
             if not self._authenticated_session_id:
                 raise SessionAuthorizationError("no authenticated remote session")
             state = self._read_state(required=True)
@@ -178,7 +178,7 @@ class SessionAuthorizationGateway:
             }
 
     def status(self) -> dict[str, Any]:
-        with self._lock:
+        with self._lock, self._exclusive_file_lock():
             state = self._read_state(required=False)
             if not state:
                 return {"status": "no_session"}
@@ -196,7 +196,7 @@ class SessionAuthorizationGateway:
             return self._public_state(state, authenticated=authenticated) | {"status": status}
 
     def revoke(self) -> dict[str, Any]:
-        with self._lock:
+        with self._lock, self._exclusive_file_lock():
             state = self._read_state(required=False)
             if not state:
                 self._authenticated_session_id = None
@@ -218,18 +218,44 @@ class SessionAuthorizationGateway:
         if state.get("schema_version") != SCHEMA_VERSION:
             raise SessionAuthorizationError("unsupported session state version")
         profile = state.get("profile")
-        if profile not in PROFILES or state.get("capabilities") != sorted(PROFILES[profile]):
+        if (
+            not isinstance(profile, str)
+            or profile not in PROFILES
+            or state.get("capabilities") != sorted(PROFILES[profile])
+        ):
             raise SessionAuthorizationError("session capability state is invalid")
-        if not isinstance(state.get("session_id"), str) or not state["session_id"]:
+        session_id = state.get("session_id")
+        if not isinstance(session_id, str) or not session_id:
             raise SessionAuthorizationError("session identity is invalid")
+        attempts = state.get("failed_attempts")
+        if isinstance(attempts, bool) or not isinstance(attempts, int) or not 0 <= attempts <= MAX_PAIRING_ATTEMPTS:
+            raise SessionAuthorizationError("pairing attempt state is invalid")
+        consumed_at = state.get("pairing_consumed_at")
+        secret_digest = state.get("secret_sha256")
+        if consumed_at:
+            try:
+                _parse_timestamp(consumed_at)
+            except (TypeError, ValueError):
+                raise SessionAuthorizationError("pairing consumption timestamp is invalid") from None
+            if secret_digest is not None:
+                raise SessionAuthorizationError("consumed pairing secret was not cleared")
+        elif (
+            not isinstance(secret_digest, str)
+            or len(secret_digest) != 64
+            or any(character not in "0123456789abcdef" for character in secret_digest)
+        ):
+            raise SessionAuthorizationError("pairing digest state is invalid")
         try:
+            created_at = _parse_timestamp(state["created_at"])
             expires_at = _parse_timestamp(state["expires_at"])
-            _parse_timestamp(state["created_at"])
         except (KeyError, TypeError, ValueError):
             raise SessionAuthorizationError("session timestamps are invalid") from None
+        now = self._now()
+        if created_at > now or expires_at <= created_at or expires_at - created_at > timedelta(minutes=MAX_TTL_MINUTES):
+            raise SessionAuthorizationError("session time window is invalid")
         if state.get("revoked_at"):
             raise SessionAuthorizationError("remote session was revoked")
-        if expires_at <= self._now():
+        if expires_at <= now:
             raise SessionAuthorizationError("remote session expired")
 
     @contextmanager
