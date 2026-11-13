@@ -42,7 +42,7 @@ The default state file is under `%LOCALAPPDATA%\Jarvis\session_authorization.jso
 
 Sessions last 5–120 minutes (default 30). Only one unexpired session may exist at a time. Five failed pairing attempts lock the code. Every host operation re-reads the state and checks expiry, revocation, profile integrity, and the exact required capability. Revocation from the local CLI is observed by the running MCP server on the next operation.
 
-The authenticated session is held in MCP-process memory. Restarting the MCP process requires a new pairing; a consumed code cannot be reused.
+The authenticated session is held in MCP-process memory. Restarting the MCP process requires a new pairing; a consumed code cannot be reused. Before issuing a replacement for an unexpired, already-paired session, revoke it locally with the CLI, then run `create` again.
 
 ## Audit and transport
 
