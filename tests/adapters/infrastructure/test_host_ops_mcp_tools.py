@@ -19,7 +19,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def _enable_host_ops_for_tests(monkeypatch, tmp_path):
     monkeypatch.setenv("JARVIS_HOST_OPS_ENABLED", "1")
-    gateway = SessionAuthorizationGateway(tmp_path / ".session-state" / "session.json")
+    gateway = SessionAuthorizationGateway(tmp_path.parent / f"{tmp_path.name}-session-state" / "session.json")
     pairing = gateway.create_session(profile="developer")
     gateway.authenticate(pairing["pairing_code"])
     monkeypatch.setattr(session_authorization, "SESSION_GATEWAY", gateway)
