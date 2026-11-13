@@ -17,9 +17,10 @@ import sys
 import tempfile
 import threading
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 SCHEMA_VERSION = 1
 MAX_PAIRING_ATTEMPTS = 5
@@ -98,7 +99,7 @@ class SessionAuthorizationGateway:
             raise ValueError(
                 f"ttl_minutes must be between {MIN_TTL_MINUTES} and {MAX_TTL_MINUTES}"
             )
-        with self._lock:
+        with self._lock, self._exclusive_file_lock():
             current = self._read_state(required=False)
             if current and not current.get("revoked_at"):
                 expires = _parse_timestamp(current["expires_at"])
@@ -230,6 +231,34 @@ class SessionAuthorizationGateway:
             raise SessionAuthorizationError("remote session was revoked")
         if expires_at <= self._now():
             raise SessionAuthorizationError("remote session expired")
+
+    @contextmanager
+    def _exclusive_file_lock(self) -> Iterator[None]:
+        """Serialize state transitions across the CLI and MCP server processes."""
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.state_path.with_name(self.state_path.name + ".lock")
+        with lock_path.open("a+b") as lock_file:
+            lock_file.seek(0, os.SEEK_END)
+            if lock_file.tell() == 0:
+                lock_file.write(b"\\0")
+                lock_file.flush()
+            lock_file.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                if os.name == "nt":
+                    lock_file.seek(0)
+                    msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     def _read_state(self, *, required: bool) -> dict[str, Any] | None:
         try:
