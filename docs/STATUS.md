@@ -620,3 +620,10 @@ A manutenção automática de PRs permanece uma capacidade transversal obrigató
 **Conclusão:** a correção automática de CI de PR não está confirmada como operacional. O dispatch `auto_fix` é uma rota sem consumidor de workflow; o endpoint `ci-heal` é diagnóstico, não reparo. Isso é uma lacuna de implementação, não motivo para remover/desativar os mecanismos existentes.
 
 **Próxima correção transversal (não implementada nesta PR):** restaurar o fluxo por etapas — evento de falha de PR; coleta de logs read-only; geração/aplicação candidata em worktree/container descartável sem credenciais de publicação; testes focados e suíte aplicável; publisher separado com credencial restrita à branch exata da PR; atualização da mesma PR; sem merge automático. Antes de implementar, definir proteção contra PRs de fork, prompt injection em logs e alteração de arquivos fora do escopo. Nenhum workflow, segredo, permissão ou mecanismo foi modificado nesta execução.
+
+
+### Sincronização da branch documental — 2026-11-13
+
+- A branch `docs/c0-capability-map-revalidation-20261113` foi sincronizada com `main` (`152a7f87d213c158be7658371581b466fec78be0`) por merge commit `e4303c95b585c2b2f435c8eae11fba9230e438b2`.
+- A árvore resultante preserva os arquivos de segurança/session authorization já integrados em main, substitui apenas `docs/COGNITIVE_BASELINE.md` e `docs/STATUS.md` pela revisão documental, e mantém os dois registros C0 novos no `data/curiosity/inbox.jsonl` sem perder os registros já presentes em main.
+- Comparação após sincronização: branch documental 7 commits à frente e 0 atrás; `main` não foi alterada. A validação CI precisa corresponder ao head posterior à sincronização; não reutilizar checks de heads anteriores.
