@@ -1,8 +1,8 @@
 # JARVIS — Status do Projeto
 
 **Versão:** 2.0.0  
-**Revisão documental:** 2026-11-12
-**Escopo desta revisão:** revalidação pós-merge #817 e acompanhamento da PR #818; C0, integrações, multiagente, CI, segurança e workflows. Runtime/produção só são declarados com evidência direta e datada.
+**Revisão documental:** 2026-11-13
+**Escopo desta revisão:** revalidação pós-merge das PRs #818–#820 e pesquisa C0 das capacidades cognitivas, integrações, multiagente, CI, segurança e workflows. Runtime/produção só são declarados com evidência direta e datada.
 
 ## Visão geral e qualidade da evidência
 
@@ -17,13 +17,13 @@
 | Memória vetorial | SupabaseVectorMemoryStore, escopo por usuário e redaction recursiva estão integrados; RLS está habilitado. | Consulta read-only em 2026-11-09 confirmou 0 linhas em jarvis_vector_memories. Os grants observados são service_role-only, sem grants anon/authenticated; insert/readback real do runtime continua não comprovado. |
 | Inventário de capabilities | data/capabilities.json mantém 102 registros legados; 34 pendentes, 34 com auto=true e nenhum target_file no snapshot anterior. | O catálogo legado não seleciona missões cognitivas; serve apenas para validar o CAP de compatibilidade quando uma missão do manifesto existe. A seleção agendada usa data/roadmap_missions.json, atualmente vazio. |
 | Soldier Mesh / edge | Há modelos, registry, adapters e testes relacionados | Continua parcial até existir validação ponta a ponta com dispositivos reais |
-| Otimização econômica | CostTrackerAdapter está descrito como integrado ao llm_router | ResourceOptimizer não foi encontrado pela auditoria; não marcar fase como completa |
+| Otimização econômica | CostTrackerAdapter existe; LLMRouter e RewardAdapter consultam resumos | Nenhum writer de produção para CostTrackerAdapter.log() foi localizado; LLMRouter.execute() só tem callers de teste; ResourceOptimizer ausente; telemetria real não comprovada |
 | Coordenação multiagente | PR #776 persiste created_by/owner_id a partir da identidade autenticada para novos enqueues e usa owner persistido no sinal task_blocked. PR #773 implementa credenciais opacas por agente; PR #779 implementa HostToolAuthorizationPolicy. | Snapshot Supabase 2026-11-09: 5 agentes, 13 tarefas e **0/13 tarefas com owner_id ou created_by**; 0 credenciais individuais ativas. A migration de ownership está aplicada, mas os registros existentes continuam sem owner. A policy host-backed ainda não tem composition root de produção localizado; workers não têm identidade individual runtime-verified. |
 | Planos declarativos | Interpretador, integração no orquestrador, autorizador e adaptador de diário estão no repositório | Execução exige plano estruturado, allowlist e diário durável. Ações sensíveis permanecem bloqueadas até existir protocolo confiável de aprovação/retomada |
 | Diário de planos no Supabase | Migrations e grants registrados; ledger local/remoto tem 29/29 versões/names correspondentes em 2026-11-08. | Insert/readback pelo adaptador em runtime ainda precisa de prova; existência de tabela/migration não comprova integração operacional. |
 | Catálogo comum de agentes | Catálogo de skills/connectors e protocolo de memória existem; quatro skills portáteis foram localizadas no repositório | A leitura automática no início de toda conversa depende de cada host/harness e precisa ser validada por runtime |
 | Deploy Render | `Jarvis-api` está live no commit `1ad74752a6393cb8f0de3614d74be0994ece940b`; deploy concluído em 2026-11-07 19:01:33 UTC e inclui o merge da PR #773. | Logs após o deploy confirmam fallback legado Supabase service-role para os três workers e Universal Intelligence recurring worker desabilitado por feature flags. A identidade HTTP individual está no código, mas não foi ativada no runtime. Memória vetorial segue sem linhas. |
-| Governança da branch main | **Proteção ausente — confirmado em 2026-11-09** | API da branch main retornou protected=false e a consulta de rulesets retornou lista vazia. Issue #682 permanece aberta; a API de proteção administrativa não está acessível ao conector. |
+| Governança da branch main | **Proteção ausente — revalidado em 2026-11-13** | API da branch main retornou protected=false. Issue #682 permanece aberta; nenhuma configuração administrativa foi alterada. |
 | Segurança Supabase / RLS legado | Mitigação legacy aplicada em produção; issue #726 fechada. | Advisor de 2026-11-09 reportou 31 tabelas com RLS habilitado sem policy (INFO), incluindo `jarvis_tool_approvals`. Nesta tabela, anon/authenticated não têm SELECT/INSERT/UPDATE/DELETE e service_role tem os quatro privilégios; não extrapolar essa verificação às demais tabelas. Manter revisão de ACL e não criar policies de cliente sem modelo de ownership. |
 
 ### Evidência operacional Supabase — 2026-11-07 (snapshot histórico)
@@ -400,7 +400,7 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 ### Estado C0 após esta revalidação
 
 - Os três critérios `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` continuam **pending**. C1 permanece bloqueado.
-- `CognitiveRouter`: `config/pipelines/jarvis_chat.yml` referencia `cognitive_router`, mas `data/nexus_registry.json` não contém mapeamento explícito para esse ID. O Nexus pode tentar descoberta por filesystem quando não está em strict mode; isso não prova consumo. Graphify não encontrou callers estritos nem testes ligados a `CognitiveRouter.execute()`. O grafo de `run_pipeline()` mostra apenas o CLI do próprio módulo e testes, sem consumidor de aplicação identificado. Além disso, o contexto inicial de `run_pipeline` não cria `metadata`, enquanto `CognitiveRouter.execute()` acessa `context["metadata"]`; há incompatibilidade potencial se o pipeline for chamado sem `inputs.metadata`. Runtime externo permanece não verificado.
+- `CognitiveRouter`: `config/pipelines/jarvis_chat.yml` referencia `cognitive_router`, mas `data/nexus_registry.json` não contém mapeamento explícito para esse ID. O Nexus pode tentar descoberta por filesystem quando não está em strict mode; isso não prova consumo. Graphify encontrou `test_execute_initializes_missing_metadata()` como caller estrito de `CognitiveRouter.execute()`, mas não encontrou consumer de aplicação. O grafo de `run_pipeline()` mostra apenas o CLI do próprio módulo e testes, sem consumidor de aplicação identificado. O runner não injeta `metadata` por padrão, mas `CognitiveRouter.execute()` usa `context.setdefault("metadata", {})`; sem `inputs.metadata.user_input`, `user_input` fica vazio. O CLI chama `run_pipeline` sem `inputs`, e não há consumer de aplicação nem teste integrado de `jarvis_chat`. Runtime externo permanece não verificado.
 - `CuriosityIntake` é distinto de `CuriosityEngine`: está registrado no Nexus; `curiosity_capture` e `curiosity_list_recent` são funções `@mcp.tool` que resolvem `curiosity_intake` e chamam `execute()`. Os testes atuais cobrem o componente diretamente e verificam estaticamente o contrato MCP, mas não invocam os wrappers via MCP.
 - `assistant_curiosity.py` ainda envia `detect_gaps` e `store_answer`; `CuriosityEngine.execute()` aceita somente `analyze`, `explore` e `suggest`. A correção da PR #796 preserva `pending_need_id` após falha e tem cinco testes diretos, mas não implementa armazenamento de respostas. Graphify encontra somente testes como callers de `capture_curiosity_answer()`; não localiza consumidor de produção para esses helpers. O impacto operacional permanece não confirmado.
 - Próximo critério: fechar o mapa de composição/consumidores e o contrato de entrada do `CognitiveRouter`; adicionar teste de integração pelo consumidor real ou documentar formalmente que o pipeline é legado/não utilizado. Separadamente, testar os wrappers MCP reais e decidir se os helpers de `CuriosityEngine` devem receber ações válidas e um consumidor, sem criar outro motor. Não iniciar C1 antes da aceitação C0.
@@ -429,7 +429,7 @@ Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser 
 ### C0 — estado e próximos critérios
 
 - Os critérios `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` permanecem **pending** no ledger. `data/roadmap_missions.json` continua com `missions: []`; não há missão C0 revisada com target/testes aprovada. C1 — World Model — continua bloqueado.
-- Graphify, indexado em `00c69fd`, confirma que os callers estritos de `run_pipeline()` são o próprio CLI e testes; não foi localizado consumidor de aplicação para `run_pipeline("jarvis_chat")`. `config/pipelines/jarvis_chat.yml` referencia `cognitive_router`, mas `CognitiveRouter.execute()` não tem caller estrito nem teste ligado no grafo. O runner aceita `inputs`, mas não injeta `metadata` por padrão; a execução sem esse input pode falhar no acesso `context["metadata"]`. Runtime de aplicação permanece não verificado.
+- Graphify, indexado em `00c69fd`, confirma que os callers estritos de `run_pipeline()` são o próprio CLI e testes; não foi localizado consumidor de aplicação para `run_pipeline("jarvis_chat")`. `config/pipelines/jarvis_chat.yml` referencia `cognitive_router`, mas Graphify encontrou somente `test_execute_initializes_missing_metadata()` como caller estrito de `CognitiveRouter.execute()`; não encontrou consumer de aplicação. O runner aceita `inputs`, mas não injeta `metadata` por padrão; `CognitiveRouter.execute()` cria o dicionário via `context.setdefault("metadata", {})`. Sem `inputs.metadata.user_input`, o router classifica uma string vazia; não há consumer de aplicação nem teste integrado de `jarvis_chat`. Runtime de aplicação permanece não verificado.
 - `CuriosityIntake` está registrado no Nexus e seus wrappers `curiosity_capture`/`curiosity_list_recent` são tools MCP reais que resolvem o componente e chamam `execute()`. O teste atual ainda verifica o contrato MCP estaticamente e testa o serviço isolado; não invoca os wrappers. `assistant_curiosity.py` continua enviando `detect_gaps` e `store_answer`, ações não suportadas pelo `CuriosityEngine` atual (`analyze`, `explore`, `suggest`), sem consumidor de produção identificado.
 - Próximo passo C0: fechar o mapa de composition root/consumidores e provar o contrato do router pelo consumidor real, ou documentar o pipeline como legado/não utilizado; em paralelo, testar os wrappers MCP reais e reconciliar os contratos de curiosidade sem criar outro motor. Não iniciar C1 nem adicionar um segundo grafo, memória, event bus ou scheduler.
 
@@ -536,3 +536,100 @@ Nenhum novo componente cognitivo foi criado e nenhum critério C0 foi promovido.
 - **Auditoria horária:** run [43284692734](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43284692734) concluiu com pytest `3203 passed, 36 skipped, 8 warnings`. O artifact [13972924401](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43284692734) contém relatório read-only: resumo de fases do roadmap e amostra limitada a 80 marcadores TODO/FIXME. Não executa correções nem prova runtime de capacidades.
 - **Task Queue da main:** push do SHA `128ec137` [43239828678](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43239828678) concluiu com sucesso.
 - A main continua em `128ec1378569d82155a42d3c234ad61a8ea0d514`. Nenhum workflow, flag, secret, configuração de produção ou branch protection foi alterado nesta auditoria.
+
+## Delta de pesquisa técnica — 2026-11-13 — revalidação C0 e frentes transversais
+
+**HEAD de main:** `ee9f4ba3173af05ee052182b4266bae2fd076202`.  
+**Referências:** PRs #818–#820 merged; Graphify indexado no mesmo SHA; workflows, logs e arquivos listados no adendo de `docs/COGNITIVE_BASELINE.md`.  
+**Limite:** pesquisa estática + CI. Nenhum probe de produção, consulta nova a Supabase/Render, execução de dispositivo ou alteração de serviço externo foi realizado.
+
+### PRs, CI e correção de falhas
+
+- #818, #819 e #820 estão merged. No início desta pesquisa não havia PR aberta; a branch de revalidação criada nesta execução é documental e não foi integrada à main.
+- PR #819 teve falha intermediária no head `ff3954d`: `tests/test_docs_references.py` apontou referência a `screen_coordinates.py` antes de a PR #820 ser integrada ao base. Após a integração da dependência e atualização do head para `0fe8afba`, a validação final [43315025475](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43315025475) passou com **3.204 passed, 35 skipped, 8 warnings**. Nenhum teste foi removido ou afrouxado.
+- PR #820 passou PR Validation [43314215786](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43314215786), Task Queue [43314215853](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43314215853) e Portas Browser [43314215851](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43314215851). Após a sequência de merges, Task Queue da main [43421396627](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43421396627) passou com **3.246 passed, 19 skipped, 181 warnings**; Portas Browser [43421307021](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43421307021) e Auto-Documentation [43421307115](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43421307115) também passaram.
+- A auditoria horária [43389368283](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43389368283) passou com **3.203 passed, 36 skipped, 8 warnings** no SHA anterior `128ec137`; é evidência histórica e não foi repetida para evitar duplicar a execução diária principal.
+- Self Healing V3 continua ativo e restrito a workflows confiáveis da main. O run [43407367827](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43407367827) ficou skipped por ausência de gatilho elegível. A autoevolução [43407344709](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43407344709) executou o gate, mas `EVOLUTION_ENABLED` estava vazio; geração/validação/publisher foram skipped. `data/roadmap_missions.json` segue vazio. Não alterar flags ou secrets.
+- Issues abertas: #682, #723 e #732. A branch API confirmou `main.protected=false`; #682 já registra a lacuna. Nenhuma issue duplicada foi criada.
+
+### Novas correções do mapa de capacidades
+
+- **Initiative:** não é mais correto dizer que falta consumer/teste. `create_api_server()` inicia e encerra `AssistantService.start_proactive_monitor()` no lifespan; `process_command()` e `on_event()` registram usuário/sinais; o monitor é proposal-only. `tests/adapters/infrastructure/test_api_server.py::test_api_lifespan_starts_and_stops_proactive_monitor` prova o vínculo com o composition root. Limite confirmado: active users, sinais, propostas pendentes, engines e cooldown são process-local; runtime/delivery de produção não foram verificados.
+- **Curiosity:** PR #818 comprova o round-trip MCP de `CuriosityIntake` com store temporário. Isso não integra o ciclo conversacional separado de `CuriosityEngine`, cujos helpers seguem sem consumer estrito de produção e com ações incompatíveis.
+- **Strategic Planner:** `StrategistService.execute()` está implementado e testado; a classificação antiga como `not_implemented` está supersedida. Graphify não encontrou caller de produção para esse método; o router atual expõe gestão/aprovação de propostas, não criação de objetivos nem replanejamento durável.
+- **CognitiveRouter:** há teste unitário de inicialização de metadata, mas `data/nexus_registry.json` não contém `cognitive_router`; `run_pipeline()` tem callers estáticos no CLI e testes, sem consumer de aplicação localizado.
+- **Cost/performance:** `CostTrackerAdapter.log()` não tem writer de produção localizado; `LLMRouter.execute()` só tem callers de teste e `ResourceOptimizer` não foi encontrado. Não tratar tabela/adapter/testes isolados como telemetria de custo operacional.
+- **Desktop security:** #820 bloqueia os dois handlers de clique por coordenadas sem aprovação host-backed. Outros side effects desktop ainda não usam essa policy no handler: `type_text`, `scroll`, `press_key`, `click_accessibility`, `set_accessibility_value`, `click_window_background_at` e `run_visual_recipe`. O risco de exploração depende do transporte/host, não avaliado nesta pesquisa. Não ampliar uso remoto até existir uma fronteira de autorização consistente; não desabilitar ferramentas por esta atualização documental.
+- **Curiosity protocol:** a tentativa de consultar/capturar via MCP Jarvis Secure Tunnel expirou; como fallback, dois registros novos e deduplicados foram adicionados a `data/curiosity/inbox.jsonl` nesta branch: Initiative com estado process-local e CostTracker sem producer de uso. Eles ainda não estão na main até eventual merge.
+
+### Decisão desta execução
+
+A próxima implementação de maior valor continua sendo concluir **C0-CAPABILITY-MAP**: atualizar composição, consumidores e testes reais, sem adicionar outro motor de curiosidade, World Model, scheduler, fila, registry ou memória. Os três critérios C0 permanecem `pending`; C1 continua bloqueado. Esta branch altera documentação e cartões de pesquisa apenas; não altera código executável, workflows, secrets, flags, migrations, banco ou produção.
+
+
+## Auditoria técnica — 2026-11-13 — continuidade C0 e segurança de sessão
+
+**Main:** `152a7f87d213c158be7658371581b466fec78be0` (commit de código pai: `7b6bcfa269390a17b844edc8d7e37cdf1e746f77`).
+
+### Continuidade de PRs e CI
+
+- PRs #818, #819 e #820 foram merged após a auditoria anterior.
+- PR #823 foi merged em `7b6bcfa`: gateway de sessão efêmera integrado às ferramentas host MCP, shell navigation e PowerShell restrito. PR Validation [43469987699](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43469987699) passou (**3.225 passed, 37 skipped, 8 warnings**); Task Queue [43469987694](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43469987694) passou; Portas Browser [43469987723](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43469987723) passou em Unit e Chromium/CDP.
+- Task Queue da main no parent de documentação [43470644826](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43470644826) passou (**3.264 passed, 19 skipped, 181 warnings**). `keepalive` [43510734149](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43510734149) passou no SHA `152a7f87`.
+- PR #821 permanece aberta. O head anterior `b05e01d0fb3ec97e4fa5c233fcccedc86f4f0088` passou PR Validation [43449655657](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43449655657): **3.225 passed, 37 skipped, 8 warnings**. Esta atualização documental cria um novo head; não presumir que o CI anterior valida o novo head.
+- PR #822 foi fechada como duplicata/supersedida por #823. A branch conflitava nos mesmos caminhos `session_authorization.py` e teste; nenhuma alteração de #822 foi integrada.
+- Issues abertas: #682, #723 e #732. A issue #682 recebeu comentário com nova evidência de branch protection.
+
+### Segurança e sessão efêmera
+
+- PR #823 implementa pairing code local de uso único, digest SHA-256 persistido, lockout após cinco tentativas, TTL de 5–120 minutos, revogação e estado local com lock cross-process.
+- As capabilities cobertas são limitadas: host filesystem, comandos estruturados, shell navigation e PowerShell restrito. Host filesystem/commands exigem `JARVIS_HOST_OPS_ENABLED` como opt-in local.
+- O gateway não cobre globalmente todos os inputs desktop/Android nem browser navigation. Inspeção dos handlers de `jarvis_desktop_mcp.py` confirmou que `click_accessibility`, `set_accessibility_value`, `click_window_background_at`, `type_text`, `scroll`, `press_key` e `run_visual_recipe` não consultam `SESSION_GATEWAY`; `click_at` e `click_at_normalized` permanecem bloqueados por `host_approval_unavailable`.
+- O gateway é process-local e não vincula a sessão a um principal individual por conexão MCP. O pairing code é bearer credential e pode aparecer no histórico de chat/tool. Não habilitar em endpoint multi-tenant/não confiável; não descrever como acesso irrestrito.
+- Nenhum secret, flag, serviço, listener, configuração de produção ou dispositivo foi alterado nesta auditoria.
+
+### Governança e autoevolução
+
+- `GET /branches/main` retornou `protected=false`, `protection.enabled=false`, required checks `enforcement_level=off`, contexts/checks vazios; `GET /rulesets` retornou `[]`. Endpoint administrativo de protection retornou 403. A issue #682 foi atualizada com esta evidência; nenhuma configuração foi alterada.
+- Autoevolução [43480459455](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43480459455): Gate concluiu com sucesso, mas log confirma `EVOLUTION_ENABLED` vazio; geração/validação isolada e publicação privilegiada ficaram `skipped`.
+- Self Healing V3 [43480488537](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43480488537) ficou `skipped`. O workflow permanece versionado/ativo e limitado aos gatilhos confiáveis de main; não foi alterado.
+- O manifesto `data/roadmap_missions.json` permanece sem missões aprovadas; nenhuma missão/candidato foi gerado.
+
+### Estado do Cognitive Roadmap
+
+- C0 permanece aberto. A matriz foi reconciliada com o código/Graphify: CognitiveRouter sem consumer de aplicação; StrategistService.execute implementado, mas sem caller estrito de produção; Initiative com composition root/teste de lifespan, mas estado process-local e sem prova de runtime/entrega em produção.
+- PR #818 comprova somente o round-trip MCP de CuriosityIntake com store temporário; não integra o ciclo conversacional de CuriosityEngine.
+- World Model canônico não foi localizado. Não criar novo grafo/event bus/scheduler/memória antes de C0.
+- `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` continuam **pending**; C1 continua bloqueado.
+- Próxima capacidade pendente: fechar a matriz C0 e identificar o composition root/consumer pretendido de `jarvis_chat`/CognitiveRouter; em seguida validar o contrato de metadata pelo consumer real. Não iniciar C1 antes do gate C0.
+
+
+
+### Correção automática de PR — lacuna funcional confirmada (2026-11-13)
+
+A manutenção automática de PRs permanece uma capacidade transversal obrigatória, mas a implementação atual **não comprova um ciclo automático ponta a ponta para corrigir CI de uma PR existente**:
+
+- `GatewayLLMCommandAdapter` herda `AutoRepairMixin`; em falhas conversacionais o mixin gera um plano e chama `GitHubAdapter.dispatch_auto_fix()`.
+- `dispatch_auto_fix()` envia `repository_dispatch` com `event_type=auto_fix` e retorna sucesso quando GitHub responde HTTP 204. O URL configurado pelo adapter aponta para um alvo de workflow que não existe na árvore atual do repositório.
+- Inventário completo de `.github/workflows` em `main`: não existe workflow correspondente ao alvo configurado pelo adapter nem listener `repository_dispatch` para o evento `auto_fix`. O único listener repository_dispatch encontrado é `sync_to_drive.yml` com `types: [jarvis_order]`. Portanto, HTTP 204 não comprova que um corretor de PR foi executado.
+- O endpoint autenticado `POST /v1/github/ci-heal/{run_id}` chama `GitHubWorker.auto_heal_ci_failure()`; o método baixa logs, registra tentativas no ThoughtLog e retorna `logs_analyzed=true`. Não aplica patch, não cria branch e não atualiza a PR. Os testes cobrem download/escalonamento, não correção.
+- `GitHubCorrectionAdapter` permanece registrado em `data/nexus_registry.json`, mas Graphify não encontrou caller ativo em `main`; o único caller estrito identificado está em `.backups/`. `GitHubAdapter.report_for_auto_correction()` cria uma branch/PR com um artefato de instrução, mas não foi localizado listener de workflow que consuma esse artefato.
+- `jarvis-pr-validation.yml` apenas valida. `repo_lifecycle.yml` é manual e preview-only. `homeostase.yml` atende falhas de workflows confiáveis originados na `main`; não cobre diretamente falhas de PR Validation/Task Queue de branches de PR.
+- O step `jarvis_healer.py` não recebe `GIT_PAT`/`GH_TOKEN` em seu próprio ambiente. O secret é usado no step de coleta de logs antes do healer (com fallback para `github.token`) e no step separado de publicação de branch/PR após a validação. O healer recebe chaves de provedores e logs, executa sobre checkout confiável de `main` e não recebe credencial GitHub de publicação nem executa código de PR não confiável. O workflow foi preservado e não foi alterado nesta auditoria.
+
+**Conclusão:** a correção automática de CI de PR não está confirmada como operacional. O dispatch `auto_fix` é uma rota sem consumidor de workflow; o endpoint `ci-heal` é diagnóstico, não reparo. Isso é uma lacuna de implementação, não motivo para remover/desativar os mecanismos existentes.
+
+**Próxima correção transversal (não implementada nesta PR):** restaurar o fluxo por etapas — evento de falha de PR; coleta de logs read-only; geração/aplicação candidata em worktree/container descartável sem credenciais de publicação; testes focados e suíte aplicável; publisher separado com credencial restrita à branch exata da PR; atualização da mesma PR; sem merge automático. Antes de implementar, definir proteção contra PRs de fork, prompt injection em logs e alteração de arquivos fora do escopo. Nenhum workflow, segredo, permissão ou mecanismo foi modificado nesta execução.
+
+
+### Sincronização da branch documental — 2026-11-13
+
+- A branch `docs/c0-capability-map-revalidation-20261113` foi sincronizada com `main` (`152a7f87d213c158be7658371581b466fec78be0`) por merge commit `e4303c95b585c2b2f435c8eae11fba9230e438b2`.
+- A árvore resultante preserva os arquivos de segurança/session authorization já integrados em main, substitui apenas `docs/COGNITIVE_BASELINE.md` e `docs/STATUS.md` pela revisão documental, e mantém os dois registros C0 novos no `data/curiosity/inbox.jsonl` sem perder os registros já presentes em main.
+- Comparação após sincronização: branch documental 7 commits à frente e 0 atrás; `main` não foi alterada. A validação CI precisa corresponder ao head posterior à sincronização; não reutilizar checks de heads anteriores.
+
+### Correção de precisão — CognitiveRouter e metadata (2026-11-13)
+
+A leitura anterior que dizia que `CognitiveRouter.execute()` acessa diretamente `context["metadata"]` e poderia lançar `KeyError` estava incorreta para o HEAD auditado. Em `app/domain/gears/cognitive_router.py`, o método usa `context.setdefault("metadata", {})` e valida que o valor seja um dicionário. Quando o campo não é fornecido, ele é criado; não há `KeyError` nesse caminho.
+
+A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user_input=""` e classifica uma entrada vazia. O CLI de `app/runtime/pipeline_runner.py` chama `run_pipeline(p_name, global_strict=g_strict)` sem `inputs`. Não foi localizado consumidor de aplicação para `jarvis_chat`, nem teste integrado que prove entrada do usuário → CognitiveRouter → LlmEngine. Portanto, a classificação permanece **implementado, consumo de aplicação não verificado**; o risco é comportamento vazio/não útil no caminho CLI, não exceção de metadata. O teste `test_execute_initializes_missing_metadata` confirma somente a inicialização do dicionário.
