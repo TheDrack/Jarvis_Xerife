@@ -375,7 +375,7 @@ def test_mobile_global_navigation_is_fixed_scrollable_and_safe_area_aware():
     assert re.search(r"\.dock-group\{[^}]*\bflex:0 0 auto(?:;|})", mobile)
     assert "min-height:44px" in mobile
     assert ".panels{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto" in mobile
-    assert "padding-bottom:90px" in mobile
+    assert re.search(r"\\.panels\\{[^}]*\\bpadding:\\s*6px\\s+2px\\s+90px(?:;|})", mobile)
 
 
 def test_intelligence_dashboard_is_installable_and_mobile_navigable():
