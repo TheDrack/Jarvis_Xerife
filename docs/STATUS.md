@@ -78,7 +78,7 @@ A autoevolução de capacidades segue o [Cognitive Roadmap](COGNITIVE_ROADMAP.md
 - No HEAD auditado (`d83c0b8`), `heal()` incluía arquivos de teste derivados do pytest JSON report/tracebacks em `target_files`. `is_production_file()` apenas alterava o prompt; não impedia que o modelo recebesse o arquivo nem que `os.replace` gravasse a resposta. O workflow `homeostase.yml` também inclui `tests` no staging da PR proposta.
 - Isso permitia que a auto-cura alterasse assertions e depois validasse o resultado com a própria suíte. Os controles adicionados nas PRs #660/#740 isolam execução privilegiada e secrets, mas não impedem essa mutação.
 - A PR [#826](https://github.com/TheDrack/Jarvis_Xerife/pull/826) propõe tornar arquivos de teste imutáveis para o healer, preservando seu uso como evidência diagnóstica e mantendo a auto-cura de arquivos de produção. O helper `apply_fixes()` também recebe uma guarda, embora o caminho principal de `heal()` grave diretamente via checkpoint e `os.replace`.
-- Estado desta atualização: correção proposta; CI pendente no head da PR; não integrada. Falha cujo único alvo seja teste continua sendo falha e requer correção/revisão humana. Nenhum workflow, secret ou permissão foi alterado.
+- Estado desta atualização: PR #826 aberta e não integrada; os checks de código/testes no head `4d417427` passaram (PR Validation e Task Queue), sem alterações posteriores em código/testes. Revisão humana continua pendente. Falha cujo único alvo seja teste continua sendo falha e requer correção/revisão humana. Nenhum workflow, secret ou permissão foi alterado.
 
 
 ## Nova trilha — Jarvis Cognitive Architecture
