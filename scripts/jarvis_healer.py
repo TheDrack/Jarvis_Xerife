@@ -107,9 +107,28 @@ def extract_failed_files_from_report(
     return sorted(found_files), failure_context
 
 
+_PYTEST_INFRASTRUCTURE_FILES = frozenset({
+    "conftest.py",
+    "pytest.ini",
+    "pytest.toml",
+    "tox.ini",
+    "setup.cfg",
+    "pyproject.toml",
+    ".coveragerc",
+})
+
+
 def is_production_file(file_path: Path) -> bool:
-    """Return False for pytest test files on POSIX and Windows paths."""
-    normalized = str(file_path).replace("\\", "/").casefold()
+    """Return False for pytest tests/configuration on POSIX and Windows paths."""
+    try:
+        # Resolve symlinks before classifying so a production-looking alias cannot
+        # point at mutable test code or pytest configuration.
+        resolved = Path(file_path).resolve(strict=False)
+    except (OSError, RuntimeError, TypeError):
+        # An unresolvable target is not eligible for privileged mutation.
+        return False
+
+    normalized = str(resolved).replace("\\", "/").casefold()
     parts = [part for part in normalized.split("/") if part]
     filename = parts[-1] if parts else normalized
     test_directory = any(part in {"test", "tests", "testing"} for part in parts[:-1])
@@ -118,7 +137,8 @@ def is_production_file(file_path: Path) -> bool:
         or filename.startswith("test_")
         or filename.endswith("_test.py")
     )
-    return not (test_directory or test_filename)
+    pytest_infrastructure = filename in _PYTEST_INFRASTRUCTURE_FILES
+    return not (test_directory or test_filename or pytest_infrastructure)
 
 
 def _strip_markdown_fences(text: str) -> str:
@@ -284,8 +304,18 @@ def apply_fixes(
     file_path: Path, fixes: List[Dict[str, Any]], dry_run: bool = False
 ) -> tuple:
     """Aplica correções apenas em arquivos de produção."""
+    try:
+        # Operate on the resolved target, not on a symlink that could be swapped.
+        file_path = Path(file_path).resolve(strict=False)
+    except (OSError, RuntimeError, TypeError):
+        logger.warning("[Healer] Caminho não resolvível; nenhuma escrita será feita: %s", file_path)
+        return 0, max(1, len(fixes))
+
     if not is_production_file(file_path):
-        logger.warning("[Healer] Arquivo de teste é imutável para auto-cura: %s", file_path)
+        logger.warning(
+            "[Healer] Arquivo de teste/configuração pytest é imutável para auto-cura: %s",
+            file_path,
+        )
         return 0, max(1, len(fixes))
 
     success = 0
