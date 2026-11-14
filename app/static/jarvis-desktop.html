@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#03080a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="/static/jarvis-icon.svg">
 <title>J.A.R.V.I.S. · NEURAL INTERFACE</title>
 <style>
@@ -326,6 +330,24 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 #selectionInspector[hidden]{display:none!important}
 .cam[data-camera-index]{cursor:pointer}
 .cam[data-camera-index]:hover{outline:1px solid var(--mint);outline-offset:2px}
+
+/* Mobile ergonomics: keep the HUD compact while preserving horizontally reachable controls. */
+@media(max-width:620px){
+ .hud-top{gap:8px;padding:0 8px}
+ .brand{flex:0 0 auto;max-width:34vw;overflow:hidden;text-overflow:ellipsis;font-size:9px}
+ .brand .slash{display:none}
+ .hud-actions{flex:1 1 0;min-width:0;max-width:none;justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+ .hud-actions::-webkit-scrollbar{display:none}
+ .layer-group{flex:0 0 auto}
+ .layer-chip{min-height:34px;min-width:34px}
+ .icon-btn{flex:0 0 34px;width:34px;height:34px}
+ .hud-foot{min-width:0;padding:0 8px}
+ .hud-foot>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .hud-foot .right{gap:8px;max-width:65vw;overflow-x:auto;scrollbar-width:none}
+ .hud-foot .right::-webkit-scrollbar{display:none}
+ .dock button:not(.orb){min-height:40px;padding:8px 4px;touch-action:manipulation}
+ .mini{min-height:32px;touch-action:manipulation}
+}
 </style>
 </head>
 <body>
@@ -3575,5 +3597,13 @@ setView('core');
 })();
 })();
 </script>
+ <script>
+  if ('serviceWorker' in navigator) {
+   window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js', {scope: '/'})
+     .catch(() => {});
+   });
+  }
+ </script>
 </body>
 </html>

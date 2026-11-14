@@ -1992,3 +1992,33 @@ def test_nhc_storms_are_collected_independently_with_official_coordinate_fields(
     assert payload["events"][0]["source_id"] == "nhc"
     assert payload["events"][0]["location"]["latitude"] == pytest.approx(20.5)
     assert payload["events"][0]["location"]["longitude"] == pytest.approx(-60.2)
+
+
+
+def test_mobile_pwa_manifest_is_served_without_auth_and_declares_global_app():
+    response = _client(LocalRuntime()).get("/manifest.webmanifest")
+
+    assert response.status_code == 200
+    assert "application/manifest+json" in response.headers["content-type"]
+    assert response.headers["cache-control"] == "no-cache"
+    manifest = response.json()
+    assert manifest["name"] == "J.A.R.V.I.S. Global"
+    assert manifest["short_name"] == "JARVIS"
+    assert manifest["start_url"] == "/"
+    assert manifest["scope"] == "/"
+    assert manifest["display"] == "standalone"
+    assert manifest["orientation"] == "any"
+    assert manifest["icons"]
+    assert manifest["icons"][0]["src"] == "/static/jarvis-icon.svg"
+
+
+def test_mobile_pwa_service_worker_is_root_scoped_and_never_caches_api_data():
+    response = _client(LocalRuntime()).get("/service-worker.js")
+
+    assert response.status_code == 200
+    assert "javascript" in response.headers["content-type"]
+    assert response.headers["service-worker-allowed"] == "/"
+    assert response.headers["cache-control"] == "no-cache"
+    assert "event.respondWith(fetch(event.request))" in response.text
+    assert "caches.open" not in response.text
+    assert "CacheStorage" not in response.text

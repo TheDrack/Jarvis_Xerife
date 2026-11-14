@@ -334,3 +334,22 @@ def test_weather_panel_escapes_every_external_string_before_html_insertion():
         "esc(dprec[i])",
     ):
         assert expression in HTML, expression
+
+
+
+def test_global_hud_declares_installable_mobile_pwa_and_registers_root_worker():
+    assert '<link rel="manifest" href="/manifest.webmanifest">' in HTML
+    assert 'name="mobile-web-app-capable" content="yes"' in HTML
+    assert "navigator.serviceWorker.register('/service-worker.js', {scope: '/'})" in HTML
+    assert "serviceWorker" in HTML
+
+
+
+def test_mobile_header_and_hud_controls_remain_reachable_on_narrow_screens():
+    mobile = HTML[HTML.rfind("@media(max-width:620px)"):]
+    assert ".hud-actions{flex:1 1 0;min-width:0;max-width:none" in mobile
+    assert "overflow-x:auto" in mobile
+    assert ".layer-group{flex:0 0 auto}" in mobile
+    assert ".layer-chip{min-height:34px;min-width:34px}" in mobile
+    assert ".dock button:not(.orb){min-height:40px" in mobile
+    assert ".hud-foot .right{gap:8px;max-width:65vw;overflow-x:auto" in mobile
