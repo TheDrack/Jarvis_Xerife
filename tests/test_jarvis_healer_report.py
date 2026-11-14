@@ -87,7 +87,7 @@ class ExtractFailedFilesFromReportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             test_file = Path(temporary) / "tests" / "test_sample.py"
             test_file.parent.mkdir(parents=True)
-            original = "def test_sample():\\n    assert True\\n"
+            original = "def test_sample():\n    assert True\n"
             test_file.write_text(original, encoding="utf-8")
 
             result = healer.apply_fixes(
@@ -107,7 +107,7 @@ class ExtractFailedFilesFromReportTests(unittest.TestCase):
             root = Path(temporary)
             test_file = root / "tests" / "unit" / "test_sample.py"
             test_file.parent.mkdir(parents=True)
-            original = "def test_sample():\\n    assert True\\n"
+            original = "def test_sample():\n    assert True\n"
             test_file.write_text(original, encoding="utf-8")
             report = root / "report.json"
             report.write_text(json.dumps({
@@ -128,10 +128,10 @@ class ExtractFailedFilesFromReportTests(unittest.TestCase):
                 "--log",
                 str(log),
             ]
-            with patch.object(healer, "REPO_ROOT", root), \\
-                 patch.object(healer.sys, "argv", argv), \\
-                 patch.object(healer, "call_groq_healer") as model:
-                result = healer.heal()
+            with patch.object(healer, "REPO_ROOT", root):
+                with patch.object(healer.sys, "argv", argv):
+                    with patch.object(healer, "call_groq_healer") as model:
+                        result = healer.heal()
 
             self.assertEqual(result, 1)
             model.assert_not_called()
