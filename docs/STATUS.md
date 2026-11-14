@@ -72,6 +72,13 @@
 ## Regra operacional permanente — correção automática de PRs
 
 A autoevolução de capacidades segue o [Cognitive Roadmap](COGNITIVE_ROADMAP.md), mas a correção automática de PRs/CI e os workflows Self Healing são uma trilha transversal permanente. Devem continuar ativos durante todas as fases: diagnosticar falhas por logs/causa raiz, corrigir a branch/PR correspondente quando seguro, acrescentar testes e reexecutar checks. Não desativar nem enfraquecer esses mecanismos, não duplicar PRs, não reduzir testes e não permitir merge/deploy autônomo. A publicação permanece sujeita aos gates e à revisão humana. Correção de CI é manutenção; não substitui nem conclui marco cognitivo.
+### Integridade dos testes no Self Healing — achado confirmado em 2026-11-14
+
+- No HEAD auditado (d83c0b8), heal() incluía arquivos de teste derivados do pytest JSON report/tracebacks em target_files. is_production_file() apenas alterava o prompt; não impedia que o modelo recebesse o arquivo nem que os.replace gravasse a resposta. O workflow homeostase.yml também inclui tests no staging da PR proposta.
+- Isso permitia que a auto-cura alterasse assertions e depois validasse o resultado com a própria suíte. A existência dos testes de isolamento de secrets e de execução confiável das PRs #660/#740 não impedia essa mutação.
+- A PR [#826](https://github.com/TheDrack/Jarvis_Xerife/pull/826) propõe tornar arquivos de teste imutáveis para o healer, preservando seu uso como evidência diagnóstica e mantendo a auto-cura de arquivos de produção.
+- Estado desta atualização: correção proposta; CI pendente no head da PR; não integrada. Falha cujo único alvo seja teste continua sendo falha e requer correção/revisão humana. Nenhum workflow, secret ou permissão foi alterado.
+
 
 ## Nova trilha — Jarvis Cognitive Architecture
 
