@@ -14,8 +14,15 @@ from pathlib import Path
 from typing import Optional
 
 from app.core.nexus import NexusComponent, nexus
+from app.application.security.repository_path_policy import (
+    UnsafeRepositoryPath,
+    is_test_or_pytest_infrastructure_path,
+    protected_prefix_for,
+    resolve_repository_path,
+)
 
 logger = logging.getLogger(__name__)
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 SAFE_AUTO_INSTALL: frozenset = frozenset(
     {"instructor", "json_repair", "json-repair", "httpx", "pydantic", "faiss", "litellm"}
@@ -112,7 +119,9 @@ class LocalRepairAgent(NexusComponent):
 ERRO: {error_type}: {error_message}
 TRACEBACK:
 {traceback_text[:_MAX_TRACEBACK_LENGTH]}
-ARQUIVO: {file_path or 'desconhecido'}
+ARQUIVO AUTORIZADO: {file_path or 'nenhum'}
+Use somente o arquivo autorizado acima. Não escolha nem redirecione para outro caminho.
+Se não houver arquivo autorizado, responda can_fix=false.
 CONTEÚDO:
 {file_content}
 
@@ -180,6 +189,51 @@ Responda com este JSON exato (sem markdown):
             pass
         return {"success": False}
 
+    def _resolve_patch_target(
+        self, original_path: Optional[str], proposed_path: Optional[str]
+    ) -> tuple[Optional[Path], str]:
+        """Resolve a single trusted source file; the model cannot choose a new target."""
+        if not original_path:
+            return None, "Nenhum arquivo de origem confiável foi fornecido."
+
+        root = Path(REPO_ROOT).resolve()
+
+        def relative_path(raw_path: str) -> str:
+            candidate = Path(raw_path)
+            if candidate.is_absolute():
+                try:
+                    return candidate.relative_to(root).as_posix()
+                except ValueError as exc:
+                    raise UnsafeRepositoryPath(
+                        "o caminho absoluto está fora do repositório"
+                    ) from exc
+            return candidate.as_posix()
+
+        try:
+            target, _, target_relative = resolve_repository_path(
+                root, relative_path(original_path), reject_symlinks=True
+            )
+            if not target.is_file():
+                return None, "O arquivo de origem confiável não existe."
+            if target.suffix.casefold() != ".py":
+                return None, "O reparo local só pode alterar arquivos Python."
+            protected = protected_prefix_for(target_relative)
+            if protected:
+                return None, f"O caminho pertence à área protegida: {protected}."
+            if is_test_or_pytest_infrastructure_path(target_relative):
+                return None, "Testes e configuração pytest são imutáveis para auto-reparo."
+
+            if proposed_path:
+                proposed, _, _ = resolve_repository_path(
+                    root, relative_path(proposed_path), reject_symlinks=True
+                )
+                if proposed != target:
+                    return None, "O modelo tentou redirecionar o patch para outro arquivo."
+
+            return target, ""
+        except (UnsafeRepositoryPath, OSError, RuntimeError, ValueError, TypeError) as exc:
+            return None, f"Caminho de reparo rejeitado: {exc}"
+
     def _apply_patch(self, patch: dict, original_path: Optional[str]) -> dict:
         if not patch.get("can_fix"):
             return {"fixed": False, "details": patch.get("explanation", "")}
@@ -194,16 +248,18 @@ Responda com este JSON exato (sem markdown):
             return self._install_missing(f"No module named '{patch.get('package_name', '')}'")
 
         if action == "replace":
-            file_path = patch.get("file_path") or original_path
             old_code, new_code = patch.get("old_code"), patch.get("new_code")
-            if not all([file_path, old_code, new_code]):
+            if not all([old_code, new_code]):
                 return {
                     "fixed": False,
-                    "details": "Patch incompleto: file_path/old_code/new_code ausente",
+                    "details": "Patch incompleto: old_code/new_code ausente",
                 }
-            path = Path(file_path)
-            if not path.exists():
-                return {"fixed": False, "details": f"Arquivo não encontrado: {file_path}"}
+            path, rejection = self._resolve_patch_target(
+                original_path, patch.get("file_path")
+            )
+            if path is None:
+                return {"fixed": False, "details": rejection}
+
             content = path.read_text(encoding="utf-8")
             if old_code not in content:
                 return {
@@ -216,7 +272,7 @@ Responda com este JSON exato (sem markdown):
                 return {"fixed": False, "details": f"new_code com SyntaxError: {exc}"}
             path.write_text(content.replace(old_code, new_code, 1), encoding="utf-8")
             logger.info(
-                "Patch aplicado em %s (confiança %.0f%%)", file_path, confidence * 100
+                "Patch aplicado em %s (confiança %.0f%%)", path, confidence * 100
             )
             return {
                 "fixed": True,

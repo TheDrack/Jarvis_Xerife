@@ -104,14 +104,15 @@ class ExtractFailedFilesFromReportTests(unittest.TestCase):
             original = "def test_sample():\n    assert True\n"
             test_file.write_text(original, encoding="utf-8")
 
-            result = healer.apply_fixes(
-                test_file,
-                [{
-                    "action": "replace",
-                    "old_code": "assert True",
-                    "new_code": "assert False",
-                }],
-            )
+            with patch.object(healer, "REPO_ROOT", Path(temporary)):
+                result = healer.apply_fixes(
+                    test_file,
+                    [{
+                        "action": "replace",
+                        "old_code": "assert True",
+                        "new_code": "assert False",
+                    }],
+                )
 
             self.assertEqual(result, (0, 1))
             self.assertEqual(test_file.read_text(encoding="utf-8"), original)
@@ -130,17 +131,50 @@ class ExtractFailedFilesFromReportTests(unittest.TestCase):
             except (OSError, NotImplementedError) as exc:
                 self.skipTest(f"symlink unavailable on this runner: {exc}")
 
-            result = healer.apply_fixes(
-                link,
-                [{
-                    "action": "replace",
-                    "old_code": "pass",
-                    "new_code": "raise RuntimeError",
-                }],
-            )
+            with patch.object(healer, "REPO_ROOT", root):
+                result = healer.apply_fixes(
+                    link,
+                    [{
+                        "action": "replace",
+                        "old_code": "pass",
+                        "new_code": "raise RuntimeError",
+                    }],
+                )
 
             self.assertEqual(result, (0, 1))
             self.assertEqual(target.read_text(encoding="utf-8"), original)
+
+
+    def test_apply_fixes_refuses_path_outside_repository(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "repo"
+            root.mkdir()
+            outside = Path(temporary) / "outside.py"
+            original = "SAFE_VALUE = 1\\n"
+            outside.write_text(original, encoding="utf-8")
+
+            with patch.object(healer, "REPO_ROOT", root):
+                result = healer.apply_fixes(
+                    outside,
+                    [{
+                        "action": "replace",
+                        "old_code": "SAFE_VALUE = 1",
+                        "new_code": "SAFE_VALUE = 2",
+                    }],
+                )
+
+            self.assertEqual(result, (0, 1))
+            self.assertEqual(outside.read_text(encoding="utf-8"), original)
+
+    def test_is_production_file_rejects_self_healing_control_plane(self):
+        protected_paths = (
+            "app/core/nexuscomponent.py",
+            "app/application/services/local_repair_agent.py",
+            "scripts/jarvis_healer.py",
+        )
+        for candidate in protected_paths:
+            with self.subTest(candidate=candidate):
+                self.assertFalse(healer.is_production_file(Path(candidate)))
 
     def test_heal_never_sends_conftest_from_traceback_to_llm(self):
         with tempfile.TemporaryDirectory() as temporary:

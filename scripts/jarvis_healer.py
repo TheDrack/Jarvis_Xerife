@@ -13,6 +13,12 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from app.core.recovery_store import RecoveryStore
+from app.application.security.repository_path_policy import (
+    UnsafeRepositoryPath,
+    is_test_or_pytest_infrastructure_path,
+    protected_prefix_for,
+    resolve_repository_path,
+)
 
 # Configuração de Logging
 logging.basicConfig(
@@ -107,38 +113,36 @@ def extract_failed_files_from_report(
     return sorted(found_files), failure_context
 
 
-_PYTEST_INFRASTRUCTURE_FILES = frozenset({
-    "conftest.py",
-    "pytest.ini",
-    "pytest.toml",
-    "tox.ini",
-    "setup.cfg",
-    "pyproject.toml",
-    ".coveragerc",
-})
+def _resolve_production_target(
+    file_path: Path, *, require_file: bool = False
+) -> Optional[Path]:
+    """Resolve a repository Python target under the shared autonomous-mutation policy."""
+    try:
+        root = REPO_ROOT.resolve()
+        candidate = Path(file_path)
+        if candidate.is_absolute():
+            relative = candidate.relative_to(root).as_posix()
+        else:
+            relative = candidate.as_posix()
+        resolved, _, resolved_relative = resolve_repository_path(
+            root, relative, reject_symlinks=True
+        )
+        if require_file and not resolved.is_file():
+            return None
+        if resolved.suffix.casefold() != ".py":
+            return None
+        if protected_prefix_for(resolved_relative):
+            return None
+        if is_test_or_pytest_infrastructure_path(resolved_relative):
+            return None
+        return resolved
+    except (UnsafeRepositoryPath, OSError, RuntimeError, ValueError, TypeError):
+        return None
 
 
 def is_production_file(file_path: Path) -> bool:
-    """Return False for pytest tests/configuration on POSIX and Windows paths."""
-    try:
-        # Resolve symlinks before classifying so a production-looking alias cannot
-        # point at mutable test code or pytest configuration.
-        resolved = Path(file_path).resolve(strict=False)
-    except (OSError, RuntimeError, TypeError):
-        # An unresolvable target is not eligible for privileged mutation.
-        return False
-
-    normalized = str(resolved).replace("\\", "/").casefold()
-    parts = [part for part in normalized.split("/") if part]
-    filename = parts[-1] if parts else normalized
-    test_directory = any(part in {"test", "tests", "testing"} for part in parts[:-1])
-    test_filename = (
-        filename == "test.py"
-        or filename.startswith("test_")
-        or filename.endswith("_test.py")
-    )
-    pytest_infrastructure = filename in _PYTEST_INFRASTRUCTURE_FILES
-    return not (test_directory or test_filename or pytest_infrastructure)
+    """Return False for tests, pytest controls, protected code, symlinks, or paths outside the repo."""
+    return _resolve_production_target(file_path) is not None
 
 
 def _strip_markdown_fences(text: str) -> str:
@@ -304,19 +308,14 @@ def apply_fixes(
     file_path: Path, fixes: List[Dict[str, Any]], dry_run: bool = False
 ) -> tuple:
     """Aplica correções apenas em arquivos de produção."""
-    try:
-        # Operate on the resolved target, not on a symlink that could be swapped.
-        file_path = Path(file_path).resolve(strict=False)
-    except (OSError, RuntimeError, TypeError):
-        logger.warning("[Healer] Caminho não resolvível; nenhuma escrita será feita: %s", file_path)
-        return 0, max(1, len(fixes))
-
-    if not is_production_file(file_path):
+    resolved_target = _resolve_production_target(file_path, require_file=True)
+    if resolved_target is None:
         logger.warning(
-            "[Healer] Arquivo de teste/configuração pytest é imutável para auto-cura: %s",
+            "[Healer] Alvo fora da política de auto-cura (teste, configuração, protegido, symlink ou fora do repo): %s",
             file_path,
         )
         return 0, max(1, len(fixes))
+    file_path = resolved_target
 
     success = 0
     fail = 0
