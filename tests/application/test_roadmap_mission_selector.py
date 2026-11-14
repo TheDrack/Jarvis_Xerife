@@ -281,7 +281,7 @@ def test_complete_mission_requires_verified_status_evidence(tmp_path):
 def test_complete_mission_requires_matching_target_and_test_evidence(tmp_path):
     root, _ = _repository(tmp_path, [_mission(status="complete")])
     (root / "tests" / "test_other.py").write_text(
-        "def test_other():\\n    assert True\\n", encoding="utf-8"
+        "def test_other():\n    assert True\n", encoding="utf-8"
     )
     _write_status_ledger(
         root,
@@ -440,10 +440,10 @@ def test_real_c0_criterion_cannot_be_marked_complete_without_production_status_e
     (tmp_path / "app" / "services").mkdir(parents=True, exist_ok=True)
     (tmp_path / "tests").mkdir(parents=True, exist_ok=True)
     (tmp_path / "app" / "services" / "target.py").write_text(
-        "VALUE = 1\\n", encoding="utf-8"
+        "VALUE = 1\n", encoding="utf-8"
     )
     (tmp_path / "tests" / "test_target.py").write_text(
-        "def test_target():\\n    assert True\\n", encoding="utf-8"
+        "def test_target():\n    assert True\n", encoding="utf-8"
     )
     (tmp_path / "data" / "capabilities.json").write_text(
         json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}),
