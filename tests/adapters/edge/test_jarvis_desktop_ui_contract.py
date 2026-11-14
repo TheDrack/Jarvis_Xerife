@@ -372,7 +372,7 @@ def test_mobile_global_navigation_is_fixed_scrollable_and_safe_area_aware():
     assert ".dock{position:fixed" in mobile
     assert "bottom:calc(24px + env(safe-area-inset-bottom))" in mobile
     assert "overflow-x:auto" in mobile
-    assert ".dock-group{flex:0 0 auto}" in mobile
+    assert re.search(r"\.dock-group\{[^}]*\bflex:0 0 auto(?:;|})", mobile)
     assert "min-height:44px" in mobile
     assert ".panels{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto" in mobile
     assert "padding-bottom:90px" in mobile
