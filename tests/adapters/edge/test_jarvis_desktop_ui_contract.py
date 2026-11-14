@@ -334,3 +334,11 @@ def test_weather_panel_escapes_every_external_string_before_html_insertion():
         "esc(dprec[i])",
     ):
         assert expression in HTML, expression
+
+
+
+def test_global_hud_declares_installable_mobile_pwa_and_registers_root_worker():
+    assert '<link rel="manifest" href="/manifest.webmanifest">' in HTML
+    assert 'name="mobile-web-app-capable" content="yes"' in HTML
+    assert "navigator.serviceWorker.register('/service-worker.js',{scope:'/'})" in HTML
+    assert "serviceWorker" in HTML
