@@ -353,3 +353,41 @@ def test_mobile_header_and_hud_controls_remain_reachable_on_narrow_screens():
     assert ".layer-chip{min-height:34px;min-width:34px}" in mobile
     assert ".dock button:not(.orb){min-height:40px" in mobile
     assert ".hud-foot .right{gap:8px;max-width:65vw;overflow-x:auto" in mobile
+
+
+
+def test_global_mobile_workspace_keeps_every_existing_module_reachable():
+    for view in ("core", "events", "sources", "orbital", "telemetry", "network", "devices"):
+        assert re.search(
+            rf'<button[^>]*data-view="{view}"',
+            HTML,
+            re.IGNORECASE,
+        ), view
+    for control in ("universalButton", "camerasButton", "engage"):
+        assert f'id="{control}"' in HTML
+
+
+def test_mobile_global_navigation_is_fixed_scrollable_and_safe_area_aware():
+    mobile = HTML[HTML.rfind("/* Mobile Global workspace */"):]
+    assert ".dock{position:fixed" in mobile
+    assert "bottom:calc(24px + env(safe-area-inset-bottom))" in mobile
+    assert "overflow-x:auto" in mobile
+    assert ".dock-group{flex:0 0 auto}" in mobile
+    assert "min-height:44px" in mobile
+    assert ".panels{flex:1 1 auto;min-height:0;overflow-y:auto" in mobile
+    assert "padding-bottom:90px" in mobile
+
+
+def test_intelligence_dashboard_is_installable_and_mobile_navigable():
+    intelligence = (
+        ROOT / "app" / "static" / "intelligence.html"
+    ).read_text(encoding="utf-8")
+    assert 'name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"' in intelligence
+    assert '<link rel="manifest" href="/manifest.webmanifest">' in intelligence
+    assert '<a class="btn" href="/">HUD principal</a>' in intelligence
+    assert "navigator.serviceWorker.register('/service-worker.js', {scope: '/'})" in intelligence
+    assert "/* Mobile Intelligence workspace */" in intelligence
+    mobile = intelligence[intelligence.rfind("/* Mobile Intelligence workspace */"):]
+    assert ".actions{width:100%" in mobile
+    assert "min-height:44px" in mobile
+    assert ".grid,.pipeline,.columns{grid-template-columns:1fr}" in mobile
