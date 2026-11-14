@@ -422,3 +422,45 @@ def test_real_repository_status_ledger_covers_production_roadmap_criteria():
         criterion_id: records[criterion_id]["state"]
         for criterion_id in ROADMAP_CRITERIA
     } == {criterion_id: "pending" for criterion_id in ROADMAP_CRITERIA}
+
+
+@pytest.mark.parametrize("criterion_id", ROADMAP_CRITERIA)
+def test_real_c0_criterion_cannot_be_marked_complete_without_production_status_evidence(
+    tmp_path, criterion_id
+):
+    """Production C0 IDs must remain blocked while the real STATUS ledger is pending."""
+    source_root = Path(__file__).resolve().parents[2]
+    for relative_path in ("docs/COGNITIVE_ROADMAP.md", "docs/STATUS.md"):
+        source = source_root / relative_path
+        destination = tmp_path / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    (tmp_path / "data").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "app" / "services").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "tests").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "app" / "services" / "target.py").write_text(
+        "VALUE = 1\\n", encoding="utf-8"
+    )
+    (tmp_path / "tests" / "test_target.py").write_text(
+        "def test_target():\\n    assert True\\n", encoding="utf-8"
+    )
+    (tmp_path / "data" / "capabilities.json").write_text(
+        json.dumps({"capabilities": [{"id": "CAP-058", "status": "pending"}]}),
+        encoding="utf-8",
+    )
+    mission = _mission(criterion_id=criterion_id, status="complete")
+    manifest = {
+        "schema_version": 1,
+        "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
+        "hold_reason": "C0 remains pending in the production STATUS ledger.",
+        "missions": [mission],
+    }
+    (tmp_path / "data" / "roadmap_missions.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+
+    with pytest.raises(
+        RoadmapManifestError, match="mission_complete_without_status_evidence"
+    ):
+        _selector(tmp_path).find_next_mission()
