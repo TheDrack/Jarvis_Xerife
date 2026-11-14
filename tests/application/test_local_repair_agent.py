@@ -264,6 +264,21 @@ class TestApplyPatchPathSafety:
         assert result["fixed"] is False
         assert outside.read_text(encoding="utf-8") == original
 
+    def test_control_plane_paths_are_not_auto_repairable(
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        target = repo_root / "app" / "core" / "nexuscomponent.py"
+        target.parent.mkdir(parents=True)
+        original = "SAFE_VALUE = 1\\n"
+        target.write_text(original, encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        result = agent._apply_patch(self._patch(target), str(target))
+
+        assert result["fixed"] is False
+        assert target.read_text(encoding="utf-8") == original
+
     def test_symlinked_target_is_rejected(self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch) -> None:
         repo_root = tmp_path / "repo"
         target = repo_root / "app" / "real.py"
