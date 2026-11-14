@@ -121,7 +121,7 @@ class ExtractFailedFilesFromReportTests(unittest.TestCase):
             root = Path(temporary)
             target = root / "tests" / "conftest.py"
             target.parent.mkdir(parents=True)
-            original = "def pytest_configure(config):\\n    pass\\n"
+            original = "def pytest_configure(config):\n    pass\n"
             target.write_text(original, encoding="utf-8")
             link = root / "app" / "worker.py"
             link.parent.mkdir(parents=True)
@@ -146,7 +146,7 @@ class ExtractFailedFilesFromReportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             conftest = root / "conftest.py"
-            conftest.write_text("def pytest_configure(config):\\n    pass\\n", encoding="utf-8")
+            conftest.write_text("def pytest_configure(config):\n    pass\n", encoding="utf-8")
             report = root / "report.json"
             report.write_text(json.dumps({
                 "summary": {"failed": 1, "error": 0},
@@ -154,7 +154,7 @@ class ExtractFailedFilesFromReportTests(unittest.TestCase):
             }), encoding="utf-8")
             log = root / "pytest.log"
             log.write_text(
-                f'File "{conftest}", line 1, in pytest_configure\\n',
+                f'File "{conftest}", line 1, in pytest_configure\n',
                 encoding="utf-8",
             )
 
