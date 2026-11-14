@@ -1,0 +1,21 @@
+{
+  "id": "/",
+  "name": "J.A.R.V.I.S. Global",
+  "short_name": "JARVIS",
+  "description": "Interface Global do Jarvis para desktop e dispositivos móveis.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#01060c",
+  "theme_color": "#03080a",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/static/jarvis-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
