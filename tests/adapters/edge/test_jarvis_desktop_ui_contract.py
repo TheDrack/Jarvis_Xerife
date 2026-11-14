@@ -346,7 +346,7 @@ def test_global_hud_declares_installable_mobile_pwa_and_registers_root_worker():
 
 
 def test_mobile_header_and_hud_controls_remain_reachable_on_narrow_screens():
-    mobile = HTML[HTML.rfind("@media(max-width:620px)"):]
+    mobile = HTML[HTML.rfind("/* Mobile ergonomics:"):]
     assert ".hud-actions{flex:1 1 0;min-width:0;max-width:none" in mobile
     assert "overflow-x:auto" in mobile
     assert ".layer-group{flex:0 0 auto}" in mobile
