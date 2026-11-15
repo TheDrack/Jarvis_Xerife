@@ -546,6 +546,9 @@ private fun JarvisMobileScreen(
             Button(onClick = { tab = 2 }, enabled = tab != 2, modifier = Modifier.padding(start = 8.dp)) {
                 Text("HUD")
             }
+            Button(onClick = { tab = 3 }, enabled = tab != 3, modifier = Modifier.padding(start = 8.dp)) {
+                Text("Acessibilidade")
+            }
         }
         if (tab == 2) {
             Column(modifier = Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp)) {
@@ -558,6 +561,10 @@ private fun JarvisMobileScreen(
                     },
                     onClose = { tab = 0 }
                 )
+            }
+        } else if (tab == 3) {
+            Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
+                AccessibilitySetupPanel(context)
             }
         } else if (tab == 3) {
             Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
