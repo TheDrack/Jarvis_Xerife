@@ -89,7 +89,7 @@ def run_shell_command(
     timeout_seconds: int = 30,
     session_id: str | None = None,
 ) -> dict[str, Any]:
-    """Execute a Bash command as the current Termux app user, never via su/sudo."""
+    """Start Bash with the current Termux app UID; do not add an elevation wrapper."""
     if not isinstance(command, str) or not command.strip() or len(command) > MAX_COMMAND_CHARS:
         raise ValueError(f"command must contain 1-{MAX_COMMAND_CHARS} characters")
     if "\x00" in command:
