@@ -38,7 +38,7 @@ def accessibility_endpoint() -> str:
     if (
         parsed.scheme != "http"
         or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
-        or parsed.port not in {None, 18766}
+        or parsed.port != 18766
         or parsed.username
         or parsed.password
         or parsed.path
