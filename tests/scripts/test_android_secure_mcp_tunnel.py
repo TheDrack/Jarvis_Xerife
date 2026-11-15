@@ -26,7 +26,10 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
 
     def test_installer_provisions_isolated_android_mcp_runtime_and_service(self):
         source = INSTALLER.read_text(encoding="utf-8")
-        self.assertIn("python -m venv", source)
+        self.assertIn("python -m venv --without-pip", source)
+        self.assertIn("python-pip", source)
+        self.assertIn('python -m pip --python "$MCP_VENV/bin/python" install --upgrade pip', source)
+        self.assertIn('"$MCP_VENV/bin/python" -m pip install', source)
         self.assertIn("mcp>=1.30.0,<2", source)
         self.assertIn("scripts/android/service/mcp-run", source)
         self.assertIn('MCP_SERVICE_NAME="jarvis-android-mcp"', source)
