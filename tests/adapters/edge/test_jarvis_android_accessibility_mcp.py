@@ -107,3 +107,15 @@ def test_accessibility_action_sends_only_validated_json(monkeypatch, tmp_path):
     monkeypatch.setattr(android_mcp.urllib.request, "urlopen", fake_urlopen)
     assert android_mcp.android_accessibility_action("back")["success"] is True
     assert captured == {"method": "POST", "body": {"action": "back"}}
+
+
+def test_accessibility_endpoint_rejects_non_loopback_hosts(monkeypatch):
+    monkeypatch.setattr(android_mcp, "_ACCESSIBILITY_URL", "http://192.168.1.10:18766")
+    with pytest.raises(RuntimeError, match="loopback"):
+        android_mcp._accessibility_endpoint()
+
+
+def test_accessibility_endpoint_rejects_unexpected_ports(monkeypatch):
+    monkeypatch.setattr(android_mcp, "_ACCESSIBILITY_URL", "http://127.0.0.1:9999")
+    with pytest.raises(RuntimeError, match="port 18766"):
+        android_mcp._accessibility_endpoint()
