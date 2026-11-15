@@ -143,11 +143,15 @@ class JarvisAccessibilityService : AccessibilityService() {
     private fun snapshot(): JSONObject {
         val root = rootInActiveWindow
             ?: return JSONObject().put("available", false).put("reason", "no_active_window")
-        val nodes = JSONArray()
-        val count = intArrayOf(0)
-        appendNode(root, nodes, 0, count)
-        return JSONObject().put("available", true).put("window_package", root.packageName?.toString().orEmpty())
-            .put("node_count", count[0]).put("truncated", count[0] >= MAX_NODES).put("nodes", nodes)
+        try {
+            val nodes = JSONArray()
+            val count = intArrayOf(0)
+            appendNode(root, nodes, 0, count)
+            return JSONObject().put("available", true).put("window_package", root.packageName?.toString().orEmpty())
+                .put("node_count", count[0]).put("truncated", count[0] >= MAX_NODES).put("nodes", nodes)
+        } finally {
+            root.recycle()
+        }
     }
 
     private fun appendNode(node: AccessibilityNodeInfo, output: JSONArray, depth: Int, count: IntArray) {
@@ -256,19 +260,28 @@ class JarvisAccessibilityService : AccessibilityService() {
             }
             return null
         }
-        return search(root, 0)
+        return try {
+            search(root, 0)
+        } finally {
+            root.recycle()
+        }
     }
 
     private fun clickNode(node: AccessibilityNodeInfo): Boolean {
+        var current: AccessibilityNodeInfo? = node
         try {
-            var current: AccessibilityNodeInfo? = node
-            var depth = 0
-            while (current != null && depth++ <= MAX_DEPTH) {
-                if (current.isClickable) return current.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                current = current.parent
+            repeat(MAX_DEPTH + 1) {
+                val candidate = current ?: return false
+                if (candidate.isClickable) return candidate.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                val parent = candidate.parent
+                if (candidate !== node) candidate.recycle()
+                current = parent
             }
             return false
-        } finally { node.recycle() }
+        } finally {
+            current?.let { if (it !== node) it.recycle() }
+            node.recycle()
+        }
     }
 
     private fun dispatchTap(x: Float, y: Float): Boolean {
