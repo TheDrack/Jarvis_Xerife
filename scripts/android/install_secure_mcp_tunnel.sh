@@ -17,7 +17,7 @@ SERVICE_NAME="jarvis-secure-mcp-tunnel"
 SERVICE_ROOT="$HOME/.local/share/jarvis-runit/$SERVICE_NAME"
 SERVICE_LINK="$PREFIX/var/service/$SERVICE_NAME"
 
-log() { printf '[JARVIS-TUNNEL] %s\n' "$*"; }
+log() { printf '[JARVIS-TUNNEL] %s\\n' "$*"; }
 die() { log "ERRO: $*" >&2; exit 1; }
 
 MCP_APP_ROOT="$HOME/.local/opt/jarvis-android-mcp"
@@ -49,13 +49,13 @@ mkdir -p "$MCP_APP_ROOT" "$MCP_CONFIG_DIR" "$HOME/.local/state/jarvis-android-mc
 chmod 700 "$CONFIG_DIR" "$PROFILE_DIR" "$HOME/.local/state/jarvis-tunnel" "$MCP_CONFIG_DIR" "$HOME/.local/state/jarvis-android-mcp"
 
 log "Preparando ambiente Python isolado para o servidor MCP Android..."
-# Termux ships pip as a separate package and its Python build may not
-# provide ensurepip. Create the venv without ensurepip, then let the
-# system pip target that interpreter (pip >= 22.3 supports --python).
+# Termux owns its system pip package and pip 26.3 refuses self-installation.
+# Keep pip outside the venv; use its --python option to install only the
+# application dependencies into the isolated interpreter.
 python -m venv --without-pip "$MCP_VENV"
-python -m pip --python "$MCP_VENV/bin/python" install --upgrade pip
-"$MCP_VENV/bin/python" -m pip install 'mcp>=1.30.0,<2' 'uvicorn>=0.24.0,<1'
-printf 'REPO_ROOT=%q\nMCP_HOST=127.0.0.1\nMCP_PORT=%q\n' "$REPO_ROOT" "$MCP_LOCAL_PORT" > "$MCP_ENV_FILE"
+python -m pip --python "$MCP_VENV/bin/python" install 'mcp>=1.30.0,<2' 'uvicorn>=0.24.0,<1'
+"$MCP_VENV/bin/python" -c 'import mcp, uvicorn'
+printf 'REPO_ROOT=%q\\nMCP_HOST=127.0.0.1\\nMCP_PORT=%q\\n' "$REPO_ROOT" "$MCP_LOCAL_PORT" > "$MCP_ENV_FILE"
 chmod 600 "$MCP_ENV_FILE"
 
 # Keep service scripts in the user's home; runit only receives symlinks.
@@ -71,7 +71,7 @@ fi
 
 if [ ! -d "$SOURCE_ROOT/.git" ]; then
   mkdir -p "$(dirname "$SOURCE_ROOT")"
-  git clone --depth 1 --branch "$TUNNEL_CLIENT_VERSION" \
+  git clone --depth 1 --branch "$TUNNEL_CLIENT_VERSION" \\
     https://github.com/openai/tunnel-client.git "$SOURCE_ROOT"
 else
   current="$(git -C "$SOURCE_ROOT" describe --tags --exact-match 2>/dev/null || true)"
@@ -87,9 +87,9 @@ log "Compilando tunnel-client oficial para Android/ARM64 (CGO habilitado para DN
   module_path="$(go list -m -f '{{.Path}}')"
   git_sha="$(git rev-parse HEAD)"
   mkdir -p bin
-  GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=clang \
-    go build -trimpath \
-      -ldflags "-X ${module_path}/pkg/version.GitSHA=${git_sha}" \
+  GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=clang \\
+    go build -trimpath \\
+      -ldflags "-X ${module_path}/pkg/version.GitSHA=${git_sha}" \\
       -o "$BIN_DIR/tunnel-client" ./cmd/client
 )
 chmod 700 "$BIN_DIR/tunnel-client"
