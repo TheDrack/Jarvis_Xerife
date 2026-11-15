@@ -16,7 +16,7 @@ MCP_SERVER_URL="${MCP_SERVER_URL:-http://127.0.0.1:8765/mcp}"
 HEALTH_ADDR="${HEALTH_ADDR:-127.0.0.1:8767}"
 
 read -r -p "Tunnel ID Android (criado em Platform > Tunnels): " tunnel_id
-[[ "$tunnel_id" =~ ^tunnel_[A-Za-z0-9_-]{8,}$ ]] || { echo "Formato de tunnel_id inválido." >&2; exit 1; }
+[[ "$tunnel_id" =~ ^tunnel__?[a-z0-9]{32}$ ]] || { echo "Formato de tunnel_id inválido." >&2; exit 1; }
 
 read -r -s -p "Runtime API key (Tunnels Read + Use): " runtime_key
 printf '\n'
@@ -24,7 +24,7 @@ printf '\n'
 
 mkdir -p "$CONFIG_DIR"
 umask 077
-printf '%s' "$runtime_key" > "$SECRET_FILE"
+printf '%s\\n' "$runtime_key" > "$SECRET_FILE"
 unset runtime_key
 chmod 600 "$SECRET_FILE" "$ENV_FILE"
 
