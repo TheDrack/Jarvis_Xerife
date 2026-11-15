@@ -13,6 +13,7 @@ SERVICE = ROOT / "scripts" / "android" / "service" / "run"
 LOG_SERVICE = ROOT / "scripts" / "android" / "service" / "log-run"
 MCP_SERVICE = ROOT / "scripts" / "android" / "service" / "mcp-run"
 MCP_LOG_SERVICE = ROOT / "scripts" / "android" / "service" / "mcp-log-run"
+SHELL_CONFIGURER = ROOT / "scripts" / "android" / "configure_termux_shell.sh"
 MCP_SERVER = ROOT / "app" / "adapters" / "edge" / "jarvis_android_mcp.py"
 
 
@@ -112,6 +113,24 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         for tool in ("android_device_status", "android_battery_status", "android_wifi_status"):
             self.assertIn(tool, source)
 
+
+    def test_termux_shell_opt_in_script_updates_private_config_and_restarts_service(self):
+        source = SHELL_CONFIGURER.read_text(encoding="utf-8")
+        self.assertIn('enable) VALUE=1 ;;', source)
+        self.assertIn('disable) VALUE=0 ;;', source)
+        self.assertIn('chmod 600 "$TEMP_FILE"', source)
+        self.assertIn('sv restart "$SERVICE_LINK"', source)
+        self.assertNotIn("pairing_code", source)
+        mcp_source = MCP_SERVICE.read_text(encoding="utf-8")
+        self.assertIn('export JARVIS_ANDROID_SHELL_ENABLED="${JARVIS_ANDROID_SHELL_ENABLED:-0}"', mcp_source)
+
+    def test_android_mcp_registers_termux_shell_session_tools(self):
+        source = MCP_SERVER.read_text(encoding="utf-8")
+        self.assertIn("register_termux_shell_tools(mcp)", source)
+        shell_module = (ROOT / "app" / "adapters" / "infrastructure" / "termux_shell_mcp_tools.py").read_text(encoding="utf-8")
+        self.assertIn("android_shell_exec", shell_module)
+        self.assertIn("JARVIS_ANDROID_SHELL_ENABLED", shell_module)
+
     def test_shell_scripts_parse_without_syntax_errors(self):
         bash = shutil.which("bash")
         if os.name == "nt":
@@ -127,7 +146,7 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertEqual(version.returncode, 0, msg=f"Selected Bash executable is not runnable: {bash}\\nstdout: {version.stdout}\\nstderr: {version.stderr}")
         self.assertIn("GNU bash", version.stdout, msg=f"Unexpected Bash executable: {bash}")
 
-        for path in (INSTALLER, CONFIGURER, SERVICE, LOG_SERVICE, MCP_SERVICE, MCP_LOG_SERVICE):
+        for path in (INSTALLER, CONFIGURER, SHELL_CONFIGURER, SERVICE, LOG_SERVICE, MCP_SERVICE, MCP_LOG_SERVICE):
             result = subprocess.run(
                 [bash, "-n"], input=path.read_text(encoding="utf-8"),
                 capture_output=True, text=True, check=False,

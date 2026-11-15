@@ -38,3 +38,33 @@ Ações são limitadas por schema, tamanho e timeout. Não há execução de she
 - O MCP lê o token do ambiente `JARVIS_ANDROID_ACCESSIBILITY_TOKEN` ou do arquivo privado Termux.
 
 A autorização de Acessibilidade é poderosa: ela pode ler o conteúdo exibido em janelas e executar ações em nome do usuário. Mantenha-a desligada quando não estiver usando automação.
+
+## Shell Termux remoto (opt-in)
+
+O MCP Android também pode expor execução Bash geral no contexto **não-root do aplicativo Termux**. Isso é separado do AccessibilityService e não usa ADB.
+
+### Ativação local
+
+1. Atualize o checkout Termux para uma revisão que contenha esta integração.
+2. Execute `bash scripts/android/configure_termux_shell.sh enable`. O script grava `JARVIS_ANDROID_SHELL_ENABLED=1` em `~/.config/jarvis/android-mcp/server.env` com modo 600 e reinicia o serviço MCP.
+3. Se uma sessão anterior ainda estiver ativa, revogue-a primeiro:
+   `python -m app.adapters.infrastructure.session_authorization revoke`
+4. Em cada sessão, emita um código de pareamento local:
+   `python -m app.adapters.infrastructure.session_authorization create --profile termux_developer --ttl-minutes 30`
+5. Use a ferramenta MCP `android_shell_session_authenticate` uma única vez com o código. O código é consumido; a sessão expira no prazo indicado.
+6. Execute comandos com `android_shell_exec`. Para encerrar antes do prazo, use `android_shell_session_revoke`.
+
+Para desativar a ferramenta e reiniciar o serviço:
+`bash scripts/android/configure_termux_shell.sh disable`
+
+### Contrato e limites
+
+- O executor inicia Bash com o UID normal do Termux e não adiciona um wrapper de elevação. Como o comando é arbitrário, ele ainda pode chamar `su` se o Android estiver rooteado e o binário estiver disponível.
+- O perfil `termux_developer` recebe somente `android.shell.exec`; não herda capacidades do host Windows.
+- Pareamento de uso único, no máximo cinco tentativas, sessão revogável e TTL de 5 a 120 minutos.
+- Um comando por vez; timeout máximo de 120 segundos; stdout limitado a 32 KiB e stderr a 16 KiB.
+- O log local `~/.local/state/jarvis/android_shell_audit.jsonl` registra sessão, hashes do comando/diretório, duração e resultado, sem armazenar comando ou saída. Arquivo modo 600 e diretório modo 700.
+- O shell tem acesso a tudo que o usuário Termux consegue acessar. Isso inclui arquivos privados e credenciais armazenadas no sandbox Termux. Não use esta ferramenta para imprimir chaves, tokens ou arquivos de credenciais no chat. O código de pareamento também é um segredo bearer: é de uso único e curto prazo, mas pode aparecer no histórico de ferramentas do cliente.
+- A ferramenta permanece desabilitada por padrão e só aparece no catálogo MCP quando o opt-in local estiver ativo.
+
+A sessão autenticada é uma autorização temporária para comandos com efeitos colaterais. Antes de comandos destrutivos, alterações de credenciais, remoção de arquivos ou mudanças de serviços, confirme o alvo e o impacto. O executor não oferece isolamento por diretório: o limite de segurança é o sandbox Android/Termux e o UID do aplicativo.

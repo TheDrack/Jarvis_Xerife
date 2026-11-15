@@ -25,11 +25,16 @@ from app.adapters.edge.android_host_status import (
     android_device_status as read_device_status,
     android_wifi_status as read_wifi_status,
 )
+from app.adapters.infrastructure.termux_shell_mcp_tools import (
+    register_termux_shell_tools,
+)
 
 mcp = FastMCP(
     "Jarvis Android",
     instructions=(
         "Android host diagnostics and opt-in native accessibility controls. "
+        "The separately opt-in Termux shell runs arbitrary Bash as the unprivileged "
+        "Termux app user and requires a one-time termux_developer session pairing. "
         "Accessibility requires the device owner to enable Jarvis Accessibility "
         "in Android Settings and pair a local bearer token. Wi-Fi SSID, BSSID, "
         "IP addresses, location, clipboard contents, and credentials are never "
@@ -79,6 +84,10 @@ def android_accessibility_action(action: str, parameters: dict[str, Any] | None 
     """Execute one allowlisted tap, swipe, semantic click, text entry, or global navigation action."""
     payload = build_accessibility_action(action, parameters)
     return accessibility_request("/v1/action", payload)
+
+
+# Session pairing controls are always available; arbitrary shell is locally opt-in.
+register_termux_shell_tools(mcp)
 
 
 async def healthz(_request: Request) -> JSONResponse:

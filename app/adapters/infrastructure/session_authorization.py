@@ -42,6 +42,9 @@ PROFILES: dict[str, frozenset[str]] = {
         "host.command.git_read",
         "host.command.inspect_d",
     }),
+    "termux_developer": frozenset({
+        "android.shell.exec",
+    }),
 }
 
 

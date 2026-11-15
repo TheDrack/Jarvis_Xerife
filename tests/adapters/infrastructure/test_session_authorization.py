@@ -121,3 +121,14 @@ def test_status_handles_structurally_corrupt_state_without_crashing(tmp_path):
     gateway = SessionAuthorizationGateway(path, clock=_clock)
 
     assert gateway.status()["status"] == "inactive"
+
+
+def test_termux_developer_profile_grants_only_android_shell_capability(tmp_path):
+    gateway = SessionAuthorizationGateway(tmp_path / "session.json", clock=_clock)
+    created = gateway.create_session(profile="termux_developer")
+
+    assert created["capabilities"] == ["android.shell.exec"]
+    gateway.authenticate(created["pairing_code"])
+    assert gateway.require("android.shell.exec")["profile"] == "termux_developer"
+    with pytest.raises(SessionAuthorizationError, match="lacks capability"):
+        gateway.require("host.fs.read")
