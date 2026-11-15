@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import shutil
 import subprocess
 import unittest
 
@@ -26,17 +28,50 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertIn("env:CONTROL_PLANE_API_KEY", CONFIGURER.read_text(encoding="utf-8"))
 
     def test_shell_scripts_parse_without_syntax_errors(self):
+        bash = shutil.which("bash")
+        if os.name == "nt":
+            git = shutil.which("git")
+            if git:
+                git_root = Path(git).resolve().parents[1]
+                git_bash = git_root / "bin" / "bash.exe"
+                if git_bash.is_file():
+                    bash = str(git_bash)
+
+        self.assertIsNotNone(bash, "A real Bash executable is required for shell syntax checks.")
+        version = subprocess.run(
+            [bash, "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(
+            version.returncode,
+            0,
+            msg=(
+                f"Selected Bash executable is not runnable: {bash}\n"
+                f"stdout: {version.stdout}\nstderr: {version.stderr}"
+            ),
+        )
+        self.assertIn("GNU bash", version.stdout, msg=f"Unexpected Bash executable: {bash}")
+
         for path in (INSTALLER, CONFIGURER, SERVICE, LOG_SERVICE):
-            # Feed source on stdin instead of passing a Windows drive path to
-            # MSYS/Git Bash. The latter is not portable across Windows runners.
+            # Feed source over stdin and explicitly select Git for Windows Bash.
+            # The plain PATH entry may resolve to the WSL launcher on Windows runners.
             result = subprocess.run(
-                ["bash", "-n"],
+                [bash, "-n"],
                 input=path.read_text(encoding="utf-8"),
                 capture_output=True,
                 text=True,
                 check=False,
             )
-            self.assertEqual(result.returncode, 0, msg=f"{path}: {result.stderr}")
+            self.assertEqual(
+                result.returncode,
+                0,
+                msg=(
+                    f"{path}: bash={bash}\n"
+                    f"stdout: {result.stdout}\nstderr: {result.stderr}"
+                ),
+            )
 
     def test_configurator_terminates_private_key_file_with_newline(self):
         source = CONFIGURER.read_text(encoding="utf-8")
