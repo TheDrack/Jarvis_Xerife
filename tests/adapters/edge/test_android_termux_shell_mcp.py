@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime, timezone
 
 import pytest
 
 from app.adapters.infrastructure import termux_shell_mcp_tools as shell_mcp
+from app.adapters.infrastructure.session_authorization import SessionAuthorizationError
 from app.adapters.infrastructure import termux_shell
+
+
+@pytest.fixture(autouse=True)
+def _isolate_audit_log(monkeypatch, tmp_path):
+    monkeypatch.setattr(termux_shell, 'AUDIT_LOG', tmp_path / 'audit.jsonl')
 
 
 class FakeMCP:
@@ -76,7 +81,7 @@ def test_shell_tool_requires_single_use_termux_session(monkeypatch, tmp_path):
 
     assert result["success"] is True
     assert result["stdout"] == "printf authorized"
-    with pytest.raises(Exception):
+    with pytest.raises(SessionAuthorizationError, match="consumed"):
         gateway.authenticate(created["pairing_code"])
 
 
