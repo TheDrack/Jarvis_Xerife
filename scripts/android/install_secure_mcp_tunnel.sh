@@ -17,7 +17,7 @@ SERVICE_NAME="jarvis-secure-mcp-tunnel"
 SERVICE_ROOT="$HOME/.local/share/jarvis-runit/$SERVICE_NAME"
 SERVICE_LINK="$PREFIX/var/service/$SERVICE_NAME"
 
-log() { printf '[JARVIS-TUNNEL] %s\\n' "$*"; }
+log() { printf '[JARVIS-TUNNEL] %s\n' "$*"; }
 die() { log "ERRO: $*" >&2; exit 1; }
 
 MCP_APP_ROOT="$HOME/.local/opt/jarvis-android-mcp"
@@ -55,7 +55,7 @@ log "Preparando ambiente Python isolado para o servidor MCP Android..."
 python -m venv --without-pip "$MCP_VENV"
 python -m pip --python "$MCP_VENV/bin/python" install 'mcp>=1.30.0,<2' 'uvicorn>=0.24.0,<1'
 "$MCP_VENV/bin/python" -c 'import mcp, uvicorn'
-printf 'REPO_ROOT=%q\nMCP_HOST=127.0.0.1\\nMCP_PORT=%q\n' "$REPO_ROOT" "$MCP_LOCAL_PORT" > "$MCP_ENV_FILE"
+printf 'REPO_ROOT=%q\nMCP_HOST=127.0.0.1\nMCP_PORT=%q\n' "$REPO_ROOT" "$MCP_LOCAL_PORT" > "$MCP_ENV_FILE"
 chmod 600 "$MCP_ENV_FILE"
 
 # Keep service scripts in the user's home; runit only receives symlinks.
