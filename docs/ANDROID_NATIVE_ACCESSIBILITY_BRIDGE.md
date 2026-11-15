@@ -59,7 +59,7 @@ Para desativar a ferramenta e reiniciar o serviço:
 
 ### Contrato e limites
 
-- O shell executa Bash arbitrário como o UID normal do Termux; não solicita root nem chama `su`/`sudo` por conta própria.
+- O executor inicia Bash com o UID normal do Termux e não adiciona um wrapper de elevação. Como o comando é arbitrário, ele ainda pode chamar `su` se o Android estiver rooteado e o binário estiver disponível.
 - O perfil `termux_developer` recebe somente `android.shell.exec`; não herda capacidades do host Windows.
 - Pareamento de uso único, no máximo cinco tentativas, sessão revogável e TTL de 5 a 120 minutos.
 - Um comando por vez; timeout máximo de 120 segundos; stdout limitado a 32 KiB e stderr a 16 KiB.
