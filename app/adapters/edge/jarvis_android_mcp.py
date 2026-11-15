@@ -33,6 +33,8 @@ mcp = FastMCP(
     "Jarvis Android",
     instructions=(
         "Android host diagnostics and opt-in native accessibility controls. "
+        "The separately opt-in Termux shell runs arbitrary Bash as the unprivileged "
+        "Termux app user and requires a one-time termux_developer session pairing. "
         "Accessibility requires the device owner to enable Jarvis Accessibility "
         "in Android Settings and pair a local bearer token. Wi-Fi SSID, BSSID, "
         "IP addresses, location, clipboard contents, and credentials are never "
