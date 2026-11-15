@@ -86,6 +86,7 @@ def test_auto_healing_changes_are_proposed_in_a_branch_without_staging_tests_or_
     assert "git add -- app scripts tests docs" not in workflow
     assert "git diff --cached --name-only | grep -E" in workflow
     assert "test_" in workflow
+    assert r"test\.py" in workflow
     assert r"_test\.py" in workflow
     assert "conftest.py" in workflow
     assert "pytest.ini" in workflow
