@@ -417,3 +417,9 @@ class TestFrozenPathProtection:
 
         assert result == (0, 1)
         assert target.read_text(encoding="utf-8") == original
+
+    def test_frozen_directory_helper_matches_complete_segments(self) -> None:
+        assert repository_path_policy.contains_frozen_directory(".frozen/module.py")
+        assert repository_path_policy.contains_frozen_directory("app/.FROZEN/module.py")
+        assert not repository_path_policy.contains_frozen_directory("app/frozen/module.py")
+        assert not repository_path_policy.contains_frozen_directory("app/.frozen-backup/module.py")
