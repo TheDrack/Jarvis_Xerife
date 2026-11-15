@@ -28,12 +28,16 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
     def test_shell_scripts_parse_without_syntax_errors(self):
         for path in (INSTALLER, CONFIGURER, SERVICE, LOG_SERVICE):
             result = subprocess.run(
-                ["bash", "-n", str(path)],
+                ["bash", "-n", path.as_posix()],
                 capture_output=True,
                 text=True,
                 check=False,
             )
             self.assertEqual(result.returncode, 0, msg=f"{path}: {result.stderr}")
+
+    def test_configurator_terminates_private_key_file_with_newline(self):
+        source = CONFIGURER.read_text(encoding="utf-8")
+        self.assertIn("printf '%s\\n'", source)
 
     def test_service_reads_private_key_file_without_printing_it(self):
         source = SERVICE.read_text(encoding="utf-8")
