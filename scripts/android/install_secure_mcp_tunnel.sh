@@ -16,6 +16,10 @@ ENV_FILE="$CONFIG_DIR/tunnel.env"
 SERVICE_NAME="jarvis-secure-mcp-tunnel"
 SERVICE_ROOT="$HOME/.local/share/jarvis-runit/$SERVICE_NAME"
 SERVICE_LINK="$PREFIX/var/service/$SERVICE_NAME"
+
+log() { printf '[JARVIS-TUNNEL] %s\n' "$*"; }
+die() { log "ERRO: $*" >&2; exit 1; }
+
 MCP_APP_ROOT="$HOME/.local/opt/jarvis-android-mcp"
 MCP_VENV="$MCP_APP_ROOT/venv"
 MCP_CONFIG_DIR="$HOME/.config/jarvis/android-mcp"
@@ -34,9 +38,6 @@ MCP_LOCAL_PORT="${MCP_LOCAL_PORT:-8765}"
 [ "$MCP_LOCAL_HOST" = "127.0.0.1" ] || die "O MCP Android só pode usar 127.0.0.1."
 MCP_SERVER_URL="http://$MCP_LOCAL_HOST:$MCP_LOCAL_PORT/mcp"
 HEALTH_ADDR="${HEALTH_ADDR:-127.0.0.1:8767}"
-
-log() { printf '[JARVIS-TUNNEL] %s\n' "$*"; }
-die() { log "ERRO: $*" >&2; exit 1; }
 
 command -v pkg >/dev/null 2>&1 || die "Execute este instalador dentro do Termux."
 [ "$MCP_LOCAL_PORT" -ge 1 ] 2>/dev/null && [ "$MCP_LOCAL_PORT" -le 65535 ] 2>/dev/null || die "MCP_LOCAL_PORT inválida."
