@@ -136,3 +136,10 @@ def test_accessibility_endpoint_requires_explicit_port(monkeypatch):
     monkeypatch.setattr(android_mcp, "ACCESSIBILITY_URL", "http://127.0.0.1")
     with pytest.raises(RuntimeError, match="port 18766"):
         android_mcp.accessibility_endpoint()
+
+
+@pytest.mark.parametrize("url", ["http://localhost:18766", "http://[::1]:18766"])
+def test_accessibility_endpoint_matches_ipv4_listener_only(monkeypatch, url):
+    monkeypatch.setattr(android_mcp, "ACCESSIBILITY_URL", url)
+    with pytest.raises(RuntimeError, match="loopback"):
+        android_mcp.accessibility_endpoint()
