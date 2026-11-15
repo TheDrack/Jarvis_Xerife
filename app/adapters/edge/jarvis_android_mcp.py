@@ -1,16 +1,18 @@
 """Loopback-only Streamable HTTP MCP server for the Android/Termux host.
 
-Run from the repository root with:
-    python -m app.adapters.edge.jarvis_android_mcp
-
-This server intentionally exposes only bounded, read-only device diagnostics.
-It is separate from the desktop MCP entrypoint and does not import desktop UI,
-ADB, Windows, or host-shell adapters.
+The native APK owns Android UI automation. This Termux process only forwards
+authenticated MCP requests to the APK's loopback AccessibilityService endpoint.
 """
 from __future__ import annotations
 
 import contextlib
+import json
 import os
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Any
 
 import uvicorn
 from mcp.server.fastmcp import FastMCP
@@ -19,7 +21,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
-import json\nimport urllib.error\nimport urllib.request\nimport urllib.parse\nfrom pathlib import Path\nfrom typing import Any\n\nfrom app.adapters.edge.android_host_status import (
+from app.adapters.edge.android_host_status import (
     android_battery_status as read_battery_status,
     android_device_status as read_device_status,
     android_wifi_status as read_wifi_status,
@@ -28,13 +30,20 @@ import json\nimport urllib.error\nimport urllib.request\nimport urllib.parse\nfr
 mcp = FastMCP(
     "Jarvis Android",
     instructions=(
-        "Read-only diagnostics for the Android device hosting this MCP server. "
-        "These tools report bounded host, battery, and Wi-Fi status. Wi-Fi SSID, "
-        "BSSID, IP addresses, location, clipboard contents, and credentials are "
-        "never returned. This server is intended to be reachable only through "
-        "the local loopback interface and its configured Secure MCP Tunnel."
+        "Android host diagnostics and opt-in native accessibility controls. "
+        "Accessibility requires the device owner to enable Jarvis Accessibility "
+        "in Android Settings and pair a local bearer token. Wi-Fi SSID, BSSID, "
+        "IP addresses, location, clipboard contents, and credentials are never "
+        "returned by host diagnostic tools. The MCP server binds to loopback."
     ),
 )
+
+_ACCESSIBILITY_URL = os.environ.get(
+    "JARVIS_ANDROID_ACCESSIBILITY_URL", "http://127.0.0.1:18766"
+).rstrip("/")
+_ACCESSIBILITY_TOKEN_FILE = Path.home() / ".config/jarvis/accessibility/token"
+_ACCESSIBILITY_TIMEOUT = 10
+_ACCESSIBILITY_MAX_RESPONSE = 2 * 1024 * 1024
 
 
 @mcp.tool()
@@ -55,56 +64,6 @@ def android_wifi_status() -> dict:
     return read_wifi_status()
 
 
-async def healthz(_request: Request) -> JSONResponse:
-    return JSONResponse({"status": "live", "service": "jarvis-android-mcp"})
-
-
-async def readyz(_request: Request) -> JSONResponse:
-    return JSONResponse({"status": "ready", "service": "jarvis-android-mcp"})
-
-
-@contextlib.asynccontextmanager
-async def lifespan(_app: Starlette):
-    async with mcp.session_manager.run():
-        yield
-
-
-# FastMCP's default Streamable HTTP path is /mcp. Keep health routes ahead of
-# Mount("/") because that mount otherwise captures every remaining path.
-app = Starlette(
-    routes=[
-        Route("/healthz", healthz, methods=["GET"]),
-        Route("/readyz", readyz, methods=["GET"]),
-        Mount("/", app=mcp.streamable_http_app()),
-    ],
-    lifespan=lifespan,
-)
-
-
-def main() -> None:
-    host = os.environ.get("JARVIS_ANDROID_MCP_HOST", "127.0.0.1").strip()
-    if host not in {"127.0.0.1", "localhost", "::1"}:
-        raise RuntimeError("Jarvis Android MCP must bind to loopback only.")
-
-    try:
-        port = int(os.environ.get("JARVIS_ANDROID_MCP_PORT", "8765"))
-    except ValueError as exc:
-        raise RuntimeError("JARVIS_ANDROID_MCP_PORT must be an integer.") from exc
-    if not 1 <= port <= 65535:
-        raise RuntimeError("JARVIS_ANDROID_MCP_PORT must be between 1 and 65535.")
-
-    uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
-
-
-if __name__ == "__main__":
-    main()
-
-
-_ACCESSIBILITY_URL = os.environ.get("JARVIS_ANDROID_ACCESSIBILITY_URL", "http://127.0.0.1:18766").rstrip("/")
-_ACCESSIBILITY_TOKEN_FILE = Path.home() / ".config/jarvis/accessibility/token"
-_ACCESSIBILITY_TIMEOUT = 10
-
-
 def _accessibility_token() -> str:
     token = os.environ.get("JARVIS_ANDROID_ACCESSIBILITY_TOKEN", "").strip()
     if not token:
@@ -115,6 +74,22 @@ def _accessibility_token() -> str:
     if len(token) < 40 or len(token) > 256:
         raise RuntimeError("Android accessibility pairing token is missing or invalid.")
     return token
+
+
+def _accessibility_endpoint() -> str:
+    parsed = urllib.parse.urlsplit(_ACCESSIBILITY_URL)
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or parsed.port not in {None, 18766}
+        or parsed.username
+        or parsed.password
+        or parsed.path
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise RuntimeError("Android accessibility endpoint must use HTTP loopback on port 18766.")
+    return _ACCESSIBILITY_URL
 
 
 def _validate_accessibility_action(payload: dict[str, Any]) -> dict[str, Any]:
@@ -165,23 +140,25 @@ def _coordinates(payload: dict[str, Any], fields: tuple[str, ...]) -> None:
 
 
 def _accessibility_request(path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    endpoint = _accessibility_endpoint()
     token = _accessibility_token()
-    parsed_url = urllib.parse.urlsplit(_ACCESSIBILITY_URL)
-    if parsed_url.scheme != "http" or parsed_url.hostname not in {"127.0.0.1", "localhost", "::1"}:
-        raise RuntimeError("Android accessibility endpoint must use HTTP loopback only.")
-    if parsed_url.port not in {None, 18766} or parsed_url.username or parsed_url.password:
-        raise RuntimeError("Android accessibility endpoint must use the configured loopback port.")
     body = None if payload is None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
     request = urllib.request.Request(
-        _ACCESSIBILITY_URL + path,
+        endpoint + path,
         data=body,
-        headers={"Authorization": "Bearer " + token, "Accept": "application/json",
-                 **({"Content-Type": "application/json"} if body is not None else {})},
+        headers={
+            "Authorization": "Bearer " + token,
+            "Accept": "application/json",
+            **({"Content-Type": "application/json"} if body is not None else {}),
+        },
         method="POST" if body is not None else "GET",
     )
     try:
         with urllib.request.urlopen(request, timeout=_ACCESSIBILITY_TIMEOUT) as response:
-            result = json.loads(response.read(2 * 1024 * 1024 + 1).decode("utf-8"))
+            raw = response.read(_ACCESSIBILITY_MAX_RESPONSE + 1)
+        if len(raw) > _ACCESSIBILITY_MAX_RESPONSE:
+            raise RuntimeError("Android accessibility response exceeded the configured size limit.")
+        result = json.loads(raw.decode("utf-8"))
     except urllib.error.HTTPError as error:
         if error.code == 401:
             raise RuntimeError("Android accessibility bridge rejected the pairing token.") from None
@@ -217,6 +194,47 @@ def android_accessibility_screenshot() -> dict:
 
 @mcp.tool()
 def android_accessibility_action(action: str, parameters: dict[str, Any] | None = None) -> dict:
-    """Execute one explicitly requested tap, swipe, semantic click, text entry, or global navigation action."""
+    """Execute one allowlisted tap, swipe, semantic click, text entry, or global navigation action."""
     payload = _validate_accessibility_action({"action": action, **(parameters or {})})
     return _accessibility_request("/v1/action", payload)
+
+
+async def healthz(_request: Request) -> JSONResponse:
+    return JSONResponse({"status": "live", "service": "jarvis-android-mcp"})
+
+
+async def readyz(_request: Request) -> JSONResponse:
+    return JSONResponse({"status": "ready", "service": "jarvis-android-mcp"})
+
+
+@contextlib.asynccontextmanager
+async def lifespan(_app: Starlette):
+    async with mcp.session_manager.run():
+        yield
+
+
+app = Starlette(
+    routes=[
+        Route("/healthz", healthz, methods=["GET"]),
+        Route("/readyz", readyz, methods=["GET"]),
+        Mount("/", app=mcp.streamable_http_app()),
+    ],
+    lifespan=lifespan,
+)
+
+
+def main() -> None:
+    host = os.environ.get("JARVIS_ANDROID_MCP_HOST", "127.0.0.1").strip()
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        raise RuntimeError("Jarvis Android MCP must bind to loopback only.")
+    try:
+        port = int(os.environ.get("JARVIS_ANDROID_MCP_PORT", "8765"))
+    except ValueError as exc:
+        raise RuntimeError("JARVIS_ANDROID_MCP_PORT must be an integer.") from exc
+    if not 1 <= port <= 65535:
+        raise RuntimeError("JARVIS_ANDROID_MCP_PORT must be between 1 and 65535.")
+    uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
+
+
+if __name__ == "__main__":
+    main()
