@@ -71,7 +71,7 @@ def test_shell_tool_requires_single_use_termux_session(monkeypatch, tmp_path):
     monkeypatch.setattr(
         termux_shell,
         "run_shell_command",
-        lambda command, cwd=None, timeout_seconds=30: {
+        lambda command, cwd=None, timeout_seconds=30, session_id=None: {
             "success": True, "stdout": command, "stderr": "", "exit_code": 0,
             "timed_out": False, "cwd": cwd, "duration_ms": 1, "shell": True,
             "elevated": False,
