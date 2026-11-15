@@ -46,5 +46,4 @@ done
 [ "$ready" -eq 1 ] || { echo "$LOG_PREFIX MCP local não iniciou após 180s" >&2; exit 1; }
 
 echo "$LOG_PREFIX iniciando perfil $PROFILE_NAME"
-exec "$CLIENT" run --profile "$PROFILE_NAME" --profile-dir "$PROFILE_DIR" \
-  --health-listen-addr "$HEALTH_ADDR"
+exec "$CLIENT" run --profile "$PROFILE_NAME" --profile-dir "$PROFILE_DIR"
