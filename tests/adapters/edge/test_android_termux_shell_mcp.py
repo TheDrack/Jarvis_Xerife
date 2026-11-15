@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 
 import pytest
@@ -97,6 +98,20 @@ def test_shell_executor_runs_shell_syntax_as_termux_user(tmp_path):
     assert result["exit_code"] == 0
     assert result["shell"] is True
     assert result["elevated"] is False
+
+
+def test_shell_executor_cleans_up_background_children_after_parent_exits(tmp_path):
+    marker = tmp_path / "background-child-finished"
+    result = termux_shell.run_shell_command(
+        f"(sleep 1; touch {marker}) & printf done",
+        cwd=str(tmp_path),
+        timeout_seconds=5,
+    )
+
+    assert result["success"] is True
+    assert result["stdout"] == "done"
+    time.sleep(1.2)
+    assert not marker.exists()
 
 
 def test_shell_executor_times_out_and_terminates_process_group(tmp_path):
