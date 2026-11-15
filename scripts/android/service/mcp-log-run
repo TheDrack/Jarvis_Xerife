@@ -1,0 +1,2 @@
+#!/data/data/com.termux/files/usr/bin/sh
+exec svlogd -tt "$HOME/.local/state/jarvis-android-mcp/log"
