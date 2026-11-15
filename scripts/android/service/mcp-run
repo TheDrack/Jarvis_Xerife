@@ -1,0 +1,40 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -Eeuo pipefail
+
+CONFIG_DIR="$HOME/.config/jarvis/android-mcp"
+ENV_FILE="$CONFIG_DIR/server.env"
+APP_ROOT="$HOME/.local/opt/jarvis-android-mcp"
+PYTHON="$APP_ROOT/venv/bin/python"
+LOG_PREFIX="[JARVIS-ANDROID-MCP]"
+
+[ -f "$ENV_FILE" ] || { echo "$LOG_PREFIX configuração ausente; execute install_secure_mcp_tunnel.sh" >&2; exit 1; }
+[ -x "$PYTHON" ] || { echo "$LOG_PREFIX ambiente Python MCP ausente; execute install_secure_mcp_tunnel.sh" >&2; exit 1; }
+. "$ENV_FILE"
+
+REPO_ROOT="${REPO_ROOT:-}"
+MCP_HOST="${MCP_HOST:-127.0.0.1}"
+MCP_PORT="${MCP_PORT:-8765}"
+[ -n "$REPO_ROOT" ] && [ -f "$REPO_ROOT/app/adapters/edge/jarvis_android_mcp.py" ] || {
+  echo "$LOG_PREFIX checkout Jarvis inválido em REPO_ROOT" >&2
+  exit 1
+}
+[ "$MCP_HOST" = "127.0.0.1" ] || {
+  echo "$LOG_PREFIX bind externo recusado; use 127.0.0.1" >&2
+  exit 1
+}
+case "$MCP_PORT" in
+  ''|*[!0-9]*) echo "$LOG_PREFIX porta inválida" >&2; exit 1 ;;
+esac
+[ "$MCP_PORT" -ge 1 ] && [ "$MCP_PORT" -le 65535 ] || {
+  echo "$LOG_PREFIX porta fora do intervalo" >&2
+  exit 1
+}
+
+cd "$REPO_ROOT"
+export PYTHONUNBUFFERED=1
+export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export JARVIS_ANDROID_MCP_HOST="$MCP_HOST"
+export JARVIS_ANDROID_MCP_PORT="$MCP_PORT"
+
+echo "$LOG_PREFIX iniciando Streamable HTTP em $MCP_HOST:$MCP_PORT"
+exec "$PYTHON" -m app.adapters.edge.jarvis_android_mcp

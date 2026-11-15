@@ -1,0 +1,49 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -Eeuo pipefail
+
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+APP_ROOT="$HOME/.local/opt/jarvis-tunnel"
+CLIENT="$APP_ROOT/bin/tunnel-client"
+CONFIG_DIR="$HOME/.config/jarvis/tunnel"
+ENV_FILE="$CONFIG_DIR/tunnel.env"
+SECRET_FILE="$CONFIG_DIR/runtime-key"
+LOG_PREFIX="[JARVIS-TUNNEL]"
+
+[ -x "$CLIENT" ] || { echo "$LOG_PREFIX tunnel-client não instalado" >&2; exit 1; }
+[ -f "$ENV_FILE" ] || { echo "$LOG_PREFIX configuração ausente; execute configure_secure_mcp_tunnel.sh" >&2; exit 1; }
+[ -f "$SECRET_FILE" ] || { echo "$LOG_PREFIX runtime key ausente" >&2; exit 1; }
+
+# Config is generated locally by the installer; do not source arbitrary user input
+# from a remote endpoint.
+. "$ENV_FILE"
+MCP_LOCAL_HOST="${MCP_LOCAL_HOST:-127.0.0.1}"
+MCP_LOCAL_PORT="${MCP_LOCAL_PORT:-8765}"
+PROFILE_NAME="${PROFILE_NAME:-jarvis-android}"
+PROFILE_DIR="${PROFILE_DIR:-$CONFIG_DIR/profiles}"
+HEALTH_ADDR="${HEALTH_ADDR:-127.0.0.1:8767}"
+
+chmod 700 "$CONFIG_DIR"
+chmod 600 "$SECRET_FILE"
+IFS= read -r CONTROL_PLANE_API_KEY < "$SECRET_FILE"
+[ "${#CONTROL_PLANE_API_KEY}" -ge 20 ] || { echo "$LOG_PREFIX runtime key inválida" >&2; exit 1; }
+export CONTROL_PLANE_API_KEY
+
+echo "$LOG_PREFIX aguardando MCP em $MCP_LOCAL_HOST:$MCP_LOCAL_PORT"
+ready=0
+for attempt in $(seq 1 180); do
+  if python - "$MCP_LOCAL_HOST" "$MCP_LOCAL_PORT" <<'PY'
+import socket, sys
+host, port = sys.argv[1], int(sys.argv[2])
+with socket.create_connection((host, port), timeout=1):
+    pass
+PY
+  then
+    ready=1
+    break
+  fi
+  sleep 1
+done
+[ "$ready" -eq 1 ] || { echo "$LOG_PREFIX MCP local não iniciou após 180s" >&2; exit 1; }
+
+echo "$LOG_PREFIX iniciando perfil $PROFILE_NAME"
+exec "$CLIENT" run --profile "$PROFILE_NAME" --profile-dir "$PROFILE_DIR"
