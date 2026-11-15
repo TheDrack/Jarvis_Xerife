@@ -1,0 +1,3 @@
+<resources>
+    <string name="accessibility_service_description">Permite ao Jarvis ler a estrutura visível da interface e executar gestos solicitados pelo operador. A ativação é opcional e controlada nas configurações de Acessibilidade do Android.</string>
+</resources>
