@@ -82,6 +82,57 @@ def _bounded_reader(
             truncated[0] = True
 
 
+def _terminate_process_group(process: subprocess.Popen[bytes]) -> None:
+    if os.name != "nt":
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    else:
+        process.kill()
+
+
+def _wait_and_cleanup(
+    process: subprocess.Popen[bytes], timeout_seconds: int
+) -> tuple[int | None, bool]:
+    """Wait without reaping the group leader, then kill leftover children safely."""
+    if (
+        os.name == "nt"
+        or not all(hasattr(os, name) for name in ("waitid", "P_PID", "WEXITED", "WNOWAIT", "WNOHANG"))
+    ):
+        try:
+            return process.wait(timeout=timeout_seconds), False
+        except subprocess.TimeoutExpired:
+            _terminate_process_group(process)
+            process.wait()
+            return None, True
+
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        try:
+            state = os.waitid(
+                os.P_PID,
+                process.pid,
+                os.WEXITED | os.WNOWAIT | os.WNOHANG,
+            )
+        except InterruptedError:
+            continue
+        except ChildProcessError:
+            return process.wait(), False
+
+        if state is not None and state.si_pid:
+            # WNOWAIT keeps the PID reserved until wait() reaps it, avoiding
+            # a PID-reuse race while cleaning up background descendants.
+            _terminate_process_group(process)
+            return process.wait(), False
+
+        if time.monotonic() >= deadline:
+            _terminate_process_group(process)
+            process.wait()
+            return None, True
+        time.sleep(0.02)
+
+
 def run_shell_command(
     command: str,
     *,
@@ -144,18 +195,7 @@ def run_shell_command(
         stdout_thread.start()
         stderr_thread.start()
         try:
-            exit_code = process.wait(timeout=timeout_seconds)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            try:
-                if os.name != "nt":
-                    os.killpg(process.pid, signal.SIGKILL)
-                else:
-                    process.kill()
-            except ProcessLookupError:
-                pass
-            process.wait()
-            exit_code = None
+            exit_code, timed_out = _wait_and_cleanup(process, timeout_seconds)
         finally:
             stdout_thread.join(timeout=5)
             stderr_thread.join(timeout=5)
