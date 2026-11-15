@@ -20,7 +20,10 @@ import java.io.BufferedOutputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
 /**
@@ -33,6 +36,9 @@ class JarvisAccessibilityService : AccessibilityService() {
     @Volatile private var server: ServerSocket? = null
     @Volatile private var listenerThread: Thread? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val clientExecutor = ThreadPoolExecutor(
+        2, 4, 30, TimeUnit.SECONDS, ArrayBlockingQueue(8)
+    ) { runnable -> Thread(runnable, "jarvis-accessibility-client").apply { isDaemon = true } }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -51,7 +57,11 @@ class JarvisAccessibilityService : AccessibilityService() {
                 server = socketServer
                 while (!socketServer.isClosed) {
                     val client = try { socketServer.accept() } catch (_: Exception) { break }
-                    Thread({ handleClient(client) }, "jarvis-accessibility-client").start()
+                    try {
+                        clientExecutor.execute { handleClient(client) }
+                    } catch (_: RejectedExecutionException) {
+                        client.close()
+                    }
                 }
             } catch (error: Exception) {
                 android.util.Log.e(TAG, "Local accessibility listener failed: " + error.javaClass.simpleName)
@@ -146,8 +156,9 @@ class JarvisAccessibilityService : AccessibilityService() {
         node.getBoundsInScreen(bounds)
         output.put(JSONObject()
             .put("index", count[0]++)
-            .put("text", node.text?.toString()?.take(500).orEmpty())
-            .put("content_description", node.contentDescription?.toString()?.take(500).orEmpty())
+            .put("text", if (node.isPassword) "" else node.text?.toString()?.take(500).orEmpty())
+            .put("content_description", if (node.isPassword) "" else node.contentDescription?.toString()?.take(500).orEmpty())
+            .put("password", node.isPassword)
             .put("view_id", node.viewIdResourceName?.take(300).orEmpty())
             .put("class_name", node.className?.toString()?.take(200).orEmpty())
             .put("bounds", JSONObject().put("left", bounds.left).put("top", bounds.top)
@@ -222,7 +233,7 @@ class JarvisAccessibilityService : AccessibilityService() {
             "click_text" -> findNode { it.text?.toString() == body.optString("text") }?.let { clickNode(it) } ?: false
             "click_view_id" -> findNode { it.viewIdResourceName == body.optString("view_id") }?.let { clickNode(it) } ?: false
             "set_text" -> {
-                val target = findNode { it.viewIdResourceName == body.optString("view_id") && it.isEditable }
+                val target = findNode { it.viewIdResourceName == body.optString("view_id") && it.isEditable && !it.isPassword }
                 target?.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
                     putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, body.optString("text").take(2000))
                 }) ?: false
@@ -304,6 +315,7 @@ class JarvisAccessibilityService : AccessibilityService() {
         server = null
         listenerThread?.interrupt()
         listenerThread = null
+        clientExecutor.shutdownNow()
         super.onDestroy()
     }
 
