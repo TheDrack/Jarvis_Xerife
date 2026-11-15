@@ -228,7 +228,7 @@ jobs:
           set -e
           gh auth setup-git
           git add -- app scripts docs
-          if git diff --cached --name-only | grep -E '(^|/)(test|tests|testing)/|(^|/)test_[^/]*\.py$|(^|/)[^/]*_test\.py$|(^|/)conftest\.py$|(^|/)(pytest\.ini|pytest\.toml|tox\.ini|setup\.cfg|pyproject\.toml|\.coveragerc)
+          if git diff --cached --name-only | grep -E '(^|/)\.frozen(/|$)|(^|/)(test|tests|testing)/|(^|/)test_[^/]*\.py$|(^|/)[^/]*_test\.py$|(^|/)conftest\.py$|(^|/)(pytest\.ini|pytest\.toml|tox\.ini|setup\.cfg|pyproject\.toml|\.coveragerc)
           git rm -r --cached .pytest_cache htmlcov .venv_tests logs backups 2>/dev/null || true
           if ! git diff --staged --quiet; then
             git commit -m "fix(jarvis): auto-cura proposta via $EVENT_NAME [run $GITHUB_RUN_ID]"
