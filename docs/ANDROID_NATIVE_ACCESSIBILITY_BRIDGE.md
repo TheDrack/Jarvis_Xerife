@@ -47,10 +47,12 @@ O MCP Android também pode expor execução Bash geral no contexto **não-root d
 
 1. Atualize o checkout Termux para uma revisão que contenha esta integração.
 2. Execute `bash scripts/android/configure_termux_shell.sh enable`. O script grava `JARVIS_ANDROID_SHELL_ENABLED=1` em `~/.config/jarvis/android-mcp/server.env` com modo 600 e reinicia o serviço MCP.
-3. Em cada sessão, emita um código de pareamento local:
+3. Se uma sessão anterior ainda estiver ativa, revogue-a primeiro:
+   `python -m app.adapters.infrastructure.session_authorization revoke`
+4. Em cada sessão, emita um código de pareamento local:
    `python -m app.adapters.infrastructure.session_authorization create --profile termux_developer --ttl-minutes 30`
-4. Use a ferramenta MCP `android_shell_session_authenticate` uma única vez com o código. O código é consumido; a sessão expira no prazo indicado.
-5. Execute comandos com `android_shell_exec`. Para encerrar antes do prazo, use `android_shell_session_revoke`.
+5. Use a ferramenta MCP `android_shell_session_authenticate` uma única vez com o código. O código é consumido; a sessão expira no prazo indicado.
+6. Execute comandos com `android_shell_exec`. Para encerrar antes do prazo, use `android_shell_session_revoke`.
 
 Para desativar a ferramenta e reiniciar o serviço:
 `bash scripts/android/configure_termux_shell.sh disable`
