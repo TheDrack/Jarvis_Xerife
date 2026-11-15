@@ -19,7 +19,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
-import json\nimport urllib.error\nimport urllib.request\nfrom pathlib import Path\nfrom typing import Any\n\nfrom app.adapters.edge.android_host_status import (
+import json\nimport urllib.error\nimport urllib.request\nimport urllib.parse\nfrom pathlib import Path\nfrom typing import Any\n\nfrom app.adapters.edge.android_host_status import (
     android_battery_status as read_battery_status,
     android_device_status as read_device_status,
     android_wifi_status as read_wifi_status,
@@ -166,6 +166,11 @@ def _coordinates(payload: dict[str, Any], fields: tuple[str, ...]) -> None:
 
 def _accessibility_request(path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
     token = _accessibility_token()
+    parsed_url = urllib.parse.urlsplit(_ACCESSIBILITY_URL)
+    if parsed_url.scheme != "http" or parsed_url.hostname not in {"127.0.0.1", "localhost", "::1"}:
+        raise RuntimeError("Android accessibility endpoint must use HTTP loopback only.")
+    if parsed_url.port not in {None, 18766} or parsed_url.username or parsed_url.password:
+        raise RuntimeError("Android accessibility endpoint must use the configured loopback port.")
     body = None if payload is None else json.dumps(payload, separators=(",", ":")).encode("utf-8")
     request = urllib.request.Request(
         _ACCESSIBILITY_URL + path,
