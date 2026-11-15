@@ -184,8 +184,8 @@ class JarvisAccessibilityService : AccessibilityService() {
         val latch = CountDownLatch(1)
         var encoded: String? = null
         var failure = "capture_failed"
-        takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, object : TakeScreenshotCallback {
-            override fun onSuccess(result: ScreenshotResult) {
+        takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, object : AccessibilityService.TakeScreenshotCallback {
+            override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
                 try {
                     val bitmap = Bitmap.wrapHardwareBuffer(result.hardwareBuffer, result.colorSpace)
                     if (bitmap == null) failure = "bitmap_unavailable" else {
