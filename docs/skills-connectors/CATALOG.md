@@ -76,6 +76,15 @@
 - Directory listings and UTF-8 reads are bounded. Symlinks, junctions, traversal, sensitive credential stores, binary files, and credential-shaped content are refused or filtered.
 - Status: implemented on the rebuild branch; CI and independent security review are required. Runtime availability requires the deployed MCP server to include the change and the local opt-in to be enabled. Runbook: [Secure MCP Tunnel](../SECURE_MCP_TUNNEL.md).
 
+## Termux shell execution over the Android MCP tunnel
+
+- Implementation: `app/adapters/infrastructure/termux_shell.py` and `termux_shell_mcp_tools.py`; registered additively by `app/adapters/edge/jarvis_android_mcp.py`.
+- Tool: `android_shell_exec`; arbitrary Bash commands execute as the normal Termux app UID, not Android root. This is intentionally broad user-level execution within the Termux sandbox.
+- Disabled by default. Explicit local opt-in: `bash scripts/android/configure_termux_shell.sh enable`; disable with the same script and `disable`.
+- A locally issued one-time code authenticates a `termux_developer` session with only `android.shell.exec`. Session TTL is 5-120 minutes, pairing code is single-use, and the session can be revoked through `android_shell_session_revoke`.
+- Execution is serialized, timeout-bounded to 120 seconds, output-bounded, and audited by command/directory digests without storing command text or output. The shell can still access all files and processes available to the Termux UID; it is not a per-directory sandbox.
+- Runtime availability requires the updated Termux checkout, the local opt-in, a restarted MCP service, and successful one-time session pairing. CI and on-device acceptance are separate gates.
+
 ## Portable Jarvis skills
 
 | Skill | Use it for | Canonical entry point |
