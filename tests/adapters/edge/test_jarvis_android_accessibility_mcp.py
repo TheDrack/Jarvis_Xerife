@@ -130,3 +130,9 @@ def test_action_builder_validates_parameters_before_transport():
     assert android_mcp.build_accessibility_action("tap", {"x": 10, "y": 20}) == {
         "action": "tap", "x": 10, "y": 20
     }
+
+
+def test_accessibility_endpoint_requires_explicit_port(monkeypatch):
+    monkeypatch.setattr(android_mcp, "ACCESSIBILITY_URL", "http://127.0.0.1")
+    with pytest.raises(RuntimeError, match="port 18766"):
+        android_mcp.accessibility_endpoint()
