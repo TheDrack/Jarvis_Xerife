@@ -18,7 +18,7 @@ from starlette.routing import Mount, Route
 
 from app.adapters.edge.android_accessibility_client import (
     accessibility_request,
-    validate_accessibility_action,
+    build_accessibility_action,
 )
 from app.adapters.edge.android_host_status import (
     android_battery_status as read_battery_status,
@@ -77,7 +77,7 @@ def android_accessibility_screenshot() -> dict:
 @mcp.tool()
 def android_accessibility_action(action: str, parameters: dict[str, Any] | None = None) -> dict:
     """Execute one allowlisted tap, swipe, semantic click, text entry, or global navigation action."""
-    payload = validate_accessibility_action({"action": action, **(parameters or {})})
+    payload = build_accessibility_action(action, parameters)
     return accessibility_request("/v1/action", payload)
 
 
