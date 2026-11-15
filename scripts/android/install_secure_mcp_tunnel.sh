@@ -71,7 +71,7 @@ fi
 
 if [ ! -d "$SOURCE_ROOT/.git" ]; then
   mkdir -p "$(dirname "$SOURCE_ROOT")"
-  git clone --depth 1 --branch "$TUNNEL_CLIENT_VERSION" \\
+  git clone --depth 1 --branch "$TUNNEL_CLIENT_VERSION" \
     https://github.com/openai/tunnel-client.git "$SOURCE_ROOT"
 else
   current="$(git -C "$SOURCE_ROOT" describe --tags --exact-match 2>/dev/null || true)"
@@ -87,9 +87,9 @@ log "Compilando tunnel-client oficial para Android/ARM64 (CGO habilitado para DN
   module_path="$(go list -m -f '{{.Path}}')"
   git_sha="$(git rev-parse HEAD)"
   mkdir -p bin
-  GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=clang \\
-    go build -trimpath \\
-      -ldflags "-X ${module_path}/pkg/version.GitSHA=${git_sha}" \\
+  GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC=clang \
+    go build -trimpath \
+      -ldflags "-X ${module_path}/pkg/version.GitSHA=${git_sha}" \
       -o "$BIN_DIR/tunnel-client" ./cmd/client
 )
 chmod 700 "$BIN_DIR/tunnel-client"
