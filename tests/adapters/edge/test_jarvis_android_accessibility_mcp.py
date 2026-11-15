@@ -38,21 +38,21 @@ def test_accessibility_action_accepts_supported_contract(payload):
 )
 def test_accessibility_action_rejects_invalid_or_unbounded_payloads(payload):
     with pytest.raises(ValueError):
-        android_mcp._validate_accessibility_action(payload)
+        android_mcp.validate_accessibility_action(payload)
 
 
-def testaccessibility_token_must_be_configured(monkeypatch, tmp_path):
+def test_accessibility_token_must_be_configured(monkeypatch, tmp_path):
     monkeypatch.delenv("JARVIS_ANDROID_ACCESSIBILITY_TOKEN", raising=False)
     monkeypatch.setattr(android_mcp, "ACCESSIBILITY_TOKEN_FILE", tmp_path / "missing")
     with pytest.raises(RuntimeError, match="pairing token"):
-        android_mcp._accessibility_token()
+        android_mcp.accessibility_token()
 
 
-def testaccessibility_request_uses_loopback_and_bearer_token(monkeypatch, tmp_path):
+def test_accessibility_request_uses_loopback_and_bearer_token(monkeypatch, tmp_path):
     token_file = tmp_path / "token"
     token_file.write_text("a" * 48, encoding="utf-8")
     monkeypatch.delenv("JARVIS_ANDROID_ACCESSIBILITY_TOKEN", raising=False)
-    monkeypatch.setattr(android_mcp, "_ACCESSIBILITY_TOKEN_FILE", token_file)
+    monkeypatch.setattr(android_mcp, "ACCESSIBILITY_TOKEN_FILE", token_file)
 
     captured = {}
 
@@ -73,7 +73,7 @@ def testaccessibility_request_uses_loopback_and_bearer_token(monkeypatch, tmp_pa
         return FakeResponse()
 
     monkeypatch.setattr(android_mcp.urllib.request, "urlopen", fake_urlopen)
-    assert android_mcp._accessibility_request("/healthz") == {"status": "ready"}
+    assert android_mcp.accessibility_request("/healthz") == {"status": "ready"}
     assert captured == {
         "url": "http://127.0.0.1:18766/healthz",
         "authorization": "Bearer " + "a" * 48,
@@ -85,7 +85,7 @@ def test_accessibility_action_sends_only_validated_json(monkeypatch, tmp_path):
     token_file = tmp_path / "token"
     token_file.write_text("b" * 48, encoding="utf-8")
     monkeypatch.delenv("JARVIS_ANDROID_ACCESSIBILITY_TOKEN", raising=False)
-    monkeypatch.setattr(android_mcp, "_ACCESSIBILITY_TOKEN_FILE", token_file)
+    monkeypatch.setattr(android_mcp, "ACCESSIBILITY_TOKEN_FILE", token_file)
     captured = {}
 
     class FakeResponse:
@@ -112,13 +112,13 @@ def test_accessibility_action_sends_only_validated_json(monkeypatch, tmp_path):
 def test_accessibility_endpoint_rejects_non_loopback_hosts(monkeypatch):
     monkeypatch.setattr(android_mcp, "ACCESSIBILITY_URL", "http://192.168.1.10:18766")
     with pytest.raises(RuntimeError, match="loopback"):
-        android_mcp._accessibility_endpoint()
+        android_mcp.accessibility_endpoint()
 
 
 def test_accessibility_endpoint_rejects_unexpected_ports(monkeypatch):
-    monkeypatch.setattr(android_mcp, "_ACCESSIBILITY_URL", "http://127.0.0.1:9999")
+    monkeypatch.setattr(android_mcp, "ACCESSIBILITY_URL", "http://127.0.0.1:9999")
     with pytest.raises(RuntimeError, match="port 18766"):
-        android_mcp._accessibility_endpoint()
+        android_mcp.accessibility_endpoint()
 
 
 def test_parameters_cannot_override_the_selected_action():
