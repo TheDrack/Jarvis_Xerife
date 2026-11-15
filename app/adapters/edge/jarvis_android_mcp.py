@@ -1,16 +1,13 @@
 """Loopback-only Streamable HTTP MCP server for the Android/Termux host.
 
-Run from the repository root with:
-    python -m app.adapters.edge.jarvis_android_mcp
-
-This server intentionally exposes only bounded, read-only device diagnostics.
-It is separate from the desktop MCP entrypoint and does not import desktop UI,
-ADB, Windows, or host-shell adapters.
+The native APK owns Android UI automation. This Termux process only forwards
+authenticated MCP requests to the APK's loopback AccessibilityService endpoint.
 """
 from __future__ import annotations
 
 import contextlib
 import os
+from typing import Any
 
 import uvicorn
 from mcp.server.fastmcp import FastMCP
@@ -19,6 +16,10 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
 
+from app.adapters.edge.android_accessibility_client import (
+    accessibility_request,
+    build_accessibility_action,
+)
 from app.adapters.edge.android_host_status import (
     android_battery_status as read_battery_status,
     android_device_status as read_device_status,
@@ -28,11 +29,11 @@ from app.adapters.edge.android_host_status import (
 mcp = FastMCP(
     "Jarvis Android",
     instructions=(
-        "Read-only diagnostics for the Android device hosting this MCP server. "
-        "These tools report bounded host, battery, and Wi-Fi status. Wi-Fi SSID, "
-        "BSSID, IP addresses, location, clipboard contents, and credentials are "
-        "never returned. This server is intended to be reachable only through "
-        "the local loopback interface and its configured Secure MCP Tunnel."
+        "Android host diagnostics and opt-in native accessibility controls. "
+        "Accessibility requires the device owner to enable Jarvis Accessibility "
+        "in Android Settings and pair a local bearer token. Wi-Fi SSID, BSSID, "
+        "IP addresses, location, clipboard contents, and credentials are never "
+        "returned by host diagnostic tools. The MCP server binds to loopback."
     ),
 )
 
@@ -55,6 +56,31 @@ def android_wifi_status() -> dict:
     return read_wifi_status()
 
 
+@mcp.tool()
+def android_accessibility_status() -> dict:
+    """Check whether the native Android accessibility service and local bridge are reachable."""
+    return accessibility_request("/healthz")
+
+
+@mcp.tool()
+def android_accessibility_snapshot() -> dict:
+    """Read a bounded snapshot of the active Android window's accessibility tree."""
+    return accessibility_request("/v1/snapshot")
+
+
+@mcp.tool()
+def android_accessibility_screenshot() -> dict:
+    """Capture the Android display (Android 11+); image is returned as base64 JPEG."""
+    return accessibility_request("/v1/screenshot")
+
+
+@mcp.tool()
+def android_accessibility_action(action: str, parameters: dict[str, Any] | None = None) -> dict:
+    """Execute one allowlisted tap, swipe, semantic click, text entry, or global navigation action."""
+    payload = build_accessibility_action(action, parameters)
+    return accessibility_request("/v1/action", payload)
+
+
 async def healthz(_request: Request) -> JSONResponse:
     return JSONResponse({"status": "live", "service": "jarvis-android-mcp"})
 
@@ -69,8 +95,6 @@ async def lifespan(_app: Starlette):
         yield
 
 
-# FastMCP's default Streamable HTTP path is /mcp. Keep health routes ahead of
-# Mount("/") because that mount otherwise captures every remaining path.
 app = Starlette(
     routes=[
         Route("/healthz", healthz, methods=["GET"]),
@@ -85,14 +109,12 @@ def main() -> None:
     host = os.environ.get("JARVIS_ANDROID_MCP_HOST", "127.0.0.1").strip()
     if host not in {"127.0.0.1", "localhost", "::1"}:
         raise RuntimeError("Jarvis Android MCP must bind to loopback only.")
-
     try:
         port = int(os.environ.get("JARVIS_ANDROID_MCP_PORT", "8765"))
     except ValueError as exc:
         raise RuntimeError("JARVIS_ANDROID_MCP_PORT must be an integer.") from exc
     if not 1 <= port <= 65535:
         raise RuntimeError("JARVIS_ANDROID_MCP_PORT must be between 1 and 65535.")
-
     uvicorn.run(app, host=host, port=port, log_level="info", access_log=False)
 
 
