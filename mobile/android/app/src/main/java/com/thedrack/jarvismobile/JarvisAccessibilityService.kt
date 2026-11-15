@@ -223,7 +223,7 @@ class JarvisAccessibilityService : AccessibilityService() {
             "tap" -> {
                 val x = body.optDouble("x", Double.NaN).toFloat()
                 val y = body.optDouble("y", Double.NaN).toFloat()
-                if (!x.isFinite() || !y.isFinite() || x < 0 || y < 0) false else dispatchTap(x, y)
+                if (!x.isFinite() || !y.isFinite() || x !in 0f..10000f || y !in 0f..10000f) false else dispatchTap(x, y)
             }
             "swipe" -> {
                 val x1 = body.optDouble("x1", Double.NaN).toFloat()
@@ -231,16 +231,29 @@ class JarvisAccessibilityService : AccessibilityService() {
                 val x2 = body.optDouble("x2", Double.NaN).toFloat()
                 val y2 = body.optDouble("y2", Double.NaN).toFloat()
                 val duration = body.optLong("duration_ms", 350L).coerceIn(80L, 1500L)
-                if (listOf(x1, y1, x2, y2).any { !it.isFinite() || it < 0 }) false
+                if (listOf(x1, y1, x2, y2).any { !it.isFinite() || it !in 0f..10000f }) false
                 else dispatchSwipe(x1, y1, x2, y2, duration)
             }
-            "click_text" -> findNode { it.text?.toString() == body.optString("text") }?.let { clickNode(it) } ?: false
-            "click_view_id" -> findNode { it.viewIdResourceName == body.optString("view_id") }?.let { clickNode(it) } ?: false
+            "click_text" -> {
+                val text = body.optString("text")
+                if (text.isBlank() || text.length > 500) false
+                else findNode { !it.isPassword && it.text?.toString() == text }?.let { clickNode(it) } ?: false
+            }
+            "click_view_id" -> {
+                val viewId = body.optString("view_id")
+                if (viewId.isBlank() || viewId.length > 300) false
+                else findNode { it.viewIdResourceName == viewId }?.let { clickNode(it) } ?: false
+            }
             "set_text" -> {
-                val target = findNode { it.viewIdResourceName == body.optString("view_id") && it.isEditable && !it.isPassword }
-                target?.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
-                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, body.optString("text").take(2000))
-                }) ?: false
+                val viewId = body.optString("view_id")
+                val text = body.optString("text")
+                if (viewId.isBlank() || viewId.length > 300 || text.length > 2000) false
+                else {
+                    val target = findNode { it.viewIdResourceName == viewId && it.isEditable && !it.isPassword }
+                    target?.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
+                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                    }) ?: false
+                }
             }
             else -> return JSONObject().put("success", false).put("error", "unsupported_action")
         }
