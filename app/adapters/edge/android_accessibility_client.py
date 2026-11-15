@@ -89,6 +89,14 @@ def validate_accessibility_action(payload: dict[str, Any]) -> dict[str, Any]:
     return dict(payload)
 
 
+def build_accessibility_action(action: str, parameters: dict[str, Any] | None = None) -> dict[str, Any]:
+    if parameters is not None and not isinstance(parameters, dict):
+        raise ValueError("Action parameters must be an object.")
+    if parameters and "action" in parameters:
+        raise ValueError("Action parameters cannot override the selected action.")
+    return validate_accessibility_action({"action": action, **(parameters or {})})
+
+
 def _coordinates(payload: dict[str, Any], fields: tuple[str, ...]) -> None:
     for field in fields:
         value = payload.get(field)
