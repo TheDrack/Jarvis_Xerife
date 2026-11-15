@@ -27,8 +27,11 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
 
     def test_shell_scripts_parse_without_syntax_errors(self):
         for path in (INSTALLER, CONFIGURER, SERVICE, LOG_SERVICE):
+            # Feed source on stdin instead of passing a Windows drive path to
+            # MSYS/Git Bash. The latter is not portable across Windows runners.
             result = subprocess.run(
-                ["bash", "-n", path.as_posix()],
+                ["bash", "-n"],
+                input=path.read_text(encoding="utf-8"),
                 capture_output=True,
                 text=True,
                 check=False,
