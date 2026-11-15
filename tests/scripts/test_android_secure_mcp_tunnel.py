@@ -26,6 +26,7 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         source = SERVICE.read_text(encoding="utf-8")
         self.assertIn('CONTROL_PLANE_API_KEY', source)
         self.assertIn('chmod 600', source)
+        self.assertNotIn('--health-listen-addr', source)
         self.assertIn('exec "$CLIENT" run', source)
         self.assertNotIn('echo "$CONTROL_PLANE_API_KEY"', source)
 
