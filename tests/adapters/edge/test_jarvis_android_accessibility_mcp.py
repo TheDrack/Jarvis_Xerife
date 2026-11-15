@@ -119,3 +119,14 @@ def test_accessibility_endpoint_rejects_unexpected_ports(monkeypatch):
     monkeypatch.setattr(android_mcp, "_ACCESSIBILITY_URL", "http://127.0.0.1:9999")
     with pytest.raises(RuntimeError, match="port 18766"):
         android_mcp._accessibility_endpoint()
+
+
+def test_parameters_cannot_override_the_selected_action():
+    with pytest.raises(ValueError, match="cannot override"):
+        android_mcp.build_accessibility_action("back", {"action": "home"})
+
+
+def test_action_builder_validates_parameters_before_transport():
+    assert android_mcp.build_accessibility_action("tap", {"x": 10, "y": 20}) == {
+        "action": "tap", "x": 10, "y": 20
+    }
