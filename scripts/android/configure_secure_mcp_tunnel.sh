@@ -24,7 +24,7 @@ printf '\n'
 
 mkdir -p "$CONFIG_DIR"
 umask 077
-printf '%s\\n' "$runtime_key" > "$SECRET_FILE"
+printf '%s\n' "$runtime_key" > "$SECRET_FILE"
 unset runtime_key
 chmod 600 "$SECRET_FILE" "$ENV_FILE"
 
