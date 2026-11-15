@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.adapters.edge import android_termux_shell_mcp as shell_mcp
+from app.adapters.infrastructure import termux_shell_mcp_tools as shell_mcp
 from app.adapters.infrastructure import termux_shell
 
 
