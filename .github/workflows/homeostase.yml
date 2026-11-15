@@ -249,7 +249,8 @@ jobs:
       - name: 💤 Standby
         if: steps.gatekeeper.outputs.authorized == 'false'
         run: echo "Sistemas estáveis."
-; then
+
+          then
             echo "::error::Refusing to stage test sources or pytest infrastructure."
             exit 1
           fi
