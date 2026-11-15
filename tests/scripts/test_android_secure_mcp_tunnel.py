@@ -1,5 +1,5 @@
 from pathlib import Path
-import unittest
+import subprocess\nimport unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -22,7 +22,7 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertIn('--mcp-server-url', source)
         self.assertIn('env:CONTROL_PLANE_API_KEY', source)
 
-    def test_service_reads_private_key_file_without_printing_it(self):
+    def test_shell_scripts_parse_without_syntax_errors(self):\n        for path in (INSTALLER, ROOT / "scripts/android/configure_secure_mcp_tunnel.sh", SERVICE, ROOT / "scripts/android/service/log-run"):\n            result = subprocess.run(["bash", "-n", str(path)], capture_output=True, text=True, check=False)\n            self.assertEqual(result.returncode, 0, msg=f"{path}: {result.stderr}")\n\n    def test_service_reads_private_key_file_without_printing_it(self):
         source = SERVICE.read_text(encoding="utf-8")
         self.assertIn('CONTROL_PLANE_API_KEY', source)
         self.assertIn('chmod 600', source)
