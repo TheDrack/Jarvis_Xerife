@@ -129,7 +129,7 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertIn("register_termux_shell_tools(mcp)", source)
         shell_module = (ROOT / "app" / "adapters" / "infrastructure" / "termux_shell_mcp_tools.py").read_text(encoding="utf-8")
         self.assertIn("android_shell_exec", shell_module)
-        self.assertIn("JARVIS_ANDROID_SHELL_ENABLED", source)
+        self.assertIn("JARVIS_ANDROID_SHELL_ENABLED", shell_module)
 
     def test_shell_scripts_parse_without_syntax_errors(self):
         bash = shutil.which("bash")
