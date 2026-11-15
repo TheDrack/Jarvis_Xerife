@@ -25,8 +25,15 @@ MCP_SERVICE_ROOT="$HOME/.local/share/jarvis-runit/$MCP_SERVICE_NAME"
 MCP_SERVICE_LINK="$PREFIX/var/service/$MCP_SERVICE_NAME"
 MCP_LOCAL_HOST="127.0.0.1"
 MCP_LOCAL_PORT="${MCP_LOCAL_PORT:-8765}"
+if [ -f "$ENV_FILE" ]; then
+  # Reuse the user's existing local tunnel target so both services agree.
+  . "$ENV_FILE"
+fi
+MCP_LOCAL_HOST="${MCP_LOCAL_HOST:-127.0.0.1}"
+MCP_LOCAL_PORT="${MCP_LOCAL_PORT:-8765}"
+[ "$MCP_LOCAL_HOST" = "127.0.0.1" ] || die "O MCP Android só pode usar 127.0.0.1."
 MCP_SERVER_URL="http://$MCP_LOCAL_HOST:$MCP_LOCAL_PORT/mcp"
-HEALTH_ADDR="127.0.0.1:8767"
+HEALTH_ADDR="${HEALTH_ADDR:-127.0.0.1:8767}"
 
 log() { printf '[JARVIS-TUNNEL] %s\n' "$*"; }
 die() { log "ERRO: $*" >&2; exit 1; }
