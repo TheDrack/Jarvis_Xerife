@@ -37,7 +37,7 @@ def accessibility_endpoint() -> str:
     parsed = urllib.parse.urlsplit(ACCESSIBILITY_URL)
     if (
         parsed.scheme != "http"
-        or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or parsed.hostname != "127.0.0.1"
         or parsed.port != 18766
         or parsed.username
         or parsed.password
