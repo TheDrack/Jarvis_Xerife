@@ -296,3 +296,45 @@ class TestApplyPatchPathSafety:
 
         assert result["fixed"] is False
         assert target.read_text(encoding="utf-8") == original
+
+
+class TestLocalRepairReadPathSafety:
+    @pytest.mark.parametrize("target_kind", ["test", "outside"])
+    def test_llm_rejects_untrusted_path_before_reading_or_calling_provider(
+        self,
+        agent: LocalRepairAgent,
+        tmp_path: Path,
+        monkeypatch,
+        target_kind: str,
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        if target_kind == "test":
+            target = repo_root / "tests" / "test_sensitive.py"
+            target.parent.mkdir(parents=True)
+            expected_detail = "Testes e configuração pytest são imutáveis"
+        else:
+            target = tmp_path / "outside.py"
+            expected_detail = "fora do repositório"
+        target.write_text("PRIVATE_SENTINEL = 'must not enter an LLM prompt'\\n", encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        original_read_text = Path.read_text
+
+        def reject_target_read(path: Path, *args, **kwargs):
+            if path.resolve() == target.resolve():
+                raise AssertionError("Untrusted source content was read before path validation")
+            return original_read_text(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", reject_target_read)
+        with patch.object(agent, "_call_via_llm_engine") as llm_call:
+            result = agent._try_llm(
+                "NameError",
+                "name 'value' is not defined",
+                "traceback supplied by the caller",
+                str(target),
+            )
+
+        assert result["fixed"] is False
+        assert expected_detail in result["details"]
+        llm_call.assert_not_called()
