@@ -28,8 +28,9 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         source = INSTALLER.read_text(encoding="utf-8")
         self.assertIn("python -m venv --without-pip", source)
         self.assertIn("python-pip", source)
-        self.assertIn('python -m pip --python "$MCP_VENV/bin/python" install --upgrade pip', source)
-        self.assertIn('"$MCP_VENV/bin/python" -m pip install', source)
+        self.assertIn('python -m pip --python "$MCP_VENV/bin/python" install', source)
+        self.assertNotIn('install --upgrade pip', source)
+        self.assertIn('"$MCP_VENV/bin/python" -c', source)
         self.assertIn("mcp>=1.30.0,<2", source)
         self.assertIn("scripts/android/service/mcp-run", source)
         self.assertIn('MCP_SERVICE_NAME="jarvis-android-mcp"', source)
@@ -44,7 +45,7 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertIn('if [ ! -f "$ENV_FILE" ]; then', source)
         self.assertIn('if [ ! -e "$SERVICE_LINK" ]; then', source)
         self.assertIn('elif [ ! -L "$SERVICE_LINK" ]; then', source)
-        self.assertNotIn('rm -rf', source)
+        self.assertNotIn("rm -rf", source)
 
     def test_configurator_uses_private_key_reference_and_newline(self):
         source = CONFIGURER.read_text(encoding="utf-8")
@@ -70,7 +71,7 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
 
     def test_mcp_server_exposes_streamable_http_and_read_only_tools(self):
         source = MCP_SERVER.read_text(encoding="utf-8")
-        self.assertIn('FastMCP(', source)
+        self.assertIn("FastMCP(", source)
         self.assertIn('"Jarvis Android"', source)
         self.assertIn("mcp.streamable_http_app()", source)
         self.assertIn('Mount("/",', source)
