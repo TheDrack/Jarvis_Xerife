@@ -338,3 +338,82 @@ class TestLocalRepairReadPathSafety:
         assert result["fixed"] is False
         assert expected_detail in result["details"]
         llm_call.assert_not_called()
+
+
+class TestFrozenPathProtection:
+    def test_local_repair_refuses_to_patch_frozen_python_file(
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        target = repo_root / ".frozen" / "module.py"
+        target.parent.mkdir(parents=True)
+        original = "SAFE_VALUE = 1\\n"
+        target.write_text(original, encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        patch_data = {
+            "can_fix": True,
+            "confidence": 0.99,
+            "explanation": "Frozen path regression",
+            "action": "replace",
+            "file_path": str(target),
+            "old_code": "SAFE_VALUE = 1",
+            "new_code": "SAFE_VALUE = 2",
+        }
+        result = agent._apply_patch(patch_data, str(target))
+
+        assert result["fixed"] is False
+        assert "frozen" in result["details"].casefold()
+        assert target.read_text(encoding="utf-8") == original
+
+    def test_local_repair_rejects_frozen_source_before_read_or_provider_call(
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        target = repo_root / ".frozen" / "private.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("PRIVATE_SENTINEL = 'must not enter an LLM prompt'\\n", encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        original_read_text = Path.read_text
+
+        def reject_target_read(path: Path, *args, **kwargs):
+            if path.resolve() == target.resolve():
+                raise AssertionError("Frozen source was read before path validation")
+            return original_read_text(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", reject_target_read)
+        with patch.object(agent, "_call_via_llm_engine") as llm_call:
+            result = agent._try_llm(
+                "NameError",
+                "name 'value' is not defined",
+                "traceback supplied by the caller",
+                str(target),
+            )
+
+        assert result["fixed"] is False
+        assert "frozen" in result["details"].casefold()
+        llm_call.assert_not_called()
+
+    def test_script_healer_refuses_frozen_files(self, tmp_path: Path) -> None:
+        from scripts import jarvis_healer as healer
+
+        repo_root = tmp_path / "repo"
+        target = repo_root / ".frozen" / "module.py"
+        target.parent.mkdir(parents=True)
+        original = "SAFE_VALUE = 1\\n"
+        target.write_text(original, encoding="utf-8")
+
+        with patch.object(healer, "REPO_ROOT", repo_root):
+            assert healer.is_production_file(target) is False
+            result = healer.apply_fixes(
+                target,
+                [{
+                    "action": "replace",
+                    "old_code": "SAFE_VALUE = 1",
+                    "new_code": "SAFE_VALUE = 2",
+                }],
+            )
+
+        assert result == (0, 1)
+        assert target.read_text(encoding="utf-8") == original
