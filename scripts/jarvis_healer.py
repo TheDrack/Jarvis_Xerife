@@ -15,6 +15,7 @@ from typing import Optional, List, Dict, Any
 from app.core.recovery_store import RecoveryStore
 from app.application.security.repository_path_policy import (
     UnsafeRepositoryPath,
+    contains_frozen_directory,
     is_test_or_pytest_infrastructure_path,
     protected_prefix_for,
     resolve_repository_path,
@@ -124,12 +125,14 @@ def _resolve_production_target(
             relative = candidate.relative_to(root).as_posix()
         else:
             relative = candidate.as_posix()
-        resolved, _, resolved_relative = resolve_repository_path(
+        resolved, normalized_relative, resolved_relative = resolve_repository_path(
             root, relative, reject_symlinks=True
         )
         if require_file and not resolved.is_file():
             return None
         if resolved.suffix.casefold() != ".py":
+            return None
+        if contains_frozen_directory(normalized_relative) or contains_frozen_directory(resolved_relative):
             return None
         if protected_prefix_for(resolved_relative):
             return None

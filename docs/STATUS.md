@@ -641,3 +641,12 @@ A manutenção automática de PRs permanece uma capacidade transversal obrigató
 A leitura anterior que dizia que `CognitiveRouter.execute()` acessa diretamente `context["metadata"]` e poderia lançar `KeyError` estava incorreta para o HEAD auditado. Em `app/domain/gears/cognitive_router.py`, o método usa `context.setdefault("metadata", {})` e valida que o valor seja um dicionário. Quando o campo não é fornecido, ele é criado; não há `KeyError` nesse caminho.
 
 A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user_input=""` e classifica uma entrada vazia. O CLI de `app/runtime/pipeline_runner.py` chama `run_pipeline(p_name, global_strict=g_strict)` sem `inputs`. Não foi localizado consumidor de aplicação para `jarvis_chat`, nem teste integrado que prove entrada do usuário → CognitiveRouter → LlmEngine. Portanto, a classificação permanece **implementado, consumo de aplicação não verificado**; o risco é comportamento vazio/não útil no caminho CLI, não exceção de metadata. O teste `test_execute_initializes_missing_metadata` confirma somente a inicialização do dicionário.
+
+
+### Proteção de arquivos .frozen no Self Healing — 2026-11-15
+
+- A política canônica `repository_path_policy.py` já define `contains_frozen_directory()`; EvolutionGatekeeper, RoadmapMissionSelector, Crystallizer e publisher usam esse helper para bloquear caminhos `.frozen`.
+- A revisão da PR #826 encontrou que os novos guards de `LocalRepairAgent` e `scripts/jarvis_healer.py` protegiam testes, pytest, symlinks e áreas de controle, mas não consultavam o helper de arquivos frozen.
+- Regressões foram adicionadas primeiro no commit `14b5c14ace5893f6b8d4c4d16f522c352a80d8ff`. O PR Validation run [43767960423](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43767960423) reproduziu os três caminhos inseguros: patch em arquivo frozen, leitura de conteúdo frozen antes do provider e classificação do healer como arquivo de produção. Resultado RED: 3 failed, 3314 passed, 38 skipped, 8 warnings.
+- A correção nesta mesma PR reutiliza `contains_frozen_directory()` sobre os caminhos lexical e resolvido em ambos os pontos de entrada. Os arquivos `.frozen` continuam disponíveis para diagnóstico, mas não podem ser lidos pelo reparador local nem alterados pelo healer.
+- A validação final do commit de correção ainda depende dos novos runs PR Validation e Task Queue; nenhum workflow, segredo, permissão ou mecanismo Self Healing foi alterado.

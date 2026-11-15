@@ -16,6 +16,7 @@ from typing import Optional
 from app.core.nexus import NexusComponent, nexus
 from app.application.security.repository_path_policy import (
     UnsafeRepositoryPath,
+    contains_frozen_directory,
     is_test_or_pytest_infrastructure_path,
     protected_prefix_for,
     resolve_repository_path,
@@ -224,11 +225,13 @@ Responda com este JSON exato (sem markdown):
             return candidate.as_posix()
 
         try:
-            target, _, target_relative = resolve_repository_path(
+            target, normalized_relative, target_relative = resolve_repository_path(
                 root, relative_path(original_path), reject_symlinks=True
             )
             if not target.is_file():
                 return None, "O arquivo de origem confiável não existe."
+            if contains_frozen_directory(normalized_relative) or contains_frozen_directory(target_relative):
+                return None, "Arquivos .frozen são imutáveis para auto-reparo."
             if target.suffix.casefold() != ".py":
                 return None, "O reparo local só pode alterar arquivos Python."
             protected = protected_prefix_for(target_relative)
