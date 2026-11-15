@@ -157,12 +157,6 @@ def run_shell_command(
             process.wait()
             exit_code = None
         finally:
-            # Do not leave background children running after the shell request ends.
-            if os.name != "nt":
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
             stdout_thread.join(timeout=5)
             stderr_thread.join(timeout=5)
             process.stdout.close()
