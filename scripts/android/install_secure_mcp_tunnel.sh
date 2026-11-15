@@ -42,15 +42,18 @@ HEALTH_ADDR="${HEALTH_ADDR:-127.0.0.1:8767}"
 command -v pkg >/dev/null 2>&1 || die "Execute este instalador dentro do Termux."
 [ "$MCP_LOCAL_PORT" -ge 1 ] 2>/dev/null && [ "$MCP_LOCAL_PORT" -le 65535 ] 2>/dev/null || die "MCP_LOCAL_PORT inválida."
 pkg update -y
-pkg install -y git golang clang make python termux-api
+pkg install -y git golang clang make python python-pip termux-api
 
 mkdir -p "$BIN_DIR" "$CONFIG_DIR" "$PROFILE_DIR" "$HOME/.local/state/jarvis-tunnel"
 mkdir -p "$MCP_APP_ROOT" "$MCP_CONFIG_DIR" "$HOME/.local/state/jarvis-android-mcp/log"
 chmod 700 "$CONFIG_DIR" "$PROFILE_DIR" "$HOME/.local/state/jarvis-tunnel" "$MCP_CONFIG_DIR" "$HOME/.local/state/jarvis-android-mcp"
 
 log "Preparando ambiente Python isolado para o servidor MCP Android..."
-python -m venv "$MCP_VENV"
-"$MCP_VENV/bin/python" -m pip install --upgrade pip
+# Termux ships pip as a separate package and its Python build may not
+# provide ensurepip. Create the venv without ensurepip, then let the
+# system pip target that interpreter (pip >= 22.3 supports --python).
+python -m venv --without-pip "$MCP_VENV"
+python -m pip --python "$MCP_VENV/bin/python" install --upgrade pip
 "$MCP_VENV/bin/python" -m pip install 'mcp>=1.30.0,<2' 'uvicorn>=0.24.0,<1'
 printf 'REPO_ROOT=%q\nMCP_HOST=127.0.0.1\nMCP_PORT=%q\n' "$REPO_ROOT" "$MCP_LOCAL_PORT" > "$MCP_ENV_FILE"
 chmod 600 "$MCP_ENV_FILE"
