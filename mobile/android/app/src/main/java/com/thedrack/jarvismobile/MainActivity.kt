@@ -566,10 +566,6 @@ private fun JarvisMobileScreen(
             Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
                 AccessibilitySetupPanel(context)
             }
-        } else if (tab == 3) {
-            Column(modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState())) {
-                AccessibilitySetupPanel(context)
-            }
         } else if (loggedIn && tab == 1) {
             ChatPanel(
                 modifier = Modifier.fillMaxWidth().weight(1f).padding(top = 12.dp),
