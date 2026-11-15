@@ -27,4 +27,11 @@ unset token
 chmod 600 "$TOKEN_FILE"
 echo "Pareamento local gravado em arquivo privado (modo 600)."
 echo "Não envie esse segredo ao Control Plane nem o coloque no repositório."
-echo "Reinicie o MCP Android para carregar as ferramentas de acessibilidade."
+
+SERVICE_DIR="${PREFIX:-/data/data/com.termux/files/usr}/var/service/jarvis-android-mcp"
+if command -v sv >/dev/null 2>&1 && [[ -d "$SERVICE_DIR" ]]; then
+  sv restart "$SERVICE_DIR"
+  echo "Servidor MCP Android reiniciado."
+else
+  echo "Reinicie o serviço MCP Android para carregar as novas ferramentas."
+fi
