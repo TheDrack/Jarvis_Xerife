@@ -24,6 +24,10 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertIn("CGO_ENABLED=1", source)
         self.assertIn("CC=clang", source)
 
+    def test_installer_uses_single_backslash_for_shell_line_continuations(self):
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertNotIn("\\\\\n", source, "Shell continuations must use exactly one trailing backslash.")
+
     def test_installer_provisions_isolated_android_mcp_runtime_and_service(self):
         source = INSTALLER.read_text(encoding="utf-8")
         self.assertIn("python -m venv --without-pip", source)
