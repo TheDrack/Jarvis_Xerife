@@ -79,10 +79,17 @@ def test_llm_generated_code_is_retested_without_provider_credentials():
         assert secret_name not in final_tests
 
 
-def test_auto_healing_changes_are_proposed_in_a_branch_and_never_stage_workflows():
+def test_auto_healing_changes_are_proposed_in_a_branch_without_staging_tests_or_workflows():
     workflow = HEAL_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "git add -- app scripts tests docs" in workflow
+    assert "git add -- app scripts docs" in workflow
+    assert "git add -- app scripts tests docs" not in workflow
+    assert "git diff --cached --name-only | grep -E" in workflow
+    assert "test_" in workflow
+    assert "_test.py" in workflow
+    assert "conftest.py" in workflow
+    assert "pytest.ini" in workflow
+    assert "Refusing to stage test sources or pytest infrastructure" in workflow
     assert "git add .github" not in workflow
     assert 'HEAL_BRANCH="jarvis/heal-$GITHUB_RUN_ID"' in workflow
     assert 'git push origin "HEAD:$HEAL_BRANCH"' in workflow
