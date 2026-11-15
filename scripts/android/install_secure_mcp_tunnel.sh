@@ -15,7 +15,8 @@ PROFILE_DIR="$CONFIG_DIR/profiles"
 SECRET_FILE="$CONFIG_DIR/runtime-key"
 ENV_FILE="$CONFIG_DIR/tunnel.env"
 SERVICE_NAME="jarvis-secure-mcp-tunnel"
-SERVICE_ROOT="$PREFIX/var/service/$SERVICE_NAME"
+SERVICE_ROOT="$HOME/.local/share/jarvis-runit/$SERVICE_NAME"
+SERVICE_LINK="$PREFIX/var/service/$SERVICE_NAME"
 MCP_LOCAL_HOST="${MCP_LOCAL_HOST:-127.0.0.1}"
 MCP_LOCAL_PORT="${MCP_LOCAL_PORT:-8765}"
 MCP_SERVER_URL="http://$MCP_LOCAL_HOST:$MCP_LOCAL_PORT/mcp"
@@ -58,7 +59,7 @@ chmod 700 "$BIN_DIR/tunnel-client"
 "$BIN_DIR/tunnel-client" --version
 
 # Keep service scripts in the user's home; runit only receives a symlink.
-mkdir -p "$SERVICE_ROOT"
+mkdir -p "$SERVICE_ROOT" "$(dirname "$SERVICE_LINK")"
 install -m 700 "$REPO_ROOT/scripts/android/service/run" "$SERVICE_ROOT/run"
 mkdir -p "$SERVICE_ROOT/log"
 install -m 700 "$REPO_ROOT/scripts/android/service/log-run" "$SERVICE_ROOT/log/run"
@@ -75,13 +76,12 @@ EOF
   chmod 600 "$ENV_FILE"
 fi
 
-if [ -d "$PREFIX/var/service" ]; then
-  if [ ! -e "$PREFIX/var/service/$SERVICE_NAME" ]; then
-    ln -s "$SERVICE_ROOT" "$PREFIX/var/service/$SERVICE_NAME"
-  fi
-  log "Serviço runit instalado: $SERVICE_NAME"
-  log "Ative com: sv-enable $SERVICE_NAME (ou ln -s manualmente, conforme seu runit atual)."
+if [ ! -e "$SERVICE_LINK" ]; then
+  ln -s "$SERVICE_ROOT" "$SERVICE_LINK"
+elif [ ! -L "$SERVICE_LINK" ]; then
+  die "Já existe um caminho não-symlink em $SERVICE_LINK; não será sobrescrito."
 fi
+log "Serviço runit instalado em $SERVICE_LINK"
 
 cat <<EOF
 
