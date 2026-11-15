@@ -77,3 +77,46 @@ def test_device_status_reports_aggregate_storage_without_paths(monkeypatch):
     assert result["uptime_seconds"] == 123.0
     assert result["storage"]["home"] == {"total_bytes": 100, "used_bytes": 40, "free_bytes": 60}
     assert all("path" not in key for key in result)
+
+
+
+def test_wifi_connected_uses_completed_supplicant_when_wifi_enabled_field_is_omitted(monkeypatch):
+    monkeypatch.setattr(status.shutil, "which", lambda _name: "/usr/bin/termux-wifi-connectioninfo")
+    monkeypatch.setattr(
+        status.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0,
+            stdout=json.dumps({
+                "supplicant_state": "COMPLETED",
+                "frequency_mhz": 5580,
+                "link_speed_mbps": 433,
+                "rssi": -54,
+            }),
+            stderr="",
+        ),
+    )
+
+    result = status.android_wifi_status()
+
+    assert result["connected"] is True
+
+
+def test_wifi_connected_is_false_when_wifi_is_explicitly_disabled(monkeypatch):
+    monkeypatch.setattr(status.shutil, "which", lambda _name: "/usr/bin/termux-wifi-connectioninfo")
+    monkeypatch.setattr(
+        status.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0,
+            stdout=json.dumps({
+                "wifi_enabled": False,
+                "supplicant_state": "COMPLETED",
+            }),
+            stderr="",
+        ),
+    )
+
+    result = status.android_wifi_status()
+
+    assert result["connected"] is False
