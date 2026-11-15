@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 import shutil
 import subprocess
+import tempfile
 import unittest
 
 
@@ -38,7 +39,7 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertIn("mcp>=1.30.0,<2", source)
         self.assertIn("scripts/android/service/mcp-run", source)
         self.assertIn('MCP_SERVICE_NAME="jarvis-android-mcp"', source)
-        self.assertIn('MCP_HOST=127.0.0.1', source)
+        self.assertIn("MCP_HOST=127.0.0.1", source)
         self.assertIn('sv up "$MCP_SERVICE_LINK"', source)
 
     def test_installer_preserves_existing_tunnel_configuration_and_secrets(self):
@@ -57,6 +58,34 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertIn("--mcp-server-url", source)
         self.assertIn("env:CONTROL_PLANE_API_KEY", source)
         self.assertIn("printf '%s\\n'", source)
+
+    def test_tunnel_service_accepts_runtime_key_without_trailing_newline(self):
+        source = SERVICE.read_text(encoding="utf-8")
+        self.assertIn(
+            'IFS= read -r CONTROL_PLANE_API_KEY < "$SECRET_FILE" || [ -n "$CONTROL_PLANE_API_KEY" ]',
+            source,
+        )
+
+        bash = shutil.which("bash")
+        self.assertIsNotNone(bash, "A real Bash executable is required for runtime-key loading tests.")
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            secret_file = Path(temporary_directory) / "runtime-key"
+            secret_file.write_bytes(b"x" * 165)
+            result = subprocess.run(
+                [
+                    bash,
+                    "-c",
+                    'set -Eeuo pipefail; CONTROL_PLANE_API_KEY=""; '
+                    'IFS= read -r CONTROL_PLANE_API_KEY < "$1" || [ -n "$CONTROL_PLANE_API_KEY" ]; '
+                    '[ "${#CONTROL_PLANE_API_KEY}" -ge 20 ]',
+                    "bash",
+                    str(secret_file),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
 
     def test_tunnel_service_waits_for_local_mcp_before_starting_tunnel(self):
         source = SERVICE.read_text(encoding="utf-8")

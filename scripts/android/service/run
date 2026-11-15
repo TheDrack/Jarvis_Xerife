@@ -24,7 +24,9 @@ HEALTH_ADDR="${HEALTH_ADDR:-127.0.0.1:8767}"
 
 chmod 700 "$CONFIG_DIR"
 chmod 600 "$SECRET_FILE"
-IFS= read -r CONTROL_PLANE_API_KEY < "$SECRET_FILE"
+# Bash read returns non-zero at EOF when the file has no trailing newline,
+# even though it has populated the variable with the complete final line.
+IFS= read -r CONTROL_PLANE_API_KEY < "$SECRET_FILE" || [ -n "$CONTROL_PLANE_API_KEY" ]
 [ "${#CONTROL_PLANE_API_KEY}" -ge 20 ] || { echo "$LOG_PREFIX runtime key inválida" >&2; exit 1; }
 export CONTROL_PLANE_API_KEY
 
