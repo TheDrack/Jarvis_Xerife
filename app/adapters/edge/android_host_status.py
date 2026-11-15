@@ -74,7 +74,7 @@ def _termux_api_json(command: str, allowed_fields: set[str]) -> dict[str, Any]:
     }
     if command == "termux-wifi-connectioninfo":
         state = str(filtered.get("supplicant_state", "")).upper()
-        filtered["connected"] = state == "COMPLETED" and filtered.get("wifi_enabled") is True
+        filtered["connected"] = state == "COMPLETED" and filtered.get("wifi_enabled") is not False
     return {"available": True, "status": "ok", **filtered}
 
 
