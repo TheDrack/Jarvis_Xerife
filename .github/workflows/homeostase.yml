@@ -228,7 +228,7 @@ jobs:
           set -e
           gh auth setup-git
           git add -- app scripts docs
-          if git diff --cached --name-only | grep -E '(^|/)\.frozen(/|)|(^|/)(test|tests|testing)/|(^|/)test_[^/]*\.py(/|)|(^|/)[^/]*_test\.py(/|)|(^|/)conftest\.py(/|)|(^|/)(pytest\.ini|pytest\.toml|tox\.ini|setup\.cfg|pyproject\.toml|\.coveragerc)(/|)'
+          if git diff --cached --name-only | grep -E '(^|/)\.frozen(/|)|(^|/)test\.py(/|)|(^|/)(test|tests|testing)/|(^|/)test_[^/]*\.py(/|)|(^|/)[^/]*_test\.py(/|)|(^|/)conftest\.py(/|)|(^|/)(pytest\.ini|pytest\.toml|tox\.ini|setup\.cfg|pyproject\.toml|\.coveragerc)(/|)'
           then
             echo "::error::Refusing to stage test sources or pytest infrastructure."
             exit 1
