@@ -67,13 +67,21 @@ class LocalRepairAgent(NexusComponent):
         if error_type in ("ModuleNotFoundError", "ImportError"):
             return self._install_missing(error_message)
         if error_type == "SyntaxError" and file_path:
+            target, rejection = self._resolve_patch_target(file_path, None)
+            if target is None:
+                return {"fixed": False, "details": rejection}
             try:
-                ast.parse(Path(file_path).read_text(encoding="utf-8"))
+                ast.parse(target.read_text(encoding="utf-8"))
                 return {"fixed": False}
             except SyntaxError as exc:
                 return {
                     "fixed": False,
-                    "details": f"SyntaxError em {file_path}:{exc.lineno} — requer LLM",
+                    "details": f"SyntaxError em {target}:{exc.lineno} — requer LLM",
+                }
+            except OSError as exc:
+                return {
+                    "fixed": False,
+                    "details": f"Não foi possível ler o arquivo autorizado: {type(exc).__name__}",
                 }
         return {"fixed": False}
 
@@ -104,15 +112,21 @@ class LocalRepairAgent(NexusComponent):
         traceback_text: str,
         file_path: Optional[str],
     ) -> dict:
-        file_content = ""
-        if file_path and Path(file_path).exists():
-            try:
-                text = Path(file_path).read_text(encoding="utf-8")
-                file_content = text[:_MAX_FILE_CONTENT_LENGTH] + (
-                    "\n...[truncado]" if len(text) > _MAX_FILE_CONTENT_LENGTH else ""
-                )
-            except Exception:
-                pass
+        # Validate the source path before reading any file content or sending a
+        # prompt to a provider. Error logs and caller-supplied paths are untrusted.
+        target, rejection = self._resolve_patch_target(file_path, None)
+        if target is None:
+            return {"fixed": False, "details": rejection}
+        try:
+            text = target.read_text(encoding="utf-8")
+        except OSError as exc:
+            return {
+                "fixed": False,
+                "details": f"Não foi possível ler o arquivo autorizado: {type(exc).__name__}",
+            }
+        file_content = text[:_MAX_FILE_CONTENT_LENGTH] + (
+            "\n...[truncado]" if len(text) > _MAX_FILE_CONTENT_LENGTH else ""
+        )
 
         prompt = f"""Analise o erro e gere um patch de correção Python.
 
