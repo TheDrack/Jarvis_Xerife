@@ -89,6 +89,7 @@ def test_auto_healing_changes_are_proposed_in_a_branch_without_staging_tests_or_
     assert "_test.py" in workflow
     assert "conftest.py" in workflow
     assert "pytest.ini" in workflow
+    assert ".frozen" in workflow
     assert "Refusing to stage test sources or pytest infrastructure" in workflow
     assert "git add .github" not in workflow
     assert 'HEAL_BRANCH="jarvis/heal-$GITHUB_RUN_ID"' in workflow
