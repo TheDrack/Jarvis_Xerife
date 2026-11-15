@@ -35,6 +35,9 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
 
     def test_installer_preserves_existing_tunnel_configuration_and_secrets(self):
         source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn('if [ -f "$ENV_FILE" ]; then', source)
+        self.assertIn('. "$ENV_FILE"', source)
+        self.assertIn('[ "$MCP_LOCAL_HOST" = "127.0.0.1" ]', source)
         self.assertIn('if [ ! -f "$ENV_FILE" ]; then', source)
         self.assertIn('if [ ! -e "$SERVICE_LINK" ]; then', source)
         self.assertIn('elif [ ! -L "$SERVICE_LINK" ]; then', source)
