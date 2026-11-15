@@ -68,7 +68,9 @@ def audit_event(event: str, **metadata: Any) -> bool:
     })
 
 
-def _bounded_reader(stream: Any, limit: int, output: bytearray) -> None:
+def _bounded_reader(
+    stream: Any, limit: int, output: bytearray, truncated: list[bool]
+) -> None:
     while True:
         chunk = stream.read(8192)
         if not chunk:
@@ -76,6 +78,8 @@ def _bounded_reader(stream: Any, limit: int, output: bytearray) -> None:
         remaining = limit - len(output)
         if remaining > 0:
             output.extend(chunk[:remaining])
+        if len(chunk) > max(remaining, 0):
+            truncated[0] = True
 
 
 def run_shell_command(
@@ -110,6 +114,8 @@ def run_shell_command(
     started = time.monotonic()
     stdout_buffer = bytearray()
     stderr_buffer = bytearray()
+    stdout_was_truncated = [False]
+    stderr_was_truncated = [False]
     timed_out = False
     exit_code: int | None = None
 
@@ -126,10 +132,14 @@ def run_shell_command(
         )
         assert process.stdout is not None and process.stderr is not None
         stdout_thread = threading.Thread(
-            target=_bounded_reader, args=(process.stdout, MAX_STDOUT_BYTES, stdout_buffer), daemon=True
+            target=_bounded_reader,
+            args=(process.stdout, MAX_STDOUT_BYTES, stdout_buffer, stdout_was_truncated),
+            daemon=True
         )
         stderr_thread = threading.Thread(
-            target=_bounded_reader, args=(process.stderr, MAX_STDERR_BYTES, stderr_buffer), daemon=True
+            target=_bounded_reader,
+            args=(process.stderr, MAX_STDERR_BYTES, stderr_buffer, stderr_was_truncated),
+            daemon=True
         )
         stdout_thread.start()
         stderr_thread.start()
@@ -147,14 +157,20 @@ def run_shell_command(
             process.wait()
             exit_code = None
         finally:
+            # Do not leave background children running after the shell request ends.
+            if os.name != "nt":
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
             stdout_thread.join(timeout=5)
             stderr_thread.join(timeout=5)
             process.stdout.close()
             process.stderr.close()
 
     duration_ms = int((time.monotonic() - started) * 1000)
-    stdout_truncated = len(stdout_buffer) >= MAX_STDOUT_BYTES
-    stderr_truncated = len(stderr_buffer) >= MAX_STDERR_BYTES
+    stdout_truncated = stdout_was_truncated[0]
+    stderr_truncated = stderr_was_truncated[0]
     audit_logged = audit_event(
         "shell_command",
         session_id=session_id,
