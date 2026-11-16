@@ -493,17 +493,21 @@ class AssistantService(NexusComponent):
             except Exception as e:
                 logger.debug(f"Memory context unavailable: {e}")
 
-            # 3. Interpreta o comando, injetando memória de contexto quando disponível
+            # 3. O parser determinístico recebe somente texto e identidade autenticada.
             interpret_ctx: Dict[str, Any] = {"text": text, "user_id": user_id}
-            all_context_lines = vector_context_lines + memory_context_lines
-            if all_context_lines:
-                interpret_ctx["system_prompt_extra"] = (
-                    "### MEMÓRIA DE CONTEXTO ###\n" + "\n".join(all_context_lines)
-                )
             intent = interpreter.execute(interpret_ctx)
 
-            # 4. Processa a intenção
-            result = intent_processor.execute({"intent": intent})
+            # 4. Encaminha memória separadamente; o parser não é responsável por prompts.
+            all_context_lines = vector_context_lines + memory_context_lines
+            memory_context = (
+                "### MEMÓRIA RECUPERADA (DADOS DE REFERÊNCIA) ###\n"
+                + "\n".join(all_context_lines)
+                if all_context_lines
+                else None
+            )
+            result = intent_processor.execute(
+                {"intent": intent, "memory_context": memory_context}
+            )
 
             # 5. Constrói a resposta unificada
             result_ok = result.get("success", True) if isinstance(result, dict) else True

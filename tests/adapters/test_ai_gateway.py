@@ -410,3 +410,41 @@ class TestAIGatewayFallback(NexusComponent):
         assert "descomissionado" in error_message
         assert ".env" in error_message
         assert "llama-3.3-70b-versatile" in error_message
+
+
+
+def test_execute_returns_provider_response_text_without_running_loop(monkeypatch):
+    from types import SimpleNamespace
+
+    gateway = AIGateway(groq_api_key="test_groq_key", gemini_api_key=None)
+    provider_response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content="Resposta real do provider")
+            )
+        ]
+    )
+
+    async def fake_generate_completion(messages, multimodal=False, force_provider=None):
+        return {
+            "provider": LLMProvider.GROQ.value,
+            "model": "test-model",
+            "response": provider_response,
+        }
+
+    monkeypatch.setattr(gateway, "generate_completion", fake_generate_completion)
+    result = gateway.execute(
+        {"messages": [{"role": "user", "content": "pergunta de teste"}]}
+    )
+
+    assert result["success"] is True
+    assert result["provider"] == LLMProvider.GROQ.value
+    assert result["model"] == "test-model"
+    assert result["response"] == "Resposta real do provider"
+
+
+def test_extract_response_text_supports_gemini_text():
+    from types import SimpleNamespace
+
+    provider_response = SimpleNamespace(text="Resposta real do Gemini")
+    assert AIGateway._extract_response_text(provider_response) == "Resposta real do Gemini"

@@ -963,6 +963,94 @@ class AIGateway(NexusComponent):
     # NexusComponent interface
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _extract_response_text(response: Any) -> Optional[str]:
+        """Extract plain text from the supported provider SDK response shapes."""
+        if isinstance(response, str):
+            return response.strip() or None
+
+        try:
+            direct_text = (
+                response.get("text")
+                if isinstance(response, dict)
+                else getattr(response, "text", None)
+            )
+        except Exception:
+            direct_text = None
+        if isinstance(direct_text, str) and direct_text.strip():
+            return direct_text.strip()
+
+        try:
+            choices = (
+                response.get("choices")
+                if isinstance(response, dict)
+                else getattr(response, "choices", None)
+            )
+        except Exception:
+            choices = None
+        if choices:
+            first = choices[0]
+            message = (
+                first.get("message")
+                if isinstance(first, dict)
+                else getattr(first, "message", None)
+            )
+            response_content = (
+                message.get("content")
+                if isinstance(message, dict)
+                else getattr(message, "content", None)
+            )
+            if isinstance(response_content, str) and response_content.strip():
+                return response_content.strip()
+            if isinstance(response_content, list):
+                fragments = []
+                for part in response_content:
+                    part_text = (
+                        part.get("text")
+                        if isinstance(part, dict)
+                        else getattr(part, "text", None)
+                    )
+                    if isinstance(part_text, str) and part_text.strip():
+                        fragments.append(part_text.strip())
+                if fragments:
+                    return "\n".join(fragments)
+
+        try:
+            candidates = (
+                response.get("candidates")
+                if isinstance(response, dict)
+                else getattr(response, "candidates", None)
+            )
+        except Exception:
+            candidates = None
+        if candidates:
+            for candidate in candidates:
+                candidate_content = (
+                    candidate.get("content")
+                    if isinstance(candidate, dict)
+                    else getattr(candidate, "content", None)
+                )
+                parts = (
+                    candidate_content.get("parts")
+                    if isinstance(candidate_content, dict)
+                    else getattr(candidate_content, "parts", None)
+                )
+                if not parts:
+                    continue
+                fragments = []
+                for part in parts:
+                    part_text = (
+                        part.get("text")
+                        if isinstance(part, dict)
+                        else getattr(part, "text", None)
+                    )
+                    if isinstance(part_text, str) and part_text.strip():
+                        fragments.append(part_text.strip())
+                if fragments:
+                    return "\n".join(fragments)
+
+        return None
+
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """NexusComponent evidence method.
 
@@ -976,7 +1064,7 @@ class AIGateway(NexusComponent):
                   Takes precedence over automatic provider selection.
 
         Returns:
-            Evidence dict with ``success`` and provider metadata.
+            Evidence dict with ``success``, provider metadata and extracted response text
         """
         ctx = context or {}
         messages: List[Dict[str, str]] = ctx.get("messages", [])
@@ -992,19 +1080,37 @@ class AIGateway(NexusComponent):
                 logger.warning("[AIGateway] Valor de provider desconhecido: %s", force_provider_value)
 
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                with concurrent.futures.ThreadPoolExecutor() as pool:
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                result = asyncio.run(
+                    self.generate_completion(
+                        messages,
+                        multimodal=multimodal,
+                        force_provider=force_provider,
+                    )
+                )
+            else:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     future = pool.submit(
                         asyncio.run,
-                        self.generate_completion(messages, multimodal=multimodal, force_provider=force_provider),
+                        self.generate_completion(
+                            messages,
+                            multimodal=multimodal,
+                            force_provider=force_provider,
+                        ),
                     )
                     result = future.result()
-            else:
-                result = loop.run_until_complete(
-                    self.generate_completion(messages, multimodal=multimodal, force_provider=force_provider)
-                )
-            return {"success": True, "provider": result.get("provider"), "model": result.get("model")}
+
+            payload = {
+                "success": True,
+                "provider": result.get("provider"),
+                "model": result.get("model"),
+            }
+            response_text = self._extract_response_text(result.get("response"))
+            if response_text:
+                payload["response"] = response_text
+            return payload
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
