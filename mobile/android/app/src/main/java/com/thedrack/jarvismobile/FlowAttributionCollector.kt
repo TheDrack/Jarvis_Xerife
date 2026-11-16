@@ -79,6 +79,7 @@ internal class FlowAttributionCollector(
     )
 
     @Volatile private var enabled = true
+    val isEnabled: Boolean get() = enabled
     private val flows = LinkedHashMap<FlowKey, MutableFlow>(16, 0.75f, true)
     private val packageCache = HashMap<Int, List<AppPackageIdentity>>()
 
