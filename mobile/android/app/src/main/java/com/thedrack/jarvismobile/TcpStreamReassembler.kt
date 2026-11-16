@@ -18,7 +18,14 @@ internal class TcpStreamReassembler(
 ) {
     private data class Segment(val sequence: Long, val bytes: ByteArray)
 
-    private val stream = ByteArrayOutputStream()
+    private class WipingByteArrayOutputStream : ByteArrayOutputStream() {
+        fun wipe() {
+            buf.fill(0)
+            reset()
+        }
+    }
+
+    private val stream = WipingByteArrayOutputStream()
     private val pending = mutableListOf<Segment>()
     private var nextSequence: Long? = null
     private var failed = false
@@ -72,7 +79,7 @@ internal class TcpStreamReassembler(
 
     @Synchronized
     fun clear() {
-        stream.reset()
+        stream.wipe()
         pending.forEach { it.bytes.fill(0) }
         pending.clear()
         nextSequence = null
@@ -112,7 +119,7 @@ internal class TcpStreamReassembler(
 
     private fun failClosed() {
         failed = true
-        stream.reset()
+        stream.wipe()
         pending.forEach { it.bytes.fill(0) }
         pending.clear()
         nextSequence = null
