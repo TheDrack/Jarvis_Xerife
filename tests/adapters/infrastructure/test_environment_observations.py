@@ -584,7 +584,7 @@ def test_network_payload_metadata_requires_separate_mobile_opt_in():
     )
     module.EnvironmentObservationCreate(**body)
 
-    with pytest.raises(ValueError, match="payload metadata requires"):
+    with pytest.raises(ValueError, match="protocol observations require"):
         module.EnvironmentObservationCreate(
             **dict(body, payload={"platform": "android", "flow_metadata_opt_in": True, "flows": [flow]})
         )
