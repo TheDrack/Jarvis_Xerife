@@ -78,7 +78,7 @@ class JarvisVpnService : VpnService() {
         val socksUsername = newSocksCredential()
         val socksPassword = newSocksCredential()
         val proxy = LocalSocks5Proxy(this, socksUsername, socksPassword)
-        proxy.start()
+        val socksPort = proxy.start()
         socksProxy = proxy
 
         val builder = Builder()
@@ -118,7 +118,7 @@ class JarvisVpnService : VpnService() {
 
         val nativeEngine = HevTunnelEngine(applicationContext)
         engine = nativeEngine
-        check(nativeEngine.start(descriptor.fd, socksUsername, socksPassword)) {
+        check(nativeEngine.start(descriptor.fd, socksUsername, socksPassword, socksPort)) {
             "Hev tun2socks failed to initialize"
         }
         check(nativeEngine.isRunning()) {
