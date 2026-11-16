@@ -507,7 +507,11 @@ private fun JarvisMobileScreen(
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("vpn_flow_sharing_enabled", false))
     }
     var vpnPayloadMetadataEnabled by remember {
-        mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("vpn_payload_metadata_enabled", false))
+        val preferences = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+        mutableStateOf(
+            preferences.getBoolean("vpn_flow_sharing_enabled", false) &&
+                preferences.getBoolean("vpn_payload_metadata_enabled", false)
+        )
     }
     var appUsagePackageFilter by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
