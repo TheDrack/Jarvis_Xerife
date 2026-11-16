@@ -300,25 +300,32 @@ class ProtocolPatternRegistry:
 
     def compare_versions(self, *, package: str, operation: str, older: str, newer: str) -> dict[str, Any]:
         records = self.list_patterns(package=package, operation=operation)
-        old = next((item for item in records if item["app_version"] == older), None)
-        new = next((item for item in records if item["app_version"] == newer), None)
-        if old is None or new is None:
+        old_records = [item for item in records if item["app_version"] == older]
+        new_records = [item for item in records if item["app_version"] == newer]
+        if not old_records or not new_records:
             raise KeyError("pattern missing for one or both app versions")
 
-        if "network_pattern" in old or "network_pattern" in new:
-            if "network_pattern" not in old or "network_pattern" not in new:
-                changes = ["record_type"]
-            else:
-                fields = (
-                    "kind", "hostname", "source", "transport", "remote_ip", "remote_port"
-                )
-                changes = [
-                    f"network_pattern.{field}"
-                    for field in fields
-                    if old["network_pattern"].get(field) != new["network_pattern"].get(field)
-                ]
+        old_network = all("network_pattern" in item for item in old_records)
+        new_network = all("network_pattern" in item for item in new_records)
+        if old_network != new_network:
+            changes = ["record_type"]
+        elif old_network:
+            fields = (
+                "kind", "hostname", "source", "transport", "remote_ip", "remote_port"
+            )
+            changes = []
+            for field in fields:
+                old_values = {
+                    json.dumps(item["network_pattern"].get(field), sort_keys=True)
+                    for item in old_records
+                }
+                new_values = {
+                    json.dumps(item["network_pattern"].get(field), sort_keys=True)
+                    for item in new_records
+                }
+                if old_values != new_values:
+                    changes.append(f"network_pattern.{field}")
         else:
-            old_pattern, new_pattern = old["pattern"], new["pattern"]
             fields = (
                 ("request", "method"), ("request", "scheme"), ("request", "host"),
                 ("request", "path"), ("request", "content_type"),
@@ -328,9 +335,19 @@ class ProtocolPatternRegistry:
             )
             changes = []
             for section, key in fields:
-                left = old_pattern.get(section) if key is None else old_pattern.get(section, {}).get(key)
-                right = new_pattern.get(section) if key is None else new_pattern.get(section, {}).get(key)
-                if left != right:
+                def field_value(
+                    record: dict[str, Any], section: str = section, key: str | None = key
+                ) -> Any:
+                    pattern = record["pattern"]
+                    return pattern.get(section) if key is None else pattern.get(section, {}).get(key)
+
+                old_values = {
+                    json.dumps(field_value(item), sort_keys=True) for item in old_records
+                }
+                new_values = {
+                    json.dumps(field_value(item), sort_keys=True) for item in new_records
+                }
+                if old_values != new_values:
                     changes.append(section if key is None else f"{section}.{key}")
 
         return {
