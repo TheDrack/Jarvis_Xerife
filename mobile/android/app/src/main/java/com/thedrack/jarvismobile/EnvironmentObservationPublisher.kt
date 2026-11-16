@@ -86,6 +86,23 @@ object EnvironmentObservationPublisher {
             .put("precision", if (fine) "fine" else "coarse")
     }
 
+    fun buildAppUsageObservation(
+        deviceId: String,
+        usage: AppUsageSnapshot,
+        observedAt: String = Instant.now().toString(),
+        requestId: String = UUID.randomUUID().toString()
+    ): JSONObject {
+        require(deviceId.isNotBlank() && deviceId.length <= 128)
+        require(usage.apps.size <= 50)
+        return JSONObject().put("device_id", deviceId)
+            .put("source_device_type", "mobile")
+            .put("observation_type", "app_usage_snapshot")
+            .put("schema_version", 1)
+            .put("request_id", requestId)
+            .put("observed_at", observedAt)
+            .put("payload", usage.toPayload())
+    }
+
     fun buildObservation(
         deviceId: String,
         snapshot: MobileNetworkSnapshot,
@@ -127,6 +144,13 @@ object EnvironmentObservationPublisher {
             .getBoolean("location_sharing_enabled", false)
         if (enabled) collectLocation(context, true)?.let { location ->
             observations += buildObservation(deviceId, snapshot, "location_snapshot", location = location)
+        }
+        val appUsageEnabled = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+            .getBoolean("app_usage_sharing_enabled", false)
+        if (AppUsageStatsCollector.isAuthorized(appUsageEnabled, AppUsageStatsCollector.hasUsageAccess(context))) {
+            AppUsageStatsCollector.collect(context)?.let { usage ->
+                observations += buildAppUsageObservation(deviceId, usage)
+            }
         }
         observations.forEach { observation ->
             MobilePushClient.authenticatedRequest(context, "/v1/environment/observations", "POST", observation.toString())

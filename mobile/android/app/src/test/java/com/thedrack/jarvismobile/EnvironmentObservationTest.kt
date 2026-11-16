@@ -64,3 +64,44 @@ class EnvironmentObservationTest {
         EnvironmentObservationPublisher.buildObservation("", snapshot)
     }
 }
+
+class AppUsageObservationTest {
+    @Test
+    fun collectionRequiresBothUserConsentAndAndroidUsageAccess() {
+        assertFalse(AppUsageStatsCollector.isAuthorized(false, false))
+        assertFalse(AppUsageStatsCollector.isAuthorized(false, true))
+        assertFalse(AppUsageStatsCollector.isAuthorized(true, false))
+        assertTrue(AppUsageStatsCollector.isAuthorized(true, true))
+    }
+
+    @Test
+    fun appUsagePayloadContainsOnlyOptedInAggregateCounters() {
+        val snapshot = AppUsageSnapshot(
+            windowStart = "2026-11-16T10:00:00Z",
+            windowEnd = "2026-11-16T11:00:00Z",
+            apps = listOf(
+                AppUsageEntry(10123, listOf("com.example.app"), 100L, 50L, 20L, 10L)
+            )
+        )
+        val observation = EnvironmentObservationPublisher.buildAppUsageObservation(
+            "phone-1", snapshot, observedAt = "2026-11-16T11:00:00Z", requestId = "req-usage"
+        )
+        val payload = observation.getJSONObject("payload")
+        val app = payload.getJSONArray("apps").getJSONObject(0)
+        assertEquals("app_usage_snapshot", observation.getString("observation_type"))
+        assertTrue(payload.getBoolean("usage_access_opt_in"))
+        assertEquals(100L, app.getJSONObject("wifi").getLong("rx_bytes"))
+        assertEquals(10L, app.getJSONObject("mobile").getLong("tx_bytes"))
+        assertFalse(payload.has("url"))
+        assertFalse(payload.has("destination"))
+        assertFalse(payload.has("payload"))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun appUsageObservationRejectsMoreThanFiftyApps() {
+        val entries = (1..51).map { uid -> AppUsageEntry(uid, emptyList(), 0L, 0L, 0L, 0L) }
+        EnvironmentObservationPublisher.buildAppUsageObservation(
+            "phone-1", AppUsageSnapshot("2026-11-16T10:00:00Z", "2026-11-16T11:00:00Z", entries)
+        )
+    }
+}

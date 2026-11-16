@@ -30,6 +30,7 @@ from app.adapters.edge.android_host_status import (
 from app.adapters.edge.android_host_status import (
     android_wifi_status as read_wifi_status,
 )
+from app.adapters.edge.android_mcp_observability import MetadataObservabilityMiddleware
 from app.adapters.edge.chatgpt_plan_mcp_tools import register_chatgpt_plan_tools
 from app.adapters.edge.communication_mcp_tools import register_communication_tools
 from app.adapters.infrastructure.termux_shell_mcp_tools import (
@@ -125,6 +126,11 @@ app = Starlette(
     ],
     lifespan=lifespan,
 )
+
+# Disabled by default. Enable only with JARVIS_ANDROID_MCP_OBSERVABILITY=1.
+_observability = MetadataObservabilityMiddleware.from_environment(app)
+if _observability is not None:
+    app = _observability
 
 
 def main() -> None:

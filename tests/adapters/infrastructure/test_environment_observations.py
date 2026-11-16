@@ -3,12 +3,10 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from app.adapters.infrastructure.routers import environment_observations as module
 from app.core.nexus import nexus
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 class Result:
@@ -52,18 +50,24 @@ class Query:
     def execute(self):
         if self.operation == "insert":
             unique = (self.payload["user_id"], self.payload["request_id"])
-            if any((row["user_id"], row["request_id"]) == unique for row in self.database.rows):
+            if any(
+                (row["user_id"], row["request_id"]) == unique
+                for row in self.database.rows
+            ):
                 raise RuntimeError("unique constraint")
             self.database.rows.append(dict(self.payload))
             return Result([dict(self.payload)])
         rows = [
-            dict(row) for row in self.database.rows
+            dict(row)
+            for row in self.database.rows
             if all(row.get(key) == value for key, value in self.filters.items())
         ]
         if self.order_key:
-            rows.sort(key=lambda row: row.get(self.order_key, ""), reverse=self.descending)
+            rows.sort(
+                key=lambda row: row.get(self.order_key, ""), reverse=self.descending
+            )
         if self.limit_count is not None:
-            rows = rows[:self.limit_count]
+            rows = rows[: self.limit_count]
         return Result(rows)
 
 
@@ -90,7 +94,9 @@ class Auth:
 def make_client(monkeypatch, database=None, claims=None):
     auth = Auth()
     auth.extra_claims = claims or {}
-    monkeypatch.setattr(nexus, "resolve", lambda name: auth if name == "auth_adapter" else None)
+    monkeypatch.setattr(
+        nexus, "resolve", lambda name: auth if name == "auth_adapter" else None
+    )
     monkeypatch.setattr(module, "get_supabase_admin_client", lambda: database)
 
     async def current_user():
@@ -125,8 +131,16 @@ def test_ingest_derives_owner_from_verified_identity_and_is_idempotent(monkeypat
     database = Database()
     client = make_client(monkeypatch, database)
     body = observation()
-    first = client.post("/v1/environment/observations", json=body, headers={"Authorization": "Bearer valid"})
-    second = client.post("/v1/environment/observations", json=body, headers={"Authorization": "Bearer valid"})
+    first = client.post(
+        "/v1/environment/observations",
+        json=body,
+        headers={"Authorization": "Bearer valid"},
+    )
+    second = client.post(
+        "/v1/environment/observations",
+        json=body,
+        headers={"Authorization": "Bearer valid"},
+    )
     assert first.status_code == 201
     assert first.json()["duplicate"] is False
     assert second.status_code == 201
@@ -138,21 +152,37 @@ def test_ingest_derives_owner_from_verified_identity_and_is_idempotent(monkeypat
 def test_ingest_rejects_client_supplied_owner(monkeypatch):
     client = make_client(monkeypatch, Database())
     body = observation(user_id="another-user")
-    response = client.post("/v1/environment/observations", json=body, headers={"Authorization": "Bearer valid"})
+    response = client.post(
+        "/v1/environment/observations",
+        json=body,
+        headers={"Authorization": "Bearer valid"},
+    )
     assert response.status_code == 422
 
 
 def test_mobile_token_must_be_bound_to_submitted_device(monkeypatch):
-    client = make_client(monkeypatch, Database(), {"client": "jarvis-mobile", "device_id": "phone-1"})
+    client = make_client(
+        monkeypatch, Database(), {"client": "jarvis-mobile", "device_id": "phone-1"}
+    )
     body = observation(device_id="phone-2", source_device_type="mobile")
-    response = client.post("/v1/environment/observations", json=body, headers={"Authorization": "Bearer valid"})
+    response = client.post(
+        "/v1/environment/observations",
+        json=body,
+        headers={"Authorization": "Bearer valid"},
+    )
     assert response.status_code == 403
 
 
 def test_mobile_token_cannot_publish_desktop_observation(monkeypatch):
-    client = make_client(monkeypatch, Database(), {"client": "jarvis-mobile", "device_id": "phone-1"})
+    client = make_client(
+        monkeypatch, Database(), {"client": "jarvis-mobile", "device_id": "phone-1"}
+    )
     body = observation(device_id="phone-1")
-    response = client.post("/v1/environment/observations", json=body, headers={"Authorization": "Bearer valid"})
+    response = client.post(
+        "/v1/environment/observations",
+        json=body,
+        headers={"Authorization": "Bearer valid"},
+    )
     assert response.status_code == 403
 
 
@@ -176,31 +206,50 @@ def test_ingest_rejects_future_timestamp_and_sensitive_payload_keys(monkeypatch)
 def test_latest_returns_only_current_users_latest_records_with_freshness(monkeypatch):
     database = Database()
     now = datetime.now(timezone.utc)
-    database.rows.extend([
-        {
-            "user_id": "user-1", "device_id": "desktop-main", "source_device_type": "desktop",
-            "observation_type": "network_snapshot", "schema_version": 1,
-            "observed_at": now.isoformat(), "received_at": now.isoformat(),
-            "expires_at": (now + timedelta(minutes=5)).isoformat(),
-            "payload": {"interfaces": []}, "request_id": str(uuid4()),
-        },
-        {
-            "user_id": "user-1", "device_id": "phone-1", "source_device_type": "mobile",
-            "observation_type": "network_snapshot", "schema_version": 1,
-            "observed_at": now.isoformat(), "received_at": now.isoformat(),
-            "expires_at": (now - timedelta(minutes=1)).isoformat(),
-            "payload": {"network_type": "wifi"}, "request_id": str(uuid4()),
-        },
-        {
-            "user_id": "other-user", "device_id": "foreign", "source_device_type": "desktop",
-            "observation_type": "network_snapshot", "schema_version": 1,
-            "observed_at": now.isoformat(), "received_at": now.isoformat(),
-            "expires_at": (now + timedelta(minutes=5)).isoformat(),
-            "payload": {}, "request_id": str(uuid4()),
-        },
-    ])
+    database.rows.extend(
+        [
+            {
+                "user_id": "user-1",
+                "device_id": "desktop-main",
+                "source_device_type": "desktop",
+                "observation_type": "network_snapshot",
+                "schema_version": 1,
+                "observed_at": now.isoformat(),
+                "received_at": now.isoformat(),
+                "expires_at": (now + timedelta(minutes=5)).isoformat(),
+                "payload": {"interfaces": []},
+                "request_id": str(uuid4()),
+            },
+            {
+                "user_id": "user-1",
+                "device_id": "phone-1",
+                "source_device_type": "mobile",
+                "observation_type": "network_snapshot",
+                "schema_version": 1,
+                "observed_at": now.isoformat(),
+                "received_at": now.isoformat(),
+                "expires_at": (now - timedelta(minutes=1)).isoformat(),
+                "payload": {"network_type": "wifi"},
+                "request_id": str(uuid4()),
+            },
+            {
+                "user_id": "other-user",
+                "device_id": "foreign",
+                "source_device_type": "desktop",
+                "observation_type": "network_snapshot",
+                "schema_version": 1,
+                "observed_at": now.isoformat(),
+                "received_at": now.isoformat(),
+                "expires_at": (now + timedelta(minutes=5)).isoformat(),
+                "payload": {},
+                "request_id": str(uuid4()),
+            },
+        ]
+    )
     client = make_client(monkeypatch, database)
-    response = client.get("/v1/environment/observations/latest", headers={"Authorization": "Bearer valid"})
+    response = client.get(
+        "/v1/environment/observations/latest", headers={"Authorization": "Bearer valid"}
+    )
     assert response.status_code == 200
     items = response.json()["observations"]
     assert {item["device_id"] for item in items} == {"desktop-main", "phone-1"}
@@ -211,23 +260,30 @@ def test_latest_returns_only_current_users_latest_records_with_freshness(monkeyp
 def test_storage_unavailable_fails_closed(monkeypatch):
     client = make_client(monkeypatch, None)
     response = client.post(
-        "/v1/environment/observations", json=observation(),
+        "/v1/environment/observations",
+        json=observation(),
         headers={"Authorization": "Bearer valid"},
     )
     assert response.status_code == 503
 
 
-
 def test_api_server_registers_authenticated_observation_router():
     from pathlib import Path
+
     root = Path(__file__).resolve().parents[3]
-    api = (root / "app" / "adapters" / "infrastructure" / "api_server.py").read_text(encoding="utf-8")
+    api = (root / "app" / "adapters" / "infrastructure" / "api_server.py").read_text(
+        encoding="utf-8"
+    )
     assert "create_environment_observations_router" in api
-    assert "app.include_router(create_environment_observations_router(get_current_user))" in api
+    assert (
+        "app.include_router(create_environment_observations_router(get_current_user))"
+        in api
+    )
 
 
 def test_baseline_migration_defines_observation_schema_and_enables_rls():
     from pathlib import Path
+
     root = Path(__file__).resolve().parents[3]
     migration = (
         root / "supabase" / "migrations" / "20261029110505_environment_observations.sql"
@@ -247,41 +303,185 @@ def test_payload_size_is_bounded(monkeypatch):
     assert response.status_code == 422
 
 
-
 def test_follow_up_migration_revokes_unneeded_server_privileges():
     from pathlib import Path
+
     root = Path(__file__).resolve().parents[3]
     migration = (
-        root / "supabase" / "migrations" / "20261029112400_environment_observations_least_privilege.sql"
-    ).read_text(encoding="utf-8").lower()
+        (
+            root
+            / "supabase"
+            / "migrations"
+            / "20261029112400_environment_observations_least_privilege.sql"
+        )
+        .read_text(encoding="utf-8")
+        .lower()
+    )
     assert "revoke all on table public.jarvis_environment_observations" in migration
     assert "from public, anon, authenticated, service_role" in migration
-    assert "grant select, insert on table public.jarvis_environment_observations to service_role" in migration
+    assert (
+        "grant select, insert on table public.jarvis_environment_observations to service_role"
+        in migration
+    )
 
 
 def test_location_snapshot_requires_mobile_opt_in_and_valid_coordinates():
     valid = observation(
         source_device_type="mobile",
         observation_type="location_snapshot",
-        payload={"location_opt_in": True, "location": {"latitude": -27.5, "longitude": -48.5, "accuracy_m": 12.0}},
+        payload={
+            "location_opt_in": True,
+            "location": {"latitude": -27.5, "longitude": -48.5, "accuracy_m": 12.0},
+        },
     )
     module.EnvironmentObservationCreate(**valid)
     with pytest.raises(ValueError):
         module.EnvironmentObservationCreate(**dict(valid, source_device_type="desktop"))
     with pytest.raises(ValueError):
-        module.EnvironmentObservationCreate(**dict(valid, payload={"location": {"latitude": -27.5, "longitude": -48.5}}))
+        module.EnvironmentObservationCreate(
+            **dict(valid, payload={"location": {"latitude": -27.5, "longitude": -48.5}})
+        )
     with pytest.raises(ValueError):
-        module.EnvironmentObservationCreate(**dict(valid, payload={"location_opt_in": True, "location": {"latitude": 91, "longitude": -48.5}}))
+        module.EnvironmentObservationCreate(
+            **dict(
+                valid,
+                payload={
+                    "location_opt_in": True,
+                    "location": {"latitude": 91, "longitude": -48.5},
+                },
+            )
+        )
 
 
 def test_expired_location_snapshot_hides_coordinates():
     now = datetime.now(timezone.utc)
     row = {
-        "device_id": "phone-1", "source_device_type": "mobile", "observation_type": "location_snapshot",
-        "observed_at": now.isoformat(), "received_at": (now - timedelta(minutes=3)).isoformat(),
+        "device_id": "phone-1",
+        "source_device_type": "mobile",
+        "observation_type": "location_snapshot",
+        "observed_at": now.isoformat(),
+        "received_at": (now - timedelta(minutes=3)).isoformat(),
         "expires_at": (now - timedelta(minutes=1)).isoformat(),
-        "payload": {"location_opt_in": True, "location": {"latitude": -27.5, "longitude": -48.5}},
+        "payload": {
+            "location_opt_in": True,
+            "location": {"latitude": -27.5, "longitude": -48.5},
+        },
     }
     result = module._public_observation(row, now)
     assert result["freshness"] == "stale"
     assert result["payload"] == {}
+
+
+def test_app_usage_snapshot_requires_mobile_explicit_usage_access_consent():
+    valid = observation(
+        device_id="phone-1",
+        source_device_type="mobile",
+        observation_type="app_usage_snapshot",
+        payload={
+            "platform": "android",
+            "usage_access_opt_in": True,
+            "collection_status": "ok",
+            "window_start": (
+                datetime.now(timezone.utc) - timedelta(minutes=60)
+            ).isoformat(),
+            "window_end": datetime.now(timezone.utc).isoformat(),
+            "apps": [
+                {
+                    "uid": 10123,
+                    "package_names": ["com.example.app"],
+                    "wifi": {"rx_bytes": 100, "tx_bytes": 50},
+                    "mobile": {"rx_bytes": 20, "tx_bytes": 10},
+                }
+            ],
+        },
+    )
+    module.EnvironmentObservationCreate(**valid)
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(**dict(valid, source_device_type="desktop"))
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(
+            **dict(valid, payload={**valid["payload"], "usage_access_opt_in": False})
+        )
+
+
+def test_app_usage_snapshot_rejects_unbounded_or_invalid_uid_counters():
+    base_payload = {
+        "platform": "android",
+        "usage_access_opt_in": True,
+        "collection_status": "ok",
+        "window_start": (
+            datetime.now(timezone.utc) - timedelta(minutes=60)
+        ).isoformat(),
+        "window_end": datetime.now(timezone.utc).isoformat(),
+        "apps": [
+            {
+                "uid": 10123,
+                "package_names": [],
+                "wifi": {"rx_bytes": 0, "tx_bytes": 0},
+                "mobile": {"rx_bytes": 0, "tx_bytes": 0},
+            }
+        ],
+    }
+    body = observation(
+        device_id="phone-1",
+        source_device_type="mobile",
+        observation_type="app_usage_snapshot",
+        payload=base_payload,
+    )
+    module.EnvironmentObservationCreate(**body)
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(
+            **dict(
+                body,
+                payload={
+                    **base_payload,
+                    "apps": [
+                        {
+                            "uid": -1,
+                            "package_names": [],
+                            "wifi": {"rx_bytes": 0, "tx_bytes": 0},
+                            "mobile": {"rx_bytes": 0, "tx_bytes": 0},
+                        }
+                    ],
+                },
+            )
+        )
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(
+            **dict(
+                body,
+                payload={
+                    **base_payload,
+                    "apps": [
+                        {
+                            "uid": 10123,
+                            "package_names": [],
+                            "wifi": {"rx_bytes": -1, "tx_bytes": 0},
+                            "mobile": {"rx_bytes": 0, "tx_bytes": 0},
+                        }
+                    ],
+                },
+            )
+        )
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(
+            **dict(body, payload={**base_payload, "apps": [{}] * 51})
+        )
+
+
+def test_forward_migration_allows_location_and_app_usage_observation_types():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    migration = (
+        (
+            root
+            / "supabase"
+            / "migrations"
+            / "20261116090000_app_usage_observation_type.sql"
+        )
+        .read_text(encoding="utf-8")
+        .lower()
+    )
+    assert "location_snapshot" in migration
+    assert "app_usage_snapshot" in migration

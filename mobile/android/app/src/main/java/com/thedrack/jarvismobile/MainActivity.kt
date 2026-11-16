@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Build
+import android.provider.Settings
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
     private var speech: TextToSpeech? = null
     private val executor = Executors.newSingleThreadExecutor()
     private val speechReady = mutableStateOf(false)
+    private val appUsageAccessGranted = mutableStateOf(false)
     private lateinit var voice: VoiceInput
     private lateinit var googleSignInLauncher: ActivityResultLauncher<Intent>
     private var pendingGoogleResult: ((String?) -> Unit)? = null
@@ -60,6 +62,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         vault = TokenVault(this)
         voice = VoiceInput(this)
+        appUsageAccessGranted.value = AppUsageStatsCollector.hasUsageAccess(this)
         googleSignInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val callback = pendingGoogleResult
             pendingGoogleResult = null
@@ -89,6 +92,7 @@ class MainActivity : ComponentActivity() {
                         isLoggedInInitially = vault.read() != null && vault.readRefreshToken() != null,
                         speechReady = speechReady.value,
                         presenceInitiallyActive = BridgeService.isRunning,
+                        usageAccessInitiallyGranted = appUsageAccessGranted.value,
                         voice = voice,
                         onLogin = ::login,
                         onGoogleSignIn = ::startGoogleSignIn,
@@ -109,6 +113,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (!this::vault.isInitialized) return
+        appUsageAccessGranted.value = AppUsageStatsCollector.hasUsageAccess(this)
         val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
         if (prefs.getBoolean("location_sharing_enabled", false)) {
             if (hasLocationPermission() && hasBackgroundLocationPermission()) {
@@ -282,6 +287,7 @@ class MainActivity : ComponentActivity() {
         val baseUrl = prefs.getString("api_base_url", BuildConfig.DEFAULT_API_BASE_URL)
             ?: BuildConfig.DEFAULT_API_BASE_URL
         stopPresence()
+        prefs.edit().putBoolean("app_usage_sharing_enabled", false).apply()
         executor.execute {
             try {
                 if (!refreshToken.isNullOrBlank()) MobilePushClient.revokeDeviceNow(applicationContext)
@@ -370,6 +376,7 @@ private fun JarvisMobileScreen(
     isLoggedInInitially: Boolean,
     speechReady: Boolean,
     presenceInitiallyActive: Boolean,
+    usageAccessInitiallyGranted: Boolean,
     voice: VoiceInput,
     onLogin: (String, String, String, (String?) -> Unit) -> Unit,
     onGoogleSignIn: ((String?) -> Unit) -> Unit,
@@ -387,6 +394,7 @@ private fun JarvisMobileScreen(
     var password by remember { mutableStateOf("") }
     var loggedIn by remember { mutableStateOf(isLoggedInInitially) }
     var presenceActive by remember { mutableStateOf(presenceInitiallyActive) }
+    var appUsageAccessGranted by remember { mutableStateOf(usageAccessInitiallyGranted) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("Entre e ative a presença para receber eventos do Jarvis.") }
     var tab by remember { mutableStateOf(0) } // 0 = Presença, 1 = Conversa
@@ -407,6 +415,9 @@ private fun JarvisMobileScreen(
     var locationSharingEnabled by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("location_sharing_enabled", false))
     }
+    var appUsageSharingEnabled by remember {
+        mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("app_usage_sharing_enabled", false))
+    }
 
     fun newId(): Long {
         val id = nextId
@@ -416,6 +427,19 @@ private fun JarvisMobileScreen(
 
     LaunchedEffect(loggedIn) {
         if (loggedIn) onFetchStatus { status = it }
+    }
+    LaunchedEffect(usageAccessInitiallyGranted) {
+        appUsageAccessGranted = usageAccessInitiallyGranted
+    }
+    val usageAccessSettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        appUsageAccessGranted = AppUsageStatsCollector.hasUsageAccess(context)
+        message = if (appUsageAccessGranted) {
+            "Usage Access concedido. A coleta agregada por aplicativo está habilitada."
+        } else {
+            "Usage Access não concedido. O consentimento fica salvo, mas nenhum tráfego será coletado."
+        }
     }
 
     val startListening: () -> Unit = {
@@ -700,6 +724,41 @@ private fun JarvisMobileScreen(
                             }
                         )
                     }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Estatísticas de tráfego por aplicativo")
+                            Text(
+                                if (appUsageAccessGranted)
+                                    "Usage Access concedido. Envia contadores RX/TX agregados por UID, sem conteúdo ou destinos."
+                                else
+                                    "Opcional. Exige consentimento e autorização especial manual nas configurações do Android.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = appUsageSharingEnabled,
+                            onCheckedChange = { enabled ->
+                                appUsageSharingEnabled = enabled
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putBoolean("app_usage_sharing_enabled", enabled).apply()
+                                if (enabled) {
+                                    message = "Consentimento salvo. Conceda Usage Access na próxima tela; sem essa autorização a coleta permanece inativa."
+                                    usageAccessSettingsLauncher.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                                } else {
+                                    message = "Coleta de tráfego por aplicativo desativada."
+                                }
+                            }
+                        )
+                    }
+                    if (appUsageSharingEnabled && !appUsageAccessGranted) {
+                        Button(
+                            onClick = { usageAccessSettingsLauncher.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
+                            modifier = Modifier.padding(top = 6.dp)
+                        ) { Text("Abrir Usage Access") }
+                    }
                     Button(
                         onClick = {
                             onStopPresence()
@@ -708,6 +767,9 @@ private fun JarvisMobileScreen(
                             loggedIn = false
                             messages = emptyList()
                             draft = ""
+                            appUsageSharingEnabled = false
+                            context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                .edit().putBoolean("app_usage_sharing_enabled", false).apply()
                             status = null
                             tab = 0
                             message = "Sessão encerrada."
