@@ -323,7 +323,12 @@ class EnvironmentObservationCreate(BaseModel):
                         kind = observation.get("kind")
                         value = observation.get("value")
                         source = observation.get("source")
-                        if kind not in expected_sources or source != expected_sources[kind]:
+                        if (
+                            not isinstance(kind, str)
+                            or not isinstance(source, str)
+                            or kind not in expected_sources
+                            or source != expected_sources[kind]
+                        ):
                             raise ValueError("protocol observation kind/source is invalid")
                         if (
                             not isinstance(value, str)
