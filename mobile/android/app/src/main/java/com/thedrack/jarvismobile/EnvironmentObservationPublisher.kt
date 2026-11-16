@@ -26,7 +26,11 @@ data class MobileNetworkSnapshot(
     val vpnCollectionMode: String = VpnCollectionMode.NETWORK_STATS.wireValue,
     val vpnModePreference: String = VpnModePreference.AUTO.wireValue,
     val tailscaleInstalled: Boolean = false,
-    val vpnTransportActive: Boolean = vpnActive
+    val vpnTransportActive: Boolean = vpnActive,
+    val vpnTxPackets: Long = 0,
+    val vpnTxBytes: Long = 0,
+    val vpnRxPackets: Long = 0,
+    val vpnRxBytes: Long = 0
 )
 
 /**
@@ -43,6 +47,7 @@ object EnvironmentObservationPublisher {
             preferences.getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
         )
         val runtime = VpnStateDetector.detect(context, jarvisVpnActive = JarvisVpnService.isRunning)
+        val tunnelStats = JarvisVpnService.currentStats()
         // The Jarvis TUN engine is user-started only; AUTO never takes over a VPN in this phase.
         // Tailscale flow telemetry still requires an adapter inside the Tailscale client.
         val decision = VpnModeOrchestrator.decide(
@@ -74,7 +79,11 @@ object EnvironmentObservationPublisher {
             vpnCollectionMode = decision.mode.wireValue,
             vpnModePreference = preference.wireValue,
             tailscaleInstalled = runtime.tailscaleInstalled,
-            vpnTransportActive = vpn
+            vpnTransportActive = vpn,
+            vpnTxPackets = tunnelStats.txPackets,
+            vpnTxBytes = tunnelStats.txBytes,
+            vpnRxPackets = tunnelStats.rxPackets,
+            vpnRxBytes = tunnelStats.rxBytes
         )
     }
 
@@ -150,6 +159,11 @@ object EnvironmentObservationPublisher {
                 .put("vpn_mode_preference", snapshot.vpnModePreference)
                 .put("tailscale_installed", snapshot.tailscaleInstalled)
                 .put("vpn_transport_active", snapshot.vpnTransportActive)
+                .put("vpn_tunnel_stats", JSONObject()
+                    .put("tx_packets", snapshot.vpnTxPackets)
+                    .put("tx_bytes", snapshot.vpnTxBytes)
+                    .put("rx_packets", snapshot.vpnRxPackets)
+                    .put("rx_bytes", snapshot.vpnRxBytes))
         }
         if (observationType == "presence") {
             payload.put("active", presenceActive)
