@@ -213,7 +213,7 @@ class JarvisVpnService : VpnService() {
             private set
         @Volatile private var activeEngine: HevTunnelEngine? = null
 
-        fun currentStats(): HevTunnelStats {
+        internal fun currentStats(): HevTunnelStats {
             if (!isRunning) return HevTunnelStats.ZERO
             return runCatching { activeEngine?.stats() ?: HevTunnelStats.ZERO }
                 .getOrDefault(HevTunnelStats.ZERO)
