@@ -355,3 +355,8 @@ def test_repeated_android_flow_observation_does_not_duplicate_pattern(tmp_path):
     assert second["recorded"] == 0
     assert second["already_known"] == 1
     assert len(registry.list_patterns(package="com.example.chat")) == 1
+
+
+def test_network_version_comparison_compares_all_observed_hosts(tmp_path):
+    registry = ProtocolPatternRegistry(tmp_path)
+    version_flows = {
