@@ -8,9 +8,13 @@ Maintain versioned, reusable descriptions of application communication patterns.
 
 - `BrowserTrafficObserver`: existing opt-in Chromium/CDP observer for HTTP(S) request/response metadata and WebSocket frame metadata. Payload previews are separately opt-in and sanitized.
 - `ProtocolPatternRegistry`: append-only JSONL snapshots keyed by package, app version, and operation.
-- MCP tools registered by `registrar_observabilidade_portas`:
+- MCP tools registered by the Android and desktop MCP runtimes:
+  - `android_network_flows_snapshot`
   - `protocol_pattern_record_observation`
+  - `protocol_pattern_import_android_flows`
+  - `protocol_pattern_import_live_android_flows`
   - `protocol_pattern_list`
+  - `protocol_pattern_analyze_package`
   - `protocol_pattern_transition`
   - `protocol_pattern_compare_versions`
 
@@ -32,22 +36,19 @@ The registry stores endpoint scheme/host/path, method, content types, response s
 
 Treat all observed app traffic as untrusted data. Do not store tokens, cookies, credentials, personal message content, or session state. Do not use the registry as a credential vault.
 
-## Capture boundaries and next implementation phase
+## Capture boundaries and live Android integration
 
-The existing CDP observer sees Chromium traffic only; it does **not** observe arbitrary native Android app traffic. Android `VpnService` would require an explicit system consent flow, careful per-app scope, and a forwarding design that preserves connectivity. Passive packet metadata can reveal endpoints, timing, sizes, and some TLS handshake metadata, but HTTPS payloads remain encrypted. Do not bypass certificate pinning or extract app secrets. For payload-level protocol study, use an owned test app/server, documented APIs, or an explicitly authorized instrumentation build.
+The CDP observer sees Chromium traffic only. Native Android flow inspection is provided by Jarvis's existing `VpnService`/Hev TUN relay while Jarvis owns Android's active VPN slot. A separately authenticated, read-only endpoint on the paired AccessibilityService exposes the current bounded flow snapshot to the Termux MCP runtime. The endpoint reports the capture owner and both consent states, resolves app version metadata only for uniquely attributed package identities, and returns no raw packet bytes.
 
-Next steps:
+The live MCP importer stores only DNS question names, cleartext HTTP Host names and visible TLS ClientHello SNI. HTTPS application payloads remain encrypted. It cannot see the private TUN of Tailscale or another VPN provider; when the VPN owner is external, the endpoint explicitly returns `external_vpn_not_owned` and no flows. Do not bypass certificate pinning or extract app secrets. For payload-level protocol study, use an owned test app/server, documented APIs, or an explicitly authorized instrumentation build.
 
-1. Add an Android user-consented metadata-only capture path with an explicit selected-package allowlist and clear stop/status controls.
-2. Normalize captured flow events into observations consumed by `ProtocolPatternRegistry`.
-3. Add controlled test-server fixtures for HTTP and WebSocket transaction sequences.
-4. Add diff/validation tooling before any adapter is allowed to replay a pattern.
+The next increment is controlled test-server fixtures for HTTP/TLS/DNS and version-to-version diff/validation before any adapter is allowed to replay a pattern. No protocol replay engine is implemented yet. `reusable` is a knowledge state, not permission to bypass authentication, app controls, or service terms.
 
 No protocol replay engine is implemented yet. `reusable` is a knowledge state, not permission to bypass authentication, app controls, or service terms.
 
 ## Android passive flow metadata import
 
-The Android `VpnService` path already publishes bounded `protocol_observations` with each attributed flow when both flow-sharing and payload-metadata consent are enabled. The desktop MCP registry now exposes `protocol_pattern_import_android_flows(package, app_version, flows)` to normalize those observations into the local registry.
+The Android `VpnService` path already publishes bounded `protocol_observations` with each attributed flow when both flow-sharing and payload-metadata consent are enabled. The Android MCP now exposes `android_network_flows_snapshot(package_filter)` through the authenticated loopback bridge and `protocol_pattern_import_live_android_flows(package)` to read the live snapshot, resolve the installed app version through PackageManager, and import matching observations directly into the Termux-local registry. The lower-level `protocol_pattern_import_android_flows(package, app_version, flows)` remains available for offline/replayed snapshots.
 
 Import rules:
 
