@@ -28,6 +28,8 @@ class EnvironmentObservationTest {
         assertEquals(1, first.getInt("schema_version"))
         assertEquals("req-1", first.getString("request_id"))
         assertTrue(first.getJSONObject("payload").getBoolean("validated"))
+        assertFalse(first.getJSONObject("payload").getBoolean("flow_metadata_opt_in"))
+        assertFalse(first.getJSONObject("payload").has("flows"))
         assertFalse(first.getJSONObject("payload").has("ssid"))
         assertFalse(first.getJSONObject("payload").has("latitude"))
         assertTrue(first.getString("request_id") != second.getString("request_id"))
@@ -105,6 +107,7 @@ class EnvironmentObservationTest {
         ).getJSONObject("payload")
         val jsonFlow = networkPayload.getJSONArray("flows").getJSONObject(0)
 
+        assertTrue(networkPayload.getBoolean("flow_metadata_opt_in"))
         assertEquals("tcp", jsonFlow.getString("protocol"))
         assertEquals("10.0.0.2", jsonFlow.getString("local_ip"))
         assertEquals(49152, jsonFlow.getInt("local_port"))
