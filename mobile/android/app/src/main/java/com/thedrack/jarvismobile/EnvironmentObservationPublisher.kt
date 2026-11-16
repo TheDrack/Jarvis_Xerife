@@ -53,7 +53,9 @@ object EnvironmentObservationPublisher {
             tailscaleAdapterReady = false,
             jarvisPacketEngineReady = false
         )
-        val capabilities = manager?.activeNetwork?.let(manager::getNetworkCapabilities)
+        val capabilities = if (manager != null) {
+            manager.activeNetwork?.let { activeNetwork -> manager.getNetworkCapabilities(activeNetwork) }
+        } else null
         val vpn = runtime.vpnTransportActive
         val type = when {
             vpn -> "vpn"
