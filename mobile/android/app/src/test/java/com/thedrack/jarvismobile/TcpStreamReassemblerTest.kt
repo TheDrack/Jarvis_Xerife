@@ -18,10 +18,10 @@ class TcpStreamReassemblerTest {
     fun buffersOutOfOrderSegmentUntilGapArrives() {
         val reassembler = TcpStreamReassembler()
 
-        assertArrayEquals("world".toByteArray(), reassembler.append(106L, "world".toByteArray()))
-        assertNull(reassembler.append(100L, "hello ".toByteArray()))
+        assertArrayEquals("hello ".toByteArray(), reassembler.append(100L, "hello ".toByteArray()))
+        assertNull(reassembler.append(111L, "world".toByteArray()))
         // The gap-filling segment makes both pieces contiguous.
-        assertArrayEquals("hello world", reassembler.snapshot())
+        assertArrayEquals("hello thereworld".toByteArray(), reassembler.append(106L, "there".toByteArray()))
     }
 
     @Test
@@ -45,7 +45,7 @@ class TcpStreamReassemblerTest {
     fun rejectsSegmentsOutsideConfiguredGapAndMemoryBounds() {
         val reassembler = TcpStreamReassembler(maxBytes = 8, maxGapBytes = 8)
 
-        assertNull(reassembler.append(100L, "a".toByteArray()))
+        assertArrayEquals("a".toByteArray(), reassembler.append(100L, "a".toByteArray()))
         assertNull(reassembler.append(200L, "b".toByteArray()))
         assertNotNull(reassembler.snapshot())
         assertArrayEquals("a".toByteArray(), reassembler.snapshot())
