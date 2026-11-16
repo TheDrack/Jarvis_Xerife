@@ -28,7 +28,7 @@ class JarvisVpnService : VpnService() {
     private val engineWatchdog = object : Runnable {
         override fun run() {
             if (stopping.get() || tun == null) return
-            if (engine?.isRunning() != true) {
+            if (engine?.isRunning() != true || socksProxy?.isRunning() != true) {
                 Log.e(TAG, "Hev worker exited; closing TUN to restore normal network routing")
                 stopTunnel()
                 return
