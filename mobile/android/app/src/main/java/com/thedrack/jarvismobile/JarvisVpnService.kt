@@ -51,6 +51,10 @@ class JarvisVpnService : VpnService() {
         try {
             startTunnel()
             return START_STICKY
+        } catch (error: LinkageError) {
+            Log.e(TAG, "Hev native library could not be loaded", error)
+            stopTunnel()
+            return START_NOT_STICKY
         } catch (error: Exception) {
             Log.e(TAG, "Jarvis VPN failed to start", error)
             stopTunnel()
@@ -80,7 +84,7 @@ class JarvisVpnService : VpnService() {
         val builder = Builder()
             .setSession("Jarvis Network Monitor")
             .setMtu(TUN_MTU)
-            .setBlocking(true)
+            .setBlocking(false)
             .addAddress(TUN_IPV4, 30)
             .addAddress(TUN_IPV6, 126)
             .addRoute("0.0.0.0", 0)
