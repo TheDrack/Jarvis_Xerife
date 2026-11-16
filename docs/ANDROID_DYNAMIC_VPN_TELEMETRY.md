@@ -12,7 +12,7 @@ The selected preference is stored locally in `jarvis_session.vpn_mode_preference
 
 ## Current implementation boundary
 
-The policy reports and observes VPN state; it does not yet automate starting/stopping VPN services on network transitions. The Presence screen's start/stop controls remain manual. The Tailscale telemetry adapter is not ready, so the stock Tailscale client continues to use the existing aggregate `NetworkStatsManager` collector.
+The policy reports and observes VPN state; it does not yet automatically start Jarvis when an external VPN turns off. The Presence screen's start/stop controls remain manual. Selecting TAILSCALE explicitly stops an active Jarvis VPN so the user can activate Tailscale; selecting JARVIS permits a manual Android-mediated provider switch. The Tailscale telemetry adapter is not ready, so the stock Tailscale client continues to use the existing aggregate `NetworkStatsManager` collector.
 
 ## Implemented in this change
 
