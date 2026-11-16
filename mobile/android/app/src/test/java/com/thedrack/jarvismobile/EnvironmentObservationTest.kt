@@ -38,7 +38,7 @@ class EnvironmentObservationTest {
         val vpnSnapshot = snapshot.copy(
             vpnActive = true,
             vpnProvider = "external_unknown",
-            vpnCollectionMode = VpnCollectionMode.EXTERNAL_VPN_UNSUPPORTED.wireValue,
+            vpnCollectionMode = VpnCollectionMode.EXTERNAL_VPN_STATS.wireValue,
             vpnModePreference = VpnModePreference.AUTO.wireValue,
             tailscaleInstalled = true,
             vpnTransportActive = true
@@ -49,7 +49,7 @@ class EnvironmentObservationTest {
 
         assertTrue(payload.getBoolean("vpn_active"))
         assertEquals("external_unknown", payload.getString("vpn_provider"))
-        assertEquals("external_vpn_unsupported", payload.getString("vpn_collection_mode"))
+        assertEquals("external_vpn_stats", payload.getString("vpn_collection_mode"))
         assertEquals("auto", payload.getString("vpn_mode_preference"))
         assertTrue(payload.getBoolean("tailscale_installed"))
         assertTrue(payload.getBoolean("vpn_transport_active"))
