@@ -214,6 +214,15 @@ internal class FlowAttributionCollector(
         if (offset < 0 || length <= 0 || offset > rawPacket.size || length > rawPacket.size - offset) {
             return
         }
+        val isDns = packet.protocolNumber == 17 &&
+            (packet.sourcePort == 53 || packet.sourcePort == 5353 ||
+                packet.destinationPort == 53 || packet.destinationPort == 5353)
+        val isHttp = packet.protocolNumber == 6 &&
+            packet.sourcePort in HTTP_METADATA_PORTS ||
+            packet.protocolNumber == 6 && packet.destinationPort in HTTP_METADATA_PORTS
+        val isTlsRecord = packet.protocolNumber == 6 && length >= 5 &&
+            (rawPacket[offset].toInt() and 0xff) == 22
+        if (!isDns && !isHttp && !isTlsRecord) return
         val boundedLength = minOf(length, PassivePayloadInspector.MAX_INSPECTED_PAYLOAD_BYTES)
         if (boundedLength <= 0) return
         val payload = rawPacket.copyOfRange(offset, offset + boundedLength)
@@ -298,6 +307,7 @@ internal class FlowAttributionCollector(
         private const val TCP_RST = 0x04
         const val DEFAULT_SNAPSHOT_LIMIT = 25
         private const val MAX_PROTOCOL_OBSERVATIONS_PER_FLOW = 3
+        private val HTTP_METADATA_PORTS = setOf(80, 8000, 8080)
         private const val DEFAULT_MAX_FLOWS = 1_000
         private const val DEFAULT_MAX_AGE_MS = 10 * 60 * 1_000L
         private const val DEFAULT_IDLE_SESSION_MS = 60 * 1_000L
