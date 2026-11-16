@@ -80,6 +80,51 @@ class EnvironmentObservationTest {
     }
 
     @Test
+    fun networkPayloadPublishesFlowTupleUidAndCountersWithoutPacketContents() {
+        val flow = NetworkFlowSnapshot(
+            flowId = "f68e4d54-2a93-4b52-bf6e-0f7f1ac30d20",
+            protocol = "tcp",
+            localIp = "10.0.0.2",
+            localPort = 49152,
+            remoteIp = "1.1.1.1",
+            remotePort = 443,
+            uid = 10123,
+            packageNames = listOf("com.example.app"),
+            appLabel = "Example",
+            attributionStatus = "resolved",
+            firstSeenAt = "2026-11-16T10:00:00Z",
+            lastSeenAt = "2026-11-16T10:00:02Z",
+            txPackets = 2,
+            txBytes = 120,
+            rxPackets = 3,
+            rxBytes = 180,
+            closed = false
+        )
+        val networkPayload = EnvironmentObservationPublisher.buildObservation(
+            "phone-1", snapshot.copy(flows = listOf(flow)), requestId = "req-flow"
+        ).getJSONObject("payload")
+        val jsonFlow = networkPayload.getJSONArray("flows").getJSONObject(0)
+
+        assertEquals("tcp", jsonFlow.getString("protocol"))
+        assertEquals("10.0.0.2", jsonFlow.getString("local_ip"))
+        assertEquals(49152, jsonFlow.getInt("local_port"))
+        assertEquals("1.1.1.1", jsonFlow.getString("remote_ip"))
+        assertEquals(443, jsonFlow.getInt("remote_port"))
+        assertEquals(10123, jsonFlow.getInt("uid"))
+        assertEquals("com.example.app", jsonFlow.getJSONArray("package_names").getString(0))
+        assertEquals("resolved", jsonFlow.getString("attribution_status"))
+        assertEquals(120L, jsonFlow.getLong("tx_bytes"))
+        assertEquals(180L, jsonFlow.getLong("rx_bytes"))
+        assertFalse(networkPayload.has("packet_payload"))
+        assertFalse(networkPayload.has("message_body"))
+
+        val presencePayload = EnvironmentObservationPublisher.buildObservation(
+            "phone-1", snapshot.copy(flows = listOf(flow)), observationType = "presence"
+        ).getJSONObject("payload")
+        assertFalse(presencePayload.has("flows"))
+    }
+
+    @Test
     fun locationPayloadIsSeparateAndOptIn() {
         val location = JSONObject().put("latitude", -27.5954).put("longitude", -48.5480)
             .put("accuracy_m", 18.0).put("captured_at", "2026-10-29T12:00:00Z").put("precision", "fine")
