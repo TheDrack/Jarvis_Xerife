@@ -305,6 +305,37 @@ class FlowAttributionCollectorTest {
         )
     }
 
+    @Test
+    fun revokingPayloadConsentDiscardsPartiallyReassembledHttpData() {
+        val collector = FlowAttributionCollector(
+            ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> 10001 },
+            packageResolver = PackageIdentityResolver { emptyList() },
+            clock = { 10_000L },
+            payloadMetadataEnabled = true
+        )
+        val request = "GET /private HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
+            .toByteArray(Charsets.US_ASCII)
+        val split = 19
+        val first = request.copyOfRange(0, split)
+        val second = request.copyOfRange(split, request.size)
+        val firstPacket = packet(
+            OUTBOUND,
+            sourcePort = 49152,
+            destinationPort = 80
+        ).copy(payloadOffset = 0, payloadLength = first.size, tcpSequenceNumber = 200L)
+        val secondPacket = firstPacket.copy(
+            payloadLength = second.size,
+            tcpSequenceNumber = 200L + first.size
+        )
+
+        collector.record(firstPacket, FlowPacketDirection.OUTBOUND, first)
+        collector.setPayloadMetadataEnabled(false)
+        collector.setPayloadMetadataEnabled(true)
+        collector.record(secondPacket, FlowPacketDirection.OUTBOUND, second)
+
+        assertTrue(collector.snapshot().single().protocolObservations.isEmpty())
+    }
+
     private fun packet(
         direction: Int,
         protocol: String = "tcp",
