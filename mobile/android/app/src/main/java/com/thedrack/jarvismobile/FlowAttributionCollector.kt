@@ -209,8 +209,12 @@ internal class FlowAttributionCollector(
             runCatching { packageResolver.resolve(uid).take(5) }.getOrDefault(emptyList())
         }
         flow.packageNames = identities.map { it.packageName }.distinct().take(5)
-        flow.appLabel = identities.firstOrNull()?.appLabel?.take(128)
-        flow.attributionStatus = if (flow.packageNames.isEmpty()) "uid_only" else "resolved"
+        flow.appLabel = if (flow.packageNames.size == 1) identities.firstOrNull()?.appLabel?.take(128) else null
+        flow.attributionStatus = when {
+            flow.packageNames.size > 1 -> "shared_uid"
+            flow.packageNames.size == 1 -> "resolved"
+            else -> "uid_only"
+        }
     }
 
     private fun prune(now: Long) {
