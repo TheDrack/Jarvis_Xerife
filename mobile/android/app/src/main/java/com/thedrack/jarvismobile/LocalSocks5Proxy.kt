@@ -166,7 +166,7 @@ internal class LocalSocks5Proxy(
             }
             val clientAddress = AtomicReference<InetSocketAddress?>(null)
             val buffer = ByteArray(MAX_UDP_PACKET)
-            while (running.get() && !control.isClosed && !relay.isClosed) {
+            while (running.get() && !relay.isClosed) {
                 val packet = DatagramPacket(buffer, buffer.size)
                 try {
                     relay.receive(packet)
@@ -186,7 +186,7 @@ internal class LocalSocks5Proxy(
                         relay.send(DatagramPacket(encoded, encoded.size, clientEndpoint))
                     }
                 } catch (error: SocketException) {
-                    if (running.get() && !control.isClosed) throw error
+                    if (running.get() && !relay.isClosed) throw error
                     break
                 } catch (_: Exception) {
                     // Drop one malformed or unreachable datagram without terminating the VPN.
