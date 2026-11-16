@@ -200,14 +200,16 @@ object EnvironmentObservationPublisher {
                         .put("rx_packets", flow.rxPackets)
                         .put("rx_bytes", flow.rxBytes)
                         .put("closed", flow.closed)
-                        .put("protocol_observations", JSONArray().apply {
-                            flow.protocolObservations.take(3).forEach { observation ->
-                                put(JSONObject()
-                                    .put("kind", observation.kind)
-                                    .put("value", observation.value)
-                                    .put("source", observation.source))
+                        .put("protocol_observations", if (snapshot.payloadMetadataEnabled) {
+                            JSONArray().apply {
+                                flow.protocolObservations.take(3).forEach { observation ->
+                                    put(JSONObject()
+                                        .put("kind", observation.kind)
+                                        .put("value", observation.value)
+                                        .put("source", observation.source))
+                                }
                             }
-                        }))
+                        } else JSONArray()))
                 }
             })
         }
