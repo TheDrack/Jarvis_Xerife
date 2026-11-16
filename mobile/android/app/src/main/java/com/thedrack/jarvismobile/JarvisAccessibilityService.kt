@@ -121,6 +121,7 @@ class JarvisAccessibilityService : AccessibilityService() {
                 .put("android_api", Build.VERSION.SDK_INT).put("screenshot_supported", Build.VERSION.SDK_INT >= 30)
         }
         if (method == "GET" && path == "/v1/snapshot") return onMain { snapshot() }
+        if (method == "GET" && path == "/v1/network/flows") return networkFlows()
         if (method == "GET" && path == "/v1/screenshot") return screenshot()
         if (method == "POST" && path == "/v1/action") return onMain { performAction(body) }
         return JSONObject().put("error", "not_found")
@@ -138,6 +139,99 @@ class JarvisAccessibilityService : AccessibilityService() {
         failure?.let { throw it }
         @Suppress("UNCHECKED_CAST")
         return value as T
+    }
+
+    private fun networkFlows(): JSONObject {
+        val preferences = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        val flowConsent = preferences.getBoolean("vpn_flow_sharing_enabled", false)
+        val payloadConsent = flowConsent &&
+            preferences.getBoolean("vpn_payload_metadata_enabled", false)
+        val runtime = VpnStateDetector.detect(
+            applicationContext,
+            jarvisVpnActive = JarvisVpnService.isRunning
+        )
+        val report = NetworkFlowSnapshotPayload.build(
+            runtime = runtime,
+            flowSharingEnabled = flowConsent,
+            payloadMetadataEnabled = payloadConsent,
+            flows = if (flowConsent) JarvisVpnService.currentFlows() else emptyList(),
+            packageVersion = { packageName ->
+                try {
+                    val info = if (Build.VERSION.SDK_INT >= 33) {
+                        packageManager.getPackageInfo(
+                            packageName,
+                            android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        packageManager.getPackageInfo(packageName, 0)
+                    }
+                    PackageVersionSnapshot(
+                        versionName = info.versionName.orEmpty(),
+                        versionCode = if (Build.VERSION.SDK_INT >= 28) {
+                            info.longVersionCode
+                        } else {
+                            @Suppress("DEPRECATION")
+                            info.versionCode.toLong()
+                        }
+                    )
+                } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+                    null
+                } catch (_: RuntimeException) {
+                    null
+                }
+            }
+        )
+        val flows = JSONArray().apply {
+            report.flows.forEach { entry ->
+                val flow = entry.flow
+                put(JSONObject()
+                    .put("flow_id", flow.flowId)
+                    .put("protocol", flow.protocol)
+                    .put("local_ip", flow.localIp)
+                    .put("local_port", flow.localPort)
+                    .put("remote_ip", flow.remoteIp)
+                    .put("remote_port", flow.remotePort)
+                    .put("uid", flow.uid ?: JSONObject.NULL)
+                    .put("package_names", JSONArray(flow.packageNames.take(2)))
+                    .put("app_label", flow.appLabel ?: JSONObject.NULL)
+                    .put("attribution_status", flow.attributionStatus)
+                    .put("first_seen_at", flow.firstSeenAt)
+                    .put("last_seen_at", flow.lastSeenAt)
+                    .put("tx_packets", flow.txPackets)
+                    .put("tx_bytes", flow.txBytes)
+                    .put("rx_packets", flow.rxPackets)
+                    .put("rx_bytes", flow.rxBytes)
+                    .put("closed", flow.closed)
+                    .put("package_versions", JSONArray().apply {
+                        entry.packageVersions.forEach { (packageName, version) ->
+                            put(JSONObject()
+                                .put("package_name", packageName)
+                                .put("version_name", version.versionName)
+                                .put("version_code", version.versionCode))
+                        }
+                    })
+                    .put("protocol_observations", JSONArray().apply {
+                        entry.protocolObservations.forEach { observation ->
+                            put(JSONObject()
+                                .put("kind", observation.kind)
+                                .put("value", observation.value)
+                                .put("source", observation.source))
+                        }
+                    }))
+            }
+        }
+        return JSONObject()
+            .put("available", true)
+            .put("vpn_transport_active", report.vpnTransportActive)
+            .put("jarvis_vpn_active", report.jarvisVpnActive)
+            .put("tailscale_installed", report.tailscaleInstalled)
+            .put("capture_owner", report.captureOwner)
+            .put("capture_reason", report.captureReason)
+            .put("flow_metadata_opt_in", report.flowMetadataOptIn)
+            .put("payload_metadata_opt_in", report.payloadMetadataOptIn)
+            .put("flow_count", flows.length())
+            .put("flows", flows)
     }
 
     private fun snapshot(): JSONObject {
