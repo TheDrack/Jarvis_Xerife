@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import android.widget.Toast
 import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -53,10 +54,16 @@ class JarvisVpnService : VpnService() {
             return START_STICKY
         } catch (error: LinkageError) {
             Log.e(TAG, "Hev native library could not be loaded", error)
+            Toast.makeText(this, "VPN Jarvis: biblioteca nativa indisponível.", Toast.LENGTH_LONG).show()
             stopTunnel()
             return START_NOT_STICKY
         } catch (error: Exception) {
             Log.e(TAG, "Jarvis VPN failed to start", error)
+            Toast.makeText(
+                this,
+                "VPN Jarvis não iniciou: " + (error.message ?: error.javaClass.simpleName),
+                Toast.LENGTH_LONG
+            ).show()
             stopTunnel()
             return START_NOT_STICKY
         }
