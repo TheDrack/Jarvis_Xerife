@@ -286,6 +286,7 @@ class JarvisVpnService : VpnService() {
 
         internal fun updateFlowMetadataConsent(enabled: Boolean): Boolean {
             val collector = activeFlowCollector ?: return false
+            if (!enabled) collector.setPayloadMetadataEnabled(false)
             collector.setEnabled(enabled)
             return true
         }
