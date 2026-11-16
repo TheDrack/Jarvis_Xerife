@@ -30,7 +30,7 @@ This change does **not** start a Jarvis `VpnService` or claim packet-level inspe
 
 This is intentional: after `VpnService.Builder.establish()`, the app receives a TUN file descriptor containing IP packets. A production implementation must process and forward those packets through a complete userspace network stack/tun-to-socket engine, protect its own upstream sockets from VPN recursion, preserve TCP/UDP/DNS/IPv4/IPv6 behavior, and shut down safely on `onRevoke()`. Establishing a TUN interface without forwarding would break the phone's connectivity.
 
-Likewise, collecting flows from the existing Tailscale tunnel requires instrumentation inside the Tailscale Android client (or a supported exported telemetry API). A second ordinary Android app cannot read Tailscale's TUN file descriptor. The upstream client source is available at https://github.com/tailscale/tailscale-android.
+Likewise, collecting flows from the existing Tailscale tunnel requires instrumentation inside the Tailscale Android client (or a supported exported telemetry API). A second ordinary Android app cannot read Tailscale's TUN file descriptor. The inspected upstream `IPNReceiver` exposes connect/disconnect broadcast actions for external control, not a flow-telemetry contract; those actions cannot provide packet attribution or counters. See https://github.com/tailscale/tailscale-android/blob/main/android/src/main/java/com/tailscale/ipn/IPNReceiver.java. The upstream client source is available at https://github.com/tailscale/tailscale-android.
 
 ## Next implementation phase
 
