@@ -101,7 +101,7 @@ class EnvironmentObservationTest {
             closed = false
         )
         val networkPayload = EnvironmentObservationPublisher.buildObservation(
-            "phone-1", snapshot.copy(flows = listOf(flow)), requestId = "req-flow"
+            "phone-1", snapshot.copy(flowMetadataEnabled = true, flows = listOf(flow)), requestId = "req-flow"
         ).getJSONObject("payload")
         val jsonFlow = networkPayload.getJSONArray("flows").getJSONObject(0)
 
@@ -119,7 +119,7 @@ class EnvironmentObservationTest {
         assertFalse(networkPayload.has("message_body"))
 
         val presencePayload = EnvironmentObservationPublisher.buildObservation(
-            "phone-1", snapshot.copy(flows = listOf(flow)), observationType = "presence"
+            "phone-1", snapshot.copy(flowMetadataEnabled = true, flows = listOf(flow)), observationType = "presence"
         ).getJSONObject("payload")
         assertFalse(presencePayload.has("flows"))
     }
