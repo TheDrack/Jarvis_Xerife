@@ -17,6 +17,7 @@ import java.net.SocketException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -34,6 +35,7 @@ internal class LocalSocks5Proxy(
 ) : AutoCloseable {
     private val running = AtomicBoolean(false)
     private val workers: ExecutorService = Executors.newCachedThreadPool()
+    private val clientSlots = Semaphore(MAX_CLIENT_SESSIONS)
     private var server: ServerSocket? = null
     private val udpSockets = ConcurrentHashMap.newKeySet<DatagramSocket>()
     private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
@@ -51,9 +53,24 @@ internal class LocalSocks5Proxy(
                 while (running.get()) {
                     try {
                         val client = server?.accept() ?: break
+                        if (!clientSlots.tryAcquire()) {
+                            client.close()
+                            continue
+                        }
                         clientSockets.add(client)
-                        workers.execute {
-                            try { handleClient(client) } finally { clientSockets.remove(client) }
+                        try {
+                            workers.execute {
+                                try { handleClient(client) }
+                                finally {
+                                    clientSockets.remove(client)
+                                    clientSlots.release()
+                                }
+                            }
+                        } catch (error: Exception) {
+                            clientSockets.remove(client)
+                            clientSlots.release()
+                            runCatching { client.close() }
+                            if (running.get()) Log.w(TAG, "SOCKS5 worker rejected", error)
                         }
                     } catch (error: SocketException) {
                         if (running.get()) Log.w(TAG, "SOCKS5 accept failed", error)
@@ -275,7 +292,8 @@ internal class LocalSocks5Proxy(
         private const val REP_COMMAND_UNSUPPORTED = 7
         private const val REP_HOST_UNREACHABLE = 4
         private const val CONNECT_TIMEOUT_MS = 12_000
-        private const val CONTROL_TIMEOUT_MS = 30_000
+        private const val CONTROL_TIMEOUT_MS = 5_000
+        private const val MAX_CLIENT_SESSIONS = 32
         private const val MAX_UDP_PACKET = 65_507
         private const val STREAM_BUFFER_SIZE = 32 * 1024
     }
