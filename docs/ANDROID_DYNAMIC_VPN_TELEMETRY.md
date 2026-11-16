@@ -4,11 +4,15 @@
 
 Use one active Android VPN at a time while selecting the telemetry source dynamically:
 
-- **AUTO** (default): observe the active VPN; prefer a verified Tailscale adapter when available; otherwise use the Jarvis VPN engine only when no external VPN is active.
-- **JARVIS**: prefer the Jarvis VPN engine, but never silently replace an already active external VPN.
-- **TAILSCALE**: wait for Tailscale; do not start the Jarvis VPN.
+- **AUTO** (default): detect an external VPN and keep aggregate per-UID statistics rather than automatically replacing it. Jarvis VPN startup remains a manual action in this implementation.
+- **JARVIS**: allow the user to manually start the Jarvis VPN. Android owns the provider switch and may revoke the currently active VPN.
+- **TAILSCALE**: do not start the Jarvis VPN; report that an external VPN is expected. Android's public transport API does not identify the owning package.
 
 The selected preference is stored locally in `jarvis_session.vpn_mode_preference`.
+
+## Current implementation boundary
+
+The policy reports and observes VPN state; it does not yet automate starting/stopping VPN services on network transitions. The Presence screen's start/stop controls remain manual. The Tailscale telemetry adapter is not ready, so the stock Tailscale client continues to use the existing aggregate `NetworkStatsManager` collector.
 
 ## Implemented in this change
 
