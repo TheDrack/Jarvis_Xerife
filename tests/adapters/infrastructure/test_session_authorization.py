@@ -4,7 +4,6 @@ import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
-
 from app.adapters.infrastructure.session_authorization import (
     MAX_PAIRING_ATTEMPTS,
     SessionAuthorizationError,
@@ -16,14 +15,18 @@ def _clock():
     return datetime(2026, 11, 13, 12, 0, tzinfo=timezone.utc)
 
 
-def test_create_session_persists_only_pairing_digest_and_returns_high_entropy_code(tmp_path):
+def test_create_session_persists_only_pairing_digest_and_returns_high_entropy_code(
+    tmp_path,
+):
     gateway = SessionAuthorizationGateway(tmp_path / "session.json", clock=_clock)
 
     created = gateway.create_session(profile="developer", ttl_minutes=30)
     persisted = json.loads((tmp_path / "session.json").read_text(encoding="utf-8"))
 
     assert len(created["pairing_code"]) >= 40
-    assert created["pairing_code"] not in (tmp_path / "session.json").read_text(encoding="utf-8")
+    assert created["pairing_code"] not in (tmp_path / "session.json").read_text(
+        encoding="utf-8"
+    )
     assert persisted["secret_sha256"]
     assert persisted["secret_sha256"] != created["pairing_code"]
     assert "host.command.git_read" in created["capabilities"]
@@ -54,12 +57,14 @@ def test_wrong_pairing_code_is_rate_limited_and_never_authenticates(tmp_path):
     assert gateway.status()["status"] == "pairing_locked"
 
 
-def test_expired_session_is_denied(tmp_path):
+def test_authenticated_session_expires_after_idle_lease(tmp_path):
     now = [_clock()]
-    gateway = SessionAuthorizationGateway(tmp_path / "session.json", clock=lambda: now[0])
+    gateway = SessionAuthorizationGateway(
+        tmp_path / "session.json", clock=lambda: now[0]
+    )
     created = gateway.create_session(ttl_minutes=5)
     gateway.authenticate(created["pairing_code"])
-    now[0] += timedelta(minutes=6)
+    now[0] += timedelta(hours=24, minutes=1)
 
     with pytest.raises(SessionAuthorizationError, match="expired"):
         gateway.require("host.fs.list")
@@ -132,3 +137,87 @@ def test_termux_developer_profile_grants_only_android_shell_capability(tmp_path)
     assert gateway.require("android.shell.exec")["profile"] == "termux_developer"
     with pytest.raises(SessionAuthorizationError, match="lacks capability"):
         gateway.require("host.fs.read")
+
+
+def test_authenticated_session_survives_gateway_restart(tmp_path):
+    path = tmp_path / "session.json"
+    issuer = SessionAuthorizationGateway(path, clock=_clock)
+    created = issuer.create_session(profile="termux_developer", ttl_minutes=5)
+    issuer.authenticate(created["pairing_code"])
+
+    restarted_gateway = SessionAuthorizationGateway(path, clock=_clock)
+
+    authorization = restarted_gateway.require("android.shell.exec")
+
+    assert authorization["session_id"] == created["session_id"]
+    assert restarted_gateway.status()["authenticated"] is True
+
+
+def test_authenticated_session_renews_idle_expiration_on_each_authorized_operation(
+    tmp_path,
+):
+    now = [_clock()]
+    path = tmp_path / "session.json"
+    gateway = SessionAuthorizationGateway(path, clock=lambda: now[0])
+    created = gateway.create_session(profile="termux_developer", ttl_minutes=5)
+    gateway.authenticate(created["pairing_code"])
+    now[0] += timedelta(minutes=4)
+
+    gateway.require("android.shell.exec")
+
+    state = json.loads(path.read_text(encoding="utf-8"))
+    renewed_expiry = datetime.fromisoformat(state["expires_at"])
+    assert datetime.fromisoformat(state["last_activity_at"]) == now[0]
+    assert renewed_expiry > now[0] + timedelta(hours=23)
+
+
+def test_authenticated_session_expires_only_after_idle_timeout_without_activity(
+    tmp_path,
+):
+    now = [_clock()]
+    path = tmp_path / "session.json"
+    gateway = SessionAuthorizationGateway(path, clock=lambda: now[0])
+    created = gateway.create_session(profile="termux_developer", ttl_minutes=5)
+    gateway.authenticate(created["pairing_code"])
+    now[0] += timedelta(hours=24, minutes=1)
+
+    with pytest.raises(SessionAuthorizationError, match="expired"):
+        gateway.require("android.shell.exec")
+
+
+def test_legacy_authenticated_session_without_activity_field_is_upgraded_on_use(
+    tmp_path,
+):
+    path = tmp_path / "session.json"
+    gateway = SessionAuthorizationGateway(path, clock=_clock)
+    created = gateway.create_session(profile="termux_developer", ttl_minutes=30)
+    gateway.authenticate(created["pairing_code"])
+
+    legacy_state = json.loads(path.read_text(encoding="utf-8"))
+    legacy_state.pop("last_activity_at")
+    legacy_state["expires_at"] = (
+        datetime.fromisoformat(legacy_state["created_at"]) + timedelta(minutes=30)
+    ).isoformat()
+    path.write_text(json.dumps(legacy_state), encoding="utf-8")
+
+    restarted_gateway = SessionAuthorizationGateway(path, clock=_clock)
+    authorization = restarted_gateway.require("android.shell.exec")
+    upgraded_state = json.loads(path.read_text(encoding="utf-8"))
+
+    assert authorization["session_id"] == created["session_id"]
+    assert upgraded_state["last_activity_at"] == _clock().isoformat()
+    assert datetime.fromisoformat(upgraded_state["expires_at"]) > _clock() + timedelta(
+        hours=23
+    )
+
+
+def test_termux_communication_profile_grants_only_chatgpt_prompt_capability(tmp_path):
+    gateway = SessionAuthorizationGateway(tmp_path / "session.json", clock=_clock)
+    created = gateway.create_session(profile="termux_communication")
+    gateway.authenticate(created["pairing_code"])
+
+    authorization = gateway.require("communication.chatgpt.prompt")
+
+    assert authorization["profile"] == "termux_communication"
+    with pytest.raises(SessionAuthorizationError, match="lacks capability"):
+        gateway.require("android.shell.exec")

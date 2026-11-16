@@ -1,6 +1,11 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -Eeuo pipefail
 
+# runit forwards stdout to svlogd; merge stderr so startup failures are observable.
+exec 2>&1
+
+PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"
+
 CONFIG_DIR="$HOME/.config/jarvis/android-mcp"
 ENV_FILE="$CONFIG_DIR/server.env"
 APP_ROOT="$HOME/.local/opt/jarvis-android-mcp"
@@ -36,6 +41,16 @@ export PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}"
 export JARVIS_ANDROID_MCP_HOST="$MCP_HOST"
 export JARVIS_ANDROID_MCP_PORT="$MCP_PORT"
 export JARVIS_ANDROID_SHELL_ENABLED="${JARVIS_ANDROID_SHELL_ENABLED:-0}"
+
+# Termux Python may not export its C-API symbols to abi3 extensions by default.
+# Preload the matching shared interpreter library before importing cryptography.
+PYTHON_VERSION="$("$PYTHON" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+PYTHON_SHARED_LIBRARY="$PREFIX/lib/libpython${PYTHON_VERSION}.so"
+if [ -r "$PYTHON_SHARED_LIBRARY" ]; then
+  export LD_PRELOAD="$PYTHON_SHARED_LIBRARY${LD_PRELOAD:+:$LD_PRELOAD}"
+else
+  echo "$LOG_PREFIX aviso: biblioteca compartilhada do Python não encontrada: $PYTHON_SHARED_LIBRARY" >&2
+fi
 
 echo "$LOG_PREFIX iniciando Streamable HTTP em $MCP_HOST:$MCP_PORT"
 exec "$PYTHON" -m app.adapters.edge.jarvis_android_mcp

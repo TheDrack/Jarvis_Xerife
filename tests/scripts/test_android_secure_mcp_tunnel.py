@@ -1,10 +1,9 @@
-from pathlib import Path
 import os
 import shutil
 import subprocess
 import tempfile
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 INSTALLER = ROOT / "scripts" / "android" / "install_secure_mcp_tunnel.sh"
@@ -28,16 +27,22 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
 
     def test_installer_uses_single_backslash_for_shell_line_continuations(self):
         source = INSTALLER.read_text(encoding="utf-8")
-        self.assertNotIn("\\\\\n", source, "Shell continuations must use exactly one trailing backslash.")
+        self.assertNotIn(
+            "\\\\\n",
+            source,
+            "Shell continuations must use exactly one trailing backslash.",
+        )
 
     def test_installer_provisions_isolated_android_mcp_runtime_and_service(self):
         source = INSTALLER.read_text(encoding="utf-8")
         self.assertIn("python -m venv --without-pip", source)
         self.assertIn("python-pip", source)
         self.assertIn('python -m pip --python "$MCP_VENV/bin/python" install', source)
-        self.assertNotIn('install --upgrade pip', source)
+        self.assertNotIn("install --upgrade pip", source)
         self.assertIn('"$MCP_VENV/bin/python" -c', source)
         self.assertIn("mcp>=1.30.0,<2", source)
+        self.assertIn("python-jose[cryptography]>=3.3.0", source)
+        self.assertIn("import mcp, uvicorn, jose, cryptography", source)
         self.assertIn("scripts/android/service/mcp-run", source)
         self.assertIn('MCP_SERVICE_NAME="jarvis-android-mcp"', source)
         self.assertIn("MCP_HOST=127.0.0.1", source)
@@ -68,7 +73,9 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         )
 
         bash = shutil.which("bash")
-        self.assertIsNotNone(bash, "A real Bash executable is required for runtime-key loading tests.")
+        self.assertIsNotNone(
+            bash, "A real Bash executable is required for runtime-key loading tests."
+        )
         with tempfile.TemporaryDirectory() as temporary_directory:
             secret_file = Path(temporary_directory) / "runtime-key"
             secret_file.write_bytes(b"x" * 165)
@@ -103,6 +110,20 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertIn('exec "$PYTHON" -m app.adapters.edge.jarvis_android_mcp', source)
         self.assertNotIn("eval ", source)
 
+    def test_android_mcp_service_captures_stderr_in_runit_log(self):
+        source = MCP_SERVICE.read_text(encoding="utf-8")
+        self.assertIn("exec 2>&1", source)
+
+    def test_android_mcp_service_preloads_termux_python_for_cryptography(self):
+        source = MCP_SERVICE.read_text(encoding="utf-8")
+        self.assertIn('PREFIX="${PREFIX:-/data/data/com.termux/files/usr}"', source)
+        self.assertIn('PYTHON_VERSION="$("$PYTHON" -c', source)
+        self.assertIn(
+            'PYTHON_SHARED_LIBRARY="$PREFIX/lib/libpython${PYTHON_VERSION}.so"', source
+        )
+        self.assertIn("export LD_PRELOAD=", source)
+        self.assertIn("$PYTHON_SHARED_LIBRARY", source)
+
     def test_mcp_server_exposes_streamable_http_and_read_only_tools(self):
         source = MCP_SERVER.read_text(encoding="utf-8")
         self.assertIn("FastMCP(", source)
@@ -110,26 +131,54 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
         self.assertIn("mcp.streamable_http_app()", source)
         self.assertIn('Mount("/",', source)
         self.assertIn('"127.0.0.1"', source)
-        for tool in ("android_device_status", "android_battery_status", "android_wifi_status"):
+        for tool in (
+            "android_device_status",
+            "android_battery_status",
+            "android_wifi_status",
+        ):
             self.assertIn(tool, source)
 
-
-    def test_termux_shell_opt_in_script_updates_private_config_and_restarts_service(self):
+    def test_termux_shell_opt_in_script_updates_private_config_and_restarts_service(
+        self,
+    ):
         source = SHELL_CONFIGURER.read_text(encoding="utf-8")
-        self.assertIn('enable) VALUE=1 ;;', source)
-        self.assertIn('disable) VALUE=0 ;;', source)
+        self.assertIn("enable) VALUE=1 ;;", source)
+        self.assertIn("disable) VALUE=0 ;;", source)
         self.assertIn('chmod 600 "$TEMP_FILE"', source)
         self.assertIn('sv restart "$SERVICE_LINK"', source)
         self.assertNotIn("pairing_code", source)
         mcp_source = MCP_SERVICE.read_text(encoding="utf-8")
-        self.assertIn('export JARVIS_ANDROID_SHELL_ENABLED="${JARVIS_ANDROID_SHELL_ENABLED:-0}"', mcp_source)
+        self.assertIn(
+            'export JARVIS_ANDROID_SHELL_ENABLED="${JARVIS_ANDROID_SHELL_ENABLED:-0}"',
+            mcp_source,
+        )
 
     def test_android_mcp_registers_termux_shell_session_tools(self):
         source = MCP_SERVER.read_text(encoding="utf-8")
         self.assertIn("register_termux_shell_tools(mcp)", source)
-        shell_module = (ROOT / "app" / "adapters" / "infrastructure" / "termux_shell_mcp_tools.py").read_text(encoding="utf-8")
+        shell_module = (
+            ROOT / "app" / "adapters" / "infrastructure" / "termux_shell_mcp_tools.py"
+        ).read_text(encoding="utf-8")
         self.assertIn("android_shell_exec", shell_module)
         self.assertIn("JARVIS_ANDROID_SHELL_ENABLED", shell_module)
+
+    def test_android_mcp_registers_chatgpt_stateless_prompt_channel(self):
+        source = MCP_SERVER.read_text(encoding="utf-8")
+        self.assertIn(
+            "communication_registry = create_default_communication_registry()", source
+        )
+        self.assertIn(
+            "register_chatgpt_plan_tools(mcp, registry=communication_registry)", source
+        )
+        provider_module = (
+            ROOT / "app" / "adapters" / "edge" / "chatgpt_plan_mcp_tools.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('PROMPT_TOOL_NAME = "chatgpt_plan_prompt"', provider_module)
+        self.assertIn("ChatGPTPlanClient", provider_module)
+        runtime_module = (
+            ROOT / "app" / "adapters" / "infrastructure" / "chatgpt_plan_runtime.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"store": False', runtime_module)
 
     def test_shell_scripts_parse_without_syntax_errors(self):
         bash = shutil.which("bash")
@@ -141,17 +190,42 @@ class AndroidTunnelPackagingTests(unittest.TestCase):
                 if git_bash.is_file():
                     bash = str(git_bash)
 
-        self.assertIsNotNone(bash, "A real Bash executable is required for shell syntax checks.")
-        version = subprocess.run([bash, "--version"], capture_output=True, text=True, check=False)
-        self.assertEqual(version.returncode, 0, msg=f"Selected Bash executable is not runnable: {bash}\\nstdout: {version.stdout}\\nstderr: {version.stderr}")
-        self.assertIn("GNU bash", version.stdout, msg=f"Unexpected Bash executable: {bash}")
+        self.assertIsNotNone(
+            bash, "A real Bash executable is required for shell syntax checks."
+        )
+        version = subprocess.run(
+            [bash, "--version"], capture_output=True, text=True, check=False
+        )
+        self.assertEqual(
+            version.returncode,
+            0,
+            msg=f"Selected Bash executable is not runnable: {bash}\\nstdout: {version.stdout}\\nstderr: {version.stderr}",
+        )
+        self.assertIn(
+            "GNU bash", version.stdout, msg=f"Unexpected Bash executable: {bash}"
+        )
 
-        for path in (INSTALLER, CONFIGURER, SHELL_CONFIGURER, SERVICE, LOG_SERVICE, MCP_SERVICE, MCP_LOG_SERVICE):
+        for path in (
+            INSTALLER,
+            CONFIGURER,
+            SHELL_CONFIGURER,
+            SERVICE,
+            LOG_SERVICE,
+            MCP_SERVICE,
+            MCP_LOG_SERVICE,
+        ):
             result = subprocess.run(
-                [bash, "-n"], input=path.read_text(encoding="utf-8"),
-                capture_output=True, text=True, check=False,
+                [bash, "-n"],
+                input=path.read_text(encoding="utf-8"),
+                capture_output=True,
+                text=True,
+                check=False,
             )
-            self.assertEqual(result.returncode, 0, msg=f"{path}: bash={bash}\\nstdout: {result.stdout}\\nstderr: {result.stderr}")
+            self.assertEqual(
+                result.returncode,
+                0,
+                msg=f"{path}: bash={bash}\\nstdout: {result.stdout}\\nstderr: {result.stderr}",
+            )
 
 
 if __name__ == "__main__":

@@ -5,7 +5,6 @@ import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
-
 from app.application.security.capability_authorizer import (
     CapabilityAuthorizer as LegacyCapabilityAuthorizer,
 )
@@ -151,16 +150,20 @@ def test_registry_rejects_duplicate_tool_ids(registry):
 
 
 def test_registry_indexes_capabilities(registry):
-    assert [
-        item.tool_id for item in registry.find_by_capability("sample.read")
-    ] == ["sample.read"]
+    assert [item.tool_id for item in registry.find_by_capability("sample.read")] == [
+        "sample.read"
+    ]
 
 
 def test_dispatch_validates_schema_before_resolving_adapter(registry):
     resolver_calls = []
+
+    def record_resolver_call(adapter_id):
+        resolver_calls.append(adapter_id)
+
     dispatcher = ToolDispatcher(
         registry,
-        resolver=lambda adapter_id: resolver_calls.append(adapter_id),
+        resolver=record_resolver_call,
         authorizer=CapabilityAuthorizer(
             allowlist={"sample_adapter"}, require_confirmation_for=set()
         ),
@@ -305,6 +308,7 @@ def test_process_idempotency_is_scoped_to_authenticated_principal(registry):
     assert second.success is True
     assert calls == ["same-payload", "same-payload"]
 
+
 def test_process_idempotency_isolated_by_tool_version_and_capability(registry):
     calls = []
 
@@ -421,13 +425,10 @@ def test_registry_loads_checked_in_manifests():
         "intelligence.events.eonet",
         "intelligence.events.earthquakes",
         "intelligence.snapshot.collect",
+        "communication.chatgpt_plan.send_prompt",
     }
-    assert (
-        registry.get("telegram.send_message").requires_idempotency_key is True
-    )
-    assert (
-        registry.get("drive.upload_backup").operation == "upload_backup_scoped"
-    )
+    assert registry.get("telegram.send_message").requires_idempotency_key is True
+    assert registry.get("drive.upload_backup").operation == "upload_backup_scoped"
 
 
 def test_legacy_authorizer_requires_confirmation_for_explicitly_allowlisted_drive():
@@ -435,9 +436,7 @@ def test_legacy_authorizer_requires_confirmation_for_explicitly_allowlisted_driv
     with pytest.raises(PermissionError, match="confirma"):
         authorizer.authorize("agent", "drive_uploader", {})
     assert (
-        authorizer.authorize(
-            "agent", "drive_uploader", {"human_confirmed": True}
-        )
+        authorizer.authorize("agent", "drive_uploader", {"human_confirmed": True})
         is True
     )
 
@@ -697,9 +696,7 @@ def test_concurrent_duplicate_is_reported_in_progress(registry):
         "idempotency_key": "concurrent-key",
     }
     first_result = []
-    worker = Thread(
-        target=lambda: first_result.append(dispatcher.dispatch(request))
-    )
+    worker = Thread(target=lambda: first_result.append(dispatcher.dispatch(request)))
     worker.start()
     assert started.wait(timeout=2)
 
@@ -714,9 +711,13 @@ def test_concurrent_duplicate_is_reported_in_progress(registry):
 
 def test_dispatch_rejects_scope_outside_manifest_allowlist(registry):
     resolver_calls = []
+
+    def record_resolver_call(adapter_id):
+        resolver_calls.append(adapter_id)
+
     dispatcher = ToolDispatcher(
         registry,
-        resolver=lambda adapter_id: resolver_calls.append(adapter_id),
+        resolver=record_resolver_call,
         authorizer=CapabilityAuthorizer(
             allowlist={"sample_adapter"}, require_confirmation_for=set()
         ),
@@ -773,9 +774,7 @@ def test_dispatch_validates_adapter_output_schema(registry):
 
 def test_registry_rejects_invalid_schema_version(tmp_path):
     path = tmp_path / "registry.json"
-    path.write_text(
-        json.dumps({"schema_version": "v1", "tools": []}), encoding="utf-8"
-    )
+    path.write_text(json.dumps({"schema_version": "v1", "tools": []}), encoding="utf-8")
 
     with pytest.raises(ValueError, match="schema_version"):
         ToolRegistry.from_file(path)
@@ -831,9 +830,7 @@ def test_local_rate_limit_returns_retry_after(registry):
 
 
 def test_read_only_timeout_is_retryable(registry):
-    read_tool = registry.get("sample.read").model_copy(
-        update={"timeout_seconds": 0.01}
-    )
+    read_tool = registry.get("sample.read").model_copy(update={"timeout_seconds": 0.01})
     limited_registry = ToolRegistry([read_tool])
 
     class SlowAdapter:

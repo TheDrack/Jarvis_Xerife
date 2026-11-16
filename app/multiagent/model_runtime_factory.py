@@ -2,9 +2,23 @@
 
 from __future__ import annotations
 
+from typing import Any, Protocol
+
 from app.multiagent.freellmapi_client import FreeLLMAPIClient
 from app.multiagent.freellmapi_handler import FreeLLMAgentHandler
-from app.multiagent.model_registry import ModelProfile, ModelRegistry, ModelRuntimeBindings
+from app.multiagent.model_registry import (
+    ModelProfile,
+    ModelRegistry,
+    ModelRuntimeBindings,
+)
+
+
+class ChatGPTPlanOAuthPort(Protocol):
+    """Minimal local OAuth contract required by the ChatGPT model factory."""
+
+    def load_valid_profile(self) -> dict[str, Any]: ...
+
+    def get_access_token(self) -> str: ...
 
 
 def create_registered_model_handler(
@@ -51,4 +65,65 @@ def create_registered_model_handler(
         runtime,
         max_tokens=max_tokens,
         temperature=temperature,
+    )
+
+
+def create_registered_chatgpt_plan_runtime(
+    oauth: ChatGPTPlanOAuthPort,
+    *,
+    model_id: str,
+) -> tuple[ModelProfile, ModelRuntimeBindings]:
+    """Create a provider-neutral runtime binding for a locally authorized SIWC profile.
+
+    The OAuth service refreshes credentials immediately before each invocation;
+    no access token is copied into model metadata or shared task records.
+    """
+    if not isinstance(model_id, str) or not model_id.strip():
+        raise ValueError("model_id must be a non-empty string")
+    from app.adapters.infrastructure.chatgpt_plan_runtime import (
+        PLAN_USAGE_SCOPE,
+        RESOURCE_INVOKE_SCOPE,
+        ChatGPTPlanClient,
+        ChatGPTPlanModelRuntimeAdapter,
+    )
+
+    credentials = oauth.load_valid_profile()
+    scopes = set(credentials.get("scopes", []))
+    if not {PLAN_USAGE_SCOPE, RESOURCE_INVOKE_SCOPE}.issubset(scopes):
+        raise ValueError("ChatGPT profile does not grant Responses API plan usage")
+    client = ChatGPTPlanClient(
+        access_token=credentials["access_token"],
+        model=model_id.strip(),
+    )
+    adapter = ChatGPTPlanModelRuntimeAdapter(
+        client, token_provider=oauth.get_access_token
+    )
+    profile = ModelProfile(
+        model_id=model_id.strip(),
+        provider_id="chatgpt_plan",
+        runtime_kind="remote_api",
+        capabilities=frozenset({"chat", "text_reasoning"}),
+        modalities=frozenset({"text"}),
+        metadata={"authentication": "sign_in_with_chatgpt", "billing": "chatgpt_plan"},
+    )
+    bindings = ModelRuntimeBindings({"chatgpt_plan": adapter})
+    return profile, bindings
+
+
+def create_registered_chatgpt_plan_handler(
+    oauth: ChatGPTPlanOAuthPort,
+    *,
+    model_id: str,
+    max_tokens: int = 1200,
+    temperature: float = 0.2,
+) -> FreeLLMAgentHandler:
+    """Create the existing bounded text-agent handler backed by ChatGPT plan usage.
+
+    This composes only a local runtime. It does not wire ChatGPT credentials into
+    the remote Supabase/Render worker processes.
+    """
+    profile, bindings = create_registered_chatgpt_plan_runtime(oauth, model_id=model_id)
+    runtime = bindings.resolve(profile)
+    return FreeLLMAgentHandler(
+        runtime, max_tokens=max_tokens, temperature=temperature, engine="chatgpt_plan"
     )

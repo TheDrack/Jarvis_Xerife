@@ -3,6 +3,7 @@
 The native APK owns Android UI automation. This Termux process only forwards
 authenticated MCP requests to the APK's loopback AccessibilityService endpoint.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -22,12 +23,19 @@ from app.adapters.edge.android_accessibility_client import (
 )
 from app.adapters.edge.android_host_status import (
     android_battery_status as read_battery_status,
+)
+from app.adapters.edge.android_host_status import (
     android_device_status as read_device_status,
+)
+from app.adapters.edge.android_host_status import (
     android_wifi_status as read_wifi_status,
 )
+from app.adapters.edge.chatgpt_plan_mcp_tools import register_chatgpt_plan_tools
+from app.adapters.edge.communication_mcp_tools import register_communication_tools
 from app.adapters.infrastructure.termux_shell_mcp_tools import (
     register_termux_shell_tools,
 )
+from app.communication import create_default_communication_registry
 
 mcp = FastMCP(
     "Jarvis Android",
@@ -80,7 +88,9 @@ def android_accessibility_screenshot() -> dict:
 
 
 @mcp.tool()
-def android_accessibility_action(action: str, parameters: dict[str, Any] | None = None) -> dict:
+def android_accessibility_action(
+    action: str, parameters: dict[str, Any] | None = None
+) -> dict:
     """Execute one allowlisted tap, swipe, semantic click, text entry, or global navigation action."""
     payload = build_accessibility_action(action, parameters)
     return accessibility_request("/v1/action", payload)
@@ -88,6 +98,9 @@ def android_accessibility_action(action: str, parameters: dict[str, Any] | None 
 
 # Session pairing controls are always available; arbitrary shell is locally opt-in.
 register_termux_shell_tools(mcp)
+communication_registry = create_default_communication_registry()
+register_communication_tools(mcp, communication_registry)
+register_chatgpt_plan_tools(mcp, registry=communication_registry)
 
 
 async def healthz(_request: Request) -> JSONResponse:
