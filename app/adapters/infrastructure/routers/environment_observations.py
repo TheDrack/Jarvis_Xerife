@@ -240,10 +240,18 @@ class EnvironmentObservationCreate(BaseModel):
                         raise ValueError("network flow attribution status is invalid")
                     if attribution_status in {"resolved", "shared_uid", "uid_only"} and uid is None:
                         raise ValueError("attributed network flow requires a UID")
-                    if attribution_status == "resolved" and len(package_names) != 1:
-                        raise ValueError("resolved network flow requires one package identity")
-                    if attribution_status == "shared_uid" and len(package_names) < 2:
-                        raise ValueError("shared-UID flow requires multiple package identities")
+                    if attribution_status == "resolved" and (
+                        len(package_names) != 1 or not app_label
+                    ):
+                        raise ValueError("resolved network flow requires one labeled package")
+                    if attribution_status == "shared_uid" and (
+                        len(package_names) < 2 or app_label is not None
+                    ):
+                        raise ValueError("shared-UID flow requires multiple packages and no single app label")
+                    if attribution_status in {"uid_only", "unresolved", "denied"} and (
+                        package_names or app_label is not None
+                    ):
+                        raise ValueError("unresolved or UID-only flow cannot claim package identity")
                     if attribution_status in {"unresolved", "denied"} and uid is not None:
                         raise ValueError("unresolved network flow cannot include a UID")
                     if not isinstance(flow.get("closed"), bool):
