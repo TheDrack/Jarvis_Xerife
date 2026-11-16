@@ -271,10 +271,23 @@ internal class LocalSocks5Proxy(
     ) {
         val upstream = Socket()
         try {
-            if (!vpnService.protect(upstream)) throw SocketException("VpnService.protect(TCP) failed")
+            val destinationAddresses = InetAddress.getAllByName(host)
+            val destinationIsLoopback = destinationAddresses.isNotEmpty() &&
+                destinationAddresses.all { it.isLoopbackAddress }
+
+            // Loopback traffic is local to this device and must remain reachable
+            // by the SOCKS self-test even when the VPN service protects external sockets.
+            if (!destinationIsLoopback && !vpnService.protect(upstream)) {
+                Log.e(TAG, "VpnService.protect(TCP) returned false for an external destination")
+                runCatching { writeReply(output, REP_GENERAL_FAILURE) }
+                runCatching { upstream.close() }
+                return
+            }
+
             upstream.tcpNoDelay = true
             upstream.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            Log.e(TAG, "SOCKS5 TCP upstream connection failed: ${error.javaClass.simpleName}")
             runCatching { writeReply(output, REP_HOST_UNREACHABLE) }
             runCatching { upstream.close() }
             return
