@@ -106,7 +106,7 @@ class PassivePayloadInspectorTest {
     private fun tlsClientHello(host: String): ByteArray {
         val hostname = host.toByteArray(Charsets.US_ASCII)
         val serverName = byteArrayOf(
-            0, (hostname.size + 5).toByte(),
+            0, (hostname.size + 3).toByte(),
             0, 0, hostname.size.toByte()
         ) + hostname
         val sniExtension = byteArrayOf(
