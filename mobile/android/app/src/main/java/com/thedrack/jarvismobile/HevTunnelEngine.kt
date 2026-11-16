@@ -7,6 +7,7 @@ import java.io.File
 internal class HevTunnelEngine(context: Context) {
     private val configFile = File(context.filesDir, "jarvis-hev-tunnel.yml")
 
+    @Synchronized
     fun start(tunFd: Int, username: String, password: String): Boolean {
         check(tunFd >= 0) { "Invalid TUN file descriptor" }
         require(username.matches(Regex("[0-9a-f]{48}")) && password.matches(Regex("[0-9a-f]{48}"))) {
@@ -20,6 +21,7 @@ internal class HevTunnelEngine(context: Context) {
         return TProxyService.TProxyIsRunning()
     }
 
+    @Synchronized
     fun stop(): Boolean {
         val stopped = TProxyService.TProxyStopService()
         configFile.delete()
@@ -28,6 +30,7 @@ internal class HevTunnelEngine(context: Context) {
 
     fun isRunning(): Boolean = TProxyService.TProxyIsRunning()
 
+    @Synchronized
     fun stats(): HevTunnelStats {
         val values = TProxyService.TProxyGetStats()
         return HevTunnelStats(
@@ -64,4 +67,8 @@ internal data class HevTunnelStats(
     val txBytes: Long,
     val rxPackets: Long,
     val rxBytes: Long
-)
+) {
+    companion object {
+        val ZERO = HevTunnelStats(0, 0, 0, 0)
+    }
+}
