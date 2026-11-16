@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 from app.adapters.edge.android_mcp_observability import MetadataObservabilityMiddleware
@@ -116,6 +117,10 @@ def test_middleware_disabled_by_default(monkeypatch, tmp_path):
     assert MetadataObservabilityMiddleware.from_environment(lambda *_: None) is None
 
 
+@pytest.mark.skipif(
+    os.name != "posix",
+    reason="POSIX mode-bit permissions are not enforced by Windows filesystems",
+)
 def test_log_file_is_created_with_owner_only_permissions(tmp_path):
     log_path = tmp_path / "observability.jsonl"
     middleware = MetadataObservabilityMiddleware(lambda *_: None, log_path=log_path)
