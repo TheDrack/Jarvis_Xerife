@@ -53,7 +53,7 @@ object IpPacketParser {
 
         val protocolNumber = packet[9].toInt() and 0xff
         val protocol = protocolName(protocolNumber) ?: return null
-        val transportHeaderLength = if (protocolNumber == IPPROTO_TCP) 20 else 8
+        val transportHeaderLength = if (protocolNumber == IPPROTO_TCP) 4 else 8
         if (headerLength + transportHeaderLength > totalLength) return null
 
         val source = packet.copyOfRange(12, 16)
@@ -66,7 +66,7 @@ object IpPacketParser {
             destinationAddress = InetAddress.getByAddress(destination),
             destinationPort = unsignedShort(packet, headerLength + 2),
             packetBytes = totalLength,
-            tcpFlags = if (protocolNumber == IPPROTO_TCP) packet[headerLength + 13].toInt() and 0xff else null
+            tcpFlags = if (protocolNumber == IPPROTO_TCP && headerLength + 14 <= totalLength) packet[headerLength + 13].toInt() and 0xff else null
         )
     }
 
@@ -112,7 +112,7 @@ object IpPacketParser {
         }
 
         val protocol = protocolName(nextHeader) ?: return null
-        val transportHeaderLength = if (nextHeader == IPPROTO_TCP) 20 else 8
+        val transportHeaderLength = if (nextHeader == IPPROTO_TCP) 4 else 8
         if (offset + transportHeaderLength > totalLength) return null
 
         val source = packet.copyOfRange(8, 24)
@@ -125,7 +125,7 @@ object IpPacketParser {
             destinationAddress = InetAddress.getByAddress(destination),
             destinationPort = unsignedShort(packet, offset + 2),
             packetBytes = totalLength,
-            tcpFlags = if (nextHeader == IPPROTO_TCP) packet[offset + 13].toInt() and 0xff else null
+            tcpFlags = if (nextHeader == IPPROTO_TCP && offset + 14 <= totalLength) packet[offset + 13].toInt() and 0xff else null
         )
     }
 
