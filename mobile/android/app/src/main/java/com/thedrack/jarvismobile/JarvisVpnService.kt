@@ -273,8 +273,10 @@ class JarvisVpnService : VpnService() {
                 .getOrDefault(emptyList())
         }
 
-        internal fun updateFlowMetadataConsent(enabled: Boolean) {
-            activeFlowCollector?.setEnabled(enabled)
+        internal fun updateFlowMetadataConsent(enabled: Boolean): Boolean {
+            val collector = activeFlowCollector ?: return false
+            collector.setEnabled(enabled)
+            return true
         }
 
         const val ACTION_START = "com.thedrack.jarvismobile.vpn.START"
