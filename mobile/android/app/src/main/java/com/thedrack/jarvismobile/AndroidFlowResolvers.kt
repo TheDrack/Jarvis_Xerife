@@ -10,7 +10,10 @@ import java.net.InetSocketAddress
 
 /** Android adapter for the VPN-owner-only 5-tuple -> UID API (API 29+). */
 @RequiresApi(Build.VERSION_CODES.Q)
-internal fun createAndroidFlowAttributionCollector(context: Context): FlowAttributionCollector {
+internal fun createAndroidFlowAttributionCollector(
+    context: Context,
+    payloadMetadataEnabled: Boolean = false
+): FlowAttributionCollector {
     val connectivity = context.getSystemService(ConnectivityManager::class.java)
         ?: error("ConnectivityManager is unavailable")
     val packageManager = context.packageManager
@@ -56,5 +59,9 @@ internal fun createAndroidFlowAttributionCollector(context: Context): FlowAttrib
         }
     }
 
-    return FlowAttributionCollector(ownerResolver, packageResolver)
+    return FlowAttributionCollector(
+        ownerResolver,
+        packageResolver,
+        payloadMetadataEnabled = payloadMetadataEnabled
+    )
 }
