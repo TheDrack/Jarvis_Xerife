@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Build
 import android.provider.Settings
 import android.speech.tts.TextToSpeech
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.compose.setContent
@@ -123,6 +124,21 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        handleVpnResumeIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleVpnResumeIntent(intent)
+    }
+
+    private fun handleVpnResumeIntent(intent: Intent?) {
+        if (intent?.action != ACTION_RESUME_JARVIS_VPN) return
+        intent.action = null
+        requestJarvisVpn { message ->
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onResume() {
@@ -183,6 +199,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startJarvisVpnService() {
+        getSharedPreferences("jarvis_session", MODE_PRIVATE).edit()
+            .putBoolean("vpn_external_handoff_active", false)
+            .putBoolean("vpn_resume_prompt_pending", false)
+            .apply()
         val intent = Intent(this, JarvisVpnService::class.java).setAction(JarvisVpnService.ACTION_START)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ContextCompat.startForegroundService(this, intent)
         else startService(intent)
@@ -426,6 +446,10 @@ class MainActivity : ComponentActivity() {
         voice.release()
         executor.shutdownNow()
         super.onDestroy()
+    }
+
+    companion object {
+        const val ACTION_RESUME_JARVIS_VPN = "com.thedrack.jarvismobile.vpn.RESUME_AFTER_EXTERNAL"
     }
 }
 

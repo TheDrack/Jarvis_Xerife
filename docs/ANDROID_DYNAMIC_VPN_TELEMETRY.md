@@ -10,9 +10,15 @@ Use one active Android VPN at a time while selecting the telemetry source dynami
 
 The selected preference is stored locally in `jarvis_session.vpn_mode_preference`.
 
-## Current implementation boundary
+## Dynamic handoff behavior
 
-The policy reports and observes VPN state; it does not yet automatically start Jarvis when an external VPN turns off. The Presence screen's start/stop controls remain manual. Selecting TAILSCALE explicitly stops an active Jarvis VPN so the user can activate Tailscale; selecting JARVIS permits a manual Android-mediated provider switch. The Tailscale telemetry adapter is not ready, so the stock Tailscale client continues to use the existing aggregate `NetworkStatsManager` collector.
+- When Jarvis owns the VPN slot and another VPN is activated, Android arbitrates the transition and revokes Jarvis through `VpnService.onRevoke()`. Jarvis closes its TUN, Hev worker, SOCKS proxy, and flow collector; it does not attempt to keep a competing tunnel alive.
+- While the Presence/Bridge foreground service is running, its `ConnectivityManager` callback detects the external VPN and keeps publishing environment observations. Collection switches to `external_vpn_stats`; app-level aggregate counters remain available through `NetworkStatsManager`.
+- When the external VPN disappears, Jarvis posts a notification offering to resume its own VPN. Tapping it opens `MainActivity`, which calls `VpnService.prepare()` and starts Jarvis only after any Android consent screen is completed.
+- The handoff state is persisted locally to avoid repeated notifications. Choosing TAILSCALE suppresses the offer to restart Jarvis.
+- The handoff monitor currently depends on the user-started Presence/Bridge service remaining alive. If Presence is stopped or Android terminates it, automatic detection/notification is unavailable until Presence runs again.
+
+This is intentionally not a silent VPN takeover. Android controls the exclusive VPN slot and may require a foreground user interaction to authorize Jarvis again. The Tailscale telemetry adapter is not ready, so the stock Tailscale client continues to use aggregate `NetworkStatsManager` counters rather than exposing its TUN flows to Jarvis.
 
 ## Implemented in this change
 
@@ -36,7 +42,7 @@ The service reuses the package filter: an empty filter routes all apps except Ja
 
 This is a **local forwarding/inspection VPN**, not a remote encrypted privacy VPN. Traffic exits directly through the current Wi-Fi/mobile network. Hev's interface-wide counters are published in `vpn_tunnel_stats`; the existing `NetworkStatsManager` remains the source of per-UID/package aggregate counters. With the separate `vpn_flow_sharing_enabled` opt-in, the Jarvis-owned VPN parses IPv4/IPv6 TCP/UDP headers at the TUN boundary and calls `ConnectivityManager.getConnectionOwnerUid()` to associate supported 5-tuples with Android UIDs. Packet payloads are forwarded to Hev but are not included in telemetry or persisted by Jarvis. This path is unavailable while another VPN owns the tunnel and still requires physical-device validation; keep the toggle default-off. The in-memory flow cache is bounded and expires after ten minutes. The API's five-minute `expires_at` is currently a freshness marker, not proof that historical database rows are deleted; durable retention/erasure remains a separate policy gap.
 
-The service is manual opt-in in this phase. AUTO does not start or replace a VPN in the background. Physical-device tests are still required for real connectivity, DNS, IPv4/IPv6, TCP/UDP, handover, process death, and revocation before automatic switching is enabled. See [ANDROID_JARVIS_VPNSERVICE.md](ANDROID_JARVIS_VPNSERVICE.md).
+The service is user-authorized. AUTO never silently replaces an external VPN; the OS performs the handoff, and returning to Jarvis is initiated by a notification tap so Android can present consent if needed. Physical-device tests are still required for real connectivity, DNS, IPv4/IPv6, TCP/UDP, handover, process death, and revocation. See [ANDROID_JARVIS_VPNSERVICE.md](ANDROID_JARVIS_VPNSERVICE.md).
 
 ## Tailscale integration boundary
 

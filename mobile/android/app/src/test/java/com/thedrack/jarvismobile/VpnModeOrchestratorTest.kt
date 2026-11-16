@@ -157,4 +157,65 @@ class VpnModeOrchestratorTest {
         assertEquals(VpnCollectionMode.JARVIS_VPN, automatic.mode)
         assertEquals(VpnCollectionMode.WAITING_FOR_TAILSCALE, tailscalePreferred.mode)
     }
+
+    @Test
+    fun externalVpnTakesOwnershipAndJarvisMustReleaseItsTunnel() {
+        assertEquals(
+            VpnHandoffAction.USE_EXTERNAL_VPN,
+            VpnHandoffPolicy.decide(
+                externalVpnActive = true,
+                jarvisVpnActive = true,
+                externalVpnWasActive = false,
+                jarvisResumeAllowed = true
+            )
+        )
+    }
+
+    @Test
+    fun jarvisIsOfferedAgainOnlyAfterPreviouslyObservedExternalVpnDisappears() {
+        assertEquals(
+            VpnHandoffAction.PROMPT_JARVIS_RESUME,
+            VpnHandoffPolicy.decide(
+                externalVpnActive = false,
+                jarvisVpnActive = false,
+                externalVpnWasActive = true,
+                jarvisResumeAllowed = true
+            )
+        )
+        assertEquals(
+            VpnHandoffAction.WAIT_FOR_EXTERNAL_OR_USER,
+            VpnHandoffPolicy.decide(
+                externalVpnActive = false,
+                jarvisVpnActive = false,
+                externalVpnWasActive = false,
+                jarvisResumeAllowed = true
+            )
+        )
+    }
+
+    @Test
+    fun explicitTailscalePreferenceDoesNotOfferJarvisWhenExternalVpnStops() {
+        assertEquals(
+            VpnHandoffAction.WAIT_FOR_EXTERNAL_OR_USER,
+            VpnHandoffPolicy.decide(
+                externalVpnActive = false,
+                jarvisVpnActive = false,
+                externalVpnWasActive = true,
+                jarvisResumeAllowed = false
+            )
+        )
+    }
+
+    @Test
+    fun activeJarvisVpnClearsAnyPendingExternalHandoff() {
+        assertEquals(
+            VpnHandoffAction.KEEP_JARVIS,
+            VpnHandoffPolicy.decide(
+                externalVpnActive = false,
+                jarvisVpnActive = true,
+                externalVpnWasActive = true,
+                jarvisResumeAllowed = true
+            )
+        )
+    }
 }
