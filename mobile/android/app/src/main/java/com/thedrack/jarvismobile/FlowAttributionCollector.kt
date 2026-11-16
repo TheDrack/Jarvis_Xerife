@@ -78,11 +78,13 @@ internal class FlowAttributionCollector(
         var closed: Boolean = false
     )
 
+    @Volatile private var enabled = true
     private val flows = LinkedHashMap<FlowKey, MutableFlow>(16, 0.75f, true)
     private val packageCache = HashMap<Int, List<AppPackageIdentity>>()
 
     @Synchronized
     fun record(packet: ParsedIpPacket, direction: FlowPacketDirection) {
+        if (!enabled) return
         val outbound = direction == FlowPacketDirection.OUTBOUND
         val localAddress = if (outbound) packet.sourceAddress else packet.destinationAddress
         val localPort = if (outbound) packet.sourcePort else packet.destinationPort
@@ -133,6 +135,7 @@ internal class FlowAttributionCollector(
 
     @Synchronized
     fun snapshot(limit: Int = DEFAULT_SNAPSHOT_LIMIT): List<NetworkFlowSnapshot> {
+        if (!enabled) return emptyList()
         require(limit in 1..DEFAULT_SNAPSHOT_LIMIT)
         prune(clock())
         return flows.values
@@ -159,6 +162,12 @@ internal class FlowAttributionCollector(
                     closed = flow.closed
                 )
             }
+    }
+
+    @Synchronized
+    fun setEnabled(value: Boolean) {
+        enabled = value
+        if (!value) clear()
     }
 
     @Synchronized
