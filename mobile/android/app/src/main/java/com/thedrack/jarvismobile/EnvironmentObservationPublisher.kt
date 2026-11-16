@@ -42,7 +42,7 @@ object EnvironmentObservationPublisher {
         val preference = VpnModePreference.fromWireValue(
             preferences.getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
         )
-        val runtime = VpnStateDetector.detect(context)
+        val runtime = VpnStateDetector.detect(context, jarvisVpnActive = JarvisVpnService.isRunning)
         // Both engines remain false until their real packet-forwarding/instrumentation
         // adapters are shipped. Detection must never be mistaken for packet collection.
         val decision = VpnModeOrchestrator.decide(
