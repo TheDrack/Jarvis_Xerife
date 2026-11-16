@@ -160,10 +160,10 @@ object PassivePayloadInspector {
                 var valueStart = separator + 1
                 var valueEnd = lineEnd
                 while (valueStart < valueEnd &&
-                    (payload[valueStart] == ' '.code.toByte() || payload[valueStart] == '\\t'.code.toByte())
+                    (payload[valueStart] == ' '.code.toByte() || payload[valueStart] == '\t'.code.toByte())
                 ) valueStart++
                 while (valueEnd > valueStart &&
-                    (payload[valueEnd - 1] == ' '.code.toByte() || payload[valueEnd - 1] == '\\t'.code.toByte())
+                    (payload[valueEnd - 1] == ' '.code.toByte() || payload[valueEnd - 1] == '\t'.code.toByte())
                 ) valueEnd--
                 if (valueStart >= valueEnd) return null
                 hostHeader = payload.copyOfRange(valueStart, valueEnd)
