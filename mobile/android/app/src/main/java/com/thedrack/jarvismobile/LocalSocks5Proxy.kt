@@ -109,15 +109,19 @@ internal class LocalSocks5Proxy(
             if (!vpnService.protect(upstream)) throw SocketException("VpnService.protect(TCP) failed")
             upstream.tcpNoDelay = true
             upstream.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
-            writeReply(output, REP_SUCCEEDED)
-            client.soTimeout = 0
-            upstream.soTimeout = 0
+        } catch (_: Exception) {
+            runCatching { writeReply(output, REP_HOST_UNREACHABLE) }
+            runCatching { upstream.close() }
+            return
+        }
+
+        writeReply(output, REP_SUCCEEDED)
+        client.soTimeout = 0
+        upstream.soTimeout = 0
+        try {
             val down = workers.submit { copyStream(upstream.getInputStream(), client.getOutputStream()) }
             copyStream(client.getInputStream(), upstream.getOutputStream())
             down.cancel(true)
-        } catch (error: Exception) {
-            runCatching { writeReply(output, REP_HOST_UNREACHABLE) }
-            throw error
         } finally {
             runCatching { upstream.close() }
         }
