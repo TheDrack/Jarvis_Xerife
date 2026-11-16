@@ -4,7 +4,6 @@ from pathlib import Path
 
 import yaml
 
-
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "android-mobile-build.yml"
 
@@ -59,7 +58,19 @@ def test_release_build_checkout_does_not_persist_git_credentials():
     checkout = _checkout_step(workflow["jobs"]["build-release"])
 
     assert checkout["with"]["persist-credentials"] == "false"
-    assert checkout["with"]["ref"] == "${{ github.sha }}"
+    assert checkout["with"]["ref"] == "${{ github.event.pull_request.merge_commit_sha || github.sha }}"
+
+
+def test_release_build_runs_for_merged_pull_requests_only():
+    workflow = _workflow()
+    condition = workflow["jobs"]["build-release"]["if"]
+
+    assert "github.event_name == 'pull_request'" in condition
+    assert "github.event.action == 'closed'" in condition
+    assert "github.event.pull_request.merged == true" in condition
+    assert "github.event.pull_request.merge_commit_sha || github.sha" in str(
+        _checkout_step(workflow["jobs"]["build-release"])
+    )
 
 
 def test_publisher_only_downloads_artifact_and_uses_scoped_write_token():
@@ -95,3 +106,4 @@ def test_pull_request_still_runs_the_debug_build():
 
     assert "pull_request" in workflow["on"]
     assert "mobile/android/**" in str(workflow["on"]["pull_request"])
+    assert "closed" in workflow["on"]["pull_request"]["types"]
