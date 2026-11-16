@@ -618,6 +618,18 @@ def test_network_payload_metadata_requires_separate_mobile_opt_in():
             )
         )
 
+    invalid_kind = {"kind": [], "value": "api.example.com", "source": "dns"}
+    with pytest.raises(ValueError, match="protocol observation kind/source"):
+        module.EnvironmentObservationCreate(
+            **dict(
+                body,
+                payload={
+                    **body["payload"],
+                    "flows": [{**flow, "protocol_observations": [invalid_kind]}],
+                },
+            )
+        )
+
     with pytest.raises(ValueError, match="payload metadata is only valid"):
         module.EnvironmentObservationCreate(
             **dict(body, source_device_type="desktop")
