@@ -1,3 +1,7 @@
+import java.io.File
+import java.net.URL
+import java.security.MessageDigest
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -52,13 +56,13 @@ val downloadHevAar = tasks.register("downloadHevAar") {
     inputs.property("hevAarSha256", hevAarSha256)
     doLast {
         fun sha256(file: java.io.File): String =
-            java.security.MessageDigest.getInstance("SHA-256")
-                .digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+            MessageDigest.getInstance("SHA-256")
+                .digest(file.readBytes()).joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
 
         aar.parentFile.mkdirs()
         if (!aar.isFile || sha256(aar) != hevAarSha256) {
-            val temporary = java.io.File(aar.parentFile, aar.name + ".part")
-            val url = java.net.URL(
+            val temporary = File(aar.parentFile, aar.name + ".part")
+            val url = URL(
                 "https://github.com/heiher/hev-socks5-tunnel/releases/download/2.20.0/hev-socks5-tunnel.aar"
             )
             val connection = url.openConnection().apply {
