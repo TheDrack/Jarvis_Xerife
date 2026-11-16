@@ -7,6 +7,13 @@ import org.junit.Test
 
 class VpnModeOrchestratorTest {
     @Test
+    fun externalVpnIsReportedOnlyWhenAnotherVpnOwnsTheTransport() {
+        assertFalse(VpnRuntimeState(false, true, false).externalVpnActive)
+        assertTrue(VpnRuntimeState(true, true, false).externalVpnActive)
+        assertFalse(VpnRuntimeState(true, true, true).externalVpnActive)
+    }
+
+    @Test
     fun autoUsesTailscaleAdapterWhenExternalVpnAndTailscaleArePresent() {
         val decision = VpnModeOrchestrator.decide(
             preference = VpnModePreference.AUTO,
