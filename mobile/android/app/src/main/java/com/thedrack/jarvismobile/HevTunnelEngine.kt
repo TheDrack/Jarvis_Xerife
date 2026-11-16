@@ -6,6 +6,7 @@ import java.io.File
 
 internal class HevTunnelEngine(context: Context) {
     private val configFile = File(context.filesDir, "jarvis-hev-tunnel.yml")
+    private var nativeStartReturned = false
 
     @Synchronized
     fun start(tunFd: Int, username: String, password: String): Boolean {
@@ -15,6 +16,7 @@ internal class HevTunnelEngine(context: Context) {
         }
         configFile.writeText(config(username, password), Charsets.UTF_8)
         val started = TProxyService.TProxyStartService(configFile.absolutePath, tunFd)
+        nativeStartReturned = true
         if (!started) return false
         // JNI returns after creating the worker thread; allow its first poll cycle to fail fast on bad config.
         Thread.sleep(400)
@@ -23,9 +25,16 @@ internal class HevTunnelEngine(context: Context) {
 
     @Synchronized
     fun stop(): Boolean {
-        val stopped = TProxyService.TProxyStopService()
-        configFile.delete()
-        return stopped
+        if (!nativeStartReturned) {
+            configFile.delete()
+            return true
+        }
+        return try {
+            TProxyService.TProxyStopService()
+        } finally {
+            nativeStartReturned = false
+            configFile.delete()
+        }
     }
 
     fun isRunning(): Boolean = TProxyService.TProxyIsRunning()
