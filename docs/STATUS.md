@@ -684,3 +684,48 @@ A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user
 ### Atualização de sincronização — 2026-11-15
 
 O snapshot de 2026-11-14 acima preserva o estado observado naquela data. Após a revalidação e reconciliação das branches, as PRs #826 (integridade do Self Healing), #824 (Global HUD móvel) e #832 (estado de conexão Wi-Fi Android) foram integradas à `main`, respectivamente nos commits `f7c7843e50699e046ef0ca2d53194f0f74551c97`, `87bc717042885700d969b5eaedda8269bb8a15b8` e `c9d793838aeae5b697dc6cbdbc6adbc510655eb4`. A PR #825 permanece em atualização para incorporar a `main` resultante; sua evidência C0 continua sem declarar os critérios como concluídos.
+
+
+### Revalidação incremental — 2026-11-16 — main `734fe70fc40db73db40dd12b86119bf2da2b3dd7`
+
+#### Reconciliação do snapshot anterior
+
+- A afirmação do snapshot de 2026-11-15 de que a PR #825 permanecia em atualização foi supersedida. A PR [#825](https://github.com/TheDrack/Jarvis_Xerife/pull/825) foi integrada em 2026-11-16 às 01:11:23 UTC, merge commit `5d5ba13fba16054e4a84ff3e0c46ecd39e50de98`.
+- O merge adiciona o gate que impede conclusão baseada apenas em nomes/documentação; **não conclui** `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` nem `C0-NO-NAME-BASED-COMPLETION`. Os três IDs permanecem `pending`.
+- `data/roadmap_missions.json` continua com `missions: []` e `hold_reason: C0 remains open`. Não existe alvo de geração autônoma aprovado.
+
+#### Evidência adicional de consumidores — Graphify
+
+O índice Graphify consultado estava no commit `2a70e72`; a ponta atual de `main` é `734fe70`, cujo único arquivo alterado foi `ARCHITECTURE.md`. Portanto, o grafo de código consultado corresponde ao código da ponta atual, embora o snapshot do grafo seja anterior.
+
+- `CognitiveRouter.execute()`: caller estrito localizado somente em teste unitário. `run_pipeline()` é chamado pelo CLI e por testes; não foi localizado consumer de aplicação para o pipeline `jarvis_chat`.
+- `CuriosityEngine.execute()` e `StrategistService.execute()`: nenhum caller estrito localizado. Não confundir `CuriosityEngine` com `CuriosityIntake`.
+- `TaskRunner.execute_plan()`: chamado pelo próprio `TaskRunner.execute()` e por testes; nenhum composition root de aplicação foi localizado. `ToolDispatcher.dispatch()` tem callers estritos em testes, sem consumer de aplicação identificado.
+- `CostTrackerAdapter.log()`: caller localizado apenas dentro do próprio `CostTrackerAdapter.execute()`; o método `execute()` não tem caller estrito localizado. `LLMRouter.execute()` tem callers de teste, sem uso de runtime comprovado.
+- `IntelligenceCore.process()`: consumidores de aplicação identificados em `collect_live_intelligence()` e na coleta local de `jarvis_desktop_local.py`. Isso confirma integração de aplicação, não atividade de providers externos ou persistência real no Supabase.
+- `MqttHomeAdapter.execute()`: callers localizados somente em testes. O adaptador não tem consumo de aplicação comprovado.
+
+A ferramenta MCP de curiosidade foi consultada antes da captura e aceitou o registro `ab56c1cc462e01082e9f` para o achado de validação/retention da PR #841. Isso comprova a captura pelo endpoint MCP disponível nesta sessão, não persistência universal em todos os hosts.
+
+#### PR #841 — integração Android proposta, não integrada
+
+- A PR [#841](https://github.com/TheDrack/Jarvis_Xerife/pull/841) permanece aberta na branch `feat/android-vpn-flow-attribution`, head `5bc4bcf414f3d1888502e0f84f9a5d9092f01f16`. As alterações desta revalidação continuam somente nessa branch.
+- A validação de `EnvironmentObservationCreate` agora rejeita `flow_metadata_opt_in`/`flows` fora de observações `network_snapshot` de origem `mobile`. O teste de regressão cobre origem desktop e tipos `presence` e `app_usage_snapshot`.
+- No head exato, [JARVIS PR Validation](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316270) passou: **3.404 passed, 38 skipped, 8 warnings, 67% coverage**. [Jarvis Task Queue Tests](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316278) passou: **3.426 passed, 21 skipped, 181 warnings, 68% coverage**. [Android Mobile Build](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316397) passou no build/teste do APK debug; build e publicação release foram corretamente skipped fora de `main`.
+- A PR não tem review formal nem threads de revisão. O comentário do Codex informa que a tentativa anterior falhou por limite de uso no commit `c744ce5`; o Strix informa indisponibilidade por billing. Não há revisão independente concluída para o head atual. Não mesclar.
+- A relay AF_UNIX/Hev, a conectividade real, a atribuição de UID e a revogação em dispositivo físico Android continuam **não verificadas**. O toggle permanece default-off.
+
+#### Retenção e privacidade da telemetria de fluxo
+
+- `TTL_BY_TYPE["network_snapshot"]` é de cinco minutos, mas `expires_at` funciona como indicador de frescor: o caminho de resposta mantém o payload stale e não foi localizado job de limpeza/expurgo das linhas históricas.
+- A expiração de dez minutos do coletor Android é somente da memória local; não prova apagamento de observações já persistidas. Retenção/erasure no banco permanece uma lacuna aberta. Não afirmar que o TTL apaga dados.
+- Endpoints IP, portas, UID/pacote e timestamps são metadados sensíveis mesmo sem payload de rede. Manter opt-in explícito e coleta desabilitada por padrão.
+
+#### Self Healing, CI e governança
+
+- `homeostase.yml` permanece ativo e com escrita privilegiada isolada. Seu `workflow_run` aceita somente workflows confiáveis originados em `main`; o predicado exige `head_branch == main` e evento `push`, `schedule` ou `workflow_dispatch`. Ele não escuta JARVIS PR Validation nem Jarvis Task Queue Tests e não corrige automaticamente branches de PR.
+- `hourly_curiosity_audit.yml` executa auditoria/pytest read-only e publica artefatos; não é mecanismo de reparo de PR.
+- A API do GitHub continua retornando `main.protected == false`, sem required status checks enforced. A issue [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) permanece aberta. As issues [#723](https://github.com/TheDrack/Jarvis_Xerife/issues/723) e [#732](https://github.com/TheDrack/Jarvis_Xerife/issues/732) permanecem abertas para reconciliação de RPCs e histórico de migrações.
+- Nenhum workflow foi desativado; nenhum teste/cobertura foi reduzido; não houve alteração de segredo, DDL, produção, dispositivo, merge ou deploy nesta revalidação.
+
+**Próximo marco real:** os três critérios C0 continuam `pending`. Completar o mapa de composição/consumidores/contratos/testes/evidência operacional é o próximo trabalho. **C1 — World Model — permanece bloqueado** até o aceite formal de C0.
