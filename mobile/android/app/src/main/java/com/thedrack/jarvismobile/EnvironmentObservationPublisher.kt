@@ -32,6 +32,7 @@ data class MobileNetworkSnapshot(
     val vpnTxBytes: Long = 0,
     val vpnRxPackets: Long = 0,
     val vpnRxBytes: Long = 0,
+    val flowMetadataEnabled: Boolean = false,
     val flows: List<NetworkFlowSnapshot> = emptyList()
 )
 
@@ -50,7 +51,8 @@ object EnvironmentObservationPublisher {
         )
         val runtime = VpnStateDetector.detect(context, jarvisVpnActive = JarvisVpnService.isRunning)
         val tunnelStats = JarvisVpnService.currentStats()
-        val flows = JarvisVpnService.currentFlows()
+        val flowMetadataEnabled = preferences.getBoolean("vpn_flow_sharing_enabled", false)
+        val flows = if (flowMetadataEnabled) JarvisVpnService.currentFlows() else emptyList()
         // The Jarvis TUN engine is user-started only; AUTO never takes over a VPN in this phase.
         // Tailscale flow telemetry still requires an adapter inside the Tailscale client.
         val decision = VpnModeOrchestrator.decide(
@@ -87,6 +89,7 @@ object EnvironmentObservationPublisher {
             vpnTxBytes = tunnelStats.txBytes,
             vpnRxPackets = tunnelStats.rxPackets,
             vpnRxBytes = tunnelStats.rxBytes,
+            flowMetadataEnabled = flowMetadataEnabled,
             flows = flows
         )
     }
@@ -163,6 +166,7 @@ object EnvironmentObservationPublisher {
                 .put("vpn_mode_preference", snapshot.vpnModePreference)
                 .put("tailscale_installed", snapshot.tailscaleInstalled)
                 .put("vpn_transport_active", snapshot.vpnTransportActive)
+                .put("flow_metadata_opt_in", snapshot.flowMetadataEnabled)
                 .put("vpn_tunnel_stats", JSONObject()
                     .put("tx_packets", snapshot.vpnTxPackets)
                     .put("tx_bytes", snapshot.vpnTxBytes)
