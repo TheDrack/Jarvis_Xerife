@@ -29,6 +29,28 @@ class IpPacketParserTest {
     }
 
     @Test
+    fun attributesFirstIpv4TcpFragmentWhenOnlyPortsArePresent() {
+        val packet = ipv4Packet(
+            protocol = 6,
+            source = byteArrayOf(10, 0, 0, 2),
+            destination = byteArrayOf(1, 1, 1, 1),
+            sourcePort = 49152,
+            destinationPort = 443
+        ).copyOf(28).also {
+            it[2] = 0
+            it[3] = 28
+            it[6] = 0x20 // More fragments; this is still the first fragment.
+        }
+
+        val parsed = IpPacketParser.parse(packet)
+
+        assertNotNull(parsed)
+        assertEquals(49152, parsed!!.sourcePort)
+        assertEquals(443, parsed.destinationPort)
+        assertNull(parsed.tcpFlags)
+    }
+
+    @Test
     fun parsesIpv4UdpWithHeaderOptions() {
         val packet = ipv4Packet(
             protocol = 17,
