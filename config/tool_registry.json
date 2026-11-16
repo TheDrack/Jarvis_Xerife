@@ -467,6 +467,93 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+        "tool_id": "communication.chatgpt_plan.send_prompt",
+        "version": "1.0.0",
+        "description": "Envia um prompt ao provider ChatGPT autorizado na sessão local do Jarvis.",
+        "adapter_id": "openai.chatgpt_plan",
+        "operation": "send_prompt",
+        "provider": "OpenAI ChatGPT plan usage",
+        "origin": "first_party",
+        "capabilities": [
+            "communication.chatgpt.prompt"
+        ],
+        "permissions": [
+            "chatgpt.plan_usage"
+        ],
+        "allowed_scopes": [
+            "local"
+        ],
+        "execution_mode": "read_only",
+        "trust_level": "trusted",
+        "data_classification": "confidential",
+        "rate_limit": {
+            "requests": 10,
+            "window_seconds": 60
+        },
+        "timeout_seconds": 300,
+        "cost_units": 1,
+        "idempotency": "not_applicable",
+        "input_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100000
+                },
+                "model": {
+                    "type": [
+                        "string",
+                        "null"
+                    ],
+                    "minLength": 1
+                },
+                "timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 300
+                }
+            },
+            "required": [
+                "prompt"
+            ],
+            "additionalProperties": false
+        },
+        "output_schema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean",
+                    "const": true
+                },
+                "response": {
+                    "type": "string"
+                },
+                "model": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "usage": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "success",
+                "response",
+                "model",
+                "usage"
+            ],
+            "additionalProperties": false
+        }
     }
   ]
 }

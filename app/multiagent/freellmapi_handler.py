@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from app.application.ports.model_runtime import (
     ModelInvocationRequest,
     ModelMessage,
     ModelRuntime,
 )
+
 from .transport import AgentMessage
 
 
@@ -21,6 +23,7 @@ class FreeLLMAgentHandler:
         *,
         max_tokens: int = 1200,
         temperature: float = 0.2,
+        engine: str = "freellmapi",
     ) -> None:
         if not isinstance(runtime, ModelRuntime):
             raise TypeError("runtime must implement the ModelRuntime protocol")
@@ -28,9 +31,17 @@ class FreeLLMAgentHandler:
             raise ValueError("max_tokens must be between 1 and 8192")
         if not 0.0 <= temperature <= 2.0:
             raise ValueError("temperature must be between 0 and 2")
+        if not isinstance(engine, str) or not engine.strip():
+            raise ValueError("engine must be a non-empty string")
         self.runtime = runtime
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.engine = engine.strip().lower()
+
+    def close(self) -> None:
+        close_runtime = getattr(self.runtime, "close", None)
+        if callable(close_runtime):
+            close_runtime()
 
     def __call__(self, message: AgentMessage) -> Mapping[str, Any]:
         if message.kind != "request":
@@ -48,7 +59,8 @@ class FreeLLMAgentHandler:
             "You are a scoped Jarvis mini-agent. Perform text analysis only. "
             "You have no tool execution, browser, filesystem, or external-action access. "
             "Never claim you ran commands, inspected files, searched the web, or changed systems "
-            "unless that evidence is included in the supplied context. Be explicit about uncertainty. "
+            "unless that evidence is included in the supplied context. "
+            "Be explicit about uncertainty. "
             "Return a concise, useful result and follow the acceptance criteria."
         )
         user_parts = [
@@ -56,7 +68,9 @@ class FreeLLMAgentHandler:
             f"Objective:\n{objective.strip()}",
         ]
         if constraints:
-            user_parts.append("Constraints:\n" + "\n".join(f"- {item}" for item in constraints))
+            user_parts.append(
+                "Constraints:\n" + "\n".join(f"- {item}" for item in constraints)
+            )
         if acceptance:
             user_parts.append(
                 "Acceptance criteria:\n" + "\n".join(f"- {item}" for item in acceptance)
@@ -78,7 +92,7 @@ class FreeLLMAgentHandler:
         return {
             "success": True,
             "output": result.content,
-            "engine": "freellmapi",
+            "engine": self.engine,
             "provider": result.provider_id,
             "model": result.model_id,
             "routed_via": result.routed_via,

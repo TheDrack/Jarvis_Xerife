@@ -53,8 +53,8 @@ log "Preparando ambiente Python isolado para o servidor MCP Android..."
 # Keep pip outside the venv; use its --python option to install only the
 # application dependencies into the isolated interpreter.
 python -m venv --without-pip "$MCP_VENV"
-python -m pip --python "$MCP_VENV/bin/python" install 'mcp>=1.30.0,<2' 'uvicorn>=0.24.0,<1'
-"$MCP_VENV/bin/python" -c 'import mcp, uvicorn'
+python -m pip --python "$MCP_VENV/bin/python" install 'mcp>=1.30.0,<2' 'uvicorn>=0.24.0,<1' 'python-jose[cryptography]>=3.3.0'
+"$MCP_VENV/bin/python" -c 'import mcp, uvicorn, jose, cryptography'
 printf 'REPO_ROOT=%q\nMCP_HOST=127.0.0.1\nMCP_PORT=%q\n' "$REPO_ROOT" "$MCP_LOCAL_PORT" > "$MCP_ENV_FILE"
 chmod 600 "$MCP_ENV_FILE"
 

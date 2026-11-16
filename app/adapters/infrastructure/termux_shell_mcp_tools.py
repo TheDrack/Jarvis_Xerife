@@ -1,4 +1,5 @@
 """MCP registration for the session-gated Termux shell executor."""
+
 from __future__ import annotations
 
 import logging
@@ -26,7 +27,7 @@ def register_termux_shell_tools(mcp: Any) -> tuple[str, ...]:
 
     @mcp.tool(name="android_shell_session_authenticate")
     def android_shell_session_authenticate(pairing_code: str) -> dict[str, Any]:
-        """Consume the one-time local pairing code for a Termux developer session."""
+        """Consume a one-time local pairing code for an approved Termux session profile."""
         try:
             result = SESSION_GATEWAY.authenticate(pairing_code)
             audit_logged = termux_shell.audit_event(
@@ -61,7 +62,9 @@ def register_termux_shell_tools(mcp: Any) -> tuple[str, ...]:
 
     enabled = os.environ.get("JARVIS_ANDROID_SHELL_ENABLED", "").strip().casefold()
     if enabled not in {"1", "true", "yes", "on"}:
-        logger.info("Termux shell execution is disabled; pairing controls remain available")
+        logger.info(
+            "Termux shell execution is disabled; pairing controls remain available"
+        )
         return SESSION_TOOL_NAMES
 
     def _authorize() -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
