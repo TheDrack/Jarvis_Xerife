@@ -727,3 +727,13 @@ A captura MCP de curiosidade desta revalidação foi aceita com ID `ab56c1cc462e
 - Classificação: composition root e consumer da conversa identificados em source; CI/testes unitários existentes; runtime/provider e persistência efetiva não verificados. A lacuna de handoff deve ser resolvida somente após definir contrato de contexto, isolamento por usuário e tratamento de memória recuperada como dado não confiável.
 
 **Próximo experimento C0:** teste integrado sem rede, atravessando API autenticada → AssistantService → memória user-scoped → IntentProcessor → provider fake, verificando conteúdo, identidade, proveniência e ausência de dados de outro usuário. Não alterar o comportamento do prompt nem iniciar C2 antes de C0 e do contrato de memória.
+
+### Percepção Android — atribuição de fluxos VPN (PR #841) — 2026-11-16
+
+- A PR [#841](https://github.com/TheDrack/Jarvis_Xerife/pull/841) foi integrada em `main` no merge commit `1106bf3dd6ad35c943b79ff645c0f92e692e8201`. O código adiciona `FlowAttributionCollector`, `IpPacketParser`, `TunPacketRelay` e publicação por `EnvironmentObservationPublisher`.
+- Quando o usuário ativa explicitamente `vpn_flow_sharing_enabled` (default `false`), `JarvisVpnService` cria um relay AF_UNIX `SOCK_DGRAM` entre TUN e Hev; o relay preserva os datagramas encaminhados e o collector observa somente cabeçalhos IP/TCP/UDP, tuplas, UID, pacotes/bytes e timestamps. O collector não persiste nem publica corpos de pacote.
+- O backend `EnvironmentObservationCreate` aceita `flow_metadata_opt_in` e `flows` somente em observações `network_snapshot` de origem `mobile`; a lista é limitada e exige opt-in explícito. O toggle permanece default-off.
+- Testes unitários cobrem parser IPv4/IPv6, TCP/UDP, atribuição UID, shared UID, contadores, expiração e revogação. O CI do head da PR passou; isso não equivale a validação em dispositivo físico.
+- Limites: atribuição individual só existe enquanto o Jarvis VPN é a VPN ativa; o cliente Tailscale Android não expõe seu telemetry de fluxo para outro app, ficando a coleta agregada como fallback. O comportamento real de Hev sobre socketpair, UID mapping e revogação em dispositivo físico permanece **não verificado**.
+- Classificação: integração de percepção de rede implementada e testada em CI; runtime Android/Hev não validado. Ela fornece observações de fluxo, não um World Model, nem inspeção de payload, nem análise contínua de câmeras.
+
