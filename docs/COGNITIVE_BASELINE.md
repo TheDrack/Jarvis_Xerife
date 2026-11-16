@@ -1,7 +1,7 @@
 # Cognitive Baseline — Fase C0
 
 **Snapshot original:** `main` em `82ca2ac70f67e8418f62079f7d94e3fc8b4d1230` (pós-PR #774; histórico)
-**Última revalidação:** `main` em `152a7f87d213c158be7658371581b466fec78be0` (2026-11-13); código funcional no parent `7b6bcfa269390a17b844edc8d7e37cdf1e746f77`.
+**Última revalidação:** `main` em `d83c0b81898ab45de75f7583b3a7bf830dfcb88c` (2026-11-14), após o merge documental da PR #821; a auditoria funcional foi revalidada nesse SHA.
 **Auditoria original:** 2026-11-07
 **Estado atual:** parcial; C0 permanece aberto.
 **Escopo:** inspeção estática de código, consumidores, contratos, testes, migrations, workflows e documentação, complementada por probes remotos somente leitura. Não é confirmação de deploy completo, execução ponta a ponta ou comportamento de todos os providers.
@@ -440,13 +440,11 @@ A sessão do Jarvis Secure MCP Tunnel terminou durante a tentativa de continuar 
 - Self Healing V3 e JARVIS PR Validation continuam versionados na main, sem alteração nesta auditoria. Não houve merge, deploy, migration, alteração de secrets/flags ou operação de produção.
 
 
-### C0 finding — completion evidence is not yet bound to STATUS.md
+### C0 finding — completion evidence is not yet bound to STATUS.md (historical; superseded 2026-11-14)
 
-A read-only code audit of `RoadmapMissionSelector` found that it reads `docs/COGNITIVE_ROADMAP.md`, `data/roadmap_missions.json` and the legacy capability catalog, but **does not read `docs/STATUS.md`**. Dependency completion is currently determined solely by each manifest entry's `status == "complete"`.
+This finding describes the selector before PR #782 and is retained only as audit history. Its statement that the current selector does not read `docs/STATUS.md` is no longer valid: the implementation described in the following section is present on the current main.
 
-The manifest is empty, so this does not currently enable a candidate or cause a mutation. The workflow remains a safe no-op. Before any mission is marked `ready`, C0 must define a machine-checkable evidence contract that ties completed criterion IDs to the proven state in `docs/STATUS.md` (or an explicitly referenced evidence record that STATUS summarizes), and the selector must reject missing/stale evidence. Add an integration test against the real roadmap; the current selector unit-test fixture contains synthetic C0 IDs that are not declared in the production roadmap.
-
-This is a confirmed architecture gap, not a completed capability. It is the next selector hardening item before populating the mission manifest.
+The remaining limitation is narrower: the selector validates evidence shape and local path existence but does not independently query GitHub to authenticate the referenced commit or confirm the referenced Actions conclusion. Human review remains mandatory. PR #825 adds a regression test using the three production C0 IDs and the actual roadmap/STATUS files to verify that pending evidence cannot be promoted to `complete`.
 
 
 ### C0 completion-evidence gate — implementation in PR #782
@@ -459,7 +457,7 @@ This is a confirmed architecture gap, not a completed capability. It is the next
 - PR #782 remains open. This change is not a completed C0 capability until CI passes and the PR is reviewed/merged. C0 remains open; C1 remains unstarted.
 
 
-### Revalidação comportamental de percepção — main `ccaea371`
+### Revalidação comportamental de percepção — snapshot histórico main `ccaea371` (2026-11-09)
 
 - `collect_live_intelligence` executa Public Intelligence, OSIRIS e God's Eye em paralelo, preservando `SourceHealth` e sucesso parcial. `_collect_osiris` isola coleta de eventos e observações.
 - Consumidores encontrados: `intelligence_dashboard.py` (endpoint autenticado sob demanda), `jarvis_desktop_local.py` (endpoint local) e `IntelligenceRecurringWorker` (coleta/persistência recorrente quando ambas as flags estão habilitadas).
@@ -656,3 +654,28 @@ O snapshot read-only descrito no corpo da PR #789 registra: 30 migrations remota
 A leitura anterior que dizia que `CognitiveRouter.execute()` acessa diretamente `context["metadata"]` e poderia lançar `KeyError` estava incorreta para o HEAD auditado. Em `app/domain/gears/cognitive_router.py`, o método usa `context.setdefault("metadata", {})` e valida que o valor seja um dicionário. Quando o campo não é fornecido, ele é criado; não há `KeyError` nesse caminho.
 
 A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user_input=""` e classifica uma entrada vazia. O CLI de `app/runtime/pipeline_runner.py` chama `run_pipeline(p_name, global_strict=g_strict)` sem `inputs`. Não foi localizado consumidor de aplicação para `jarvis_chat`, nem teste integrado que prove entrada do usuário → CognitiveRouter → LlmEngine. Portanto, a classificação permanece **implementado, consumo de aplicação não verificado**; o risco é comportamento vazio/não útil no caminho CLI, não exceção de metadata. O teste `test_execute_initializes_missing_metadata` confirma somente a inicialização do dicionário.
+
+## Revalidação C0 — 2026-11-14 — main `d83c0b81898ab45de75f7583b3a7bf830dfcb88c`
+
+### Perception / Universal Intelligence
+
+- Graphify, indexado no mesmo SHA de `main`, confirma que `IntelligenceCore.process()` é chamado por `collect_live_intelligence()`; o core normaliza eventos/observações, deduplica identidades e produz correlações candidatas, sem declarar corroboration.
+- Consumidores de aplicação confirmados: `create_intelligence_dashboard_router()` expõe `POST /v1/intelligence/collect` autenticado; `jarvis_desktop_local.py` expõe a coleta local com token; `main.py::start_cloud_service()` chama `start_configured_intelligence_worker()`.
+- O worker recorrente é opt-in: `JARVIS_INTELLIGENCE_WORKER_ENABLED` e `JARVIS_INTELLIGENCE_HISTORY_ENABLED` precisam estar explicitamente em `true`, além do cliente Supabase server-admin estar disponível. O código retorna sem iniciar quando qualquer requisito falta. A configuração de runtime do Render não foi consultada nesta revalidação; não afirmar que o worker está ativo nem que as flags atuais estão desligadas.
+- `tests/adapters/infrastructure/test_intelligence_dashboard.py::test_authenticated_collection_endpoint_integrates_sources_core_and_report` percorre o endpoint autenticado com fontes controladas; a persistência está desabilitada nesse teste.
+- `tests/application/test_intelligence_worker_pipeline.py::test_real_collector_core_worker_and_history_adapter_form_one_pipeline` atravessa o coletor, o core, o worker recorrente e `SupabaseIntelligenceHistoryAdapter`. Usa fontes determinísticas e `RecordingSupabaseClient`, sem rede nem escrita real no Supabase. Verifica sucesso parcial, deduplicação, correlação candidata, upserts idempotentes, lease e registro da execução.
+- Portanto, há integração de aplicação comprovada com doubles, mas não há um único teste que atravesse simultaneamente o endpoint autenticado e a persistência; providers externos e Supabase real também não foram exercitados. Classificação: **REUSE_PARTIAL**, não capacidade operacional concluída.
+- `IntelligenceCore` continua sendo normalizador/correlator de eventos e observações; não substitui o World Model canônico de C1.
+
+### Evidence gate do Cognitive Roadmap
+
+- `RoadmapMissionSelector._load_status_evidence()` lê o ledger JSON em `docs/STATUS.md`; missões `complete` exigem estado `verified` e evidências de commit, Actions, implementação, consumidor e teste.
+- O ledger de produção mantém os três IDs C0 como `pending`. PR #825 adiciona teste parametrizado contra os arquivos reais de roadmap/STATUS para impedir que qualquer um desses IDs seja marcado `complete` sem evidência `verified`.
+- O parser não consulta GitHub para confirmar a conclusão real do run remoto; a aprovação/revisão humana continua obrigatória.
+- O roadmap contém IDs machine-readable para C0; os critérios C1 ainda não têm IDs `C1-*`. Não criar missão C1 nem iniciar o World Model antes do aceite formal de C0.
+
+### Integridade do Self Healing
+
+- `scripts/jarvis_healer.py` inclui arquivos de teste apontados por nodeids do pytest entre os alvos possíveis. Para esses arquivos, a instrução de produção que proíbe inserir código de teste não se aplica; o modelo pode devolver o arquivo completo e o healer pode escrevê-lo.
+- `homeostase.yml` inclui `tests` no staging e executa pytest após a cura, mas não foi localizado gate de diff que proíba apagar testes, remover assertions ou reduzir cobertura. Pytest verde, isoladamente, não prova preservação das assertions.
+- Isto é um risco de integridade confirmado no desenho, não evidência de que tenha ocorrido uma alteração maliciosa. O workflow foi preservado nesta auditoria. Próximo hardening: impedir mutação automática de arquivos de teste ou exigir validação independente do diff antes de publicação.

@@ -207,14 +207,19 @@ Só marcar como concluído quando os critérios de aceitação correspondentes t
 - A integração MCP de diagnóstico está comprovada em código e CI, mas ainda não foi executada no Windows do usuário; depende da restauração do Secure MCP Tunnel. Não inferir diagnóstico atual de disco/RAM a partir dos testes.
 
 
-### C0 blocker — selector completion status versus proven STATUS
+### C0 evidence gate — revalidação de 2026-11-14
 
-- Confirmed from `app/application/services/roadmap_mission_selector.py`: the selector validates criterion IDs against the roadmap, but reads no `docs/STATUS.md`. A dependency is treated as complete when its manifest entry says `status: complete`; no evidence pointer or STATUS corroboration is required.
-- `data/roadmap_missions.json` is currently empty, so the scheduled workflow remains a safe no-op. No LLM generation, Docker candidate execution or publication occurs.
-- Before a reviewed mission is marked ready, define and test a fail-closed evidence contract binding each completed criterion to the proven state in STATUS. Also add an integration test using the actual C0 criterion IDs from the production roadmap; the selector's current dependency tests use synthetic IDs in a fixture.
-- This is the next C0 hardening task. Do not populate the manifest or begin C1 until C0's capability map, behavioral baseline, evidence provenance and completion-state consistency are verified.
+**Correção de precisão:** a afirmação do registro de 2026-11-08 de que o selector não lia `docs/STATUS.md` está supersedida e não descreve o código atual em `main` (`d83c0b81898ab45de75f7583b3a7bf830dfcb88c`).
 
+- `RoadmapMissionSelector._load_status_evidence()` lê o bloco JSON delimitado em `docs/STATUS.md`, valida os IDs contra `docs/COGNITIVE_ROADMAP.md`, rejeita duplicatas/estados inválidos e exige cobertura dos critérios identificados no roadmap.
+- Quando o manifesto contém missões, `find_next_mission()` carrega esse ledger. Uma missão com `status: complete` só é aceita se o critério estiver `verified` no STATUS e as evidências incluírem o mesmo `target_file` e os testes declarados. Evidência `verified` exige URL de commit, URLs de Actions e caminhos existentes de implementação, consumidor e teste.
+- A saída antecipada para manifesto vazio continua sendo um no-op seguro; ela não consulta o ledger nem inicia LLM, Docker ou publicação.
+- Testes existentes cobrem evidência incompleta, divergência de target/test, cobertura de critérios, dependências de fase e o ledger real atualmente pendente. A nova regressão parametrizada usa os três IDs C0 do roadmap e uma cópia dos arquivos reais de roadmap/STATUS; cada tentativa de marcar um C0 como complete deve falhar com `mission_complete_without_status_evidence` enquanto o ledger real permanecer pending.
+- O roadmap atual contém IDs formais para os três critérios C0; os critérios de C1 ainda estão descritos em texto, sem IDs `C1-*`. Não criar missão C1 nem iniciar C1 antes de C0 ser aceito e dos critérios C1 serem formalizados.
+- O ledger real continua com `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` em `pending`. A correção do selector não conclui C0: o mapa completo de consumidores/runtime e a baseline comportamental integrada continuam pendentes.
+- `data/roadmap_missions.json` permanece com `missions: []`; nenhuma geração, execução candidata ou publicação é autorizada por esta atualização.
 
+**Próximo critério C0:** fechar o mapa de capacidades com entry points, consumidores, contratos, testes e nível de verificação, e completar a baseline comportamental integrada. C1 continua bloqueado.
 
 
 ## Auditoria recorrente — 2026-11-08 — revalidação da main
@@ -643,6 +648,20 @@ A leitura anterior que dizia que `CognitiveRouter.execute()` acessa diretamente 
 
 A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user_input=""` e classifica uma entrada vazia. O CLI de `app/runtime/pipeline_runner.py` chama `run_pipeline(p_name, global_strict=g_strict)` sem `inputs`. Não foi localizado consumidor de aplicação para `jarvis_chat`, nem teste integrado que prove entrada do usuário → CognitiveRouter → LlmEngine. Portanto, a classificação permanece **implementado, consumo de aplicação não verificado**; o risco é comportamento vazio/não útil no caminho CLI, não exceção de metadata. O teste `test_execute_initializes_missing_metadata` confirma somente a inicialização do dicionário.
 
+## Auditoria recorrente — 2026-11-14 — snapshot histórico de main e PRs
+
+**Main auditada:** `d83c0b81898ab45de75f7583b3a7bf830dfcb88c` (merge da PR #821). A PR #821 está merged; o ledger C0 permanece pending.
+
+- **PR aberta:** [#824 — mobile-ready Jarvis Global](https://github.com/TheDrack/Jarvis_Xerife/pull/824), branch `feat/jarvis-global-mobile-pwa`, head `b9b76492505077f9dfccbc164449a92a8bfbd24a`, base `d83c0b8`. PR Validation [43634334489](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43634334489) passou com **3.247 passed, 38 skipped, 8 warnings**; Task Queue [43634334493](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43634334493) passou com **3.271 passed, 19 skipped, 181 warnings**. Ambos executaram a suíte completa; não há review formal registrado. A validação é CI, não teste em dispositivo Android real.
+- **Falhas intermediárias da PR #824:** os heads anteriores `7012d409` falharam porque um teste procurava a declaração literal `padding-bottom:90px`, enquanto o CSS usava a forma equivalente `padding:6px 2px 90px`. A correção final tornou a asserção compatível com a declaração shorthand; o head atual passou. Classificação: incompatibilidade da asserção do teste com a sintaxe CSS, não falha reproduzida no layout. Nenhum teste válido foi removido.
+- **Branch protection:** `GET /branches/main` retornou `protected=false`, `protection.enabled=false` e enforcement de required checks `off`. A issue [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) permanece aberta. O conector não expõe a operação administrativa de proteção; nenhuma configuração foi alterada.
+- **Autoevolução:** run [43644405819](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43644405819) concluiu o gate, mas `EVOLUTION_ENABLED` estava vazio; geração/validação isolada e publicação ficaram skipped. O manifesto de missões continua vazio.
+- **Self Healing V3:** run [43644417471](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43644417471) concluiu skipped porque não houve gatilho elegível. `homeostase.yml` permanece preservado e restrito a falhas confiáveis originadas na `main`; não cobre diretamente falhas de PR Validation/Task Queue em branches de PR.
+- **Correção automática de PR:** `dispatch_auto_fix()` continua emitindo `repository_dispatch` com `event_type=auto_fix`; o inventário atual de workflows não contém listener correspondente. `auto_heal_ci_failure()` baixa e registra logs, mas não aplica patch nem atualiza a PR. A manutenção automática de PR permanece uma lacuna funcional; os workflows Self Healing/PR Validation não foram alterados nem substituídos.
+- **Perception / Universal Intelligence:** `collect_live_intelligence` tem consumidores no dashboard autenticado, desktop local e worker opt-in chamado por `main.py::start_cloud_service`. Há teste integrado coletor/core/worker/history adapter com fontes e cliente Supabase determinísticos; não há prova de providers externos ou persistência real nesta execução.
+- **Integridade do Self Healing:** `jarvis_healer.py` pode incluir arquivos de teste entre os alvos e reescrevê-los; `homeostase.yml` stages `tests` e não tem gate de diff que impeça remoção de assertions. É risco de desenho confirmado, não incidente observado. Nenhuma alteração foi feita no workflow.
+- Issues abertas: #682 (proteção de main), #723 (provider-aware task claims) e #732 (reconciliação de migrations). Nenhuma issue foi criada.
+- Nenhum merge, deploy manual, migration, alteração de secrets/flags ou escrita em produção foi executado nesta auditoria.
 
 ### Proteção de arquivos .frozen no Self Healing — 2026-11-15
 
@@ -660,3 +679,8 @@ A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user
 - Task Queue [run 43773108755](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43773108755): **success**, 3342 passed, 19 skipped, 181 warnings, 68% coverage; os testes focados da fila passaram (15 passed).
 - O merge ref de validação foi `3daf7136b6a1e61b3445eb7521a724c14e4fa7bd`, com a mensagem explícita de integração do head `2d67a2f` sobre a `main` `70c53b372bb970854efac6380b4fcc55cc0703bb`. Isso confirma que os dois workflows validaram a árvore combinada com a main observada nesta auditoria.
 - A PR #826 continua aberta e sem review formal. Os checks aprovados não autorizam merge automático; a revisão humana permanece obrigatória.
+
+
+### Atualização de sincronização — 2026-11-15
+
+O snapshot de 2026-11-14 acima preserva o estado observado naquela data. Após a revalidação e reconciliação das branches, as PRs #826 (integridade do Self Healing), #824 (Global HUD móvel) e #832 (estado de conexão Wi-Fi Android) foram integradas à `main`, respectivamente nos commits `f7c7843e50699e046ef0ca2d53194f0f74551c97`, `87bc717042885700d969b5eaedda8269bb8a15b8` e `c9d793838aeae5b697dc6cbdbc6adbc510655eb4`. A PR #825 permanece em atualização para incorporar a `main` resultante; sua evidência C0 continua sem declarar os critérios como concluídos.
