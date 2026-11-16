@@ -90,6 +90,33 @@ class FlowAttributionCollectorTest {
     }
 
     @Test
+    fun retriesTransientUidMissesOnLaterPackets() {
+        var now = 2_500L
+        var attempts = 0
+        val collector = FlowAttributionCollector(
+            ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ ->
+                attempts += 1
+                if (attempts == 1) -1 else 10022
+            },
+            packageResolver = PackageIdentityResolver {
+                listOf(AppPackageIdentity("com.example.retry", "Retry App", false))
+            },
+            clock = { now }
+        )
+
+        collector.record(packet(OUTBOUND, tcpFlags = 0x02), FlowPacketDirection.OUTBOUND)
+        assertNull(collector.snapshot().single().uid)
+
+        now += 300
+        collector.record(packet(OUTBOUND, tcpFlags = 0x10), FlowPacketDirection.OUTBOUND)
+
+        val flow = collector.snapshot().single()
+        assertEquals(2, attempts)
+        assertEquals(10022, flow.uid)
+        assertEquals("resolved", flow.attributionStatus)
+    }
+
+    @Test
     fun retransmittedSynKeepsSameFlowAndNewSynAfterResetCreatesNewFlow() {
         var now = 3_000L
         val collector = FlowAttributionCollector(
