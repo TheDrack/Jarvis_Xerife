@@ -822,6 +822,12 @@ private fun JarvisMobileScreen(
                                 vpnModePreference = VpnModePreference.TAILSCALE
                                 context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
                                     .edit().putString("vpn_mode_preference", vpnModePreference.wireValue).apply()
+                                if (JarvisVpnService.isRunning) {
+                                    onStopVpn()
+                                    message = "VPN Jarvis encerrando. Ative Tailscale para assumir o túnel."
+                                } else {
+                                    message = "Modo TAILSCALE selecionado. A coleta será agregada enquanto a VPN externa estiver ativa."
+                                }
                             },
                             enabled = vpnModePreference != VpnModePreference.TAILSCALE,
                             modifier = Modifier.weight(1f)
