@@ -72,7 +72,7 @@ def test_windows_directory_acl_is_explicitly_restricted_to_user_and_system(
             return subprocess.CompletedProcess(
                 command, 0, stdout=f'"{user_name}","{user_sid}"\n', stderr=""
             )
-        if "/grant:r" in command:
+        if "/reset" in command or "/grant:r" in command:
             return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
         return subprocess.CompletedProcess(
             command,
@@ -90,7 +90,8 @@ def test_windows_directory_acl_is_explicitly_restricted_to_user_and_system(
     permissions._set_windows_acl(directory, directory=True)
 
     apply_call = next(call for call in calls if "/grant:r" in call)
-    assert "/reset" in apply_call
+    reset_call = next(call for call in calls if "/reset" in call)
+    assert "/reset" in reset_call
     assert "/inheritance:r" in apply_call
     assert f"*{user_sid}:(OI)(CI)(F)" in apply_call
     assert "*S-1-5-18:(OI)(CI)(F)" in apply_call

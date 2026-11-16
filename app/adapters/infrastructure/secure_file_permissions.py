@@ -102,11 +102,24 @@ def _set_windows_acl(path: Path, *, directory: bool) -> None:
     user_ace = f"*{user_sid}:{inheritance}(F)"
     system_ace = f"*S-1-5-18:{inheritance}(F)"
     try:
+        reset = subprocess.run(
+            [executable, str(path), "/reset"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=10,
+            check=False,
+        )
+        if reset.returncode != 0:
+            detail = (reset.stderr or reset.stdout).strip().replace("\n", " ")[:240]
+            raise PermissionError(
+                f"Unable to reset Windows ACL (exit {reset.returncode}): {detail}"
+            )
         result = subprocess.run(
             [
                 executable,
                 str(path),
-                "/reset",
                 "/inheritance:r",
                 "/grant:r",
                 user_ace,
@@ -122,7 +135,10 @@ def _set_windows_acl(path: Path, *, directory: bool) -> None:
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise PermissionError("Unable to set private Windows ACL") from exc
     if result.returncode != 0:
-        raise PermissionError("Unable to set private Windows ACL")
+        detail = (result.stderr or result.stdout).strip().replace("\n", " ")[:240]
+        raise PermissionError(
+            f"Unable to set private Windows ACL (exit {result.returncode}): {detail}"
+        )
     _verify_windows_acl(path)
 
 
