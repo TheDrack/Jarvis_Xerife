@@ -133,6 +133,49 @@ class IpPacketParserTest {
         assertNull(IpPacketParser.parse(byteArrayOf(0x60)))
     }
 
+    @Test
+    fun exposesValidatedIpv4TcpAndUdpPayloadRanges() {
+        val tcp = ipv4Packet(
+            protocol = 6,
+            source = byteArrayOf(10, 0, 0, 2),
+            destination = byteArrayOf(1, 1, 1, 1),
+            sourcePort = 49152,
+            destinationPort = 443
+        )
+        val udp = ipv4Packet(
+            protocol = 17,
+            source = byteArrayOf(10, 0, 0, 2),
+            destination = byteArrayOf(8, 8, 8, 8),
+            sourcePort = 53000,
+            destinationPort = 53
+        )
+
+        val parsedTcp = IpPacketParser.parse(tcp)!!
+        val parsedUdp = IpPacketParser.parse(udp)!!
+
+        assertEquals(40, parsedTcp.payloadOffset)
+        assertEquals(4, parsedTcp.payloadLength)
+        assertEquals(28, parsedUdp.payloadOffset)
+        assertEquals(4, parsedUdp.payloadLength)
+    }
+
+    @Test
+    fun refusesPayloadRangeWhenTcpDataOffsetIsMalformed() {
+        val packet = ipv4Packet(
+            protocol = 6,
+            source = byteArrayOf(10, 0, 0, 2),
+            destination = byteArrayOf(1, 1, 1, 1),
+            sourcePort = 49152,
+            destinationPort = 443
+        ).also { it[32] = 0x40 }
+
+        val parsed = IpPacketParser.parse(packet)
+
+        assertNotNull(parsed)
+        assertNull(parsed!!.payloadOffset)
+        assertEquals(0, parsed.payloadLength)
+    }
+
     private fun ipv4Packet(
         protocol: Int,
         source: ByteArray,
@@ -159,6 +202,13 @@ class IpPacketParserTest {
         packet[headerLength + 1] = sourcePort.toByte()
         packet[headerLength + 2] = (destinationPort shr 8).toByte()
         packet[headerLength + 3] = destinationPort.toByte()
+        if (protocol == 6) {
+            packet[headerLength + 12] = 0x50 // TCP header length: 20 bytes.
+        } else {
+            val udpLength = 8 + payloadLength
+            packet[headerLength + 4] = (udpLength shr 8).toByte()
+            packet[headerLength + 5] = udpLength.toByte()
+        }
         return packet
     }
 
