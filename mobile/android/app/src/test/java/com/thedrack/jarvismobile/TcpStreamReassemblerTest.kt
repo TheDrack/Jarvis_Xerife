@@ -42,6 +42,16 @@ class TcpStreamReassemblerTest {
     }
 
     @Test
+    fun clearsAndPermanentlyRejectsStreamWhenContiguousMemoryCapIsExceeded() {
+        val reassembler = TcpStreamReassembler(maxBytes = 4)
+
+        assertArrayEquals("abc".toByteArray(), reassembler.append(1L, "abc".toByteArray()))
+        assertNull(reassembler.append(4L, "de".toByteArray()))
+        assertNull(reassembler.snapshot())
+        assertNull(reassembler.append(6L, "x".toByteArray()))
+    }
+
+    @Test
     fun rejectsSegmentsOutsideConfiguredGapAndMemoryBounds() {
         val reassembler = TcpStreamReassembler(maxBytes = 8, maxGapBytes = 8)
 
