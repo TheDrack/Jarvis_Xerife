@@ -98,7 +98,7 @@ class EnvironmentObservationCreate(BaseModel):
     @root_validator(skip_on_failure=True)
     def validate_location_consent(cls, values: dict[str, Any]) -> dict[str, Any]:
         payload = values.get("payload") or {}
-        if {"flow_metadata_opt_in", "flows"}.intersection(payload):
+        if {"flow_metadata_opt_in", "flows", "payload_metadata_opt_in"}.intersection(payload):
             if (
                 values.get("source_device_type") != "mobile"
                 or values.get("observation_type") != "network_snapshot"
@@ -187,6 +187,11 @@ class EnvironmentObservationCreate(BaseModel):
             flow_opt_in = payload.get("flow_metadata_opt_in")
             if flow_opt_in is not None and not isinstance(flow_opt_in, bool):
                 raise ValueError("flow metadata opt-in flag must be boolean")
+            payload_metadata_opt_in = payload.get("payload_metadata_opt_in")
+            if payload_metadata_opt_in is not None and not isinstance(payload_metadata_opt_in, bool):
+                raise ValueError("payload metadata opt-in flag must be boolean")
+            if payload_metadata_opt_in is True and flow_opt_in is not True:
+                raise ValueError("payload metadata requires flow metadata opt-in")
             flows = payload.get("flows")
             if flows is not None:
                 if not isinstance(flows, list) or len(flows) > 50:
@@ -290,6 +295,50 @@ class EnvironmentObservationCreate(BaseModel):
                             raise ValueError(
                                 "network flow counters must be non-negative integers"
                             )
+
+                    protocol_observations = flow.get("protocol_observations", [])
+                    if (
+                        not isinstance(protocol_observations, list)
+                        or len(protocol_observations) > 3
+                    ):
+                        raise ValueError("protocol observations must contain at most 3 entries")
+                    if protocol_observations and payload_metadata_opt_in is not True:
+                        raise ValueError("protocol observations require payload metadata opt-in")
+                    expected_sources = {
+                        "dns_query": "dns",
+                        "dns_response_question": "dns",
+                        "http_host": "http",
+                        "tls_sni": "tls_client_hello",
+                    }
+                    for observation in protocol_observations:
+                        if not isinstance(observation, dict) or set(observation) != {
+                            "kind", "value", "source"
+                        }:
+                            raise ValueError("protocol observation schema is invalid")
+                        kind = observation.get("kind")
+                        value = observation.get("value")
+                        source = observation.get("source")
+                        if kind not in expected_sources or source != expected_sources[kind]:
+                            raise ValueError("protocol observation kind/source is invalid")
+                        if (
+                            not isinstance(value, str)
+                            or not value
+                            or len(value) > 253
+                            or value != value.lower()
+                            or value.startswith(".")
+                            or value.endswith(".")
+                        ):
+                            raise ValueError("protocol observation hostname is invalid")
+                        labels = value.split(".")
+                        if any(
+                            not label
+                            or len(label) > 63
+                            or label.startswith("-")
+                            or label.endswith("-")
+                            or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789-" for char in label)
+                            for label in labels
+                        ):
+                            raise ValueError("protocol observation hostname is invalid")
 
         if values.get("observation_type") == "app_usage_snapshot":
             if (
