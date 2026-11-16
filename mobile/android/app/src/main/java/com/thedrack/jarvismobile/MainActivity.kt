@@ -854,7 +854,7 @@ private fun JarvisMobileScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Identificação por fluxo — VPN Jarvis")
                             Text(
-                                "Opcional. Registra protocolo, IPs, portas, UID/pacote e contadores por conexão. Não registra conteúdo. Só funciona com a VPN Jarvis ativa; reinicie a VPN após alterar.",
+                                "Opcional. Registra protocolo, IPs, portas, UID/pacote e contadores por conexão. Não registra conteúdo. Só funciona com a VPN Jarvis ativa. Desativar interrompe imediatamente; ativar exige reinício se a VPN já estiver rodando sem coleta.",
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -864,10 +864,16 @@ private fun JarvisMobileScreen(
                                 vpnFlowSharingEnabled = enabled
                                 context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
                                     .edit().putBoolean("vpn_flow_sharing_enabled", enabled).apply()
-                                message = if (enabled) {
-                                    "Metadados por fluxo ativados. Reinicie a VPN Jarvis para aplicar."
-                                } else {
-                                    "Metadados por fluxo desativados. Reinicie a VPN Jarvis para aplicar."
+                                val appliedToRunningVpn = JarvisVpnService.updateFlowMetadataConsent(enabled)
+                                message = when {
+                                    !enabled && appliedToRunningVpn ->
+                                        "Coleta de metadados por fluxo interrompida imediatamente."
+                                    !enabled ->
+                                        "Metadados por fluxo desativados."
+                                    appliedToRunningVpn ->
+                                        "Metadados por fluxo ativados na VPN em execução."
+                                    else ->
+                                        "Preferência salva. Inicie ou reinicie a VPN Jarvis para aplicar."
                                 }
                             }
                         )
