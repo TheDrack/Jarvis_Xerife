@@ -175,8 +175,13 @@ class EnvironmentObservationCreate(BaseModel):
                             "VPN tunnel counters must be non-negative integers"
                         )
 
+            flow_opt_in = payload.get("flow_metadata_opt_in")
+            if flow_opt_in is not None and not isinstance(flow_opt_in, bool):
+                raise ValueError("flow metadata opt-in flag must be boolean")
             flows = payload.get("flows")
             if flows is not None:
+                if flow_opt_in is not True:
+                    raise ValueError("network flows require explicit flow metadata opt-in")
                 if not isinstance(flows, list) or len(flows) > 50:
                     raise ValueError("network flows must contain at most 50 entries")
                 seen_flow_ids: set[UUID] = set()
