@@ -731,12 +731,24 @@ A ferramenta MCP de curiosidade foi consultada antes da captura e aceitou o regi
 
 **Próximo marco real:** os três critérios C0 continuam `pending`. Completar o mapa de composição/consumidores/contratos/testes/evidência operacional é o próximo trabalho. **C1 — World Model — permanece bloqueado** até o aceite formal de C0.
 
-### Revalidação do composition root e handoff de memória — 2026-11-16
+### Baseline do composition root e handoff de memória — 2026-11-16 (main 50a0726534fa7a3c67a00e4d6f6f857adb2d9d1a)
 
 - O caminho conversacional em source é `main.py::start_cloud_service()` → `create_edge_container()` → `Container.assistant_service` → Nexus `assistant_service` → `create_api_server()` → `create_assistant_router()`. As rotas autenticadas `/v1/execute` e `/v1/message` chamam `AssistantService.async_process_command()` e, por thread, `process_command()`.
 - O registry mapeia `AssistantService`, `CommandInterpreter`, `IntentProcessor` e `AIGateway`. A factory `create_command_interpreter()` e `LLMCommandInterpreter` não têm caller de produção identificado; não confundir seus testes isolados com o caminho usado pelo serviço.
 - `AssistantService.process_command()` tenta recuperar contexto vetorial e semântico e o coloca em `system_prompt_extra`; `CommandInterpreter.execute()` descarta esse campo, lendo apenas `text`/ `user_id`. `IntentProcessor` recebe somente `intent` e seu fallback envia apenas o texto bruto para `llm_service`/ `ai_gateway`. **A memória é consultada no código, mas não chega ao LLM fallback neste caminho.**
 - Testes existentes cobrem passagem de user_id pela API, escopo do serviço e componentes LLM isolados; não foi localizado teste integrado API → memória → prompt do provider. `MemoryManager` não está explicitamente no registry JSON e depende de descoberta dinâmica quando Nexus não está em strict mode; a configuração real de produção não foi consultada.
-- Este achado é evidência de código, não runtime: não foram chamadas APIs de provider nem verificada persistência real. O conteúdo recuperado também precisa de contrato anti-prompt-injection e isolamento por usuário antes de ser enviado ao modelo.
+- Este achado descreve o estado da main no SHA acima; não foram chamadas APIs de provider nem verificada persistência real. A mitigação anti-prompt-injection e o handoff candidato estão descritos na seção de continuação C0 abaixo.
 
 **Impacto no roadmap:** reforça `C0-CAPABILITY-MAP` e `C0-GAPS-RECORDED`, mas não os conclui. Os três critérios C0 permanecem `pending`; C1 — World Model — continua bloqueado. Próximo passo: teste integrado sem rede que atravesse o composition root e prove o handoff/isolamento, antes de mudar o prompt ou iniciar C2.
+
+
+### Continuação C0 — handoff de memória ao fallback conversacional — 2026-11-16
+
+- Branch isolada: `c0/memory-aware-llm-fallback-20261116`, baseada em `main` no commit `50a0726534fa7a3c67a00e4d6f6f857adb2d9d1a`; nenhuma alteração foi feita diretamente em `main`.
+- `AssistantService.process_command()` agora mantém o parser determinístico limitado a texto/identidade e encaminha o contexto vetorial/semântico separadamente a `IntentProcessor.execute()`. O contexto só é usado quando o fluxo cai no fallback LLM; execução de hardware e comandos com executor encontrado preservam o comportamento anterior.
+- `IntentProcessor` limita o contexto recuperado a 4.000 caracteres e envia instrução de sistema para tratá-lo como dado histórico não confiável, sem autoridade para comandos, políticas ou permissões. O escopo por usuário continua aplicado na recuperação anterior ao handoff.
+- `AIGateway.execute()` agora devolve texto extraído das respostas Gemini/OpenAI-compatíveis e executa a coroutine com `asyncio.run()` quando não existe loop ativo; isso fecha o contrato que o fallback do `IntentProcessor` já esperava.
+- Testes de regressão adicionados/estendidos: caminho integrado `AssistantService` → `CommandInterpreter` → `IntentProcessor` → LLM mockado, isolamento de user_id, contexto limitado, fallback AIGateway e extração de resposta. Nenhum teste chama provider externo.
+- Classificação: `IMPLEMENTED_UNVERIFIED` até CI do PR; não comprova configuração Nexus em produção, persistência real da memória, latência/custo do provider nem resistência completa a prompt injection. `NEXUS_STRICT_MODE` e disponibilidade de `MemoryManager` no ambiente de produção permanecem não verificados.
+- Riscos/custos: até 4.000 caracteres adicionais por fallback com memória; a instrução anti-injection é mitigação, não sandbox semântico; o fallback AIGateway passa a retornar texto em vez de apenas metadata, campo aditivo no contrato existente.
+- Os três critérios C0 permanecem `pending`; C1 — World Model — continua bloqueado até aceite formal de C0. Próximo passo: acompanhar checks, revisar diff e, após CI, validar readback/provider em ambiente autorizado sem expor dados pessoais ou segredos.

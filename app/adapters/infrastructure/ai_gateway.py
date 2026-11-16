@@ -963,6 +963,57 @@ class AIGateway(NexusComponent):
     # NexusComponent interface
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _extract_response_text(response: Any) -> Optional[str]:
+        """Extract text from Gemini and OpenAI-compatible provider responses."""
+        if isinstance(response, str):
+            return response.strip() or None
+
+        try:
+            direct_text = (
+                response.get("text")
+                if isinstance(response, dict)
+                else getattr(response, "text", None)
+            )
+        except Exception:
+            direct_text = None
+        if isinstance(direct_text, str) and direct_text.strip():
+            return direct_text.strip()
+
+        try:
+            choices = (
+                response.get("choices")
+                if isinstance(response, dict)
+                else getattr(response, "choices", None)
+            )
+        except Exception:
+            choices = None
+        if not choices:
+            return None
+
+        first = choices[0]
+        message = (
+            first.get("message")
+            if isinstance(first, dict)
+            else getattr(first, "message", None)
+        )
+        response_text = (
+            message.get("content")
+            if isinstance(message, dict)
+            else getattr(message, "content", None)
+        )
+        if isinstance(response_text, str) and response_text.strip():
+            return response_text.strip()
+        if isinstance(response_text, list):
+            fragments = [
+                part.get("text") if isinstance(part, dict) else getattr(part, "text", None)
+                for part in response_text
+            ]
+            text_parts = [part for part in fragments if isinstance(part, str) and part.strip()]
+            if text_parts:
+                return "\n".join(part.strip() for part in text_parts)
+        return None
+
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """NexusComponent evidence method.
 
@@ -976,7 +1027,7 @@ class AIGateway(NexusComponent):
                   Takes precedence over automatic provider selection.
 
         Returns:
-            Evidence dict with ``success`` and provider metadata.
+            Evidence dict with ``success``, provider metadata and extracted response text
         """
         ctx = context or {}
         messages: List[Dict[str, str]] = ctx.get("messages", [])
@@ -992,19 +1043,37 @@ class AIGateway(NexusComponent):
                 logger.warning("[AIGateway] Valor de provider desconhecido: %s", force_provider_value)
 
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                with concurrent.futures.ThreadPoolExecutor() as pool:
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                result = asyncio.run(
+                    self.generate_completion(
+                        messages,
+                        multimodal=multimodal,
+                        force_provider=force_provider,
+                    )
+                )
+            else:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                     future = pool.submit(
                         asyncio.run,
-                        self.generate_completion(messages, multimodal=multimodal, force_provider=force_provider),
+                        self.generate_completion(
+                            messages,
+                            multimodal=multimodal,
+                            force_provider=force_provider,
+                        ),
                     )
                     result = future.result()
-            else:
-                result = loop.run_until_complete(
-                    self.generate_completion(messages, multimodal=multimodal, force_provider=force_provider)
-                )
-            return {"success": True, "provider": result.get("provider"), "model": result.get("model")}
+
+            payload = {
+                "success": True,
+                "provider": result.get("provider"),
+                "model": result.get("model"),
+            }
+            response_text = self._extract_response_text(result.get("response"))
+            if response_text:
+                payload["response"] = response_text
+            return payload
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
