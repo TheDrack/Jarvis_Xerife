@@ -10,7 +10,8 @@ data class ParsedIpPacket(
     val sourcePort: Int,
     val destinationAddress: InetAddress,
     val destinationPort: Int,
-    val packetBytes: Int
+    val packetBytes: Int,
+    val tcpFlags: Int? = null
 )
 
 /**
@@ -61,7 +62,8 @@ object IpPacketParser {
             sourcePort = unsignedShort(packet, headerLength),
             destinationAddress = InetAddress.getByAddress(destination),
             destinationPort = unsignedShort(packet, headerLength + 2),
-            packetBytes = totalLength
+            packetBytes = totalLength,
+            tcpFlags = if (protocolNumber == IPPROTO_TCP) packet[headerLength + 13].toInt() and 0xff else null
         )
     }
 
@@ -118,7 +120,8 @@ object IpPacketParser {
             sourcePort = unsignedShort(packet, offset),
             destinationAddress = InetAddress.getByAddress(destination),
             destinationPort = unsignedShort(packet, offset + 2),
-            packetBytes = totalLength
+            packetBytes = totalLength,
+            tcpFlags = if (nextHeader == IPPROTO_TCP) packet[offset + 13].toInt() and 0xff else null
         )
     }
 
