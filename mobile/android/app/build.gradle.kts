@@ -44,7 +44,44 @@ android {
     }
 }
 
+val hevAarFile = layout.buildDirectory.file("third_party/hev-socks5-tunnel-2.20.0.aar")
+val hevAarSha256 = "ae8a2e96b80b4eccccd037805a4bb4a278090c89dbcae8bc6fcb7634e9a255b9"
+val downloadHevAar = tasks.register("downloadHevAar") {
+    val aar = hevAarFile.get().asFile
+    outputs.file(aar)
+    inputs.property("hevAarSha256", hevAarSha256)
+    doLast {
+        fun sha256(file: java.io.File): String =
+            java.security.MessageDigest.getInstance("SHA-256")
+                .digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+
+        aar.parentFile.mkdirs()
+        if (!aar.isFile || sha256(aar) != hevAarSha256) {
+            val temporary = java.io.File(aar.parentFile, aar.name + ".part")
+            val url = java.net.URL(
+                "https://github.com/heiher/hev-socks5-tunnel/releases/download/2.20.0/hev-socks5-tunnel.aar"
+            )
+            val connection = url.openConnection().apply {
+                connectTimeout = 15_000
+                readTimeout = 45_000
+            }
+            connection.getInputStream().use { input ->
+                temporary.outputStream().use { output -> input.copyTo(output) }
+            }
+            check(sha256(temporary) == hevAarSha256) {
+                "Hev AAR SHA-256 mismatch; refusing to use an unverified native dependency"
+            }
+            if (aar.exists()) check(aar.delete()) { "Cannot replace previous Hev AAR" }
+            check(temporary.renameTo(aar)) { "Cannot install verified Hev AAR" }
+        }
+        check(sha256(aar) == hevAarSha256) { "Hev AAR verification failed" }
+    }
+}
+
+tasks.named("preBuild").configure { dependsOn(downloadHevAar) }
+
 dependencies {
+    implementation(files(hevAarFile))
     val composeBom = platform("androidx.compose:compose-bom:2025.04.01")
     implementation(composeBom)
     implementation("androidx.activity:activity-compose:1.10.1")
