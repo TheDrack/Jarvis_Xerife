@@ -56,6 +56,21 @@ class PassivePayloadInspectorTest {
     }
 
     @Test
+    fun rejectsAmbiguousDuplicateHttpHostHeaders() {
+        val request = "GET / HTTP/1.1\r\nHost: first.example.com\r\nHost: second.example.com\r\n\r\n"
+            .toByteArray(Charsets.US_ASCII)
+
+        val observations = PassivePayloadInspector.inspect(
+            protocolNumber = 6,
+            sourcePort = 51000,
+            destinationPort = 80,
+            payload = request
+        )
+
+        assertTrue(observations.isEmpty())
+    }
+
+    @Test
     fun extractsTlsServerNameFromCompleteClientHello() {
         val observations = PassivePayloadInspector.inspect(
             protocolNumber = 6,

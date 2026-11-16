@@ -129,26 +129,89 @@ object PassivePayloadInspector {
         val headerEnd = indexOfHeaderEnd(payload, inspectedLength)
         if (headerEnd < 0) return null
 
-        val text = payload.copyOfRange(0, headerEnd).toString(Charsets.ISO_8859_1)
-        val firstLineEnd = text.indexOf("\r\n")
+        // Inspect only the method token and Host value. Do not materialize the
+        // request target or unrelated headers (which may contain credentials).
+        val firstLineEnd = findCrlf(payload, 0, headerEnd + 2)
         if (firstLineEnd <= 0) return null
-        val firstLine = text.substring(0, firstLineEnd)
-        val looksLikeHttp = firstLine.startsWith("HTTP/1.") ||
-            firstLine.substringBefore(' ').uppercase(Locale.ROOT) in HTTP_METHODS
-        if (!looksLikeHttp) return null
+        val isResponse = startsWithAscii(payload, 0, firstLineEnd, "HTTP/1.")
+        val firstSpace = findByte(payload, 0, firstLineEnd, ' '.code)
+        val isRequest = if (firstSpace > 0) {
+            val secondSpace = findByte(payload, firstSpace + 1, firstLineEnd, ' '.code)
+            val method = payload.copyOfRange(0, firstSpace)
+                .toString(Charsets.US_ASCII)
+                .uppercase(Locale.ROOT)
+            secondSpace > firstSpace + 1 && method in HTTP_METHODS
+        } else {
+            false
+        }
+        if (!isResponse && !isRequest) return null
 
-        val hostHeader = text.substring(firstLineEnd + 2)
-            .split("\r\n")
-            .firstNotNullOfOrNull { line ->
-                val separator = line.indexOf(':')
-                if (separator <= 0) null
-                else if (line.substring(0, separator).equals("host", ignoreCase = true)) {
-                    line.substring(separator + 1).trim()
-                } else null
-            } ?: return null
+        var lineStart = firstLineEnd + 2
+        var hostHeader: String? = null
+        while (lineStart < headerEnd) {
+            val lineEnd = findCrlf(payload, lineStart, headerEnd + 2)
+            if (lineEnd < 0) return null
+            val separator = findByte(payload, lineStart, lineEnd, ':'.code)
+            if (separator > lineStart &&
+                asciiEqualsIgnoreCase(payload, lineStart, separator, "host")
+            ) {
+                // Multiple Host fields are ambiguous and must not be attributed.
+                if (hostHeader != null) return null
+                var valueStart = separator + 1
+                var valueEnd = lineEnd
+                while (valueStart < valueEnd &&
+                    (payload[valueStart] == ' '.code.toByte() || payload[valueStart] == '\t'.code.toByte())
+                ) valueStart++
+                while (valueEnd > valueStart &&
+                    (payload[valueEnd - 1] == ' '.code.toByte() || payload[valueEnd - 1] == '\t'.code.toByte())
+                ) valueEnd--
+                if (valueStart >= valueEnd) return null
+                hostHeader = payload.copyOfRange(valueStart, valueEnd)
+                    .toString(Charsets.ISO_8859_1)
+            }
+            lineStart = lineEnd + 2
+        }
 
-        val host = normalizeHostHeader(hostHeader) ?: return null
+        val host = normalizeHostHeader(hostHeader ?: return null) ?: return null
         return NetworkProtocolObservation("http_host", host, "http")
+    }
+
+    private fun findCrlf(bytes: ByteArray, start: Int, endExclusive: Int): Int {
+        var index = start
+        while (index + 1 < endExclusive) {
+            if (bytes[index] == 13.toByte() && bytes[index + 1] == 10.toByte()) return index
+            index++
+        }
+        return -1
+    }
+
+    private fun findByte(bytes: ByteArray, start: Int, endExclusive: Int, value: Int): Int {
+        for (index in start until endExclusive) {
+            if ((bytes[index].toInt() and 0xff) == value) return index
+        }
+        return -1
+    }
+
+    private fun startsWithAscii(bytes: ByteArray, start: Int, endExclusive: Int, value: String): Boolean {
+        if (endExclusive - start < value.length) return false
+        for (index in value.indices) {
+            if ((bytes[start + index].toInt() and 0xff) != value[index].code) return false
+        }
+        return true
+    }
+
+    private fun asciiEqualsIgnoreCase(
+        bytes: ByteArray,
+        start: Int,
+        endExclusive: Int,
+        value: String
+    ): Boolean {
+        if (endExclusive - start != value.length) return false
+        for (index in value.indices) {
+            val actual = (bytes[start + index].toInt() and 0xff).toChar().lowercaseChar()
+            if (actual != value[index]) return false
+        }
+        return true
     }
 
     private fun parseTlsServerName(payload: ByteArray): NetworkProtocolObservation? {
