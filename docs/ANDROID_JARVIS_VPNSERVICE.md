@@ -23,7 +23,7 @@ The SOCKS5 layer sees destination addresses and ports as it forwards connections
 
 ## Tailscale coexistence
 
-Android permits only one active `VpnService` owner at a time. Jarvis refuses to establish its TUN while another VPN transport is active. If Tailscale is active, its tunnel remains in control and the existing `NetworkStatsManager` aggregate collection can continue.
+Android permits only one active `VpnService` owner at a time. Jarvis refuses to establish its TUN while another VPN transport is active. If Tailscale is active, its tunnel remains in control and the existing `NetworkStatsManager` aggregate collection can continue. When the user activates Tailscale over Jarvis, Android revokes Jarvis's VPN ownership and `onRevoke()` tears down the TUN. Android does not silently grant ownership back when Tailscale is disabled; the user must start Jarvis again and approve the system VPN consent if requested.
 
 The public Tailscale Android `IPNReceiver` exposes connect/disconnect control broadcasts, not a flow-telemetry API. The package being installed does not prove that it owns the active VPN. This change therefore does not label an unknown external VPN as Tailscale and does not claim to read Tailscale's TUN packets.
 
