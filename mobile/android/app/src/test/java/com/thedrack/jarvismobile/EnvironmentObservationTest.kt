@@ -207,6 +207,8 @@ class EnvironmentObservationTest {
         assertEquals("foreground_service", payload.getString("app_state"))
         assertFalse(payload.has("ssid"))
         assertFalse(payload.has("location"))
+        assertFalse(payload.has("flow_metadata_opt_in"))
+        assertFalse(payload.has("payload_metadata_opt_in"))
     }
 
     @Test(expected = IllegalArgumentException::class)
