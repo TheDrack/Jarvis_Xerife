@@ -40,13 +40,28 @@ object PassivePayloadInspector {
                 destinationPort in setOf(DNS_PORT, MDNS_PORT)
             ) parseDns(payload) else emptyList()
             6 -> {
+                val dns = if (sourcePort in DNS_PORTS || destinationPort in DNS_PORTS) {
+                    parseDnsTcp(payload)
+                } else null
                 val http = if (sourcePort in HTTP_PORTS || destinationPort in HTTP_PORTS) {
                     parseHttpHost(payload)
                 } else null
                 val tls = parseTlsServerName(payload)
-                listOfNotNull(http, tls).distinct()
+                listOfNotNull(dns, http, tls).distinct()
             }
             else -> emptyList()
+        }
+    }
+
+    private fun parseDnsTcp(payload: ByteArray): NetworkProtocolObservation? {
+        if (payload.size < 14) return null
+        val messageLength = u16(payload, 0)
+        if (messageLength < 12 || messageLength > payload.size - 2) return null
+        val message = payload.copyOfRange(2, 2 + messageLength)
+        return try {
+            parseDns(message).firstOrNull()
+        } finally {
+            message.fill(0)
         }
     }
 
@@ -290,6 +305,7 @@ object PassivePayloadInspector {
             ((bytes[offset + 1].toInt() and 0xff) shl 8) or
             (bytes[offset + 2].toInt() and 0xff)
 
+    private val DNS_PORTS = setOf(DNS_PORT, MDNS_PORT)
     private val HTTP_PORTS = setOf(HTTP_PORT, ALT_HTTP_PORT, ALT_HTTP_PORT_2)
     private val HTTP_METHODS = setOf(
         "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", "CONNECT", "TRACE"
