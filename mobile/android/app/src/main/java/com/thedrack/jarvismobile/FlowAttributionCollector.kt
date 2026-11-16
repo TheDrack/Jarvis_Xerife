@@ -147,7 +147,7 @@ internal class FlowAttributionCollector(
                     remoteIp = flow.key.remoteIp,
                     remotePort = flow.key.remotePort,
                     uid = flow.uid,
-                    packageNames = flow.packageNames.take(5),
+                    packageNames = flow.packageNames.take(2),
                     appLabel = flow.appLabel?.take(128),
                     attributionStatus = flow.attributionStatus,
                     firstSeenAt = Instant.ofEpochMilli(flow.firstSeenMillis).toString(),
@@ -223,7 +223,7 @@ internal class FlowAttributionCollector(
         private const val TCP_ACK = 0x10
         private const val TCP_FIN = 0x01
         private const val TCP_RST = 0x04
-        const val DEFAULT_SNAPSHOT_LIMIT = 50
+        const val DEFAULT_SNAPSHOT_LIMIT = 25
         private const val DEFAULT_MAX_FLOWS = 1_000
         private const val DEFAULT_MAX_AGE_MS = 10 * 60 * 1_000L
         private const val DEFAULT_IDLE_SESSION_MS = 60 * 1_000L
