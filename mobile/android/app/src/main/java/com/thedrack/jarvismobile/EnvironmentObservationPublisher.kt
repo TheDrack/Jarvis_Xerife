@@ -145,10 +145,13 @@ object EnvironmentObservationPublisher {
         if (enabled) collectLocation(context, true)?.let { location ->
             observations += buildObservation(deviceId, snapshot, "location_snapshot", location = location)
         }
-        val appUsageEnabled = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
-            .getBoolean("app_usage_sharing_enabled", false)
+        val preferences = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+        val appUsageEnabled = preferences.getBoolean("app_usage_sharing_enabled", false)
+        val selectedPackages = preferences.getString("app_usage_package_filter", "")
+            .orEmpty().split(Regex("[,;\\s]+"))
+            .map(String::trim).filter(String::isNotEmpty).toSet()
         if (AppUsageStatsCollector.isAuthorized(appUsageEnabled, AppUsageStatsCollector.hasUsageAccess(context))) {
-            AppUsageStatsCollector.collect(context)?.let { usage ->
+            AppUsageStatsCollector.collect(context, selectedPackages = selectedPackages)?.let { usage ->
                 observations += buildAppUsageObservation(deviceId, usage)
             }
         }
