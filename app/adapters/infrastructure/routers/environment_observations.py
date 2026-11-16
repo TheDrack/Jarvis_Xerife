@@ -228,11 +228,18 @@ class EnvironmentObservationCreate(BaseModel):
                         not isinstance(app_label, str) or len(app_label) > 128
                     ):
                         raise ValueError("network flow app label is invalid")
-                    if flow.get("attribution_status") not in {
+                    attribution_status = flow.get("attribution_status")
+                    if attribution_status not in {
                         "resolved", "uid_only", "unresolved", "denied"
                     }:
                         raise ValueError("network flow attribution status is invalid")
-                    if flow.get("closed") not in {True, False}:
+                    if attribution_status in {"resolved", "uid_only"} and uid is None:
+                        raise ValueError("attributed network flow requires a UID")
+                    if attribution_status == "resolved" and not package_names:
+                        raise ValueError("resolved network flow requires package identity")
+                    if attribution_status in {"unresolved", "denied"} and uid is not None:
+                        raise ValueError("unresolved network flow cannot include a UID")
+                    if not isinstance(flow.get("closed"), bool):
                         raise ValueError("network flow closed flag is invalid")
                     try:
                         first_seen = datetime.fromisoformat(
