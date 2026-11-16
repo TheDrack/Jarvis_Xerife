@@ -80,9 +80,18 @@ internal class FlowAttributionCollector(
         var rxBytes: Long = 0,
         var closed: Boolean = false,
         val protocolObservations: LinkedHashMap<String, NetworkProtocolObservation> = LinkedHashMap(),
+        var outboundTcpReassembler: TcpStreamReassembler? = null,
+        var inboundTcpReassembler: TcpStreamReassembler? = null,
         var resolutionAttempts: Int = 0,
         var lastResolutionMillis: Long = Long.MIN_VALUE
-    )
+    ) {
+        fun clearTransientPayloadBuffers() {
+            outboundTcpReassembler?.clear()
+            inboundTcpReassembler?.clear()
+            outboundTcpReassembler = null
+            inboundTcpReassembler = null
+        }
+    }
 
     @Volatile private var enabled = true
     @Volatile private var payloadInspectionEnabled = payloadMetadataEnabled
@@ -117,6 +126,9 @@ internal class FlowAttributionCollector(
             packet.tcpFlags?.and(TCP_ACK) != TCP_ACK
         val startsNewTcpSession = existing?.closed == true && isInitialTcpSyn
         val expired = existing != null && now - existing.lastSeenMillis > idleSessionMillis
+        if (existing != null && (startsNewTcpSession || expired)) {
+            existing.clearTransientPayloadBuffers()
+        }
         val flow = if (existing == null || startsNewTcpSession || expired) {
             val created = MutableFlow(
                 key = key,
@@ -150,7 +162,8 @@ internal class FlowAttributionCollector(
             flow.rxPackets = saturatingAdd(flow.rxPackets, 1)
             flow.rxBytes = saturatingAdd(flow.rxBytes, packet.packetBytes.toLong())
         }
-        inspectPayloadMetadata(flow, packet, rawPacket)
+        inspectPayloadMetadata(flow, packet, direction, rawPacket)
+        if (flow.closed) flow.clearTransientPayloadBuffers()
         prune(now)
     }
 
@@ -195,11 +208,15 @@ internal class FlowAttributionCollector(
     @Synchronized
     fun setPayloadMetadataEnabled(value: Boolean) {
         payloadInspectionEnabled = value
-        if (!value) flows.values.forEach { it.protocolObservations.clear() }
+        if (!value) flows.values.forEach {
+            it.protocolObservations.clear()
+            it.clearTransientPayloadBuffers()
+        }
     }
 
     @Synchronized
     fun clear() {
+        flows.values.forEach { it.clearTransientPayloadBuffers() }
         flows.clear()
         packageCache.clear()
     }
@@ -207,6 +224,7 @@ internal class FlowAttributionCollector(
     private fun inspectPayloadMetadata(
         flow: MutableFlow,
         packet: ParsedIpPacket,
+        direction: FlowPacketDirection,
         rawPacket: ByteArray?
     ) {
         if (!payloadInspectionEnabled || rawPacket == null) return
@@ -215,30 +233,94 @@ internal class FlowAttributionCollector(
         if (offset < 0 || length <= 0 || offset > rawPacket.size || length > rawPacket.size - offset) {
             return
         }
-        val isDns = packet.protocolNumber == 17 &&
+
+        val isDns = packet.protocolNumber == UDP_PROTOCOL &&
             (packet.sourcePort == 53 || packet.sourcePort == 5353 ||
                 packet.destinationPort == 53 || packet.destinationPort == 5353)
-        val isHttp = packet.protocolNumber == 6 &&
+        val isHttp = packet.protocolNumber == TCP_PROTOCOL &&
             (packet.sourcePort in HTTP_METADATA_PORTS ||
                 packet.destinationPort in HTTP_METADATA_PORTS)
-        val isTlsRecord = packet.protocolNumber == 6 && length >= 5 &&
+        val isTlsPort = packet.protocolNumber == TCP_PROTOCOL &&
+            (packet.sourcePort in TLS_METADATA_PORTS ||
+                packet.destinationPort in TLS_METADATA_PORTS)
+        val isTlsRecordStart = packet.protocolNumber == TCP_PROTOCOL && length >= 1 &&
             (rawPacket[offset].toInt() and 0xff) == 22
-        if (!isDns && !isHttp && !isTlsRecord) return
+        val existingReassembler = if (direction == FlowPacketDirection.OUTBOUND) {
+            flow.outboundTcpReassembler
+        } else {
+            flow.inboundTcpReassembler
+        }
+        if (!isDns && !isHttp && !isTlsPort && !isTlsRecordStart && existingReassembler == null) return
+
         val boundedLength = minOf(length, PassivePayloadInspector.MAX_INSPECTED_PAYLOAD_BYTES)
         if (boundedLength <= 0) return
         val payload = rawPacket.copyOfRange(offset, offset + boundedLength)
-        PassivePayloadInspector.inspect(
-            protocolNumber = packet.protocolNumber,
-            sourcePort = packet.sourcePort,
-            destinationPort = packet.destinationPort,
-            payload = payload
-        ).forEach { observation ->
+        val observations = try {
+            if (packet.protocolNumber == UDP_PROTOCOL) {
+                PassivePayloadInspector.inspect(
+                    protocolNumber = packet.protocolNumber,
+                    sourcePort = packet.sourcePort,
+                    destinationPort = packet.destinationPort,
+                    payload = payload
+                )
+            } else {
+                val sequence = packet.tcpSequenceNumber ?: return
+                val reassembler = existingReassembler ?: createTcpReassembler(flow, direction) ?: return
+                val payloadSequence = (
+                    sequence + if (packet.tcpFlags?.and(TCP_SYN) == TCP_SYN) 1L else 0L
+                ) and TCP_SEQUENCE_MASK
+                val assembled = reassembler.append(payloadSequence, payload) ?: return
+                try {
+                    PassivePayloadInspector.inspect(
+                        protocolNumber = packet.protocolNumber,
+                        sourcePort = packet.sourcePort,
+                        destinationPort = packet.destinationPort,
+                        payload = assembled
+                    )
+                } finally {
+                    assembled.fill(0)
+                }
+            }
+        } finally {
+            payload.fill(0)
+        }
+
+        observations.forEach { observation ->
             if (flow.protocolObservations.containsKey(observation.kind) ||
                 flow.protocolObservations.size < MAX_PROTOCOL_OBSERVATIONS_PER_FLOW
             ) {
                 flow.protocolObservations[observation.kind] = observation
             }
         }
+        if (observations.isNotEmpty() && packet.protocolNumber == TCP_PROTOCOL) {
+            if (direction == FlowPacketDirection.OUTBOUND) {
+                flow.outboundTcpReassembler?.clear()
+                flow.outboundTcpReassembler = null
+            } else {
+                flow.inboundTcpReassembler?.clear()
+                flow.inboundTcpReassembler = null
+            }
+        }
+    }
+
+    private fun createTcpReassembler(
+        flow: MutableFlow,
+        direction: FlowPacketDirection
+    ): TcpStreamReassembler? {
+        val activeFlows = flows.values.count {
+            it.outboundTcpReassembler != null || it.inboundTcpReassembler != null
+        }
+        if (activeFlows >= MAX_ACTIVE_REASSEMBLY_FLOWS) return null
+        val reassembler = TcpStreamReassembler(
+            maxBytes = MAX_REASSEMBLED_STREAM_BYTES,
+            maxGapBytes = MAX_REASSEMBLED_STREAM_BYTES
+        )
+        if (direction == FlowPacketDirection.OUTBOUND) {
+            flow.outboundTcpReassembler = reassembler
+        } else {
+            flow.inboundTcpReassembler = reassembler
+        }
+        return reassembler
     }
 
     private fun resolveAttribution(
@@ -290,10 +372,12 @@ internal class FlowAttributionCollector(
         val staleKeys = flows.values
             .filter { now - it.lastSeenMillis > maxAgeMillis }
             .map { it.key }
-        staleKeys.forEach(flows::remove)
+        staleKeys.forEach { key ->
+            flows.remove(key)?.clearTransientPayloadBuffers()
+        }
         while (flows.size > maxFlows) {
             val oldest = flows.values.minByOrNull { it.lastSeenMillis } ?: break
-            flows.remove(oldest.key)
+            flows.remove(oldest.key)?.clearTransientPayloadBuffers()
         }
     }
 
@@ -302,13 +386,18 @@ internal class FlowAttributionCollector(
 
     companion object {
         private const val TCP_PROTOCOL = 6
+        private const val UDP_PROTOCOL = 17
         private const val TCP_SYN = 0x02
         private const val TCP_ACK = 0x10
         private const val TCP_FIN = 0x01
         private const val TCP_RST = 0x04
         const val DEFAULT_SNAPSHOT_LIMIT = 25
         private const val MAX_PROTOCOL_OBSERVATIONS_PER_FLOW = 3
+        private const val MAX_ACTIVE_REASSEMBLY_FLOWS = 32
+        private const val MAX_REASSEMBLED_STREAM_BYTES = 16 * 1024
+        private const val TCP_SEQUENCE_MASK = 0xffff_ffffL
         private val HTTP_METADATA_PORTS = setOf(80, 8000, 8080)
+        private val TLS_METADATA_PORTS = setOf(443, 465, 587, 853, 993, 995, 8443, 9443)
         private const val DEFAULT_MAX_FLOWS = 1_000
         private const val DEFAULT_MAX_AGE_MS = 10 * 60 * 1_000L
         private const val DEFAULT_IDLE_SESSION_MS = 60 * 1_000L
