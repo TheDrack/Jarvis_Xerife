@@ -189,7 +189,9 @@ class JarvisVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        stopTunnel()
+        // Android may invoke onRevoke from a binder thread; service/notification teardown
+        // is serialized onto the main looper.
+        mainHandler.post { stopTunnel() }
         super.onRevoke()
     }
 
