@@ -28,6 +28,8 @@ import java.util.concurrent.atomic.AtomicReference
  */
 internal class LocalSocks5Proxy(
     private val vpnService: VpnService,
+    private val username: String,
+    private val password: String,
     private val port: Int = DEFAULT_PORT
 ) : AutoCloseable {
     private val running = AtomicBoolean(false)
@@ -73,11 +75,23 @@ internal class LocalSocks5Proxy(
             try {
                 if (readU8(input) != SOCKS_VERSION) return
                 val methodCount = readU8(input)
-                var noAuthOffered = false
-                repeat(methodCount) { if (readU8(input) == METHOD_NO_AUTH) noAuthOffered = true }
-                output.write(byteArrayOf(SOCKS_VERSION.toByte(), (if (noAuthOffered) METHOD_NO_AUTH else METHOD_REJECT).toByte()))
+                var userPassOffered = false
+                repeat(methodCount) { if (readU8(input) == METHOD_USER_PASSWORD) userPassOffered = true }
+                output.write(byteArrayOf(SOCKS_VERSION.toByte(), (if (userPassOffered) METHOD_USER_PASSWORD else METHOD_REJECT).toByte()))
                 output.flush()
-                if (!noAuthOffered) return
+                if (!userPassOffered) return
+
+                if (readU8(input) != AUTH_VERSION) return
+                val usernameLength = readU8(input)
+                val suppliedUsername = ByteArray(usernameLength) { readU8(input).toByte() }
+                val passwordLength = readU8(input)
+                val suppliedPassword = ByteArray(passwordLength) { readU8(input).toByte() }
+                val authenticated = Socks5Authenticator.matches(
+                    suppliedUsername, suppliedPassword, username, password
+                )
+                output.write(byteArrayOf(AUTH_VERSION.toByte(), (if (authenticated) 0 else 1).toByte()))
+                output.flush()
+                if (!authenticated) return
 
                 if (readU8(input) != SOCKS_VERSION) return
                 val command = readU8(input)
@@ -234,8 +248,9 @@ internal class LocalSocks5Proxy(
         const val DEFAULT_PORT = 10808
         private const val TAG = "JarvisSocks5"
         private const val SOCKS_VERSION = 5
-        private const val METHOD_NO_AUTH = 0
+        private const val METHOD_USER_PASSWORD = 2
         private const val METHOD_REJECT = 0xff
+        private const val AUTH_VERSION = 1
         private const val CMD_CONNECT = 1
         private const val CMD_UDP_ASSOCIATE = 3
         private const val ATYP_IPV4 = 1
