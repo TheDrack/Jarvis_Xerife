@@ -522,6 +522,30 @@ def test_network_snapshot_accepts_bounded_per_flow_uid_attribution():
         )
 
 
+def test_flow_metadata_is_restricted_to_mobile_network_snapshots():
+    body = observation(
+        device_id="phone-1",
+        source_device_type="mobile",
+        observation_type="network_snapshot",
+        payload={"flow_metadata_opt_in": True, "flows": []},
+    )
+
+    with pytest.raises(ValueError, match="flow metadata is only valid"):
+        module.EnvironmentObservationCreate(
+            **dict(body, source_device_type="desktop")
+        )
+
+    with pytest.raises(ValueError, match="flow metadata is only valid"):
+        module.EnvironmentObservationCreate(
+            **dict(body, observation_type="presence")
+        )
+
+    with pytest.raises(ValueError, match="flow metadata is only valid"):
+        module.EnvironmentObservationCreate(
+            **dict(body, observation_type="app_usage_snapshot")
+        )
+
+
 def test_app_usage_snapshot_accepts_bounded_package_identity_metadata():
     now = datetime.now(timezone.utc)
     valid = observation(
