@@ -23,7 +23,7 @@ internal class TunPacketRelay private constructor(
     private val onFailure: (Throwable) -> Unit
 ) : Closeable {
     private val running = AtomicBoolean(false)
-    private var worker: Thread? = null
+    @Volatile private var worker: Thread? = null
     private val toHev = ArrayDeque<ByteArray>()
     private val toTun = ArrayDeque<ByteArray>()
 
@@ -149,10 +149,7 @@ internal class TunPacketRelay private constructor(
     }
 
     override fun close() {
-        if (!running.compareAndSet(true, false)) {
-            runCatching { bridge.close() }
-            return
-        }
+        running.set(false)
         runCatching { bridge.close() }
         worker?.interrupt()
         runCatching { worker?.join(STOP_JOIN_TIMEOUT_MS) }
