@@ -684,3 +684,59 @@ A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user
 ### Atualização de sincronização — 2026-11-15
 
 O snapshot de 2026-11-14 acima preserva o estado observado naquela data. Após a revalidação e reconciliação das branches, as PRs #826 (integridade do Self Healing), #824 (Global HUD móvel) e #832 (estado de conexão Wi-Fi Android) foram integradas à `main`, respectivamente nos commits `f7c7843e50699e046ef0ca2d53194f0f74551c97`, `87bc717042885700d969b5eaedda8269bb8a15b8` e `c9d793838aeae5b697dc6cbdbc6adbc510655eb4`. A PR #825 permanece em atualização para incorporar a `main` resultante; sua evidência C0 continua sem declarar os critérios como concluídos.
+
+
+### Revalidação incremental — 2026-11-16 — main `734fe70fc40db73db40dd12b86119bf2da2b3dd7`
+
+#### Reconciliação do snapshot anterior
+
+- A afirmação do snapshot de 2026-11-15 de que a PR #825 permanecia em atualização foi supersedida. A PR [#825](https://github.com/TheDrack/Jarvis_Xerife/pull/825) foi integrada em 2026-11-16 às 01:11:23 UTC, merge commit `5d5ba13fba16054e4a84ff3e0c46ecd39e50de98`.
+- O merge adiciona o gate que impede conclusão baseada apenas em nomes/documentação; **não conclui** `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` nem `C0-NO-NAME-BASED-COMPLETION`. Os três IDs permanecem `pending`.
+- `data/roadmap_missions.json` continua com `missions: []` e `hold_reason: C0 remains open`. Não existe alvo de geração autônoma aprovado.
+
+#### Evidência adicional de consumidores — Graphify
+
+O índice Graphify consultado estava no commit `2a70e72`; a ponta atual de `main` é `734fe70`, cujo único arquivo alterado foi `ARCHITECTURE.md`. Portanto, o grafo de código consultado corresponde ao código da ponta atual, embora o snapshot do grafo seja anterior.
+
+- `CognitiveRouter.execute()`: caller estrito localizado somente em teste unitário. `run_pipeline()` é chamado pelo CLI e por testes; não foi localizado consumer de aplicação para o pipeline `jarvis_chat`.
+- `CuriosityEngine.execute()` e `StrategistService.execute()`: nenhum caller estrito localizado. Não confundir `CuriosityEngine` com `CuriosityIntake`.
+- `TaskRunner.execute_plan()`: chamado pelo próprio `TaskRunner.execute()` e por testes; nenhum composition root de aplicação foi localizado. `ToolDispatcher.dispatch()` tem callers estritos em testes, sem consumer de aplicação identificado.
+- `CostTrackerAdapter.log()`: caller localizado apenas dentro do próprio `CostTrackerAdapter.execute()`; o método `execute()` não tem caller estrito localizado. `LLMRouter.execute()` tem callers de teste, sem uso de runtime comprovado.
+- `IntelligenceCore.process()`: consumidores de aplicação identificados em `collect_live_intelligence()` e na coleta local de `jarvis_desktop_local.py`. Isso confirma integração de aplicação, não atividade de providers externos ou persistência real no Supabase.
+- `MqttHomeAdapter.execute()`: callers localizados somente em testes. O adaptador não tem consumo de aplicação comprovado.
+
+A ferramenta MCP de curiosidade foi consultada antes da captura e aceitou o registro `ab56c1cc462e01082e9f` para o achado de validação/retention da PR #841. Isso comprova a captura pelo endpoint MCP disponível nesta sessão, não persistência universal em todos os hosts.
+
+#### PR #841 — atribuição de fluxos VPN Android (merged; dispositivo não validado)
+
+- A PR [#841](https://github.com/TheDrack/Jarvis_Xerife/pull/841) foi merged em 2026-11-16 às 15:59:11 UTC, merge commit `1106bf3dd6ad35c943b79ff645c0f92e692e8201`. Não há review formal registrada no endpoint de reviews.
+- No head `5bc4bcf414f3d1888502e0f84f9a5d9092f01f16`, PR Validation [43893316270](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316270) passou (**3.404 passed, 38 skipped, 8 warnings, 67% coverage**); Task Queue [43893316278](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316278) passou (**3.426 passed, 21 skipped, 181 warnings, 68% coverage**); Android Mobile Build [43893316397](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316397) passou. Esses resultados são CI/build, não teste físico.
+- `JarvisVpnService` usa `vpn_flow_sharing_enabled`, default `false`. Com consentimento, `TunPacketRelay` cria socketpair AF_UNIX `SOCK_DGRAM` entre TUN e Hev e encaminha os datagramas; `FlowAttributionCollector` registra apenas cabeçalhos/tuplas IP/TCP/UDP, UID, nomes de pacote, contadores e timestamps. Corpos de pacote não são armazenados nem publicados.
+- O backend restringe `flows` e `flow_metadata_opt_in` a `network_snapshot` de origem `mobile`, com opt-in explícito e limites de tamanho. A coleta individual só funciona enquanto Jarvis VPN está ativa; quando Tailscale Android é a VPN ativa, permanece apenas a coleta agregada disponível.
+- **Não verificado:** relay real do Hev em dispositivo físico, atribuição real por `getConnectionOwnerUid()`, revogação de consentimento em runtime e restauração de rede sob falha. O toggle continua default-off; não habilitar por esta evidência.
+
+#### Retenção e privacidade da telemetria de fluxo
+
+- `TTL_BY_TYPE["network_snapshot"]` é de cinco minutos, mas `expires_at` funciona como indicador de frescor: o caminho de resposta mantém o payload stale e não foi localizado job de limpeza/expurgo das linhas históricas.
+- A expiração de dez minutos do coletor Android é somente da memória local; não prova apagamento de observações já persistidas. Retenção/erasure no banco permanece uma lacuna aberta. Não afirmar que o TTL apaga dados.
+- Endpoints IP, portas, UID/pacote e timestamps são metadados sensíveis mesmo sem payload de rede. Manter opt-in explícito e coleta desabilitada por padrão.
+
+#### Self Healing, CI e governança
+
+- `homeostase.yml` permanece ativo e com escrita privilegiada isolada. Seu `workflow_run` aceita somente workflows confiáveis originados em `main`; o predicado exige `head_branch == main` e evento `push`, `schedule` ou `workflow_dispatch`. Ele não escuta JARVIS PR Validation nem Jarvis Task Queue Tests e não corrige automaticamente branches de PR. Quando encontra diff elegível, cria branch/PR com sufixo do run; não atualiza uma PR existente.
+- O caminho legado `GitHubAdapter.dispatch_auto_fix()` aponta para o identificador legado `jarvis_code_fixer`, sem definição correspondente na árvore atual de workflows; Graphify não encontrou caller estrito. `AIGateway._dispatch_auto_repair_if_enabled()` constrói e registra o payload, mas o próprio código comenta que não chama `dispatch_auto_fix()`. `GitHubAdapter.report_for_auto_correction()`, se invocado, cria nova branch e nova PR; Graphify também não encontrou caller estrito. Portanto, esse caminho legado não comprova correção automática de PR/CI ativa nem deduplicação/atualização de PR existente.
+- `hourly_curiosity_audit.yml` executa auditoria/pytest read-only e publica artefatos; não é mecanismo de reparo de PR.
+- A API do GitHub continua retornando `main.protected == false`, sem required status checks enforced. A issue [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) permanece aberta. As issues [#723](https://github.com/TheDrack/Jarvis_Xerife/issues/723) e [#732](https://github.com/TheDrack/Jarvis_Xerife/issues/732) permanecem abertas para reconciliação de RPCs e histórico de migrações.
+- Nenhum workflow foi desativado; nenhum teste/cobertura foi reduzido; não houve alteração de segredo, DDL, produção, dispositivo, merge ou deploy nesta revalidação.
+
+**Próximo marco real:** os três critérios C0 continuam `pending`. Completar o mapa de composição/consumidores/contratos/testes/evidência operacional é o próximo trabalho. **C1 — World Model — permanece bloqueado** até o aceite formal de C0.
+
+### Revalidação do composition root e handoff de memória — 2026-11-16
+
+- O caminho conversacional em source é `main.py::start_cloud_service()` → `create_edge_container()` → `Container.assistant_service` → Nexus `assistant_service` → `create_api_server()` → `create_assistant_router()`. As rotas autenticadas `/v1/execute` e `/v1/message` chamam `AssistantService.async_process_command()` e, por thread, `process_command()`.
+- O registry mapeia `AssistantService`, `CommandInterpreter`, `IntentProcessor` e `AIGateway`. A factory `create_command_interpreter()` e `LLMCommandInterpreter` não têm caller de produção identificado; não confundir seus testes isolados com o caminho usado pelo serviço.
+- `AssistantService.process_command()` tenta recuperar contexto vetorial e semântico e o coloca em `system_prompt_extra`; `CommandInterpreter.execute()` descarta esse campo, lendo apenas `text`/ `user_id`. `IntentProcessor` recebe somente `intent` e seu fallback envia apenas o texto bruto para `llm_service`/ `ai_gateway`. **A memória é consultada no código, mas não chega ao LLM fallback neste caminho.**
+- Testes existentes cobrem passagem de user_id pela API, escopo do serviço e componentes LLM isolados; não foi localizado teste integrado API → memória → prompt do provider. `MemoryManager` não está explicitamente no registry JSON e depende de descoberta dinâmica quando Nexus não está em strict mode; a configuração real de produção não foi consultada.
+- Este achado é evidência de código, não runtime: não foram chamadas APIs de provider nem verificada persistência real. O conteúdo recuperado também precisa de contrato anti-prompt-injection e isolamento por usuário antes de ser enviado ao modelo.
+
+**Impacto no roadmap:** reforça `C0-CAPABILITY-MAP` e `C0-GAPS-RECORDED`, mas não os conclui. Os três critérios C0 permanecem `pending`; C1 — World Model — continua bloqueado. Próximo passo: teste integrado sem rede que atravesse o composition root e prove o handoff/isolamento, antes de mudar o prompt ou iniciar C2.
