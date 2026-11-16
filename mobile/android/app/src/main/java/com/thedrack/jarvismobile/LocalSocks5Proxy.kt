@@ -133,9 +133,19 @@ internal class LocalSocks5Proxy(
         client.soTimeout = 0
         upstream.soTimeout = 0
         try {
-            val down = workers.submit { copyStream(upstream.getInputStream(), client.getOutputStream()) }
-            copyStream(client.getInputStream(), upstream.getOutputStream())
-            down.cancel(true)
+            val down = workers.submit {
+                try {
+                    copyStream(upstream.getInputStream(), client.getOutputStream())
+                } finally {
+                    runCatching { client.shutdownOutput() }
+                }
+            }
+            try {
+                copyStream(client.getInputStream(), upstream.getOutputStream())
+            } finally {
+                runCatching { upstream.shutdownOutput() }
+            }
+            down.get()
         } finally {
             runCatching { upstream.close() }
         }
@@ -161,7 +171,8 @@ internal class LocalSocks5Proxy(
                 try {
                     relay.receive(packet)
                     val source = InetSocketAddress(packet.address, packet.port)
-                    if (packet.address.isLoopbackAddress) {
+                    val knownClient = clientAddress.get()
+                    if (packet.address.isLoopbackAddress && (knownClient == null || knownClient == source)) {
                         clientAddress.set(source)
                         val frame = Socks5Codec.decodeUdp(packet.data.copyOfRange(packet.offset, packet.offset + packet.length))
                             ?: continue
