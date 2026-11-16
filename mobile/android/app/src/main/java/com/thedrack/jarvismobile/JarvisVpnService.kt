@@ -24,12 +24,15 @@ class JarvisVpnService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
     private var socksProxy: LocalSocks5Proxy? = null
     private var engine: HevTunnelEngine? = null
+    private var hevTransport: ParcelFileDescriptor? = null
+    private var packetRelay: TunPacketRelay? = null
+    private var flowCollector: FlowAttributionCollector? = null
     private val stopping = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val engineWatchdog = object : Runnable {
         override fun run() {
             if (stopping.get() || tun == null) return
-            if (engine?.isRunning() != true || socksProxy?.isRunning() != true) {
+            if (engine?.isRunning() != true || socksProxy?.isRunning() != true || packetRelay?.isRunning != true) {
                 Log.e(TAG, "Hev worker exited; closing TUN to restore normal network routing")
                 stopTunnel()
                 return
@@ -124,15 +127,26 @@ class JarvisVpnService : VpnService() {
         }
         tun = descriptor
 
+        val collector = createAndroidFlowAttributionCollector(applicationContext)
+        flowCollector = collector
+        val transport = TunPacketRelay.create(descriptor, collector) { error ->
+            Log.e(TAG, "Packet observer relay failed; restoring normal routing", error)
+            mainHandler.post { stopTunnel() }
+        }
+        hevTransport = transport.hevDescriptor
+        packetRelay = transport.relay
+
         val nativeEngine = HevTunnelEngine(applicationContext)
         engine = nativeEngine
-        check(nativeEngine.start(descriptor.fd, socksUsername, socksPassword, socksPort)) {
+        check(nativeEngine.start(transport.hevDescriptor.fd, socksUsername, socksPassword, socksPort)) {
             "Hev tun2socks failed to initialize"
         }
         check(nativeEngine.isRunning()) {
             "Hev tun2socks did not enter the running state"
         }
+        transport.relay.start()
         activeEngine = nativeEngine
+        activeFlowCollector = collector
         isRunning = true
 
         startVpnForeground()
@@ -171,8 +185,16 @@ class JarvisVpnService : VpnService() {
         runCatching { engine?.stop() }
             .onFailure { Log.w(TAG, "Hev shutdown reported an error", it) }
         engine = null
+        runCatching { packetRelay?.close() }
+            .onFailure { Log.w(TAG, "TUN packet relay shutdown reported an error", it) }
+        packetRelay = null
+        runCatching { hevTransport?.close() }
+        hevTransport = null
         activeEngine = null
+        activeFlowCollector = null
         isRunning = false
+        runCatching { flowCollector?.clear() }
+        flowCollector = null
         runCatching { tun?.close() }
         tun = null
         runCatching { socksProxy?.close() }
@@ -224,11 +246,18 @@ class JarvisVpnService : VpnService() {
         @Volatile var isRunning: Boolean = false
             private set
         @Volatile private var activeEngine: HevTunnelEngine? = null
+        @Volatile private var activeFlowCollector: FlowAttributionCollector? = null
 
         internal fun currentStats(): HevTunnelStats {
             if (!isRunning) return HevTunnelStats.ZERO
             return runCatching { activeEngine?.stats() ?: HevTunnelStats.ZERO }
                 .getOrDefault(HevTunnelStats.ZERO)
+        }
+
+        internal fun currentFlows(): List<NetworkFlowSnapshot> {
+            if (!isRunning) return emptyList()
+            return runCatching { activeFlowCollector?.snapshot() ?: emptyList() }
+                .getOrDefault(emptyList())
         }
 
         const val ACTION_START = "com.thedrack.jarvismobile.vpn.START"
