@@ -26,6 +26,9 @@ object IpPacketParser {
     private const val IPV6_FRAGMENT = 44
     private const val IPV6_AUTHENTICATION = 51
     private const val IPV6_DESTINATION_OPTIONS = 60
+    private const val IPV6_MOBILITY = 135
+    private const val IPV6_HIP = 139
+    private const val IPV6_SHIM6 = 140
     private const val MAX_IPV6_EXTENSION_HEADERS = 8
 
     fun parse(packet: ByteArray, length: Int = packet.size): ParsedIpPacket? {
@@ -84,7 +87,8 @@ object IpPacketParser {
             if (offset + 2 > totalLength) return null
 
             when (nextHeader) {
-                IPV6_HOP_BY_HOP, IPV6_ROUTING, IPV6_DESTINATION_OPTIONS -> {
+                IPV6_HOP_BY_HOP, IPV6_ROUTING, IPV6_DESTINATION_OPTIONS,
+                IPV6_MOBILITY, IPV6_HIP, IPV6_SHIM6 -> {
                     val extensionLength = ((packet[offset + 1].toInt() and 0xff) + 1) * 8
                     if (extensionLength < 8 || offset + extensionLength > totalLength) return null
                     nextHeader = packet[offset].toInt() and 0xff
