@@ -117,6 +117,7 @@ class IpPacketParserTest {
         assertEquals("tcp", parsed!!.protocol)
         assertEquals(42000, parsed.sourcePort)
         assertEquals(443, parsed.destinationPort)
+        assertEquals(0L, parsed.tcpSequenceNumber)
         assertEquals(68, parsed.payloadOffset)
         assertEquals(4, parsed.payloadLength)
     }
