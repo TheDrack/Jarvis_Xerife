@@ -798,3 +798,14 @@ private fun JarvisMobileScreen(
                             context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
                                 .edit().putBoolean("app_usage_sharing_enabled", false).apply()
                             status = null
+                            tab = 0
+                            message = "Sessão encerrada."
+                        },
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text("Sair") }
+                }
+                Text(message, modifier = Modifier.padding(top = 16.dp), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
