@@ -66,7 +66,10 @@ class BridgeService : Service() {
             scheduleVpnObservation()
     }
     private val vpnObservationRunnable = Runnable {
-        if (!stopping) publishEnvironmentObservations()
+        if (!stopping) {
+            reconcileVpnHandoff()
+            publishEnvironmentObservations()
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -322,6 +325,7 @@ class BridgeService : Service() {
     private val observationRunnable = object : Runnable {
         override fun run() {
             if (stopping) return
+            reconcileVpnHandoff()
             publishEnvironmentObservations()
             handler.postDelayed(this, OBSERVATION_INTERVAL_MS)
         }
@@ -343,6 +347,109 @@ class BridgeService : Service() {
         handler.postDelayed(vpnObservationRunnable, 1_500L)
     }
 
+    /**
+     * Android owns VPN arbitration. When an external provider takes the VPN slot,
+     * this service records the handoff and keeps publishing aggregate observations.
+     * When that provider disappears, it asks the user to reactivate Jarvis from an
+     * Activity so VpnService.prepare() can display Android's consent UI if required.
+     */
+    private fun reconcileVpnHandoff() {
+        val preferences = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        val runtime = VpnStateDetector.detect(
+            applicationContext,
+            jarvisVpnActive = JarvisVpnService.isRunning
+        )
+        val modePreference = VpnModePreference.fromWireValue(
+            preferences.getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
+        )
+        val externalWasActive = preferences.getBoolean(PREF_EXTERNAL_VPN_HANDOFF, false)
+        val action = VpnHandoffPolicy.decide(
+            externalVpnActive = runtime.externalVpnActive,
+            jarvisVpnActive = runtime.jarvisVpnActive,
+            externalVpnWasActive = externalWasActive,
+            jarvisResumeAllowed = modePreference != VpnModePreference.TAILSCALE
+        )
+
+        when (action) {
+            VpnHandoffAction.USE_EXTERNAL_VPN -> {
+                preferences.edit()
+                    .putBoolean(PREF_EXTERNAL_VPN_HANDOFF, true)
+                    .putBoolean(PREF_VPN_RESUME_PROMPT_PENDING, false)
+                    .apply()
+                if (JarvisVpnService.isRunning) {
+                    startService(
+                        Intent(this, JarvisVpnService::class.java)
+                            .setAction(JarvisVpnService.ACTION_STOP)
+                    )
+                }
+                updateNotification("VPN externa ativa; Jarvis em observação agregada")
+            }
+            VpnHandoffAction.KEEP_JARVIS -> {
+                preferences.edit()
+                    .putBoolean(PREF_EXTERNAL_VPN_HANDOFF, false)
+                    .putBoolean(PREF_VPN_RESUME_PROMPT_PENDING, false)
+                    .apply()
+            }
+            VpnHandoffAction.PROMPT_JARVIS_RESUME -> {
+                val alreadyPending = preferences.getBoolean(PREF_VPN_RESUME_PROMPT_PENDING, false)
+                preferences.edit()
+                    .putBoolean(PREF_EXTERNAL_VPN_HANDOFF, false)
+                    .putBoolean(PREF_VPN_RESUME_PROMPT_PENDING, true)
+                    .apply()
+                if (!alreadyPending) showVpnResumeNotification()
+            }
+            VpnHandoffAction.WAIT_FOR_EXTERNAL_OR_USER -> {
+                if (externalWasActive) {
+                    preferences.edit()
+                        .putBoolean(PREF_EXTERNAL_VPN_HANDOFF, false)
+                        .putBoolean(PREF_VPN_RESUME_PROMPT_PENDING, false)
+                        .apply()
+                }
+            }
+        }
+    }
+
+    private fun showVpnResumeNotification() {
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            updateNotification("VPN externa desativada; abra Jarvis para reativar a VPN própria")
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            updateNotification("VPN externa desativada; abra Jarvis para reativar a VPN própria")
+            return
+        }
+        val launchIntent = Intent(this, MainActivity::class.java)
+            .setAction(MainActivity.ACTION_RESUME_JARVIS_VPN)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            VPN_RESUME_REQUEST_CODE,
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, VPN_HANDOFF_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setContentTitle("Jarvis VPN disponível")
+            .setContentText("A VPN externa foi desativada. Toque para solicitar a reativação da VPN Jarvis.")
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    "A VPN externa foi desativada. Toque para solicitar a reativação da VPN Jarvis. O Android poderá pedir confirmação."
+                )
+            )
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+        try {
+            NotificationManagerCompat.from(this).notify(VPN_HANDOFF_NOTIFICATION_ID, notification)
+        } catch (error: SecurityException) {
+            updateNotification("VPN externa desativada; abra Jarvis para reativar a VPN própria")
+        }
+    }
+
     private fun publishEnvironmentObservations() {
         if (deviceId.isBlank() || token.isBlank()) return
         Thread {
@@ -361,7 +468,15 @@ class BridgeService : Service() {
                 "Presença do Jarvis",
                 NotificationManager.IMPORTANCE_LOW
             ).apply { description = "Conexão ativa do Jarvis Mobile" }
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    VPN_HANDOFF_CHANNEL_ID,
+                    "Alternância de VPN",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply { description = "Avisos de transferência entre a VPN Jarvis e provedores externos" }
+            )
         }
     }
 
@@ -418,6 +533,11 @@ class BridgeService : Service() {
         const val EXTRA_TOKEN = "access_token"
         private const val CHANNEL_ID = "jarvis_presence"
         private const val NOTIFICATION_ID = 5821
+        private const val VPN_HANDOFF_CHANNEL_ID = "jarvis_vpn_handoff"
+        private const val VPN_HANDOFF_NOTIFICATION_ID = 5822
+        private const val VPN_RESUME_REQUEST_CODE = 5823
+        private const val PREF_EXTERNAL_VPN_HANDOFF = "vpn_external_handoff_active"
+        private const val PREF_VPN_RESUME_PROMPT_PENDING = "vpn_resume_prompt_pending"
         const val EVENT_CHANNEL_ID = "jarvis_native_events"
         private const val OBSERVATION_INTERVAL_MS = 60_000L
         @Volatile var isRunning: Boolean = false
