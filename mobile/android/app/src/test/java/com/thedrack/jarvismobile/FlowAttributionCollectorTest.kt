@@ -279,7 +279,7 @@ class FlowAttributionCollectorTest {
             clock = { 9_000L },
             payloadMetadataEnabled = true
         )
-        val request = "GET /private HTTP/1.1\\r\\nHost: api.example.com\\r\\n\\r\\n"
+        val request = "GET /private HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
             .toByteArray(Charsets.US_ASCII)
         val split = 19
         val first = request.copyOfRange(0, split)
