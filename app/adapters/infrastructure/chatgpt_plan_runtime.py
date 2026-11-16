@@ -26,7 +26,6 @@ from app.application.ports.model_runtime import (
 API_BASE_URL = "https://api.openai.com/v1"
 PLAN_USAGE_SCOPE = "chatgpt.tokens.use.direct"
 RESOURCE_INVOKE_SCOPE = "resource.invoke"
-MAX_OUTPUT_TOKENS = 8192
 _ALLOWED_INPUT_ROLES = frozenset({"system", "developer", "user", "assistant"})
 
 
@@ -231,20 +230,10 @@ class ChatGPTPlanClient:
         messages: Sequence[Mapping[str, str]],
         *,
         model: str | None = None,
-        max_output_tokens: int = 1200,
         timeout_seconds: float | None = None,
-        temperature: float | None = None,
     ) -> dict[str, Any]:
         """Generate one completed response without server-side conversation state."""
         normalized = _validate_messages(messages)
-        if (
-            isinstance(max_output_tokens, bool)
-            or not isinstance(max_output_tokens, int)
-            or not 1 <= max_output_tokens <= MAX_OUTPUT_TOKENS
-        ):
-            raise ValueError(
-                f"max_output_tokens must be between 1 and {MAX_OUTPUT_TOKENS}"
-            )
         timeout = self.timeout_seconds if timeout_seconds is None else timeout_seconds
         if (
             isinstance(timeout, bool)
@@ -255,13 +244,6 @@ class ChatGPTPlanClient:
             raise ValueError("timeout_seconds must be finite and positive")
         if model is not None and (not isinstance(model, str) or not model.strip()):
             raise ValueError("model must be a non-empty string or None")
-        if temperature is not None and (
-            isinstance(temperature, bool)
-            or not isinstance(temperature, (int, float))
-            or not isfinite(temperature)
-            or not 0.0 <= temperature <= 2.0
-        ):
-            raise ValueError("temperature must be finite and between 0 and 2")
         selected_model = model or self.model
         if not selected_model:
             models = self.list_models()
@@ -274,12 +256,9 @@ class ChatGPTPlanClient:
         body = {
             "model": selected_model,
             "input": normalized,
-            "max_output_tokens": max_output_tokens,
             "store": False,
             "stream": True,
         }
-        if temperature is not None:
-            body["temperature"] = temperature
         chunks: list[str] = []
         completed: Mapping[str, Any] | None = None
         request_id: str | None = None
@@ -409,18 +388,26 @@ class ChatGPTPlanModelRuntimeAdapter:
             {"role": item.role, "content": item.content} for item in request.messages
         )
         try:
+            if request.max_output_tokens != 1200:
+                raise ModelRuntimeError(
+                    "ChatGPT plan usage preview does not support max_output_tokens.",
+                    code="unsupported_parameter",
+                    provider_id=self.provider_id,
+                    retryable=False,
+                )
+            if request.temperature != 0.2:
+                raise ModelRuntimeError(
+                    "ChatGPT plan usage preview does not support temperature.",
+                    code="unsupported_parameter",
+                    provider_id=self.provider_id,
+                    retryable=False,
+                )
             if self.token_provider is not None:
                 self.client.set_access_token(self.token_provider())
             result = self.client.generate(
                 messages,
                 model=request.model_id,
-                max_output_tokens=request.max_output_tokens,
                 timeout_seconds=request.timeout_seconds,
-                # Keep the Responses API model default unless a caller explicitly
-                # overrides the ModelInvocationRequest default of 0.2.
-                temperature=(
-                    None if request.temperature == 0.2 else request.temperature
-                ),
             )
         except ChatGPTPlanError as exc:
             raise ModelRuntimeError(
@@ -470,7 +457,9 @@ def _validate_messages(messages: Sequence[Mapping[str, str]]) -> list[dict[str, 
             )
         if not isinstance(content, str) or not content.strip():
             raise ValueError("message content must be a non-empty string")
-        normalized.append({"role": role, "content": content})
+        normalized.append(
+            {"role": "developer" if role == "system" else role, "content": content}
+        )
     return normalized
 
 

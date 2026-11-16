@@ -35,7 +35,6 @@ class ChatGPTPlanCommunicationAdapter:
         self,
         prompt: str,
         model: str | None = None,
-        max_output_tokens: int = 1200,
         timeout_seconds: int = 90,
     ) -> dict[str, Any]:
         """Expose the manifest operation shape expected by ToolDispatcher."""
@@ -47,7 +46,6 @@ class ChatGPTPlanCommunicationAdapter:
                 {
                     "prompt": prompt,
                     "model": model,
-                    "max_output_tokens": max_output_tokens,
                     "timeout_seconds": timeout_seconds,
                 },
                 context={"source": "tool_dispatcher"},
@@ -67,15 +65,8 @@ class ChatGPTPlanCommunicationAdapter:
         prompt = payload.get("prompt")
         if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 100_000:
             raise ValueError("prompt must contain 1-100000 characters")
-        max_output_tokens = payload.get("max_output_tokens", 1200)
         timeout_seconds = payload.get("timeout_seconds", 90)
         model = payload.get("model")
-        if (
-            isinstance(max_output_tokens, bool)
-            or not isinstance(max_output_tokens, int)
-            or not 1 <= max_output_tokens <= 8192
-        ):
-            raise ValueError("max_output_tokens must be between 1 and 8192")
         if (
             isinstance(timeout_seconds, bool)
             or not isinstance(timeout_seconds, int)
@@ -96,7 +87,6 @@ class ChatGPTPlanCommunicationAdapter:
             )
             result = client.generate(
                 ({"role": "user", "content": prompt.strip()},),
-                max_output_tokens=max_output_tokens,
                 timeout_seconds=float(timeout_seconds),
             )
             return {

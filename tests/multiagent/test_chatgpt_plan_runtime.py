@@ -59,6 +59,7 @@ def test_single_prompt_uses_responses_api_oauth_contract_and_waits_for_completed
     assert captured["body"]["store"] is False
     assert captured["body"]["stream"] is True
     assert "temperature" not in captured["body"]
+    assert "max_output_tokens" not in captured["body"]
     assert captured["body"]["input"] == [{"role": "user", "content": "Faça um resumo."}]
     assert result.content == "Resposta completa"
     assert result.request_id == "resp_123"
@@ -229,7 +230,61 @@ def test_model_discovery_filters_to_account_visible_models():
     )
 
 
-def test_non_default_temperature_is_forwarded_to_responses_api():
+def test_non_default_temperature_is_rejected_before_http_request():
+    called = False
+
+    def handler(_request):
+        nonlocal called
+        called = True
+        return httpx.Response(500)
+
+    client = ChatGPTPlanClient(
+        access_token="token",
+        model="gpt-6.1-sol",
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    adapter = ChatGPTPlanModelRuntimeAdapter(client)
+
+    with pytest.raises(ModelRuntimeError) as error:
+        adapter.invoke(
+            ModelInvocationRequest(
+                messages=(ModelMessage("user", "oi"),),
+                temperature=0.7,
+            )
+        )
+
+    assert error.value.code == "unsupported_parameter"
+    assert called is False
+
+
+def test_non_default_max_output_tokens_is_rejected_before_http_request():
+    called = False
+
+    def handler(_request):
+        nonlocal called
+        called = True
+        return httpx.Response(500)
+
+    client = ChatGPTPlanClient(
+        access_token="token",
+        model="gpt-6.1-sol",
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    adapter = ChatGPTPlanModelRuntimeAdapter(client)
+
+    with pytest.raises(ModelRuntimeError) as error:
+        adapter.invoke(
+            ModelInvocationRequest(
+                messages=(ModelMessage("user", "oi"),),
+                max_output_tokens=2048,
+            )
+        )
+
+    assert error.value.code == "unsupported_parameter"
+    assert called is False
+
+
+def test_system_message_is_mapped_to_supported_developer_role():
     captured = {}
     events = sse(
         {"type": "response.output_text.delta", "delta": "ok"},
@@ -247,12 +302,16 @@ def test_non_default_temperature_is_forwarded_to_responses_api():
         model="gpt-6.1-sol",
         http_client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
-    adapter = ChatGPTPlanModelRuntimeAdapter(client)
-    adapter.invoke(
+    ChatGPTPlanModelRuntimeAdapter(client).invoke(
         ModelInvocationRequest(
-            messages=(ModelMessage("user", "oi"),),
-            temperature=0.7,
+            messages=(
+                ModelMessage("system", "Responda em português."),
+                ModelMessage("user", "Oi."),
+            )
         )
     )
 
-    assert captured["body"]["temperature"] == 0.7
+    assert captured["body"]["input"] == [
+        {"role": "developer", "content": "Responda em português."},
+        {"role": "user", "content": "Oi."},
+    ]

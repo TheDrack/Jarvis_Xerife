@@ -26,7 +26,6 @@ from app.communication import (
 STATUS_TOOL_NAME = "chatgpt_plan_status"
 PROMPT_TOOL_NAME = "chatgpt_plan_prompt"
 MAX_PROMPT_CHARS = 100_000
-MAX_OUTPUT_TOKENS = 8192
 MAX_TIMEOUT_SECONDS = 300
 
 _SAFE_ERRORS = {
@@ -42,7 +41,7 @@ _SAFE_ERRORS = {
     "provider_rejected": "ChatGPT rejected the request.",
     "incomplete_response": "ChatGPT ended the response before completion.",
     "incomplete_stream": "ChatGPT stream ended before completion.",
-    "invalid_request": "The prompt or generation limits are invalid.",
+    "invalid_request": "The prompt or timeout limits are invalid.",
     "session_authorization_denied": "The local communication session is not authorized.",
 }
 
@@ -120,7 +119,6 @@ def register_chatgpt_plan_tools(
     def chatgpt_plan_prompt(
         prompt: str,
         model: str | None = None,
-        max_output_tokens: int = 1200,
         timeout_seconds: int = 90,
         capture: bool = False,
     ) -> dict[str, Any]:
@@ -135,12 +133,6 @@ def register_chatgpt_plan_tools(
             not isinstance(prompt, str)
             or not prompt.strip()
             or len(prompt) > MAX_PROMPT_CHARS
-        ):
-            return _failure("invalid_request")
-        if (
-            isinstance(max_output_tokens, bool)
-            or not isinstance(max_output_tokens, int)
-            or not 1 <= max_output_tokens <= MAX_OUTPUT_TOKENS
         ):
             return _failure("invalid_request")
         if (
@@ -161,7 +153,6 @@ def register_chatgpt_plan_tools(
                     "arguments": {
                         "prompt": prompt.strip(),
                         "model": model.strip() if model else None,
-                        "max_output_tokens": max_output_tokens,
                         "timeout_seconds": timeout_seconds,
                     },
                     "caller": "android_mcp",
@@ -208,7 +199,6 @@ def register_chatgpt_plan_tools(
                             payload={
                                 "prompt": prompt.strip(),
                                 "model": model.strip() if model else None,
-                                "max_output_tokens": max_output_tokens,
                                 "timeout_seconds": timeout_seconds,
                             },
                             metadata={"provider": "OpenAI Responses API"},

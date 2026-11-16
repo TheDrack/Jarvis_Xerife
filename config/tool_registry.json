@@ -511,11 +511,6 @@
                     ],
                     "minLength": 1
                 },
-                "max_output_tokens": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 8192
-                },
                 "timeout_seconds": {
                     "type": "integer",
                     "minimum": 5,

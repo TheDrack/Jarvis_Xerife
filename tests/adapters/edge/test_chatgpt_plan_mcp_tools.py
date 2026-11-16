@@ -93,12 +93,8 @@ def test_prompt_tool_sends_one_stateless_prompt_and_returns_response(monkeypatch
                 access_token=access_token, model=model, timeout=timeout_seconds
             )
 
-        def generate(self, messages, *, max_output_tokens, timeout_seconds):
-            captured.update(
-                messages=messages,
-                max_output_tokens=max_output_tokens,
-                request_timeout=timeout_seconds,
-            )
+        def generate(self, messages, *, timeout_seconds):
+            captured.update(messages=messages, request_timeout=timeout_seconds)
             return {
                 "content": "Resposta do ChatGPT",
                 "model": "gpt-5.4",
@@ -119,7 +115,6 @@ def test_prompt_tool_sends_one_stateless_prompt_and_returns_response(monkeypatch
     result = mcp.tools[PROMPT_TOOL_NAME](
         prompt="Resuma a hipótese em três pontos.",
         model="gpt-5.4",
-        max_output_tokens=700,
         timeout_seconds=45,
     )
 
@@ -133,7 +128,6 @@ def test_prompt_tool_sends_one_stateless_prompt_and_returns_response(monkeypatch
     assert captured["messages"] == (
         {"role": "user", "content": "Resuma a hipótese em três pontos."},
     )
-    assert captured["max_output_tokens"] == 700
     assert captured["request_timeout"] == 45
     assert captured["access_token"] == "must-not-leak"
     assert "must-not-leak" not in str(result)

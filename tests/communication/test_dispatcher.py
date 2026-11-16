@@ -39,14 +39,12 @@ class FakeChatGPTAdapter:
         self,
         prompt: str,
         model: str | None = None,
-        max_output_tokens: int = 1200,
         timeout_seconds: int = 90,
     ) -> dict[str, object]:
         self.calls.append(
             {
                 "prompt": prompt,
                 "model": model,
-                "max_output_tokens": max_output_tokens,
                 "timeout_seconds": timeout_seconds,
             }
         )
@@ -76,7 +74,6 @@ def test_communication_dispatch_uses_toolbox_authorization_and_audit():
             "arguments": {
                 "prompt": "Analise o estado do sistema",
                 "model": None,
-                "max_output_tokens": 256,
                 "timeout_seconds": 30,
             },
             "scope": "local",
@@ -89,7 +86,6 @@ def test_communication_dispatch_uses_toolbox_authorization_and_audit():
         {
             "prompt": "Analise o estado do sistema",
             "model": None,
-            "max_output_tokens": 256,
             "timeout_seconds": 30,
         }
     ]
