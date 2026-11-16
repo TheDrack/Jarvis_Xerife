@@ -59,6 +59,9 @@ class JarvisVpnService : VpnService() {
     }
 
     private fun startTunnel() {
+        check(HevRuntimeCompatibility.isSupported(Build.VERSION.SDK_INT)) {
+            "Jarvis VPN requires Android API ${HevRuntimeCompatibility.MIN_ANDROID_API} or newer"
+        }
         check(VpnService.prepare(this) == null) {
             "VPN permission has not been granted by the user"
         }
