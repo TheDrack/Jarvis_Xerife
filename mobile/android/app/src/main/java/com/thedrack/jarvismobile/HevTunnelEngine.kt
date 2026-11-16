@@ -5,16 +5,17 @@ import hev.htproxy.TProxyService
 import java.io.File
 
 internal class HevTunnelEngine(context: Context) {
-    private val configFile = File(context.filesDir, "jarvis-hev-tunnel.yml")
+    private val configFile = File(context.cacheDir, "jarvis-hev-tunnel.yml")
     private var nativeStartReturned = false
 
     @Synchronized
-    fun start(tunFd: Int, username: String, password: String): Boolean {
+    fun start(tunFd: Int, username: String, password: String, socksPort: Int): Boolean {
         check(tunFd >= 0) { "Invalid TUN file descriptor" }
+        require(socksPort in 1..65535) { "Invalid local SOCKS5 port" }
         require(username.matches(Regex("[0-9a-f]{48}")) && password.matches(Regex("[0-9a-f]{48}"))) {
             "SOCKS credentials must be random 192-bit lowercase hex values"
         }
-        configFile.writeText(config(username, password), Charsets.UTF_8)
+        configFile.writeText(config(username, password, socksPort), Charsets.UTF_8)
         val started = TProxyService.TProxyStartService(configFile.absolutePath, tunFd)
         nativeStartReturned = true
         if (!started) return false
@@ -51,7 +52,7 @@ internal class HevTunnelEngine(context: Context) {
     }
 
     companion object {
-        private fun config(username: String, password: String) = """
+        private fun config(username: String, password: String, socksPort: Int) = """
 tunnel:
   name: jarvis0
   mtu: 1500
@@ -60,7 +61,7 @@ tunnel:
   icmp: 'off'
 socks5:
   address: 127.0.0.1
-  port: 10808
+  port: $socksPort
   udp: 'udp'
   username: '$username'
   password: '$password'
