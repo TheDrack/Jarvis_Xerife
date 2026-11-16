@@ -51,8 +51,8 @@ internal class TcpStreamReassembler(
 
         val expected = nextSequence
         if (expected == null) {
-            if (!appendContiguous(payload)) return null
-            nextSequence = (sequenceNumber + payload.size) and SEQUENCE_MASK
+            nextSequence = sequenceNumber
+            if (!appendContiguous(payload, 0, payload.size)) return null
             drainPending()
             return snapshot()
         }
@@ -69,7 +69,7 @@ internal class TcpStreamReassembler(
 
         val overlap = (-distance).coerceAtMost(payload.size.toLong()).toInt()
         if (overlap >= payload.size) return null
-        if (!appendContiguous(payload.copyOfRange(overlap, payload.size))) return null
+        if (!appendContiguous(payload, overlap, payload.size - overlap)) return null
         drainPending()
         return snapshot()
     }
@@ -98,22 +98,23 @@ internal class TcpStreamReassembler(
             pending.remove(segment)
             val overlap = (-distance).coerceAtMost(segment.bytes.size.toLong()).toInt()
             if (overlap < segment.bytes.size) {
-                val suffix = segment.bytes.copyOfRange(overlap, segment.bytes.size)
-                appendContiguous(suffix)
-                suffix.fill(0)
+                appendContiguous(segment.bytes, overlap, segment.bytes.size - overlap)
             }
             segment.bytes.fill(0)
             if (failed) return
         }
     }
 
-    private fun appendContiguous(bytes: ByteArray): Boolean {
-        if (stream.size() + bytes.size > maxBytes) {
+    private fun appendContiguous(bytes: ByteArray, offset: Int, length: Int): Boolean {
+        if (offset < 0 || length <= 0 || offset > bytes.size || length > bytes.size - offset) {
+            return false
+        }
+        if (stream.size() + length > maxBytes) {
             failClosed()
             return false
         }
-        stream.write(bytes)
-        nextSequence = ((nextSequence ?: 0L) + bytes.size) and SEQUENCE_MASK
+        stream.write(bytes, offset, length)
+        nextSequence = ((nextSequence ?: 0L) + length) and SEQUENCE_MASK
         return true
     }
 
