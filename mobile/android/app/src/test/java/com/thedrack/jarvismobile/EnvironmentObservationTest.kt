@@ -128,6 +128,62 @@ class EnvironmentObservationTest {
     }
 
     @Test
+    fun networkPayloadPublishesOnlyOptedInProtocolMetadata() {
+        val flow = NetworkFlowSnapshot(
+            flowId = "f68e4d54-2a93-4b52-bf6e-0f7f1ac30d20",
+            protocol = "tcp",
+            localIp = "10.0.0.2",
+            localPort = 49152,
+            remoteIp = "1.1.1.1",
+            remotePort = 443,
+            uid = 10123,
+            packageNames = listOf("com.example.app"),
+            appLabel = "Example",
+            attributionStatus = "resolved",
+            firstSeenAt = "2026-11-16T10:00:00Z",
+            lastSeenAt = "2026-11-16T10:00:02Z",
+            txPackets = 2,
+            txBytes = 120,
+            rxPackets = 3,
+            rxBytes = 180,
+            closed = false,
+            protocolObservations = listOf(
+                NetworkProtocolObservation("tls_sni", "api.example.com", "tls_client_hello")
+            )
+        )
+        val enabledPayload = EnvironmentObservationPublisher.buildObservation(
+            "phone-1",
+            snapshot.copy(
+                flowMetadataEnabled = true,
+                payloadMetadataEnabled = true,
+                flows = listOf(flow)
+            ),
+            requestId = "req-protocol-metadata"
+        ).getJSONObject("payload")
+        val observations = enabledPayload.getJSONArray("flows")
+            .getJSONObject(0).getJSONArray("protocol_observations")
+
+        assertTrue(enabledPayload.getBoolean("payload_metadata_opt_in"))
+        assertEquals(1, observations.length())
+        assertEquals("tls_sni", observations.getJSONObject(0).getString("kind"))
+        assertEquals("api.example.com", observations.getJSONObject(0).getString("value"))
+        assertEquals("tls_client_hello", observations.getJSONObject(0).getString("source"))
+        assertFalse(enabledPayload.has("packet_payload"))
+
+        val disabledPayload = EnvironmentObservationPublisher.buildObservation(
+            "phone-1",
+            snapshot.copy(flowMetadataEnabled = true, payloadMetadataEnabled = false, flows = listOf(flow)),
+            requestId = "req-protocol-metadata-disabled"
+        ).getJSONObject("payload")
+        assertFalse(disabledPayload.getBoolean("payload_metadata_opt_in"))
+        assertEquals(
+            0,
+            disabledPayload.getJSONArray("flows").getJSONObject(0)
+                .getJSONArray("protocol_observations").length()
+        )
+    }
+
+    @Test
     fun locationPayloadIsSeparateAndOptIn() {
         val location = JSONObject().put("latitude", -27.5954).put("longitude", -48.5480)
             .put("accuracy_m", 18.0).put("captured_at", "2026-10-29T12:00:00Z").put("precision", "fine")
