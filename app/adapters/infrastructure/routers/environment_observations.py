@@ -98,6 +98,15 @@ class EnvironmentObservationCreate(BaseModel):
     @root_validator(skip_on_failure=True)
     def validate_location_consent(cls, values: dict[str, Any]) -> dict[str, Any]:
         payload = values.get("payload") or {}
+        if {"flow_metadata_opt_in", "flows"}.intersection(payload):
+            if (
+                values.get("source_device_type") != "mobile"
+                or values.get("observation_type") != "network_snapshot"
+            ):
+                raise ValueError(
+                    "flow metadata is only valid in mobile network snapshots"
+                )
+
         location_keys = {
             "latitude",
             "longitude",
