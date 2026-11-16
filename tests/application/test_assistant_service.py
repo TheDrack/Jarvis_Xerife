@@ -428,6 +428,7 @@ def test_process_command_forwards_scoped_memory_to_llm_fallback_without_network(
     vector_memory.query_similar.return_value = []
 
     processor = IntentProcessor()
+    processor._submit_laya_intent_shadow = Mock()
     processor._check_hardware_command = Mock(return_value={"success": False})
     service = AssistantService(
         command_interpreter=CommandInterpreter(wake_word="test"),

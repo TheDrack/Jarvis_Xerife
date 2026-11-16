@@ -965,7 +965,7 @@ class AIGateway(NexusComponent):
 
     @staticmethod
     def _extract_response_text(response: Any) -> Optional[str]:
-        """Extract plain text from the supported provider SDK response shapes."""
+        """Extract text from Gemini and OpenAI-compatible provider responses."""
         if isinstance(response, str):
             return response.strip() or None
 
@@ -988,67 +988,30 @@ class AIGateway(NexusComponent):
             )
         except Exception:
             choices = None
-        if choices:
-            first = choices[0]
-            message = (
-                first.get("message")
-                if isinstance(first, dict)
-                else getattr(first, "message", None)
-            )
-            response_content = (
-                message.get("content")
-                if isinstance(message, dict)
-                else getattr(message, "content", None)
-            )
-            if isinstance(response_content, str) and response_content.strip():
-                return response_content.strip()
-            if isinstance(response_content, list):
-                fragments = []
-                for part in response_content:
-                    part_text = (
-                        part.get("text")
-                        if isinstance(part, dict)
-                        else getattr(part, "text", None)
-                    )
-                    if isinstance(part_text, str) and part_text.strip():
-                        fragments.append(part_text.strip())
-                if fragments:
-                    return "\n".join(fragments)
+        if not choices:
+            return None
 
-        try:
-            candidates = (
-                response.get("candidates")
-                if isinstance(response, dict)
-                else getattr(response, "candidates", None)
-            )
-        except Exception:
-            candidates = None
-        if candidates:
-            for candidate in candidates:
-                candidate_content = (
-                    candidate.get("content")
-                    if isinstance(candidate, dict)
-                    else getattr(candidate, "content", None)
-                )
-                parts = (
-                    candidate_content.get("parts")
-                    if isinstance(candidate_content, dict)
-                    else getattr(candidate_content, "parts", None)
-                )
-                if not parts:
-                    continue
-                fragments = []
-                for part in parts:
-                    part_text = (
-                        part.get("text")
-                        if isinstance(part, dict)
-                        else getattr(part, "text", None)
-                    )
-                    if isinstance(part_text, str) and part_text.strip():
-                        fragments.append(part_text.strip())
-                if fragments:
-                    return "\n".join(fragments)
-
+        first = choices[0]
+        message = (
+            first.get("message")
+            if isinstance(first, dict)
+            else getattr(first, "message", None)
+        )
+        response_text = (
+            message.get("content")
+            if isinstance(message, dict)
+            else getattr(message, "content", None)
+        )
+        if isinstance(response_text, str) and response_text.strip():
+            return response_text.strip()
+        if isinstance(response_text, list):
+            fragments = [
+                part.get("text") if isinstance(part, dict) else getattr(part, "text", None)
+                for part in response_text
+            ]
+            text_parts = [part for part in fragments if isinstance(part, str) and part.strip()]
+            if text_parts:
+                return "\n".join(part.strip() for part in text_parts)
         return None
 
     def execute(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

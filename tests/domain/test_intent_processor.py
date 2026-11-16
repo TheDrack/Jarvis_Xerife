@@ -64,6 +64,7 @@ class TestIntentProcessor:
 
 def test_execute_forwards_memory_context_to_llm_service(processor):
     intent = Intent(command_type=CommandType.UNKNOWN, raw_input="qual era o projeto?")
+    processor._submit_laya_intent_shadow = MagicMock()
     processor._check_hardware_command = MagicMock(return_value={"success": False})
     mock_llm = MagicMock()
     mock_llm.chat.return_value = "Resposta com memória"
@@ -85,6 +86,7 @@ def test_execute_forwards_memory_context_to_llm_service(processor):
 
 def test_execute_bounds_memory_context_before_llm_submission(processor):
     intent = Intent(command_type=CommandType.UNKNOWN, raw_input="resuma")
+    processor._submit_laya_intent_shadow = MagicMock()
     processor._check_hardware_command = MagicMock(return_value={"success": False})
     mock_llm = MagicMock()
     mock_llm.chat.return_value = "ok"
@@ -103,6 +105,7 @@ def test_execute_bounds_memory_context_before_llm_submission(processor):
 
 def test_execute_forwards_memory_context_to_ai_gateway_when_llm_service_unavailable(processor):
     intent = Intent(command_type=CommandType.UNKNOWN, raw_input="qual era o projeto?")
+    processor._submit_laya_intent_shadow = MagicMock()
     processor._check_hardware_command = MagicMock(return_value={"success": False})
     mock_gateway = MagicMock()
     mock_gateway.execute.return_value = {"response": "Resposta do gateway"}
