@@ -20,13 +20,13 @@ The selected preference is stored locally in `jarvis_session.vpn_mode_preference
 
 ## Important detection boundary
 
-Android's public `NetworkCapabilities.TRANSPORT_VPN` identifies a VPN transport, not the owning application package. Package installation is not proof that Tailscale owns the currently active tunnel. Therefore the current detector reports an external VPN as `external_unknown`; it does not falsely label every external VPN as Tailscale.
+Android's public `NetworkCapabilities.TRANSPORT_VPN` identifies a VPN transport, not the owning application package. Package installation is not proof that Tailscale owns the currently active tunnel. Therefore the current detector reports an external VPN as `external_unknown`; it does not falsely label every external VPN as Tailscale. In this case the collection mode remains `external_vpn_stats`: per-UID aggregate counters can continue through `NetworkStatsManager`, while packet-level flow inspection is unavailable.
 
 `VpnService.prepare()` reports whether Jarvis has user authorization to establish a VPN. It does not identify the currently active VPN provider. Android grants VPN control to one application at a time and revokes the previous app; the previous service receives `VpnService.onRevoke()`.
 
 ## Deliberately not enabled yet
 
-This change does **not** start a Jarvis `VpnService` or claim packet-level inspection. The policy keeps `jarvisPacketEngineReady=false` and `tailscaleAdapterReady=false`, so the actual collector remains the existing opt-in `NetworkStatsManager` aggregate collector.
+This change does **not** start a Jarvis `VpnService` or claim packet-level inspection. The policy keeps `jarvisPacketEngineReady=false` and `tailscaleAdapterReady=false`, so the actual collector remains the existing opt-in `NetworkStatsManager` aggregate collector in both cases: `network_stats` without an external VPN and `external_vpn_stats` when an external VPN owns the transport.
 
 This is intentional: after `VpnService.Builder.establish()`, the app receives a TUN file descriptor containing IP packets. A production implementation must process and forward those packets through a complete userspace network stack/tun-to-socket engine, protect its own upstream sockets from VPN recursion, preserve TCP/UDP/DNS/IPv4/IPv6 behavior, and shut down safely on `onRevoke()`. Establishing a TUN interface without forwarding would break the phone's connectivity.
 
