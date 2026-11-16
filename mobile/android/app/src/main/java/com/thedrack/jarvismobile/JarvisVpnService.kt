@@ -32,7 +32,7 @@ class JarvisVpnService : VpnService() {
     private val engineWatchdog = object : Runnable {
         override fun run() {
             if (stopping.get() || tun == null) return
-            if (engine?.isRunning() != true || socksProxy?.isRunning() != true || packetRelay?.isRunning != true) {
+            if (engine?.isRunning() != true || socksProxy?.isRunning() != true || (packetRelay != null && packetRelay?.isRunning != true)) {
                 Log.e(TAG, "Hev worker exited; closing TUN to restore normal network routing")
                 stopTunnel()
                 return
@@ -127,31 +127,44 @@ class JarvisVpnService : VpnService() {
         }
         tun = descriptor
 
-        val collector = createAndroidFlowAttributionCollector(applicationContext)
+        val flowSharingEnabled = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+            .getBoolean("vpn_flow_sharing_enabled", false)
+        val collector = if (flowSharingEnabled) {
+            createAndroidFlowAttributionCollector(applicationContext)
+        } else null
         flowCollector = collector
-        val transport = TunPacketRelay.create(descriptor, collector) { error ->
-            Log.e(TAG, "Packet observer relay failed; restoring normal routing", error)
-            mainHandler.post { stopTunnel() }
+        val transport = collector?.let {
+            TunPacketRelay.create(descriptor, it) { error ->
+                Log.e(TAG, "Packet observer relay failed; restoring normal routing", error)
+                mainHandler.post { stopTunnel() }
+            }
         }
-        hevTransport = transport.hevDescriptor
-        packetRelay = transport.relay
+        hevTransport = transport?.hevDescriptor
+        packetRelay = transport?.relay
 
         val nativeEngine = HevTunnelEngine(applicationContext)
         engine = nativeEngine
-        check(nativeEngine.start(transport.hevDescriptor.fd, socksUsername, socksPassword, socksPort)) {
+        val tunnelFd = transport?.hevDescriptor?.fd ?: descriptor.fd
+        check(nativeEngine.start(tunnelFd, socksUsername, socksPassword, socksPort)) {
             "Hev tun2socks failed to initialize"
         }
         check(nativeEngine.isRunning()) {
             "Hev tun2socks did not enter the running state"
         }
-        transport.relay.start()
+        transport?.relay?.start()
         activeEngine = nativeEngine
         activeFlowCollector = collector
         isRunning = true
 
         startVpnForeground()
         getSystemService(NotificationManager::class.java)
-            ?.notify(NOTIFICATION_ID, buildNotification("VPN Jarvis ativa — TCP/UDP encaminhados"))
+            ?.notify(
+                NOTIFICATION_ID,
+                buildNotification(
+                    if (flowSharingEnabled) "VPN Jarvis ativa — fluxos identificados por aplicativo"
+                    else "VPN Jarvis ativa — encaminhamento agregado; metadados por fluxo desativados"
+                )
+            )
         mainHandler.removeCallbacks(engineWatchdog)
         mainHandler.postDelayed(engineWatchdog, ENGINE_WATCHDOG_INTERVAL_MS)
     }
