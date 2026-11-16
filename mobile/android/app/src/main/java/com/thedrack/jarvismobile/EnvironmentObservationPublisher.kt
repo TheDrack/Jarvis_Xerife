@@ -170,15 +170,15 @@ object EnvironmentObservationPublisher {
                 .put("vpn_mode_preference", snapshot.vpnModePreference)
                 .put("tailscale_installed", snapshot.tailscaleInstalled)
                 .put("vpn_transport_active", snapshot.vpnTransportActive)
+        }
+        if (observationType == "network_snapshot") {
+            payload.put("flow_metadata_opt_in", snapshot.flowMetadataEnabled)
+                .put("payload_metadata_opt_in", snapshot.payloadMetadataEnabled)
                 .put("vpn_tunnel_stats", JSONObject()
                     .put("tx_packets", snapshot.vpnTxPackets)
                     .put("tx_bytes", snapshot.vpnTxBytes)
                     .put("rx_packets", snapshot.vpnRxPackets)
                     .put("rx_bytes", snapshot.vpnRxBytes))
-        }
-        if (observationType == "network_snapshot") {
-            payload.put("flow_metadata_opt_in", snapshot.flowMetadataEnabled)
-                .put("payload_metadata_opt_in", snapshot.payloadMetadataEnabled)
         }
         if (observationType == "network_snapshot" && snapshot.flows.isNotEmpty()) {
             val flowLimit = if (snapshot.payloadMetadataEnabled) 15 else FlowAttributionCollector.DEFAULT_SNAPSHOT_LIMIT
