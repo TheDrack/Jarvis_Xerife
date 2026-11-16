@@ -205,7 +205,7 @@ class EnvironmentObservationCreate(BaseModel):
                         if (
                             isinstance(port, bool)
                             or not isinstance(port, int)
-                            or not 1 <= port <= 65535
+                            or not 0 <= port <= 65535
                         ):
                             raise ValueError("network flow port is invalid")
                     uid = flow.get("uid")
