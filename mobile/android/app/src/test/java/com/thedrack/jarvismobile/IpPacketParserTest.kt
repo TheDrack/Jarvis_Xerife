@@ -159,6 +159,8 @@ class IpPacketParserTest {
 
         assertEquals(40, parsedTcp.payloadOffset)
         assertEquals(4, parsedTcp.payloadLength)
+        assertEquals(0x01020304L, parsedTcp.tcpSequenceNumber)
+        assertEquals(null, parsedUdp.tcpSequenceNumber)
         assertEquals(28, parsedUdp.payloadOffset)
         assertEquals(4, parsedUdp.payloadLength)
     }
@@ -187,7 +189,8 @@ class IpPacketParserTest {
         sourcePort: Int,
         destinationPort: Int,
         ipv4OptionsBytes: Int = 0,
-        fragmentOffset: Int = 0
+        fragmentOffset: Int = 0,
+        tcpSequenceNumber: Long = 0x01020304L
     ): ByteArray {
         val headerLength = 20 + ipv4OptionsBytes
         val transportLength = if (protocol == 6) 20 else 8
@@ -207,6 +210,10 @@ class IpPacketParserTest {
         packet[headerLength + 2] = (destinationPort shr 8).toByte()
         packet[headerLength + 3] = destinationPort.toByte()
         if (protocol == 6) {
+            packet[headerLength + 4] = (tcpSequenceNumber shr 24).toByte()
+            packet[headerLength + 5] = (tcpSequenceNumber shr 16).toByte()
+            packet[headerLength + 6] = (tcpSequenceNumber shr 8).toByte()
+            packet[headerLength + 7] = tcpSequenceNumber.toByte()
             packet[headerLength + 12] = 0x50 // TCP header length: 20 bytes.
         } else {
             val udpLength = 8 + payloadLength
