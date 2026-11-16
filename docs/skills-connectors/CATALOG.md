@@ -76,6 +76,13 @@
 - Directory listings and UTF-8 reads are bounded. Symlinks, junctions, traversal, sensitive credential stores, binary files, and credential-shaped content are refused or filtered.
 - Status: implemented on the rebuild branch; CI and independent security review are required. Runtime availability requires the deployed MCP server to include the change and the local opt-in to be enabled. Runbook: [Secure MCP Tunnel](../SECURE_MCP_TUNNEL.md).
 
+## Android MCP metadata-only observability (opt-in)
+
+- Implementation: `app/adapters/edge/android_mcp_observability.py`, integrated at the ASGI boundary in `app/adapters/edge/jarvis_android_mcp.py`.
+- Disabled by default; enable with `JARVIS_ANDROID_MCP_OBSERVABILITY=1`. Records inbound/outbound method, route template, status, byte counts, request correlation ID and latency. It never persists bodies, prompts, tool arguments, headers, cookies, tokens, query strings or client addresses. Owner-only JSONL with bounded rotation; logging is fail-open.
+- Runtime activation requires changing the local service environment and restarting `jarvis-android-mcp`; this repository change does neither. See [Android MCP observability](../ANDROID_MCP_OBSERVABILITY.md).
+- Tailscale is not required. Network Flow Logs are a separate Premium/Enterprise feature and record aggregate flow metadata, not packet contents; no Tailscale logging is enabled by this adapter.
+
 ## Termux shell execution over the Android MCP tunnel
 
 - Implementation: `app/adapters/infrastructure/termux_shell.py` and `termux_shell_mcp_tools.py`; registered additively by `app/adapters/edge/jarvis_android_mcp.py`.

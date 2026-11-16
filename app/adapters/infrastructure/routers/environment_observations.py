@@ -1,12 +1,13 @@
 """Authenticated ingestion and read API for desktop/mobile environment observations."""
+
 from __future__ import annotations
 
 import json
 import logging
+import math
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 from uuid import UUID
-import math
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field, root_validator, validator
@@ -24,9 +25,16 @@ TTL_BY_TYPE = {
     "network_snapshot": timedelta(minutes=5),
     "presence": timedelta(minutes=2),
     "location_snapshot": timedelta(minutes=2),
+    "app_usage_snapshot": timedelta(minutes=5),
 }
 FORBIDDEN_PAYLOAD_KEYS = {
-    "ssid", "bssid", "password", "token", "authorization", "api_key", "secret",
+    "ssid",
+    "bssid",
+    "password",
+    "token",
+    "authorization",
+    "api_key",
+    "secret",
 }
 
 
@@ -35,7 +43,9 @@ class EnvironmentObservationCreate(BaseModel):
 
     device_id: str = Field(min_length=1, max_length=128)
     source_device_type: Literal["desktop", "mobile"]
-    observation_type: Literal["network_snapshot", "presence", "location_snapshot"]
+    observation_type: Literal[
+        "network_snapshot", "presence", "location_snapshot", "app_usage_snapshot"
+    ]
     schema_version: Literal[1] = 1
     request_id: UUID
     observed_at: datetime
@@ -68,23 +78,35 @@ class EnvironmentObservationCreate(BaseModel):
         encoded = json.dumps(value, separators=(",", ":"), ensure_ascii=True)
         if len(encoded.encode("utf-8")) > MAX_PAYLOAD_BYTES:
             raise ValueError("payload exceeds 32 KiB")
+
         def check_keys(item: Any) -> None:
             if isinstance(item, dict):
                 for key, nested in item.items():
                     if str(key).strip().lower() in FORBIDDEN_PAYLOAD_KEYS:
-                        raise ValueError("payload contains a field that must not be collected")
+                        raise ValueError(
+                            "payload contains a field that must not be collected"
+                        )
                     check_keys(nested)
             elif isinstance(item, list):
                 for nested in item:
                     check_keys(nested)
+
         check_keys(value)
         return value
 
     @root_validator(skip_on_failure=True)
     def validate_location_consent(cls, values: dict[str, Any]) -> dict[str, Any]:
         payload = values.get("payload") or {}
-        location_keys = {"latitude", "longitude", "location", "accuracy_m", "captured_at", "precision"}
+        location_keys = {
+            "latitude",
+            "longitude",
+            "location",
+            "accuracy_m",
+            "captured_at",
+            "precision",
+        }
         found_location_data = False
+
         def inspect(item: Any) -> None:
             nonlocal found_location_data
             if isinstance(item, dict):
@@ -95,29 +117,112 @@ class EnvironmentObservationCreate(BaseModel):
             elif isinstance(item, list):
                 for nested in item:
                     inspect(nested)
+
         inspect(payload)
         if not found_location_data:
             if values.get("observation_type") == "location_snapshot":
-                raise ValueError("location_snapshot requires an opted-in location payload")
-            return values
-        if (values.get("source_device_type") != "mobile"
+                raise ValueError(
+                    "location_snapshot requires an opted-in location payload"
+                )
+        else:
+            if (
+                values.get("source_device_type") != "mobile"
                 or values.get("observation_type") != "location_snapshot"
-                or payload.get("location_opt_in") is not True):
-            raise ValueError("location requires explicit mobile location opt-in")
-        location = payload.get("location")
-        if not isinstance(location, dict):
-            raise ValueError("location must be an object")
-        latitude, longitude = location.get("latitude"), location.get("longitude")
-        if (isinstance(latitude, bool) or not isinstance(latitude, (int, float))
-                or not math.isfinite(float(latitude)) or not -90 <= float(latitude) <= 90):
-            raise ValueError("location latitude is invalid")
-        if (isinstance(longitude, bool) or not isinstance(longitude, (int, float))
-                or not math.isfinite(float(longitude)) or not -180 <= float(longitude) <= 180):
-            raise ValueError("location longitude is invalid")
-        accuracy = location.get("accuracy_m")
-        if accuracy is not None and (isinstance(accuracy, bool) or not isinstance(accuracy, (int, float))
-                or not math.isfinite(float(accuracy)) or float(accuracy) < 0):
-            raise ValueError("location accuracy is invalid")
+                or payload.get("location_opt_in") is not True
+            ):
+                raise ValueError("location requires explicit mobile location opt-in")
+            location = payload.get("location")
+            if not isinstance(location, dict):
+                raise ValueError("location must be an object")
+            latitude, longitude = location.get("latitude"), location.get("longitude")
+            if (
+                isinstance(latitude, bool)
+                or not isinstance(latitude, (int, float))
+                or not math.isfinite(float(latitude))
+                or not -90 <= float(latitude) <= 90
+            ):
+                raise ValueError("location latitude is invalid")
+            if (
+                isinstance(longitude, bool)
+                or not isinstance(longitude, (int, float))
+                or not math.isfinite(float(longitude))
+                or not -180 <= float(longitude) <= 180
+            ):
+                raise ValueError("location longitude is invalid")
+            accuracy = location.get("accuracy_m")
+            if accuracy is not None and (
+                isinstance(accuracy, bool)
+                or not isinstance(accuracy, (int, float))
+                or not math.isfinite(float(accuracy))
+                or float(accuracy) < 0
+            ):
+                raise ValueError("location accuracy is invalid")
+
+        if values.get("observation_type") == "app_usage_snapshot":
+            if (
+                values.get("source_device_type") != "mobile"
+                or payload.get("usage_access_opt_in") is not True
+            ):
+                raise ValueError(
+                    "app usage requires explicit mobile Usage Access opt-in"
+                )
+            start_value, end_value = (
+                payload.get("window_start"),
+                payload.get("window_end"),
+            )
+            try:
+                window_start = datetime.fromisoformat(
+                    str(start_value).replace("Z", "+00:00")
+                )
+                window_end = datetime.fromisoformat(
+                    str(end_value).replace("Z", "+00:00")
+                )
+            except (TypeError, ValueError):
+                raise ValueError(
+                    "app usage window timestamps must be ISO-8601"
+                ) from None
+            if (
+                window_start.tzinfo is None
+                or window_end.tzinfo is None
+                or window_end <= window_start
+                or window_end - window_start > timedelta(hours=24)
+            ):
+                raise ValueError("app usage window is invalid")
+            if payload.get("collection_status") not in {"ok", "partial"}:
+                raise ValueError("app usage collection status is invalid")
+            apps = payload.get("apps")
+            if not isinstance(apps, list) or len(apps) > 50:
+                raise ValueError("app usage must contain at most 50 app entries")
+            for app in apps:
+                if not isinstance(app, dict):
+                    raise ValueError("app usage entry must be an object")
+                uid = app.get("uid")
+                if isinstance(uid, bool) or not isinstance(uid, int) or uid < 0:
+                    raise ValueError("app usage UID is invalid")
+                package_names = app.get("package_names", [])
+                if (
+                    not isinstance(package_names, list)
+                    or len(package_names) > 5
+                    or any(
+                        not isinstance(name, str) or not name or len(name) > 255
+                        for name in package_names
+                    )
+                ):
+                    raise ValueError("app usage package names are invalid")
+                for network in ("wifi", "mobile"):
+                    counters = app.get(network)
+                    if not isinstance(counters, dict):
+                        raise ValueError("app usage network counters are required")
+                    for counter in ("rx_bytes", "tx_bytes"):
+                        amount = counters.get(counter)
+                        if (
+                            isinstance(amount, bool)
+                            or not isinstance(amount, int)
+                            or amount < 0
+                        ):
+                            raise ValueError(
+                                "app usage byte counters must be non-negative integers"
+                            )
         return values
 
 
@@ -125,7 +230,9 @@ def _owner_id(user: User) -> str:
     value = getattr(user, "user_id", None) or getattr(user, "username", None)
     normalized = str(value or "").strip()
     if not normalized:
-        raise HTTPException(status_code=401, detail="Authenticated user has no stable identity")
+        raise HTTPException(
+            status_code=401, detail="Authenticated user has no stable identity"
+        )
     return normalized
 
 
@@ -155,7 +262,9 @@ def _parse_datetime(value: Any) -> datetime | None:
     if not isinstance(value, str):
         return value if isinstance(value, datetime) else None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(
+            timezone.utc
+        )
     except (ValueError, TypeError):
         return None
 
@@ -163,9 +272,15 @@ def _parse_datetime(value: Any) -> datetime | None:
 def _public_observation(row: dict[str, Any], now: datetime) -> dict[str, Any]:
     received_at = _parse_datetime(row.get("received_at"))
     expires_at = _parse_datetime(row.get("expires_at"))
-    age_seconds = max(0, int((now - received_at).total_seconds())) if received_at else None
+    age_seconds = (
+        max(0, int((now - received_at).total_seconds())) if received_at else None
+    )
     payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
-    if row.get("observation_type") == "location_snapshot" and expires_at and expires_at <= now:
+    if (
+        row.get("observation_type") == "location_snapshot"
+        and expires_at
+        and expires_at <= now
+    ):
         payload = {}
     return {
         "device_id": row.get("device_id"),
@@ -194,21 +309,34 @@ def create_environment_observations_router(get_current_user) -> APIRouter:
         owner_id = _owner_id(current_user)
         claim_owner = str(claims.get("user_id") or claims.get("sub") or "").strip()
         if not claim_owner or claim_owner != owner_id:
-            raise HTTPException(status_code=403, detail="Token identity does not match authenticated user")
+            raise HTTPException(
+                status_code=403,
+                detail="Token identity does not match authenticated user",
+            )
 
         token_client = str(claims.get("client") or "").lower()
         token_device = claims.get("device_id")
         if observation.source_device_type == "mobile":
             if token_client != "jarvis-mobile" or token_device != observation.device_id:
-                raise HTTPException(status_code=403, detail="Mobile observations require a token bound to this device")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Mobile observations require a token bound to this device",
+                )
         elif token_client == "jarvis-mobile":
-            raise HTTPException(status_code=403, detail="Mobile sessions cannot publish desktop observations")
+            raise HTTPException(
+                status_code=403,
+                detail="Mobile sessions cannot publish desktop observations",
+            )
         elif token_device and token_device != observation.device_id:
-            raise HTTPException(status_code=403, detail="Token is bound to a different device")
+            raise HTTPException(
+                status_code=403, detail="Token is bound to a different device"
+            )
 
         database = get_supabase_admin_client()
         if database is None:
-            raise HTTPException(status_code=503, detail="Environment observation storage is unavailable")
+            raise HTTPException(
+                status_code=503, detail="Environment observation storage is unavailable"
+            )
 
         now = datetime.now(timezone.utc)
         record = {
@@ -226,24 +354,40 @@ def create_environment_observations_router(get_current_user) -> APIRouter:
         try:
             inserted = _rows(database.table(TABLE).insert(record).select("*").execute())
             if inserted:
-                return {"accepted": True, "duplicate": False, "observation": _public_observation(inserted[0], now)}
+                return {
+                    "accepted": True,
+                    "duplicate": False,
+                    "observation": _public_observation(inserted[0], now),
+                }
         except Exception as exc:
             # A unique (user_id, request_id) conflict is an idempotent replay.
             try:
                 existing = _rows(
-                    database.table(TABLE).select("*")
+                    database.table(TABLE)
+                    .select("*")
                     .eq("user_id", owner_id)
                     .eq("request_id", str(observation.request_id))
-                    .limit(1).execute()
+                    .limit(1)
+                    .execute()
                 )
             except Exception:
                 existing = []
             if existing:
-                return {"accepted": True, "duplicate": True, "observation": _public_observation(existing[0], now)}
-            logger.warning("Environment observation persistence failed (%s)", type(exc).__name__)
-            raise HTTPException(status_code=503, detail="Could not persist environment observation") from None
+                return {
+                    "accepted": True,
+                    "duplicate": True,
+                    "observation": _public_observation(existing[0], now),
+                }
+            logger.warning(
+                "Environment observation persistence failed (%s)", type(exc).__name__
+            )
+            raise HTTPException(
+                status_code=503, detail="Could not persist environment observation"
+            ) from None
 
-        raise HTTPException(status_code=503, detail="Could not persist environment observation")
+        raise HTTPException(
+            status_code=503, detail="Could not persist environment observation"
+        )
 
     @router.get("/v1/environment/observations/latest")
     async def latest_observations(
@@ -251,15 +395,26 @@ def create_environment_observations_router(get_current_user) -> APIRouter:
     ) -> dict[str, Any]:
         database = get_supabase_admin_client()
         if database is None:
-            raise HTTPException(status_code=503, detail="Environment observation storage is unavailable")
+            raise HTTPException(
+                status_code=503, detail="Environment observation storage is unavailable"
+            )
         owner_id = _owner_id(current_user)
         try:
-            response = database.table(TABLE).select("*").eq("user_id", owner_id).order(
-                "received_at", desc=True
-            ).limit(200).execute()
+            response = (
+                database.table(TABLE)
+                .select("*")
+                .eq("user_id", owner_id)
+                .order("received_at", desc=True)
+                .limit(200)
+                .execute()
+            )
         except Exception as exc:
-            logger.warning("Environment observation query failed (%s)", type(exc).__name__)
-            raise HTTPException(status_code=503, detail="Could not read environment observations") from None
+            logger.warning(
+                "Environment observation query failed (%s)", type(exc).__name__
+            )
+            raise HTTPException(
+                status_code=503, detail="Could not read environment observations"
+            ) from None
 
         now = datetime.now(timezone.utc)
         latest: dict[tuple[str, str, str], dict[str, Any]] = {}
