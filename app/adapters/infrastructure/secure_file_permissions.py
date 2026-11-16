@@ -16,7 +16,10 @@ def set_private_directory_permissions(path: str | Path) -> None:
     target = Path(path)
     _validate_target(target, directory=True)
     if os.name == "nt":
-        _set_windows_acl(target, directory=True)
+        try:
+            verify_private_directory_permissions(target)
+        except PermissionError:
+            _set_windows_acl(target, directory=True)
     else:
         os.chmod(target, 0o700)
         verify_private_directory_permissions(target)
@@ -27,7 +30,10 @@ def set_private_file_permissions(path: str | Path) -> None:
     target = Path(path)
     _validate_target(target, directory=False)
     if os.name == "nt":
-        _set_windows_acl(target, directory=False)
+        try:
+            verify_private_file_permissions(target)
+        except PermissionError:
+            _set_windows_acl(target, directory=False)
     else:
         os.chmod(target, 0o600)
         verify_private_file_permissions(target)
@@ -58,7 +64,7 @@ def _validate_target(path: Path, *, directory: bool) -> None:
 
 def _verify_permissions(path: Path, *, directory: bool) -> None:
     if os.name == "nt":
-        _verify_windows_acl(path)
+        _verify_windows_acl(path, directory=directory)
         return
     expected = 0o700 if directory else 0o600
     actual = stat.S_IMODE(path.stat().st_mode)
@@ -139,10 +145,10 @@ def _set_windows_acl(path: Path, *, directory: bool) -> None:
         raise PermissionError(
             f"Unable to set private Windows ACL (exit {result.returncode}): {detail}"
         )
-    _verify_windows_acl(path)
+    _verify_windows_acl(path, directory=directory)
 
 
-def _verify_windows_acl(path: Path) -> None:
+def _verify_windows_acl(path: Path, *, directory: bool) -> None:
     executable = shutil.which("icacls")
     if not executable:
         raise PermissionError("Windows ACL utility is unavailable")
@@ -179,7 +185,16 @@ def _verify_windows_acl(path: Path) -> None:
     )
     has_system = any("system" in ace.casefold() for ace in aces)
     has_full_control = all("(F)" in ace for ace in aces)
-    if len(aces) != 2 or not has_user or not has_system or not has_full_control:
+    has_directory_inheritance = not directory or all(
+        "(OI)" in ace and "(CI)" in ace for ace in aces
+    )
+    if (
+        len(aces) != 2
+        or not has_user
+        or not has_system
+        or not has_full_control
+        or not has_directory_inheritance
+    ):
         raise PermissionError(
             "Private Windows ACL must grant full control only to the current user and SYSTEM"
         )

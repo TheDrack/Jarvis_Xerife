@@ -126,4 +126,35 @@ def test_windows_acl_verification_rejects_extra_group_access(tmp_path, monkeypat
     monkeypatch.setattr(permissions.subprocess, "run", run)
 
     with pytest.raises(PermissionError, match="only to the current user and SYSTEM"):
-        permissions._verify_windows_acl(directory)
+        permissions._verify_windows_acl(directory, directory=True)
+
+
+def test_windows_directory_acl_requires_child_inheritance_flags(tmp_path, monkeypatch):
+    directory = tmp_path / "private"
+    directory.mkdir()
+    user_name = "TESTHOST\\tester"
+    user_sid = "S-1-5-21-111-222-333-1001"
+
+    def which(name):
+        return f"{name}.exe"
+
+    def run(command, **_kwargs):
+        if command[0] == "whoami.exe":
+            return subprocess.CompletedProcess(
+                command, 0, stdout=f'"{user_name}","{user_sid}"\n', stderr=""
+            )
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=(
+                f"{directory} {user_name}:(F)\n"
+                "                  NT AUTHORITY\\SYSTEM:(F)\n"
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(permissions.shutil, "which", which)
+    monkeypatch.setattr(permissions.subprocess, "run", run)
+
+    with pytest.raises(PermissionError, match="only to the current user and SYSTEM"):
+        permissions._verify_windows_acl(directory, directory=True)
