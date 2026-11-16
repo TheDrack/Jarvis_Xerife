@@ -73,6 +73,7 @@ class JarvisVpnService : VpnService() {
     }
 
     private fun startTunnel() {
+        stopping.set(false)
         check(HevRuntimeCompatibility.isSupported(Build.VERSION.SDK_INT)) {
             "Jarvis VPN requires Android API ${HevRuntimeCompatibility.MIN_ANDROID_API} or newer"
         }
@@ -91,7 +92,6 @@ class JarvisVpnService : VpnService() {
             "An external VPN is active. AUTO preserves it; select JARVIS to explicitly request replacement."
         }
 
-        stopping.set(false)
         val socksUsername = newSocksCredential()
         val socksPassword = newSocksCredential()
         val proxy = LocalSocks5Proxy(this, socksUsername, socksPassword)
