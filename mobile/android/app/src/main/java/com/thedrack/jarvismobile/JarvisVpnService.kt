@@ -67,13 +67,11 @@ class JarvisVpnService : VpnService() {
             .addRoute("::", 0)
             .addDnsServer(DNS_IPV4)
 
-        val selectedPackages = getSharedPreferences("jarvis_session", MODE_PRIVATE)
-            .getString("app_usage_package_filter", "")
-            .orEmpty()
-            .split(Regex("[,;\\s]+"))
-            .map(String::trim)
-            .filter(String::isNotEmpty)
-            .distinct()
+        val selectedPackages = VpnPackageFilter.parse(
+            getSharedPreferences("jarvis_session", MODE_PRIVATE)
+                .getString("app_usage_package_filter", "")
+                .orEmpty()
+        )
         if (selectedPackages.isEmpty()) {
             builder.addDisallowedApplication(packageName)
         } else {
