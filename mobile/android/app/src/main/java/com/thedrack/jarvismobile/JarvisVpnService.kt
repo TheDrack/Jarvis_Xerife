@@ -76,12 +76,19 @@ class JarvisVpnService : VpnService() {
         check(HevRuntimeCompatibility.isSupported(Build.VERSION.SDK_INT)) {
             "Jarvis VPN requires Android API ${HevRuntimeCompatibility.MIN_ANDROID_API} or newer"
         }
+        val preferences = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        val modePreference = VpnModePreference.fromWireValue(
+            preferences.getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
+        )
+        check(modePreference != VpnModePreference.TAILSCALE) {
+            "TAILSCALE mode is selected; Jarvis VPN startup is disabled."
+        }
         check(VpnService.prepare(this) == null) {
             "VPN permission has not been granted by the user"
         }
         val runtime = VpnStateDetector.detect(this)
-        check(!runtime.externalVpnActive) {
-            "Another VPN is active. Jarvis will not replace it automatically."
+        check(!runtime.externalVpnActive || modePreference == VpnModePreference.JARVIS) {
+            "An external VPN is active. AUTO preserves it; select JARVIS to explicitly request replacement."
         }
 
         stopping.set(false)
@@ -127,8 +134,7 @@ class JarvisVpnService : VpnService() {
         }
         tun = descriptor
 
-        val flowSharingEnabled = getSharedPreferences("jarvis_session", MODE_PRIVATE)
-            .getBoolean("vpn_flow_sharing_enabled", false)
+        val flowSharingEnabled = preferences.getBoolean("vpn_flow_sharing_enabled", false)
         val collector = if (flowSharingEnabled) {
             createAndroidFlowAttributionCollector(applicationContext)
         } else null
