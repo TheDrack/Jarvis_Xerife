@@ -58,7 +58,11 @@ object VpnModeOrchestrator {
             ) {
                 return VpnModeDecision(VpnCollectionMode.TAILSCALE, "tailscale", false)
             }
-            return VpnModeDecision(VpnCollectionMode.EXTERNAL_VPN_STATS, "external_unknown", false)
+            return VpnModeDecision(
+                VpnCollectionMode.EXTERNAL_VPN_STATS,
+                "external_unknown",
+                mayStartJarvisVpn = preference == VpnModePreference.JARVIS
+            )
         }
 
         if (preference == VpnModePreference.TAILSCALE) {
