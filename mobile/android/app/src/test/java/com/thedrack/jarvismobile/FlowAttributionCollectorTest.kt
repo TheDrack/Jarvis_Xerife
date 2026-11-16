@@ -49,6 +49,30 @@ class FlowAttributionCollectorTest {
     }
 
     @Test
+    fun marksSharedUidAsAmbiguousInsteadOfClaimingOneApplication() {
+        val collector = FlowAttributionCollector(
+            ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> 10123 },
+            packageResolver = PackageIdentityResolver {
+                listOf(
+                    AppPackageIdentity("com.example.primary", "Primary", false),
+                    AppPackageIdentity("com.example.companion", "Companion", false)
+                )
+            },
+            clock = { 1_500L }
+        )
+
+        collector.record(packet(OUTBOUND, tcpFlags = 0x02), FlowPacketDirection.OUTBOUND)
+
+        val flow = collector.snapshot().single()
+        assertEquals("shared_uid", flow.attributionStatus)
+        assertEquals(
+            listOf("com.example.companion", "com.example.primary"),
+            flow.packageNames
+        )
+        assertNull(flow.appLabel)
+    }
+
+    @Test
     fun recordsUnresolvedUidWithoutInventingPackageIdentity() {
         val collector = FlowAttributionCollector(
             ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> -1 },
