@@ -17,8 +17,9 @@ data class ParsedIpPacket(
 )
 
 /**
- * Minimal IPv4/IPv6 TCP/UDP header parser for packets read from the VPN TUN.
- * It deliberately returns only tuple metadata and total packet length.
+ * Minimal IPv4/IPv6 TCP/UDP parser for packets read from the VPN TUN.
+ * It returns tuple metadata and a validated payload byte range; it never copies
+ * or retains payload bytes.
  */
 object IpPacketParser {
     private const val IPPROTO_TCP = 6
