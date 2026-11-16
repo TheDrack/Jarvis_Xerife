@@ -158,6 +158,22 @@ class EnvironmentObservationCreate(BaseModel):
             ):
                 raise ValueError("location accuracy is invalid")
 
+        if values.get("observation_type") == "network_snapshot":
+            tunnel_stats = payload.get("vpn_tunnel_stats")
+            if tunnel_stats is not None:
+                if not isinstance(tunnel_stats, dict):
+                    raise ValueError("VPN tunnel statistics must be an object")
+                for counter in ("tx_packets", "tx_bytes", "rx_packets", "rx_bytes"):
+                    amount = tunnel_stats.get(counter)
+                    if (
+                        isinstance(amount, bool)
+                        or not isinstance(amount, int)
+                        or amount < 0
+                    ):
+                        raise ValueError(
+                            "VPN tunnel counters must be non-negative integers"
+                        )
+
         if values.get("observation_type") == "app_usage_snapshot":
             if (
                 values.get("source_device_type") != "mobile"
