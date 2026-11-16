@@ -17,7 +17,7 @@
 
 This is an **on-device traffic inspection/forwarding VPN**, not a remote privacy VPN. The local SOCKS5 server creates protected direct sockets over the current Wi-Fi/mobile network. It does not encrypt traffic to a remote gateway, change the public IP, or provide anonymity.
 
-Hev's public JNI statistics are interface-wide counters (packets and bytes). They do not identify the originating Android package or expose per-flow metadata by themselves. The existing `NetworkStatsManager` collector remains the source of per-UID/package aggregate RX/TX counters.
+Hev's public JNI statistics are now published as `payload.vpn_tunnel_stats` (`tx_packets`, `tx_bytes`, `rx_packets`, `rx_bytes`). They are interface-wide counters: they do not identify the originating Android package or expose per-flow metadata by themselves. The existing `NetworkStatsManager` collector remains the source of per-UID/package aggregate RX/TX counters.
 
 The SOCKS5 layer sees destination addresses and ports as it forwards connections, but this first integration does not yet publish a per-flow event schema or map each forwarded flow back to the originating package. That requires additional TUN/UID correlation work and device-level verification before claiming per-app flow attribution.
 
