@@ -336,6 +336,49 @@ class FlowAttributionCollectorTest {
         assertTrue(collector.snapshot().single().protocolObservations.isEmpty())
     }
 
+    @Test
+    fun reconstructsSplitLengthPrefixedDnsOverTcp() {
+        val collector = FlowAttributionCollector(
+            ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> 10001 },
+            packageResolver = PackageIdentityResolver { emptyList() },
+            clock = { 11_000L },
+            payloadMetadataEnabled = true
+        )
+        val dnsName = byteArrayOf(
+            3, 'a'.code.toByte(), 'p'.code.toByte(), 'i'.code.toByte(),
+            7, 'e'.code.toByte(), 'x'.code.toByte(), 'a'.code.toByte(),
+            'm'.code.toByte(), 'p'.code.toByte(), 'l'.code.toByte(), 'e'.code.toByte(),
+            3, 'c'.code.toByte(), 'o'.code.toByte(), 'm'.code.toByte(), 0,
+            0, 1, 0, 1
+        )
+        val dnsMessage = byteArrayOf(
+            0x12, 0x34, 0x01, 0x00, 0x00, 0x01,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        ) + dnsName
+        val framed = byteArrayOf((dnsMessage.size shr 8).toByte(), dnsMessage.size.toByte()) + dnsMessage
+        val split = 10
+        val first = framed.copyOfRange(0, split)
+        val second = framed.copyOfRange(split, framed.size)
+        val firstPacket = packet(
+            OUTBOUND,
+            sourcePort = 53000,
+            destinationPort = 53
+        ).copy(payloadOffset = 0, payloadLength = first.size, tcpSequenceNumber = 300L)
+        val secondPacket = firstPacket.copy(
+            payloadLength = second.size,
+            tcpSequenceNumber = 300L + first.size
+        )
+
+        collector.record(firstPacket, FlowPacketDirection.OUTBOUND, first)
+        assertTrue(collector.snapshot().single().protocolObservations.isEmpty())
+        collector.record(secondPacket, FlowPacketDirection.OUTBOUND, second)
+
+        assertEquals(
+            listOf(NetworkProtocolObservation("dns_query", "api.example.com", "dns")),
+            collector.snapshot().single().protocolObservations
+        )
+    }
+
     private fun packet(
         direction: Int,
         protocol: String = "tcp",

@@ -237,6 +237,9 @@ internal class FlowAttributionCollector(
         val isDns = packet.protocolNumber == UDP_PROTOCOL &&
             (packet.sourcePort == 53 || packet.sourcePort == 5353 ||
                 packet.destinationPort == 53 || packet.destinationPort == 5353)
+        val isTcpDns = packet.protocolNumber == TCP_PROTOCOL &&
+            (packet.sourcePort == 53 || packet.sourcePort == 5353 ||
+                packet.destinationPort == 53 || packet.destinationPort == 5353)
         val isHttp = packet.protocolNumber == TCP_PROTOCOL &&
             (packet.sourcePort in HTTP_METADATA_PORTS ||
                 packet.destinationPort in HTTP_METADATA_PORTS)
@@ -250,7 +253,7 @@ internal class FlowAttributionCollector(
         } else {
             flow.inboundTcpReassembler
         }
-        if (!isDns && !isHttp && !isTlsPort && !isTlsRecordStart && existingReassembler == null) return
+        if (!isDns && !isTcpDns && !isHttp && !isTlsPort && !isTlsRecordStart && existingReassembler == null) return
 
         val boundedLength = minOf(length, PassivePayloadInspector.MAX_INSPECTED_PAYLOAD_BYTES)
         if (boundedLength <= 0) return
