@@ -460,6 +460,18 @@ def test_network_snapshot_accepts_bounded_per_flow_uid_attribution():
     )
     module.EnvironmentObservationCreate(**valid)
 
+    zero_port_flow = {**flow, "flow_id": str(uuid4()), "local_port": 0}
+    module.EnvironmentObservationCreate(
+        **dict(
+            valid,
+            payload={
+                "platform": "android",
+                "flow_metadata_opt_in": True,
+                "flows": [zero_port_flow],
+            },
+        )
+    )
+
     shared_uid_flow = {
         **flow,
         "flow_id": str(uuid4()),
