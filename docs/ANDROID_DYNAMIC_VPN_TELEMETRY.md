@@ -30,7 +30,7 @@ The Android app now includes an explicitly user-started `JarvisVpnService` backe
 
 The service reuses the package filter: an empty filter routes all apps except Jarvis; a populated filter routes only the named packages. Changing this list requires re-establishing the VPN.
 
-This is a **local forwarding/inspection VPN**, not a remote encrypted privacy VPN. Traffic exits directly through the current Wi-Fi/mobile network. Hev's exposed counters are interface-wide; the existing `NetworkStatsManager` remains the source of per-UID/package aggregate counters. This integration does not yet publish per-flow records or correlate each SOCKS flow to its originating Android UID.
+This is a **local forwarding/inspection VPN**, not a remote encrypted privacy VPN. Traffic exits directly through the current Wi-Fi/mobile network. Hev's interface-wide counters are published in `vpn_tunnel_stats`; the existing `NetworkStatsManager` remains the source of per-UID/package aggregate counters. This integration does not yet publish per-flow records or correlate each SOCKS flow to its originating Android UID.
 
 The service is manual opt-in in this phase. AUTO does not start or replace a VPN in the background. Physical-device tests are still required for real connectivity, DNS, IPv4/IPv6, TCP/UDP, handover, process death, and revocation before automatic switching is enabled. See [ANDROID_JARVIS_VPNSERVICE.md](ANDROID_JARVIS_VPNSERVICE.md).
 
