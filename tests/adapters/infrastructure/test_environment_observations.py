@@ -546,6 +546,84 @@ def test_flow_metadata_is_restricted_to_mobile_network_snapshots():
         )
 
 
+def test_network_payload_metadata_requires_separate_mobile_opt_in():
+    now = datetime.now(timezone.utc)
+    flow = {
+        "flow_id": str(uuid4()),
+        "protocol": "tcp",
+        "local_ip": "10.0.0.2",
+        "local_port": 49152,
+        "remote_ip": "1.1.1.1",
+        "remote_port": 443,
+        "uid": 10123,
+        "package_names": ["com.example.app"],
+        "app_label": "Example",
+        "attribution_status": "resolved",
+        "first_seen_at": now.isoformat(),
+        "last_seen_at": now.isoformat(),
+        "tx_packets": 1,
+        "tx_bytes": 60,
+        "rx_packets": 1,
+        "rx_bytes": 52,
+        "closed": False,
+        "protocol_observations": [
+            {"kind": "tls_sni", "value": "api.example.com", "source": "tls_client_hello"},
+            {"kind": "dns_query", "value": "api.example.com", "source": "dns"},
+        ],
+    }
+    body = observation(
+        device_id="phone-1",
+        source_device_type="mobile",
+        observation_type="network_snapshot",
+        payload={
+            "platform": "android",
+            "flow_metadata_opt_in": True,
+            "payload_metadata_opt_in": True,
+            "flows": [flow],
+        },
+    )
+    module.EnvironmentObservationCreate(**body)
+
+    with pytest.raises(ValueError, match="payload metadata requires"):
+        module.EnvironmentObservationCreate(
+            **dict(body, payload={"platform": "android", "flow_metadata_opt_in": True, "flows": [flow]})
+        )
+
+    with pytest.raises(ValueError, match="protocol observations require"):
+        module.EnvironmentObservationCreate(
+            **dict(
+                body,
+                payload={
+                    "platform": "android",
+                    "flow_metadata_opt_in": True,
+                    "payload_metadata_opt_in": False,
+                    "flows": [flow],
+                },
+            )
+        )
+
+    invalid_observation = {
+        "kind": "http_host",
+        "value": "https://example.com/private",
+        "source": "http",
+    }
+    with pytest.raises(ValueError, match="protocol observation"):
+        module.EnvironmentObservationCreate(
+            **dict(
+                body,
+                payload={
+                    **body["payload"],
+                    "flows": [{**flow, "protocol_observations": [invalid_observation]}],
+                },
+            )
+        )
+
+    with pytest.raises(ValueError, match="payload metadata is only valid"):
+        module.EnvironmentObservationCreate(
+            **dict(body, source_device_type="desktop")
+        )
+
+
 def test_app_usage_snapshot_accepts_bounded_package_identity_metadata():
     now = datetime.now(timezone.utc)
     valid = observation(
