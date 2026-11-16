@@ -16,7 +16,7 @@ enum class VpnCollectionMode(val wireValue: String) {
     NETWORK_STATS("network_stats"),
     JARVIS_VPN("jarvis_vpn"),
     TAILSCALE("tailscale"),
-    EXTERNAL_VPN_UNSUPPORTED("external_vpn_unsupported"),
+    EXTERNAL_VPN_STATS("external_vpn_stats"),
     WAITING_FOR_TAILSCALE("waiting_for_tailscale")
 }
 
@@ -58,7 +58,7 @@ object VpnModeOrchestrator {
             ) {
                 return VpnModeDecision(VpnCollectionMode.TAILSCALE, "tailscale", false)
             }
-            return VpnModeDecision(VpnCollectionMode.EXTERNAL_VPN_UNSUPPORTED, "external_unknown", false)
+            return VpnModeDecision(VpnCollectionMode.EXTERNAL_VPN_STATS, "external_unknown", false)
         }
 
         if (preference == VpnModePreference.TAILSCALE) {
