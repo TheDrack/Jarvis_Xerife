@@ -460,6 +460,9 @@ private fun JarvisMobileScreen(
     var appUsageSharingEnabled by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("app_usage_sharing_enabled", false))
     }
+    var vpnFlowSharingEnabled by remember {
+        mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("vpn_flow_sharing_enabled", false))
+    }
     var appUsagePackageFilter by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
             .getString("app_usage_package_filter", "") ?: "")
@@ -849,6 +852,31 @@ private fun JarvisMobileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            Text("Identificação por fluxo — VPN Jarvis")
+                            Text(
+                                "Opcional. Registra protocolo, IPs, portas, UID/pacote e contadores por conexão. Não registra conteúdo. Só funciona com a VPN Jarvis ativa; reinicie a VPN após alterar.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = vpnFlowSharingEnabled,
+                            onCheckedChange = { enabled ->
+                                vpnFlowSharingEnabled = enabled
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putBoolean("vpn_flow_sharing_enabled", enabled).apply()
+                                message = if (enabled) {
+                                    "Metadados por fluxo ativados. Reinicie a VPN Jarvis para aplicar."
+                                } else {
+                                    "Metadados por fluxo desativados. Reinicie a VPN Jarvis para aplicar."
+                                }
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text("Estatísticas de tráfego por aplicativo")
                             Text(
                                 if (appUsageAccessGranted)
@@ -873,7 +901,7 @@ private fun JarvisMobileScreen(
                             }
                         )
                     }
-                    if (appUsageSharingEnabled) {
+                    if (appUsageSharingEnabled || vpnFlowSharingEnabled) {
                         Text(
                             "Filtro de aplicativos",
                             modifier = Modifier.padding(top = 10.dp),
@@ -890,7 +918,7 @@ private fun JarvisMobileScreen(
                             label = { Text("Nomes dos pacotes") },
                             placeholder = { Text("com.instagram.android, com.google.android.youtube") },
                             supportingText = {
-                                Text("Separe por vírgula ou linha. Vazio = todos os apps. UID compartilhado é observado como um único registro.")
+                                Text("Separe por vírgula ou linha. Vazio = todos os apps. Aplica-se ao túnel Jarvis e às estatísticas por UID.")
                             },
                             minLines = 2,
                             maxLines = 4
