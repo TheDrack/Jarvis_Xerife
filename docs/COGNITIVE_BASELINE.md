@@ -701,6 +701,11 @@ A captura MCP de curiosidade desta revalidação foi aceita com ID `ab56c1cc462e
 
 ### Separação entre manutenção e evolução cognitiva
 
+- `homeostase.yml` é o caminho Self Healing confirmado, mas somente para falhas de workflows confiáveis em `main`; não recebe PR Validation/Task Queue e cria uma PR nova por run elegível.
+- O caminho legado de `GitHubAdapter.dispatch_auto_fix()` aponta para workflow ausente (`jarvis_code_fixer.yml`) e não tem caller estrito localizado. `AIGateway._dispatch_auto_repair_if_enabled()` somente registra o payload; não despacha o evento. `report_for_auto_correction()` criaria outra PR em vez de atualizar uma existente e também não tem caller estrito localizado.
+- A automação de reparo de PR/CI precisa de um desenho separado, idempotente e seguro: análise em contexto sem escrita, sandbox não privilegiada para proposta de patch e publicador privilegiado isolado que atualize a PR correspondente após validar o diff. Não habilitar execução de código não confiável com token de escrita nem remover o Self Healing atual.
+
+
 - PR #825 foi merged em 2026-11-16 (merge commit `5d5ba13fba16054e4a84ff3e0c46ecd39e50de98`), mas seu gate apenas protege os critérios C0 contra conclusão baseada em nomes; não os conclui.
 - PR #841 contém proposta de percepção de fluxo Android e correção de escopo do schema, mas continua fora de `main`. Seu CI passou no head `5bc4bcf`; a validação em dispositivo físico e a revisão independente ainda faltam.
 - O fluxo Self Healing permanece ativo para falhas de workflows confiáveis em `main`, mas não observa PR Validation/Task Queue. Essa lacuna transversal de manutenção não deve ser tratada como uma fase opcional do roadmap cognitivo.
