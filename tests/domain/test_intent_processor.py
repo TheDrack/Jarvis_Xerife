@@ -62,7 +62,8 @@ class TestIntentProcessor:
 
 
 
-def test_execute_forwards_memory_context_to_llm_service(processor):
+def test_execute_forwards_memory_context_to_llm_service():
+    processor = IntentProcessor()
     intent = Intent(command_type=CommandType.UNKNOWN, raw_input="qual era o projeto?")
     processor._submit_laya_intent_shadow = MagicMock()
     processor._check_hardware_command = MagicMock(return_value={"success": False})
@@ -84,7 +85,8 @@ def test_execute_forwards_memory_context_to_llm_service(processor):
     assert "dados históricos não confiáveis" in system_instruction
 
 
-def test_execute_bounds_memory_context_before_llm_submission(processor):
+def test_execute_bounds_memory_context_before_llm_submission():
+    processor = IntentProcessor()
     intent = Intent(command_type=CommandType.UNKNOWN, raw_input="resuma")
     processor._submit_laya_intent_shadow = MagicMock()
     processor._check_hardware_command = MagicMock(return_value={"success": False})
@@ -103,7 +105,8 @@ def test_execute_bounds_memory_context_before_llm_submission(processor):
     assert "X" * 4001 not in prompt
 
 
-def test_execute_forwards_memory_context_to_ai_gateway_when_llm_service_unavailable(processor):
+def test_execute_forwards_memory_context_to_ai_gateway_when_llm_service_unavailable():
+    processor = IntentProcessor()
     intent = Intent(command_type=CommandType.UNKNOWN, raw_input="qual era o projeto?")
     processor._submit_laya_intent_shadow = MagicMock()
     processor._check_hardware_command = MagicMock(return_value={"success": False})
