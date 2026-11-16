@@ -21,6 +21,24 @@ class PassivePayloadInspectorTest {
     }
 
     @Test
+    fun extractsLengthPrefixedDnsQuestionOverTcp() {
+        val message = dnsQuery("api.example.com")
+        val framed = byteArrayOf((message.size shr 8).toByte(), message.size.toByte()) + message
+
+        val observations = PassivePayloadInspector.inspect(
+            protocolNumber = 6,
+            sourcePort = 53000,
+            destinationPort = 53,
+            payload = framed
+        )
+
+        assertEquals(
+            listOf(NetworkProtocolObservation("dns_query", "api.example.com", "dns")),
+            observations
+        )
+    }
+
+    @Test
     fun extractsHttpHostButNeverRequestPathOrHeaders() {
         val observations = PassivePayloadInspector.inspect(
             protocolNumber = 6,
