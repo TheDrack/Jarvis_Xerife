@@ -144,20 +144,27 @@ internal class LocalSocks5Proxy(
             val buffer = ByteArray(MAX_UDP_PACKET)
             while (running.get() && !control.isClosed && !relay.isClosed) {
                 val packet = DatagramPacket(buffer, buffer.size)
-                relay.receive(packet)
-                val source = InetSocketAddress(packet.address, packet.port)
-                if (packet.address.isLoopbackAddress) {
-                    clientAddress.set(source)
-                    val frame = Socks5Codec.decodeUdp(packet.data.copyOfRange(packet.offset, packet.offset + packet.length))
-                        ?: continue
-                    val destination = InetAddress.getByName(frame.host)
-                    val outgoing = DatagramPacket(frame.payload, frame.payload.size, destination, frame.port)
-                    relay.send(outgoing)
-                } else {
-                    val clientEndpoint = clientAddress.get() ?: continue
-                    val encoded = Socks5Codec.encodeUdp(packet.address, packet.port,
-                        packet.data.copyOfRange(packet.offset, packet.offset + packet.length))
-                    relay.send(DatagramPacket(encoded, encoded.size, clientEndpoint))
+                try {
+                    relay.receive(packet)
+                    val source = InetSocketAddress(packet.address, packet.port)
+                    if (packet.address.isLoopbackAddress) {
+                        clientAddress.set(source)
+                        val frame = Socks5Codec.decodeUdp(packet.data.copyOfRange(packet.offset, packet.offset + packet.length))
+                            ?: continue
+                        val destination = InetAddress.getByName(frame.host)
+                        val outgoing = DatagramPacket(frame.payload, frame.payload.size, destination, frame.port)
+                        relay.send(outgoing)
+                    } else {
+                        val clientEndpoint = clientAddress.get() ?: continue
+                        val encoded = Socks5Codec.encodeUdp(packet.address, packet.port,
+                            packet.data.copyOfRange(packet.offset, packet.offset + packet.length))
+                        relay.send(DatagramPacket(encoded, encoded.size, clientEndpoint))
+                    }
+                } catch (error: SocketException) {
+                    if (running.get() && !control.isClosed) throw error
+                    break
+                } catch (_: Exception) {
+                    // Drop one malformed or unreachable datagram without terminating the VPN.
                 }
             }
         } finally {
