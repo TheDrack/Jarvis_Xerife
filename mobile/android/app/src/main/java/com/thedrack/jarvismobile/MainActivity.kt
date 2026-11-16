@@ -149,6 +149,10 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     private fun requestJarvisVpn(result: (String) -> Unit) {
+        if (!HevRuntimeCompatibility.isSupported(Build.VERSION.SDK_INT)) {
+            result("A VPN própria exige Android 10 ou superior (API 29). A coleta agregada continua disponível nesta versão do Android.")
+            return
+        }
         val permissionIntent = VpnService.prepare(this)
         if (permissionIntent != null) {
             pendingVpnConsentResult = result
