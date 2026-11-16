@@ -44,8 +44,9 @@ data class NetworkFlowSnapshot(
 )
 
 /**
- * Aggregates only IP/transport headers and packet lengths. It never stores packet payloads.
- * The tuple is normalized to app-local -> remote, regardless of packet direction.
+ * Aggregates IP/transport tuples, counters and separately opted-in protocol metadata.
+ * It never stores raw packet payloads. Tuples are normalized to app-local -> remote,
+ * regardless of packet direction.
  */
 internal class FlowAttributionCollector(
     private val ownerResolver: ConnectionOwnerResolver,
@@ -218,8 +219,8 @@ internal class FlowAttributionCollector(
             (packet.sourcePort == 53 || packet.sourcePort == 5353 ||
                 packet.destinationPort == 53 || packet.destinationPort == 5353)
         val isHttp = packet.protocolNumber == 6 &&
-            packet.sourcePort in HTTP_METADATA_PORTS ||
-            packet.protocolNumber == 6 && packet.destinationPort in HTTP_METADATA_PORTS
+            (packet.sourcePort in HTTP_METADATA_PORTS ||
+                packet.destinationPort in HTTP_METADATA_PORTS)
         val isTlsRecord = packet.protocolNumber == 6 && length >= 5 &&
             (rawPacket[offset].toInt() and 0xff) == 22
         if (!isDns && !isHttp && !isTlsRecord) return
