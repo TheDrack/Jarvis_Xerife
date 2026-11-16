@@ -1,5 +1,6 @@
 package com.thedrack.jarvismobile
 
+import java.net.InetAddress
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
@@ -76,9 +77,9 @@ class IpPacketParserTest {
 
         assertNotNull(parsed)
         assertEquals("udp", parsed!!.protocol)
-        assertEquals("2001:db8::1", parsed.sourceAddress.hostAddress)
+        assertEquals(InetAddress.getByName("2001:db8::1"), parsed.sourceAddress)
         assertEquals(55000, parsed.sourcePort)
-        assertEquals("2001:db8::2", parsed.destinationAddress.hostAddress)
+        assertEquals(InetAddress.getByName("2001:db8::2"), parsed.destinationAddress)
         assertEquals(443, parsed.destinationPort)
     }
 
