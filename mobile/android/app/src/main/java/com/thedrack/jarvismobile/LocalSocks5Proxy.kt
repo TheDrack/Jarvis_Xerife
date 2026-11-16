@@ -88,6 +88,135 @@ internal class LocalSocks5Proxy(
         }
     }
 
+    /** Verifies authenticated TCP and UDP forwarding before the TUN interface is established. */
+    fun selfTest() {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        val probe = byteArrayOf(0x4a, 0x41, 0x52, 0x56, 0x49, 0x53)
+
+        val tcpEchoServer = ServerSocket(0, 1, loopback).apply { soTimeout = SELF_TEST_TIMEOUT_MS }
+        val tcpEchoThread = Thread {
+            runCatching {
+                tcpEchoServer.accept().use { accepted ->
+                    val buffer = ByteArray(probe.size)
+                    val count = accepted.getInputStream().read(buffer)
+                    if (count > 0) accepted.getOutputStream().write(buffer, 0, count)
+                }
+            }
+        }.apply { isDaemon = true; start() }
+
+        try {
+            Socket().use { client ->
+                client.connect(InetSocketAddress(loopback, checkNotNull(server).localPort), SELF_TEST_TIMEOUT_MS)
+                client.soTimeout = SELF_TEST_TIMEOUT_MS
+                val input = BufferedInputStream(client.getInputStream())
+                val output = BufferedOutputStream(client.getOutputStream())
+                authenticate(input, output)
+                val echoPort = tcpEchoServer.localPort
+                output.write(byteArrayOf(
+                    SOCKS_VERSION.toByte(), CMD_CONNECT.toByte(), 0, ATYP_IPV4.toByte(),
+                    127, 0, 0, 1, (echoPort shr 8).toByte(), echoPort.toByte()
+                ))
+                output.flush()
+                readSocksReply(input)
+                output.write(probe)
+                output.flush()
+                check(readExactly(input, probe.size).contentEquals(probe)) {
+                    "SOCKS5 TCP self-test did not return the probe bytes"
+                }
+            }
+        } finally {
+            runCatching { tcpEchoServer.close() }
+            runCatching { tcpEchoThread.join(SELF_TEST_TIMEOUT_MS.toLong()) }
+        }
+
+        val udpEchoServer = DatagramSocket(null).apply {
+            bind(InetSocketAddress(loopback, 0))
+            soTimeout = SELF_TEST_TIMEOUT_MS
+        }
+        val udpEchoThread = Thread {
+            runCatching {
+                val buffer = ByteArray(128)
+                val packet = DatagramPacket(buffer, buffer.size)
+                udpEchoServer.receive(packet)
+                udpEchoServer.send(
+                    DatagramPacket(packet.data, packet.offset, packet.length, packet.socketAddress)
+                )
+            }
+        }.apply { isDaemon = true; start() }
+
+        try {
+            Socket().use { control ->
+                control.connect(InetSocketAddress(loopback, checkNotNull(server).localPort), SELF_TEST_TIMEOUT_MS)
+                control.soTimeout = SELF_TEST_TIMEOUT_MS
+                val input = BufferedInputStream(control.getInputStream())
+                val output = BufferedOutputStream(control.getOutputStream())
+                authenticate(input, output)
+                output.write(byteArrayOf(
+                    SOCKS_VERSION.toByte(), CMD_UDP_ASSOCIATE.toByte(), 0, ATYP_IPV4.toByte(),
+                    0, 0, 0, 0, 0, 0
+                ))
+                output.flush()
+                val relay = readSocksReply(input)
+                DatagramSocket(InetSocketAddress(loopback, 0)).use { clientUdp ->
+                    clientUdp.soTimeout = SELF_TEST_TIMEOUT_MS
+                    val request = Socks5Codec.encodeUdp(loopback, udpEchoServer.localPort, probe)
+                    clientUdp.send(DatagramPacket(request, request.size, relay))
+                    val responseBuffer = ByteArray(256)
+                    val response = DatagramPacket(responseBuffer, responseBuffer.size)
+                    clientUdp.receive(response)
+                    val decoded = Socks5Codec.decodeUdp(
+                        response.data.copyOfRange(response.offset, response.offset + response.length)
+                    )
+                    check(decoded?.payload?.contentEquals(probe) == true) {
+                        "SOCKS5 UDP self-test did not return the probe bytes"
+                    }
+                }
+            }
+        } finally {
+            udpEchoServer.close()
+            runCatching { udpEchoThread.join(SELF_TEST_TIMEOUT_MS.toLong()) }
+        }
+    }
+
+    private fun authenticate(input: InputStream, output: OutputStream) {
+        output.write(byteArrayOf(SOCKS_VERSION.toByte(), 1, METHOD_USER_PASSWORD.toByte()))
+        output.flush()
+        check(readU8(input) == SOCKS_VERSION && readU8(input) == METHOD_USER_PASSWORD) {
+            "SOCKS5 proxy did not negotiate username/password authentication"
+        }
+        val userBytes = username.toByteArray(Charsets.US_ASCII)
+        val passwordBytes = password.toByteArray(Charsets.US_ASCII)
+        output.write(byteArrayOf(AUTH_VERSION.toByte(), userBytes.size.toByte()))
+        output.write(userBytes)
+        output.write(byteArrayOf(passwordBytes.size.toByte()))
+        output.write(passwordBytes)
+        output.flush()
+        check(readU8(input) == AUTH_VERSION && readU8(input) == 0) {
+            "SOCKS5 proxy authentication self-test failed"
+        }
+    }
+
+    private fun readSocksReply(input: InputStream): InetSocketAddress {
+        check(readU8(input) == SOCKS_VERSION) { "Invalid SOCKS5 reply version" }
+        val status = readU8(input)
+        check(readU8(input) == 0) { "Invalid SOCKS5 reply reserved field" }
+        val host = readAddress(input)
+        val port = readU16(input)
+        check(status == REP_SUCCEEDED) { "SOCKS5 command failed with status $status" }
+        return InetSocketAddress(host, port)
+    }
+
+    private fun readExactly(input: InputStream, length: Int): ByteArray {
+        val bytes = ByteArray(length)
+        var offset = 0
+        while (offset < length) {
+            val count = input.read(bytes, offset, length - offset)
+            if (count < 0) throw EOFException("Unexpected end of SOCKS5 self-test stream")
+            offset += count
+        }
+        return bytes
+    }
+
     private fun handleClient(client: Socket) {
         client.use { socket ->
             socket.soTimeout = CONTROL_TIMEOUT_MS
@@ -297,5 +426,6 @@ internal class LocalSocks5Proxy(
         private const val MAX_CLIENT_SESSIONS = 32
         private const val MAX_UDP_PACKET = 65_507
         private const val STREAM_BUFFER_SIZE = 32 * 1024
+        private const val SELF_TEST_TIMEOUT_MS = 3_000
     }
 }
