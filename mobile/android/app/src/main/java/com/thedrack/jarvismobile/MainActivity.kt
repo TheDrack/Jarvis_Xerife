@@ -787,11 +787,11 @@ private fun JarvisMobileScreen(
                     Text(
                         when (vpnModePreference) {
                             VpnModePreference.AUTO ->
-                                "AUTO: detecta VPNs externas e evita iniciar uma VPN concorrente. A VPN própria pode ser iniciada manualmente; o filtro de pacotes também limita quais aplicativos passam pelo túnel."
+                                "AUTO: detecta uma VPN externa e mantém o coletor agregado, sem troca automática. Iniciar Jarvis manualmente pode solicitar ao Android a substituição da VPN ativa."
                             VpnModePreference.JARVIS ->
-                                "JARVIS: prioriza o mecanismo VPN próprio, mas não interrompe uma VPN já ativa. A VPN própria usa o motor nativo Hev e exige consentimento do Android."
+                                "JARVIS: permite iniciar manualmente a VPN própria. Se outra VPN estiver ativa, o Android controla a troca e pode revogá-la."
                             VpnModePreference.TAILSCALE ->
-                                "TAILSCALE: aguarda uma VPN externa compatível. A presença do app Tailscale, sozinha, não confirma que ele controla o túnel."
+                                "TAILSCALE: não inicia a VPN Jarvis e aguarda uma VPN externa. O Android não revela ao Jarvis qual app controla o túnel; no cliente Tailscale oficial, a coleta permanece agregada."
                         },
                         style = MaterialTheme.typography.bodySmall
                     )
