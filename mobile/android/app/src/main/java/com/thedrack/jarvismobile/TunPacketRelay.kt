@@ -164,6 +164,7 @@ internal class TunPacketRelay private constructor(
         private const val MAX_QUEUED_PACKETS = 128
         private const val POLL_TIMEOUT_MS = 200
         private const val STOP_JOIN_TIMEOUT_MS = 500L
+        private const val SOCKETPAIR_SELF_TEST_TIMEOUT_MS = 1_000
 
         data class Pair(
             val hevDescriptor: ParcelFileDescriptor,
@@ -188,7 +189,9 @@ internal class TunPacketRelay private constructor(
                 hev = ParcelFileDescriptor.dup(descriptors[0])
                 bridge = ParcelFileDescriptor.dup(descriptors[1])
                 setNonBlocking(tun.fileDescriptor)
+                setNonBlocking(hev.fileDescriptor)
                 setNonBlocking(bridge.fileDescriptor)
+                verifyPacketSocketPair(hev.fileDescriptor, bridge.fileDescriptor)
                 return Pair(
                     hevDescriptor = hev,
                     relay = TunPacketRelay(tun, bridge, flowCollector, onFailure)
@@ -206,6 +209,32 @@ internal class TunPacketRelay private constructor(
         private fun setNonBlocking(fd: FileDescriptor) {
             val flags = Os.fcntlInt(fd, OsConstants.F_GETFL, 0)
             Os.fcntlInt(fd, OsConstants.F_SETFL, flags or OsConstants.O_NONBLOCK)
+        }
+
+        private fun verifyPacketSocketPair(hev: FileDescriptor, bridge: FileDescriptor) {
+            val probe = byteArrayOf(0x4a, 0x41, 0x52, 0x56, 0x49, 0x53)
+            verifyDatagram(from = bridge, to = hev, probe = probe)
+            verifyDatagram(from = hev, to = bridge, probe = probe)
+        }
+
+        private fun verifyDatagram(from: FileDescriptor, to: FileDescriptor, probe: ByteArray) {
+            val written = Os.write(from, probe, 0, probe.size)
+            check(written == probe.size) { "TUN relay socketpair probe write was incomplete" }
+            val poll = StructPollfd().apply {
+                fd = to
+                events = OsConstants.POLLIN.toShort()
+            }
+            check(Os.poll(arrayOf(poll), SOCKETPAIR_SELF_TEST_TIMEOUT_MS) > 0) {
+                "TUN relay socketpair probe timed out"
+            }
+            check(poll.revents.toInt() and OsConstants.POLLIN != 0) {
+                "TUN relay socketpair did not become readable"
+            }
+            val received = ByteArray(probe.size)
+            val count = Os.read(to, received, 0, received.size)
+            check(count == probe.size && received.contentEquals(probe)) {
+                "TUN relay socketpair did not preserve packet boundaries"
+            }
         }
     }
 }
