@@ -38,6 +38,7 @@
 - Maximum inspected payload: 16 KiB.
 - Supported passive metadata: UDP DNS and length-prefixed TCP DNS (53/5353), cleartext HTTP Host (80/8000/8080), TLS ClientHello SNI (common TLS ports or visible handshake record).
 - Output is a small list of typed metadata observations. It never returns raw bytes, HTTP paths, authorization headers, cookies, request bodies, TLS application data, or credentials.
+- HTTP parsing scans bytes and materializes only the method token and Host value; request targets and unrelated headers are not converted to strings. Duplicate Host fields are rejected.
 - DNS compression pointers and message bounds are validated. Hostnames are normalized and length/character bounded.
 - TLS ClientHello and HTTP Host parsing now operate on bounded reassembled TCP streams. The first observed payload anchors each direction; bytes preceding that first segment cannot be reconstructed. Each returned stream snapshot is wiped immediately after parsing.
 - Encrypted DNS, ECH-protected names, QUIC payload decryption, TLS application data and pinned applications are not decoded by this parser.
