@@ -758,4 +758,149 @@ def registrar_observabilidade_portas(mcp: Any, tracked_action: Any) -> None:
     @mcp.tool()
     @tracked_action("Configurando endpoint CDP do Chromium")
     def portas_cdp_configurar(url: str) -> dict[str, Any]:
-        """Def
+        """Define endpoint CDP local (localhost); aceita ws:// dinâmico do agent-browser."""
+        return portas_core.configurar_cdp_url(url)
+
+    @mcp.tool()
+    @tracked_action("Descobrindo endpoint CDP do agent-browser")
+    def portas_cdp_descobrir_agent_browser(session: str = "default") -> dict[str, Any]:
+        """Obtém o endpoint CDP de uma sessão agent-browser e configura o núcleo."""
+        import shutil
+        import subprocess
+
+        executable = shutil.which("agent-browser")
+        if not executable:
+            return {"success": False, "error": "agent-browser não está no PATH do processo MCP."}
+        if not session or not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", session):
+            return {"success": False, "error": "Nome de sessão inválido."}
+        try:
+            completed = subprocess.run(
+                [executable, "--session", session, "get", "cdp-url"],
+                capture_output=True,
+                text=True,
+                timeout=12,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return {"success": False, "error": f"{type(exc).__name__}: {exc}"}
+        match = re.search(r"wss?://127\.0\.0\.1:\d+/[^\s]+|https?://(?:127\.0\.0\.1|localhost):\d+", completed.stdout)
+        if completed.returncode != 0 or not match:
+            return {
+                "success": False,
+                "error": "Não foi possível obter endpoint CDP local.",
+                "detail": completed.stderr[-500:],
+            }
+        configured = portas_core.configurar_cdp_url(match.group(0))
+        return {**configured, "session": session, "source": "agent-browser"}
+
+    @mcp.tool()
+    @tracked_action("Iniciando observabilidade do navegador")
+    def portas_trafego_iniciar(
+        capturar_payloads: bool = False,
+        limite_eventos: int = 2000,
+        capturar_midia: bool = False,
+    ) -> dict[str, Any]:
+        """Observa HTTP(S)/WebSocket; capturar_midia habilita chunks binários via CDP."""
+        return observer.start(
+            capture_payloads=capturar_payloads,
+            capture_media=capturar_midia,
+            max_events=limite_eventos,
+        )
+
+    @mcp.tool()
+    @tracked_action("Consultando fluxos de mídia")
+    def portas_media_eventos(limit: int = 50) -> dict[str, Any]:
+        """Lista fluxos de mídia descobertos e seus metadados, sem devolver bytes."""
+        return observer.media_events(limit=limit)
+
+    @mcp.tool()
+    @tracked_action("Lendo chunks binários de mídia")
+    def portas_media_chunks(stream_id: str, after_sequence: int = 0, limit: int = 16) -> dict[str, Any]:
+        """Retorna chunks base64 ordenados para consumidores autorizados; buffer limitado."""
+        return observer.media_chunks(stream_id, after_sequence=after_sequence, limit=limit)
+
+    @mcp.tool()
+    @tracked_action("Parando observabilidade do navegador")
+    def portas_trafego_parar() -> dict[str, Any]:
+        """Para a captura e desconecta o observador sem fechar o Chromium."""
+        return observer.stop()
+
+    @mcp.tool()
+    @tracked_action("Consultando tráfego do navegador")
+    def portas_trafego_eventos(limit: int = 100, after_id: int = 0, host_contains: str = "") -> dict[str, Any]:
+        """Consulta eventos recentes, com paginação incremental e filtro opcional por host."""
+        return observer.events(limit=limit, after_id=after_id, host_contains=host_contains)
+
+    @mcp.tool()
+    @tracked_action("Consultando estado da observabilidade")
+    def portas_trafego_status() -> dict[str, Any]:
+        """Retorna estado da captura, número de abas ligadas e tamanho dos buffers."""
+        return observer.status()
+
+    @mcp.tool()
+    @tracked_action("Limpando eventos de tráfego")
+    def portas_trafego_limpar() -> dict[str, Any]:
+        """Limpa buffers em memória sem interromper a captura."""
+        return observer.clear()
+
+    @mcp.tool()
+    @tracked_action("Consultando streams de mídia capturados")
+    def portas_midia_status() -> dict[str, Any]:
+        """Estado do motor de captura de mídia (streams, bytes, limites)."""
+        return media_engine.status()
+
+    @mcp.tool()
+    @tracked_action("Listando streams de mídia")
+    def portas_midia_streams() -> dict[str, Any]:
+        """Lista streams de mídia capturados (metadados)."""
+        return {"success": True, "streams": media_engine.streams()}
+
+    @mcp.tool()
+    @tracked_action("Consultando chunks de mídia")
+    def portas_midia_chunks(stream_id: str, after_sequence: int = -1, limit: int = 64) -> dict[str, Any]:
+        """Consulta chunks de um stream de mídia (metadados por chunk)."""
+        return media_engine.chunks(stream_id, after_sequence=after_sequence, limit=limit)
+
+    @mcp.tool()
+    @tracked_action("Lendo bytes de mídia")
+    def portas_midia_bytes(stream_id: str, max_bytes: int = 65536) -> dict[str, Any]:
+        """Lê bytes brutos de um stream (hex), limitado."""
+        return media_engine.read_bytes(stream_id, max_bytes=max_bytes)
+
+    @mcp.tool()
+    @tracked_action("Consultando partes UMP de mídia")
+    def portas_midia_ump(stream_id: str) -> dict[str, Any]:
+        """Retorna partes UMP parseadas de um stream (tipos, tamanhos, segmentos)."""
+        return media_engine.ump_parts(stream_id)
+
+    @mcp.tool()
+    @tracked_action("Consultando playlist HLS")
+    def portas_midia_hls(stream_id: str) -> dict[str, Any]:
+        """Retorna playlist HLS parseada de um stream."""
+        return media_engine.hls_playlist(stream_id)
+
+    @mcp.tool()
+    @tracked_action("Consultando manifesto DASH")
+    def portas_midia_dash(stream_id: str) -> dict[str, Any]:
+        """Retorna manifesto DASH parseado de um stream."""
+        return media_engine.dash_manifest(stream_id)
+
+    @mcp.tool()
+    @tracked_action("Decodificando stream de mídia")
+    def portas_midia_decode(stream_id: str, mode: str = "probe") -> dict[str, Any]:
+        """Tenta decodificar um stream capturado (requer ffmpeg/ffprobe). mode: probe|audio|frames."""
+        return decode_stream(stream_id, mode=mode)
+
+    @mcp.tool()
+    @tracked_action("Verificando disponibilidade de decodificação")
+    def portas_midia_decode_status() -> dict[str, Any]:
+        """Informa se ffmpeg/ffprobe estão disponíveis para decodificação."""
+        return {"success": True, "available": decode_available()}
+
+    @mcp.tool()
+    @tracked_action("Limpando streams de mídia")
+    def portas_midia_limpar() -> dict[str, Any]:
+        """Limpa streams de mídia capturados."""
+        return media_engine.clear()
+
+    register_protocol_pattern_tools(mcp, tracked_action)
