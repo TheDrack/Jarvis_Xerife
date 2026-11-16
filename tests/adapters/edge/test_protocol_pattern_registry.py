@@ -360,3 +360,27 @@ def test_repeated_android_flow_observation_does_not_duplicate_pattern(tmp_path):
 def test_network_version_comparison_compares_all_observed_hosts(tmp_path):
     registry = ProtocolPatternRegistry(tmp_path)
     version_flows = {
+        "1.0": ("api.example.test", "cdn.example.test"),
+        "2.0": ("api.example.test", "edge.example.test"),
+    }
+    for version, hosts in version_flows.items():
+        flows = [{
+            "protocol": "tcp",
+            "remote_ip": f"203.0.113.{index + 10}",
+            "remote_port": 443,
+            "package_names": ["com.example.chat"],
+            "attribution_status": "resolved",
+            "protocol_observations": [
+                {"kind": "tls_sni", "value": host, "source": "tls_client_hello"}
+            ],
+        } for index, host in enumerate(hosts)]
+        registry.record_flow_observations(
+            package="com.example.chat", app_version=version, flows=flows
+        )
+
+    diff = registry.compare_versions(
+        package="com.example.chat", operation="tls_sni", older="1.0", newer="2.0"
+    )
+
+    assert diff["changed"] is True
+    assert diff["changes"] == ["network_pattern.hostname"]
