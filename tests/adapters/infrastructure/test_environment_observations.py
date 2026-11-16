@@ -431,6 +431,62 @@ def test_network_snapshot_validates_nonnegative_vpn_tunnel_counters():
             module.EnvironmentObservationCreate(**dict(valid, payload=invalid_payload))
 
 
+def test_network_snapshot_accepts_bounded_per_flow_uid_attribution():
+    now = datetime.now(timezone.utc)
+    flow = {
+        "flow_id": str(uuid4()),
+        "protocol": "tcp",
+        "local_ip": "10.0.0.2",
+        "local_port": 49152,
+        "remote_ip": "1.1.1.1",
+        "remote_port": 443,
+        "uid": 10123,
+        "package_names": ["com.example.app"],
+        "app_label": "Example",
+        "attribution_status": "resolved",
+        "first_seen_at": now.isoformat(),
+        "last_seen_at": now.isoformat(),
+        "tx_packets": 1,
+        "tx_bytes": 60,
+        "rx_packets": 2,
+        "rx_bytes": 104,
+        "closed": False,
+    }
+    valid = observation(
+        device_id="phone-1",
+        source_device_type="mobile",
+        observation_type="network_snapshot",
+        payload={"platform": "android", "flows": [flow]},
+    )
+    module.EnvironmentObservationCreate(**valid)
+
+    invalid_flows = [
+        {**flow, "local_ip": "not-an-ip"},
+        {**flow, "local_port": 0},
+        {**flow, "uid": True},
+        {**flow, "tx_bytes": -1},
+        {**flow, "closed": 1},
+        {**flow, "attribution_status": "resolved", "uid": None},
+        {**flow, "attribution_status": "unresolved", "uid": 10123},
+    ]
+    for invalid_flow in invalid_flows:
+        with pytest.raises(ValueError):
+            module.EnvironmentObservationCreate(
+                **dict(valid, payload={"platform": "android", "flows": [invalid_flow]})
+            )
+
+    duplicate = {**flow}
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(
+            **dict(valid, payload={"platform": "android", "flows": [flow, duplicate]})
+        )
+
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(
+            **dict(valid, payload={"platform": "android", "flows": [flow] * 51})
+        )
+
+
 def test_app_usage_snapshot_accepts_bounded_package_identity_metadata():
     now = datetime.now(timezone.utc)
     valid = observation(
