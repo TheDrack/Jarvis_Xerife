@@ -730,3 +730,13 @@ A ferramenta MCP de curiosidade foi consultada antes da captura e aceitou o regi
 - Nenhum workflow foi desativado; nenhum teste/cobertura foi reduzido; não houve alteração de segredo, DDL, produção, dispositivo, merge ou deploy nesta revalidação.
 
 **Próximo marco real:** os três critérios C0 continuam `pending`. Completar o mapa de composição/consumidores/contratos/testes/evidência operacional é o próximo trabalho. **C1 — World Model — permanece bloqueado** até o aceite formal de C0.
+
+### Revalidação do composition root e handoff de memória — 2026-11-16
+
+- O caminho conversacional em source é `main.py::start_cloud_service()` → `create_edge_container()` → `Container.assistant_service` → Nexus `assistant_service` → `create_api_server()` → `create_assistant_router()`. As rotas autenticadas `/v1/execute` e `/v1/message` chamam `AssistantService.async_process_command()` e, por thread, `process_command()`.
+- O registry mapeia `AssistantService`, `CommandInterpreter`, `IntentProcessor` e `AIGateway`. A factory `create_command_interpreter()` e `LLMCommandInterpreter` não têm caller de produção identificado; não confundir seus testes isolados com o caminho usado pelo serviço.
+- `AssistantService.process_command()` tenta recuperar contexto vetorial e semântico e o coloca em `system_prompt_extra`; `CommandInterpreter.execute()` descarta esse campo, lendo apenas `text`/ `user_id`. `IntentProcessor` recebe somente `intent` e seu fallback envia apenas o texto bruto para `llm_service`/ `ai_gateway`. **A memória é consultada no código, mas não chega ao LLM fallback neste caminho.**
+- Testes existentes cobrem passagem de user_id pela API, escopo do serviço e componentes LLM isolados; não foi localizado teste integrado API → memória → prompt do provider. `MemoryManager` não está explicitamente no registry JSON e depende de descoberta dinâmica quando Nexus não está em strict mode; a configuração real de produção não foi consultada.
+- Este achado é evidência de código, não runtime: não foram chamadas APIs de provider nem verificada persistência real. O conteúdo recuperado também precisa de contrato anti-prompt-injection e isolamento por usuário antes de ser enviado ao modelo.
+
+**Impacto no roadmap:** reforça `C0-CAPABILITY-MAP` e `C0-GAPS-RECORDED`, mas não os conclui. Os três critérios C0 permanecem `pending`; C1 — World Model — continua bloqueado. Próximo passo: teste integrado sem rede que atravesse o composition root e prove o handoff/isolamento, antes de mudar o prompt ou iniciar C2.
