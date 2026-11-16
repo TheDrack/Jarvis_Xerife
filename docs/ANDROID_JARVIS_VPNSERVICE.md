@@ -4,6 +4,7 @@
 
 - Pin the upstream HevSocks5Tunnel Android AAR at version 2.20.0 and verify its SHA-256 before Gradle uses it.
 - Declare `JarvisVpnService` as a protected Android `VpnService`, with the system VPN bind permission and the required foreground-service type for active VPN apps.
+- Require Android 10 (API 29) for the Hev native VPN engine; the app's lower overall minSdk remains supported for aggregate telemetry only.
 - Request Android VPN consent from the Presence screen; the user explicitly starts or stops the service.
 - Establish a dual-stack TUN interface (IPv4 and IPv6) and hand its file descriptor to the Hev JNI worker.
 - Run a loopback-only SOCKS5 upstream on `127.0.0.1:10808`, requiring per-session random 192-bit username/password credentials shared only with Hev.
@@ -31,6 +32,7 @@ To collect per-flow metadata through Tailscale, a supported telemetry bridge mus
 ## Safety and rollout
 
 - The service is **manual opt-in** in this phase; AUTO does not start it in the background.
+- Devices below Android 10 cannot start the Hev VPN service; the app keeps its existing aggregate network statistics path.
 - Starting Jarvis while another VPN is active is refused. The user must explicitly switch VPN ownership through Android's system consent.
 - No incomplete tunnel is left active if the Hev worker fails its startup check.
 - Runtime network-transition, DNS, IPv4/IPv6, TCP/UDP, mobile/Wi-Fi handover, process-death, and revocation tests still need to be run on a physical Android device before enabling automatic switching.
