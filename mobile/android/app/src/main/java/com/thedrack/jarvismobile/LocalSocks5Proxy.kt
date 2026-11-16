@@ -99,8 +99,8 @@ internal class LocalSocks5Proxy(
                 val target = readAddress(input)
                 val targetPort = readU16(input)
                 when (command) {
-                    CMD_CONNECT -> connectAndRelay(socket, output, target, targetPort)
-                    CMD_UDP_ASSOCIATE -> udpAssociate(socket, output)
+                    CMD_CONNECT -> connectAndRelay(socket, input, output, target, targetPort)
+                    CMD_UDP_ASSOCIATE -> udpAssociate(socket, input, output)
                     else -> writeReply(output, REP_COMMAND_UNSUPPORTED)
                 }
             } catch (_: EOFException) {
@@ -114,6 +114,7 @@ internal class LocalSocks5Proxy(
 
     private fun connectAndRelay(
         client: Socket,
+        clientInput: InputStream,
         output: OutputStream,
         host: String,
         port: Int
@@ -141,7 +142,7 @@ internal class LocalSocks5Proxy(
                 }
             }
             try {
-                copyStream(client.getInputStream(), upstream.getOutputStream())
+                copyStream(clientInput, upstream.getOutputStream())
             } finally {
                 runCatching { upstream.shutdownOutput() }
             }
@@ -151,7 +152,7 @@ internal class LocalSocks5Proxy(
         }
     }
 
-    private fun udpAssociate(control: Socket, output: OutputStream) {
+    private fun udpAssociate(control: Socket, controlInput: InputStream, output: OutputStream) {
         control.soTimeout = 0
         val relay = DatagramSocket(null)
         try {
@@ -161,7 +162,7 @@ internal class LocalSocks5Proxy(
             udpSockets.add(relay)
             writeReply(output, REP_SUCCEEDED, InetAddress.getByName("127.0.0.1"), relay.localPort)
             workers.execute {
-                try { while (control.getInputStream().read() >= 0) Unit } catch (_: Exception) { }
+                try { while (controlInput.read() >= 0) Unit } catch (_: Exception) { }
                 runCatching { relay.close() }
             }
             val clientAddress = AtomicReference<InetSocketAddress?>(null)
