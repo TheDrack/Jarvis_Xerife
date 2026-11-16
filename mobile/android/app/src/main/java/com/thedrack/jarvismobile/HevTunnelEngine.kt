@@ -10,7 +10,11 @@ internal class HevTunnelEngine(context: Context) {
     fun start(tunFd: Int): Boolean {
         check(tunFd >= 0) { "Invalid TUN file descriptor" }
         configFile.writeText(CONFIG, Charsets.UTF_8)
-        return TProxyService.TProxyStartService(configFile.absolutePath, tunFd)
+        val started = TProxyService.TProxyStartService(configFile.absolutePath, tunFd)
+        if (!started) return false
+        // JNI returns after creating the worker thread; allow its first poll cycle to fail fast on bad config.
+        Thread.sleep(400)
+        return TProxyService.TProxyIsRunning()
     }
 
     fun stop(): Boolean = TProxyService.TProxyStopService()
