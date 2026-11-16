@@ -676,4 +676,125 @@ private fun JarvisMobileScreen(
                                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
                                 PackageManager.PERMISSION_GRANTED
                             ) {
-                                notificationPermission
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                onStartPresence()
+                                presenceActive = true
+                                message = "Presença ativada; verifique a notificação persistente."
+                            }
+                        },
+                        enabled = !presenceActive,
+                        modifier = Modifier.padding(top = 12.dp)
+                    ) { Text("Ativar presença em segundo plano") }
+                    Button(
+                        onClick = { onStopPresence(); presenceActive = false; message = "Presença interrompida." },
+                        enabled = presenceActive,
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text("Parar presença") }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Compartilhar localização")
+                            Text("Opcional. Com permissão 'o tempo todo', continua em segundo plano; uma notificação persistente indica a coleta.", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Switch(
+                            checked = locationSharingEnabled,
+                            onCheckedChange = { enabled ->
+                                if (!enabled) {
+                                    locationSharingEnabled = false
+                                    context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).edit().putBoolean("location_sharing_enabled", false).apply()
+                                    onLocationSharingChanged(false)
+                                    message = "Compartilhamento de localização interrompido."
+                                } else if (
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                                    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                                        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED
+                                    ) {
+                                        message = "Conceda localização 'o tempo todo' para permitir a coleta em segundo plano."
+                                        backgroundLocationPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                                    } else {
+                                        locationSharingEnabled = true
+                                        context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).edit().putBoolean("location_sharing_enabled", true).apply()
+                                        onLocationSharingChanged(true)
+                                        message = "Compartilhamento contínuo ativado."
+                                    }
+                                } else {
+                                    locationPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+                                }
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Estatísticas de tráfego por aplicativo")
+                            Text(
+                                if (appUsageAccessGranted)
+                                    "Usage Access concedido. Envia contadores RX/TX agregados por UID, sem conteúdo ou destinos."
+                                else
+                                    "Opcional. Exige consentimento e autorização especial manual nas configurações do Android.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = appUsageSharingEnabled,
+                            onCheckedChange = { enabled ->
+                                appUsageSharingEnabled = enabled
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putBoolean("app_usage_sharing_enabled", enabled).apply()
+                                if (enabled) {
+                                    message = "Consentimento salvo. Conceda Usage Access na próxima tela; sem essa autorização a coleta permanece inativa."
+                                    usageAccessSettingsLauncher.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+                                } else {
+                                    message = "Coleta de tráfego por aplicativo desativada."
+                                }
+                            }
+                        )
+                    }
+                    if (appUsageSharingEnabled) {
+                        Text(
+                            "Filtro de aplicativos",
+                            modifier = Modifier.padding(top = 10.dp),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        OutlinedTextField(
+                            value = appUsagePackageFilter,
+                            onValueChange = { value ->
+                                appUsagePackageFilter = value
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putString("app_usage_package_filter", value).apply()
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            label = { Text("Nomes dos pacotes") },
+                            placeholder = { Text("com.instagram.android, com.google.android.youtube") },
+                            supportingText = {
+                                Text("Separe por vírgula ou linha. Vazio = todos os apps. UID compartilhado é observado como um único registro.")
+                            },
+                            minLines = 2,
+                            maxLines = 4
+                        )
+                    }
+                    if (appUsageSharingEnabled && !appUsageAccessGranted) {
+                        Button(
+                            onClick = { usageAccessSettingsLauncher.launch(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },
+                            modifier = Modifier.padding(top = 6.dp)
+                        ) { Text("Abrir Usage Access") }
+                    }
+                    Button(
+                        onClick = {
+                            onStopPresence()
+                            onLogout()
+                            presenceActive = false
+                            loggedIn = false
+                            messages = emptyList()
+                            draft = ""
+                            appUsageSharingEnabled = false
+                            context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                .edit().putBoolean("app_usage_sharing_enabled", false).apply()
+                            status = null
