@@ -679,3 +679,31 @@ A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user
 - `scripts/jarvis_healer.py` inclui arquivos de teste apontados por nodeids do pytest entre os alvos possíveis. Para esses arquivos, a instrução de produção que proíbe inserir código de teste não se aplica; o modelo pode devolver o arquivo completo e o healer pode escrevê-lo.
 - `homeostase.yml` inclui `tests` no staging e executa pytest após a cura, mas não foi localizado gate de diff que proíba apagar testes, remover assertions ou reduzir cobertura. Pytest verde, isoladamente, não prova preservação das assertions.
 - Isto é um risco de integridade confirmado no desenho, não evidência de que tenha ocorrido uma alteração maliciosa. O workflow foi preservado nesta auditoria. Próximo hardening: impedir mutação automática de arquivos de teste ou exigir validação independente do diff antes de publicação.
+
+
+### Revalidação estrita de consumidores — 2026-11-16
+
+Graphify foi consultado antes da leitura dirigida dos arquivos. O índice estava no commit `2a70e72`; `main` avançou para `734fe70` apenas com uma atualização de `ARCHITECTURE.md`, sem alteração de código entre esses snapshots.
+
+| Componente | Resultado de callers estritos | Classificação conservadora |
+|---|---|---|
+| `CognitiveRouter.execute()` / `jarvis_chat` | Um caller de teste para `execute()`; `run_pipeline()` é alcançado pelo CLI e por testes. | Sem consumer de aplicação identificado. O pipeline não é caminho conversacional de produção comprovado. |
+| `CuriosityEngine.execute()` | Nenhum caller estrito localizado. | Implementação sem ciclo conversacional de consumo comprovado. Não duplicar `CuriosityIntake`. |
+| `StrategistService.execute()` | Nenhum caller estrito localizado. | Serviço implementado, mas sem consumer de produção identificado. |
+| `TaskRunner.execute_plan()` | Chamado pelo próprio `TaskRunner.execute()` e por testes. | Sem composition root de aplicação identificado. |
+| `ToolDispatcher.dispatch()` | Callers estritos localizados em testes. | Contrato e testes existem; consumo de aplicação não comprovado. |
+| `CostTrackerAdapter.log()` / `execute()` | `log()` é chamado pelo próprio `execute()`; nenhum caller estrito de `execute()` foi localizado. | Sem writer de uso LLM em runtime comprovado. |
+| `LLMRouter.execute()` | Callers localizados somente em testes. | Roteamento implementado, consumo de runtime não comprovado. |
+| `IntelligenceCore.process()` | Consumidores em `collect_live_intelligence()` e na coleta local desktop. | Integração de aplicação confirmada; provider externo e persistência real continuam não verificados. |
+| `MqttHomeAdapter.execute()` | Callers localizados somente em testes. | Sem consumidor de aplicação comprovado. |
+
+A captura MCP de curiosidade desta revalidação foi aceita com ID `ab56c1cc462e01082e9f`. Isso demonstra o caminho MCP usado nesta sessão, não um runtime de captura universal em todos os hosts.
+
+### Separação entre manutenção e evolução cognitiva
+
+- PR #825 foi merged em 2026-11-16 (merge commit `5d5ba13fba16054e4a84ff3e0c46ecd39e50de98`), mas seu gate apenas protege os critérios C0 contra conclusão baseada em nomes; não os conclui.
+- PR #841 contém proposta de percepção de fluxo Android e correção de escopo do schema, mas continua fora de `main`. Seu CI passou no head `5bc4bcf`; a validação em dispositivo físico e a revisão independente ainda faltam.
+- O fluxo Self Healing permanece ativo para falhas de workflows confiáveis em `main`, mas não observa PR Validation/Task Queue. Essa lacuna transversal de manutenção não deve ser tratada como uma fase opcional do roadmap cognitivo.
+- O `expires_at` de network snapshots marca frescor e não garante apagamento do payload ou das linhas históricas. A política de retenção da telemetria por fluxo ainda precisa de definição e teste.
+
+**Conclusão desta revalidação:** nenhum critério C0 foi promovido. `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` continuam pendentes; C1 — World Model — continua bloqueado. Esta atualização registra evidência e incerteza, não declara capacidade concluída.
