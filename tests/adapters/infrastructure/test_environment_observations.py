@@ -493,6 +493,11 @@ def test_network_snapshot_accepts_bounded_per_flow_uid_attribution():
                 **dict(valid, payload={"platform": "android", "flow_metadata_opt_in": True, "flows": [invalid_flow]})
             )
 
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(
+            **dict(valid, payload={"platform": "android", "flow_metadata_opt_in": False, "flows": [flow]})
+        )
+
     duplicate = {**flow}
     with pytest.raises(ValueError):
         module.EnvironmentObservationCreate(
