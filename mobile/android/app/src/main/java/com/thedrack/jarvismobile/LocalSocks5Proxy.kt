@@ -34,6 +34,7 @@ internal class LocalSocks5Proxy(
     private val workers: ExecutorService = Executors.newCachedThreadPool()
     private var server: ServerSocket? = null
     private val udpSockets = ConcurrentHashMap.newKeySet<DatagramSocket>()
+    private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
 
     fun start() {
         check(running.compareAndSet(false, true)) { "SOCKS5 proxy already started" }
@@ -46,7 +47,10 @@ internal class LocalSocks5Proxy(
                 while (running.get()) {
                     try {
                         val client = server?.accept() ?: break
-                        workers.execute { handleClient(client) }
+                        clientSockets.add(client)
+                        workers.execute {
+                            try { handleClient(client) } finally { clientSockets.remove(client) }
+                        }
                     } catch (error: SocketException) {
                         if (running.get()) Log.w(TAG, "SOCKS5 accept failed", error)
                         break
@@ -120,6 +124,7 @@ internal class LocalSocks5Proxy(
     }
 
     private fun udpAssociate(control: Socket, output: OutputStream) {
+        control.soTimeout = 0
         val relay = DatagramSocket(null)
         try {
             if (!vpnService.protect(relay)) throw SocketException("VpnService.protect(UDP) failed")
@@ -127,6 +132,10 @@ internal class LocalSocks5Proxy(
             relay.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0))
             udpSockets.add(relay)
             writeReply(output, REP_SUCCEEDED, InetAddress.getByName("127.0.0.1"), relay.localPort)
+            workers.execute {
+                try { while (control.getInputStream().read() >= 0) Unit } catch (_: Exception) { }
+                runCatching { relay.close() }
+            }
             val clientAddress = AtomicReference<InetSocketAddress?>(null)
             val buffer = ByteArray(MAX_UDP_PACKET)
             while (running.get() && !control.isClosed && !relay.isClosed) {
@@ -204,6 +213,8 @@ internal class LocalSocks5Proxy(
         if (!running.compareAndSet(true, false)) return
         runCatching { server?.close() }
         server = null
+        clientSockets.toList().forEach { runCatching { it.close() } }
+        clientSockets.clear()
         udpSockets.toList().forEach { runCatching { it.close() } }
         workers.shutdownNow()
     }
