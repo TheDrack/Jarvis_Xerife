@@ -12,6 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -67,7 +68,9 @@ class JarvisVpnService : VpnService() {
         }
 
         stopping.set(false)
-        val proxy = LocalSocks5Proxy(this)
+        val socksUsername = newSocksCredential()
+        val socksPassword = newSocksCredential()
+        val proxy = LocalSocks5Proxy(this, socksUsername, socksPassword)
         proxy.start()
         socksProxy = proxy
 
@@ -108,7 +111,7 @@ class JarvisVpnService : VpnService() {
 
         val nativeEngine = HevTunnelEngine(applicationContext)
         engine = nativeEngine
-        check(nativeEngine.start(descriptor.fd)) {
+        check(nativeEngine.start(descriptor.fd, socksUsername, socksPassword)) {
             "Hev tun2socks failed to initialize"
         }
         check(nativeEngine.isRunning()) {
@@ -214,5 +217,11 @@ class JarvisVpnService : VpnService() {
         private const val TUN_IPV6 = "fc00::1"
         private const val DNS_IPV4 = "1.1.1.1"
         private const val ENGINE_WATCHDOG_INTERVAL_MS = 1_000L
+        private fun newSocksCredential(): String {
+            val bytes = ByteArray(24)
+            SecureRandom().nextBytes(bytes)
+            return bytes.joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+        }
+
     }
 }
