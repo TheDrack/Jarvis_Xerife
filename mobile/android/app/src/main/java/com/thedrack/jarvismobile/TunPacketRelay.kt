@@ -120,7 +120,7 @@ internal class TunPacketRelay private constructor(
         return try {
             Os.read(fd, buffer, 0, buffer.size)
         } catch (error: ErrnoException) {
-            if (error.errno == OsConstants.EAGAIN || error.errno == OsConstants.EWOULDBLOCK) 0
+            if (error.errno == OsConstants.EAGAIN) 0
             else throw error
         }
     }
@@ -141,7 +141,7 @@ internal class TunPacketRelay private constructor(
             }
             queue.removeFirst()
         } catch (error: ErrnoException) {
-            if (error.errno != OsConstants.EAGAIN && error.errno != OsConstants.EWOULDBLOCK) {
+            if (error.errno != OsConstants.EAGAIN) {
                 throw error
             }
         }
@@ -180,18 +180,20 @@ internal class TunPacketRelay private constructor(
             flowCollector: FlowAttributionCollector,
             onFailure: (Throwable) -> Unit
         ): Pair {
-            val descriptors = arrayOf(FileDescriptor(), FileDescriptor())
+            val firstDescriptor = FileDescriptor()
+            val secondDescriptor = FileDescriptor()
             Os.socketpair(
                 OsConstants.AF_UNIX,
                 OsConstants.SOCK_DGRAM,
                 0,
-                descriptors
+                firstDescriptor,
+                secondDescriptor
             )
             var hev: ParcelFileDescriptor? = null
             var bridge: ParcelFileDescriptor? = null
             try {
-                hev = ParcelFileDescriptor.dup(descriptors[0])
-                bridge = ParcelFileDescriptor.dup(descriptors[1])
+                hev = ParcelFileDescriptor.dup(firstDescriptor)
+                bridge = ParcelFileDescriptor.dup(secondDescriptor)
                 setNonBlocking(tun.fileDescriptor)
                 setNonBlocking(hev.fileDescriptor)
                 setNonBlocking(bridge.fileDescriptor)
@@ -205,8 +207,8 @@ internal class TunPacketRelay private constructor(
                 runCatching { bridge?.close() }
                 throw error
             } finally {
-                runCatching { Os.close(descriptors[0]) }
-                runCatching { Os.close(descriptors[1]) }
+                runCatching { Os.close(firstDescriptor) }
+                runCatching { Os.close(secondDescriptor) }
             }
         }
 
