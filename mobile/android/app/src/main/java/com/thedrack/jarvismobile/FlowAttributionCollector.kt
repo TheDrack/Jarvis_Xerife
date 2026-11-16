@@ -39,12 +39,14 @@ data class NetworkFlowSnapshot(
     val txBytes: Long,
     val rxPackets: Long,
     val rxBytes: Long,
-    val closed: Boolean
+    val closed: Boolean,
+    val protocolObservations: List<NetworkProtocolObservation> = emptyList()
 )
 
 /**
- * Aggregates only IP/transport headers and packet lengths. It never stores packet payloads.
- * The tuple is normalized to app-local -> remote, regardless of packet direction.
+ * Aggregates IP/transport tuples, counters and separately opted-in protocol metadata.
+ * It never stores raw packet payloads. Tuples are normalized to app-local -> remote,
+ * regardless of packet direction.
  */
 internal class FlowAttributionCollector(
     private val ownerResolver: ConnectionOwnerResolver,
@@ -52,7 +54,8 @@ internal class FlowAttributionCollector(
     private val clock: () -> Long = System::currentTimeMillis,
     private val maxFlows: Int = DEFAULT_MAX_FLOWS,
     private val maxAgeMillis: Long = DEFAULT_MAX_AGE_MS,
-    private val idleSessionMillis: Long = DEFAULT_IDLE_SESSION_MS
+    private val idleSessionMillis: Long = DEFAULT_IDLE_SESSION_MS,
+    payloadMetadataEnabled: Boolean = false
 ) {
     private data class FlowKey(
         val protocolNumber: Int,
@@ -76,17 +79,23 @@ internal class FlowAttributionCollector(
         var rxPackets: Long = 0,
         var rxBytes: Long = 0,
         var closed: Boolean = false,
+        val protocolObservations: LinkedHashMap<String, NetworkProtocolObservation> = LinkedHashMap(),
         var resolutionAttempts: Int = 0,
         var lastResolutionMillis: Long = Long.MIN_VALUE
     )
 
     @Volatile private var enabled = true
+    @Volatile private var payloadInspectionEnabled = payloadMetadataEnabled
     val isEnabled: Boolean get() = enabled
     private val flows = LinkedHashMap<FlowKey, MutableFlow>(16, 0.75f, true)
     private val packageCache = HashMap<Int, List<AppPackageIdentity>>()
 
     @Synchronized
-    fun record(packet: ParsedIpPacket, direction: FlowPacketDirection) {
+    fun record(
+        packet: ParsedIpPacket,
+        direction: FlowPacketDirection,
+        rawPacket: ByteArray? = null
+    ) {
         if (!enabled) return
         val outbound = direction == FlowPacketDirection.OUTBOUND
         val localAddress = if (outbound) packet.sourceAddress else packet.destinationAddress
@@ -141,6 +150,7 @@ internal class FlowAttributionCollector(
             flow.rxPackets = saturatingAdd(flow.rxPackets, 1)
             flow.rxBytes = saturatingAdd(flow.rxBytes, packet.packetBytes.toLong())
         }
+        inspectPayloadMetadata(flow, packet, rawPacket)
         prune(now)
     }
 
@@ -170,7 +180,8 @@ internal class FlowAttributionCollector(
                     txBytes = flow.txBytes,
                     rxPackets = flow.rxPackets,
                     rxBytes = flow.rxBytes,
-                    closed = flow.closed
+                    closed = flow.closed,
+                    protocolObservations = flow.protocolObservations.values.toList()
                 )
             }
     }
@@ -182,9 +193,52 @@ internal class FlowAttributionCollector(
     }
 
     @Synchronized
+    fun setPayloadMetadataEnabled(value: Boolean) {
+        payloadInspectionEnabled = value
+        if (!value) flows.values.forEach { it.protocolObservations.clear() }
+    }
+
+    @Synchronized
     fun clear() {
         flows.clear()
         packageCache.clear()
+    }
+
+    private fun inspectPayloadMetadata(
+        flow: MutableFlow,
+        packet: ParsedIpPacket,
+        rawPacket: ByteArray?
+    ) {
+        if (!payloadInspectionEnabled || rawPacket == null) return
+        val offset = packet.payloadOffset ?: return
+        val length = packet.payloadLength
+        if (offset < 0 || length <= 0 || offset > rawPacket.size || length > rawPacket.size - offset) {
+            return
+        }
+        val isDns = packet.protocolNumber == 17 &&
+            (packet.sourcePort == 53 || packet.sourcePort == 5353 ||
+                packet.destinationPort == 53 || packet.destinationPort == 5353)
+        val isHttp = packet.protocolNumber == 6 &&
+            (packet.sourcePort in HTTP_METADATA_PORTS ||
+                packet.destinationPort in HTTP_METADATA_PORTS)
+        val isTlsRecord = packet.protocolNumber == 6 && length >= 5 &&
+            (rawPacket[offset].toInt() and 0xff) == 22
+        if (!isDns && !isHttp && !isTlsRecord) return
+        val boundedLength = minOf(length, PassivePayloadInspector.MAX_INSPECTED_PAYLOAD_BYTES)
+        if (boundedLength <= 0) return
+        val payload = rawPacket.copyOfRange(offset, offset + boundedLength)
+        PassivePayloadInspector.inspect(
+            protocolNumber = packet.protocolNumber,
+            sourcePort = packet.sourcePort,
+            destinationPort = packet.destinationPort,
+            payload = payload
+        ).forEach { observation ->
+            if (flow.protocolObservations.containsKey(observation.kind) ||
+                flow.protocolObservations.size < MAX_PROTOCOL_OBSERVATIONS_PER_FLOW
+            ) {
+                flow.protocolObservations[observation.kind] = observation
+            }
+        }
     }
 
     private fun resolveAttribution(
@@ -253,6 +307,8 @@ internal class FlowAttributionCollector(
         private const val TCP_FIN = 0x01
         private const val TCP_RST = 0x04
         const val DEFAULT_SNAPSHOT_LIMIT = 25
+        private const val MAX_PROTOCOL_OBSERVATIONS_PER_FLOW = 3
+        private val HTTP_METADATA_PORTS = setOf(80, 8000, 8080)
         private const val DEFAULT_MAX_FLOWS = 1_000
         private const val DEFAULT_MAX_AGE_MS = 10 * 60 * 1_000L
         private const val DEFAULT_IDLE_SESSION_MS = 60 * 1_000L

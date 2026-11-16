@@ -506,6 +506,13 @@ private fun JarvisMobileScreen(
     var vpnFlowSharingEnabled by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("vpn_flow_sharing_enabled", false))
     }
+    var vpnPayloadMetadataEnabled by remember {
+        val preferences = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+        mutableStateOf(
+            preferences.getBoolean("vpn_flow_sharing_enabled", false) &&
+                preferences.getBoolean("vpn_payload_metadata_enabled", false)
+        )
+    }
     var appUsagePackageFilter by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
             .getString("app_usage_package_filter", "") ?: "")
@@ -912,8 +919,14 @@ private fun JarvisMobileScreen(
                             checked = vpnFlowSharingEnabled,
                             onCheckedChange = { enabled ->
                                 vpnFlowSharingEnabled = enabled
-                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
-                                    .edit().putBoolean("vpn_flow_sharing_enabled", enabled).apply()
+                                val preferences = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                preferences.edit()
+                                    .putBoolean("vpn_flow_sharing_enabled", enabled)
+                                    // A change to the parent flow consent requires a fresh, separate protocol opt-in.
+                                    .putBoolean("vpn_payload_metadata_enabled", false)
+                                    .apply()
+                                vpnPayloadMetadataEnabled = false
+                                JarvisVpnService.updatePayloadMetadataConsent(false)
                                 val appliedToRunningVpn = JarvisVpnService.updateFlowMetadataConsent(enabled)
                                 message = when {
                                     !enabled && appliedToRunningVpn ->
@@ -924,6 +937,38 @@ private fun JarvisMobileScreen(
                                         "Metadados por fluxo ativados na VPN em execução."
                                     else ->
                                         "Preferência salva. Inicie ou reinicie a VPN Jarvis para aplicar."
+                                }
+                            }
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Inspeção passiva de protocolos")
+                            Text(
+                                "Consentimento separado. Extrai nomes DNS, Host HTTP e SNI TLS quando visíveis. Não armazena corpos, mensagens, cookies ou credenciais e não descriptografa TLS. Exige identificação por fluxo e VPN Jarvis ativa.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = vpnPayloadMetadataEnabled,
+                            enabled = vpnFlowSharingEnabled,
+                            onCheckedChange = { enabled ->
+                                vpnPayloadMetadataEnabled = enabled
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putBoolean("vpn_payload_metadata_enabled", enabled).apply()
+                                val appliedToRunningVpn = JarvisVpnService.updatePayloadMetadataConsent(enabled)
+                                message = when {
+                                    !enabled && appliedToRunningVpn ->
+                                        "Inspeção passiva de protocolos desativada; metadados existentes foram limpos."
+                                    !enabled ->
+                                        "Inspeção passiva de protocolos desativada."
+                                    appliedToRunningVpn ->
+                                        "Inspeção passiva ativada na VPN Jarvis."
+                                    else ->
+                                        "Preferência salva. Inicie ou reinicie a VPN Jarvis com identificação por fluxo ativa."
                                 }
                             }
                         )

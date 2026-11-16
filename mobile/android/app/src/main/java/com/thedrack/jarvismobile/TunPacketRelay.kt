@@ -75,7 +75,7 @@ internal class TunPacketRelay private constructor(
                         if (flowCollector.isEnabled) {
                             runCatching {
                                 IpPacketParser.parse(packet)?.let {
-                                    flowCollector.record(it, FlowPacketDirection.OUTBOUND)
+                                    flowCollector.record(it, FlowPacketDirection.OUTBOUND, packet)
                                 }
                             }.onFailure { Log.w(TAG, "Outbound flow attribution failed", it) }
                         }
@@ -90,7 +90,7 @@ internal class TunPacketRelay private constructor(
                         if (flowCollector.isEnabled) {
                             runCatching {
                                 IpPacketParser.parse(packet)?.let {
-                                    flowCollector.record(it, FlowPacketDirection.INBOUND)
+                                    flowCollector.record(it, FlowPacketDirection.INBOUND, packet)
                                 }
                             }.onFailure { Log.w(TAG, "Inbound flow attribution failed", it) }
                         }

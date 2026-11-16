@@ -226,6 +226,51 @@ class FlowAttributionCollectorTest {
         assertEquals(72L, flow.rxBytes)
     }
 
+    @Test
+    fun protocolMetadataRequiresSeparateOptInAndIsClearedWhenRevoked() {
+        val dnsPayload = byteArrayOf(
+            0x12, 0x34, 0x01, 0x00, 0x00, 0x01,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            3, 'a'.code.toByte(), 'p'.code.toByte(), 'i'.code.toByte(),
+            7, 'e'.code.toByte(), 'x'.code.toByte(), 'a'.code.toByte(),
+            'm'.code.toByte(), 'p'.code.toByte(), 'l'.code.toByte(), 'e'.code.toByte(),
+            3, 'c'.code.toByte(), 'o'.code.toByte(), 'm'.code.toByte(), 0,
+            0, 1, 0, 1
+        )
+        val dnsPacket = packet(
+            OUTBOUND,
+            protocol = "udp",
+            protocolNumber = 17,
+            sourcePort = 53000,
+            destinationPort = 53
+        ).copy(payloadOffset = 0, payloadLength = dnsPayload.size)
+
+        val disabledByDefault = FlowAttributionCollector(
+            ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> 10001 },
+            packageResolver = PackageIdentityResolver { emptyList() },
+            clock = { 7_000L }
+        )
+        disabledByDefault.record(dnsPacket, FlowPacketDirection.OUTBOUND, dnsPayload)
+        assertTrue(disabledByDefault.snapshot().single().protocolObservations.isEmpty())
+
+        val enabled = FlowAttributionCollector(
+            ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> 10001 },
+            packageResolver = PackageIdentityResolver { emptyList() },
+            clock = { 7_000L },
+            payloadMetadataEnabled = true
+        )
+        enabled.record(dnsPacket, FlowPacketDirection.OUTBOUND, dnsPayload)
+        assertEquals(
+            listOf(NetworkProtocolObservation("dns_query", "api.example.com", "dns")),
+            enabled.snapshot().single().protocolObservations
+        )
+
+        enabled.setPayloadMetadataEnabled(false)
+        assertTrue(enabled.snapshot().single().protocolObservations.isEmpty())
+        enabled.record(dnsPacket, FlowPacketDirection.OUTBOUND, dnsPayload)
+        assertTrue(enabled.snapshot().single().protocolObservations.isEmpty())
+    }
+
     private fun packet(
         direction: Int,
         protocol: String = "tcp",

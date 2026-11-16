@@ -57,6 +57,7 @@ object PassivePayloadInspector {
         if (questionCount !in 1..MAX_DNS_QUESTIONS) return emptyList()
 
         val parsed = readDnsName(payload, 12) ?: return emptyList()
+        if (parsed.second + 4 > payload.size) return emptyList()
         val normalized = normalizeHostname(parsed.first) ?: return emptyList()
         val kind = if (flags and 0x8000 == 0) "dns_query" else "dns_response_question"
         return listOf(NetworkProtocolObservation(kind, normalized, "dns"))
@@ -86,7 +87,7 @@ object PassivePayloadInspector {
                 length and 0xc0 == 0xc0 -> {
                     if (cursor + 1 >= message.size) return null
                     val pointer = ((length and 0x3f) shl 8) or (message[cursor + 1].toInt() and 0xff)
-                    if (pointer !in message.indices || !visited.add(pointer)) return null
+                    if (pointer < 12 || pointer >= cursor || !visited.add(pointer)) return null
                     if (nextOffset < 0) nextOffset = cursor + 2
                     cursor = pointer
                     pointerHops += 1
@@ -178,7 +179,8 @@ object PassivePayloadInspector {
         val extensionsEnd = cursor + extensionsLength
         if (extensionsEnd > bodyEnd) return null
 
-        while (cursor + 4 <= extensionsEnd) {
+        while (cursor < extensionsEnd) {
+            if (cursor + 4 > extensionsEnd) return null
             val extensionType = u16(payload, cursor)
             val extensionLength = u16(payload, cursor + 2)
             cursor += 4
@@ -202,38 +204,65 @@ object PassivePayloadInspector {
         val listLength = u16(payload, start)
         if (start + 2 + listLength != end) return null
         var cursor = start + 2
-        while (cursor + 3 <= end) {
+        var serverName: String? = null
+        while (cursor < end) {
+            if (cursor + 3 > end) return null
             val nameType = payload[cursor].toInt() and 0xff
             val nameLength = u16(payload, cursor + 1)
             cursor += 3
             if (cursor + nameLength > end) return null
             if (nameType == 0) {
+                if (serverName != null) return null
                 val bytes = payload.copyOfRange(cursor, cursor + nameLength)
                 val raw = bytes.toString(Charsets.US_ASCII)
-                return normalizeHostname(raw)
+                serverName = normalizeHostname(raw) ?: return null
             }
             cursor += nameLength
         }
-        return null
+        return serverName
     }
 
     private fun normalizeHostHeader(value: String): String? {
-        val host = when {
+        val host: String
+        val port: String?
+        when {
             value.startsWith("[") -> {
                 val close = value.indexOf(']')
                 if (close <= 1) return null
-                value.substring(1, close)
+                host = value.substring(1, close)
+                val suffix = value.substring(close + 1)
+                if (suffix.isEmpty()) {
+                    port = null
+                } else {
+                    if (!suffix.startsWith(":")) return null
+                    port = suffix.drop(1)
+                }
             }
-            value.count { it == ':' } == 1 -> value.substringBeforeLast(':')
-            else -> value
+            value.count { it == ':' } == 1 -> {
+                host = value.substringBeforeLast(':')
+                port = value.substringAfterLast(':')
+            }
+            value.contains(':') -> return null
+            else -> {
+                host = value
+                port = null
+            }
         }
+        if (port != null && (
+                port.isEmpty() || port.any { !it.isDigit() } ||
+                    port.toIntOrNull()?.let { it !in 1..65535 } != false
+            )
+        ) return null
         return normalizeHostname(host)
     }
 
     private fun normalizeHostname(value: String): String? {
-        val host = value.trim().trimEnd('.').lowercase(Locale.ROOT)
-        if (host.isEmpty() || host.length > 253 || host.any { it.code !in 0x21..0x7e }) return null
-        if (host.startsWith(".") || host.endsWith(".") || ".." in host) return null
+        var host = value.trim().lowercase(Locale.ROOT)
+        if (host.endsWith(".")) host = host.dropLast(1)
+        if (host.isEmpty() || host.endsWith(".") || host.length > 253 ||
+            host.any { it.code !in 0x21..0x7e }
+        ) return null
+        if (host.startsWith(".") || ".." in host) return null
         val labels = host.split(".")
         if (labels.any { label ->
                 label.isEmpty() || label.length > 63 ||

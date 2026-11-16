@@ -11,12 +11,15 @@ data class ParsedIpPacket(
     val destinationAddress: InetAddress,
     val destinationPort: Int,
     val packetBytes: Int,
-    val tcpFlags: Int? = null
+    val tcpFlags: Int? = null,
+    val payloadOffset: Int? = null,
+    val payloadLength: Int = 0
 )
 
 /**
- * Minimal IPv4/IPv6 TCP/UDP header parser for packets read from the VPN TUN.
- * It deliberately returns only tuple metadata and total packet length.
+ * Minimal IPv4/IPv6 TCP/UDP parser for packets read from the VPN TUN.
+ * It returns tuple metadata and a validated payload byte range; it never copies
+ * or retains payload bytes.
  */
 object IpPacketParser {
     private const val IPPROTO_TCP = 6
@@ -58,6 +61,7 @@ object IpPacketParser {
 
         val source = packet.copyOfRange(12, 16)
         val destination = packet.copyOfRange(16, 20)
+        val payloadRange = transportPayloadRange(packet, headerLength, totalLength, protocolNumber)
         return ParsedIpPacket(
             protocol = protocol,
             protocolNumber = protocolNumber,
@@ -66,7 +70,9 @@ object IpPacketParser {
             destinationAddress = InetAddress.getByAddress(destination),
             destinationPort = unsignedShort(packet, headerLength + 2),
             packetBytes = totalLength,
-            tcpFlags = if (protocolNumber == IPPROTO_TCP && headerLength + 14 <= totalLength) packet[headerLength + 13].toInt() and 0xff else null
+            tcpFlags = if (protocolNumber == IPPROTO_TCP && headerLength + 14 <= totalLength) packet[headerLength + 13].toInt() and 0xff else null,
+            payloadOffset = payloadRange.first,
+            payloadLength = payloadRange.second
         )
     }
 
@@ -117,6 +123,7 @@ object IpPacketParser {
 
         val source = packet.copyOfRange(8, 24)
         val destination = packet.copyOfRange(24, 40)
+        val payloadRange = transportPayloadRange(packet, offset, totalLength, nextHeader)
         return ParsedIpPacket(
             protocol = protocol,
             protocolNumber = nextHeader,
@@ -125,8 +132,41 @@ object IpPacketParser {
             destinationAddress = InetAddress.getByAddress(destination),
             destinationPort = unsignedShort(packet, offset + 2),
             packetBytes = totalLength,
-            tcpFlags = if (nextHeader == IPPROTO_TCP && offset + 14 <= totalLength) packet[offset + 13].toInt() and 0xff else null
+            tcpFlags = if (nextHeader == IPPROTO_TCP && offset + 14 <= totalLength) packet[offset + 13].toInt() and 0xff else null,
+            payloadOffset = payloadRange.first,
+            payloadLength = payloadRange.second
         )
+    }
+
+    /**
+     * Returns a validated byte range for the transport payload. The packet itself
+     * remains owned by the relay; this parser never copies or retains payload data.
+     */
+    private fun transportPayloadRange(
+        packet: ByteArray,
+        transportOffset: Int,
+        totalLength: Int,
+        protocolNumber: Int
+    ): Pair<Int?, Int> {
+        return when (protocolNumber) {
+            IPPROTO_TCP -> {
+                if (transportOffset + 20 > totalLength) return null to 0
+                val tcpHeaderLength = ((packet[transportOffset + 12].toInt() and 0xff) ushr 4) * 4
+                if (tcpHeaderLength < 20 || transportOffset + tcpHeaderLength > totalLength) {
+                    return null to 0
+                }
+                val payloadOffset = transportOffset + tcpHeaderLength
+                payloadOffset to (totalLength - payloadOffset)
+            }
+            IPPROTO_UDP -> {
+                if (transportOffset + 8 > totalLength) return null to 0
+                val udpLength = unsignedShort(packet, transportOffset + 4)
+                if (udpLength < 8 || udpLength > totalLength - transportOffset) return null to 0
+                val payloadOffset = transportOffset + 8
+                payloadOffset to (udpLength - 8)
+            }
+            else -> null to 0
+        }
     }
 
     private fun protocolName(number: Int): String? = when (number) {

@@ -73,6 +73,31 @@ class PassivePayloadInspectorTest {
     }
 
     @Test
+    fun rejectsTruncatedDnsQuestionsAndInvalidHttpAuthorityPorts() {
+        val completeDns = dnsQuery("api.example.com")
+        val truncatedDns = completeDns.copyOf(completeDns.size - 4)
+        assertTrue(
+            PassivePayloadInspector.inspect(
+                protocolNumber = 17,
+                sourcePort = 53000,
+                destinationPort = 53,
+                payload = truncatedDns
+            ).isEmpty()
+        )
+
+        val invalidHttp = "GET / HTTP/1.1\r\nHost: example.com:not-a-port\r\n\r\n"
+            .toByteArray(Charsets.US_ASCII)
+        assertTrue(
+            PassivePayloadInspector.inspect(
+                protocolNumber = 6,
+                sourcePort = 51000,
+                destinationPort = 80,
+                payload = invalidHttp
+            ).isEmpty()
+        )
+    }
+
+    @Test
     fun ignoresUnsupportedPortsAndOversizedPayloads() {
         assertTrue(
             PassivePayloadInspector.inspect(

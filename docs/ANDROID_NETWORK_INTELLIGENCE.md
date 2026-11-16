@@ -23,11 +23,11 @@
 | Step | State | Evidence / boundary |
 |---|---|---|
 | Architecture and platform constraints | Complete | User approved Android unrooted + payload-inspection target on 2026-11-16. |
-| Passive protocol metadata parser | In progress | `PassivePayloadInspector` extracts DNS question names, cleartext HTTP Host and TLS ClientHello SNI from a single supplied transport payload. Unit tests specify normal and malformed cases. Not yet connected to the TUN relay. |
-| TUN payload-offset integration | Pending | Extend the IP parser to expose a validated transport payload range without copying or retaining the full packet. |
-| Per-flow metadata and consent | Pending | Add a separate default-off preference for protocol metadata; revocation must clear metadata immediately. |
+| Passive protocol metadata parser | Implemented | `PassivePayloadInspector` extracts DNS question names, cleartext HTTP Host and TLS ClientHello SNI from a single supplied transport payload. Unit tests cover normal, malformed and oversized inputs. |
+| TUN payload-offset integration | Implemented | `IpPacketParser` exposes validated TCP/UDP payload offsets and lengths for IPv4/IPv6. `TunPacketRelay` passes the packet buffer to the flow collector; the inspector copies only a bounded temporary slice and does not retain raw bytes. |
+| Per-flow metadata and consent | Implemented | Separate `vpn_payload_metadata_enabled` opt-in, default-off, requires flow attribution consent and Jarvis VPN ownership. Revocation clears stored per-flow protocol observations immediately. |
 | TCP stream reassembly | Pending | Bounded, sequence-aware reassembly is required for split/out-of-order TLS ClientHello and HTTP headers. Until then, the passive parser only handles complete messages present in one segment. |
-| Backend schema and UI | Pending | Validate and publish only bounded metadata; expose explicit consent in Android UI. |
+| Backend schema and UI | Implemented | Android UI exposes a separate protocol-inspection switch. Publisher sends at most 3 typed observations per flow and caps metadata-enabled snapshots at 15 flows; backend validates type/source/hostname and both opt-ins. |
 | TLS diagnostic proxy | Pending | Separate feature, disabled by default, only for user-selected compatible apps and explicit CA installation. |
 | PCAPng evidence store | Pending | Separate explicit capture sessions, encryption, quotas, retention and local-first storage. |
 | Tailscale gateway | Pending | Preserve Android UID attribution before forwarding; validate routes, loop prevention and failure recovery. |
@@ -39,7 +39,7 @@
 - Supported in the first parser increment: UDP DNS (53/5353), cleartext HTTP Host (80/8000/8080), TLS ClientHello SNI (TCP).
 - Output is a small list of typed metadata observations. It never returns raw bytes, HTTP paths, authorization headers, cookies, request bodies, TLS application data, or credentials.
 - DNS compression pointers and message bounds are validated. Hostnames are normalized and length/character bounded.
-- TLS parsing requires a complete ClientHello record in the supplied segment. No TCP stream reassembly is implied.
+- TLS parsing requires a complete ClientHello record in the supplied segment. No TCP stream reassembly is implied. Live TUN integration currently observes each packet independently.
 - Encrypted DNS, ECH-protected names, QUIC payload decryption, TLS application data and pinned applications are not decoded by this parser.
 
 ## Validation policy
