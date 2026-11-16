@@ -31,8 +31,10 @@ from app.adapters.edge.android_host_status import (
     android_wifi_status as read_wifi_status,
 )
 from app.adapters.edge.android_mcp_observability import MetadataObservabilityMiddleware
+from app.adapters.edge.android_network_mcp_tools import register_android_network_tools
 from app.adapters.edge.chatgpt_plan_mcp_tools import register_chatgpt_plan_tools
 from app.adapters.edge.communication_mcp_tools import register_communication_tools
+from app.adapters.edge.protocol_pattern_mcp_tools import register_protocol_pattern_tools
 from app.adapters.infrastructure.termux_shell_mcp_tools import (
     register_termux_shell_tools,
 )
@@ -99,6 +101,8 @@ def android_accessibility_action(
 
 # Session pairing controls are always available; arbitrary shell is locally opt-in.
 register_termux_shell_tools(mcp)
+register_android_network_tools(mcp)
+register_protocol_pattern_tools(mcp, include_live_android=True)
 communication_registry = create_default_communication_registry()
 register_communication_tools(mcp, communication_registry)
 register_chatgpt_plan_tools(mcp, registry=communication_registry)
