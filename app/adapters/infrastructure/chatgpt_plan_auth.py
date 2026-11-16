@@ -33,6 +33,12 @@ from app.adapters.infrastructure.chatgpt_plan_runtime import (
     ChatGPTPlanCredentialStore,
     ChatGPTPlanError,
 )
+from app.adapters.infrastructure.secure_file_permissions import (
+    set_private_directory_permissions,
+    set_private_file_permissions,
+    verify_private_directory_permissions,
+    verify_private_file_permissions,
+)
 
 ISSUER = "https://auth.openai.com"
 AUTHORIZE_URL = f"{ISSUER}/api/accounts/authorize"
@@ -373,9 +379,23 @@ class ChatGPTPlanOAuth:
         """Serialize rotating refresh-token use across Jarvis processes."""
         lock_path = self.store.path.with_name(self.store.path.name + ".lock")
         lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
-        if hasattr(os, "fchmod"):
-            os.fchmod(fd, 0o600)
+        set_private_directory_permissions(lock_path.parent)
+        if lock_path.is_symlink():
+            raise PermissionError("ChatGPT refresh lock must not be a symbolic link")
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
+            created = True
+        except FileExistsError:
+            fd = os.open(lock_path, os.O_RDWR)
+            created = False
+        try:
+            if created:
+                set_private_file_permissions(lock_path)
+            else:
+                verify_private_file_permissions(lock_path)
+        except Exception:
+            os.close(fd)
+            raise
         try:
             try:
                 import fcntl
@@ -592,14 +612,16 @@ class ChatGPTPlanOAuth:
             raise ChatGPTPlanError(
                 "ChatGPT credential directory is unsafe.", code="unsafe_storage"
             )
-        os.chmod(parent, 0o700)
+        set_private_directory_permissions(parent)
         path = parent / "host-id"
         if path.exists():
-            if path.is_symlink() or path.stat().st_mode & 0o077:
+            try:
+                verify_private_file_permissions(path)
+            except PermissionError as exc:
                 raise ChatGPTPlanError(
                     "ChatGPT host identifier permissions are unsafe.",
                     code="unsafe_storage",
-                )
+                ) from exc
             value = path.read_text(encoding="ascii").strip()
             try:
                 parsed = value.removeprefix("urn:uuid:")
@@ -615,6 +637,7 @@ class ChatGPTPlanOAuth:
             stream.write(value + "\n")
             stream.flush()
             os.fsync(stream.fileno())
+        set_private_file_permissions(path)
         return value
 
     def _registration_path(self) -> Path:
@@ -624,11 +647,14 @@ class ChatGPTPlanOAuth:
         path = self._registration_path()
         if not path.exists():
             return None
-        if path.is_symlink() or path.stat().st_mode & 0o077:
+        try:
+            verify_private_directory_permissions(path.parent)
+            verify_private_file_permissions(path)
+        except PermissionError as exc:
             raise ChatGPTPlanError(
                 "ChatGPT registration metadata permissions are unsafe.",
                 code="unsafe_storage",
-            )
+            ) from exc
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
             client_id = value.get("client_id") if isinstance(value, dict) else None
@@ -651,19 +677,20 @@ class ChatGPTPlanOAuth:
     def _save_registered_client_id(self, client_id: str) -> None:
         path = self._registration_path()
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        set_private_directory_permissions(path.parent)
         fd, temporary_name = tempfile.mkstemp(
             prefix=".registration-", suffix=".tmp", dir=path.parent
         )
         temporary = Path(temporary_name)
         try:
-            if hasattr(os, "fchmod"):
+            if os.name != "nt" and hasattr(os, "fchmod"):
                 os.fchmod(fd, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
                 json.dump({"client_id": client_id}, stream)
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary, path)
-            os.chmod(path, 0o600)
+            set_private_file_permissions(path)
         except Exception:
             try:
                 os.close(fd)

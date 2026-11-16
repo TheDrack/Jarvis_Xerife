@@ -1,5 +1,4 @@
 import json
-import stat
 
 import httpx
 import pytest
@@ -8,6 +7,10 @@ from app.adapters.infrastructure.chatgpt_plan_runtime import (
     ChatGPTPlanCredentialStore,
     ChatGPTPlanError,
     ChatGPTPlanModelRuntimeAdapter,
+)
+from app.adapters.infrastructure.secure_file_permissions import (
+    verify_private_directory_permissions,
+    verify_private_file_permissions,
 )
 from app.application.ports.model_runtime import (
     ModelInvocationRequest,
@@ -130,8 +133,8 @@ def test_credential_store_writes_owner_only_file_atomically(tmp_path):
     store.save(profile)
 
     assert store.load() == profile
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600
-    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    verify_private_file_permissions(path)
+    verify_private_directory_permissions(path.parent)
     assert not list(path.parent.glob("*.tmp"))
 
 

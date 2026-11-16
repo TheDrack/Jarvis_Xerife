@@ -51,7 +51,7 @@ Default local directory: `~/.config/jarvis/chatgpt/`.
 - `host-id`: stable `ext_agent_host_id` for this Jarvis installation.
 - `profile.json.lock`: cross-process lock used to serialize rotating refresh-token use.
 
-On POSIX systems, the directory is set to `0700` and credential/registration/host files to `0600`. Override only the profile path with `JARVIS_CHATGPT_AUTH_FILE`; do not point it at a shared or remotely mounted location. The registration and host identifiers remain local metadata, not authentication secrets.
+On POSIX systems, the directory is set to `0700` and credential/registration/host files to `0600`. On Windows, Jarvis removes inherited ACLs and grants full control only to the current user SID and `NT AUTHORITY\SYSTEM`; ACL verification fails closed if any additional principal is present. Override only the profile path with `JARVIS_CHATGPT_AUTH_FILE`; do not point it at a shared or remotely mounted location. The registration and host identifiers remain local metadata, not authentication secrets.
 
 ## Python integration
 

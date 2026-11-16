@@ -16,6 +16,12 @@ from typing import Any
 
 import httpx
 
+from app.adapters.infrastructure.secure_file_permissions import (
+    set_private_directory_permissions,
+    set_private_file_permissions,
+    verify_private_directory_permissions,
+    verify_private_file_permissions,
+)
 from app.application.ports.model_runtime import (
     ModelInvocationRequest,
     ModelInvocationResult,
@@ -73,13 +79,13 @@ class ChatGPTPlanCredentialStore:
         parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         if parent.is_symlink():
             raise ValueError("credential directory must not be a symbolic link")
-        os.chmod(parent, 0o700)
+        set_private_directory_permissions(parent)
         fd, temporary_name = tempfile.mkstemp(
             prefix=".chatgpt-", suffix=".tmp", dir=parent
         )
         temporary = Path(temporary_name)
         try:
-            if hasattr(os, "fchmod"):
+            if os.name != "nt" and hasattr(os, "fchmod"):
                 os.fchmod(fd, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
                 json.dump(
@@ -88,7 +94,7 @@ class ChatGPTPlanCredentialStore:
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary, self.path)
-            os.chmod(self.path, 0o600)
+            set_private_file_permissions(self.path)
             try:
                 directory_fd = os.open(parent, os.O_RDONLY)
                 try:
@@ -110,8 +116,8 @@ class ChatGPTPlanCredentialStore:
             return None
         if self.path.is_symlink():
             raise ValueError("credential file must not be a symbolic link")
-        if self.path.stat().st_mode & 0o077:
-            raise PermissionError("ChatGPT credential file permissions must be 0600")
+        verify_private_directory_permissions(self.path.parent)
+        verify_private_file_permissions(self.path)
         try:
             value = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:

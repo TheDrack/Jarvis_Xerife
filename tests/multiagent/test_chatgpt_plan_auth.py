@@ -11,6 +11,9 @@ from app.adapters.infrastructure.chatgpt_plan_runtime import (
     ChatGPTPlanCredentialStore,
     ChatGPTPlanError,
 )
+from app.adapters.infrastructure.secure_file_permissions import (
+    verify_private_file_permissions,
+)
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jose import jwt
@@ -122,7 +125,7 @@ def test_local_host_identifier_is_stable_and_owner_only(tmp_path):
     second = oauth._get_or_create_host_id()
     assert first == second
     assert first.startswith("urn:uuid:")
-    assert (store.path.parent / "host-id").stat().st_mode & 0o077 == 0
+    verify_private_file_permissions(store.path.parent / "host-id")
     oauth.close()
 
 
