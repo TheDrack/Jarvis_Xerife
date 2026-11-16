@@ -404,6 +404,33 @@ def test_app_usage_snapshot_requires_mobile_explicit_usage_access_consent():
         )
 
 
+def test_network_snapshot_validates_nonnegative_vpn_tunnel_counters():
+    payload = {
+        "platform": "android",
+        "vpn_tunnel_stats": {
+            "tx_packets": 10,
+            "tx_bytes": 2048,
+            "rx_packets": 12,
+            "rx_bytes": 4096,
+        },
+    }
+    valid = observation(
+        device_id="phone-1",
+        source_device_type="mobile",
+        observation_type="network_snapshot",
+        payload=payload,
+    )
+    module.EnvironmentObservationCreate(**valid)
+
+    for invalid_value in (-1, True, 1.5, "10"):
+        invalid_payload = {
+            **payload,
+            "vpn_tunnel_stats": {**payload["vpn_tunnel_stats"], "tx_bytes": invalid_value},
+        }
+        with pytest.raises(ValueError):
+            module.EnvironmentObservationCreate(**dict(valid, payload=invalid_payload))
+
+
 def test_app_usage_snapshot_accepts_bounded_package_identity_metadata():
     now = datetime.now(timezone.utc)
     valid = observation(
