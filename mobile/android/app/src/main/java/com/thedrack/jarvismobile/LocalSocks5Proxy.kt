@@ -38,6 +38,8 @@ internal class LocalSocks5Proxy(
     private val udpSockets = ConcurrentHashMap.newKeySet<DatagramSocket>()
     private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
 
+    fun isRunning(): Boolean = running.get() && server?.isClosed == false
+
     fun start() {
         check(running.compareAndSet(false, true)) { "SOCKS5 proxy already started" }
         try {
