@@ -384,3 +384,156 @@ def test_network_version_comparison_compares_all_observed_hosts(tmp_path):
 
     assert diff["changed"] is True
     assert diff["changes"] == ["network_pattern.hostname"]
+
+
+def test_live_android_import_uses_paired_snapshot_and_package_manager_version(tmp_path, monkeypatch):
+    import app.adapters.edge.android_network_mcp_tools as android_network_tools
+    import app.adapters.edge.protocol_pattern_mcp_tools as module
+
+    class FakeMcp:
+        def __init__(self):
+            self.tools = {}
+
+        def tool(self):
+            def register(function):
+                self.tools[function.__name__] = function
+                return function
+            return register
+
+    flow = {
+        "protocol": "tcp",
+        "remote_ip": "203.0.113.20",
+        "remote_port": 443,
+        "package_names": ["com.example.chat"],
+        "attribution_status": "resolved",
+        "package_versions": [{
+            "package_name": "com.example.chat",
+            "version_name": "4.2.1",
+            "version_code": 42001,
+        }],
+        "protocol_observations": [
+            {"kind": "tls_sni", "value": "api.example.test", "source": "tls_client_hello"}
+        ],
+    }
+    monkeypatch.setattr(
+        android_network_tools,
+        "read_android_network_flows_snapshot",
+        lambda package: {
+            "capture_owner": "jarvis",
+            "capture_reason": "capturing",
+            "flow_metadata_opt_in": True,
+            "payload_metadata_opt_in": True,
+            "flow_count": 1,
+            "flows": [flow],
+        },
+    )
+    monkeypatch.setattr(module, "protocol_registry", ProtocolPatternRegistry(tmp_path))
+    server = FakeMcp()
+    module.register_protocol_pattern_tools(server, include_live_android=True)
+
+    result = server.tools["protocol_pattern_import_live_android_flows"]("com.example.chat")
+
+    assert result["success"] is True
+    assert result["app_version"] == "4.2.1+42001"
+    assert result["recorded"] == 1
+    assert result["protocol_observations_seen"] == 1
+    assert "protocol_pattern_import_live_android_flows" in server.tools
+
+
+def test_desktop_pattern_registry_does_not_register_local_android_capture_tool():
+    import app.adapters.edge.protocol_pattern_mcp_tools as module
+
+    class FakeMcp:
+        def __init__(self):
+            self.tools = {}
+
+        def tool(self):
+            def register(function):
+                self.tools[function.__name__] = function
+                return function
+            return register
+
+    server = FakeMcp()
+    module.register_protocol_pattern_tools(server)
+
+    assert "protocol_pattern_import_live_android_flows" not in server.tools
+    assert "protocol_pattern_analyze_package" in server.tools
+
+
+def test_live_android_import_refuses_external_vpn_snapshots(monkeypatch, tmp_path):
+    import app.adapters.edge.android_network_mcp_tools as android_network_tools
+    import app.adapters.edge.protocol_pattern_mcp_tools as module
+
+    class FakeMcp:
+        def __init__(self):
+            self.tools = {}
+
+        def tool(self):
+            def register(function):
+                self.tools[function.__name__] = function
+                return function
+            return register
+
+    monkeypatch.setattr(
+        android_network_tools,
+        "read_android_network_flows_snapshot",
+        lambda _package: {
+            "capture_owner": "external",
+            "capture_reason": "external_vpn_not_owned",
+            "flow_metadata_opt_in": True,
+            "payload_metadata_opt_in": True,
+            "flow_count": 0,
+            "flows": [],
+        },
+    )
+    registry = ProtocolPatternRegistry(tmp_path)
+    monkeypatch.setattr(module, "protocol_registry", registry)
+    server = FakeMcp()
+    module.register_protocol_pattern_tools(server, include_live_android=True)
+
+    result = server.tools["protocol_pattern_import_live_android_flows"]("com.example.chat")
+
+    assert result["success"] is False
+    assert result["status"] == "capture_unavailable"
+    assert registry.list_patterns() == []
+
+
+def test_package_analysis_groups_hosts_versions_and_lifecycle_status(tmp_path, monkeypatch):
+    import app.adapters.edge.protocol_pattern_mcp_tools as module
+
+    class FakeMcp:
+        def __init__(self):
+            self.tools = {}
+
+        def tool(self):
+            def register(function):
+                self.tools[function.__name__] = function
+                return function
+            return register
+
+    registry = ProtocolPatternRegistry(tmp_path)
+    registry.record_flow_observations(
+        package="com.example.chat",
+        app_version="4.2.1+42001",
+        flows=[{
+            "protocol": "tcp",
+            "remote_ip": "203.0.113.20",
+            "remote_port": 443,
+            "package_names": ["com.example.chat"],
+            "attribution_status": "resolved",
+            "protocol_observations": [
+                {"kind": "tls_sni", "value": "api.example.test", "source": "tls_client_hello"}
+            ],
+        }],
+    )
+    monkeypatch.setattr(module, "protocol_registry", registry)
+    server = FakeMcp()
+    module.register_protocol_pattern_tools(server)
+
+    analysis = server.tools["protocol_pattern_analyze_package"]("com.example.chat")
+
+    assert analysis["pattern_count"] == 1
+    assert analysis["network_pattern_count"] == 1
+    assert analysis["versions"] == ["4.2.1+42001"]
+    assert analysis["hosts"] == ["api.example.test"]
+    assert analysis["statuses"] == {"observed": 1}
