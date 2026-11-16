@@ -208,8 +208,11 @@ internal class FlowAttributionCollector(
         val identities = packageCache.getOrPut(uid) {
             runCatching { packageResolver.resolve(uid).take(5) }.getOrDefault(emptyList())
         }
-        flow.packageNames = identities.map { it.packageName }.distinct().take(5)
-        flow.appLabel = if (flow.packageNames.size == 1) identities.firstOrNull()?.appLabel?.take(128) else null
+        val orderedIdentities = identities.distinctBy { it.packageName }
+            .sortedBy { it.packageName }
+            .take(5)
+        flow.packageNames = orderedIdentities.map { it.packageName }
+        flow.appLabel = if (flow.packageNames.size == 1) orderedIdentities.firstOrNull()?.appLabel?.take(128) else null
         flow.attributionStatus = when {
             flow.packageNames.size > 1 -> "shared_uid"
             flow.packageNames.size == 1 -> "resolved"
