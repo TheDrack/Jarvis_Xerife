@@ -273,6 +273,10 @@ class JarvisVpnService : VpnService() {
                 .getOrDefault(emptyList())
         }
 
+        internal fun updateFlowMetadataConsent(enabled: Boolean) {
+            activeFlowCollector?.setEnabled(enabled)
+        }
+
         const val ACTION_START = "com.thedrack.jarvismobile.vpn.START"
         const val ACTION_STOP = "com.thedrack.jarvismobile.vpn.STOP"
         private const val TAG = "JarvisVpnService"
