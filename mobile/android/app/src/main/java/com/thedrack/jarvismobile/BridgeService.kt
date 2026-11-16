@@ -8,6 +8,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -55,6 +58,16 @@ class BridgeService : Service() {
     private var retryCount = 0
     private var stopping = false
     private val queuedEventIds = ConcurrentHashMap.newKeySet<String>()
+    private var networkCallbackRegistered = false
+    private val vpnNetworkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) = scheduleVpnObservation()
+        override fun onLost(network: Network) = scheduleVpnObservation()
+        override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) =
+            scheduleVpnObservation()
+    }
+    private val vpnObservationRunnable = Runnable {
+        if (!stopping) publishEnvironmentObservations()
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -63,6 +76,7 @@ class BridgeService : Service() {
         isRunning = true
         tokenVault = TokenVault(applicationContext)
         createNotificationChannel()
+        registerVpnNetworkObserver()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -313,6 +327,22 @@ class BridgeService : Service() {
         }
     }
 
+    private fun registerVpnNetworkObserver() {
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        try {
+            manager.registerDefaultNetworkCallback(vpnNetworkCallback)
+            networkCallbackRegistered = true
+        } catch (error: RuntimeException) {
+            android.util.Log.w("JarvisMobile", "VPN network observer unavailable: " + error.javaClass.simpleName)
+        }
+    }
+
+    private fun scheduleVpnObservation() {
+        if (stopping) return
+        handler.removeCallbacks(vpnObservationRunnable)
+        handler.postDelayed(vpnObservationRunnable, 1_500L)
+    }
+
     private fun publishEnvironmentObservations() {
         if (deviceId.isBlank() || token.isBlank()) return
         Thread {
@@ -359,6 +389,12 @@ class BridgeService : Service() {
         stopping = true
         isRunning = false
         handler.removeCallbacksAndMessages(null)
+        if (networkCallbackRegistered) {
+            runCatching {
+                getSystemService(ConnectivityManager::class.java)?.unregisterNetworkCallback(vpnNetworkCallback)
+            }
+            networkCallbackRegistered = false
+        }
         socket?.close(1000, "service stopped")
         socket = null
         tts?.stop()

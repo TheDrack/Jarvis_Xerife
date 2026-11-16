@@ -21,7 +21,12 @@ data class MobileNetworkSnapshot(
     val internetAvailable: Boolean,
     val validated: Boolean,
     val metered: Boolean,
-    val vpnActive: Boolean
+    val vpnActive: Boolean,
+    val vpnProvider: String = "none",
+    val vpnCollectionMode: String = VpnCollectionMode.NETWORK_STATS.wireValue,
+    val vpnModePreference: String = VpnModePreference.AUTO.wireValue,
+    val tailscaleInstalled: Boolean = false,
+    val vpnTransportActive: Boolean = vpnActive
 )
 
 /**
@@ -33,26 +38,43 @@ data class MobileNetworkSnapshot(
 object EnvironmentObservationPublisher {
     fun collect(context: Context): MobileNetworkSnapshot {
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return MobileNetworkSnapshot("unknown", false, false, true, false)
-        val network = manager.activeNetwork
-            ?: return MobileNetworkSnapshot("unknown", false, false, true, false)
-        val capabilities = manager.getNetworkCapabilities(network)
-            ?: return MobileNetworkSnapshot("unknown", false, false, true, false)
-
-        val vpn = capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+        val preferences = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+        val preference = VpnModePreference.fromWireValue(
+            preferences.getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
+        )
+        val runtime = VpnStateDetector.detect(context)
+        // Both engines remain false until their real packet-forwarding/instrumentation
+        // adapters are shipped. Detection must never be mistaken for packet collection.
+        val decision = VpnModeOrchestrator.decide(
+            preference = preference,
+            externalVpnActive = runtime.externalVpnActive,
+            tailscaleInstalled = runtime.tailscaleInstalled,
+            jarvisVpnActive = runtime.jarvisVpnActive,
+            tailscaleAdapterReady = false,
+            jarvisPacketEngineReady = false
+        )
+        val capabilities = if (manager != null) {
+            manager.activeNetwork?.let { activeNetwork -> manager.getNetworkCapabilities(activeNetwork) }
+        } else null
+        val vpn = runtime.vpnTransportActive
         val type = when {
             vpn -> "vpn"
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "wifi"
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "cellular"
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true -> "ethernet"
             else -> "unknown"
         }
         return MobileNetworkSnapshot(
             networkType = type,
-            internetAvailable = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
-            validated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED),
-            metered = !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
-            vpnActive = vpn
+            internetAvailable = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true,
+            validated = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true,
+            metered = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) != true,
+            vpnActive = vpn,
+            vpnProvider = decision.provider,
+            vpnCollectionMode = decision.mode.wireValue,
+            vpnModePreference = preference.wireValue,
+            tailscaleInstalled = runtime.tailscaleInstalled,
+            vpnTransportActive = vpn
         )
     }
 
@@ -123,6 +145,11 @@ object EnvironmentObservationPublisher {
                 .put("internet_available", snapshot.internetAvailable)
                 .put("validated", snapshot.validated).put("metered", snapshot.metered)
                 .put("vpn_active", snapshot.vpnActive)
+                .put("vpn_provider", snapshot.vpnProvider)
+                .put("vpn_collection_mode", snapshot.vpnCollectionMode)
+                .put("vpn_mode_preference", snapshot.vpnModePreference)
+                .put("tailscale_installed", snapshot.tailscaleInstalled)
+                .put("vpn_transport_active", snapshot.vpnTransportActive)
         }
         if (observationType == "presence") {
             payload.put("active", presenceActive)

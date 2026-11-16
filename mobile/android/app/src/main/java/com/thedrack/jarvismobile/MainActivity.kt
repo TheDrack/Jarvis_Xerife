@@ -422,6 +422,12 @@ private fun JarvisMobileScreen(
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
             .getString("app_usage_package_filter", "") ?: "")
     }
+    var vpnModePreference by remember {
+        mutableStateOf(VpnModePreference.fromWireValue(
+            context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                .getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
+        ))
+    }
 
     fun newId(): Long {
         val id = nextId
@@ -727,6 +733,54 @@ private fun JarvisMobileScreen(
                                 }
                             }
                         )
+                    }
+                    Text(
+                        "Política dinâmica de VPN",
+                        modifier = Modifier.padding(top = 16.dp),
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        when (vpnModePreference) {
+                            VpnModePreference.AUTO ->
+                                "AUTO: detecta VPNs externas e evita iniciar uma VPN concorrente. A captura por TUN será ativada quando os adaptadores de encaminhamento estiverem disponíveis; até lá, mantém estatísticas agregadas."
+                            VpnModePreference.JARVIS ->
+                                "JARVIS: prioriza o mecanismo VPN próprio, mas não interrompe uma VPN já ativa. O motor de encaminhamento ainda não está habilitado."
+                            VpnModePreference.TAILSCALE ->
+                                "TAILSCALE: aguarda uma VPN externa compatível. A presença do app Tailscale, sozinha, não confirma que ele controla o túnel."
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                vpnModePreference = VpnModePreference.AUTO
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putString("vpn_mode_preference", vpnModePreference.wireValue).apply()
+                            },
+                            enabled = vpnModePreference != VpnModePreference.AUTO,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("AUTO") }
+                        Button(
+                            onClick = {
+                                vpnModePreference = VpnModePreference.JARVIS
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putString("vpn_mode_preference", vpnModePreference.wireValue).apply()
+                            },
+                            enabled = vpnModePreference != VpnModePreference.JARVIS,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("JARVIS") }
+                        Button(
+                            onClick = {
+                                vpnModePreference = VpnModePreference.TAILSCALE
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putString("vpn_mode_preference", vpnModePreference.wireValue).apply()
+                            },
+                            enabled = vpnModePreference != VpnModePreference.TAILSCALE,
+                            modifier = Modifier.weight(1f)
+                        ) { Text("TAILSCALE") }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
