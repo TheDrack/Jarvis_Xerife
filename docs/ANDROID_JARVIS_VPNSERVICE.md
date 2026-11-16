@@ -6,7 +6,7 @@
 - Declare `JarvisVpnService` as a protected Android `VpnService`, with the system VPN bind permission and the required foreground-service type for active VPN apps.
 - Request Android VPN consent from the Presence screen; the user explicitly starts or stops the service.
 - Establish a dual-stack TUN interface (IPv4 and IPv6) and hand its file descriptor to the Hev JNI worker.
-- Run a loopback-only SOCKS5 upstream on `127.0.0.1:10808`.
+- Run a loopback-only SOCKS5 upstream on `127.0.0.1:10808`, requiring per-session random 192-bit username/password credentials shared only with Hev.
 - Protect outbound TCP and UDP sockets with `VpnService.protect()` so upstream connections do not recurse into the TUN.
 - Forward SOCKS5 TCP CONNECT and UDP ASSOCIATE sessions. Payloads are not logged or persisted.
 - Reuse the existing package filter: empty means all apps except Jarvis; a non-empty list becomes Android's allowed-app list. Android requires the TUN to be re-established to change that list.
