@@ -118,6 +118,27 @@ class FlowAttributionCollectorTest {
     }
 
     @Test
+    fun revokingFlowConsentImmediatelyClearsAndStopsMetadataCollection() {
+        val collector = FlowAttributionCollector(
+            ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> 10001 },
+            packageResolver = PackageIdentityResolver { emptyList() },
+            clock = { 6_000L }
+        )
+        collector.record(packet(OUTBOUND, tcpFlags = 0x02), FlowPacketDirection.OUTBOUND)
+        assertEquals(1, collector.snapshot().size)
+
+        collector.setEnabled(false)
+        assertTrue(collector.snapshot().isEmpty())
+        collector.record(packet(OUTBOUND, tcpFlags = 0x10), FlowPacketDirection.OUTBOUND)
+        assertTrue(collector.snapshot().isEmpty())
+
+        collector.setEnabled(true)
+        assertTrue(collector.snapshot().isEmpty())
+        collector.record(packet(OUTBOUND, tcpFlags = 0x02), FlowPacketDirection.OUTBOUND)
+        assertEquals(1, collector.snapshot().size)
+    }
+
+    @Test
     fun reverseDirectionNormalizesUdpFlowToOriginalAppTuple() {
         val collector = FlowAttributionCollector(
             ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> 10055 },
