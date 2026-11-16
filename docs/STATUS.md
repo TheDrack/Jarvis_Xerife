@@ -707,13 +707,13 @@ O índice Graphify consultado estava no commit `2a70e72`; a ponta atual de `main
 
 A ferramenta MCP de curiosidade foi consultada antes da captura e aceitou o registro `ab56c1cc462e01082e9f` para o achado de validação/retention da PR #841. Isso comprova a captura pelo endpoint MCP disponível nesta sessão, não persistência universal em todos os hosts.
 
-#### PR #841 — integração Android proposta, não integrada
+#### PR #841 — atribuição de fluxos VPN Android (merged; dispositivo não validado)
 
-- A PR [#841](https://github.com/TheDrack/Jarvis_Xerife/pull/841) permanece aberta na branch `feat/android-vpn-flow-attribution`, head `5bc4bcf414f3d1888502e0f84f9a5d9092f01f16`. As alterações desta revalidação continuam somente nessa branch.
-- A validação de `EnvironmentObservationCreate` agora rejeita `flow_metadata_opt_in`/`flows` fora de observações `network_snapshot` de origem `mobile`. O teste de regressão cobre origem desktop e tipos `presence` e `app_usage_snapshot`.
-- No head exato, [JARVIS PR Validation](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316270) passou: **3.404 passed, 38 skipped, 8 warnings, 67% coverage**. [Jarvis Task Queue Tests](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316278) passou: **3.426 passed, 21 skipped, 181 warnings, 68% coverage**. [Android Mobile Build](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316397) passou no build/teste do APK debug; build e publicação release foram corretamente skipped fora de `main`.
-- A PR não tem review formal nem threads de revisão. O comentário do Codex informa que a tentativa anterior falhou por limite de uso no commit `c744ce5`; o Strix informa indisponibilidade por billing. Não há revisão independente concluída para o head atual. Não mesclar.
-- A relay AF_UNIX/Hev, a conectividade real, a atribuição de UID e a revogação em dispositivo físico Android continuam **não verificadas**. O toggle permanece default-off.
+- A PR [#841](https://github.com/TheDrack/Jarvis_Xerife/pull/841) foi merged em 2026-11-16 às 15:59:11 UTC, merge commit `1106bf3dd6ad35c943b79ff645c0f92e692e8201`. Não há review formal registrada no endpoint de reviews.
+- No head `5bc4bcf414f3d1888502e0f84f9a5d9092f01f16`, PR Validation [43893316270](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316270) passou (**3.404 passed, 38 skipped, 8 warnings, 67% coverage**); Task Queue [43893316278](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316278) passou (**3.426 passed, 21 skipped, 181 warnings, 68% coverage**); Android Mobile Build [43893316397](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43893316397) passou. Esses resultados são CI/build, não teste físico.
+- `JarvisVpnService` usa `vpn_flow_sharing_enabled`, default `false`. Com consentimento, `TunPacketRelay` cria socketpair AF_UNIX `SOCK_DGRAM` entre TUN e Hev e encaminha os datagramas; `FlowAttributionCollector` registra apenas cabeçalhos/tuplas IP/TCP/UDP, UID, nomes de pacote, contadores e timestamps. Corpos de pacote não são armazenados nem publicados.
+- O backend restringe `flows` e `flow_metadata_opt_in` a `network_snapshot` de origem `mobile`, com opt-in explícito e limites de tamanho. A coleta individual só funciona enquanto Jarvis VPN está ativa; quando Tailscale Android é a VPN ativa, permanece apenas a coleta agregada disponível.
+- **Não verificado:** relay real do Hev em dispositivo físico, atribuição real por `getConnectionOwnerUid()`, revogação de consentimento em runtime e restauração de rede sob falha. O toggle continua default-off; não habilitar por esta evidência.
 
 #### Retenção e privacidade da telemetria de fluxo
 
