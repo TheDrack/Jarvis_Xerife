@@ -12,7 +12,8 @@
 - Protect outbound TCP and UDP sockets with `VpnService.protect()` so upstream connections do not recurse into the TUN.
 - Forward SOCKS5 TCP CONNECT and UDP ASSOCIATE sessions. Payloads are not logged or persisted.
 - Reuse the existing package filter: empty means all apps except Jarvis; a non-empty list becomes Android's allowed-app list. Android requires the TUN to be re-established to change that list.
-- Parse IPv4/IPv6 TCP/UDP headers in the relay and call Android's VPN-owner-only `ConnectivityManager.getConnectionOwnerUid()` with the original 5-tuple to map flows to UIDs.
+- Per-flow metadata is a separate, default-off consent toggle (`vpn_flow_sharing_enabled`). When disabled, Hev receives the TUN fd directly and no flow parser/relay is created. Revoking consent during an active capture immediately clears and stops metadata collection; enabling it after VPN startup requires a restart.
+- When enabled, parse IPv4/IPv6 TCP/UDP headers in the relay and call Android's VPN-owner-only `ConnectivityManager.getConnectionOwnerUid()` with the original 5-tuple to map flows to UIDs.
 - Resolve UID package names and labels through `PackageManager`; publish bounded flow snapshots with protocol, local/remote IP and port, UID/package identity, first/last seen, TX/RX packet counts, and IP packet-byte totals.
 - Never store or publish packet payloads, application message bodies, credentials, or TLS contents. Non-initial IP fragments lack transport ports and are not individually attributed.
 - Close the native engine, relay socketpair, TUN descriptor, flow collector, SOCKS listener, client sockets, and UDP relays on user stop, service destruction, and `onRevoke()`.
@@ -39,6 +40,7 @@ To collect per-flow metadata through Tailscale, a supported telemetry bridge mus
 - Devices below Android 10 cannot start the Hev VPN service; the app keeps its existing aggregate network statistics path.
 - Starting Jarvis while another VPN is active is refused. The user must explicitly switch VPN ownership through Android's system consent.
 - No incomplete tunnel is left active if the Hev worker fails its startup check.
+- Per-flow metadata is disabled by default and requires a separate explicit switch in Presence. The backend rejects flow records unless `flow_metadata_opt_in=true`.
 - The socketpair is preflighted at runtime, and packet parsing/UID aggregation have unit tests. The Hev-over-AF_UNIX transport and `getConnectionOwnerUid` attribution still require physical-device validation with real TCP, UDP, DNS, IPv4/IPv6, fragmented traffic, mobile/Wi-Fi handover, process death, and revocation before enabling automatic switching.
 - Do not enable automatic VPN takeover or claim packet-level collection in production until those device tests pass.
 
