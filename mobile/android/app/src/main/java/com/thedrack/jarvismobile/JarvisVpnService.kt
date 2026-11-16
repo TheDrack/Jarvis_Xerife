@@ -136,7 +136,10 @@ class JarvisVpnService : VpnService() {
 
         val flowSharingEnabled = preferences.getBoolean("vpn_flow_sharing_enabled", false)
         val collector = if (flowSharingEnabled) {
-            createAndroidFlowAttributionCollector(applicationContext)
+            createAndroidFlowAttributionCollector(
+                applicationContext,
+                payloadMetadataEnabled = preferences.getBoolean("vpn_payload_metadata_enabled", false)
+            )
         } else null
         flowCollector = collector
         val transport = collector?.let {
@@ -284,6 +287,12 @@ class JarvisVpnService : VpnService() {
         internal fun updateFlowMetadataConsent(enabled: Boolean): Boolean {
             val collector = activeFlowCollector ?: return false
             collector.setEnabled(enabled)
+            return true
+        }
+
+        internal fun updatePayloadMetadataConsent(enabled: Boolean): Boolean {
+            val collector = activeFlowCollector ?: return false
+            collector.setPayloadMetadataEnabled(enabled)
             return true
         }
 
