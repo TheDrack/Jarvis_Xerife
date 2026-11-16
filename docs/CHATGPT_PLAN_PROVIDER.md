@@ -6,7 +6,7 @@ Jarvis can use an eligible ChatGPT plan through OpenAI's documented **Sign in wi
 
 This provider is intended for the user's own local Jarvis runtime. Keep its tokens on the user's device or other user-controlled self-hosted runtime; do not put them in Render, Supabase, shared task records, browser storage, source control, logs, or prompts. Requests must be for this connected Jarvis application and originate from the user's activity or an automation the user expressly authorized. Do not expose this provider as a general-purpose API for other users or unrelated tools.
 
-The plan-usage grant is separate from identity sign-in. Jarvis requires both `resource.invoke` and `chatgpt.tokens.use.direct`; a valid identity token alone is insufficient. OpenAI's current Help Center states that ChatGPT Go, Plus, Pro, and Business accounts may share plan usage with participating apps; Free accounts can sign in for identity but are not eligible to share plan usage for inference. Therefore this provider cannot perform plan-backed inference for a Free account. Model access and usage limits remain controlled by OpenAI, the account plan, and any workspace/app limits. Usage is shared with the applicable plan allowance or eligible credits, not a separate unlimited quota.
+The plan-usage grant is separate from identity sign-in. Jarvis requires both `resource.invoke` and `chatgpt.tokens.use.direct`; a valid identity token alone is insufficient. OpenAI's Help Center limits plan sharing in participating commercial apps to Go, Plus, Pro, and Business, while also stating that supported open-source tools remain available to all ChatGPT users. The published wording does not establish whether every Free account receives the plan-usage scope in every open-source flow. For this provider, the decisive check is whether OpenAI grants `chatgpt.tokens.use.direct`; identity sign-in alone is not enough. Free-account plan inference has not been verified and must not be assumed either way. Model access and usage limits remain controlled by OpenAI and the account plan. Usage is shared with the applicable plan allowance, not a separate unlimited quota.
 
 ## Local setup
 
@@ -71,7 +71,6 @@ try:
     result = runtime.invoke(
         ModelInvocationRequest(
             messages=(ModelMessage("user", "Execute a tarefa de rotina aqui."),),
-            max_output_tokens=1200,
         )
     )
     print(result.content)
@@ -100,7 +99,7 @@ finally:
 
 For a conversation owned by Jarvis, pass the required prior `system`/`user`/`assistant` messages in the same `ModelInvocationRequest`. This sends the supplied history as input on each call; it does **not** retrieve or modify existing ChatGPT conversations. Since this integration sets `store=false`, no server-side conversation state is used. Keep any Jarvis-side history in its own authorized local memory store.
 
-The provider always streams and considers a request successful only after `response.completed`. The default model sampling behavior is preserved; an explicit non-default temperature is forwarded to models that support it. It rejects failed, incomplete, interrupted, malformed, or empty responses. It does not automatically retry an uncertain inference POST, avoiding accidental duplicate usage. It reports normalized token usage and sanitized error codes through `ModelRuntime`.
+The provider follows the current ChatGPT plan-usage preview contract: it always sets `store=false` and `stream=true`, maps system messages to developer messages, and considers a request successful only after `response.completed`. The preview does not support `max_output_tokens` or `temperature`; those fields are omitted, and a non-default temperature request is rejected before network I/O. Output length and sampling remain model-controlled. It rejects failed, incomplete, interrupted, malformed, or empty responses. It does not automatically retry an uncertain inference POST, avoiding accidental duplicate usage. It reports normalized token usage and sanitized error codes through `ModelRuntime`.
 
 ## Current scope
 
