@@ -39,7 +39,7 @@ class VpnModeOrchestratorTest {
             jarvisPacketEngineReady = true
         )
 
-        assertEquals(VpnCollectionMode.EXTERNAL_VPN_UNSUPPORTED, decision.mode)
+        assertEquals(VpnCollectionMode.EXTERNAL_VPN_STATS, decision.mode)
         assertFalse(decision.mayStartJarvisVpn)
     }
 
@@ -104,7 +104,7 @@ class VpnModeOrchestratorTest {
     }
 
     @Test
-    fun externalVpnIsNotLabeledTailscaleUntilItsTelemetryAdapterIsReady() {
+    fun externalVpnFallsBackToAggregateStatsUntilItsTelemetryAdapterIsReady() {
         val decision = VpnModeOrchestrator.decide(
             preference = VpnModePreference.AUTO,
             externalVpnActive = true,
@@ -114,7 +114,7 @@ class VpnModeOrchestratorTest {
             jarvisPacketEngineReady = true
         )
 
-        assertEquals(VpnCollectionMode.EXTERNAL_VPN_UNSUPPORTED, decision.mode)
+        assertEquals(VpnCollectionMode.EXTERNAL_VPN_STATS, decision.mode)
         assertEquals("external_unknown", decision.provider)
         assertFalse(decision.mayStartJarvisVpn)
     }
