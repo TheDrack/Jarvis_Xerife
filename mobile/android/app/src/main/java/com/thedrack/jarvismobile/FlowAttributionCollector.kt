@@ -119,7 +119,7 @@ internal class FlowAttributionCollector(
 
         flow.lastSeenMillis = now
         if (packet.protocolNumber == TCP_PROTOCOL &&
-            packet.tcpFlags?.and(TCP_FIN or TCP_RST) != 0
+            packet.tcpFlags?.let { it and (TCP_FIN or TCP_RST) != 0 } == true
         ) flow.closed = true
         if (outbound) {
             flow.txPackets = saturatingAdd(flow.txPackets, 1)
