@@ -72,11 +72,13 @@ internal class TunPacketRelay private constructor(
                     val count = readPacket(tun.fileDescriptor, tunBuffer)
                     if (count > 0) {
                         val packet = tunBuffer.copyOf(count)
-                        runCatching {
-                            IpPacketParser.parse(packet)?.let {
-                                flowCollector.record(it, FlowPacketDirection.OUTBOUND)
-                            }
-                        }.onFailure { Log.w(TAG, "Outbound flow attribution failed", it) }
+                        if (flowCollector.isEnabled) {
+                            runCatching {
+                                IpPacketParser.parse(packet)?.let {
+                                    flowCollector.record(it, FlowPacketDirection.OUTBOUND)
+                                }
+                            }.onFailure { Log.w(TAG, "Outbound flow attribution failed", it) }
+                        }
                         enqueue(toHev, packet)
                     }
                 }
@@ -85,11 +87,13 @@ internal class TunPacketRelay private constructor(
                     val count = readPacket(bridge.fileDescriptor, bridgeBuffer)
                     if (count > 0) {
                         val packet = bridgeBuffer.copyOf(count)
-                        runCatching {
-                            IpPacketParser.parse(packet)?.let {
-                                flowCollector.record(it, FlowPacketDirection.INBOUND)
-                            }
-                        }.onFailure { Log.w(TAG, "Inbound flow attribution failed", it) }
+                        if (flowCollector.isEnabled) {
+                            runCatching {
+                                IpPacketParser.parse(packet)?.let {
+                                    flowCollector.record(it, FlowPacketDirection.INBOUND)
+                                }
+                            }.onFailure { Log.w(TAG, "Inbound flow attribution failed", it) }
+                        }
                         enqueue(toTun, packet)
                     }
                 }
