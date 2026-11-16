@@ -153,6 +153,19 @@ class MainActivity : ComponentActivity() {
             result("A VPN própria exige Android 10 ou superior (API 29). A coleta agregada continua disponível nesta versão do Android.")
             return
         }
+        val preferences = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        val modePreference = VpnModePreference.fromWireValue(
+            preferences.getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
+        )
+        if (modePreference == VpnModePreference.TAILSCALE) {
+            result("Modo TAILSCALE selecionado: a VPN Jarvis permanece bloqueada.")
+            return
+        }
+        val externalVpnActive = VpnStateDetector.detect(this).externalVpnActive
+        if (externalVpnActive && modePreference == VpnModePreference.AUTO) {
+            result("Uma VPN externa está ativa. AUTO preserva o provedor atual; selecione JARVIS para solicitar uma troca manual.")
+            return
+        }
         val permissionIntent = VpnService.prepare(this)
         if (permissionIntent != null) {
             pendingVpnConsentResult = result
@@ -851,7 +864,7 @@ private fun JarvisMobileScreen(
                         ) { Text("Desativar VPN") }
                     }
                     Text(
-                        "A VPN própria usa Hev tun2socks e um proxy SOCKS5 local. A ativação exige consentimento explícito do Android; se outra VPN estiver ativa, o sistema pode solicitar confirmação para trocar o provedor.",
+                        "A VPN própria usa Hev tun2socks e um proxy SOCKS5 local. AUTO preserva uma VPN externa; JARVIS solicita a troca pelo fluxo de consentimento do Android, que revoga o provedor anterior.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Row(
