@@ -66,7 +66,28 @@ class JarvisVpnService : VpnService() {
             .addRoute("0.0.0.0", 0)
             .addRoute("::", 0)
             .addDnsServer(DNS_IPV4)
-            .addDisallowedApplication(packageName)
+
+        val selectedPackages = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+            .getString("app_usage_package_filter", "")
+            .orEmpty()
+            .split(Regex("[,;\\s]+"))
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinct()
+        if (selectedPackages.isEmpty()) {
+            builder.addDisallowedApplication(packageName)
+        } else {
+            require(!selectedPackages.contains(packageName)) {
+                "Jarvis itself cannot be included in its own VPN capture filter"
+            }
+            val missing = selectedPackages.filter {
+                runCatching { packageManager.getApplicationInfo(it, 0) }.isFailure
+            }
+            require(missing.isEmpty()) {
+                "Selected packages are not installed: ${missing.joinToString()}"
+            }
+            selectedPackages.forEach(builder::addAllowedApplication)
+        }
 
         val descriptor = checkNotNull(builder.establish()) {
             "Android refused to establish the VPN interface"
@@ -81,6 +102,7 @@ class JarvisVpnService : VpnService() {
         check(nativeEngine.isRunning()) {
             "Hev tun2socks did not enter the running state"
         }
+        isRunning = true
 
         startVpnForeground()
         getSystemService(NotificationManager::class.java)
@@ -115,6 +137,7 @@ class JarvisVpnService : VpnService() {
         runCatching { engine?.stop() }
             .onFailure { Log.w(TAG, "Hev shutdown reported an error", it) }
         engine = null
+        isRunning = false
         runCatching { tun?.close() }
         tun = null
         runCatching { socksProxy?.close() }
@@ -163,6 +186,9 @@ class JarvisVpnService : VpnService() {
     }
 
     companion object {
+        @Volatile var isRunning: Boolean = false
+            private set
+
         const val ACTION_START = "com.thedrack.jarvismobile.vpn.START"
         const val ACTION_STOP = "com.thedrack.jarvismobile.vpn.STOP"
         private const val TAG = "JarvisVpnService"
