@@ -103,6 +103,8 @@ class IpPacketParserTest {
         assertEquals(55000, parsed.sourcePort)
         assertEquals(InetAddress.getByName("2001:db8::2"), parsed.destinationAddress)
         assertEquals(443, parsed.destinationPort)
+        assertEquals(56, parsed.payloadOffset)
+        assertEquals(4, parsed.payloadLength)
     }
 
     @Test
@@ -115,6 +117,8 @@ class IpPacketParserTest {
         assertEquals("tcp", parsed!!.protocol)
         assertEquals(42000, parsed.sourcePort)
         assertEquals(443, parsed.destinationPort)
+        assertEquals(68, parsed.payloadOffset)
+        assertEquals(4, parsed.payloadLength)
     }
 
     @Test
@@ -261,6 +265,7 @@ class IpPacketParserTest {
         packet[tcpOffset + 1] = 42000.toByte()
         packet[tcpOffset + 2] = 0x01
         packet[tcpOffset + 3] = 0xbb.toByte()
+        packet[tcpOffset + 12] = 0x50
         return packet
     }
 }
