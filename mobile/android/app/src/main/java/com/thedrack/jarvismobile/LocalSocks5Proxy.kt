@@ -426,6 +426,6 @@ internal class LocalSocks5Proxy(
         private const val MAX_CLIENT_SESSIONS = 32
         private const val MAX_UDP_PACKET = 65_507
         private const val STREAM_BUFFER_SIZE = 32 * 1024
-        private const val SELF_TEST_TIMEOUT_MS = 3_000
+        private const val SELF_TEST_TIMEOUT_MS = 1_000
     }
 }
