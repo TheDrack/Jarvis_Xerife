@@ -919,14 +919,14 @@ private fun JarvisMobileScreen(
                             checked = vpnFlowSharingEnabled,
                             onCheckedChange = { enabled ->
                                 vpnFlowSharingEnabled = enabled
-                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
-                                    .edit().putBoolean("vpn_flow_sharing_enabled", enabled).apply()
-                                if (!enabled) {
-                                    vpnPayloadMetadataEnabled = false
-                                    context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
-                                        .edit().putBoolean("vpn_payload_metadata_enabled", false).apply()
-                                    JarvisVpnService.updatePayloadMetadataConsent(false)
-                                }
+                                val preferences = context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                preferences.edit()
+                                    .putBoolean("vpn_flow_sharing_enabled", enabled)
+                                    // A change to the parent flow consent requires a fresh, separate protocol opt-in.
+                                    .putBoolean("vpn_payload_metadata_enabled", false)
+                                    .apply()
+                                vpnPayloadMetadataEnabled = false
+                                JarvisVpnService.updatePayloadMetadataConsent(false)
                                 val appliedToRunningVpn = JarvisVpnService.updateFlowMetadataConsent(enabled)
                                 message = when {
                                     !enabled && appliedToRunningVpn ->
