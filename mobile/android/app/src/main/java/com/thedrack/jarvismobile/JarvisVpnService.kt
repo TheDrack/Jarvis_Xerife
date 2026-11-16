@@ -120,6 +120,7 @@ class JarvisVpnService : VpnService() {
         check(nativeEngine.isRunning()) {
             "Hev tun2socks did not enter the running state"
         }
+        activeEngine = nativeEngine
         isRunning = true
 
         startVpnForeground()
@@ -158,6 +159,7 @@ class JarvisVpnService : VpnService() {
         runCatching { engine?.stop() }
             .onFailure { Log.w(TAG, "Hev shutdown reported an error", it) }
         engine = null
+        activeEngine = null
         isRunning = false
         runCatching { tun?.close() }
         tun = null
@@ -209,6 +211,13 @@ class JarvisVpnService : VpnService() {
     companion object {
         @Volatile var isRunning: Boolean = false
             private set
+        @Volatile private var activeEngine: HevTunnelEngine? = null
+
+        fun currentStats(): HevTunnelStats {
+            if (!isRunning) return HevTunnelStats.ZERO
+            return runCatching { activeEngine?.stats() ?: HevTunnelStats.ZERO }
+                .getOrDefault(HevTunnelStats.ZERO)
+        }
 
         const val ACTION_START = "com.thedrack.jarvismobile.vpn.START"
         const val ACTION_STOP = "com.thedrack.jarvismobile.vpn.STOP"
