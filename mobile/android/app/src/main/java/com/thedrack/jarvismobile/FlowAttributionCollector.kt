@@ -38,7 +38,8 @@ data class NetworkFlowSnapshot(
     val txPackets: Long,
     val txBytes: Long,
     val rxPackets: Long,
-    val rxBytes: Long
+    val rxBytes: Long,
+    val closed: Boolean
 )
 
 /**
@@ -73,7 +74,8 @@ internal class FlowAttributionCollector(
         var txPackets: Long = 0,
         var txBytes: Long = 0,
         var rxPackets: Long = 0,
-        var rxBytes: Long = 0
+        var rxBytes: Long = 0,
+        var closed: Boolean = false
     )
 
     private val flows = LinkedHashMap<FlowKey, MutableFlow>(16, 0.75f, true)
@@ -95,10 +97,11 @@ internal class FlowAttributionCollector(
         )
         val now = clock()
         val existing = flows[key]
-        val startsNewTcpSession = outbound &&
+        val isInitialTcpSyn = outbound &&
             packet.protocolNumber == TCP_PROTOCOL &&
             packet.tcpFlags?.and(TCP_SYN) == TCP_SYN &&
             packet.tcpFlags?.and(TCP_ACK) != TCP_ACK
+        val startsNewTcpSession = existing?.closed == true && isInitialTcpSyn
         val expired = existing != null && now - existing.lastSeenMillis > idleSessionMillis
         val flow = if (existing == null || startsNewTcpSession || expired) {
             val created = MutableFlow(
@@ -115,6 +118,9 @@ internal class FlowAttributionCollector(
         }
 
         flow.lastSeenMillis = now
+        if (packet.protocolNumber == TCP_PROTOCOL &&
+            packet.tcpFlags?.and(TCP_FIN or TCP_RST) != 0
+        ) flow.closed = true
         if (outbound) {
             flow.txPackets = saturatingAdd(flow.txPackets, 1)
             flow.txBytes = saturatingAdd(flow.txBytes, packet.packetBytes.toLong())
@@ -149,7 +155,8 @@ internal class FlowAttributionCollector(
                     txPackets = flow.txPackets,
                     txBytes = flow.txBytes,
                     rxPackets = flow.rxPackets,
-                    rxBytes = flow.rxBytes
+                    rxBytes = flow.rxBytes,
+                    closed = flow.closed
                 )
             }
     }
@@ -214,6 +221,8 @@ internal class FlowAttributionCollector(
         private const val TCP_PROTOCOL = 6
         private const val TCP_SYN = 0x02
         private const val TCP_ACK = 0x10
+        private const val TCP_FIN = 0x01
+        private const val TCP_RST = 0x04
         const val DEFAULT_SNAPSHOT_LIMIT = 50
         private const val DEFAULT_MAX_FLOWS = 1_000
         private const val DEFAULT_MAX_AGE_MS = 10 * 60 * 1_000L
