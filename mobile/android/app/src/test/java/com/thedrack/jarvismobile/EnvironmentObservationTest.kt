@@ -56,6 +56,30 @@ class EnvironmentObservationTest {
     }
 
     @Test
+    fun networkPayloadPublishesOnlyAggregateHevTunnelCounters() {
+        val vpnSnapshot = snapshot.copy(
+            vpnActive = true,
+            vpnProvider = "jarvis",
+            vpnCollectionMode = VpnCollectionMode.JARVIS_VPN.wireValue,
+            vpnTxPackets = 7,
+            vpnTxBytes = 1024,
+            vpnRxPackets = 9,
+            vpnRxBytes = 2048
+        )
+        val payload = EnvironmentObservationPublisher.buildObservation(
+            "phone-1", vpnSnapshot, requestId = "req-tunnel-stats"
+        ).getJSONObject("payload")
+        val stats = payload.getJSONObject("vpn_tunnel_stats")
+
+        assertEquals(7L, stats.getLong("tx_packets"))
+        assertEquals(1024L, stats.getLong("tx_bytes"))
+        assertEquals(9L, stats.getLong("rx_packets"))
+        assertEquals(2048L, stats.getLong("rx_bytes"))
+        assertFalse(payload.has("packet_payload"))
+        assertFalse(payload.has("message_body"))
+    }
+
+    @Test
     fun locationPayloadIsSeparateAndOptIn() {
         val location = JSONObject().put("latitude", -27.5954).put("longitude", -48.5480)
             .put("accuracy_m", 18.0).put("captured_at", "2026-10-29T12:00:00Z").put("precision", "fine")

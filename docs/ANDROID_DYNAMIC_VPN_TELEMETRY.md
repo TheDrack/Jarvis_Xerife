@@ -24,21 +24,21 @@ Android's public `NetworkCapabilities.TRANSPORT_VPN` identifies a VPN transport,
 
 `VpnService.prepare()` reports whether Jarvis has user authorization to establish a VPN. It does not identify the currently active VPN provider. Android grants VPN control to one application at a time and revokes the previous app; the previous service receives `VpnService.onRevoke()`.
 
-## Deliberately not enabled yet
+## Jarvis VPN implementation status
 
-This change does **not** start a Jarvis `VpnService` or claim packet-level inspection. The policy keeps `jarvisPacketEngineReady=false` and `tailscaleAdapterReady=false`, so the actual collector remains the existing opt-in `NetworkStatsManager` aggregate collector in both cases: `network_stats` without an external VPN and `external_vpn_stats` when an external VPN owns the transport.
+The Android app now includes an explicitly user-started `JarvisVpnService` backed by HevSocks5Tunnel 2.20.0 and a loopback-only SOCKS5 proxy. The native AAR is pinned by SHA-256 and downloaded during Gradle build. TCP CONNECT and UDP ASSOCIATE are forwarded using outbound sockets protected with `VpnService.protect()`. The service closes the TUN descriptor and native worker on stop or `onRevoke()`.
 
-This is intentional: after `VpnService.Builder.establish()`, the app receives a TUN file descriptor containing IP packets. A production implementation must process and forward those packets through a complete userspace network stack/tun-to-socket engine, protect its own upstream sockets from VPN recursion, preserve TCP/UDP/DNS/IPv4/IPv6 behavior, and shut down safely on `onRevoke()`. Establishing a TUN interface without forwarding would break the phone's connectivity.
+The service reuses the package filter: an empty filter routes all apps except Jarvis; a populated filter routes only the named packages. Changing this list requires re-establishing the VPN.
 
-Likewise, collecting flows from the existing Tailscale tunnel requires instrumentation inside the Tailscale Android client (or a supported exported telemetry API). A second ordinary Android app cannot read Tailscale's TUN file descriptor. The inspected upstream `IPNReceiver` exposes connect/disconnect broadcast actions for external control, not a flow-telemetry contract; those actions cannot provide packet attribution or counters. See https://github.com/tailscale/tailscale-android/blob/main/android/src/main/java/com/tailscale/ipn/IPNReceiver.java. The upstream client source is available at https://github.com/tailscale/tailscale-android.
+This is a **local forwarding/inspection VPN**, not a remote encrypted privacy VPN. Traffic exits directly through the current Wi-Fi/mobile network. Hev's interface-wide counters are published in `vpn_tunnel_stats`; the existing `NetworkStatsManager` remains the source of per-UID/package aggregate counters. This integration does not yet publish per-flow records or correlate each SOCKS flow to its originating Android UID.
 
-## Next implementation phase
+The service is manual opt-in in this phase. AUTO does not start or replace a VPN in the background. Physical-device tests are still required for real connectivity, DNS, IPv4/IPv6, TCP/UDP, handover, process death, and revocation before automatic switching is enabled. See [ANDROID_JARVIS_VPNSERVICE.md](ANDROID_JARVIS_VPNSERVICE.md).
 
-1. Select and audit a maintained Android TUN forwarding engine (or integrate the Tailscale Android client source as a maintained fork).
-2. Implement a Jarvis `VpnService` with explicit consent, foreground notification, socket protection, and complete packet forwarding.
-3. Instrument the Tailscale client to emit flow metadata through a narrow authenticated local IPC interface.
-4. Set each adapter's readiness only after integration and runtime tests pass.
-5. Test transitions: Tailscale on/off, Jarvis VPN on/off, Wi-Fi/mobile handover, DNS, IPv4/IPv6, TCP/UDP, app attribution, process death, and revocation.
+## Tailscale integration boundary
+
+Android's public `NetworkCapabilities.TRANSPORT_VPN` identifies an active VPN transport, not the owning application. The Tailscale package being installed is not proof that it owns the active tunnel. The current detector therefore reports an external VPN as `external_unknown`; it does not falsely label every external VPN as Tailscale. In that state, `external_vpn_stats` keeps per-UID aggregate counters available while packet-level flow inspection remains unavailable.
+
+The public Tailscale Android `IPNReceiver` exposes connect/disconnect broadcasts for external control, not a flow-telemetry contract. A second ordinary Android app cannot read Tailscale's TUN descriptor. Flow collection through Tailscale requires instrumentation inside its Android client or a supported exported API. See https://github.com/tailscale/tailscale-android/blob/main/android/src/main/java/com/tailscale/ipn/IPNReceiver.java.
 
 ## Privacy boundary
 
