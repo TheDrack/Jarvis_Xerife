@@ -712,3 +712,18 @@ A captura MCP de curiosidade desta revalidação foi aceita com ID `ab56c1cc462e
 - O `expires_at` de network snapshots marca frescor e não garante apagamento do payload ou das linhas históricas. A política de retenção da telemetria por fluxo ainda precisa de definição e teste.
 
 **Conclusão desta revalidação:** nenhum critério C0 foi promovido. `C0-CAPABILITY-MAP`, `C0-GAPS-RECORDED` e `C0-NO-NAME-BASED-COMPLETION` continuam pendentes; C1 — World Model — continua bloqueado. Esta atualização registra evidência e incerteza, não declara capacidade concluída.
+
+### Revalidação do caminho conversacional e handoff de memória — 2026-11-16
+
+**Composition root em source (runtime não verificado nesta execução):**
+
+`main.py::start_cloud_service()` cria `Container` via `create_edge_container()`; `Container.assistant_service` resolve `assistant_service` pelo Nexus; `create_api_server()` injeta o serviço em `create_assistant_router()`. As rotas autenticadas `/v1/execute` e `/v1/message` chamam `AssistantService.async_process_command()`, que delega `process_command()` para uma thread.
+
+- `data/nexus_registry.json` registra `assistant_service`, `command_interpreter`, `intent_processor` e `ai_gateway`. O construtor de `AssistantService` resolve os dois primeiros componentes de processamento diretamente pelo Nexus.
+- O caminho de interpretação configurado é `CommandInterpreter.execute()` → `IntentProcessor.execute()`; o fallback conversacional tenta `llm_service` e depois `ai_gateway`. `create_command_interpreter()`/ `LLMCommandInterpreter` não têm caller de produção identificado pelo grafo; os callers localizados para a factory são testes.
+- `AssistantService.process_command()` tenta consultar `VectorMemoryAdapter.query_similar()` e `MemoryManager.get_relevant_context()`. Em seguida monta `system_prompt_extra` em `interpret_ctx`, mas `CommandInterpreter.execute()` lê somente `text` e `user_id`; o campo extra é descartado. `IntentProcessor.execute()` recebe somente `intent`, e `_process_with_llm()` envia apenas o texto bruto ao fallback LLM. Portanto, **a recuperação de contexto está implementada no caminho de serviço, mas não é encaminhada ao prompt do LLM fallback**.
+- `MemoryManager` não tem entrada explícita em `data/nexus_registry.json`; a resolução depende da descoberta dinâmica do Nexus quando `NEXUS_STRICT_MODE` não está ativo. O default do código é permissivo, mas a configuração real de produção não foi consultada.
+- Evidência de testes: `tests/adapters/infrastructure/test_assistant_router_memory_scope.py` valida que a identidade autenticada chega ao serviço; `tests/application/test_assistant_service.py` cobre isolamento/escopo de memória; `tests/adapters/infrastructure/test_api_server.py` exercita o router com serviço mockado; `tests/test_llm_integration.py` testa `LLMCommandInterpreter` isoladamente. **Não foi localizado teste integrado que prove memória recuperada → prompt do LLM pelo caminho autenticado de produção.**
+- Classificação: composition root e consumer da conversa identificados em source; CI/testes unitários existentes; runtime/provider e persistência efetiva não verificados. A lacuna de handoff deve ser resolvida somente após definir contrato de contexto, isolamento por usuário e tratamento de memória recuperada como dado não confiável.
+
+**Próximo experimento C0:** teste integrado sem rede, atravessando API autenticada → AssistantService → memória user-scoped → IntentProcessor → provider fake, verificando conteúdo, identidade, proveniência e ausência de dados de outro usuário. Não alterar o comportamento do prompt nem iniciar C2 antes de C0 e do contrato de memória.
