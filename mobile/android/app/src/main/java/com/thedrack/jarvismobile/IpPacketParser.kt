@@ -12,6 +12,7 @@ data class ParsedIpPacket(
     val destinationPort: Int,
     val packetBytes: Int,
     val tcpFlags: Int? = null,
+    val tcpSequenceNumber: Long? = null,
     val payloadOffset: Int? = null,
     val payloadLength: Int = 0
 )
@@ -71,6 +72,7 @@ object IpPacketParser {
             destinationPort = unsignedShort(packet, headerLength + 2),
             packetBytes = totalLength,
             tcpFlags = if (protocolNumber == IPPROTO_TCP && headerLength + 14 <= totalLength) packet[headerLength + 13].toInt() and 0xff else null,
+            tcpSequenceNumber = if (protocolNumber == IPPROTO_TCP && headerLength + 8 <= totalLength) unsignedInt(packet, headerLength + 4) else null,
             payloadOffset = payloadRange.first,
             payloadLength = payloadRange.second
         )
@@ -133,6 +135,7 @@ object IpPacketParser {
             destinationPort = unsignedShort(packet, offset + 2),
             packetBytes = totalLength,
             tcpFlags = if (nextHeader == IPPROTO_TCP && offset + 14 <= totalLength) packet[offset + 13].toInt() and 0xff else null,
+            tcpSequenceNumber = if (nextHeader == IPPROTO_TCP && offset + 8 <= totalLength) unsignedInt(packet, offset + 4) else null,
             payloadOffset = payloadRange.first,
             payloadLength = payloadRange.second
         )
@@ -177,4 +180,10 @@ object IpPacketParser {
 
     private fun unsignedShort(bytes: ByteArray, offset: Int): Int =
         ((bytes[offset].toInt() and 0xff) shl 8) or (bytes[offset + 1].toInt() and 0xff)
+
+    private fun unsignedInt(bytes: ByteArray, offset: Int): Long =
+        ((bytes[offset].toLong() and 0xff) shl 24) or
+            ((bytes[offset + 1].toLong() and 0xff) shl 16) or
+            ((bytes[offset + 2].toLong() and 0xff) shl 8) or
+            (bytes[offset + 3].toLong() and 0xff)
 }

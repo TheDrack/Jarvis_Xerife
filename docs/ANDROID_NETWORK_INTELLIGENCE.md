@@ -26,7 +26,7 @@
 | Passive protocol metadata parser | Implemented | `PassivePayloadInspector` extracts DNS question names, cleartext HTTP Host and TLS ClientHello SNI from a single supplied transport payload. Unit tests cover normal, malformed and oversized inputs. |
 | TUN payload-offset integration | Implemented | `IpPacketParser` exposes validated TCP/UDP payload offsets and lengths for IPv4/IPv6. `TunPacketRelay` passes the packet buffer to the flow collector; the inspector copies only a bounded temporary slice and does not retain raw bytes. |
 | Per-flow metadata and consent | Implemented | Separate `vpn_payload_metadata_enabled` opt-in, default-off, requires flow attribution consent and Jarvis VPN ownership. Revocation clears stored per-flow protocol observations immediately. |
-| TCP stream reassembly primitive | Implemented, not integrated | `TcpStreamReassembler` reconstructs bounded contiguous byte streams, handles retransmission overlap, bounded out-of-order segments and 32-bit sequence wrap. The flow collector still inspects packets independently until the integration increment. |
+| TCP stream reassembly | Implemented | `TcpStreamReassembler` is integrated per flow and direction. It handles in-order data, bounded out-of-order segments, retransmission overlap and 32-bit sequence wrap. It caps each stream at 16 KiB, allows at most 32 active reassembly flows, and wipes transient buffers on successful extraction, revocation, flow expiry, close or overflow. |
 | Backend schema and UI | Implemented | Android UI exposes a separate protocol-inspection switch. Publisher sends at most 3 typed observations per flow and caps metadata-enabled snapshots at 15 flows; backend validates type/source/hostname and both opt-ins. |
 | TLS diagnostic proxy | Pending | Separate feature, disabled by default, only for user-selected compatible apps and explicit CA installation. |
 | PCAPng evidence store | Pending | Separate explicit capture sessions, encryption, quotas, retention and local-first storage. |
@@ -39,7 +39,7 @@
 - Supported in the first parser increment: UDP DNS (53/5353), cleartext HTTP Host (80/8000/8080), TLS ClientHello SNI (TCP).
 - Output is a small list of typed metadata observations. It never returns raw bytes, HTTP paths, authorization headers, cookies, request bodies, TLS application data, or credentials.
 - DNS compression pointers and message bounds are validated. Hostnames are normalized and length/character bounded.
-- TLS parsing requires a complete ClientHello record in the supplied segment. A bounded TCP reassembly primitive exists, but it is not yet connected to the live TUN collector; current live inspection still observes each packet independently.
+- TLS ClientHello and HTTP Host parsing now operate on bounded reassembled TCP streams. The first observed payload anchors each direction; bytes preceding that first segment cannot be reconstructed. Each returned stream snapshot is wiped immediately after parsing.
 - Encrypted DNS, ECH-protected names, QUIC payload decryption, TLS application data and pinned applications are not decoded by this parser.
 
 ## Validation policy

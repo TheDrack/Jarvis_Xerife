@@ -271,6 +271,71 @@ class FlowAttributionCollectorTest {
         assertTrue(enabled.snapshot().single().protocolObservations.isEmpty())
     }
 
+    @Test
+    fun reconstructsSplitHttpHeadersBeforeExtractingHostMetadata() {
+        val collector = FlowAttributionCollector(
+            ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> 10001 },
+            packageResolver = PackageIdentityResolver { emptyList() },
+            clock = { 9_000L },
+            payloadMetadataEnabled = true
+        )
+        val request = "GET /private HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
+            .toByteArray(Charsets.US_ASCII)
+        val split = 19
+        val first = request.copyOfRange(0, split)
+        val second = request.copyOfRange(split, request.size)
+        val firstPacket = packet(
+            OUTBOUND,
+            sourcePort = 49152,
+            destinationPort = 80
+        ).copy(payloadOffset = 0, payloadLength = first.size, tcpSequenceNumber = 100L)
+        val secondPacket = firstPacket.copy(
+            payloadLength = second.size,
+            tcpSequenceNumber = 100L + first.size
+        )
+
+        collector.record(firstPacket, FlowPacketDirection.OUTBOUND, first)
+        assertTrue(collector.snapshot().single().protocolObservations.isEmpty())
+
+        collector.record(secondPacket, FlowPacketDirection.OUTBOUND, second)
+
+        assertEquals(
+            listOf(NetworkProtocolObservation("http_host", "api.example.com", "http")),
+            collector.snapshot().single().protocolObservations
+        )
+    }
+
+    @Test
+    fun revokingPayloadConsentDiscardsPartiallyReassembledHttpData() {
+        val collector = FlowAttributionCollector(
+            ownerResolver = ConnectionOwnerResolver { _, _, _, _, _ -> 10001 },
+            packageResolver = PackageIdentityResolver { emptyList() },
+            clock = { 10_000L },
+            payloadMetadataEnabled = true
+        )
+        val request = "GET /private HTTP/1.1\r\nHost: api.example.com\r\n\r\n"
+            .toByteArray(Charsets.US_ASCII)
+        val split = 19
+        val first = request.copyOfRange(0, split)
+        val second = request.copyOfRange(split, request.size)
+        val firstPacket = packet(
+            OUTBOUND,
+            sourcePort = 49152,
+            destinationPort = 80
+        ).copy(payloadOffset = 0, payloadLength = first.size, tcpSequenceNumber = 200L)
+        val secondPacket = firstPacket.copy(
+            payloadLength = second.size,
+            tcpSequenceNumber = 200L + first.size
+        )
+
+        collector.record(firstPacket, FlowPacketDirection.OUTBOUND, first)
+        collector.setPayloadMetadataEnabled(false)
+        collector.setPayloadMetadataEnabled(true)
+        collector.record(secondPacket, FlowPacketDirection.OUTBOUND, second)
+
+        assertTrue(collector.snapshot().single().protocolObservations.isEmpty())
+    }
+
     private fun packet(
         direction: Int,
         protocol: String = "tcp",
@@ -278,7 +343,8 @@ class FlowAttributionCollectorTest {
         sourcePort: Int = if (direction == OUTBOUND) 49152 else 443,
         destinationPort: Int = if (direction == OUTBOUND) 443 else 49152,
         packetBytes: Int = 60,
-        tcpFlags: Int? = null
+        tcpFlags: Int? = null,
+        tcpSequenceNumber: Long? = null
     ) = ParsedIpPacket(
         protocol = protocol,
         protocolNumber = protocolNumber,
@@ -287,7 +353,8 @@ class FlowAttributionCollectorTest {
         destinationAddress = InetAddress.getByName(if (direction == OUTBOUND) "1.1.1.1" else "10.0.0.2"),
         destinationPort = destinationPort,
         packetBytes = packetBytes,
-        tcpFlags = tcpFlags
+        tcpFlags = tcpFlags,
+        tcpSequenceNumber = tcpSequenceNumber
     )
 
     private companion object {
