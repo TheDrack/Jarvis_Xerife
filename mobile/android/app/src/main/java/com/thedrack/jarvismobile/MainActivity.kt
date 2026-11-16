@@ -833,6 +833,7 @@ private fun JarvisMobileScreen(
                     ) {
                         Button(
                             onClick = { onStartVpn { message = it } },
+                            enabled = vpnModePreference != VpnModePreference.TAILSCALE,
                             modifier = Modifier.weight(1f)
                         ) { Text("Iniciar VPN Jarvis") }
                         Button(
