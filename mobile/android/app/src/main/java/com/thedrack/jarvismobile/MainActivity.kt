@@ -153,6 +153,10 @@ class MainActivity : ComponentActivity() {
             result("A VPN própria exige Android 10 ou superior (API 29). A coleta agregada continua disponível nesta versão do Android.")
             return
         }
+        if (JarvisVpnService.isRunning) {
+            result("A VPN Jarvis já está ativa.")
+            return
+        }
         val preferences = getSharedPreferences("jarvis_session", MODE_PRIVATE)
         val modePreference = VpnModePreference.fromWireValue(
             preferences.getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
@@ -161,7 +165,9 @@ class MainActivity : ComponentActivity() {
             result("Modo TAILSCALE selecionado: a VPN Jarvis permanece bloqueada.")
             return
         }
-        val externalVpnActive = VpnStateDetector.detect(this).externalVpnActive
+        val externalVpnActive = VpnStateDetector.detect(
+            this, jarvisVpnActive = JarvisVpnService.isRunning
+        ).externalVpnActive
         if (externalVpnActive && modePreference == VpnModePreference.AUTO) {
             result("Uma VPN externa está ativa. AUTO preserva o provedor atual; selecione JARVIS para solicitar uma troca manual.")
             return
