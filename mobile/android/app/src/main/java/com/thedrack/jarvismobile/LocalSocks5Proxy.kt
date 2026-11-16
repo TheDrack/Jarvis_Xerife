@@ -31,24 +31,25 @@ internal class LocalSocks5Proxy(
     private val vpnService: VpnService,
     private val username: String,
     private val password: String,
-    private val port: Int = DEFAULT_PORT
+    private val port: Int = 0
 ) : AutoCloseable {
     private val running = AtomicBoolean(false)
     private val workers: ExecutorService = Executors.newCachedThreadPool()
     private val clientSlots = Semaphore(MAX_CLIENT_SESSIONS)
-    private var server: ServerSocket? = null
+    @Volatile private var server: ServerSocket? = null
     private val udpSockets = ConcurrentHashMap.newKeySet<DatagramSocket>()
     private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
 
     fun isRunning(): Boolean = running.get() && server?.isClosed == false
 
-    fun start() {
+    fun start(): Int {
         check(running.compareAndSet(false, true)) { "SOCKS5 proxy already started" }
         try {
             server = ServerSocket().apply {
                 reuseAddress = true
                 bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), port), 32)
             }
+            val listeningPort = checkNotNull(server).localPort
             workers.execute {
                 while (running.get()) {
                     try {
@@ -80,6 +81,7 @@ internal class LocalSocks5Proxy(
                     }
                 }
             }
+            return listeningPort
         } catch (error: Exception) {
             close()
             throw error
@@ -276,7 +278,6 @@ internal class LocalSocks5Proxy(
     }
 
     companion object {
-        const val DEFAULT_PORT = 10808
         private const val TAG = "JarvisSocks5"
         private const val SOCKS_VERSION = 5
         private const val METHOD_USER_PASSWORD = 2
