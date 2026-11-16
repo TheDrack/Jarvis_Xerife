@@ -33,6 +33,7 @@ data class MobileNetworkSnapshot(
     val vpnRxPackets: Long = 0,
     val vpnRxBytes: Long = 0,
     val flowMetadataEnabled: Boolean = false,
+    val payloadMetadataEnabled: Boolean = false,
     val flows: List<NetworkFlowSnapshot> = emptyList()
 )
 
@@ -52,6 +53,8 @@ object EnvironmentObservationPublisher {
         val runtime = VpnStateDetector.detect(context, jarvisVpnActive = JarvisVpnService.isRunning)
         val tunnelStats = JarvisVpnService.currentStats()
         val flowMetadataEnabled = preferences.getBoolean("vpn_flow_sharing_enabled", false)
+        val payloadMetadataEnabled = flowMetadataEnabled &&
+            preferences.getBoolean("vpn_payload_metadata_enabled", false)
         val flows = if (flowMetadataEnabled) JarvisVpnService.currentFlows() else emptyList()
         // The Jarvis TUN engine is user-started only; AUTO never takes over a VPN in this phase.
         // Tailscale flow telemetry still requires an adapter inside the Tailscale client.
@@ -90,6 +93,7 @@ object EnvironmentObservationPublisher {
             vpnRxPackets = tunnelStats.rxPackets,
             vpnRxBytes = tunnelStats.rxBytes,
             flowMetadataEnabled = flowMetadataEnabled,
+            payloadMetadataEnabled = payloadMetadataEnabled,
             flows = flows
         )
     }
@@ -167,6 +171,7 @@ object EnvironmentObservationPublisher {
                 .put("tailscale_installed", snapshot.tailscaleInstalled)
                 .put("vpn_transport_active", snapshot.vpnTransportActive)
                 .put("flow_metadata_opt_in", snapshot.flowMetadataEnabled)
+                .put("payload_metadata_opt_in", snapshot.payloadMetadataEnabled)
                 .put("vpn_tunnel_stats", JSONObject()
                     .put("tx_packets", snapshot.vpnTxPackets)
                     .put("tx_bytes", snapshot.vpnTxBytes)
@@ -174,8 +179,9 @@ object EnvironmentObservationPublisher {
                     .put("rx_bytes", snapshot.vpnRxBytes))
         }
         if (observationType == "network_snapshot" && snapshot.flows.isNotEmpty()) {
+            val flowLimit = if (snapshot.payloadMetadataEnabled) 15 else FlowAttributionCollector.DEFAULT_SNAPSHOT_LIMIT
             payload.put("flows", JSONArray().apply {
-                snapshot.flows.take(FlowAttributionCollector.DEFAULT_SNAPSHOT_LIMIT).forEach { flow ->
+                snapshot.flows.take(flowLimit).forEach { flow ->
                     put(JSONObject()
                         .put("flow_id", flow.flowId)
                         .put("protocol", flow.protocol)
@@ -193,7 +199,15 @@ object EnvironmentObservationPublisher {
                         .put("tx_bytes", flow.txBytes)
                         .put("rx_packets", flow.rxPackets)
                         .put("rx_bytes", flow.rxBytes)
-                        .put("closed", flow.closed))
+                        .put("closed", flow.closed)
+                        .put("protocol_observations", JSONArray().apply {
+                            flow.protocolObservations.take(3).forEach { observation ->
+                                put(JSONObject()
+                                    .put("kind", observation.kind)
+                                    .put("value", observation.value)
+                                    .put("source", observation.source))
+                            }
+                        }))
                 }
             })
         }
