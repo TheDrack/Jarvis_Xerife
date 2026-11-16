@@ -6,7 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import app.application.services.local_repair_agent as local_repair_module
 from app.application.services.local_repair_agent import LocalRepairAgent, SAFE_AUTO_INSTALL
+from app.application.security import repository_path_policy
 
 
 @pytest.fixture
@@ -110,10 +112,13 @@ class TestApplyPatchOldCodeMissing:
     """_apply_patch com old_code ausente no arquivo retorna fixed=False."""
 
     def test_returns_not_fixed_when_old_code_not_in_file(
-        self, agent: LocalRepairAgent, tmp_path: Path
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
     ) -> None:
-        py_file = tmp_path / "example.py"
+        repo_root = tmp_path / "repo"
+        py_file = repo_root / "app" / "example.py"
+        py_file.parent.mkdir(parents=True)
         py_file.write_text("x = 1\ny = 2\n", encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
 
         patch_data = {
             "can_fix": True,
@@ -135,10 +140,13 @@ class TestApplyPatchNewCodeSyntaxError:
     """_apply_patch com new_code com SyntaxError retorna fixed=False."""
 
     def test_returns_not_fixed_when_new_code_has_syntax_error(
-        self, agent: LocalRepairAgent, tmp_path: Path
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
     ) -> None:
-        py_file = tmp_path / "example.py"
+        repo_root = tmp_path / "repo"
+        py_file = repo_root / "app" / "example.py"
+        py_file.parent.mkdir(parents=True)
         py_file.write_text("old_function()\n", encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
 
         patch_data = {
             "can_fix": True,
@@ -154,3 +162,264 @@ class TestApplyPatchNewCodeSyntaxError:
 
         assert result["fixed"] is False
         assert "SyntaxError" in result["details"]
+
+
+class TestLocalRepairRepositoryPathPolicy:
+    def test_test_and_pytest_infrastructure_paths_are_protected(self):
+        protected = (
+            "tests/test_sample.py",
+            "app/conftest.py",
+            "pytest.ini",
+            "pytest.toml",
+            "tox.ini",
+            "setup.cfg",
+            "pyproject.toml",
+            ".coveragerc",
+            "app/sample_test.py",
+        )
+        for path in protected:
+            assert repository_path_policy.is_test_or_pytest_infrastructure_path(path)
+
+        assert not repository_path_policy.is_test_or_pytest_infrastructure_path(
+            "app/services/worker.py"
+        )
+
+    def test_parent_traversal_is_rejected(self):
+        with pytest.raises(repository_path_policy.UnsafeRepositoryPath):
+            repository_path_policy.is_test_or_pytest_infrastructure_path(
+                "../tests/test_sample.py"
+            )
+
+
+class TestApplyPatchPathSafety:
+    @staticmethod
+    def _patch(path: Path) -> dict:
+        return {
+            "can_fix": True,
+            "confidence": 0.95,
+            "explanation": "Regression path-safety test",
+            "action": "replace",
+            "file_path": str(path),
+            "old_code": "SAFE_VALUE = 1",
+            "new_code": "SAFE_VALUE = 2",
+        }
+
+    def test_model_cannot_select_target_without_trusted_original_path(
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        target = repo_root / "app" / "target.py"
+        target.parent.mkdir(parents=True)
+        original = "SAFE_VALUE = 1\n"
+        target.write_text(original, encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        result = agent._apply_patch(self._patch(target), None)
+
+        assert result["fixed"] is False
+        assert target.read_text(encoding="utf-8") == original
+
+    def test_model_cannot_redirect_patch_to_another_repository_file(
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        source = repo_root / "app" / "source.py"
+        target = repo_root / "app" / "target.py"
+        source.parent.mkdir(parents=True)
+        source.write_text("SOURCE_VALUE = 1\n", encoding="utf-8")
+        target.write_text("SAFE_VALUE = 1\n", encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        result = agent._apply_patch(self._patch(target), str(source))
+
+        assert result["fixed"] is False
+        assert source.read_text(encoding="utf-8") == "SOURCE_VALUE = 1\n"
+        assert target.read_text(encoding="utf-8") == "SAFE_VALUE = 1\n"
+
+    def test_test_source_cannot_be_patched(self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch) -> None:
+        repo_root = tmp_path / "repo"
+        target = repo_root / "tests" / "test_sample.py"
+        target.parent.mkdir(parents=True)
+        original = "SAFE_VALUE = 1\n"
+        target.write_text(original, encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        result = agent._apply_patch(self._patch(target), str(target))
+
+        assert result["fixed"] is False
+        assert target.read_text(encoding="utf-8") == original
+
+    def test_path_outside_repository_cannot_be_patched(
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        outside = tmp_path / "outside.py"
+        original = "SAFE_VALUE = 1\n"
+        outside.write_text(original, encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        result = agent._apply_patch(self._patch(outside), str(outside))
+
+        assert result["fixed"] is False
+        assert outside.read_text(encoding="utf-8") == original
+
+    def test_control_plane_paths_are_not_auto_repairable(
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        target = repo_root / "app" / "core" / "nexuscomponent.py"
+        target.parent.mkdir(parents=True)
+        original = "SAFE_VALUE = 1\\n"
+        target.write_text(original, encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        result = agent._apply_patch(self._patch(target), str(target))
+
+        assert result["fixed"] is False
+        assert target.read_text(encoding="utf-8") == original
+
+    def test_symlinked_target_is_rejected(self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch) -> None:
+        repo_root = tmp_path / "repo"
+        target = repo_root / "app" / "real.py"
+        link = repo_root / "app" / "alias.py"
+        target.parent.mkdir(parents=True)
+        original = "SAFE_VALUE = 1\n"
+        target.write_text(original, encoding="utf-8")
+        try:
+            link.symlink_to(target)
+        except (OSError, NotImplementedError) as exc:
+            pytest.skip(f"symlink unavailable on this runner: {exc}")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        result = agent._apply_patch(self._patch(link), str(link))
+
+        assert result["fixed"] is False
+        assert target.read_text(encoding="utf-8") == original
+
+
+class TestLocalRepairReadPathSafety:
+    @pytest.mark.parametrize("target_kind", ["test", "outside"])
+    def test_llm_rejects_untrusted_path_before_reading_or_calling_provider(
+        self,
+        agent: LocalRepairAgent,
+        tmp_path: Path,
+        monkeypatch,
+        target_kind: str,
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        if target_kind == "test":
+            target = repo_root / "tests" / "test_sensitive.py"
+            target.parent.mkdir(parents=True)
+            expected_detail = "Testes e configuração pytest são imutáveis"
+        else:
+            target = tmp_path / "outside.py"
+            expected_detail = "fora do repositório"
+        target.write_text("PRIVATE_SENTINEL = 'must not enter an LLM prompt'\\n", encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        original_read_text = Path.read_text
+
+        def reject_target_read(path: Path, *args, **kwargs):
+            if path.resolve() == target.resolve():
+                raise AssertionError("Untrusted source content was read before path validation")
+            return original_read_text(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", reject_target_read)
+        with patch.object(agent, "_call_via_llm_engine") as llm_call:
+            result = agent._try_llm(
+                "NameError",
+                "name 'value' is not defined",
+                "traceback supplied by the caller",
+                str(target),
+            )
+
+        assert result["fixed"] is False
+        assert expected_detail in result["details"]
+        llm_call.assert_not_called()
+
+
+class TestFrozenPathProtection:
+    def test_local_repair_refuses_to_patch_frozen_python_file(
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        target = repo_root / ".frozen" / "module.py"
+        target.parent.mkdir(parents=True)
+        original = "SAFE_VALUE = 1\\n"
+        target.write_text(original, encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        patch_data = {
+            "can_fix": True,
+            "confidence": 0.99,
+            "explanation": "Frozen path regression",
+            "action": "replace",
+            "file_path": str(target),
+            "old_code": "SAFE_VALUE = 1",
+            "new_code": "SAFE_VALUE = 2",
+        }
+        result = agent._apply_patch(patch_data, str(target))
+
+        assert result["fixed"] is False
+        assert "frozen" in result["details"].casefold()
+        assert target.read_text(encoding="utf-8") == original
+
+    def test_local_repair_rejects_frozen_source_before_read_or_provider_call(
+        self, agent: LocalRepairAgent, tmp_path: Path, monkeypatch
+    ) -> None:
+        repo_root = tmp_path / "repo"
+        target = repo_root / ".frozen" / "private.py"
+        target.parent.mkdir(parents=True)
+        target.write_text("PRIVATE_SENTINEL = 'must not enter an LLM prompt'\\n", encoding="utf-8")
+        monkeypatch.setattr(local_repair_module, "REPO_ROOT", repo_root)
+
+        original_read_text = Path.read_text
+
+        def reject_target_read(path: Path, *args, **kwargs):
+            if path.resolve() == target.resolve():
+                raise AssertionError("Frozen source was read before path validation")
+            return original_read_text(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", reject_target_read)
+        with patch.object(agent, "_call_via_llm_engine") as llm_call:
+            result = agent._try_llm(
+                "NameError",
+                "name 'value' is not defined",
+                "traceback supplied by the caller",
+                str(target),
+            )
+
+        assert result["fixed"] is False
+        assert "frozen" in result["details"].casefold()
+        llm_call.assert_not_called()
+
+    def test_script_healer_refuses_frozen_files(self, tmp_path: Path) -> None:
+        from scripts import jarvis_healer as healer
+
+        repo_root = tmp_path / "repo"
+        target = repo_root / ".frozen" / "module.py"
+        target.parent.mkdir(parents=True)
+        original = "SAFE_VALUE = 1\\n"
+        target.write_text(original, encoding="utf-8")
+
+        with patch.object(healer, "REPO_ROOT", repo_root):
+            assert healer.is_production_file(target) is False
+            result = healer.apply_fixes(
+                target,
+                [{
+                    "action": "replace",
+                    "old_code": "SAFE_VALUE = 1",
+                    "new_code": "SAFE_VALUE = 2",
+                }],
+            )
+
+        assert result == (0, 1)
+        assert target.read_text(encoding="utf-8") == original
+
+    def test_frozen_directory_helper_matches_complete_segments(self) -> None:
+        assert repository_path_policy.contains_frozen_directory(".frozen/module.py")
+        assert repository_path_policy.contains_frozen_directory("app/.FROZEN/module.py")
+        assert not repository_path_policy.contains_frozen_directory("app/frozen/module.py")
+        assert not repository_path_policy.contains_frozen_directory("app/.frozen-backup/module.py")

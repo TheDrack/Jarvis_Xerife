@@ -13,6 +13,13 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from app.core.recovery_store import RecoveryStore
+from app.application.security.repository_path_policy import (
+    UnsafeRepositoryPath,
+    contains_frozen_directory,
+    is_test_or_pytest_infrastructure_path,
+    protected_prefix_for,
+    resolve_repository_path,
+)
 
 # Configuração de Logging
 logging.basicConfig(
@@ -107,10 +114,38 @@ def extract_failed_files_from_report(
     return sorted(found_files), failure_context
 
 
+def _resolve_production_target(
+    file_path: Path, *, require_file: bool = False
+) -> Optional[Path]:
+    """Resolve a repository Python target under the shared autonomous-mutation policy."""
+    try:
+        root = REPO_ROOT.resolve()
+        candidate = Path(file_path)
+        if candidate.is_absolute():
+            relative = candidate.relative_to(root).as_posix()
+        else:
+            relative = candidate.as_posix()
+        resolved, normalized_relative, resolved_relative = resolve_repository_path(
+            root, relative, reject_symlinks=True
+        )
+        if require_file and not resolved.is_file():
+            return None
+        if resolved.suffix.casefold() != ".py":
+            return None
+        if contains_frozen_directory(normalized_relative) or contains_frozen_directory(resolved_relative):
+            return None
+        if protected_prefix_for(resolved_relative):
+            return None
+        if is_test_or_pytest_infrastructure_path(resolved_relative):
+            return None
+        return resolved
+    except (UnsafeRepositoryPath, OSError, RuntimeError, ValueError, TypeError):
+        return None
+
+
 def is_production_file(file_path: Path) -> bool:
-    """Verifica se o arquivo pertence à lógica de produção."""
-    path_str = str(file_path).lower()
-    return "tests/" not in path_str and "test_" not in file_path.name.lower()
+    """Return False for tests, pytest controls, protected code, symlinks, or paths outside the repo."""
+    return _resolve_production_target(file_path) is not None
 
 
 def _strip_markdown_fences(text: str) -> str:
@@ -275,7 +310,16 @@ def _build_healer_prompt(
 def apply_fixes(
     file_path: Path, fixes: List[Dict[str, Any]], dry_run: bool = False
 ) -> tuple:
-    """Aplica correções ao arquivo."""
+    """Aplica correções apenas em arquivos de produção."""
+    resolved_target = _resolve_production_target(file_path, require_file=True)
+    if resolved_target is None:
+        logger.warning(
+            "[Healer] Alvo fora da política de auto-cura (teste, configuração, protegido, symlink ou fora do repo): %s",
+            file_path,
+        )
+        return 0, max(1, len(fixes))
+    file_path = resolved_target
+
     success = 0
     fail = 0
     
@@ -352,7 +396,9 @@ def heal():
     # O relatório estruturado é a fonte de fallback quando o log não contém
     # traceback Python (por exemplo, falhas de assert do pytest).
     report_path = Path(args.report)
-    report_files, report_context = extract_failed_files_from_report(report_path)
+    report_files, report_context = extract_failed_files_from_report(
+        report_path, repo_root=REPO_ROOT
+    )
     target_files.update(report_files)
     if report_context:
         error_context += report_context
@@ -370,7 +416,18 @@ def heal():
             continue
         if resolved.is_file() and ".venv" not in resolved.parts:
             safe_targets.add(resolved)
-    target_files = safe_targets
+    # Test files are diagnostic evidence only. Never send their source to an
+    # LLM or let the privileged healer rewrite their assertions.
+    target_files = {
+        candidate for candidate in safe_targets if is_production_file(candidate)
+    }
+    excluded_test_targets = len(safe_targets) - len(target_files)
+    if excluded_test_targets:
+        logger.warning(
+            "[Healer] %s arquivo(s) de teste mantido(s) imutável(is); "
+            "nenhum conteúdo será enviado ao modelo.",
+            excluded_test_targets,
+        )
 
     if not target_files:
         # Nenhum arquivo com erro: só é sucesso se o relatório existir e não tiver falhas.
