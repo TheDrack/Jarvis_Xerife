@@ -180,10 +180,10 @@ class EnvironmentObservationCreate(BaseModel):
                 raise ValueError("flow metadata opt-in flag must be boolean")
             flows = payload.get("flows")
             if flows is not None:
-                if flow_opt_in is not True:
-                    raise ValueError("network flows require explicit flow metadata opt-in")
                 if not isinstance(flows, list) or len(flows) > 50:
                     raise ValueError("network flows must contain at most 50 entries")
+                if flows and flow_opt_in is not True:
+                    raise ValueError("network flows require explicit flow metadata opt-in")
                 seen_flow_ids: set[UUID] = set()
                 for flow in flows:
                     if not isinstance(flow, dict):
