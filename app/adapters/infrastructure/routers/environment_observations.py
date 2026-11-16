@@ -209,6 +209,22 @@ class EnvironmentObservationCreate(BaseModel):
                     )
                 ):
                     raise ValueError("app usage package names are invalid")
+                packages = app.get("packages", [])
+                if (
+                    not isinstance(packages, list)
+                    or len(packages) > 5
+                    or any(
+                        not isinstance(item, dict)
+                        or not isinstance(item.get("package_name"), str)
+                        or not item["package_name"]
+                        or len(item["package_name"]) > 255
+                        or not isinstance(item.get("app_label"), str)
+                        or len(item["app_label"]) > 128
+                        or not isinstance(item.get("is_system_app"), bool)
+                        for item in packages
+                    )
+                ):
+                    raise ValueError("app usage package identities are invalid")
                 for network in ("wifi", "mobile"):
                     counters = app.get(network)
                     if not isinstance(counters, dict):

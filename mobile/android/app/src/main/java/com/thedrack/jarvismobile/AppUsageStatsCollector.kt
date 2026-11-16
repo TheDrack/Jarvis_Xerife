@@ -11,6 +11,13 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 
+/** Package identity resolved locally by Android's PackageManager. */
+data class AppPackageIdentity(
+    val packageName: String,
+    val appLabel: String,
+    val isSystemApp: Boolean
+)
+
 /** One app UID's aggregate byte counters over the requested interval. */
 data class AppUsageEntry(
     val uid: Int,
@@ -18,7 +25,8 @@ data class AppUsageEntry(
     val wifiRxBytes: Long,
     val wifiTxBytes: Long,
     val mobileRxBytes: Long,
-    val mobileTxBytes: Long
+    val mobileTxBytes: Long,
+    val packageIdentities: List<AppPackageIdentity> = emptyList()
 ) {
     val totalBytes: Long
         get() = listOf(wifiRxBytes, wifiTxBytes, mobileRxBytes, mobileTxBytes)
@@ -43,6 +51,14 @@ data class AppUsageSnapshot(
                 JSONObject()
                     .put("uid", app.uid)
                     .put("package_names", JSONArray(app.packageNames.take(5)))
+                    .put("packages", JSONArray().apply {
+                        app.packageIdentities.take(5).forEach { identity ->
+                            put(JSONObject()
+                                .put("package_name", identity.packageName)
+                                .put("app_label", identity.appLabel.take(128))
+                                .put("is_system_app", identity.isSystemApp))
+                        }
+                    })
                     .put("wifi", JSONObject().put("rx_bytes", app.wifiRxBytes).put("tx_bytes", app.wifiTxBytes))
                     .put("mobile", JSONObject().put("rx_bytes", app.mobileRxBytes).put("tx_bytes", app.mobileTxBytes))
             )
@@ -81,7 +97,12 @@ object AppUsageStatsCollector {
         }
     }
 
-    fun collect(context: Context, nowMillis: Long = System.currentTimeMillis(), windowMillis: Long = DEFAULT_WINDOW_MS): AppUsageSnapshot? {
+    fun collect(
+        context: Context,
+        nowMillis: Long = System.currentTimeMillis(),
+        windowMillis: Long = DEFAULT_WINDOW_MS,
+        selectedPackages: Set<String> = emptySet()
+    ): AppUsageSnapshot? {
         if (windowMillis <= 0L || nowMillis <= 0L || !hasUsageAccess(context)) return null
         val manager = context.getSystemService(Context.NETWORK_STATS_SERVICE) as? NetworkStatsManager ?: return null
         val start = (nowMillis - windowMillis).coerceAtLeast(0L)
@@ -93,21 +114,45 @@ object AppUsageStatsCollector {
         if (successfulNetworks == 0) return null
 
         val entries = counters.map { (uid, value) ->
+            val packageNames = try {
+                context.packageManager.getPackagesForUid(uid)
+                    ?.filter { it.isNotBlank() }?.distinct()?.sorted()?.take(5).orEmpty()
+            } catch (_: PackageManager.NameNotFoundException) {
+                emptyList()
+            } catch (_: RuntimeException) {
+                emptyList()
+            }
+            val identities = packageNames.mapNotNull { packageName ->
+                try {
+                    @Suppress("DEPRECATION")
+                    val info = context.packageManager.getApplicationInfo(packageName, 0)
+                    val label = context.packageManager.getApplicationLabel(info).toString()
+                        .ifBlank { packageName }.take(128)
+                    AppPackageIdentity(
+                        packageName = packageName,
+                        appLabel = label,
+                        isSystemApp = info.flags and (
+                            android.content.pm.ApplicationInfo.FLAG_SYSTEM or
+                                android.content.pm.ApplicationInfo.FLAG_UPDATED_SYSTEM_APP
+                            ) != 0
+                    )
+                } catch (_: PackageManager.NameNotFoundException) {
+                    null
+                } catch (_: RuntimeException) {
+                    null
+                }
+            }
             AppUsageEntry(
                 uid = uid,
-                packageNames = try {
-                    context.packageManager.getPackagesForUid(uid)?.filter { it.isNotBlank() }?.distinct()?.sorted()?.take(5).orEmpty()
-                } catch (_: PackageManager.NameNotFoundException) {
-                    emptyList()
-                } catch (_: RuntimeException) {
-                    emptyList()
-                },
+                packageNames = packageNames,
                 wifiRxBytes = value.wifiRx,
                 wifiTxBytes = value.wifiTx,
                 mobileRxBytes = value.mobileRx,
-                mobileTxBytes = value.mobileTx
+                mobileTxBytes = value.mobileTx,
+                packageIdentities = identities
             )
-        }.sortedByDescending { it.totalBytes }.take(MAX_APPS)
+        }.let { filterEntries(it, selectedPackages) }
+            .sortedByDescending { it.totalBytes }.take(MAX_APPS)
 
         return AppUsageSnapshot(
             windowStart = Instant.ofEpochMilli(start).toString(),
@@ -115,6 +160,12 @@ object AppUsageStatsCollector {
             apps = entries,
             status = if (successfulNetworks == 2) "ok" else "partial"
         )
+    }
+
+    /** Empty selection means all visible UIDs; shared UIDs remain one indivisible record. */
+    fun filterEntries(entries: List<AppUsageEntry>, selectedPackages: Set<String>): List<AppUsageEntry> {
+        if (selectedPackages.isEmpty()) return entries
+        return entries.filter { entry -> entry.packageNames.any(selectedPackages::contains) }
     }
 
     private fun readNetwork(

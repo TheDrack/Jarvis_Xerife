@@ -418,6 +418,10 @@ private fun JarvisMobileScreen(
     var appUsageSharingEnabled by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("app_usage_sharing_enabled", false))
     }
+    var appUsagePackageFilter by remember {
+        mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+            .getString("app_usage_package_filter", "") ?: "")
+    }
 
     fun newId(): Long {
         val id = nextId
@@ -751,6 +755,29 @@ private fun JarvisMobileScreen(
                                     message = "Coleta de tráfego por aplicativo desativada."
                                 }
                             }
+                        )
+                    }
+                    if (appUsageSharingEnabled) {
+                        Text(
+                            "Filtro de aplicativos",
+                            modifier = Modifier.padding(top = 10.dp),
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        OutlinedTextField(
+                            value = appUsagePackageFilter,
+                            onValueChange = { value ->
+                                appUsagePackageFilter = value
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putString("app_usage_package_filter", value).apply()
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                            label = { Text("Nomes dos pacotes") },
+                            placeholder = { Text("com.instagram.android, com.google.android.youtube") },
+                            supportingText = {
+                                Text("Separe por vírgula ou linha. Vazio = todos os apps. UID compartilhado é observado como um único registro.")
+                            },
+                            minLines = 2,
+                            maxLines = 4
                         )
                     }
                     if (appUsageSharingEnabled && !appUsageAccessGranted) {

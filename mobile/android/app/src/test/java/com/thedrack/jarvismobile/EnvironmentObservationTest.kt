@@ -75,6 +75,48 @@ class AppUsageObservationTest {
     }
 
     @Test
+    fun appUsagePayloadIncludesResolvedPackageIdentityWithoutChangingUidCounters() {
+        val snapshot = AppUsageSnapshot(
+            windowStart = "2026-11-16T10:00:00Z",
+            windowEnd = "2026-11-16T11:00:00Z",
+            apps = listOf(
+                AppUsageEntry(
+                    uid = 10123,
+                    packageNames = listOf("com.example.app"),
+                    wifiRxBytes = 100L,
+                    wifiTxBytes = 50L,
+                    mobileRxBytes = 20L,
+                    mobileTxBytes = 10L,
+                    packageIdentities = listOf(
+                        AppPackageIdentity("com.example.app", "Example", false)
+                    )
+                )
+            )
+        )
+
+        val app = snapshot.toPayload().getJSONArray("apps").getJSONObject(0)
+        val identity = app.getJSONArray("packages").getJSONObject(0)
+        assertEquals("com.example.app", identity.getString("package_name"))
+        assertEquals("Example", identity.getString("app_label"))
+        assertFalse(identity.getBoolean("is_system_app"))
+        assertEquals(100L, app.getJSONObject("wifi").getLong("rx_bytes"))
+        assertEquals(10L, app.getJSONObject("mobile").getLong("tx_bytes"))
+    }
+
+    @Test
+    fun selectedPackageFilterKeepsOnlyMatchingUidEntriesAndEmptyMeansAll() {
+        val entries = listOf(
+            AppUsageEntry(10123, listOf("com.example.one"), 10, 0, 0, 0),
+            AppUsageEntry(10124, listOf("com.example.two"), 20, 0, 0, 0),
+            AppUsageEntry(10125, listOf("com.example.shared", "com.example.companion"), 30, 0, 0, 0)
+        )
+
+        assertEquals(3, AppUsageStatsCollector.filterEntries(entries, emptySet()).size)
+        assertEquals(2, AppUsageStatsCollector.filterEntries(entries, setOf("com.example.two", "com.example.companion")).size)
+        assertEquals(10125, AppUsageStatsCollector.filterEntries(entries, setOf("com.example.companion")).single().uid)
+    }
+
+    @Test
     fun appUsagePayloadContainsOnlyOptedInAggregateCounters() {
         val snapshot = AppUsageSnapshot(
             windowStart = "2026-11-16T10:00:00Z",

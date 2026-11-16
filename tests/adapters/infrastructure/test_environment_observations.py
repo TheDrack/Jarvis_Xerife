@@ -404,6 +404,40 @@ def test_app_usage_snapshot_requires_mobile_explicit_usage_access_consent():
         )
 
 
+def test_app_usage_snapshot_accepts_bounded_package_identity_metadata():
+    now = datetime.now(timezone.utc)
+    valid = observation(
+        device_id="phone-1",
+        source_device_type="mobile",
+        observation_type="app_usage_snapshot",
+        payload={
+            "platform": "android",
+            "usage_access_opt_in": True,
+            "collection_status": "ok",
+            "window_start": (now - timedelta(minutes=60)).isoformat(),
+            "window_end": now.isoformat(),
+            "apps": [{
+                "uid": 10123,
+                "package_names": ["com.example.app"],
+                "packages": [{
+                    "package_name": "com.example.app",
+                    "app_label": "Example",
+                    "is_system_app": False,
+                }],
+                "wifi": {"rx_bytes": 100, "tx_bytes": 50},
+                "mobile": {"rx_bytes": 20, "tx_bytes": 10},
+            }],
+        },
+    )
+    module.EnvironmentObservationCreate(**valid)
+    invalid_payload = {**valid["payload"], "apps": [{
+        **valid["payload"]["apps"][0],
+        "packages": [{"package_name": "com.example.app", "app_label": "x" * 129, "is_system_app": False}],
+    }]}
+    with pytest.raises(ValueError):
+        module.EnvironmentObservationCreate(**dict(valid, payload=invalid_payload))
+
+
 def test_app_usage_snapshot_rejects_unbounded_or_invalid_uid_counters():
     base_payload = {
         "platform": "android",
