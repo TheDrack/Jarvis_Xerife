@@ -1,62 +1,57 @@
-# Paridade HUD ↔ App Android
+# Paridade móvel do Jarvis Global
 
-## Papel de cada cliente
+## Arquitetura implementada
 
-- HUD (`app/static/index.html`): interface web/PWA na nuvem. É o protótipo inicial e continua existindo; não é descartado. Funciona enquanto a aba estiver aberta.
-- App Android (`mobile/android`): cliente com maior capacidade de execução e presença. Processa eventos pela fila do Supabase quando o serviço de presença reconecta; sem push externo, não garante entrega enquanto o processo está parado.
-- Núcleo Jarvis: fonte única de verdade. HUD e App consomem os mesmos contratos HTTP autenticados. Nenhum dos dois guarda memória própria.
+- **Global HUD:** `app/static/jarvis-desktop.html`, servido por `GET /` no runtime local `app/adapters/edge/jarvis_desktop_local.py`.
+- **Universal Intelligence:** `app/static/intelligence.html`, servido por `GET /intelligence`.
+- **PWA:** manifesto raiz em `/manifest.webmanifest`; Service Worker em `/service-worker.js`, com escopo `/`.
+- **Android nativo:** `mobile/android` mantém login móvel, armazenamento de tokens no Android Keystore, presença, notificações, chat, voz, TTS e compartilhamento de localização opt-in. A aba HUD pode carregar o mesmo Global HUD responsivo.
+- **Fonte de verdade:** os clientes reutilizam o runtime e os contratos existentes. Esta implementação não cria uma segunda API de negócio nem duplica os módulos do HUD.
 
-Resultado esperado: tudo o que o HUD faz, o App também faz; o App acrescenta presença, notificações e execução no aparelho, com permissões explícitas.
+## Matriz de capacidades do Global HUD
 
-## Matriz de capacidades (estado verificado no código)
-
-| Capacidade | HUD | App Android | Endpoint/recurso |
+| Módulo | Desktop | Navegador/PWA móvel | Android WebView |
 |---|---|---|---|
-| Login e logout | Sim (`/token`, expira em 30 min) | Sim (sessão renovável de 15 min, revogação no logout) | `/token`; `/v1/mobile/session/*` |
-| Chat com o Jarvis (texto) | Sim | **Não** | `POST /v1/message` |
-| Entrada de voz (reconhecimento) | Sim | **Não** | cliente (SpeechRecognizer) |
-| Saída de voz (TTS pt-BR) | Sim | Sim | cliente (TTS) |
-| Wake word | Sim (via `/v1/status`) | **Não** | `GET /v1/status` |
-| Status do sistema | Parcial | **Não** | `GET /v1/status` |
-| Telemetria de bateria | Sim | **Não** | `POST /v1/telemetry` |
-| Localização e mapa | Sim (Leaflet + Nominatim) | **Não** | `POST /v1/telemetry`; Nominatim |
-| Progresso do roadmap | Sim | **Não** | `GET /v1/roadmap/progress` |
-| Presença com app fechado | Não | Condicional (fila após reconexão + serviço em primeiro plano) | `/v1/mobile/push/*`; `/v1/local-bridge` |
-| Ações remotas | Chat | Somente `speak` | `/v1/local-bridge/send-task` |
+| Core e briefing | Sim | Sim, layout responsivo | Sim, ao abrir o HUD |
+| Eventos | Sim | Sim | Sim, ao abrir o HUD |
+| Fontes | Sim | Sim | Sim, ao abrir o HUD |
+| Orbital / God's Eye | Sim | Sim | Sim, ao abrir o HUD |
+| Telemetria do host | Sim | Sim, somente leitura | Sim, ao abrir o HUD |
+| Rede / topologia | Sim | Sim, inventário passivo/read-only | Sim, ao abrir o HUD |
+| Dispositivos | Sim | Sim, inventário read-only | Sim, ao abrir o HUD |
+| Câmeras | Sim | Sim, modal e controles com alvos de toque móveis | Sim, ao abrir o HUD |
+| Universal Intelligence | Sim | Sim, página responsiva e navegável | Sim, ao abrir o HUD |
 
-## Princípios
+A navegação móvel do Global usa uma barra persistente horizontal, rolagem independente dos painéis, alvos de toque de pelo menos 44 px e respeito às áreas seguras do Android. Os módulos são os já existentes no HUD; a presença na matriz não significa que o backend ganhou novas capacidades.
 
-1. Paridade antes de expansão: cada capacidade do HUD ganha equivalente no App antes de qualquer ação nova no aparelho.
-2. Mesmos contratos: o App não cria endpoints próprios para funções que o HUD já usa.
-3. Permissão sob demanda: microfone, localização e notificações só são pedidos quando a função é ativada pelo usuário.
-4. Dados mínimos: telemetria e localização seguem a política do HUD (30 s, deslocamento de 100 m) e nunca vão para payload de push.
-5. Ações de execução exigem allowlist: qualquer ação nova no telefone passa por contrato com tipo, origem, idempotência, expiração e revogação, conforme a Fase 0 de `docs/JARVIS_MOBILE_COMPANION.md`.
+## PWA e armazenamento
 
-## Fases propostas
+- O manifesto inicia em `/`, usa escopo raiz e modo `standalone`.
+- O Service Worker encaminha requisições GET diretamente à rede.
+- **Não há cache offline:** tokens, páginas autenticadas e respostas da API não são persistidos em Cache Storage.
+- A instalação PWA no Chrome requer contexto seguro: HTTPS ou localhost. HTTP em IP de LAN não satisfaz esse requisito.
+- A PWA não substitui o aplicativo Android nativo. O app continua responsável por recursos do sistema operacional móvel, como presença, notificações, microfone, TTS e localização opt-in.
 
-**P1 — Conversa e voz.** Tela de chat com `POST /v1/message`, entrada de voz com reconhecimento pt-BR, wake word e status via `GET /v1/status`. Permissão extra: microfone, pedida só ao ativar a voz.
+## Limites de segurança e integração
 
-**P2 — Contexto do aparelho.** Telemetria de bateria (BatteryManager) e localização opcional (com permissão de localização aproximada por padrão) enviadas para `POST /v1/telemetry`, com throttle de 30 s e filtro de deslocamento de 100 m. Indicador visível e botão de desligar.
+- As rotas existentes do HUD continuam exigindo o token local de pareamento quando acessam dados e ações autenticadas. O manifesto e o Service Worker são recursos estáticos.
+- A coleta de rede é passiva/read-only; não são introduzidos probes ativos.
+- Telemetria e inventário de dispositivos são somente leitura.
+- Esta entrega não introduz shell remoto, elevação de privilégio, escrita arbitrária no host, encerramento de processos ou alteração de serviços Ubuntu.
+- O código do Global HUD pode ser servido em Linux/Ubuntu pelo runtime local, mas a integração completa com `HostPort`, supervisão do sistema, comandos equivalentes de terminal e recuperação do Ubuntu ainda requer incrementos próprios com autorização e auditoria.
 
-**P3 — Roadmap e mapa.** Painel de progresso via `GET /v1/roadmap/progress` com cache local, e mapa com geocodificação reversa respeitando 1 req/s e cache por coordenada.
+## Graphify Memory / aprovações
 
-**P4 — Execução ampliada.** Só depois de P1 a P3 e da Fase 0 do documento de companion: lista explícita de ações permitidas no aparelho, com decisão do dono do projeto sobre cada uma.
+A interface móvel ainda não aprova candidatos Graphify. No estado verificado desta implementação:
+- O repositório Jarvis não contém endpoint de leitura ou aprovação da fila Graphify.
+- O conector Graphify disponível fornece consulta/revisão de estado e gravação de notas, mas não expõe uma operação de aprovação/publicação que o runtime Jarvis possa chamar.
+- Não é seguro simular uma aprovação no frontend ou aceitar um booleano fornecido pelo cliente.
 
-## Critérios de aceitação por fase
+A integração exige uma API oficial autorizada, identidade do revisor, escopo de permissão, auditoria e testes de estado/transição. Até isso existir, a aprovação continua no fluxo oficial do Graphify.
 
-- Cada função tem teste de contrato contra o endpoint real e teste de UI em telefone físico.
-- Telefone bloqueado, sem rede, após expiração de sessão e após logout: a função falha de forma explícita e não repete ações.
-- Nenhuma capacidade nova conecta sem autenticação verificada no servidor.
-- O HUD continua funcionando sem alterações de contrato.
+## Verificação e critérios de aceitação
 
-## Decisões pendentes do dono do projeto
-
-1. Quais ações de execução o telefone pode fazer em P4 (exemplos: abrir apps, automação de tela, enviar mensagens).
-2. Retenção de telemetria e localização no servidor.
-3. Biblioteca de mapa no Android: osmdroid (OpenStreetMap) ou MapLibre.
-
-## Bloqueios externos já conhecidos
-
-- Registro autenticado do dispositivo, migração da fila de eventos e configuração da chave dedicada do agente.
-- Deploy do backend com `SUPABASE_SERVICE_ROLE_KEY` confirmada no ambiente.
-- Reconciliação do histórico de migrations Supabase, citada em `docs/JARVIS_MOBILE_COMPANION.md`.
+- Testes de contrato cobrem entrega do manifesto e Service Worker, ausência de cache, navegação dos módulos existentes e contratos de layout responsivo.
+- GitHub Actions deve executar o pytest completo antes do merge.
+- Ainda é necessária validação visual em Android físico e navegador desktop; testes de contrato não substituem teste de interação real.
+- A instalação PWA remota depende de HTTPS configurado no ambiente de publicação.

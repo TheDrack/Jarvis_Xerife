@@ -334,3 +334,60 @@ def test_weather_panel_escapes_every_external_string_before_html_insertion():
         "esc(dprec[i])",
     ):
         assert expression in HTML, expression
+
+
+
+def test_global_hud_declares_installable_mobile_pwa_and_registers_root_worker():
+    assert '<link rel="manifest" href="/manifest.webmanifest">' in HTML
+    assert 'name="mobile-web-app-capable" content="yes"' in HTML
+    assert "navigator.serviceWorker.register('/service-worker.js', {scope: '/'})" in HTML
+    assert "serviceWorker" in HTML
+
+
+
+def test_mobile_header_and_hud_controls_remain_reachable_on_narrow_screens():
+    mobile = HTML[HTML.rfind("/* Mobile ergonomics:"):]
+    assert ".hud-actions{flex:1 1 0;min-width:0;max-width:none" in mobile
+    assert "overflow-x:auto" in mobile
+    assert ".layer-group{flex:0 0 auto}" in mobile
+    assert ".layer-chip{min-height:34px;min-width:34px}" in mobile
+    assert ".dock button:not(.orb){min-height:40px" in mobile
+    assert ".hud-foot .right{gap:8px;max-width:65vw;overflow-x:auto" in mobile
+
+
+
+def test_global_mobile_workspace_keeps_every_existing_module_reachable():
+    for view in ("core", "events", "sources", "orbital", "telemetry", "network", "devices"):
+        assert re.search(
+            rf'<button[^>]*data-view="{view}"',
+            HTML,
+            re.IGNORECASE,
+        ), view
+    for control in ("universalButton", "camerasButton", "engage"):
+        assert f'id="{control}"' in HTML
+
+
+def test_mobile_global_navigation_is_fixed_scrollable_and_safe_area_aware():
+    mobile = HTML[HTML.rfind("/* Mobile Global workspace */"):]
+    assert ".dock{position:fixed" in mobile
+    assert "bottom:calc(24px + env(safe-area-inset-bottom))" in mobile
+    assert "overflow-x:auto" in mobile
+    assert re.search(r"\.dock-group\{[^}]*\bflex:0 0 auto(?:;|})", mobile)
+    assert "min-height:44px" in mobile
+    assert ".panels{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;flex:1 1 auto;min-height:0;overflow-x:hidden;overflow-y:auto" in mobile
+    assert re.search(r"\.panels\{[^}]*\bpadding:\s*6px\s+2px\s+90px(?:;|})", mobile)
+
+
+def test_intelligence_dashboard_is_installable_and_mobile_navigable():
+    intelligence = (
+        ROOT / "app" / "static" / "intelligence.html"
+    ).read_text(encoding="utf-8")
+    assert 'name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"' in intelligence
+    assert '<link rel="manifest" href="/manifest.webmanifest">' in intelligence
+    assert '<a class="btn" href="/">HUD principal</a>' in intelligence
+    assert "navigator.serviceWorker.register('/service-worker.js', {scope: '/'})" in intelligence
+    assert "/* Mobile Intelligence workspace */" in intelligence
+    mobile = intelligence[intelligence.rfind("/* Mobile Intelligence workspace */"):]
+    assert ".actions{width:100%" in mobile
+    assert "min-height:44px" in mobile
+    assert ".grid,.pipeline,.columns{grid-template-columns:1fr}" in mobile

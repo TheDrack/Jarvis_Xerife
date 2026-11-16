@@ -104,6 +104,8 @@ _WORLD_LAND_PATH = _REPO_ROOT / "app" / "static" / "world-land.json"
 _WORLD_ADMIN_BOUNDARIES_PATH = _REPO_ROOT / "app" / "static" / "world-admin-boundaries.json.gz.b64"
 _GEO_LAYER_PATH = _REPO_ROOT / "app" / "static" / "jarvis-geospatial-layer.js"
 _ICON_PATH = _REPO_ROOT / "app" / "static" / "jarvis-icon.svg"
+_PWA_MANIFEST_PATH = _REPO_ROOT / "app" / "static" / "manifest.webmanifest"
+_SERVICE_WORKER_PATH = _REPO_ROOT / "app" / "static" / "service-worker.js"
 _WINDOWS_ICON_PATH = _REPO_ROOT / "desktop" / "jarvis.ico"
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
 _LOCAL_INTELLIGENCE_KEYS = {
@@ -758,6 +760,30 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         if not _HTML_PATH.is_file():
             raise HTTPException(status_code=503, detail="Interface Jarvis Desktop nao encontrada.")
         return HTMLResponse(_HTML_PATH.read_text(encoding="utf-8"))
+
+    @app.get("/manifest.webmanifest", include_in_schema=False)
+    async def mobile_app_manifest() -> FileResponse:
+        if not _PWA_MANIFEST_PATH.is_file():
+            raise HTTPException(status_code=404, detail="Manifesto móvel Jarvis indisponível.")
+        return FileResponse(
+            _PWA_MANIFEST_PATH,
+            media_type="application/manifest+json",
+            headers={"Cache-Control": "no-cache", "X-Content-Type-Options": "nosniff"},
+        )
+
+    @app.get("/service-worker.js", include_in_schema=False)
+    async def mobile_service_worker() -> FileResponse:
+        if not _SERVICE_WORKER_PATH.is_file():
+            raise HTTPException(status_code=404, detail="Service worker móvel Jarvis indisponível.")
+        return FileResponse(
+            _SERVICE_WORKER_PATH,
+            media_type="application/javascript",
+            headers={
+                "Cache-Control": "no-cache",
+                "Service-Worker-Allowed": "/",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @app.get("/static/jarvis-icon.svg", include_in_schema=False)
     async def desktop_icon_svg() -> FileResponse:
