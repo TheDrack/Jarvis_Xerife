@@ -480,7 +480,7 @@ def test_network_snapshot_accepts_bounded_per_flow_uid_attribution():
 
     invalid_flows = [
         {**flow, "local_ip": "not-an-ip"},
-        {**flow, "local_port": 0},
+        {**flow, "local_port": 65536},
         {**flow, "uid": True},
         {**flow, "tx_bytes": -1},
         {**flow, "closed": 1},
