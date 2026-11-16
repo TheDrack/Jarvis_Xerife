@@ -4,11 +4,15 @@
 
 Use one active Android VPN at a time while selecting the telemetry source dynamically:
 
-- **AUTO** (default): observe the active VPN; prefer a verified Tailscale adapter when available; otherwise use the Jarvis VPN engine only when no external VPN is active.
-- **JARVIS**: prefer the Jarvis VPN engine, but never silently replace an already active external VPN.
-- **TAILSCALE**: wait for Tailscale; do not start the Jarvis VPN.
+- **AUTO** (default): preserve an external VPN and block Jarvis startup while it is active; continue aggregate per-UID statistics. When no external VPN is active, Jarvis VPN startup remains manual.
+- **JARVIS**: allow the user to explicitly request Jarvis VPN startup. If another VPN is active, Android controls the provider switch and may revoke it after the system's consent flow.
+- **TAILSCALE**: block Jarvis VPN startup and wait for an external VPN. Android's public transport API does not identify the owning package.
 
 The selected preference is stored locally in `jarvis_session.vpn_mode_preference`.
+
+## Current implementation boundary
+
+The policy reports and observes VPN state; it does not yet automatically start Jarvis when an external VPN turns off. The Presence screen's start/stop controls remain manual. Selecting TAILSCALE explicitly stops an active Jarvis VPN so the user can activate Tailscale; selecting JARVIS permits a manual Android-mediated provider switch. The Tailscale telemetry adapter is not ready, so the stock Tailscale client continues to use the existing aggregate `NetworkStatsManager` collector.
 
 ## Implemented in this change
 
@@ -30,7 +34,7 @@ The Android app now includes an explicitly user-started `JarvisVpnService` backe
 
 The service reuses the package filter: an empty filter routes all apps except Jarvis; a populated filter routes only the named packages. Changing this list requires re-establishing the VPN.
 
-This is a **local forwarding/inspection VPN**, not a remote encrypted privacy VPN. Traffic exits directly through the current Wi-Fi/mobile network. Hev's interface-wide counters are published in `vpn_tunnel_stats`; the existing `NetworkStatsManager` remains the source of per-UID/package aggregate counters. This integration does not yet publish per-flow records or correlate each SOCKS flow to its originating Android UID.
+This is a **local forwarding/inspection VPN**, not a remote encrypted privacy VPN. Traffic exits directly through the current Wi-Fi/mobile network. Hev's interface-wide counters are published in `vpn_tunnel_stats`; the existing `NetworkStatsManager` remains the source of per-UID/package aggregate counters. With the separate `vpn_flow_sharing_enabled` opt-in, the Jarvis-owned VPN parses IPv4/IPv6 TCP/UDP headers at the TUN boundary and calls `ConnectivityManager.getConnectionOwnerUid()` to associate supported 5-tuples with Android UIDs. Packet payloads are forwarded to Hev but are not included in telemetry or persisted by Jarvis. This path is unavailable while another VPN owns the tunnel and still requires physical-device validation; keep the toggle default-off. The in-memory flow cache is bounded and expires after ten minutes. The API's five-minute `expires_at` is currently a freshness marker, not proof that historical database rows are deleted; durable retention/erasure remains a separate policy gap.
 
 The service is manual opt-in in this phase. AUTO does not start or replace a VPN in the background. Physical-device tests are still required for real connectivity, DNS, IPv4/IPv6, TCP/UDP, handover, process death, and revocation before automatic switching is enabled. See [ANDROID_JARVIS_VPNSERVICE.md](ANDROID_JARVIS_VPNSERVICE.md).
 

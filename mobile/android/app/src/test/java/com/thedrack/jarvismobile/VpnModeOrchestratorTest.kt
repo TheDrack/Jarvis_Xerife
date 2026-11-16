@@ -44,6 +44,22 @@ class VpnModeOrchestratorTest {
     }
 
     @Test
+    fun explicitJarvisPreferenceAllowsUserRequestedExternalVpnReplacement() {
+        val decision = VpnModeOrchestrator.decide(
+            preference = VpnModePreference.JARVIS,
+            externalVpnActive = true,
+            tailscaleInstalled = true,
+            jarvisVpnActive = false,
+            tailscaleAdapterReady = false,
+            jarvisPacketEngineReady = true
+        )
+
+        assertEquals(VpnCollectionMode.EXTERNAL_VPN_STATS, decision.mode)
+        assertEquals("external_unknown", decision.provider)
+        assertTrue(decision.mayStartJarvisVpn)
+    }
+
+    @Test
     fun autoSelectsJarvisWhenNoOtherVpnIsActiveAndEngineIsReady() {
         val decision = VpnModeOrchestrator.decide(
             preference = VpnModePreference.AUTO,

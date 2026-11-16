@@ -28,6 +28,8 @@ class EnvironmentObservationTest {
         assertEquals(1, first.getInt("schema_version"))
         assertEquals("req-1", first.getString("request_id"))
         assertTrue(first.getJSONObject("payload").getBoolean("validated"))
+        assertFalse(first.getJSONObject("payload").getBoolean("flow_metadata_opt_in"))
+        assertFalse(first.getJSONObject("payload").has("flows"))
         assertFalse(first.getJSONObject("payload").has("ssid"))
         assertFalse(first.getJSONObject("payload").has("latitude"))
         assertTrue(first.getString("request_id") != second.getString("request_id"))
@@ -77,6 +79,52 @@ class EnvironmentObservationTest {
         assertEquals(2048L, stats.getLong("rx_bytes"))
         assertFalse(payload.has("packet_payload"))
         assertFalse(payload.has("message_body"))
+    }
+
+    @Test
+    fun networkPayloadPublishesFlowTupleUidAndCountersWithoutPacketContents() {
+        val flow = NetworkFlowSnapshot(
+            flowId = "f68e4d54-2a93-4b52-bf6e-0f7f1ac30d20",
+            protocol = "tcp",
+            localIp = "10.0.0.2",
+            localPort = 49152,
+            remoteIp = "1.1.1.1",
+            remotePort = 443,
+            uid = 10123,
+            packageNames = listOf("com.example.app"),
+            appLabel = "Example",
+            attributionStatus = "resolved",
+            firstSeenAt = "2026-11-16T10:00:00Z",
+            lastSeenAt = "2026-11-16T10:00:02Z",
+            txPackets = 2,
+            txBytes = 120,
+            rxPackets = 3,
+            rxBytes = 180,
+            closed = false
+        )
+        val networkPayload = EnvironmentObservationPublisher.buildObservation(
+            "phone-1", snapshot.copy(flowMetadataEnabled = true, flows = listOf(flow)), requestId = "req-flow"
+        ).getJSONObject("payload")
+        val jsonFlow = networkPayload.getJSONArray("flows").getJSONObject(0)
+
+        assertTrue(networkPayload.getBoolean("flow_metadata_opt_in"))
+        assertEquals("tcp", jsonFlow.getString("protocol"))
+        assertEquals("10.0.0.2", jsonFlow.getString("local_ip"))
+        assertEquals(49152, jsonFlow.getInt("local_port"))
+        assertEquals("1.1.1.1", jsonFlow.getString("remote_ip"))
+        assertEquals(443, jsonFlow.getInt("remote_port"))
+        assertEquals(10123, jsonFlow.getInt("uid"))
+        assertEquals("com.example.app", jsonFlow.getJSONArray("package_names").getString(0))
+        assertEquals("resolved", jsonFlow.getString("attribution_status"))
+        assertEquals(120L, jsonFlow.getLong("tx_bytes"))
+        assertEquals(180L, jsonFlow.getLong("rx_bytes"))
+        assertFalse(networkPayload.has("packet_payload"))
+        assertFalse(networkPayload.has("message_body"))
+
+        val presencePayload = EnvironmentObservationPublisher.buildObservation(
+            "phone-1", snapshot.copy(flowMetadataEnabled = true, flows = listOf(flow)), observationType = "presence"
+        ).getJSONObject("payload")
+        assertFalse(presencePayload.has("flows"))
     }
 
     @Test

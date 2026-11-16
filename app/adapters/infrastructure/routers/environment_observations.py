@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import math
@@ -97,6 +98,15 @@ class EnvironmentObservationCreate(BaseModel):
     @root_validator(skip_on_failure=True)
     def validate_location_consent(cls, values: dict[str, Any]) -> dict[str, Any]:
         payload = values.get("payload") or {}
+        if {"flow_metadata_opt_in", "flows"}.intersection(payload):
+            if (
+                values.get("source_device_type") != "mobile"
+                or values.get("observation_type") != "network_snapshot"
+            ):
+                raise ValueError(
+                    "flow metadata is only valid in mobile network snapshots"
+                )
+
         location_keys = {
             "latitude",
             "longitude",
@@ -173,6 +183,113 @@ class EnvironmentObservationCreate(BaseModel):
                         raise ValueError(
                             "VPN tunnel counters must be non-negative integers"
                         )
+
+            flow_opt_in = payload.get("flow_metadata_opt_in")
+            if flow_opt_in is not None and not isinstance(flow_opt_in, bool):
+                raise ValueError("flow metadata opt-in flag must be boolean")
+            flows = payload.get("flows")
+            if flows is not None:
+                if not isinstance(flows, list) or len(flows) > 50:
+                    raise ValueError("network flows must contain at most 50 entries")
+                if flows and flow_opt_in is not True:
+                    raise ValueError("network flows require explicit flow metadata opt-in")
+                seen_flow_ids: set[UUID] = set()
+                for flow in flows:
+                    if not isinstance(flow, dict):
+                        raise ValueError("network flow entry must be an object")
+                    try:
+                        flow_id = UUID(str(flow.get("flow_id")))
+                    except (TypeError, ValueError):
+                        raise ValueError("network flow ID must be a UUID") from None
+                    if flow_id in seen_flow_ids:
+                        raise ValueError("network flow IDs must be unique per snapshot")
+                    seen_flow_ids.add(flow_id)
+                    if flow.get("protocol") not in {"tcp", "udp"}:
+                        raise ValueError("network flow protocol must be TCP or UDP")
+                    for address_key in ("local_ip", "remote_ip"):
+                        address = flow.get(address_key)
+                        if not isinstance(address, str) or len(address) > 45:
+                            raise ValueError("network flow IP address is invalid")
+                        try:
+                            ipaddress.ip_address(address)
+                        except ValueError:
+                            raise ValueError("network flow IP address is invalid") from None
+                    for port_key in ("local_port", "remote_port"):
+                        port = flow.get(port_key)
+                        if (
+                            isinstance(port, bool)
+                            or not isinstance(port, int)
+                            or not 0 <= port <= 65535
+                        ):
+                            raise ValueError("network flow port is invalid")
+                    uid = flow.get("uid")
+                    if uid is not None and (
+                        isinstance(uid, bool) or not isinstance(uid, int) or uid < 0
+                    ):
+                        raise ValueError("network flow UID is invalid")
+                    package_names = flow.get("package_names", [])
+                    if (
+                        not isinstance(package_names, list)
+                        or len(package_names) > 5
+                        or any(
+                            not isinstance(name, str) or not name or len(name) > 255
+                            for name in package_names
+                        )
+                    ):
+                        raise ValueError("network flow package names are invalid")
+                    app_label = flow.get("app_label")
+                    if app_label is not None and (
+                        not isinstance(app_label, str) or len(app_label) > 128
+                    ):
+                        raise ValueError("network flow app label is invalid")
+                    attribution_status = flow.get("attribution_status")
+                    if attribution_status not in {
+                        "resolved", "shared_uid", "uid_only", "unresolved", "denied"
+                    }:
+                        raise ValueError("network flow attribution status is invalid")
+                    if attribution_status in {"resolved", "shared_uid", "uid_only"} and uid is None:
+                        raise ValueError("attributed network flow requires a UID")
+                    if attribution_status == "resolved" and (
+                        len(package_names) != 1 or not app_label
+                    ):
+                        raise ValueError("resolved network flow requires one labeled package")
+                    if attribution_status == "shared_uid" and (
+                        len(package_names) < 2 or app_label is not None
+                    ):
+                        raise ValueError("shared-UID flow requires multiple packages and no single app label")
+                    if attribution_status in {"uid_only", "unresolved", "denied"} and (
+                        package_names or app_label is not None
+                    ):
+                        raise ValueError("unresolved or UID-only flow cannot claim package identity")
+                    if attribution_status in {"unresolved", "denied"} and uid is not None:
+                        raise ValueError("unresolved network flow cannot include a UID")
+                    if not isinstance(flow.get("closed"), bool):
+                        raise ValueError("network flow closed flag is invalid")
+                    try:
+                        first_seen = datetime.fromisoformat(
+                            str(flow.get("first_seen_at")).replace("Z", "+00:00")
+                        )
+                        last_seen = datetime.fromisoformat(
+                            str(flow.get("last_seen_at")).replace("Z", "+00:00")
+                        )
+                    except (TypeError, ValueError):
+                        raise ValueError("network flow timestamps must be ISO-8601") from None
+                    if (
+                        first_seen.tzinfo is None
+                        or last_seen.tzinfo is None
+                        or last_seen < first_seen
+                    ):
+                        raise ValueError("network flow timestamps are invalid")
+                    for counter in ("tx_packets", "tx_bytes", "rx_packets", "rx_bytes"):
+                        amount = flow.get(counter)
+                        if (
+                            isinstance(amount, bool)
+                            or not isinstance(amount, int)
+                            or amount < 0
+                        ):
+                            raise ValueError(
+                                "network flow counters must be non-negative integers"
+                            )
 
         if values.get("observation_type") == "app_usage_snapshot":
             if (

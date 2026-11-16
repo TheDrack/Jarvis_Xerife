@@ -153,6 +153,25 @@ class MainActivity : ComponentActivity() {
             result("A VPN própria exige Android 10 ou superior (API 29). A coleta agregada continua disponível nesta versão do Android.")
             return
         }
+        if (JarvisVpnService.isRunning) {
+            result("A VPN Jarvis já está ativa.")
+            return
+        }
+        val preferences = getSharedPreferences("jarvis_session", MODE_PRIVATE)
+        val modePreference = VpnModePreference.fromWireValue(
+            preferences.getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
+        )
+        if (modePreference == VpnModePreference.TAILSCALE) {
+            result("Modo TAILSCALE selecionado: a VPN Jarvis permanece bloqueada.")
+            return
+        }
+        val externalVpnActive = VpnStateDetector.detect(
+            this, jarvisVpnActive = JarvisVpnService.isRunning
+        ).externalVpnActive
+        if (externalVpnActive && modePreference == VpnModePreference.AUTO) {
+            result("Uma VPN externa está ativa. AUTO preserva o provedor atual; selecione JARVIS para solicitar uma troca manual.")
+            return
+        }
         val permissionIntent = VpnService.prepare(this)
         if (permissionIntent != null) {
             pendingVpnConsentResult = result
@@ -459,6 +478,9 @@ private fun JarvisMobileScreen(
     }
     var appUsageSharingEnabled by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("app_usage_sharing_enabled", false))
+    }
+    var vpnFlowSharingEnabled by remember {
+        mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE).getBoolean("vpn_flow_sharing_enabled", false))
     }
     var appUsagePackageFilter by remember {
         mutableStateOf(context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
@@ -784,11 +806,11 @@ private fun JarvisMobileScreen(
                     Text(
                         when (vpnModePreference) {
                             VpnModePreference.AUTO ->
-                                "AUTO: detecta VPNs externas e evita iniciar uma VPN concorrente. A VPN própria pode ser iniciada manualmente; o filtro de pacotes também limita quais aplicativos passam pelo túnel."
+                                "AUTO: preserva uma VPN externa e bloqueia o início do Jarvis enquanto ela estiver ativa. Para solicitar uma troca manual, selecione JARVIS."
                             VpnModePreference.JARVIS ->
-                                "JARVIS: prioriza o mecanismo VPN próprio, mas não interrompe uma VPN já ativa. A VPN própria usa o motor nativo Hev e exige consentimento do Android."
+                                "JARVIS: permite iniciar manualmente a VPN própria. Se outra VPN estiver ativa, o Android controla a troca e pode revogar o provedor anterior."
                             VpnModePreference.TAILSCALE ->
-                                "TAILSCALE: aguarda uma VPN externa compatível. A presença do app Tailscale, sozinha, não confirma que ele controla o túnel."
+                                "TAILSCALE: bloqueia o início da VPN Jarvis e aguarda uma VPN externa. O Android não revela qual app controla o túnel; no cliente Tailscale oficial, a coleta permanece agregada."
                         },
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -819,6 +841,12 @@ private fun JarvisMobileScreen(
                                 vpnModePreference = VpnModePreference.TAILSCALE
                                 context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
                                     .edit().putString("vpn_mode_preference", vpnModePreference.wireValue).apply()
+                                if (JarvisVpnService.isRunning) {
+                                    onStopVpn()
+                                    message = "VPN Jarvis encerrando. Ative Tailscale para assumir o túnel."
+                                } else {
+                                    message = "Modo TAILSCALE selecionado. A coleta será agregada enquanto a VPN externa estiver ativa."
+                                }
                             },
                             enabled = vpnModePreference != VpnModePreference.TAILSCALE,
                             modifier = Modifier.weight(1f)
@@ -830,6 +858,7 @@ private fun JarvisMobileScreen(
                     ) {
                         Button(
                             onClick = { onStartVpn { message = it } },
+                            enabled = vpnModePreference != VpnModePreference.TAILSCALE,
                             modifier = Modifier.weight(1f)
                         ) { Text("Iniciar VPN Jarvis") }
                         Button(
@@ -841,9 +870,40 @@ private fun JarvisMobileScreen(
                         ) { Text("Desativar VPN") }
                     }
                     Text(
-                        "A VPN própria usa Hev tun2socks e um proxy SOCKS5 local. A ativação exige consentimento explícito do Android; se outra VPN estiver ativa, o sistema pode solicitar confirmação para trocar o provedor.",
+                        "A VPN própria usa Hev tun2socks e um proxy SOCKS5 local. AUTO preserva uma VPN externa; JARVIS solicita a troca pelo fluxo de consentimento do Android, que revoga o provedor anterior.",
                         style = MaterialTheme.typography.bodySmall
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Identificação por fluxo — VPN Jarvis")
+                            Text(
+                                "Opcional. Registra protocolo, IPs, portas, UID/pacote e contadores por conexão. Não registra conteúdo. Só funciona com a VPN Jarvis ativa. Desativar interrompe imediatamente; ativar exige reinício se a VPN já estiver rodando sem coleta.",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = vpnFlowSharingEnabled,
+                            onCheckedChange = { enabled ->
+                                vpnFlowSharingEnabled = enabled
+                                context.getSharedPreferences("jarvis_session", Context.MODE_PRIVATE)
+                                    .edit().putBoolean("vpn_flow_sharing_enabled", enabled).apply()
+                                val appliedToRunningVpn = JarvisVpnService.updateFlowMetadataConsent(enabled)
+                                message = when {
+                                    !enabled && appliedToRunningVpn ->
+                                        "Coleta de metadados por fluxo interrompida imediatamente."
+                                    !enabled ->
+                                        "Metadados por fluxo desativados."
+                                    appliedToRunningVpn ->
+                                        "Metadados por fluxo ativados na VPN em execução."
+                                    else ->
+                                        "Preferência salva. Inicie ou reinicie a VPN Jarvis para aplicar."
+                                }
+                            }
+                        )
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -873,7 +933,7 @@ private fun JarvisMobileScreen(
                             }
                         )
                     }
-                    if (appUsageSharingEnabled) {
+                    if (appUsageSharingEnabled || vpnFlowSharingEnabled) {
                         Text(
                             "Filtro de aplicativos",
                             modifier = Modifier.padding(top = 10.dp),
@@ -890,7 +950,7 @@ private fun JarvisMobileScreen(
                             label = { Text("Nomes dos pacotes") },
                             placeholder = { Text("com.instagram.android, com.google.android.youtube") },
                             supportingText = {
-                                Text("Separe por vírgula ou linha. Vazio = todos os apps. UID compartilhado é observado como um único registro.")
+                                Text("Separe por vírgula ou linha. Vazio = todos os apps. Aplica-se ao túnel Jarvis e às estatísticas por UID.")
                             },
                             minLines = 2,
                             maxLines = 4
