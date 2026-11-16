@@ -80,6 +80,7 @@ class JarvisVpnService : VpnService() {
         val proxy = LocalSocks5Proxy(this, socksUsername, socksPassword)
         val socksPort = proxy.start()
         socksProxy = proxy
+        proxy.selfTest()
 
         val builder = Builder()
             .setSession("Jarvis Network Monitor")
