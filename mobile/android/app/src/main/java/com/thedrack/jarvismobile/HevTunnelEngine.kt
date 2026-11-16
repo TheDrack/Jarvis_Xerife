@@ -7,9 +7,12 @@ import java.io.File
 internal class HevTunnelEngine(context: Context) {
     private val configFile = File(context.filesDir, "jarvis-hev-tunnel.yml")
 
-    fun start(tunFd: Int): Boolean {
+    fun start(tunFd: Int, username: String, password: String): Boolean {
         check(tunFd >= 0) { "Invalid TUN file descriptor" }
-        configFile.writeText(CONFIG, Charsets.UTF_8)
+        require(username.matches(Regex("[0-9a-f]{48}")) && password.matches(Regex("[0-9a-f]{48}"))) {
+            "SOCKS credentials must be random 192-bit lowercase hex values"
+        }
+        configFile.writeText(config(username, password), Charsets.UTF_8)
         val started = TProxyService.TProxyStartService(configFile.absolutePath, tunFd)
         if (!started) return false
         // JNI returns after creating the worker thread; allow its first poll cycle to fail fast on bad config.
@@ -17,7 +20,11 @@ internal class HevTunnelEngine(context: Context) {
         return TProxyService.TProxyIsRunning()
     }
 
-    fun stop(): Boolean = TProxyService.TProxyStopService()
+    fun stop(): Boolean {
+        val stopped = TProxyService.TProxyStopService()
+        configFile.delete()
+        return stopped
+    }
 
     fun isRunning(): Boolean = TProxyService.TProxyIsRunning()
 
@@ -32,7 +39,7 @@ internal class HevTunnelEngine(context: Context) {
     }
 
     companion object {
-        private const val CONFIG = """
+        private fun config(username: String, password: String) = """
 tunnel:
   name: jarvis0
   mtu: 1500
@@ -43,6 +50,8 @@ socks5:
   address: 127.0.0.1
   port: 10808
   udp: 'udp'
+  username: '$username'
+  password: '$password'
 misc:
   log-level: warn
   max-session-count: 2048
