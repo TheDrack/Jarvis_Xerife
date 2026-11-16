@@ -21,10 +21,14 @@ object VpnStateDetector {
 
     fun detect(context: Context, jarvisVpnActive: Boolean = false): VpnRuntimeState {
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-        val vpnActive = manager?.allNetworks?.any { network ->
-            manager.getNetworkCapabilities(network)
-                ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-        } ?: false
+        val vpnActive = if (manager == null) {
+            false
+        } else {
+            manager.allNetworks.any { network ->
+                manager.getNetworkCapabilities(network)
+                    ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+            }
+        }
 
         val tailscaleInstalled = try {
             if (Build.VERSION.SDK_INT >= 33) {
