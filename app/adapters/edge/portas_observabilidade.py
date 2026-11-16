@@ -20,8 +20,13 @@ from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.adapters.edge import portas_core
-from app.adapters.edge.portas_midia import engine as media_engine, is_media_request, decode_stream, decode_available
-
+from app.adapters.edge.portas_midia import (
+    decode_available,
+    decode_stream,
+    is_media_request,
+)
+from app.adapters.edge.portas_midia import engine as media_engine
+from app.adapters.edge.protocol_pattern_mcp_tools import register_protocol_pattern_tools
 
 _REDACT_KEYS = re.compile(r"(pass(word)?|token|secret|auth|cookie|api.?key|credential|session)", re.I)
 _REDACT_BEARER = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/-]+=*")
@@ -897,3 +902,5 @@ def registrar_observabilidade_portas(mcp: Any, tracked_action: Any) -> None:
     def portas_midia_limpar() -> dict[str, Any]:
         """Limpa streams de mídia capturados."""
         return media_engine.clear()
+
+    register_protocol_pattern_tools(mcp, tracked_action)

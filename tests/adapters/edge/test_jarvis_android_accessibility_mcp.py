@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 import pytest
-
 from app.adapters.edge import android_accessibility_client as android_mcp
 
 
@@ -143,3 +142,85 @@ def test_accessibility_endpoint_matches_ipv4_listener_only(monkeypatch, url):
     monkeypatch.setattr(android_mcp, "ACCESSIBILITY_URL", url)
     with pytest.raises(RuntimeError, match="loopback"):
         android_mcp.accessibility_endpoint()
+
+
+def test_android_network_flows_snapshot_uses_authenticated_loopback_route(monkeypatch):
+    from app.adapters.edge import android_network_mcp_tools as module
+
+    captured = {}
+
+    def fake_request(path):
+        captured["path"] = path
+        return {
+            "capture_owner": "jarvis",
+            "flows": [
+                {"package_names": ["com.example.chat"], "remote_port": 443},
+                {"package_names": ["com.example.mail"], "remote_port": 443},
+            ],
+        }
+
+    monkeypatch.setattr(module, "accessibility_request", fake_request)
+    result = module.read_android_network_flows_snapshot("com.example.chat")
+
+    assert captured["path"] == "/v1/network/flows"
+    assert len(result["flows"]) == 1
+    assert result["flows"][0]["package_names"] == ["com.example.chat"]
+
+
+def test_android_network_flows_snapshot_rejects_invalid_package_filter():
+    from app.adapters.edge import android_network_mcp_tools as module
+
+    with pytest.raises(ValueError, match="package"):
+        module.read_android_network_flows_snapshot("../com.example.chat")
+
+
+def test_android_network_tool_is_registered_with_read_only_name():
+    from app.adapters.edge.android_network_mcp_tools import (
+        register_android_network_tools,
+    )
+
+    class FakeMcp:
+        def __init__(self):
+            self.tools = {}
+
+        def tool(self):
+            def decorate(function):
+                self.tools[function.__name__] = function
+                return function
+            return decorate
+
+    server = FakeMcp()
+    register_android_network_tools(server)
+
+    assert "android_network_flows_snapshot" in server.tools
+
+
+def test_android_mcp_registers_network_snapshot_and_protocol_registry_tools():
+    from pathlib import Path
+
+    source = (
+        Path(__file__).resolve().parents[3]
+        / "app" / "adapters" / "edge" / "jarvis_android_mcp.py"
+    ).read_text(encoding="utf-8")
+    assert "register_android_network_tools(mcp)" in source
+    assert "register_protocol_pattern_tools(mcp, include_live_android=True)" in source
+
+
+def test_android_network_snapshot_filter_requires_package_names_array(monkeypatch):
+    from app.adapters.edge import android_network_mcp_tools as module
+
+    monkeypatch.setattr(
+        module,
+        "accessibility_request",
+        lambda _path: {
+            "flows": [
+                {"package_names": "com.example.chat"},
+                {"package_names": ["com.example.chat"]},
+            ]
+        },
+    )
+
+    result = module.read_android_network_flows_snapshot("com.example.chat")
+
+    assert result["flow_count"] == 1
+    assert result["flows"] == [{"package_names": ["com.example.chat"]}]
