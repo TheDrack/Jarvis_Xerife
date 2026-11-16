@@ -180,7 +180,7 @@ object EnvironmentObservationPublisher {
                         .put("remote_ip", flow.remoteIp)
                         .put("remote_port", flow.remotePort)
                         .put("uid", flow.uid ?: JSONObject.NULL)
-                        .put("package_names", JSONArray(flow.packageNames.take(5)))
+                        .put("package_names", JSONArray(flow.packageNames.take(2)))
                         .put("app_label", flow.appLabel ?: JSONObject.NULL)
                         .put("attribution_status", flow.attributionStatus)
                         .put("first_seen_at", flow.firstSeenAt)
