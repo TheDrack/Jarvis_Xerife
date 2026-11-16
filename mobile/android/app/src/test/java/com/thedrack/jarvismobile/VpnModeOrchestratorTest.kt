@@ -82,6 +82,37 @@ class VpnModeOrchestratorTest {
     }
 
     @Test
+    fun installedTailscaleIsNotTreatedAsActiveWithoutAnExternalVpn() {
+        val decision = VpnModeOrchestrator.decide(
+            preference = VpnModePreference.AUTO,
+            externalVpnActive = false,
+            tailscaleInstalled = true,
+            jarvisVpnActive = false,
+            tailscaleAdapterReady = false,
+            jarvisPacketEngineReady = false
+        )
+
+        assertEquals(VpnCollectionMode.NETWORK_STATS, decision.mode)
+        assertEquals("none", decision.provider)
+    }
+
+    @Test
+    fun externalVpnIsNotLabeledTailscaleUntilItsTelemetryAdapterIsReady() {
+        val decision = VpnModeOrchestrator.decide(
+            preference = VpnModePreference.AUTO,
+            externalVpnActive = true,
+            tailscaleInstalled = true,
+            jarvisVpnActive = false,
+            tailscaleAdapterReady = false,
+            jarvisPacketEngineReady = true
+        )
+
+        assertEquals(VpnCollectionMode.EXTERNAL_VPN_UNSUPPORTED, decision.mode)
+        assertEquals("external_unknown", decision.provider)
+        assertFalse(decision.mayStartJarvisVpn)
+    }
+
+    @Test
     fun activeJarvisVpnWinsOnlyWhenPreferenceAllowsIt() {
         val automatic = VpnModeOrchestrator.decide(
             preference = VpnModePreference.AUTO,
