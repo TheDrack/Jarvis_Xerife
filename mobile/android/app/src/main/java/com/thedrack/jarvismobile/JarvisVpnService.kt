@@ -14,6 +14,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import android.widget.Toast
 import java.security.SecureRandom
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -28,6 +29,11 @@ class JarvisVpnService : VpnService() {
     private var packetRelay: TunPacketRelay? = null
     private var flowCollector: FlowAttributionCollector? = null
     private val stopping = AtomicBoolean(false)
+    private val startupRequested = AtomicBoolean(false)
+    private val cleanupQueued = AtomicBoolean(false)
+    private val startupExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "JarvisVpnWorker").apply { isDaemon = true }
+    }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val engineWatchdog = object : Runnable {
         override fun run() {
@@ -51,29 +57,56 @@ class JarvisVpnService : VpnService() {
             stopTunnel()
             return START_NOT_STICKY
         }
-        if (tun != null) return START_STICKY
+        if (isRunning || !startupRequested.compareAndSet(false, true)) return START_STICKY
+
+        stopping.set(false)
         try {
-            startTunnel()
-            return START_STICKY
-        } catch (error: LinkageError) {
-            Log.e(TAG, "Hev native library could not be loaded", error)
-            Toast.makeText(this, "VPN Jarvis: biblioteca nativa indisponível.", Toast.LENGTH_LONG).show()
-            stopTunnel()
-            return START_NOT_STICKY
+            // Android requires a foreground notification promptly after startForegroundService().
+            // Keep this lifecycle operation on the service's main thread; all socket, proxy,
+            // TUN setup and native-engine initialization work runs on startupExecutor.
+            startVpnForeground()
         } catch (error: Exception) {
-            Log.e(TAG, "Jarvis VPN failed to start", error)
-            Toast.makeText(
-                this,
-                "VPN Jarvis não iniciou: " + (error.message ?: error.javaClass.simpleName),
-                Toast.LENGTH_LONG
-            ).show()
-            stopTunnel()
+            startupRequested.set(false)
+            Log.e(TAG, "Could not promote Jarvis VPN service to foreground", error)
+            stopSelf(startId)
             return START_NOT_STICKY
         }
+
+        startupExecutor.execute {
+            try {
+                startTunnel()
+                startupRequested.set(false)
+                if (!stopping.get()) {
+                    mainHandler.post {
+                        if (stopping.get() || !isRunning) return@post
+                        getSystemService(NotificationManager::class.java)?.notify(
+                            NOTIFICATION_ID,
+                            buildNotification(
+                                if (flowCollector != null) "VPN Jarvis ativa — fluxos identificados por aplicativo"
+                                else "VPN Jarvis ativa — encaminhamento agregado; metadados por fluxo desativados"
+                            )
+                        )
+                        mainHandler.removeCallbacks(engineWatchdog)
+                        mainHandler.postDelayed(engineWatchdog, ENGINE_WATCHDOG_INTERVAL_MS)
+                    }
+                }
+            } catch (error: LinkageError) {
+                startupRequested.set(false)
+                Log.e(TAG, "Hev native library could not be loaded", error)
+                reportStartupFailure("VPN Jarvis: biblioteca nativa indisponível.")
+            } catch (error: Exception) {
+                startupRequested.set(false)
+                Log.e(TAG, "Jarvis VPN failed to start", error)
+                reportStartupFailure(
+                    "VPN Jarvis não iniciou: " + (error.message ?: error.javaClass.simpleName)
+                )
+            }
+        }
+        return START_STICKY
     }
 
     private fun startTunnel() {
-        stopping.set(false)
+        check(!stopping.get()) { "Jarvis VPN startup was cancelled" }
         check(HevRuntimeCompatibility.isSupported(Build.VERSION.SDK_INT)) {
             "Jarvis VPN requires Android API ${HevRuntimeCompatibility.MIN_ANDROID_API} or newer"
         }
@@ -98,6 +131,7 @@ class JarvisVpnService : VpnService() {
         val socksPort = proxy.start()
         socksProxy = proxy
         proxy.selfTest()
+        check(!stopping.get()) { "Jarvis VPN startup was cancelled" }
 
         val builder = Builder()
             .setSession("Jarvis Network Monitor")
@@ -129,6 +163,7 @@ class JarvisVpnService : VpnService() {
             selectedPackages.forEach(builder::addAllowedApplication)
         }
 
+        check(!stopping.get()) { "Jarvis VPN startup was cancelled" }
         val descriptor = checkNotNull(builder.establish()) {
             "Android refused to establish the VPN interface"
         }
@@ -151,6 +186,7 @@ class JarvisVpnService : VpnService() {
         hevTransport = transport?.hevDescriptor
         packetRelay = transport?.relay
 
+        check(!stopping.get()) { "Jarvis VPN startup was cancelled" }
         val nativeEngine = HevTunnelEngine(applicationContext)
         engine = nativeEngine
         val tunnelFd = transport?.hevDescriptor?.fd ?: descriptor.fd
@@ -164,18 +200,6 @@ class JarvisVpnService : VpnService() {
         activeEngine = nativeEngine
         activeFlowCollector = collector
         isRunning = true
-
-        startVpnForeground()
-        getSystemService(NotificationManager::class.java)
-            ?.notify(
-                NOTIFICATION_ID,
-                buildNotification(
-                    if (flowSharingEnabled) "VPN Jarvis ativa — fluxos identificados por aplicativo"
-                    else "VPN Jarvis ativa — encaminhamento agregado; metadados por fluxo desativados"
-                )
-            )
-        mainHandler.removeCallbacks(engineWatchdog)
-        mainHandler.postDelayed(engineWatchdog, ENGINE_WATCHDOG_INTERVAL_MS)
     }
 
     private fun startVpnForeground() {
@@ -203,9 +227,40 @@ class JarvisVpnService : VpnService() {
         super.onDestroy()
     }
 
+    private fun reportStartupFailure(message: String) {
+        mainHandler.post {
+            Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
+        }
+        stopTunnel()
+    }
+
+    /**
+     * Stop requests are serialized behind startup on the same worker. This prevents
+     * teardown from racing with socket creation, TUN establishment or Hev startup.
+     */
     private fun stopTunnel() {
         if (!stopping.compareAndSet(false, true)) return
         mainHandler.removeCallbacks(engineWatchdog)
+        if (!cleanupQueued.compareAndSet(false, true)) return
+
+        startupExecutor.execute {
+            cleanupTunnelResources()
+            mainHandler.post {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                cleanupQueued.set(false)
+                startupRequested.set(false)
+                stopSelf()
+            }
+        }
+    }
+
+    /** Must only be called from startupExecutor. */
+    private fun cleanupTunnelResources() {
         runCatching { engine?.stop() }
             .onFailure { Log.w(TAG, "Hev shutdown reported an error", it) }
         engine = null
@@ -223,13 +278,6 @@ class JarvisVpnService : VpnService() {
         tun = null
         runCatching { socksProxy?.close() }
         socksProxy = null
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } else {
-            @Suppress("DEPRECATION")
-            stopForeground(true)
-        }
-        stopSelf()
     }
 
     private fun createNotificationChannel() {
