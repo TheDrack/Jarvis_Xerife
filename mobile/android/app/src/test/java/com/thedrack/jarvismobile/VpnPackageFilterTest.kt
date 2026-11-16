@@ -20,6 +20,11 @@ class VpnPackageFilterTest {
         )
     }
 
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsMoreThanFiftySelectedPackages() {
+        VpnPackageFilter.parse((1..51).joinToString(",") { "com.example.app$it" })
+    }
+
     @Test
     fun emptyFilterMeansAllAppsExceptJarvis() {
         assertEquals(emptyList<String>(), VpnPackageFilter.parse(" , ; \n "))
