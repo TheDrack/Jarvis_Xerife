@@ -43,8 +43,8 @@ object EnvironmentObservationPublisher {
             preferences.getString("vpn_mode_preference", VpnModePreference.AUTO.wireValue)
         )
         val runtime = VpnStateDetector.detect(context, jarvisVpnActive = JarvisVpnService.isRunning)
-        // Both engines remain false until their real packet-forwarding/instrumentation
-        // adapters are shipped. Detection must never be mistaken for packet collection.
+        // The Jarvis TUN engine is user-started only; AUTO never takes over a VPN in this phase.
+        // Tailscale flow telemetry still requires an adapter inside the Tailscale client.
         val decision = VpnModeOrchestrator.decide(
             preference = preference,
             externalVpnActive = runtime.externalVpnActive,
