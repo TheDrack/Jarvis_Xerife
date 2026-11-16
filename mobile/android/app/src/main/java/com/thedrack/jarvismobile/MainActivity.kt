@@ -57,6 +57,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var voice: VoiceInput
     private lateinit var googleSignInLauncher: ActivityResultLauncher<Intent>
     private var pendingGoogleResult: ((String?) -> Unit)? = null
+    private lateinit var vpnConsentLauncher: ActivityResultLauncher<Intent>
+    private var pendingVpnConsentResult: ((String) -> Unit)? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,6 +81,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        vpnConsentLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val callback = pendingVpnConsentResult
+            pendingVpnConsentResult = null
+            if (result.resultCode == RESULT_OK) {
+                startJarvisVpnService()
+                callback?.invoke("Autorização VPN concedida. Solicitação de inicialização enviada; verifique a notificação do Jarvis.")
+            } else {
+                callback?.invoke("Autorização da VPN cancelada. Nenhum túnel foi iniciado.")
+            }
+        }
         speech = TextToSpeech(this) { status ->
             speechReady.value = status == TextToSpeech.SUCCESS
             if (status == TextToSpeech.SUCCESS) speech?.language = Locale("pt", "BR")
@@ -99,6 +111,8 @@ class MainActivity : ComponentActivity() {
                         onLogout = ::logout,
                         onStartPresence = ::startPresence,
                         onStopPresence = ::stopPresence,
+                        onStartVpn = ::requestJarvisVpn,
+                        onStopVpn = ::stopJarvisVpn,
                         onLocationSharingChanged = ::setLocationSharing,
                         onSpeak = { speak("Jarvis Mobile ativo. Canal de voz local funcionando.") },
                         onSendChat = ::sendChat,
@@ -132,6 +146,27 @@ class MainActivity : ComponentActivity() {
     private fun hasBackgroundLocationPermission(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    private fun requestJarvisVpn(result: (String) -> Unit) {
+        val permissionIntent = VpnService.prepare(this)
+        if (permissionIntent != null) {
+            pendingVpnConsentResult = result
+            vpnConsentLauncher.launch(permissionIntent)
+        } else {
+            startJarvisVpnService()
+            result("Solicitação de inicialização enviada. O serviço verificará a VPN ativa e o motor nativo.")
+        }
+    }
+
+    private fun startJarvisVpnService() {
+        val intent = Intent(this, JarvisVpnService::class.java).setAction(JarvisVpnService.ACTION_START)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ContextCompat.startForegroundService(this, intent)
+        else startService(intent)
+    }
+
+    private fun stopJarvisVpn() {
+        startService(Intent(this, JarvisVpnService::class.java).setAction(JarvisVpnService.ACTION_STOP))
+    }
 
     private fun setLocationSharing(enabled: Boolean) {
         val prefs = getSharedPreferences("jarvis_session", MODE_PRIVATE)
@@ -383,6 +418,8 @@ private fun JarvisMobileScreen(
     onLogout: () -> Unit,
     onStartPresence: () -> Unit,
     onStopPresence: () -> Unit,
+    onStartVpn: ((String) -> Unit) -> Unit,
+    onStopVpn: () -> Unit,
     onLocationSharingChanged: (Boolean) -> Unit,
     onSpeak: () -> Unit,
     onSendChat: (String, (ChatReply) -> Unit) -> Unit,
@@ -742,9 +779,9 @@ private fun JarvisMobileScreen(
                     Text(
                         when (vpnModePreference) {
                             VpnModePreference.AUTO ->
-                                "AUTO: detecta VPNs externas e evita iniciar uma VPN concorrente. A captura por TUN será ativada quando os adaptadores de encaminhamento estiverem disponíveis; até lá, mantém estatísticas agregadas."
+                                "AUTO: detecta VPNs externas e evita iniciar uma VPN concorrente. A VPN própria pode ser iniciada manualmente; a troca automática aguarda validação de transições e telemetria de fluxos."
                             VpnModePreference.JARVIS ->
-                                "JARVIS: prioriza o mecanismo VPN próprio, mas não interrompe uma VPN já ativa. O motor de encaminhamento ainda não está habilitado."
+                                "JARVIS: prioriza o mecanismo VPN próprio, mas não interrompe uma VPN já ativa. A VPN própria pode ser iniciada manualmente após consentimento do Android."
                             VpnModePreference.TAILSCALE ->
                                 "TAILSCALE: aguarda uma VPN externa compatível. A presença do app Tailscale, sozinha, não confirma que ele controla o túnel."
                         },
@@ -782,6 +819,26 @@ private fun JarvisMobileScreen(
                             modifier = Modifier.weight(1f)
                         ) { Text("TAILSCALE") }
                     }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { onStartVpn { message = it } },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Iniciar VPN Jarvis") }
+                        Button(
+                            onClick = {
+                                onStopVpn()
+                                message = "Solicitação de encerramento da VPN enviada."
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Desativar VPN") }
+                    }
+                    Text(
+                        "A VPN própria usa Hev tun2socks e um proxy SOCKS5 local. A ativação exige consentimento do Android e não substitui uma VPN externa ativa.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
