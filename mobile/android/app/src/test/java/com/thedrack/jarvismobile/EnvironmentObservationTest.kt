@@ -34,6 +34,28 @@ class EnvironmentObservationTest {
     }
 
     @Test
+    fun networkPayloadIncludesDynamicVpnSelectionWithoutClaimingPacketCapture() {
+        val vpnSnapshot = snapshot.copy(
+            vpnActive = true,
+            vpnProvider = "external_unknown",
+            vpnCollectionMode = VpnCollectionMode.EXTERNAL_VPN_UNSUPPORTED.wireValue,
+            vpnModePreference = VpnModePreference.AUTO.wireValue,
+            tailscaleInstalled = true,
+            vpnTransportActive = true
+        )
+        val payload = EnvironmentObservationPublisher.buildObservation(
+            "phone-1", vpnSnapshot, requestId = "req-vpn"
+        ).getJSONObject("payload")
+
+        assertTrue(payload.getBoolean("vpn_active"))
+        assertEquals("external_unknown", payload.getString("vpn_provider"))
+        assertEquals("external_vpn_unsupported", payload.getString("vpn_collection_mode"))
+        assertEquals("auto", payload.getString("vpn_mode_preference"))
+        assertTrue(payload.getBoolean("tailscale_installed"))
+        assertTrue(payload.getBoolean("vpn_transport_active"))
+    }
+
+    @Test
     fun locationPayloadIsSeparateAndOptIn() {
         val location = JSONObject().put("latitude", -27.5954).put("longitude", -48.5480)
             .put("accuracy_m", 18.0).put("captured_at", "2026-10-29T12:00:00Z").put("precision", "fine")
