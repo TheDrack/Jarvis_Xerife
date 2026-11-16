@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
@@ -21,6 +23,18 @@ class JarvisVpnService : VpnService() {
     private var socksProxy: LocalSocks5Proxy? = null
     private var engine: HevTunnelEngine? = null
     private val stopping = AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val engineWatchdog = object : Runnable {
+        override fun run() {
+            if (stopping.get() || tun == null) return
+            if (engine?.isRunning() != true) {
+                Log.e(TAG, "Hev worker exited; closing TUN to restore normal network routing")
+                stopTunnel()
+                return
+            }
+            mainHandler.postDelayed(this, ENGINE_WATCHDOG_INTERVAL_MS)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -105,6 +119,8 @@ class JarvisVpnService : VpnService() {
         startVpnForeground()
         getSystemService(NotificationManager::class.java)
             ?.notify(NOTIFICATION_ID, buildNotification("VPN Jarvis ativa — TCP/UDP encaminhados"))
+        mainHandler.removeCallbacks(engineWatchdog)
+        mainHandler.postDelayed(engineWatchdog, ENGINE_WATCHDOG_INTERVAL_MS)
     }
 
     private fun startVpnForeground() {
@@ -132,6 +148,7 @@ class JarvisVpnService : VpnService() {
 
     private fun stopTunnel() {
         if (!stopping.compareAndSet(false, true)) return
+        mainHandler.removeCallbacks(engineWatchdog)
         runCatching { engine?.stop() }
             .onFailure { Log.w(TAG, "Hev shutdown reported an error", it) }
         engine = null
@@ -196,5 +213,6 @@ class JarvisVpnService : VpnService() {
         private const val TUN_IPV4 = "198.18.0.1"
         private const val TUN_IPV6 = "fc00::1"
         private const val DNS_IPV4 = "1.1.1.1"
+        private const val ENGINE_WATCHDOG_INTERVAL_MS = 1_000L
     }
 }
