@@ -24,6 +24,8 @@ PROTECTED_PATH_FILES = (
     "app/application/services/roadmap_mission_selector.py",
     "scripts/evolve_all_pending.py",
     "scripts/publish_validated_evolution.py",
+    "app/application/services/local_repair_agent.py",
+    "scripts/jarvis_healer.py",
 )
 FROZEN_DIRECTORY = ".frozen"
 _WINDOWS_RESERVED_NAMES = {
@@ -124,6 +126,36 @@ def resolve_repository_path(
         raise UnsafeRepositoryPath("path escapes the repository or cannot be resolved") from exc
 
     return resolved, normalized, resolved_relative
+
+
+_TEST_DIRECTORY_NAMES = frozenset({"test", "tests", "testing"})
+_PYTEST_INFRASTRUCTURE_FILES = frozenset({
+    "conftest.py",
+    "pytest.ini",
+    "pytest.toml",
+    "tox.ini",
+    "setup.cfg",
+    "pyproject.toml",
+    ".coveragerc",
+})
+
+
+def is_test_or_pytest_infrastructure_path(relative_path: str) -> bool:
+    """Return whether a repository-relative path is test code or pytest control data."""
+    normalized = normalize_relative_path(relative_path).casefold()
+    parts = PurePosixPath(normalized).parts
+    filename = parts[-1]
+    test_directory = any(part in _TEST_DIRECTORY_NAMES for part in parts[:-1])
+    test_filename = (
+        filename == "test.py"
+        or filename.startswith("test_")
+        or filename.endswith("_test.py")
+    )
+    return (
+        test_directory
+        or test_filename
+        or filename in _PYTEST_INFRASTRUCTURE_FILES
+    )
 
 
 def protected_prefix_for(relative_path: str) -> Optional[str]:

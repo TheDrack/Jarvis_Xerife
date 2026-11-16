@@ -1,0 +1,122 @@
+import json
+import subprocess
+
+from app.adapters.edge import android_host_status as status
+
+
+def test_battery_status_returns_only_allowlisted_fields(monkeypatch):
+    monkeypatch.setattr(status.shutil, "which", lambda _name: "/data/data/com.termux/files/usr/bin/termux-battery-status")
+    monkeypatch.setattr(
+        status.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0,
+            stdout=json.dumps({"percentage": 87, "status": "DISCHARGING", "serial": "secret-device-id"}),
+            stderr="",
+        ),
+    )
+
+    result = status.android_battery_status()
+
+    assert result == {"available": True, "status": "ok", "percentage": 87, "battery_status": "DISCHARGING"}
+
+
+def test_wifi_status_never_returns_network_identifiers(monkeypatch):
+    monkeypatch.setattr(status.shutil, "which", lambda _name: "/usr/bin/termux-wifi-connectioninfo")
+    monkeypatch.setattr(
+        status.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0,
+            stdout=json.dumps({
+                "wifi_enabled": True,
+                "supplicant_state": "COMPLETED",
+                "frequency_mhz": 5180,
+                "ssid": "private-network",
+                "bssid": "00:11:22:33:44:55",
+                "ip": "192.168.1.20",
+            }),
+            stderr="",
+        ),
+    )
+
+    result = status.android_wifi_status()
+
+    assert result["connected"] is True
+    assert result["frequency_mhz"] == 5180
+    assert not {"ssid", "bssid", "ip"}.intersection(result)
+
+
+def test_termux_api_missing_is_reported_without_exception(monkeypatch):
+    monkeypatch.setattr(status.shutil, "which", lambda _name: None)
+
+    assert status.android_battery_status() == {
+        "available": False,
+        "status": "termux_api_not_installed",
+    }
+
+
+def test_termux_api_timeout_is_bounded(monkeypatch):
+    monkeypatch.setattr(status.shutil, "which", lambda _name: "/usr/bin/termux-battery-status")
+
+    def timeout(*_args, **_kwargs):
+        raise subprocess.TimeoutExpired("termux-battery-status", 5)
+
+    monkeypatch.setattr(status.subprocess, "run", timeout)
+    assert status.android_battery_status() == {"available": False, "status": "timeout"}
+
+
+def test_device_status_reports_aggregate_storage_without_paths(monkeypatch):
+    monkeypatch.setattr(status.shutil, "disk_usage", lambda _path: type("Usage", (), {"total": 100, "used": 40, "free": 60})())
+    monkeypatch.setattr(status.Path, "read_text", lambda *_args, **_kwargs: "123.0 456.0")
+    monkeypatch.setattr(status.shutil, "which", lambda _name: None)
+
+    result = status.android_device_status()
+
+    assert result["status"] == "ok"
+    assert result["uptime_seconds"] == 123.0
+    assert result["storage"]["home"] == {"total_bytes": 100, "used_bytes": 40, "free_bytes": 60}
+    assert all("path" not in key for key in result)
+
+
+
+def test_wifi_connected_uses_completed_supplicant_when_wifi_enabled_field_is_omitted(monkeypatch):
+    monkeypatch.setattr(status.shutil, "which", lambda _name: "/usr/bin/termux-wifi-connectioninfo")
+    monkeypatch.setattr(
+        status.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0,
+            stdout=json.dumps({
+                "supplicant_state": "COMPLETED",
+                "frequency_mhz": 5580,
+                "link_speed_mbps": 433,
+                "rssi": -54,
+            }),
+            stderr="",
+        ),
+    )
+
+    result = status.android_wifi_status()
+
+    assert result["connected"] is True
+
+
+def test_wifi_connected_is_false_when_wifi_is_explicitly_disabled(monkeypatch):
+    monkeypatch.setattr(status.shutil, "which", lambda _name: "/usr/bin/termux-wifi-connectioninfo")
+    monkeypatch.setattr(
+        status.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0,
+            stdout=json.dumps({
+                "wifi_enabled": False,
+                "supplicant_state": "COMPLETED",
+            }),
+            stderr="",
+        ),
+    )
+
+    result = status.android_wifi_status()
+
+    assert result["connected"] is False

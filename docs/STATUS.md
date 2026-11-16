@@ -73,6 +73,15 @@
 
 A autoevolução de capacidades segue o [Cognitive Roadmap](COGNITIVE_ROADMAP.md), mas a correção automática de PRs/CI e os workflows Self Healing são uma trilha transversal permanente. Devem continuar ativos durante todas as fases: diagnosticar falhas por logs/causa raiz, corrigir a branch/PR correspondente quando seguro, acrescentar testes e reexecutar checks. Não desativar nem enfraquecer esses mecanismos, não duplicar PRs, não reduzir testes e não permitir merge/deploy autônomo. A publicação permanece sujeita aos gates e à revisão humana. Correção de CI é manutenção; não substitui nem conclui marco cognitivo.
 
+### Integridade dos testes no Self Healing — achado confirmado em 2026-11-14
+
+- No HEAD auditado (`d83c0b8`), `heal()` incluía arquivos de teste derivados do pytest JSON report/tracebacks em `target_files`. `is_production_file()` apenas alterava o prompt; não impedia que o modelo recebesse o arquivo nem que `os.replace` gravasse a resposta. O workflow `homeostase.yml` também inclui `tests` no staging da PR proposta.
+- Isso permitia que a auto-cura alterasse assertions e depois validasse o resultado com a própria suíte. Os controles adicionados nas PRs #660/#740 isolam execução privilegiada e secrets, mas não impedem essa mutação.
+- A PR [#826](https://github.com/TheDrack/Jarvis_Xerife/pull/826) torna testes, `conftest.py` e arquivos de configuração pytest imutáveis para o healer, preservando-os como evidência diagnóstica e mantendo a auto-cura de arquivos de produção. A classificação resolve symlinks antes de decidir e `apply_fixes()` opera no destino canônico; o caminho principal de `heal()` também filtra os alvos antes do LLM/checkpoint/`os.replace`.
+- Estado desta atualização: PR #826 permanece aberta e não integrada. A proteção de código/testes e caminhos `.frozen` passou nos heads `6078c660` (PR Validation e Task Queue). A revisão adicional do staging e esta atualização documental estão no head atual da branch; os checks desse head ainda precisam concluir. Revisão humana continua pendente. Falha cujo único alvo seja teste continua sendo falha e requer correção/revisão humana.
+- `homeostase.yml` agora prepara PRs com `git add -- app scripts docs` e um guard fail-closed que rejeita qualquer arquivo de teste, configuração pytest ou caminho `.frozen` no diff staged. Os testes continuam sendo executados integralmente antes/depois da cura; não são removidos nem alterados pelo healer. Os triggers, jobs, secrets e permissões do Self Healing foram preservados; a alteração limita somente o conteúdo que pode ser proposto automaticamente.
+
+
 ## Nova trilha — Jarvis Cognitive Architecture
 
 **Estado:** C0 em andamento; C1–C8 não são declaradas concluídas. O inventário inicial está em [COGNITIVE_BASELINE.md](COGNITIVE_BASELINE.md) e não substitui os critérios de aceitação do roadmap.
@@ -639,7 +648,7 @@ A leitura anterior que dizia que `CognitiveRouter.execute()` acessa diretamente 
 
 A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user_input=""` e classifica uma entrada vazia. O CLI de `app/runtime/pipeline_runner.py` chama `run_pipeline(p_name, global_strict=g_strict)` sem `inputs`. Não foi localizado consumidor de aplicação para `jarvis_chat`, nem teste integrado que prove entrada do usuário → CognitiveRouter → LlmEngine. Portanto, a classificação permanece **implementado, consumo de aplicação não verificado**; o risco é comportamento vazio/não útil no caminho CLI, não exceção de metadata. O teste `test_execute_initializes_missing_metadata` confirma somente a inicialização do dicionário.
 
-## Auditoria recorrente — 2026-11-14 — revalidação de main e PRs
+## Auditoria recorrente — 2026-11-14 — snapshot histórico de main e PRs
 
 **Main auditada:** `d83c0b81898ab45de75f7583b3a7bf830dfcb88c` (merge da PR #821). A PR #821 está merged; o ledger C0 permanece pending.
 
@@ -653,3 +662,25 @@ A lacuna real é diferente: sem `inputs.metadata.user_input`, o router usa `user
 - **Integridade do Self Healing:** `jarvis_healer.py` pode incluir arquivos de teste entre os alvos e reescrevê-los; `homeostase.yml` stages `tests` e não tem gate de diff que impeça remoção de assertions. É risco de desenho confirmado, não incidente observado. Nenhuma alteração foi feita no workflow.
 - Issues abertas: #682 (proteção de main), #723 (provider-aware task claims) e #732 (reconciliação de migrations). Nenhuma issue foi criada.
 - Nenhum merge, deploy manual, migration, alteração de secrets/flags ou escrita em produção foi executado nesta auditoria.
+
+### Proteção de arquivos .frozen no Self Healing — 2026-11-15
+
+- A política canônica `repository_path_policy.py` já define `contains_frozen_directory()`; EvolutionGatekeeper, RoadmapMissionSelector, Crystallizer e publisher usam esse helper para bloquear caminhos `.frozen`.
+- A revisão da PR #826 encontrou que os novos guards de `LocalRepairAgent` e `scripts/jarvis_healer.py` protegiam testes, pytest, symlinks e áreas de controle, mas não consultavam o helper de arquivos frozen.
+- Regressões foram adicionadas primeiro no commit `14b5c14ace5893f6b8d4c4d16f522c352a80d8ff`. O PR Validation run [43767960423](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43767960423) reproduziu os três caminhos inseguros: patch em arquivo frozen, leitura de conteúdo frozen antes do provider e classificação do healer como arquivo de produção. Resultado RED: 3 failed, 3314 passed, 38 skipped, 8 warnings.
+- A correção nesta mesma PR reutiliza `contains_frozen_directory()` sobre os caminhos lexical e resolvido em ambos os pontos de entrada. Os arquivos `.frozen` continuam disponíveis para diagnóstico, mas não podem ser lidos pelo reparador local nem alterados pelo healer.
+- A correção de `.frozen` foi implementada no commit `3517775e7949118bc7e2270bd5167e20746d5cf4`; o head de código/testes `6078c660124e7e1f315f86d855686dddde3b1978` passou no PR Validation [43768618854](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43768618854): **3318 passed, 38 skipped, 8 warnings, 67% coverage**, e no Task Queue [43768618800](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43768618800): **3342 passed, 19 skipped, 181 warnings, 68% coverage**. O helper de path foi testado em Linux e Windows. Nenhum teste válido foi removido; nenhum workflow, segredo, permissão ou mecanismo Self Healing foi alterado.
+
+### Revalidação final do staging e da integridade dos testes — 2026-11-15
+
+- O head `d61e3284cd95ba5d09a78f393a9d956b355d5a97` reproduziu uma falha exclusivamente no teste `test_auto_healing_changes_are_proposed_in_a_branch_without_staging_tests_or_workflows`: a asserção procurava `conftest.py` sem a barra invertida, enquanto o workflow já continha o padrão correto de caminho `(^|/)conftest\\.py(/|)`. O mesmo teste também foi alinhado para verificar `pytest\\.ini` como expressão regular literal.
+- A correção ficou na mesma branch/PR, commit `2d67a2f33d283bc4b620f2bb2e3e483874427d5c`. Nenhum teste foi removido, ignorado ou enfraquecido; o workflow de staging permaneceu inalterado.
+- PR Validation [run 43773108736](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43773108736): **success**, 3318 passed, 38 skipped, 8 warnings, 67% coverage.
+- Task Queue [run 43773108755](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/43773108755): **success**, 3342 passed, 19 skipped, 181 warnings, 68% coverage; os testes focados da fila passaram (15 passed).
+- O merge ref de validação foi `3daf7136b6a1e61b3445eb7521a724c14e4fa7bd`, com a mensagem explícita de integração do head `2d67a2f` sobre a `main` `70c53b372bb970854efac6380b4fcc55cc0703bb`. Isso confirma que os dois workflows validaram a árvore combinada com a main observada nesta auditoria.
+- A PR #826 continua aberta e sem review formal. Os checks aprovados não autorizam merge automático; a revisão humana permanece obrigatória.
+
+
+### Atualização de sincronização — 2026-11-15
+
+O snapshot de 2026-11-14 acima preserva o estado observado naquela data. Após a revalidação e reconciliação das branches, as PRs #826 (integridade do Self Healing), #824 (Global HUD móvel) e #832 (estado de conexão Wi-Fi Android) foram integradas à `main`, respectivamente nos commits `f7c7843e50699e046ef0ca2d53194f0f74551c97`, `87bc717042885700d969b5eaedda8269bb8a15b8` e `c9d793838aeae5b697dc6cbdbc6adbc510655eb4`. A PR #825 permanece em atualização para incorporar a `main` resultante; sua evidência C0 continua sem declarar os critérios como concluídos.

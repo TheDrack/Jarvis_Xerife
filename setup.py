@@ -36,5 +36,9 @@ setup(
             "pynput",
             "paho-mqtt>=2.0,<3",
         ],
+        "android-mcp": [
+            "mcp>=1.30.0,<2",
+            "uvicorn>=0.24.0,<1",
+        ],
     },
 )
