@@ -4,9 +4,9 @@
 
 Use one active Android VPN at a time while selecting the telemetry source dynamically:
 
-- **AUTO** (default): detect an external VPN and keep aggregate per-UID statistics rather than automatically replacing it. Jarvis VPN startup remains a manual action in this implementation.
-- **JARVIS**: allow the user to manually start the Jarvis VPN. Android owns the provider switch and may revoke the currently active VPN.
-- **TAILSCALE**: do not start the Jarvis VPN; report that an external VPN is expected. Android's public transport API does not identify the owning package.
+- **AUTO** (default): preserve an external VPN and block Jarvis startup while it is active; continue aggregate per-UID statistics. When no external VPN is active, Jarvis VPN startup remains manual.
+- **JARVIS**: allow the user to explicitly request Jarvis VPN startup. If another VPN is active, Android controls the provider switch and may revoke it after the system's consent flow.
+- **TAILSCALE**: block Jarvis VPN startup and wait for an external VPN. Android's public transport API does not identify the owning package.
 
 The selected preference is stored locally in `jarvis_session.vpn_mode_preference`.
 
