@@ -841,7 +841,7 @@ private fun JarvisMobileScreen(
                         ) { Text("Desativar VPN") }
                     }
                     Text(
-                        "A VPN própria usa Hev tun2socks e um proxy SOCKS5 local. A ativação exige consentimento do Android e não substitui uma VPN externa ativa.",
+                        "A VPN própria usa Hev tun2socks e um proxy SOCKS5 local. A ativação exige consentimento explícito do Android; se outra VPN estiver ativa, o sistema pode solicitar confirmação para trocar o provedor.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Row(
