@@ -28,6 +28,8 @@
 | Per-flow metadata and consent | Implemented | Separate `vpn_payload_metadata_enabled` opt-in, default-off, requires flow attribution consent and Jarvis VPN ownership. Revocation clears stored per-flow protocol observations immediately. |
 | TCP stream reassembly | Implemented | `TcpStreamReassembler` is integrated per flow and direction. It handles in-order data, bounded out-of-order segments, retransmission overlap and 32-bit sequence wrap. It caps each stream at 16 KiB, allows at most 32 active reassembly flows, and wipes transient buffers on successful extraction, revocation, flow expiry, close or overflow. |
 | Backend schema and UI | Implemented | Android UI exposes a separate protocol-inspection switch. Publisher sends at most 3 typed observations per flow and caps metadata-enabled snapshots at 15 flows; backend validates type/source/hostname and both opt-ins. |
+| Authenticated live flow inspection | Implemented in source | The paired AccessibilityService exposes `GET /v1/network/flows` on its authenticated IPv4 loopback listener. It returns current in-memory flows only while Jarvis owns the VPN, includes package version metadata for uniquely attributed UIDs, and enforces both consent flags. No raw packet bytes are returned. |
+| MCP live import | Implemented in source | Android MCP exposes `android_network_flows_snapshot` and `protocol_pattern_import_live_android_flows(package)`. The latter reads the live local snapshot, derives version from PackageManager, and writes observed patterns to the Termux-local registry. |
 | TLS diagnostic proxy | Pending | Separate feature, disabled by default, only for user-selected compatible apps and explicit CA installation. |
 | PCAPng evidence store | Pending | Separate explicit capture sessions, encryption, quotas, retention and local-first storage. |
 | Tailscale gateway | Pending | Preserve Android UID attribution before forwarding; validate routes, loop prevention and failure recovery. |
@@ -45,4 +47,4 @@
 
 ## Validation policy
 
-Every behavioral increment must add tests before implementation, pass focused Android unit tests, run the Android debug build and preserve the repository's full Python test/coverage gates. Physical-device validation is required before enabling packet inspection by default. No collection is enabled by this document alone.
+Every behavioral increment must add tests before implementation, pass focused Android unit tests, run the Android debug build and preserve the repository's full Python test/coverage gates. Physical-device validation is required before enabling packet inspection by default. No collection is enabled by this document alone. The live endpoint and importer still require a new Android APK and MCP service restart before device-level verification.
