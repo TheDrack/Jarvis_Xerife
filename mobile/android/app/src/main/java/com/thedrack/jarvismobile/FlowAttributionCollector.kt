@@ -75,7 +75,9 @@ internal class FlowAttributionCollector(
         var txBytes: Long = 0,
         var rxPackets: Long = 0,
         var rxBytes: Long = 0,
-        var closed: Boolean = false
+        var closed: Boolean = false,
+        var resolutionAttempts: Int = 0,
+        var lastResolutionMillis: Long = Long.MIN_VALUE
     )
 
     @Volatile private var enabled = true
@@ -124,6 +126,14 @@ internal class FlowAttributionCollector(
         if (packet.protocolNumber == TCP_PROTOCOL &&
             packet.tcpFlags?.let { it and (TCP_FIN or TCP_RST) != 0 } == true
         ) flow.closed = true
+        if (
+            flow.uid == null &&
+            flow.attributionStatus == "unresolved" &&
+            flow.resolutionAttempts < MAX_ATTRIBUTION_ATTEMPTS &&
+            now - flow.lastResolutionMillis >= ATTRIBUTION_RETRY_INTERVAL_MS
+        ) {
+            resolveAttribution(flow, packet, localAddress, localPort, remoteAddress, remotePort)
+        }
         if (outbound) {
             flow.txPackets = saturatingAdd(flow.txPackets, 1)
             flow.txBytes = saturatingAdd(flow.txBytes, packet.packetBytes.toLong())
@@ -185,6 +195,8 @@ internal class FlowAttributionCollector(
         remoteAddress: java.net.InetAddress,
         remotePort: Int
     ) {
+        flow.resolutionAttempts += 1
+        flow.lastResolutionMillis = flow.lastSeenMillis
         val uid = try {
             ownerResolver.resolve(
                 packet.protocolNumber,
@@ -244,5 +256,7 @@ internal class FlowAttributionCollector(
         private const val DEFAULT_MAX_FLOWS = 1_000
         private const val DEFAULT_MAX_AGE_MS = 10 * 60 * 1_000L
         private const val DEFAULT_IDLE_SESSION_MS = 60 * 1_000L
+        private const val MAX_ATTRIBUTION_ATTEMPTS = 3
+        private const val ATTRIBUTION_RETRY_INTERVAL_MS = 250L
     }
 }
