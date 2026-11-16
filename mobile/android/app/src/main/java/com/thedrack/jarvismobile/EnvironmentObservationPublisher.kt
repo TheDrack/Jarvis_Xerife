@@ -9,6 +9,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import androidx.core.content.ContextCompat
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 import java.util.UUID
@@ -30,7 +31,8 @@ data class MobileNetworkSnapshot(
     val vpnTxPackets: Long = 0,
     val vpnTxBytes: Long = 0,
     val vpnRxPackets: Long = 0,
-    val vpnRxBytes: Long = 0
+    val vpnRxBytes: Long = 0,
+    val flows: List<NetworkFlowSnapshot> = emptyList()
 )
 
 /**
@@ -48,6 +50,7 @@ object EnvironmentObservationPublisher {
         )
         val runtime = VpnStateDetector.detect(context, jarvisVpnActive = JarvisVpnService.isRunning)
         val tunnelStats = JarvisVpnService.currentStats()
+        val flows = JarvisVpnService.currentFlows()
         // The Jarvis TUN engine is user-started only; AUTO never takes over a VPN in this phase.
         // Tailscale flow telemetry still requires an adapter inside the Tailscale client.
         val decision = VpnModeOrchestrator.decide(
@@ -83,7 +86,8 @@ object EnvironmentObservationPublisher {
             vpnTxPackets = tunnelStats.txPackets,
             vpnTxBytes = tunnelStats.txBytes,
             vpnRxPackets = tunnelStats.rxPackets,
-            vpnRxBytes = tunnelStats.rxBytes
+            vpnRxBytes = tunnelStats.rxBytes,
+            flows = flows
         )
     }
 
@@ -164,6 +168,30 @@ object EnvironmentObservationPublisher {
                     .put("tx_bytes", snapshot.vpnTxBytes)
                     .put("rx_packets", snapshot.vpnRxPackets)
                     .put("rx_bytes", snapshot.vpnRxBytes))
+        }
+        if (observationType == "network_snapshot" && snapshot.flows.isNotEmpty()) {
+            payload.put("flows", JSONArray().apply {
+                snapshot.flows.take(FlowAttributionCollector.DEFAULT_SNAPSHOT_LIMIT).forEach { flow ->
+                    put(JSONObject()
+                        .put("flow_id", flow.flowId)
+                        .put("protocol", flow.protocol)
+                        .put("local_ip", flow.localIp)
+                        .put("local_port", flow.localPort)
+                        .put("remote_ip", flow.remoteIp)
+                        .put("remote_port", flow.remotePort)
+                        .put("uid", flow.uid ?: JSONObject.NULL)
+                        .put("package_names", JSONArray(flow.packageNames.take(5)))
+                        .put("app_label", flow.appLabel ?: JSONObject.NULL)
+                        .put("attribution_status", flow.attributionStatus)
+                        .put("first_seen_at", flow.firstSeenAt)
+                        .put("last_seen_at", flow.lastSeenAt)
+                        .put("tx_packets", flow.txPackets)
+                        .put("tx_bytes", flow.txBytes)
+                        .put("rx_packets", flow.rxPackets)
+                        .put("rx_bytes", flow.rxBytes)
+                        .put("closed", flow.closed))
+                }
+            })
         }
         if (observationType == "presence") {
             payload.put("active", presenceActive)
