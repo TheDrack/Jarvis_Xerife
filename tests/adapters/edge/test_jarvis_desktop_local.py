@@ -2097,7 +2097,7 @@ def test_prospecting_search_reports_missing_store_without_leaking_paths(monkeypa
 
     assert response.status_code == 503
     assert "Base CNPJ não configurada" in response.json()["detail"]
-    assert "C:\\\\" not in response.text
+    assert "C:" not in response.text
 
 
 def test_prospecting_exact_lookup_requires_local_authentication():
