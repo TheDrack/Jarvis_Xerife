@@ -61,13 +61,15 @@ O domínio de prospecção não deve depender do Android nem do PC da MultMetal.
 ### Empresa e prospect
 
 - `ProspectCompany`: identidade empresarial, CNPJ, website, setor/segmento e localização.
-- `ProspectRecord`: vínculo entre a empresa e a carteira comercial de um tenant.
+- `ProspectRecord`: registro operacional de campanha usado pelo fluxo interno atual. O `tenant_id` desse registro é apenas um rótulo local; não representa membership nem isolamento SaaS.
 - `ProspectEvidence`: fonte, URL, tipo de fonte, termos aplicáveis, timestamps e lista explícita dos atributos empresariais sustentados por aquela evidência.
 - `ProspectStageChange`: evento auditável de mudança de etapa.
 
 A primeira versão não armazena contatos pessoais. A inclusão futura de nome, telefone, e-mail pessoal ou perfil profissional exigirá finalidade específica, base legal documentada, minimização, retenção, controle de acesso e mecanismo de oposição/opt-out.
 
-### Pipeline
+### Pipeline interno legado
+
+O pipeline abaixo permanece para acompanhar a operação manual da própria equipe. Não deve receber recursos de marketplace, catálogo, relacionamento comprador-fornecedor ou pedidos; esses domínios pertencem ao produto comercial independente.
 
 ```text
 DISCOVERED
@@ -85,18 +87,15 @@ Etapas não convertidas -> DISQUALIFIED
 
 Transições inválidas são rejeitadas. `DO_NOT_CONTACT` é terminal para impedir reativação acidental. Toda transição exige ator e justificativa; a persistência futura deve manter o histórico append-only.
 
-## 5. Multi-tenancy e autorização
+## 5. Identidade de organização e limite de tenancy
 
-- Cada prospect e cada dado comercial pertencem a um `tenant_id` obrigatório.
-- O tenant ativo deve ser resolvido no servidor a partir da identidade autenticada e de uma associação/membership verificada.
-- Nunca confiar em `tenant_id` enviado pelo cliente como prova de autorização.
-- Nunca usar `user_id` como se fosse automaticamente `tenant_id`.
-- Consultas, atualizações, exports, tarefas assíncronas e eventos devem aplicar o mesmo escopo do tenant.
-- Usar chaves estrangeiras compostas ou constraints equivalentes para impedir referências cruzadas entre tenants.
-- RLS no banco será defesa adicional, alinhada ao modelo de autenticação real; não aplicar uma policy genérica antes de verificar como a identidade JWT atual se relaciona com o Supabase.
-- Não compartilhar evidências, contatos, scores, notas ou histórico comercial entre tenants por deduplicação global implícita.
+O núcleo de discovery não é um SaaS multi-tenant e não administra contas de clientes. A base CNPJ é um conjunto público compartilhado; pesquisas, evidências e resultados de descoberta não pertencem a uma organização cliente.
 
-A API atual do Jarvis injeta usuário autenticado, mas isso não comprova associação a uma organização. Por isso a camada de persistência multi-tenant e os endpoints de cliente ficam bloqueados até existir um contrato de membership verificável.
+- O `tenant_id` ainda presente em campanhas/registros operacionais é um rótulo local de execução, não uma identidade nem uma autorização.
+- Não criar membership, RLS comercial, carteira de clientes ou API pública multi-tenant no Jarvis_Xerife.
+- Não confiar em `tenant_id` enviado por um consumidor como prova de autorização.
+- A aplicação comercial independente será responsável por organizações, memberships, isolamento dos dados privados, RLS e autorização por organização.
+- A integração com o Jarvis deve usar uma identidade de serviço com permissão de leitura de discovery; a organização cliente é resolvida e autorizada no produto comercial antes da chamada.
 
 ## 6. Contrato de qualidade dos dados
 
@@ -106,7 +105,7 @@ Cada atributo obtido externamente deve permitir responder:
 - Qual URL ou referência permite verificá-lo?
 - Quando foi coletado e quando foi verificado pela última vez?
 - Quais termos/licenças se aplicam?
-- Qual tenant e qual finalidade justificam o armazenamento?
+- Qual finalidade de uso, retenção e necessidade operacional justificam o armazenamento?
 - O dado está confirmado, inferido ou ainda não verificado?
 
 Conteúdo de páginas, diretórios e APIs externas é dado não confiável. Não pode ser interpretado como instrução para agentes nem como autorização para contatar uma pessoa.
@@ -165,7 +164,7 @@ Listagens serão paginadas; erros seguirão envelope consistente; criação e ex
 ## 10. Fases de implementação
 
 ### Fase 1 — domínio (implementada)
-- Contratos de empresa, evidência e prospect tenant-scoped.
+- Contratos de empresa/evidência para discovery; o registro operacional de etapa permanece interno e não constitui contrato SaaS multi-tenant.
 - Pipeline determinístico e histórico de transições.
 - Testes unitários de validação, isolamento conceitual e transições.
 - `employee_count` opcional em `ProspectCompany` para o critério de porte, sempre sustentado por evidência.
@@ -183,7 +182,7 @@ Listagens serão paginadas; erros seguirão envelope consistente; criação e ex
 
 ### Fase 4 — discovery e qualification
 - Adaptadores de fontes permitidas, rate limit, termos e proveniência. **(implementado para a base oficial de CNPJ: adaptadores CSV e DuckDB, com proveniência CC-BY; fontes e termos em [JARVIS_PROSPECTO_SOURCES.md](JARVIS_PROSPECTO_SOURCES.md))**
-- ICPs configuráveis por oferta/tenant. **(implementado: `IcpProfile` + `IcpWeights`)**
+- ICPs configuráveis por oferta/campanha. **(implementado: `IcpProfile` + `IcpWeights`)**
 - Scores separados e explicáveis de fit, intent e confidence. **(implementado, sem calibração de pesos)**
 - Sem scraping indiscriminado ou disparo automático. **(respeitado: nenhuma coleta ou envio existe no domínio)**
 
