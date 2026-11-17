@@ -7,6 +7,8 @@ whether the source yields company-level records are explicit.
 from __future__ import annotations
 
 from enum import Enum
+import json
+from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
@@ -91,10 +93,17 @@ class ProspectSourceCatalog(BaseModel):
         )
 
 
+def load_source_catalog(path: Path | str) -> ProspectSourceCatalog:
+    """Load and validate the declarative source catalog."""
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    return ProspectSourceCatalog.model_validate(payload)
+
+
 __all__ = [
     "AcquisitionMode",
     "ProspectSourceCatalog",
     "ProspectSourceDefinition",
     "SourceKind",
     "SourceStatus",
+    "load_source_catalog",
 ]
