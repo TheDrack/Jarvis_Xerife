@@ -131,10 +131,22 @@ def test_invalid_cnpj_length_is_rejected():
         source_type="public_registry",
         url="https://registry.example/company",
         license_or_terms="Public registry terms.",
+        supports_fields=("cnpj",),
     )
     with pytest.raises(ValidationError):
         ProspectCompany(
             company_name="Example Ltda",
             cnpj="123",
             evidence=(evidence,),
+        )
+
+def test_evidence_rejects_duplicate_supported_fields():
+    with pytest.raises(ValidationError):
+        ProspectEvidence(
+            source_id="registry",
+            source_name="Public registry",
+            source_type="public_registry",
+            url="https://registry.example/company",
+            license_or_terms="Public registry terms.",
+            supports_fields=("cnpj", "cnpj"),
         )
