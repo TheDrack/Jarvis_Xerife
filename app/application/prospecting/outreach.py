@@ -16,6 +16,14 @@ from urllib.request import Request, urlopen
 from urllib.parse import urlparse
 
 
+class _ClosingConnection(sqlite3.Connection):
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
+
+
 class Channel(StrEnum):
     WHATSAPP = "whatsapp"
     EMAIL = "email"
@@ -96,8 +104,8 @@ class SQLiteOutreachStore:
     """Durable local store with unique campaign targets and atomic dispatch claims."""
 
     def __init__(self, database: str | Path) -> None:
-        self.database = str(database)
-        Path(self.database).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        self.database = str(Path(database).expanduser())
+        Path(self.database).parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.executescript(
                 """
@@ -158,7 +166,9 @@ class SQLiteOutreachStore:
             )
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database, timeout=15, isolation_level=None)
+        connection = sqlite3.connect(
+            self.database, timeout=15, isolation_level=None, factory=_ClosingConnection
+        )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA busy_timeout = 15000")
