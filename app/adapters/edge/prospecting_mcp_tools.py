@@ -96,20 +96,23 @@ def register_prospecting_tools(
         it does not contact companies or expose personal contact data.
         """
         try:
+            arguments: dict[str, Any] = {
+                "uf": uf,
+                "cnae_prefixes": cnae_prefixes,
+                "only_active": only_active,
+                "include_secondary_cnae": include_secondary_cnae,
+                "limit": limit,
+            }
+            if municipalities is not None:
+                arguments["municipalities"] = municipalities
+            if after_cnpj_basico is not None:
+                arguments["after_cnpj_basico"] = after_cnpj_basico
             result = await tool_dispatcher.dispatch_async(
                 {
                     "tool_id": "prospecting.companies.search",
                     "tool_version": "1.0.0",
                     "capability": PROSPECTING_CAPABILITY,
-                    "arguments": {
-                        "uf": uf,
-                        "cnae_prefixes": cnae_prefixes,
-                        "municipalities": municipalities,
-                        "only_active": only_active,
-                        "include_secondary_cnae": include_secondary_cnae,
-                        "limit": limit,
-                        "after_cnpj_basico": after_cnpj_basico,
-                    },
+                    "arguments": arguments,
                     "caller": "android_mcp",
                     "scope": "local",
                 }
