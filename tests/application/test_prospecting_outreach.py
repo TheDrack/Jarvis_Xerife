@@ -149,7 +149,7 @@ def test_authorization_requires_traceable_basis_and_reviewer(tmp_path):
             body="Mensagem",
             campaign_id="campaign-1",
             authorization=ContactAuthorization(
-                basis="unknown", evidence_ref="", reviewed_by=""
+                basis="legitimate_interest_reviewed", evidence_ref="", reviewed_by=""
             ),
         )
 
