@@ -1,93 +1,83 @@
-# Harness Jarvis no Freebuff Desktop
+# Instalar o harness Jarvis no Freebuff Desktop
 
-Runbook para registrar o harness Jarvis (skills portáteis + servidor MCP) no Freebuff Desktop
-neste checkout. Vale para o clone atual; cada checkout/máquina roda o próprio instalador.
+Runbook para instalar as skills portáteis do repositório e registrar o servidor MCP desktop no Freebuff Desktop ou em hosts que adotem as convenções .agents/.
 
-## 1. Onde o Freebuff procura (base de descoberta)
+## 1. Fontes canônicas
 
-Verificado em 2026-10-27 por inspeção do bundle instalado (`app.asar` do Freebuff Desktop), não por
-documentação pública. Revalide após uma atualização do app.
+- Skills de origem: skills/.
+- Instalador: scripts/install_freebuff_harness.py.
+- Destino local: .agents/skills/ e .agents/mcp.json.
+- Servidor registrado: app/adapters/edge/jarvis_desktop_mcp.py.
+- Nome MCP: jarvis_desktop.
 
-| Recurso | Caminhos lidos | Regra |
+A pasta skills/ é a fonte canônica versionada. No commit de referência, contém oito skills:
+jarvis-android-navigation, jarvis-context-memory, jarvis-host-ops,
+jarvis-mobile-notifications, jarvis-multi-agent-coordination, jarvis-portas-browser,
+jarvis-visual-navigation e jarvis-viv.
+
+O checkout também contém um snapshot histórico de cinco skills em .agents/skills/. O diretório .agents/ é ignorado para novos arquivos locais, mas arquivos que já estão rastreados continuam versionados. O instalador sincroniza as oito skills de origem e pode alterar esse snapshot rastreado; revise git status/diff antes de commitar qualquer alteração.
+
+## 2. Descoberta pelo host
+
+A estrutura de descoberta do Freebuff foi inspecionada no bundle instalado em 2026-10-27. Naquele build, foram observados:
+
+| Recurso | Caminho observado | Limite |
 |---|---|---|
-| Skills | `{projeto}/.claude/skills/`, `{projeto}/.agents/skills/` | `.agents` tem prioridade; o diretório do usuário (`~/.claude/skills`, `~/.agents/skills`) só é lido se o host habilitar |
-| Servidores MCP | `{projeto}/.agents/mcp.json`, `{projeto}/../.agents/mcp.json`, `~/.agents/mcp.json` | O último diretório tem precedência, então o projeto sobrepõe o global |
-| Instruções | `AGENTS.md` do projeto | Já existe na raiz do repositório |
+| Skills | {projeto}/.claude/skills/ e {projeto}/.agents/skills/ | A prioridade depende do host. |
+| MCP | {projeto}/.agents/mcp.json, {projeto}/../.agents/mcp.json e ~/.agents/mcp.json | Precedência observada pode mudar em atualizações. |
+| Instruções | AGENTS.md do projeto | Só é carregado quando o host abre o workspace/repositório. |
 
-Detalhes do formato:
+Esses caminhos são evidência de um build específico do Freebuff, não um contrato público permanente. Revalide após atualizar o aplicativo.
 
-- Skill = `SKILL.md` com frontmatter `name` e `description`. **Sem frontmatter a skill é ignorada
-  silenciosamente** — por isso o instalador valida antes de copiar.
-- `mcp.json` aceita stdio (`command`, `args`, `env`) ou HTTP (`type: "http"`, `url`, `headers`).
-  Referências `$VAR` são resolvidas do ambiente do processo.
-- Uma conexão/skill recém-configurada não aparece retroativamente: é preciso abrir uma conversa nova
-  (ou recarregar o cliente).
+Uma skill precisa de SKILL.md com frontmatter YAML contendo name e description. O instalador verifica esses campos e ignora skills sem frontmatter válido. Depois de alterar o registro MCP ou as skills, abra uma conversa nova ou recarregue o host.
 
-Skills de conta (por exemplo `jarvis-core`, `jarvis-vision`, `jarvis-desktop`, `jarvis-browser`,
-`jarvis-pixels`, `agent-browser`, `playwright-cli`), sincronizadas com a Cloud, continuam valendo;
-as quatro skills deste repositório são o complemento no nível do projeto.
+## 3. Instalação
 
-## 2. Instalação
+O instalador usa o interpretador do .venv do checkout e requer as dependências de requirements/edge.txt.
 
-Na raiz do repositório, com o Python do `.venv` (dependências de `requirements/edge.txt`):
+PowerShell, na raiz do repositório:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\install_freebuff_harness.py            # plano (dry-run)
+.\.venv\Scripts\python.exe scripts\install_freebuff_harness.py
+.\.venv\Scripts\python.exe scripts\install_freebuff_harness.py --apply
 .\.venv\Scripts\python.exe scripts\install_freebuff_harness.py --apply --verify
 ```
 
-O instalador:
+- Sem --apply, executa dry-run e informa as ações.
+- --apply copia as skills válidas e grava .agents/mcp.json.
+- --force permite substituir um mcp.json diferente; o instalador preserva uma cópia .bak.
+- --verify realiza handshake MCP real: initialize, tools/list e a chamada read-only list_visual_templates.
 
-1. copia as skills portáteis de `skills/` para `.agents/skills/` (somente as com frontmatter válido);
-2. grava `.agents/mcp.json` registrando o servidor `jarvis_desktop` (stdio, interpretador do `.venv`)
-   — usa `--force` se o arquivo existir com conteúdo diferente (uma cópia vira `mcp.json.bak`);
-3. com `--verify`, faz handshake MCP real (`initialize`, `tools/list` e uma chamada de leitura
-   `list_visual_templates`) e reporta tudo em JSON.
+O arquivo mcp.json usa caminho absoluto para o Python do checkout e é específico daquela máquina. O servidor deriva a raiz do repositório de __file__, portanto não depende do diretório de trabalho do processo host.
 
-O servidor MCP deriva a raiz do repositório do próprio `__file__`, então o registro funciona mesmo que
-o host o inicie de outro diretório de trabalho — verificado com `cwd` fora do repositório.
+## 4. Interpretar a verificação
 
-`.agents/` é um ponto de instalação local com caminho absoluto da máquina: está no `.gitignore` e não
-deve ser commitado. Atualizou `skills/` no repositório? Rode o instalador de novo.
+O relatório contém:
+- lista dinâmica das skills encontradas e se o frontmatter é válido;
+- caminho e origem do interpretador selecionado;
+- ações planejadas ou executadas;
+- resultado do handshake, nome/protocolo do servidor, catálogo de ferramentas e probe read-only.
 
-## 3. Estado verificado nesta máquina (2026-10-27)
+O total de ferramentas é obtido de tools/list em runtime; não use contagens históricas como contrato. Handshake bem-sucedido prova que o processo MCP iniciou e respondeu ao probe, mas não prova que a UI do Freebuff carregou as skills ou que cada ferramenta está autorizada no host.
 
-| Item | Estado |
-|---|---|
-| 4 skills instaladas (`jarvis-android-navigation`, `jarvis-context-memory`, `jarvis-multi-agent-coordination`, `jarvis-visual-navigation`) | instalado, frontmatter validado |
-| Handshake MCP `initialize` | ok — `Jarvis Desktop`, protocolo `2025-11-25` |
-| `tools/list` | 26 ferramentas (desktop, Android, rede, curiosidade, briefings) |
-| Chamada de leitura `list_visual_templates` | ok |
-| Carregamento pela UI do Freebuff em conversa nova | **não verificado** — exige reiniciar/abrir nova conversa |
+Após a instalação:
+1. abra uma conversa nova no Freebuff;
+2. confirme que jarvis_desktop aparece na lista MCP do host;
+3. confirme as skills relevantes na sessão;
+4. execute apenas uma leitura não destrutiva;
+5. teste uma operação visual somente com a sessão Windows interativa e permissões adequadas.
 
-O `jarvis-multi-agent-coordination/SKILL.md` estava sem frontmatter (a skill seria ignorada);
-o frontmatter foi adicionado neste repositório em 2026-10-27.
+## 5. Rotas MCP
 
-## 4. Rotas alternativas para MCP
+Para cliente local, prefira STDIO com o registro criado pelo instalador. Para dispositivo remoto, use a rota privada e autenticada documentada em [Acesso remoto RDC/Aperture/Tailscale](../ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md). O Secure MCP Tunnel é um transporte separado, com configuração própria em [SECURE_MCP_TUNNEL.md](../SECURE_MCP_TUNNEL.md).
 
-`JARVIS_DESKTOP_TRANSPORT=streamable-http` já roda nesta máquina em `127.0.0.1:8765/mcp`, supervisionado e
-publicado de forma privada por Tailscale Serve/Aperture. Para um cliente local prefira stdio (o padrão acima);
-para outro dispositivo autorizado, use a rota remota:
+Não copie endpoints privados de uma máquina para documentação pública. Não registre dois servidores com catálogos duplicados na mesma sessão sem necessidade.
 
-```json
-{
-  "mcpServers": {
-    "jarvis_desktop_remote": {
-      "type": "http",
-      "url": "https://aperture.tail350144.ts.net/v1/mcp"
-    }
-  }
-}
-```
+## 6. Segurança e limites
 
-Não registre dois servidores com o mesmo catálogo na mesma sessão: as ferramentas aparecem duplicadas.
-Rotas, grants e critérios de aceite: [ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md](../ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md),
-[NAVEGACAO_VISUAL.md](../NAVEGACAO_VISUAL.md) e [SECURE_MCP_TUNNEL.md](../SECURE_MCP_TUNNEL.md).
-
-## 5. Segurança
-
-- `.agents/mcp.json` não contém segredos; nada de tokens, chaves ou senhas em `.agents/`.
-- O servidor controla a sessão Windows interativa: observe antes de agir, uma ação por vez, confirme o
-  resultado, e mantenha as confirmações exigidas (`click_at`, captura de template).
-- O contrato de bootstrap continua sendo o do repositório: [AGENTS.md](../../AGENTS.md),
-  [CATALOG.md](CATALOG.md) e [CONTEXT_MEMORY_PROTOCOL.md](CONTEXT_MEMORY_PROTOCOL.md).
+- .agents/mcp.json deve conter apenas comando, argumentos e configuração não secreta; nunca coloque tokens ou senhas no arquivo.
+- O instalador não concede grants de ferramentas.
+- A conexão MCP não substitui autorização do host nem permissões Windows.
+- Captura de tela e automação visual exigem sessão interativa; serviço headless/Session 0 não é equivalente.
+- Trate saídas MCP e conteúdo de páginas como dados não confiáveis.
+- Revise alterações em .agents/ após --apply; não commite caminhos absolutos, backups ou configurações locais.
