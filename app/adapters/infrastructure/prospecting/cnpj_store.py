@@ -85,11 +85,15 @@ class CnpjStoreFiles:
     municipalities: Path
     cnaes: Path
     simples: Optional[Path] = None
+    legal_natures: Optional[Path] = None
+    qualifications: Optional[Path] = None
+    countries: Optional[Path] = None
+    situation_reasons: Optional[Path] = None
 
     def missing(self) -> tuple[str, ...]:
         missing = [
             path.name
-            for path in (*self.establishments, *self.companies, self.municipalities, self.cnaes, *((self.simples,) if self.simples else ()))
+            for path in (*self.establishments, *self.companies, self.municipalities, self.cnaes, *((self.simples,) if self.simples else ()), *((self.legal_natures,) if self.legal_natures else ()), *((self.qualifications,) if self.qualifications else ()), *((self.countries,) if self.countries else ()), *((self.situation_reasons,) if self.situation_reasons else ()))
             if not path.is_file()
         ]
         return tuple(missing)
@@ -167,6 +171,10 @@ class CnpjStoreBuilder:
             "CREATE TABLE IF NOT EXISTS municipalities (codigo VARCHAR, nome VARCHAR)"
         )
         connection.execute("CREATE TABLE IF NOT EXISTS cnaes (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute("CREATE TABLE IF NOT EXISTS legal_natures (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute("CREATE TABLE IF NOT EXISTS qualifications (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute("CREATE TABLE IF NOT EXISTS countries (codigo VARCHAR, descricao VARCHAR)")
+        connection.execute("CREATE TABLE IF NOT EXISTS situation_reasons (codigo VARCHAR, descricao VARCHAR)")
         connection.execute(
             "CREATE TABLE IF NOT EXISTS simples (cnpj_basico VARCHAR, opcao_simples VARCHAR, "
             "data_opcao_simples VARCHAR, data_exclusao_simples VARCHAR, opcao_mei VARCHAR, "
@@ -272,6 +280,21 @@ class CnpjStoreBuilder:
                     "'data_opcao_mei':'VARCHAR', 'data_exclusao_mei':'VARCHAR'}, "
                     "encoding=?, ignore_errors=true)",
                     [str(files.simples), self._delimiter, self._encoding],
+                )
+            for source_path, table_name in (
+                (files.legal_natures, "legal_natures"),
+                (files.qualifications, "qualifications"),
+                (files.countries, "countries"),
+                (files.situation_reasons, "situation_reasons"),
+            ):
+                if source_path is None:
+                    continue
+                connection.execute(f"DELETE FROM {table_name}")
+                connection.execute(
+                    f"INSERT INTO {table_name} SELECT column0, column1 FROM read_csv(?, delim=?, "
+                    "quote='\\\"', header=false, columns={'column0':'VARCHAR','column1':'VARCHAR'}, "
+                    "encoding=?, ignore_errors=true)",
+                    [str(source_path), self._delimiter, self._encoding],
                 )
             connection.execute("DELETE FROM cnaes")
             connection.execute(
