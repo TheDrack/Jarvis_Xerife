@@ -1,8 +1,8 @@
 # Jarvis Prospecto — arquitetura inicial
 
-**Status:** domínio e qualificação determinística implementados; persistência, API e discovery pendentes  
-**Escopo:** prospecção comercial B2B para a operação própria e, futuramente, tenants clientes.  
-**Princípio:** extensão do Jarvis_Xerife; não criar uma segunda plataforma de agentes, fila ou identidade.
+**Status:** domínio, discovery por CNPJ, qualificação, campanhas, entregáveis e store DuckDB implementados. Esta branch acrescenta uma capability interna read-only via Nexus, Tool Registry e MCP Desktop/Android. API de carteira multi-tenant, cobrança e marketplace não pertencem ao núcleo de inteligência.  
+**Escopo:** mecanismo interno de descoberta e qualificação empresarial reutilizável pelo Jarvis, por seus agentes e por aplicações autorizadas. A operação própria é o primeiro operador; a entrega comercial manual é um uso do mecanismo, não um SaaS embutido no Jarvis.  
+**Princípio:** extensão do Jarvis_Xerife; não criar uma segunda plataforma de agentes, fila ou identidade. Vitrines, catálogos, relacionamento comprador-fornecedor, pedidos e recorrência pertencem a outro produto e outro repositório.
 
 ## 1. Objetivo do produto
 
@@ -20,7 +20,7 @@ Empresa encontrada, empresa qualificada e empresa com intenção demonstrada sã
 
 ## 2. Primeira carteira
 
-A operação própria será o primeiro tenant e o primeiro usuário do produto. MultMetal (São José/SC) e M&B Menegaz e Boger são prospects potenciais da operação Jarvis Prospecto, não tenants nem clientes confirmados.
+A operação própria será o primeiro operador e usuário do mecanismo. O `tenant_id` presente em arquivos de campanha é apenas um rótulo local de execução, não cadastro de cliente, membership ou isolamento SaaS. MultMetal (São José/SC) e M&B Menegaz e Boger são prospects potenciais da operação, não clientes confirmados.
 
 - **Operação própria:** usar o sistema para encontrar empresas que possam contratar os serviços de inteligência comercial e automação.
 - **MultMetal:** prospect de relacionamento profissional. Os segmentos compradores devem ser definidos a partir do catálogo, capacidade produtiva, território e histórico comercial confirmados.
@@ -31,30 +31,28 @@ Não criar contas de clientes, importar listas privadas ou conectar sistemas des
 ## 3. Arquitetura lógica
 
 ```text
-Android / Desktop / Web / API
-            |
-      FastAPI routers
-            |
-   Authenticated application services
-            |
-       Prospecting domain
-       |       |       |
-    Company  Evidence  Pipeline
-       |       |       |
-       +--- Qualification policy
-            |
-    Tenant-scoped repositories
-            |
- PostgreSQL / Supabase (future persistence)
-            |
- Discovery / Enrichment provider adapters
-            |
- Public registries / official websites / licensed providers
+Jarvis Agent / HUD Global / MCP Desktop / MCP Android
+                         |
+                Tool Registry + Dispatcher
+                         |
+                 ProspectingAdapter
+                         |
+              DiscoveryQuery / Provider
+                         |
+               CnpjStoreProvider
+                         |
+                 DuckDB (read-only)
+                         |
+        Receita Federal — Dados Abertos CNPJ
 
-Existing Jarvis Multi-agent Queue
-            |
- Optional asynchronous jobs after deterministic MVP
+Produto comercial independente
+          |
+   contrato privado versionado
+          |
+   capability de discovery do Jarvis
 ```
+
+O mecanismo de discovery não depende do HUD, de uma sessão de agente específica nem do computador da MultMetal. O HUD e os agentes são consumidores; o DuckDB precisa estar disponível no host configurado. A integração com o produto comercial será serviço-a-serviço, nunca importação direta de módulos Python.
 
 O domínio de prospecção não deve depender do Android nem do PC da MultMetal. O PC da empresa é infraestrutura de terceiro e não é requisito de execução, armazenamento ou disponibilidade do produto.
 
@@ -133,18 +131,25 @@ A base durável de discovery é o conjunto público do CNPJ da Receita Federal (
 
 ## 8. Integração com o Jarvis existente
 
-Reutilizar:
-- FastAPI e dependência de autenticação já existentes.
-- Nexus DI para composição de serviços.
-- Pydantic v2 e contratos imutáveis usados no domínio de inteligência.
-- PostgreSQL/Supabase depois de definir membership, RLS e migrations.
-- Fila multiagente existente para discovery/enrichment assíncronos quando houver critérios, idempotência, orçamento, limites de fonte e auditoria.
+A capability interna usa os componentes já existentes:
+
+- `ProspectingAdapter` resolve `CnpjStoreProvider` e o contrato `DiscoveryQuery`.
+- `data/nexus_registry.json` registra o adaptador no Nexus.
+- `config/tool_registry.json` declara `prospecting.companies.search` e `prospecting.companies.lookup`, com schemas, capability, permissão, escopo, rate limit e classificação.
+- `app/adapters/edge/prospecting_mcp_tools.py` expõe as duas operações nos MCPs Desktop e Android.
+- O `ToolDispatcher` continua responsável por validação, autorização, resolução do adaptador e auditoria quando a execução usa o caminho de dispatcher.
+
+O adaptador só abre o store em modo de leitura. O caminho é definido por `JARVIS_PROSPECTO_STORE_PATH`; sem arquivo presente, a capability falha fechada e informa que o store está indisponível. O banco não é versionado nem sincronizado automaticamente entre dispositivos.
+
+A busca devolve um registro por raiz de CNPJ (`cnpj_basico`, 8 dígitos). O CNPJ completo exibido identifica o estabelecimento representativo retornado; a operação `lookup` exata, por sua vez, consulta um estabelecimento pelo CNPJ completo. Não confundir essas duas granularidades.
 
 Não criar nova fila, scheduler, worker, sistema de identidade ou memória comercial paralelos.
 
-## 9. API planejada
+## 9. API da carteira comercial — fora do núcleo
 
-Depois de implementar membership e repositórios tenant-scoped:
+Os endpoints de carteira abaixo descrevem um CRM/serviço comercial multi-tenant. Eles não devem ser implementados no Jarvis_Xerife como parte da capability de discovery. Se forem necessários, pertencem ao novo produto comercial e ao seu próprio modelo de identidade e persistência.
+
+Depois de implementar membership e repositórios tenant-scoped no produto comercial:
 
 - `GET /v1/prospects` — lista paginada e filtrada.
 - `POST /v1/prospects` — cria prospect com evidência.
@@ -164,24 +169,23 @@ Listagens serão paginadas; erros seguirão envelope consistente; criação e ex
 - Testes unitários de validação, isolamento conceitual e transições.
 - `employee_count` opcional em `ProspectCompany` para o critério de porte, sempre sustentado por evidência.
 
-### Fase 2 — persistência segura
-- Resolver modelo de tenants e memberships.
-- Migration de tabelas e índices, RLS e constraints anti-cross-tenant.
-- Repositório com tenant_id sempre explícito e testes de isolamento entre dois tenants.
-- Sem aplicar migrations em produção durante a implementação da PR.
+### Fase 2 — carteira comercial (fora do Jarvis_Xerife)
+- Tenants, memberships, carteira comercial e histórico de relacionamento pertencem ao repositório do novo produto.
+- O núcleo Jarvis não recebe tabelas de marketplace, pedidos, recorrência, pagamentos ou assinatura.
+- O `tenant_id` de campanha permanece um rótulo local até que exista um consumidor comercial com contrato próprio.
 
-### Fase 3 — API e interface
-- Endpoints autenticados, paginação, filtros e respostas tipadas.
-- Interface inicial de carteira e pipeline.
-- Testes de autorização, IDOR/BOLA e contratos.
+### Fase 3 — integração interna e HUD
+- Consumir a capability pelo MCP/Tool Registry e apresentar resultados no HUD Global sem duplicar o motor de busca.
+- Se o HUD precisar de endpoint HTTP, usar autenticação local existente e manter a rota read-only; não transformar essa rota em API pública de clientes.
+- Testar autorização, paginação, estados de store ausente e proveniência.
 
 ### Fase 4 — discovery e qualification
-- Adaptadores de fontes permitidas, rate limit, termos e proveniência. **(parcial: adaptador de dados abertos do CNPJ implementado em `app/adapters/infrastructure/prospecting/cnpj_open_data.py`; fontes e termos em [JARVIS_PROSPECTO_SOURCES.md](JARVIS_PROSPECTO_SOURCES.md))**
+- Adaptadores de fontes permitidas, rate limit, termos e proveniência. **(implementado para a base oficial de CNPJ: adaptadores CSV e DuckDB, com proveniência CC-BY; fontes e termos em [JARVIS_PROSPECTO_SOURCES.md](JARVIS_PROSPECTO_SOURCES.md))**
 - ICPs configuráveis por oferta/tenant. **(implementado: `IcpProfile` + `IcpWeights`)**
 - Scores separados e explicáveis de fit, intent e confidence. **(implementado, sem calibração de pesos)**
 - Sem scraping indiscriminado ou disparo automático. **(respeitado: nenhuma coleta ou envio existe no domínio)**
 
-### Fase 4b — entregável
+### Fase 4b — entregável e operação manual (implementada)
 - `build_deliverable_csv` gera o banco de prospects entregue ao cliente, com score, tier, critérios, fontes e flag de verificação.
 - `app/application/prospecting/campaign.py` + `scripts/prospecto_run.py` executam uma campanha (ICP + consulta) de forma repetível, com manifesto por execução (passo a passo em [JARVIS_PROSPECTO_RUNBOOK.md](JARVIS_PROSPECTO_RUNBOOK.md)).
 - `app/adapters/infrastructure/prospecting/cnpj_store.py` + `scripts/prospecto_ingest.py` materializam a base por UF num store DuckDB retomável, tirando a varredura de ~30 GB do caminho de cada campanha ([metodologia e medições](JARVIS_PROSPECTO_DATA_PIPELINE.md)).
@@ -203,3 +207,10 @@ Listagens serão paginadas; erros seguirão envelope consistente; criação e ex
 - Nenhum contato é enviado sem autorização e política de canal.
 - Jobs são idempotentes, limitados e auditáveis.
 - Testes unitários, integração, segurança e suíte completa passam sem desabilitar testes ou reduzir cobertura.
+
+### Fase 4c — capability interna (esta implementação)
+- Expor pesquisa por UF, município e prefixos CNAE via `ProspectingAdapter`.
+- Expor consulta exata de CNPJ completo por estabelecimento.
+- Registrar os manifests no Tool Registry e o adaptador no Nexus.
+- Disponibilizar os tools nos MCPs Desktop e Android, com paginação e limite de 100 resultados por chamada.
+- Não executar outreach, não ler telefone/e-mail e não cobrar automaticamente.
