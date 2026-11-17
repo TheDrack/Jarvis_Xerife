@@ -96,6 +96,7 @@ function wire(){
  windowNode.addEventListener('click',event=>{if(event.target===windowNode)windowNode.classList.remove('show');});
  $('prospectingForm').addEventListener('submit',event=>{event.preventDefault();search(false);});
  $('prospectingNext').addEventListener('click',()=>search(true));
+ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&windowNode.classList.contains('show'))windowNode.classList.remove('show');});
  $('prospectingResults').addEventListener('click',async event=>{
   const button=event.target.closest('[data-copy-cnpj]');
   if(!button)return;
