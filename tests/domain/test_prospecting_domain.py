@@ -104,3 +104,35 @@ def test_do_not_contact_is_available_from_any_open_stage_and_is_terminal():
             actor_id="user-123",
             reason="Must not reactivate a suppressed prospect.",
         )
+
+def test_cnpj_is_normalized_to_digits():
+    evidence = ProspectEvidence(
+        source_id="registry",
+        source_name="Public registry",
+        source_type="public_registry",
+        url="https://registry.example/company",
+        license_or_terms="Public registry terms.",
+    )
+    company = ProspectCompany(
+        company_name="Example Ltda",
+        cnpj="12.345.678/0001-90",
+        evidence=(evidence,),
+    )
+
+    assert company.cnpj == "12345678000190"
+
+
+def test_invalid_cnpj_length_is_rejected():
+    evidence = ProspectEvidence(
+        source_id="registry",
+        source_name="Public registry",
+        source_type="public_registry",
+        url="https://registry.example/company",
+        license_or_terms="Public registry terms.",
+    )
+    with pytest.raises(ValidationError):
+        ProspectCompany(
+            company_name="Example Ltda",
+            cnpj="123",
+            evidence=(evidence,),
+        )
