@@ -95,6 +95,9 @@ class ProspectCompany(BaseModel):
     neighborhood: Optional[str] = Field(default=None, max_length=120)
     postal_code: Optional[str] = Field(default=None, max_length=8)
     primary_cnae: Optional[str] = Field(default=None, max_length=7)
+    has_phone: Optional[bool] = None
+    has_email: Optional[bool] = None
+    has_fax: Optional[bool] = None
     city: Optional[str] = Field(default=None, max_length=120)
     state: Optional[str] = Field(default=None, min_length=2, max_length=2)
     country: str = Field(default="BR", min_length=2, max_length=2)
