@@ -1,3 +1,7 @@
+from types import SimpleNamespace
+
+import pytest
+
 from app.adapters.edge import prospecting_mcp_tools
 
 
@@ -12,56 +16,97 @@ class FakeMCP:
         return register
 
 
-class FakeAdapter:
-    def __init__(self, *, available=True):
-        self.available = available
+class FakeDispatcher:
+    def __init__(self, *, success=True, output=None, error_code=None):
+        self.requests = []
+        self.success = success
+        self.output = output or {"success": True, "companies": []}
+        self.error_code = error_code
 
-    def can_execute(self, context=None):
-        return self.available
+    async def dispatch_async(self, request):
+        self.requests.append(request)
+        return SimpleNamespace(
+            success=self.success,
+            output=self.output,
+            error_code=self.error_code,
+            retryable=False,
+            retry_after_seconds=None,
+        )
 
-    def search_companies(self, **kwargs):
-        return {"success": True, "received": kwargs}
 
-    def lookup_company(self, cnpj):
-        return {"success": True, "found": cnpj == "12345678000190"}
-
-
-def test_registers_search_and_exact_cnpj_lookup_tools(monkeypatch):
+@pytest.mark.asyncio
+async def test_registers_search_and_exact_cnpj_lookup_through_tool_dispatcher():
     mcp = FakeMCP()
-    adapter = FakeAdapter()
-    monkeypatch.setattr(prospecting_mcp_tools.nexus, "resolve", lambda component_id: adapter)
+    dispatcher = FakeDispatcher(output={"success": True, "companies": [{"cnpj": "12345678000190"}]})
 
-    names = prospecting_mcp_tools.register_prospecting_tools(mcp)
-    search = mcp.tools["prospecting.companies.search"]
-    lookup = mcp.tools["prospecting.companies.lookup"]
-
-    result = search(
+    names = prospecting_mcp_tools.register_prospecting_tools(mcp, dispatcher=dispatcher)
+    search = await mcp.tools["prospecting.companies.search"](
         uf="SC",
         cnae_prefixes=["4120"],
         municipalities=["São José"],
         limit=25,
     )
-    found = lookup(cnpj="12345678000190")
+    lookup = await mcp.tools["prospecting.companies.lookup"](
+        cnpj="12345678000190"
+    )
 
     assert names == ("prospecting.companies.search", "prospecting.companies.lookup")
-    assert result["success"] is True
-    assert result["received"]["uf"] == "SC"
-    assert result["received"]["limit"] == 25
-    assert found == {"success": True, "found": True}
+    assert search["companies"][0]["cnpj"] == "12345678000190"
+    assert lookup["success"] is True
+    assert dispatcher.requests[0]["tool_id"] == "prospecting.companies.search"
+    assert dispatcher.requests[0]["capability"] == "prospecting.companies.search"
+    assert dispatcher.requests[0]["arguments"]["limit"] == 25
+    assert dispatcher.requests[0]["scope"] == "local"
+    assert dispatcher.requests[1]["tool_id"] == "prospecting.companies.lookup"
 
 
-def test_mcp_search_reports_missing_store_without_exposing_host_paths(monkeypatch):
+@pytest.mark.asyncio
+async def test_mcp_search_returns_safe_authorization_failure():
     mcp = FakeMCP()
-    adapter = FakeAdapter(available=False)
-    monkeypatch.setattr(prospecting_mcp_tools.nexus, "resolve", lambda component_id: adapter)
+    dispatcher = FakeDispatcher(success=False, error_code="authorization_denied")
 
-    prospecting_mcp_tools.register_prospecting_tools(mcp)
-    result = mcp.tools["prospecting.companies.search"](
+    prospecting_mcp_tools.register_prospecting_tools(mcp, dispatcher=dispatcher)
+    result = await mcp.tools["prospecting.companies.search"](
         uf="SC",
         cnae_prefixes=["41"],
     )
 
     assert result["success"] is False
-    assert result["error_code"] == "prospecting_store_unavailable"
-    assert "CNPJ DuckDB store" in result["message"]
-    assert "C:\\" not in result["message"]
+    assert result["error_code"] == "authorization_denied"
+    assert "termux_jarvis" in result["message"]
+
+
+def test_dispatcher_uses_the_session_gateway_capability(monkeypatch):
+    calls = []
+
+    class Gateway:
+        def require(self, capability):
+            calls.append(capability)
+            return {"session_id": "session-1", "capability": capability}
+
+    class FakeRegistry:
+        @classmethod
+        def from_file(cls):
+            return object()
+
+    class FakePolicy:
+        def __init__(self, *, principal_resolver):
+            self.principal_resolver = principal_resolver
+
+    class FakeDispatcher:
+        def __init__(self, registry, *, authorizer, event_sink):
+            self.registry = registry
+            self.authorizer = authorizer
+            self.event_sink = event_sink
+
+    monkeypatch.setattr(prospecting_mcp_tools, "ToolRegistry", FakeRegistry)
+    monkeypatch.setattr(prospecting_mcp_tools, "HostToolAuthorizationPolicy", FakePolicy)
+    monkeypatch.setattr(prospecting_mcp_tools, "ToolDispatcher", FakeDispatcher)
+    monkeypatch.setattr(prospecting_mcp_tools, "JsonlToolAuditSink", lambda: "audit")
+
+    dispatcher = prospecting_mcp_tools._build_dispatcher(session_gateway=Gateway())
+    principal = dispatcher.authorizer.principal_resolver()
+
+    assert calls == ["prospecting.cnpj.read"]
+    assert principal.principal_id == "local-owner"
+    assert principal.capabilities == frozenset({"prospecting.cnpj.read"})
