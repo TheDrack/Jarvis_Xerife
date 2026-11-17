@@ -35,7 +35,10 @@ from app.adapters.edge.android_network_mcp_tools import register_android_network
 from app.adapters.edge.chatgpt_plan_mcp_tools import register_chatgpt_plan_tools
 from app.adapters.edge.communication_mcp_tools import register_communication_tools
 from app.adapters.edge.protocol_pattern_mcp_tools import register_protocol_pattern_tools
-from app.adapters.edge.prospecting_mcp_tools import (\n    register_prospecting_tools,\n    register_prospecting_outreach_tools,\n)
+from app.adapters.edge.prospecting_mcp_tools import (
+    register_prospecting_tools,
+    register_prospecting_outreach_tools,
+)
 from app.adapters.infrastructure.termux_shell_mcp_tools import (
     register_termux_shell_tools,
 )
@@ -103,7 +106,8 @@ def android_accessibility_action(
 # Session pairing controls are always available; arbitrary shell is locally opt-in.
 register_termux_shell_tools(mcp)
 register_android_network_tools(mcp)
-register_prospecting_tools(mcp)\nregister_prospecting_outreach_tools(mcp)
+register_prospecting_tools(mcp)
+register_prospecting_outreach_tools(mcp)
 register_protocol_pattern_tools(mcp, include_live_android=True)
 communication_registry = create_default_communication_registry()
 register_communication_tools(mcp, communication_registry)
