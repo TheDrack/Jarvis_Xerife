@@ -21,7 +21,7 @@ Fonte canônica: skills/
 | Skill | Domínio |
 |---|---|
 | jarvis-android-navigation | Navegação e operações Android sob permissões concedidas. |
-| jarvis-context-memory | Contexto compartilhado e memória. |
+| jarvis-context-memory | Contexto compartilhado e memória; protocolo portátil [SKILL.md](../../skills/jarvis-context-memory/SKILL.md) e [Context & Memory Protocol](CONTEXT_MEMORY_PROTOCOL.md). |
 | jarvis-host-ops | Diagnóstico e operações do host. |
 | jarvis-mobile-notifications | Notificações móveis. |
 | jarvis-multi-agent-coordination | Coordenação e fila multiagente. |
@@ -30,6 +30,19 @@ Fonte canônica: skills/
 | jarvis-viv | Verificação inicial de voo e prontidão operacional. |
 
 A pasta .agents/skills/ contém uma seleção instalada para descoberta por alguns hosts. Instalar uma skill não instala um conector e não concede permissões.
+
+## Contrato de bootstrap e memória
+
+Quando Jarvis MCP estiver conectado, call `jarvis_agent_bootstrap` antes das demais operações Jarvis. Compare o inventário retornado com o live tool registry do host; nunca trate o baseline do repositório como prova de disponibilidade ou autorização. O servidor Jarvis não enxerga automaticamente ferramentas privadas do host chamador.
+
+Consulte [skills/jarvis-context-memory/SKILL.md](../../skills/jarvis-context-memory/SKILL.md) e [CONTEXT_MEMORY_PROTOCOL.md](CONTEXT_MEMORY_PROTOCOL.md) para bootstrap, consolidação, deduplicação, conflitos e persistência. Após failure or a domain/provider change, atualize a descoberta e recarregue a skill pertinente antes de repetir a operação. Não repita uma chamada que falhou sem diagnosticar a causa.
+
+## Navegação visual e VIV
+
+| Capability | Uso e limite | Referência |
+|---|---|---|
+| Visual navigation | Observação e operação do desktop por MCP/JSONL bridge, UI Automation, templates e receitas verificadas. Requer sessão Windows interativa e permissões efetivas. | [Skill](../../skills/jarvis-visual-navigation/SKILL.md) e [runbook](../NAVEGACAO_VISUAL.md) |
+| VIV — Verificação Inicial de Voo | Auditoria de prontidão: reler skills, descobrir conectores reais, inspecionar schemas/permissões, pesquisar falhas, aplicar correções autorizadas, testar e relatar evidências. | [Skill](../../skills/jarvis-viv/SKILL.md) e [procedimento completo](../POS_INSTALACAO.md) |
 
 ## Universal Tool Registry
 
