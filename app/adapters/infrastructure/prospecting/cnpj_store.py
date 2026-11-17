@@ -270,8 +270,8 @@ class CnpjStoreBuilder:
                 "encoding=?, ignore_errors=true)",
                 [str(files.municipalities), self._delimiter, self._encoding],
             )
+            connection.execute("DELETE FROM simples")
             if files.simples is not None:
-                connection.execute("DELETE FROM simples")
                 connection.execute(
                     "INSERT INTO simples SELECT * FROM read_csv(?, delim=?, quote='\"', "
                     "escape='\"', header=false, columns={'cnpj_basico':'VARCHAR', "
@@ -287,9 +287,9 @@ class CnpjStoreBuilder:
                 (files.countries, "countries"),
                 (files.situation_reasons, "situation_reasons"),
             ):
+                connection.execute(f"DELETE FROM {table_name}")
                 if source_path is None:
                     continue
-                connection.execute(f"DELETE FROM {table_name}")
                 connection.execute(
                     f"INSERT INTO {table_name} SELECT column0, column1 FROM read_csv(?, delim=?, "
                     "quote='\"', header=false, columns={'column0':'VARCHAR','column1':'VARCHAR'}, "
