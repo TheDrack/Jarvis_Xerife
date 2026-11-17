@@ -23,12 +23,12 @@ Não converter estatísticas agregadas em atributos de uma empresa individual. T
 | PNCP | Oportunidades B2G | Editais, itens, compradores, prazos e contratos | Planejado: API oficial |
 | Carreiras oficiais | Oportunidades C2B | Vagas, cargo, localidade, remoto, prazo e URL | Planejado |
 | Rede de Inovação Florianópolis | Ecossistema | Incubadoras, centros, programas e startups | Pesquisa |
-| INPI | Sinais de inovação | Marcas, patentes e classes tecnológicas | Planejado |
+| INPI | Sinais de inovação | Marcas, patentes e classes tecnológicas | Planejado |\n| Comex Stat / MDIC | Comércio exterior | NCM, município, país, UF, valor FOB, peso e fluxo | Pesquisa agregada |\n| FAPESC / FINEP | Fomento | Editais, elegibilidade, prazos e linhas de apoio | Pesquisa / planejado |\n| CEIS / CNEP | Compliance | Sanções e impedimentos de fornecedores | Planejado |
 
 ## ACATE: dois produtos de dados diferentes
 
 - O diretório de associados apresenta mais de 1.500 empresas e filtros por polo e vertical. Ele é uma fonte de entidades candidatas, mas a página pública não foi identificada como API aberta com licença irrestrita de reutilização. O adaptador AcateDirectoryAdapter importa CSV fornecido pelo operador e exige reuse_permission_confirmed=True; não faz scraping.
-- O Observatório ACATE é uma fonte de indicadores agregados. O site reporta, entre outros indicadores, 34,2 mil empresas de tecnologia e 102,2 mil colaboradores em SC em 2025, e para Florianópolis cerca de 7,4 mil empresas, 44,8 mil empregos e R$ 14 bilhões em faturamento de tecnologia em 2025. São indicadores de mercado, não uma lista de empresas. Os números devem ser persistidos com a data/período e metodologia exatos da publicação.
+- O Observatório ACATE é uma fonte de indicadores agregados. Na publicação consultada, SC aparece com 34,2 mil empresas de tecnologia e cerca de 102 mil colaboradores em 2025. Florianópolis aparece com 7,4 mil empresas, 44,8 mil empregos, R$ 14 bilhões de faturamento, crescimento de 9,4% e R$ 178 milhões de ISS do setor em 2025; o painel também reporta mais de R$ 787 milhões em investimentos captados por startups e empresas locais. A participação do setor no PIB municipal é 21%, com referência a 2023. São indicadores de mercado, não uma lista de empresas; cada métrica precisa preservar o seu período específico e a metodologia publicada.
 
 Fontes:
 - https://www.acate.com.br/associados/
@@ -42,6 +42,18 @@ Fontes:
 - https://redeinovacao.floripa.br/
 - https://www.gov.br/inpi/pt-br
 
+## GAPs e hipóteses que os indicadores permitem investigar
+
+- **Concentração de receita e porte:** o Observatório publica distribuição por faixas de faturamento; cruzar essas faixas agregadas com o porte cadastral do CNPJ para localizar segmentos de micro e pequenas empresas. Não atribuir faturamento estimado a uma empresa individual.
+- **Desalinhamento entre emprego e receita:** comparar empresas/empregos/faturamento por vertical para encontrar segmentos com alta intensidade de mão de obra e menor faturamento por trabalhador.
+- **Concentração geográfica:** comparar Florianópolis, São José, Blumenau, Joinville e demais polos para identificar oferta e crescimento fora da capital.
+- **Especialização por vertical:** cruzar CNAEs com as verticais ACATE (AgTech, Construtech, Edtech, Energia, Fintech, Manufatura 4.0, Peopletech, Saúde, Security Tech, Smart Cities e Varejo). CNAE é proxy cadastral; a vertical exige evidência adicional.
+- **Capital e inovação:** usar investimento, chamadas FAPESC/FINEP, marcas e patentes como sinais de atividade e oportunidade, sem inferir necessidade de contratação.
+- **Mercado público:** cruzar especialidades de fornecedores com editais e itens PNCP, identificando oportunidades B2G por categoria e prazo.
+- **Exportação/importação:** Comex Stat permite observar fluxos por NCM, município e país; serve para dimensionar cadeias e dependência externa, não para identificar o CNPJ do operador sem fonte específica.
+
+Essas análises são hipóteses a validar, não recomendações automáticas de compra nem prova de demanda.
+
 ## O que passa a integrar o roadmap
 
 1. **B2G**: PNCP e Compras.gov — oportunidades de venda para órgãos públicos, com itens, prazos, requisitos e contratos.
@@ -53,15 +65,16 @@ Fontes:
 7. **Enriquecimento empresarial**: sites oficiais, portfólios e catálogos de produtos/serviços, com evidência individual e revisão de termos.
 8. **Dados de relacionamento**: feiras, eventos, associações e comunidades, sem presumir que presença pública equivale a consentimento para contato.
 
-## GAPs de ingestão CNPJ a resolver
+## Cobertura CNPJ implementada e lacunas remanescentes
 
-A tabela establishments reconhece o layout de estabelecimento, mas a carga atual materializa somente parte dos dados auxiliares:
-- companies: atualmente guarda razão social e porte; precisa preservar natureza jurídica, qualificação, capital e ente federativo.
-- partners: arquivo de sócios ainda não integrado.
-- simples: arquivo de opção Simples/MEI ainda não integrado.
-- Tabelas de domínio: CNAE e município existem; Naturezas, Qualificações, Países e Motivos precisam ser adicionadas.
-- O catálogo de filtros deve refletir apenas colunas efetivamente ingeridas. Campos pessoais de sócios e contatos cadastrais precisam de política de acesso e finalidade antes de qualquer exposição.
-- Preservar CNPJ como string; preparar migração para o identificador alfanumérico sem remover letras.
+O materializador agora preserva os sete campos do arquivo Empresas e ingere, quando fornecidos, os arquivos Simples/MEI, Naturezas, Qualificações, Países e Motivos. A busca DuckDB expõe filtros por situação, matriz/filial, bairro, CEP, abertura, porte, natureza, capital, país, motivo, situação especial, presença de telefone/e-mail/fax e opção Simples/MEI.
+
+Lacunas remanescentes:
+- O arquivo de Sócios não é ingerido nesta etapa porque contém dados pessoais; qualquer uso futuro precisa de finalidade, minimização, controle de acesso e retenção próprios.
+- Campos de contato são mantidos apenas no store local para filtros de presença; os valores não são devolvidos pelo domínio/MCP.
+- Filtros avançados exigem DuckDB. O adaptador de leitura direta dos CSVs falha explicitamente se receber filtros que não consegue aplicar.
+- O CNPJ alfanumérico exige uma migração coordenada do parser, chave, store, lookup, schemas MCP e fixtures. A normalização atual ainda é numérica e não deve ser considerada compatível com esse novo formato.
+- PNCP, Comex Stat, FAPESC/FINEP, FIESC, JUCESC, IBGE, INPI, CEIS/CNEP e páginas de carreira estão catalogados, mas ainda precisam de providers de rede/API, testes de contrato e atualização incremental.
 
 ## Regras de governança
 
