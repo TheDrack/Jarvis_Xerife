@@ -1,7 +1,9 @@
 # Estado do projeto — leitura do código versionado
 
-**Data da revisão documental:** 2026-11-16  
-**Base de código auditada:** main @ 444b0b322f132802368cbbe0c9568d4409438e61  
+**Revisão documental integral anterior:** 2026-11-16  
+**Base da revisão integral:** main @ 444b0b322f132802368cbbe0c9568d4409438e61  
+**Delta incremental verificado:** 2026-11-17 — main @ ec2755a1a3e673971d4c1ba0ebdba5b7324ecc97  
+**Escopo do delta:** PRs #859/#860, inventário Prospecto e handoff de memória; não substitui reauditoria integral dos demais subsistemas.  
 **Escopo:** árvore de código e documentação versionada. Não foi realizada nesta página uma inspeção autenticada do deploy, banco, dispositivos ou serviços externos.
 
 ## Como interpretar este documento
@@ -24,8 +26,9 @@ A presença de arquivo, migration, manifest, skill ou variável de ambiente não
 |---|---|---|
 | Nexus DI e composição | Presente no código; usado pelos entrypoints e wrappers de compatibilidade. | Não confundir wrapper app/container.py com um segundo container independente. |
 | Domínio e aplicação | Presentes: tools, capabilities, intelligence, memory, context, graph, missions, orchestration, services, ports e security. | A separação é incremental; existem módulos históricos e compatibilidade. |
-| Universal Tool Registry | Contratos tipados/versionados e registry em app/domain/tools; catálogo em config/tool_registry.json. | Registry é metadado. Não autentica, autoriza, verifica saúde ou executa. |
+| Universal Tool Registry | Contratos tipados/versionados e registry em app/domain/tools; catálogo em config/tool_registry.json com 12 manifests no main atual. | Registry é metadado. Não autentica, autoriza, verifica saúde ou executa. |
 | Tool Dispatcher | Implementação em app/runtime/toolbox com validação, resolução, autorização e eventos. | Sem política/principal autorizados, execução deve falhar fechada. Controles locais em memória não são garantias distribuídas. |
+| Prospecto | Busca CNPJ read-only e workflow outbound auditável via Android MCP; planos, aprovação, dispatch, DNC e histórico. | Sem descoberta automática de contatos; sem relay/provider real configurado ou envio externo comprovado. Não equivale a operação comercial autônoma. |
 | Pipelines | Pipeline runner e definições YAML presentes. | Compatibilidade legada permanece; não declarar migração integral para tool_id/dispatcher. |
 | Multiagente | Contratos, scheduler, queue, workers, transport e execution plans presentes em app/multiagent. | Opt-in e dependente de backend, credenciais, grants e configuração. Código não prova worker ativo. |
 | Identidade de worker | Existe caminho autenticado com token opaco individual e grants do lado do servidor, além de um caminho legado Supabase direto. | O caminho legado service-role não oferece a mesma fronteira de identidade. Verificar migration e runtime no ambiente alvo. |
@@ -36,6 +39,13 @@ A presença de arquivo, migration, manifest, skill ou variável de ambiente não
 | Auto-evolução e reparo | Serviços, gatekeeper, sandbox, scripts e workflows estão presentes. | Não declarar autonomia irrestrita nem merge automático. Validar isolamento, aprovação, testes e publisher por fluxo. |
 | Deploy e persistência | Manifestos, migrations e adapters estão presentes. | Só inspeção no ambiente confirma deploy, schema aplicado, RLS/grants, feature flags e saúde. |
 
+## Delta verificado: Jarvis Prospecto (2026-11-17)
+
+- **PR [#859](https://github.com/TheDrack/Jarvis_Xerife/pull/859)** foi integrada em `main`. A busca/lookup CNPJ read-only está registrada em `config/tool_registry.json` como `prospecting.companies.search` e `prospecting.companies.lookup`, com implementação em `app/adapters/infrastructure/prospecting/`, consumer Android MCP e UI de Prospecto. Os três workflows do head `9c3dfc9` retornaram sucesso: [44104544766](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44104544766), [44104544800](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44104544800) e [44104544626](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44104544626).
+- **PR [#860](https://github.com/TheDrack/Jarvis_Xerife/pull/860)** foi integrada em 2026-11-17 15:00:45 UTC. O head `27c4dca` passou em [JARVIS PR Validation](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44108337559) e [Jarvis Task Queue Tests](https://github.com/TheDrack/Jarvis_Xerife/actions/runs/44108337555). O código registra cinco ferramentas MCP de outbound: plan, approve, dispatch, block e history; quatro canais são modelados por relays HTTPS configuráveis.
+- **Limites operacionais:** planejar não envia; dispatch exige aprovação; DNC e unicidade por empresa/canal/destino/campanha são aplicados localmente. Não há descoberta automática de e-mails, telefones ou formulários institucionais. A PR declara que não foram fornecidas credenciais de providers e que nenhum envio externo ao vivo foi realizado. Relay/provider e sessão Android com a nova capability não foram validados neste delta.
+- **Revisão independente:** a API do GitHub não retornou reviews para a PR #860. Os comentários de Strix e Codex registram indisponibilidade de revisão por limite de trial/uso. CI verde não substitui revisão independente. A issue [#682](https://github.com/TheDrack/Jarvis_Xerife/issues/682) de proteção da branch continua aberta; a configuração atual de proteção não foi revalidada por este conector.
+- **Roadmap cognitivo:** os três critérios C0 continuam pendentes no ledger abaixo. As PRs de Prospecto não constituem evidência de conclusão C0 nem liberam C1.
 ## Entrypoints
 
 - main.py — bootstrap principal cloud/edge.
