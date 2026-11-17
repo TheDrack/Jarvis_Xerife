@@ -301,3 +301,29 @@ def test_discovery_query_rejects_invalid_date_and_capital_ranges():
         query(opened_from="2025-01-01")
     with pytest.raises(ValueError, match="capital_min"):
         query(capital_min=200, capital_max=100)
+
+
+def test_simples_and_mei_filters_use_the_auxiliary_dataset(tmp_path):
+    base = sample_files(tmp_path)
+    files = CnpjStoreFiles(
+        establishments=base.establishments,
+        companies=base.companies,
+        municipalities=base.municipalities,
+        cnaes=base.cnaes,
+        simples=write_csv(
+            tmp_path / "Simples.csv",
+            [
+                ["12345678", "S", "20200101", "", "S", "20200101", ""],
+                ["87654321", "S", "20200101", "", "N", "", ""],
+            ],
+        ),
+    )
+    database = tmp_path / "with-simples.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+    provider = CnpjStoreProvider(database)
+
+    simples = provider.discover(query(simples_only=True))
+    mei = provider.discover(query(mei_only=True))
+
+    assert [item.cnpj for item in simples.companies] == ["12345678000190", "87654321000190"]
+    assert [item.cnpj for item in mei.companies] == ["12345678000190"]
