@@ -61,3 +61,52 @@ Para Supabase, verifique migrations remotas, schema, RLS, grants e uma operaçã
 ## Atualização
 
 Esta página substitui snapshots antigos como descrição geral de estado. Resultados históricos continuam úteis como histórico, mas devem permanecer datados e não ser copiados para uma afirmação de estado atual sem revalidação.
+
+
+## Ledger verificável dos critérios cognitivos
+
+Este bloco é consumido por `RoadmapMissionSelector`. Um critério só pode ser tratado como concluído quando estiver como `verified` e trouxer referência imutável de commit, execução de Actions, implementação, consumidor e testes. A presença das referências é validada pelo selector; a autenticidade e a suficiência técnica continuam sujeitas à revisão humana.
+
+<!-- JARVIS_COGNITIVE_EVIDENCE_START -->
+```json
+{
+  "schema_version": 1,
+  "roadmap_path": "docs/COGNITIVE_ROADMAP.md",
+  "criteria": [
+    {
+      "criterion_id": "C0-CAPABILITY-MAP",
+      "state": "pending",
+      "evidence": {
+        "commit_url": null,
+        "check_urls": [],
+        "implementation_paths": [],
+        "consumer_paths": [],
+        "test_paths": []
+      }
+    },
+    {
+      "criterion_id": "C0-GAPS-RECORDED",
+      "state": "pending",
+      "evidence": {
+        "commit_url": null,
+        "check_urls": [],
+        "implementation_paths": [],
+        "consumer_paths": [],
+        "test_paths": []
+      }
+    },
+    {
+      "criterion_id": "C0-NO-NAME-BASED-COMPLETION",
+      "state": "pending",
+      "evidence": {
+        "commit_url": null,
+        "check_urls": [],
+        "implementation_paths": [],
+        "consumer_paths": [],
+        "test_paths": []
+      }
+    }
+  ]
+}
+```
+<!-- JARVIS_COGNITIVE_EVIDENCE_END -->
