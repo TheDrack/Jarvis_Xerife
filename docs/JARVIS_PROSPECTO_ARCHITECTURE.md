@@ -64,7 +64,7 @@ O domínio de prospecção não deve depender do Android nem do PC da MultMetal.
 
 - `ProspectCompany`: identidade empresarial, CNPJ, website, setor/segmento e localização.
 - `ProspectRecord`: vínculo entre a empresa e a carteira comercial de um tenant.
-- `ProspectEvidence`: fonte, URL, tipo de fonte, termos aplicáveis e timestamps de coleta/verificação.
+- `ProspectEvidence`: fonte, URL, tipo de fonte, termos aplicáveis, timestamps e lista explícita dos atributos empresariais sustentados por aquela evidência.
 - `ProspectStageChange`: evento auditável de mudança de etapa.
 
 A primeira versão não armazena contatos pessoais. A inclusão futura de nome, telefone, e-mail pessoal ou perfil profissional exigirá finalidade específica, base legal documentada, minimização, retenção, controle de acesso e mecanismo de oposição/opt-out.
