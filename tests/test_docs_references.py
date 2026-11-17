@@ -14,6 +14,7 @@ link quebrado de verdade: corrija a documentação.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -237,3 +238,23 @@ def test_allowlist_has_no_stale_entries():
             "Nenhum doc monitorado usa mais (remova a exceção): " + ", ".join(sorted(unused))
         )
     assert not problems, "\n".join(problems)
+
+
+def test_capability_inventory_matches_tool_registry_manifests():
+    """O inventário deve listar todos os manifests ativos, sem contagem obsoleta."""
+    registry_path = REPO_ROOT / "config" / "tool_registry.json"
+    inventory_path = REPO_ROOT / "docs" / "skills-connectors" / "CAPABILITY_INVENTORY.md"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    manifests = registry.get("tools")
+    assert isinstance(manifests, list) and manifests, "Tool Registry sem manifests"
+
+    tool_ids = [item.get("tool_id") for item in manifests if isinstance(item, dict)]
+    assert len(tool_ids) == len(manifests), "Manifest sem tool_id"
+    assert len(tool_ids) == len(set(tool_ids)), "tool_id duplicado no Tool Registry"
+
+    inventory = inventory_path.read_text(encoding="utf-8")
+    missing = sorted(tool_id for tool_id in tool_ids if tool_id not in inventory)
+    assert not missing, f"Manifests ausentes do inventário: {missing}"
+    assert f"declara {len(tool_ids)} manifests" in inventory, (
+        "A contagem declarada no inventário diverge do Tool Registry"
+    )
