@@ -1,7 +1,8 @@
 """Session-authorized MCP tools for Jarvis Prospecto.
 
-All calls pass through the canonical ToolDispatcher so manifest validation,
-rate limiting, authorization, output-schema validation and audit are enforced.
+Company discovery calls pass through the canonical ToolDispatcher. The active
+outreach tools use a separate session capability plus the durable SQLite
+approval, suppression, idempotency and audit workflow.
 """
 from __future__ import annotations
 
@@ -154,4 +155,127 @@ def register_prospecting_tools(
     return PROSPECTING_TOOLS
 
 
-__all__ = ["register_prospecting_tools", "PROSPECTING_CAPABILITY", "PROSPECTING_TOOLS"]
+
+# Outreach is a separate active capability; existing read-only sessions do not inherit it.
+PROSPECTING_OUTREACH_CAPABILITY = "prospecting.outreach.manage"
+PROSPECTING_OUTREACH_TOOLS = (
+    "prospecting.outreach.plan",
+    "prospecting.outreach.approve",
+    "prospecting.outreach.dispatch",
+    "prospecting.outreach.block",
+    "prospecting.outreach.history",
+)
+
+
+def _build_outreach_service():
+    import os
+    from pathlib import Path
+    from app.application.prospecting.outreach import (
+        OutreachService, SQLiteOutreachStore, build_webhook_transports_from_env,
+    )
+
+    configured = os.getenv("JARVIS_PROSPECTO_OUTREACH_DB", "").strip()
+    database = Path(configured).expanduser() if configured else (
+        Path.home() / ".local" / "share" / "jarvis" / "prospecto" / "outreach.sqlite3"
+    )
+    return OutreachService(
+        SQLiteOutreachStore(database),
+        transports=build_webhook_transports_from_env(),
+    )
+
+
+def register_prospecting_outreach_tools(
+    mcp: Any, *, service: Any = None, session_gateway: Any = None,
+) -> tuple[str, ...]:
+    """Register session-authorized planning, approval, dispatch and DNC tools."""
+    from app.application.prospecting.outreach import Channel, ContactAuthorization
+
+    outreach = service if service is not None else _build_outreach_service()
+    gateway = session_gateway if session_gateway is not None else SESSION_GATEWAY
+
+    def actor() -> str:
+        session = gateway.require(PROSPECTING_OUTREACH_CAPABILITY)
+        return str(session.get("session_id") or "authenticated-session")
+
+    @mcp.tool(name="prospecting.outreach.plan")
+    def prospecting_outreach_plan(
+        company_id: str, channel: str, destination: str, body: str,
+        campaign_id: str, authorization_basis: str, authorization_evidence_ref: str,
+        subject: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Create a durable outreach draft. This operation never sends a message."""
+        try:
+            session_id = actor()
+            plan = outreach.create_plan(
+                company_id=company_id, channel=Channel(channel), destination=destination,
+                subject=subject, body=body, campaign_id=campaign_id,
+                authorization=ContactAuthorization(
+                    basis=authorization_basis,
+                    evidence_ref=authorization_evidence_ref,
+                    reviewed_by=session_id,
+                ),
+            )
+            return {"success": True, "plan_id": plan.plan_id, "status": plan.status.value}
+        except Exception as exc:
+            logger.warning("Prospecto outreach plan rejected: %s", type(exc).__name__)
+            return {"success": False, "error_code": str(exc) if isinstance(exc, (ValueError, PermissionError)) else "outreach_plan_failed"}
+
+    @mcp.tool(name="prospecting.outreach.approve")
+    def prospecting_outreach_approve(plan_id: str) -> dict[str, Any]:
+        """Approve one reviewed plan; approval is required before any dispatch."""
+        try:
+            plan = outreach.approve_plan(plan_id, approved_by=actor())
+            return {"success": True, "plan_id": plan.plan_id, "status": plan.status.value}
+        except Exception as exc:
+            logger.warning("Prospecto outreach approval rejected: %s", type(exc).__name__)
+            return {"success": False, "error_code": str(exc) if isinstance(exc, (ValueError, PermissionError)) else "outreach_approval_failed"}
+
+    @mcp.tool(name="prospecting.outreach.dispatch")
+    def prospecting_outreach_dispatch(plan_id: str, idempotency_key: str) -> dict[str, Any]:
+        """Dispatch one approved plan through its configured channel relay."""
+        try:
+            actor()
+            plan = outreach.dispatch(plan_id, idempotency_key=idempotency_key)
+            return {"success": True, "plan_id": plan.plan_id, "status": plan.status.value}
+        except Exception as exc:
+            logger.warning("Prospecto outreach dispatch rejected: %s", type(exc).__name__)
+            return {"success": False, "error_code": str(exc) if isinstance(exc, (ValueError, PermissionError, LookupError, RuntimeError)) else "outreach_dispatch_failed"}
+
+    @mcp.tool(name="prospecting.outreach.history")
+    def prospecting_outreach_history(plan_id: str) -> dict[str, Any]:
+        """Read status and metadata-only audit events for one outreach plan."""
+        try:
+            actor()
+            plan = outreach.get_plan(plan_id)
+            return {
+                "success": True,
+                "plan_id": plan.plan_id,
+                "status": plan.status.value,
+                "events": outreach.list_events(plan_id),
+            }
+        except Exception as exc:
+            logger.warning("Prospecto outreach history rejected: %s", type(exc).__name__)
+            return {"success": False, "error_code": "outreach_history_unavailable"}
+
+    @mcp.tool(name="prospecting.outreach.block")
+    def prospecting_outreach_block(
+        company_id: str, reason: str, channel: Optional[str] = None,
+        destination: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Record a terminal do-not-contact block for a company/channel or exact destination."""
+        try:
+            session_id = actor()
+            outreach.block_contact(
+                company_id=company_id,
+                channel=Channel(channel) if channel is not None else None,
+                destination=destination, reason=reason, recorded_by=session_id,
+            )
+            return {"success": True, "blocked": True}
+        except Exception as exc:
+            logger.warning("Prospecto outreach block rejected: %s", type(exc).__name__)
+            return {"success": False, "error_code": str(exc) if isinstance(exc, ValueError) else "outreach_block_failed"}
+
+    return PROSPECTING_OUTREACH_TOOLS
+
+
+__all__ = ["register_prospecting_tools", "register_prospecting_outreach_tools", "PROSPECTING_CAPABILITY", "PROSPECTING_TOOLS", "PROSPECTING_OUTREACH_CAPABILITY", "PROSPECTING_OUTREACH_TOOLS"]

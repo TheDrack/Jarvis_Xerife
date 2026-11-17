@@ -64,6 +64,7 @@ PROFILES: dict[str, frozenset[str]] = {
             "android.shell.exec",
             "communication.chatgpt.prompt",
             "prospecting.cnpj.read",
+            "prospecting.outreach.manage",
         }
     ),
 }

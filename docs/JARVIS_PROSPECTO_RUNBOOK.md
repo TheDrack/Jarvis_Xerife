@@ -210,3 +210,16 @@ A busca por segmento retorna um resultado por raiz CNPJ (8 dígitos), com um CNP
 O arquivo DuckDB é local ao host: configurar o caminho no Android não disponibiliza automaticamente o arquivo do Desktop, e vice-versa. O Android MCP aplica o perfil de sessão e o Tool Dispatcher; o HUD Desktop aplica o token local e o guardião de rede privada. A distribuição/host definitivo da base precisa ser escolhido separadamente. O banco está coberto pelo `.gitignore`; não o envie ao Git.
 
 Essas ferramentas apenas pesquisam dados públicos e devolvem proveniência. Não coletam telefone/e-mail e não enviam mensagens ou contatos.
+
+
+## 7. Prospecção ativa multicanal
+
+A descoberta de empresas não envia mensagens automaticamente. Para preparar e executar contatos com auditoria, regras de não contato e aprovação, consulte [Jarvis Prospecto — outbound outreach](JARVIS_PROSPECTO_OUTREACH.md).
+
+O fluxo inicial é:
+1. Preparar um plano de contato por empresa/canal.
+2. Registrar base e evidência revisadas.
+3. Aprovar o plano pela sessão autenticada.
+4. Despachar pelo relay HTTPS configurado para WhatsApp, e-mail, telefone ou formulário institucional.
+
+Sem relay e credenciais configurados, o despacho falha fechado. A implementação não coleta e-mails/telefones da base CNPJ nem contorna CAPTCHA ou controles dos formulários.
