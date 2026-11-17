@@ -26,6 +26,18 @@ O mapa é regenerado pelo workflow .github/workflows/autodoc.yml quando alteraç
 
 ## Diagrama arquitetural de referência
 
-Para responsabilidades, fluxos, entrypoints e limites entre esses diretórios, use [docs/ARCHITECTURE.md](ARCHITECTURE.md) e o [mapa de alto nível](../ARCHITECTURE.md).
+```mermaid
+flowchart TB
+  Clients["Desktop / Android / API / MCP / CLI"]
+  Adapters["API / Edge / Infrastructure adapters"]
+  App["Application services / ports / security"]
+  Domain["Domain: tools / intelligence / memory / missions"]
+  Runtime["Nexus / Tool Dispatcher / Pipeline / Multi-agent"]
+  External["Supabase / LLM providers / Render / private network"]
+  Clients --> Adapters --> App --> Domain
+  Runtime --> App
+  Runtime --> Domain
+  Adapters <--> External
+```
 
-O diagrama detalhado gerado automaticamente abaixo será atualizado pelo workflow de documentação após a integração desta mudança.
+Para responsabilidades, fluxos, entrypoints e limites entre esses diretórios, use [docs/ARCHITECTURE.md](ARCHITECTURE.md) e o [mapa de alto nível](../ARCHITECTURE.md). O workflow atualiza automaticamente o inventário de diretórios e assinaturas quando o código de app/ ou o gerador muda.
