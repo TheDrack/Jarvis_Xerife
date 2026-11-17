@@ -1,3 +1,4 @@
+from app.adapters.infrastructure.prospecting.acate_directory import AcateDirectoryAdapter
 from app.adapters.infrastructure.prospecting.cnpj_open_data import (
     DATASET_LICENSE,
     DATASET_URL,
@@ -21,6 +22,7 @@ __all__ = [
     "DATASET_LICENSE",
     "DATASET_URL",
     "DEFAULT_LICENSE",
+    "AcateDirectoryAdapter",
     "CnpjOpenDataAdapter",
     "CnpjOpenDataFiles",
     "CnpjStoreBuilder",
