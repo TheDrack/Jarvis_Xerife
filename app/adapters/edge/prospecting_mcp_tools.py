@@ -241,14 +241,16 @@ def register_prospecting_outreach_tools(
 
     @mcp.tool(name="prospecting.outreach.block")
     def prospecting_outreach_block(
-        company_id: str, channel: str, reason: str, destination: Optional[str] = None,
+        company_id: str, reason: str, channel: Optional[str] = None,
+        destination: Optional[str] = None,
     ) -> dict[str, Any]:
         """Record a terminal do-not-contact block for a company/channel or exact destination."""
         try:
             session_id = actor()
             outreach.block_contact(
-                company_id=company_id, channel=Channel(channel), destination=destination,
-                reason=reason, recorded_by=session_id,
+                company_id=company_id,
+                channel=Channel(channel) if channel is not None else None,
+                destination=destination, reason=reason, recorded_by=session_id,
             )
             return {"success": True, "blocked": True}
         except Exception as exc:
