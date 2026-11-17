@@ -6,7 +6,6 @@ rate limiting, authorization, output-schema validation and audit are enforced.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 from app.adapters.infrastructure.session_authorization import SESSION_GATEWAY
