@@ -13,7 +13,7 @@ def test_every_button_declares_button_type_and_accessible_name():
     buttons = _buttons()
     assert buttons
     for attributes, body in buttons:
-        button_type = re.search(r'\\btype="(button|submit|reset)"', attributes)
+        button_type = re.search(r'\btype="(button|submit|reset)"', attributes)
         assert button_type, attributes
         if button_type.group(1) == "submit":
             assert 'id="prospectingSearch"' in attributes, attributes
