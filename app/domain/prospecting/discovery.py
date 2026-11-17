@@ -49,12 +49,6 @@ class DiscoveryQuery(BaseModel):
     capital_max: Optional[float] = Field(default=None, ge=0)
     simples_only: bool = False
     mei_only: bool = False
-    country_codes: tuple[str, ...] = Field(default=(), max_length=50)
-    reason_codes: tuple[str, ...] = Field(default=(), max_length=50)
-    special_situation_codes: tuple[str, ...] = Field(default=(), max_length=50)
-    has_phone: Optional[bool] = None
-    has_email: Optional[bool] = None
-    has_fax: Optional[bool] = None
 
     @field_validator("after_cnpj_basico")
     @classmethod
