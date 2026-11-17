@@ -96,11 +96,11 @@
   },
   "metadata": {
     "version": "2026.03",
-    "last_updated": "2026-10-24T00:00:00Z",
+    "last_updated": "2026-11-17T00:00:00Z",
     "total_components": 93,
     "core_components": 15,
     "memory_components": 5,
-    "adapter_components": 42,
+    "adapter_components": 43,
     "service_components": 26,
     "edge_components": 11,
     "macrodroid_integration": true,
