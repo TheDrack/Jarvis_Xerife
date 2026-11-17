@@ -26,8 +26,7 @@ class ProspectingAdapter(NexusComponent):
     """Nexus-resolvable read-only access to the materialized CNPJ registry."""
 
     adapter_id = "prospecting_adapter"
-    search_capability = "prospecting.companies.search"
-    lookup_capability = "prospecting.companies.lookup"
+    read_capability = "prospecting.cnpj.read"
 
     def __init__(self, database: Path | str | None = None) -> None:
         configured = database if database is not None else os.getenv(_STORE_ENV)
@@ -52,7 +51,7 @@ class ProspectingAdapter(NexusComponent):
             "success": True,
             "adapter_id": self.adapter_id,
             "execution_mode": "read_only",
-            "capabilities": [self.search_capability, self.lookup_capability],
+            "capabilities": [self.read_capability],
             "store_available": self.can_execute(context),
         }
 
