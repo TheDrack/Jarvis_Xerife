@@ -35,7 +35,7 @@ A pasta .agents/skills/ contém uma seleção instalada para descoberta por algu
 
 Quando Jarvis MCP estiver conectado, call `jarvis_agent_bootstrap` antes das demais operações Jarvis. Compare o inventário retornado com o live tool registry do host; nunca trate o baseline do repositório como prova de disponibilidade ou autorização. O servidor Jarvis não enxerga automaticamente ferramentas privadas do host chamador.
 
-Consulte [skills/jarvis-context-memory/SKILL.md](../../skills/jarvis-context-memory/SKILL.md) e [CONTEXT_MEMORY_PROTOCOL.md](CONTEXT_MEMORY_PROTOCOL.md) para bootstrap, consolidação, deduplicação, conflitos e persistência. Após failure or a domain/provider change, atualize a descoberta e recarregue a skill pertinente antes de repetir a operação. Não repita uma chamada que falhou sem diagnosticar a causa.
+Consulte [skills/jarvis-context-memory/SKILL.md](../../skills/jarvis-context-memory/SKILL.md) e [CONTEXT_MEMORY_PROTOCOL.md](CONTEXT_MEMORY_PROTOCOL.md) para bootstrap, consolidação, deduplicação, conflitos e persistência. After failure or a domain/provider change, atualize a descoberta e recarregue a skill pertinente antes de repetir a operação. Não repita uma chamada que falhou sem diagnosticar a causa.
 
 ## Navegação visual e VIV
 
