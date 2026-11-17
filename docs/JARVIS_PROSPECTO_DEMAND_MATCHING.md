@@ -23,6 +23,7 @@ The direction is validated against requester type and intent. Invalid combinatio
 - SQLite persistence and bounded listing.
 - Android MCP create/get/list tools, protected by `prospecting.demand.manage`.
 - Explainable deterministic candidate scoring based on category and geography signals.
+- Provider-neutral fan-out service with source provenance checks, deduplication, ranking and partial-source failure reporting.
 - Source evidence is mandatory for every candidate.
 - CV/profile references remain private by default.
 - Sharing a CV requires explicit request-scoped consent, a profile reference, a recorded timestamp and a consent scope.
@@ -57,8 +58,8 @@ B2C supplier discovery can reuse company discovery as a first candidate source, 
 
 ## Not yet implemented
 
-- External job-vacancy providers and career-page discovery.
-- Product/service catalogue enrichment for B2C supplier results.
+- External job-vacancy providers and career-page discovery (the provider interface and fan-out are ready; no live vacancy provider is wired yet).
+- Product/service catalogue enrichment for B2C supplier results (the provider interface and fan-out are ready; no live catalogue provider is wired yet).
 - Persistent candidate-match history and ranking feedback.
 - CV vault integration, per-vacancy disclosure approval and sending through the outreach engine.
 - Public customer-facing API/UI and real multi-user tenant provisioning.
