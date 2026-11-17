@@ -1,7 +1,7 @@
 # Inventário de capacidades — Jarvis Xerife
 
 **Revisão de código:** 2026-11-16  
-**Branch de referência:** main, commit 444b0b322f132802368cbbe0c9568d4409438e61  
+**Base de código auditada:** main @ 444b0b322f132802368cbbe0c9568d4409438e61  
 **Escopo:** inventário do código e contratos versionados. Não é um health check de deploy nem de conectores do host.
 
 ## Semântica dos estados
