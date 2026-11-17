@@ -73,7 +73,7 @@ ESTABELECIMENTO_COLUMNS: tuple[str, ...] = (
 )
 MINIMUM_ESTABLISHMENT_COLUMNS = 21
 _ACTIVE = "02"
-_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state")
+_SUPPORTED_FIELDS = ("company_name", "legal_name", "cnpj", "industry", "city", "state", "company_size", "legal_nature", "capital_social", "opening_date", "establishment_type", "neighborhood", "postal_code", "primary_cnae")
 
 
 @dataclass(frozen=True)
@@ -428,6 +428,8 @@ class CnpjStoreProvider:
             if query.capital_max is not None:
                 conditions.append("try_cast(replace(c.capital, ',', '.') AS DOUBLE) <= ?")
                 parameters.append(query.capital_max)
+            if (query.simples_only or query.mei_only) and connection.execute("SELECT count(*) FROM simples").fetchone()[0] == 0:
+                raise RuntimeError("Simples/MEI filters require the official Simples dataset to be ingested")
             if query.simples_only:
                 conditions.append("EXISTS (SELECT 1 FROM simples sn WHERE sn.cnpj_basico=e.cnpj_basico AND sn.opcao_simples='S')")
             if query.mei_only:
