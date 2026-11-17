@@ -71,8 +71,6 @@ class DiscoveryQuery(BaseModel):
             raise ValueError("opened_from must not be later than opened_to")
         if self.capital_min is not None and self.capital_max is not None and self.capital_min > self.capital_max:
             raise ValueError("capital_min must not exceed capital_max")
-        if self.simples_only and self.mei_only:
-            raise ValueError("simples_only and mei_only are mutually exclusive")
         return self
 
     @field_validator("cnae_prefixes")
