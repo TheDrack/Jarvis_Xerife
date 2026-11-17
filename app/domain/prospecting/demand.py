@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Optional
+from typing import Optional, Protocol, Sequence, runtime_checkable
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
@@ -228,8 +228,21 @@ def evaluate_demand_match(demand: DemandRequest, candidate: DemandCandidate) -> 
     )
 
 
+@runtime_checkable
+class DemandDiscoveryProvider(Protocol):
+    """Source adapter that returns opportunities for one private demand."""
+
+    source_id: str
+
+    def discover(
+        self, demand: DemandRequest, *, limit: int = 100,
+    ) -> Sequence[DemandCandidate]:
+        ...
+
+
+
 __all__ = [
-    "CandidateType", "DemandCandidate", "DemandEvidence", "DemandIntent",
+    "CandidateType", "DemandCandidate", "DemandDiscoveryProvider", "DemandEvidence", "DemandIntent",
     "DemandMatch", "DemandRequest", "DemandStatus", "MarketDirection",
     "RequesterType", "evaluate_demand_match",
 ]
