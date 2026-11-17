@@ -41,7 +41,7 @@ async def test_registers_search_and_exact_cnpj_lookup_through_tool_dispatcher():
 
     names = prospecting_mcp_tools.register_prospecting_tools(mcp, dispatcher=dispatcher)
     search = await mcp.tools["prospecting.companies.search"](
-        uf="SC",
+        uf="sc",
         cnae_prefixes=["4120"],
         municipalities=["São José"],
         limit=25,
@@ -56,6 +56,7 @@ async def test_registers_search_and_exact_cnpj_lookup_through_tool_dispatcher():
     assert dispatcher.requests[0]["tool_id"] == "prospecting.companies.search"
     assert dispatcher.requests[0]["capability"] == "prospecting.cnpj.read"
     assert dispatcher.requests[0]["arguments"]["limit"] == 25
+    assert dispatcher.requests[0]["arguments"]["uf"] == "SC"
     assert dispatcher.requests[0]["scope"] == "local"
     assert dispatcher.requests[1]["tool_id"] == "prospecting.companies.lookup"
 
