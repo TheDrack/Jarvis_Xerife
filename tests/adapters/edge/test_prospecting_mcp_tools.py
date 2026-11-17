@@ -160,6 +160,12 @@ def test_registers_session_authorized_outreach_controls():
         def block_contact(self, **kwargs):
             self.calls.append(("block", kwargs))
 
+        def get_plan(self, plan_id):
+            return SimpleNamespace(plan_id=plan_id, status=PlanStatus.SENT)
+
+        def list_events(self, plan_id):
+            return [{"event": "delivery_sent", "metadata": {"channel": "email"}}]
+
     mcp, gateway, service = FakeMCP(), Gateway(), Service()
     names = prospecting_mcp_tools.register_prospecting_outreach_tools(
         mcp, service=service, session_gateway=gateway
@@ -175,6 +181,7 @@ def test_registers_session_authorized_outreach_controls():
     sent = mcp.tools["prospecting.outreach.dispatch"](
         plan_id="plan-1", idempotency_key="send-1"
     )
+    history = mcp.tools["prospecting.outreach.history"](plan_id="plan-1")
     blocked = mcp.tools["prospecting.outreach.block"](
         company_id="12345678000190", channel="email",
         reason="recipient_requested_stop", destination="sales@example.com",
@@ -185,7 +192,8 @@ def test_registers_session_authorized_outreach_controls():
     assert approved["status"] == "approved"
     assert sent["status"] == "sent"
     assert blocked["blocked"] is True
-    assert gateway.calls == ["prospecting.outreach.manage"] * 4
+    assert history["events"][0]["event"] == "delivery_sent"
+    assert gateway.calls == ["prospecting.outreach.manage"] * 5
     assert service.calls[0][1]["authorization"].reviewed_by == "paired-session"
     assert service.calls[1] == ("approve", "plan-1", "paired-session")
     assert service.calls[2] == ("dispatch", "plan-1", "send-1")
