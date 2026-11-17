@@ -20,6 +20,7 @@ def make_prospect() -> ProspectRecord:
         source_type="company_website",
         url="https://example.com/about",
         license_or_terms="Public company information; collected for B2B prospect research.",
+        supports_fields=("company_name", "website", "industry"),
         collected_at=datetime(2026, 11, 16, tzinfo=timezone.utc),
     )
     company = ProspectCompany(
@@ -112,6 +113,7 @@ def test_cnpj_is_normalized_to_digits():
         source_type="public_registry",
         url="https://registry.example/company",
         license_or_terms="Public registry terms.",
+        supports_fields=("cnpj",),
     )
     company = ProspectCompany(
         company_name="Example Ltda",
