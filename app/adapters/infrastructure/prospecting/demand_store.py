@@ -9,7 +9,7 @@ from uuid import UUID
 from app.domain.prospecting.demand import DemandRequest
 
 
-class DemandNotFound(LookupError):
+class _ClosingConnection(sqlite3.Connection):\n    def __exit__(self, exc_type, exc_value, traceback):\n        try:\n            return super().__exit__(exc_type, exc_value, traceback)\n        finally:\n            self.close()\n\n\nclass DemandNotFound(LookupError):
     pass
 
 
@@ -39,7 +39,7 @@ class SQLiteDemandStore:
             )
 
     def _connect(self):
-        db = sqlite3.connect(self.database, timeout=15)
+        db = sqlite3.connect(self.database, timeout=15, factory=_ClosingConnection)
         db.row_factory = sqlite3.Row
         return db
 
