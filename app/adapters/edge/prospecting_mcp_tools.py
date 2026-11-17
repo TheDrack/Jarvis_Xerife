@@ -1,7 +1,8 @@
 """Session-authorized MCP tools for Jarvis Prospecto.
 
-All calls pass through the canonical ToolDispatcher so manifest validation,
-rate limiting, authorization, output-schema validation and audit are enforced.
+Company discovery calls pass through the canonical ToolDispatcher. The active
+outreach tools use a separate session capability plus the durable SQLite
+approval, suppression, idempotency and audit workflow.
 """
 from __future__ import annotations
 
