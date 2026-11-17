@@ -238,6 +238,7 @@ def test_termux_jarvis_profile_grants_shell_chatgpt_and_prospecting_capabilities
     assert gateway.require("android.shell.exec")["profile"] == "termux_jarvis"
     assert gateway.require("communication.chatgpt.prompt")["profile"] == "termux_jarvis"
     assert gateway.require("prospecting.cnpj.read")["profile"] == "termux_jarvis"
-    assert gateway.require("prospecting.outreach.manage")["profile"] == "termux_jarvis"\n    assert gateway.require("prospecting.demand.manage")["profile"] == "termux_jarvis"
+    assert gateway.require("prospecting.outreach.manage")["profile"] == "termux_jarvis"
+    assert gateway.require("prospecting.demand.manage")["profile"] == "termux_jarvis"
     with pytest.raises(SessionAuthorizationError, match="lacks capability"):
         gateway.require("host.fs.read")
