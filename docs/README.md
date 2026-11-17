@@ -6,9 +6,9 @@ Este índice aponta para os documentos mantidos no repositório. Documentos de a
 
 1. [README principal](../README.md) — propósito, instalação e superfícies.
 2. [Arquitetura](ARCHITECTURE.md) — camadas, diretórios, limites e fluxos.
-3. [Guia de agentes](AGENT_GUIDE.md) — bootstrap, navegação e regras de trabalho.
-4. [Status](STATUS.md) — estados de implementação e evidência.
-5. [Segurança](../SECURITY_GUARDRAILS.md) — invariantes de autorização e proteção.
+4. [Guia de agentes](AGENT_GUIDE.md) — bootstrap, navegação e regras de trabalho.
+5. [Status](STATUS.md) — estados de implementação e evidência.
+6. [Segurança](../SECURITY_GUARDRAILS.md) — invariantes de autorização e proteção.
 
 ## Contratos para agentes
 
