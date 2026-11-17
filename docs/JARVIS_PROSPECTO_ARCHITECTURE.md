@@ -1,6 +1,6 @@
 # Jarvis Prospecto — arquitetura inicial
 
-**Status:** domínio e qualificação determinística implementados; persistência, API e discovery pendentes  
+**Status:** fundação de domínio em implementação  
 **Escopo:** prospecção comercial B2B para a operação própria e, futuramente, tenants clientes.  
 **Princípio:** extensão do Jarvis_Xerife; não criar uma segunda plataforma de agentes, fila ou identidade.
 
@@ -115,21 +115,13 @@ Conteúdo de páginas, diretórios e APIs externas é dado não confiável. Não
 
 ## 7. Qualificação e scoring
 
-O score é explicável e separado em dimensões:
+O score será explicável e separado em dimensões:
 
-- **Fit:** aderência ao ICP (setor, segmento, território e porte/capacidade), calculado por `evaluate_fit` em `app/domain/prospecting/icp.py`.
-- **Intent:** apenas sinais explícitos, datados e com evidência, avaliados por `assess_intent`.
-- **Confidence:** qualidade, atualidade e independência das evidências, avaliada por `assess_confidence`.
+- **Fit:** aderência ao ICP (segmento, território, porte/capacidade e necessidade compatível).
+- **Intent:** sinais observáveis de intenção de compra, com evidência e data.
+- **Confidence:** qualidade, atualidade e independência das evidências.
 
-Não converter fit em intent. Segmento compatível, tamanho da empresa ou presença na web não provam intenção de compra: uma empresa com fit máximo e nenhum sinal fica em `outbound` (lista fria), nunca em `priority`.
-
-Os pesos de fit são **dados do perfil**, não constantes do código: `IcpProfile` exige um peso positivo para cada critério configurado e não aceita perfil sem critério. O score é a fração do peso avaliável que casou. Atributo ausente na empresa vira `unknown` — não penaliza o score, não conta como incompatibilidade e marca o prospect para verificação. Os pesos ainda não foram calibrados com resultados comerciais; até lá o score ordena listas, não decide sozinho.
-
-A confiança usa uma rubrica determinística documentada (fontes distintas, atualidade e diversidade de tipos de fonte), não uma probabilidade calibrada.
-
-## 7b. Fontes de dados
-
-A base durável de discovery é o conjunto público do CNPJ da Receita Federal (CC-BY, mensal): não há custo por consulta e a atribuição é obrigatória na entrega. Google Places não pode ser armazenado (os termos permitem apenas `place_id`), então não é base de dados. Comparativo de fontes, custos, limites e regras de armazenamento em [JARVIS_PROSPECTO_SOURCES.md](JARVIS_PROSPECTO_SOURCES.md).
+Não converter fit em intent. Segmento compatível, tamanho da empresa ou presença na web não provam intenção de compra. Nenhum score será implementado como regra fixa até definirmos ICPs por oferta e validar os pesos com resultados reais.
 
 ## 8. Integração com o Jarvis existente
 
@@ -151,18 +143,17 @@ Depois de implementar membership e repositórios tenant-scoped:
 - `GET /v1/prospects/{prospect_id}` — consulta no tenant ativo.
 - `PATCH /v1/prospects/{prospect_id}` — atualiza atributos permitidos.
 - `POST /v1/prospects/{prospect_id}/transitions` — registra mudança de etapa.
-- `POST /v1/discovery-runs` — agenda uma execução de descoberta com parâmetros explícitos e idempotência. **(contrato de discovery já existe: `DiscoveryQuery`/`DiscoveryProvider`/`DiscoveryResult`)**
+- `POST /v1/discovery-runs` — agenda uma execução de descoberta com parâmetros explícitos e idempotência.
 - `GET /v1/discovery-runs/{run_id}` — acompanha estado, fontes e falhas parciais.
 
 Listagens serão paginadas; erros seguirão envelope consistente; criação e execução assíncrona terão idempotency key durável.
 
 ## 10. Fases de implementação
 
-### Fase 1 — domínio (implementada)
+### Fase 1 — domínio (em andamento)
 - Contratos de empresa, evidência e prospect tenant-scoped.
 - Pipeline determinístico e histórico de transições.
 - Testes unitários de validação, isolamento conceitual e transições.
-- `employee_count` opcional em `ProspectCompany` para o critério de porte, sempre sustentado por evidência.
 
 ### Fase 2 — persistência segura
 - Resolver modelo de tenants e memberships.
@@ -176,17 +167,10 @@ Listagens serão paginadas; erros seguirão envelope consistente; criação e ex
 - Testes de autorização, IDOR/BOLA e contratos.
 
 ### Fase 4 — discovery e qualification
-- Adaptadores de fontes permitidas, rate limit, termos e proveniência. **(parcial: adaptador de dados abertos do CNPJ implementado em `app/adapters/infrastructure/prospecting/cnpj_open_data.py`; fontes e termos em [JARVIS_PROSPECTO_SOURCES.md](JARVIS_PROSPECTO_SOURCES.md))**
-- ICPs configuráveis por oferta/tenant. **(implementado: `IcpProfile` + `IcpWeights`)**
-- Scores separados e explicáveis de fit, intent e confidence. **(implementado, sem calibração de pesos)**
-- Sem scraping indiscriminado ou disparo automático. **(respeitado: nenhuma coleta ou envio existe no domínio)**
-
-### Fase 4b — entregável
-- `build_deliverable_csv` gera o banco de prospects entregue ao cliente, com score, tier, critérios, fontes e flag de verificação.
-- `app/application/prospecting/campaign.py` + `scripts/prospecto_run.py` executam uma campanha (ICP + consulta) de forma repetível, com manifesto por execução (passo a passo em [JARVIS_PROSPECTO_RUNBOOK.md](JARVIS_PROSPECTO_RUNBOOK.md)).
-- `app/adapters/infrastructure/prospecting/cnpj_store.py` + `scripts/prospecto_ingest.py` materializam a base por UF num store DuckDB retomável, tirando a varredura de ~30 GB do caminho de cada campanha ([metodologia e medições](JARVIS_PROSPECTO_DATA_PIPELINE.md)).
-- Sem dados de contato pessoal; valores vindos de fontes externas são neutralizados contra injeção de fórmula em planilha.
-- `outbound` = lista fria por aderência; `priority` = aderência com sinal explícito; `not_fit` fica fora do CSV por padrão.
+- Adaptadores de fontes permitidas, rate limit, termos e proveniência.
+- ICPs configuráveis por oferta/tenant.
+- Scores separados e explicáveis de fit, intent e confidence.
+- Sem scraping indiscriminado ou disparo automático.
 
 ### Fase 5 — outreach e analytics
 - Integrações de canais permitidos, inicialmente com aprovação humana.

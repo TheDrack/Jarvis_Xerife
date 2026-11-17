@@ -23,19 +23,6 @@ class ProspectEvidenceType(str, Enum):
     AUTHORIZED_PROVIDER = "authorized_provider"
 
 
-class RegistryPresence(str, Enum):
-    """Whether the company was found in the public company registry.
-
-    A prospect can be a real buyer without being in the Receita extract (informal
-    business, establishment registered elsewhere, divergent activity code). The
-    deliverable must say which case it is instead of implying registry coverage.
-    """
-
-    FOUND = "found"
-    NOT_FOUND = "not_found"
-    UNVERIFIED = "unverified"
-
-
 class ProspectStage(str, Enum):
     DISCOVERED = "discovered"
     ENRICHED = "enriched"
@@ -86,11 +73,9 @@ class ProspectCompany(BaseModel):
     website: Optional[HttpUrl] = None
     industry: Optional[str] = Field(default=None, max_length=120)
     segment: Optional[str] = Field(default=None, max_length=120)
-    employee_count: Optional[int] = Field(default=None, ge=1, le=1_000_000)
     city: Optional[str] = Field(default=None, max_length=120)
     state: Optional[str] = Field(default=None, min_length=2, max_length=2)
     country: str = Field(default="BR", min_length=2, max_length=2)
-    registry_presence: Optional[RegistryPresence] = None
     evidence: tuple[ProspectEvidence, ...] = Field(min_length=1, max_length=20)
 
     @field_validator("cnpj")
