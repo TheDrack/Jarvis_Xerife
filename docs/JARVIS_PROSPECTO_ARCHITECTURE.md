@@ -174,10 +174,11 @@ Listagens serão paginadas; erros seguirão envelope consistente; criação e ex
 - O núcleo Jarvis não recebe tabelas de marketplace, pedidos, recorrência, pagamentos ou assinatura.
 - O `tenant_id` de campanha permanece um rótulo local até que exista um consumidor comercial com contrato próprio.
 
-### Fase 3 — integração interna e HUD
-- Consumir a capability pelo MCP/Tool Registry e apresentar resultados no HUD Global sem duplicar o motor de busca.
-- Se o HUD precisar de endpoint HTTP, usar autenticação local existente e manter a rota read-only; não transformar essa rota em API pública de clientes.
-- Testar autorização, paginação, estados de store ausente e proveniência.
+### Fase 3 — integração interna e HUD (implementada nesta branch)
+- Consumir a capability pelo MCP/Tool Registry e apresentar resultados no HUD Global sem duplicar o motor de busca. **(MCP Desktop/Android + janela Prospecto no HUD Global)**
+- O HUD usa `/api/prospecting/search` e `/api/prospecting/lookup`, autenticados pelo token local e limitados a leitura.
+- Paginação por `after_cnpj_basico`, limite de 100 por chamada, estado explícito quando o store não existe e proveniência exibida na interface.
+- A rota é do servidor local do Desktop, não uma API pública de clientes.
 
 ### Fase 4 — discovery e qualification
 - Adaptadores de fontes permitidas, rate limit, termos e proveniência. **(implementado para a base oficial de CNPJ: adaptadores CSV e DuckDB, com proveniência CC-BY; fontes e termos em [JARVIS_PROSPECTO_SOURCES.md](JARVIS_PROSPECTO_SOURCES.md))**
@@ -192,20 +193,21 @@ Listagens serão paginadas; erros seguirão envelope consistente; criação e ex
 - Sem dados de contato pessoal; valores vindos de fontes externas são neutralizados contra injeção de fórmula em planilha.
 - `outbound` = lista fria por aderência; `priority` = aderência com sinal explícito; `not_fit` fica fora do CSV por padrão.
 
-### Fase 5 — outreach e analytics
-- Integrações de canais permitidos, inicialmente com aprovação humana.
-- Opt-out/supressão, idempotência, limites e auditoria.
-- Métricas de conversão e receita atribuível.
+### Fase 5 — outreach e analytics (fora do núcleo de discovery)
+- Gestão de relacionamento, opt-out, campanhas de contato e métricas comerciais pertencem ao novo produto comercial.
+- O Jarvis pode fornecer automação de canais como infraestrutura, mas não deve acoplar esse fluxo ao mecanismo público de CNPJ.
+- Nenhum outreach é executado por esta capability.
 
-## 11. Critérios de aceite do MVP
+## 11. Critérios de aceite da capability interna
 
-- Nenhum prospect pode ser lido ou alterado fora do tenant autenticado.
-- Todo prospect tem pelo menos uma evidência de origem.
-- Toda mudança de etapa tem ator, motivo e timestamp.
-- `DO_NOT_CONTACT` não pode ser revertido por fluxo comum.
-- Scores distinguem fit, intent e confiança e mostram as evidências.
-- Nenhum contato é enviado sem autorização e política de canal.
-- Jobs são idempotentes, limitados e auditáveis.
+- As chamadas do HUD local exigem o token local; os MCPs expõem apenas operações de leitura.
+- O store é aberto em modo read-only e não é criado automaticamente pelo adaptador.
+- Toda empresa devolvida tem pelo menos uma evidência de origem.
+- A busca declara a granularidade por raiz CNPJ; lookup declara a granularidade por estabelecimento.
+- Paginação é limitada e explicita `truncated` e `next_cursor`.
+- Ausência do store ou falha de consulta não produz resultados fictícios.
+- Nenhum telefone/e-mail é coletado e nenhum contato é enviado.
+- Cobrança, membership, carteira comercial e marketplace permanecem fora deste núcleo.
 - Testes unitários, integração, segurança e suíte completa passam sem desabilitar testes ou reduzir cobertura.
 
 ### Fase 4c — capability interna (esta implementação)
