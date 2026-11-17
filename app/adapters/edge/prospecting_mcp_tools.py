@@ -186,7 +186,7 @@ def register_prospecting_outreach_tools(
     mcp: Any, *, service: Any = None, session_gateway: Any = None,
 ) -> tuple[str, ...]:
     """Register session-authorized planning, approval, dispatch and DNC tools."""
-    from app.application.prospecting.outreach import Channel
+    from app.application.prospecting.outreach import Channel, ContactAuthorization
 
     outreach = service if service is not None else _build_outreach_service()
     gateway = session_gateway if session_gateway is not None else SESSION_GATEWAY
@@ -207,9 +207,7 @@ def register_prospecting_outreach_tools(
             plan = outreach.create_plan(
                 company_id=company_id, channel=Channel(channel), destination=destination,
                 subject=subject, body=body, campaign_id=campaign_id,
-                authorization=__import__(
-                    "app.application.prospecting.outreach", fromlist=["ContactAuthorization"]
-                ).ContactAuthorization(
+                authorization=ContactAuthorization(
                     basis=authorization_basis,
                     evidence_ref=authorization_evidence_ref,
                     reviewed_by=session_id,
