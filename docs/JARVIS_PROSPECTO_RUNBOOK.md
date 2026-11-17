@@ -161,7 +161,7 @@ Critério de invalidação sugerido: se depois de 20 abordagens humanas menos de
 
 ## 9. Uso interno pelo Jarvis
 
-O mesmo store DuckDB usado pelo CLI pode ser lido pelo Android MCP e pela janela Prospecto do HUD Global Desktop. O adaptador não cria nem baixa a base automaticamente: ele abre o arquivo configurado em modo de leitura.
+O mesmo store DuckDB usado pelo CLI pode ser lido pelo Android MCP (com sessão autorizada) e pela janela Prospecto do HUD Global Desktop. O adaptador não cria nem baixa a base automaticamente: ele abre o arquivo configurado em modo de leitura.
 
 Configure `JARVIS_PROSPECTO_STORE_PATH` no processo Android MCP ou no servidor local do HUD Desktop. Se não for definido, o adaptador procura `data/prospecting/cnpj.duckdb` na raiz do repositório.
 
