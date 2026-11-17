@@ -721,12 +721,10 @@ registrar_entrega_midia(mcp, tracked_action)
 # - Host operations are bounded/read-only and are not registered unless the
 #   machine owner explicitly opts in with JARVIS_HOST_OPS_ENABLED=1.
 from app.adapters.edge.osint_mcp_tools import register_osint_tools
-from app.adapters.edge.prospecting_mcp_tools import register_prospecting_tools
 from app.adapters.infrastructure.host_ops_mcp_tools import register_host_ops_tools
 from app.adapters.infrastructure.secure_shell_navigation import register_shell_navigation_tools
 
 register_osint_tools(mcp)
-register_prospecting_tools(mcp)
 register_host_ops_tools(mcp)
 register_shell_navigation_tools(mcp)
 
