@@ -100,7 +100,7 @@ def register_prospecting_tools(
                 {
                     "tool_id": "prospecting.companies.search",
                     "tool_version": "1.0.0",
-                    "capability": "prospecting.companies.search",
+                    "capability": PROSPECTING_CAPABILITY,
                     "arguments": {
                         "uf": uf,
                         "cnae_prefixes": cnae_prefixes,
@@ -132,7 +132,7 @@ def register_prospecting_tools(
                 {
                     "tool_id": "prospecting.companies.lookup",
                     "tool_version": "1.0.0",
-                    "capability": "prospecting.companies.lookup",
+                    "capability": PROSPECTING_CAPABILITY,
                     "arguments": {"cnpj": cnpj},
                     "caller": "android_mcp",
                     "scope": "local",
