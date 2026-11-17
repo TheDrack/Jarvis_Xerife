@@ -26,16 +26,22 @@ def establishment(
     secundario: str = "",
     uf: str = "SC",
     municipio: str = "8000",
+    abertura: str = "20200115",
+    tipo: str = "1",
+    bairro: str = "Centro",
+    cep: str = "88010000",
 ) -> list[str]:
     row = [""] * ESTABLISHMENT_COLUMNS
-    row[0], row[1], row[2], row[3] = basico, ordem, dv, "1"
+    row[0], row[1], row[2], row[3] = basico, ordem, dv, tipo
     row[4], row[5], row[11], row[12] = fantasia, situacao, cnae, secundario
+    row[10] = abertura
+    row[17], row[18] = bairro, cep
     row[19], row[20] = uf, municipio
     return row
 
 
-def company_row(basico: str = "12345678", razao: str = "ALFA SERRALHERIA LTDA") -> list[str]:
-    return [basico, razao, "2062", "49", "100000,00", "03", ""]
+def company_row(basico: str = "12345678", razao: str = "ALFA SERRALHERIA LTDA", *, natureza: str = "2062", capital: str = "100000,00", porte: str = "03") -> list[str]:
+    return [basico, razao, natureza, "49", capital, porte, ""]
 
 
 def write_csv(path: Path, rows: list[list[str]]) -> Path:
@@ -248,3 +254,50 @@ def test_lookup_finds_a_cnpj_outside_the_campaign_filter(tmp_path):
 def test_scope_requires_at_least_one_state(tmp_path):
     with pytest.raises(ValueError):
         CnpjStoreBuilder(tmp_path / "store.duckdb", scope_ufs=())
+
+
+
+def test_advanced_filters_use_company_and_establishment_columns(tmp_path):
+    files = build_files(
+        tmp_path,
+        [establishment(bairro="Trindade", cep="88036000", abertura="20240110", tipo="1")],
+        [company_row(natureza="2062", capital="250000,00", porte="03")],
+    )
+    database = tmp_path / "advanced.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+    result = CnpjStoreProvider(database).discover(query(
+        neighborhoods=("Trindade",),
+        postal_codes=("88036-000",),
+        opened_from="20240101",
+        opened_to="20241231",
+        establishment_types=("1",),
+        company_sizes=("03",),
+        legal_natures=("2062",),
+        capital_min=200000,
+        capital_max=300000,
+    ))
+
+    assert len(result.companies) == 1
+    company = result.companies[0]
+    assert company.company_size == "03"
+    assert company.legal_nature == "2062"
+    assert company.capital_social == "250000,00"
+    assert company.opening_date == "20240110"
+    assert company.neighborhood == "Trindade"
+    assert company.postal_code == "88036000"
+
+
+def test_simples_and_mei_filters_require_the_auxiliary_dataset(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "without-simples.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    with pytest.raises(RuntimeError, match="Simples/MEI"):
+        CnpjStoreProvider(database).discover(query(simples_only=True))
+
+
+def test_discovery_query_rejects_invalid_date_and_capital_ranges():
+    with pytest.raises(ValueError):
+        query(opened_from="2025-01-01")
+    with pytest.raises(ValueError, match="capital_min"):
+        query(capital_min=200, capital_max=100)
