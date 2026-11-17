@@ -84,6 +84,10 @@ def test_search_companies_uses_validated_query_and_discloses_root_granularity(
         opened_to="20251231",
         capital_min=1000,
         simples_only=True,
+        country_codes=["105"],
+        has_phone=True,
+        has_email=False,
+        has_fax=True,
     )
 
     assert provider.query.uf == "SC"
@@ -96,6 +100,10 @@ def test_search_companies_uses_validated_query_and_discloses_root_granularity(
     assert provider.query.opened_from == "20200101"
     assert provider.query.capital_min == 1000
     assert provider.query.simples_only is True
+    assert provider.query.country_codes == ("105",)
+    assert provider.query.has_phone is True
+    assert provider.query.has_email is False
+    assert provider.query.has_fax is True
     assert result["identity_granularity"] == "cnpj_basico"
     assert result["companies"][0]["cnpj"] == "12345678000190"
     assert result["truncated"] is True
