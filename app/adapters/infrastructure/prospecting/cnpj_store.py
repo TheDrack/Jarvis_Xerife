@@ -265,8 +265,8 @@ class CnpjStoreBuilder:
             if files.simples is not None:
                 connection.execute("DELETE FROM simples")
                 connection.execute(
-                    "INSERT INTO simples SELECT * FROM read_csv(?, delim=?, quote='\\\"', "
-                    "escape='\\\"', header=false, columns={'cnpj_basico':'VARCHAR', "
+                    "INSERT INTO simples SELECT * FROM read_csv(?, delim=?, quote='\"', "
+                    "escape='\"', header=false, columns={'cnpj_basico':'VARCHAR', "
                     "'opcao_simples':'VARCHAR', 'data_opcao_simples':'VARCHAR', "
                     "'data_exclusao_simples':'VARCHAR', 'opcao_mei':'VARCHAR', "
                     "'data_opcao_mei':'VARCHAR', 'data_exclusao_mei':'VARCHAR'}, "
