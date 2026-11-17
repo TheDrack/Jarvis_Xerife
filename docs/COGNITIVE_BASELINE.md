@@ -1,4 +1,4 @@
-# Cognitive Baseline — Fase C0
+> **Baseline histórico com revalidação limitada.** A última revalidação declarada neste documento é de 2026-11-14, anterior ao commit main 444b0b322f132802368cbbe0c9568d4409438e61 (2026-11-16). Mudanças posteriores podem alterar consumers, gates e estados. Use [docs/STATUS.md](STATUS.md) para a visão atual baseada no código e trate esta baseline como referência histórica até nova auditoria C0 completa. Não copie seus snapshots de produção sem consulta ao ambiente.\n\n# Cognitive Baseline — Fase C0
 
 **Snapshot original:** `main` em `82ca2ac70f67e8418f62079f7d94e3fc8b4d1230` (pós-PR #774; histórico)
 **Última revalidação:** `main` em `d83c0b81898ab45de75f7583b3a7bf830dfcb88c` (2026-11-14), após o merge documental da PR #821; a auditoria funcional foi revalidada nesse SHA.
