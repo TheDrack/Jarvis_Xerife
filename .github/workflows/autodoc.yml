@@ -12,7 +12,6 @@ on:
 permissions:
   contents: write
 
-# Serialize documentation writers; a later run checks out the current main head.
 concurrency:
   group: jarvis-autodoc-main
   cancel-in-progress: false
@@ -22,38 +21,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout do repositório
+      - name: Checkout main
         uses: actions/checkout@v5
         with:
           ref: main
           fetch-depth: 0
 
-      - name: 🐍 Configurar Python
+      - name: Configure Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
-      - name: ⚙️ Gerar mapa de arquitetura
+      - name: Generate active module map
         run: python scripts/autodoc.py
 
-      - name: 💾 Commit da documentação
+      - name: Commit generated documentation
         run: |
           set -e
 
-          if [ ! -f ARCHITECTURE.md ]; then
-            echo "❌ O script não gerou ARCHITECTURE.md"
+          if [ ! -f docs/ARQUIVO_MAP.md ]; then
+            echo "docs/ARQUIVO_MAP.md was not generated"
             exit 1
           fi
 
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+          git add docs/ARQUIVO_MAP.md
 
-          git add ARCHITECTURE.md
-
-          if git diff --quiet --cached ARCHITECTURE.md; then
-            echo "𝑁𝑒𝑛𝑕𝑖𝑚 𝑐𝑎𝑚𝑏𝑖𝑎𝑚𝑒𝑛𝑡𝑜 𝑟𝑒𝑎𝑙 𝑛𝑎 𝑑𝑜𝑐𝑢𝑚𝑒𝑛𝑡𝑎çã𝑜."
+          if git diff --quiet --cached -- docs/ARQUIVO_MAP.md; then
+            echo "No module-map changes."
             exit 0
           fi
 
-          git commit -m "docs: 🤖 mapa de arquitetura atualizado [skip ci]"
+          git commit -m "docs: update generated module map [skip ci]"
           git push
