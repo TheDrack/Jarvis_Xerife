@@ -850,6 +850,24 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "has_phone": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "has_email": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    "has_fax": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
                     }},
               "required": ["company_name", "cnpj", "evidence"],
               "additionalProperties": true
