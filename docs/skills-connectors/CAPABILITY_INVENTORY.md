@@ -1,7 +1,7 @@
 # Inventário de capacidades — Jarvis Xerife
 
-**Revisão de código:** 2026-11-16  
-**Base de código auditada:** main @ 444b0b322f132802368cbbe0c9568d4409438e61  
+**Revisão de código:** 2026-11-17  
+**Base de código auditada:** main @ ec2755a1a3e673971d4c1ba0ebdba5b7324ecc97  
 **Escopo:** inventário do código e contratos versionados. Não é um health check de deploy nem de conectores do host.
 
 ## Semântica dos estados
@@ -22,6 +22,7 @@ Esses estados são independentes. Manifest, skill, migration ou adapter não pro
 | Composição Nexus | app/core/ | Resolve componentes; não autoriza ações. |
 | Tool manifests | app/domain/tools/, config/tool_registry.json | Catálogo versionado e schemas; não executa por si só. |
 | Tool dispatcher | app/runtime/toolbox/ | Valida, autoriza, resolve adapter e registra resultado; depende de política/principal válidos e deve falhar fechada. |
+| Prospecto | app/adapters/infrastructure/prospecting/, app/application/prospecting/outreach.py, app/adapters/edge/prospecting_mcp_tools.py | Busca CNPJ read-only; outbound exige sessão autorizada, aprovação explícita, DNC e relay HTTPS configurado. Sem provider/live send verificado. |
 | Toolchains | config/toolchains/ | DAGs declarativos; limites e execução dependem do dispatcher/runtime. |
 | Pipelines YAML | app/runtime/pipeline_runner.py, config/pipelines/ | Mantém compatibilidade legada; nem todo passo usa o dispatcher. |
 | Multiagente | app/multiagent/ | Queue, scheduler, workers e contratos; depende de banco, migrations, credenciais e worker ativo. |
@@ -37,7 +38,7 @@ Esses estados são independentes. Manifest, skill, migration ou adapter não pro
 
 ## Tool manifest catalog
 
-O arquivo config/tool_registry.json declara 10 manifests na versão de schema 1.0.0 no commit de referência:
+O arquivo config/tool_registry.json declara 12 manifests na versão de schema 1.0.0 no commit de referência:
 
 - telegram.get_updates
 - telegram.send_message
@@ -49,8 +50,22 @@ O arquivo config/tool_registry.json declara 10 manifests na versão de schema 1.
 - intelligence.events.earthquakes
 - intelligence.snapshot.collect
 - communication.chatgpt_plan.send_prompt
+- prospecting.companies.search
+- prospecting.companies.lookup
 
 A listagem descreve manifests versionados, não disponibilidade real de adapters, credenciais ou grants. Consulte o arquivo JSON para schemas, permissões, escopos e metadados atualizados.
+
+## Prospecto Android MCP tools (fora do catálogo de manifests)
+
+O servidor `app/adapters/edge/jarvis_android_mcp.py` também registra cinco ferramentas MCP de outbound, separadas do `config/tool_registry.json`:
+
+- `prospecting.outreach.plan`
+- `prospecting.outreach.approve`
+- `prospecting.outreach.dispatch`
+- `prospecting.outreach.block`
+- `prospecting.outreach.history`
+
+Todas exigem a capability de sessão `prospecting.outreach.manage`. Planejar não envia; dispatch exige plano aprovado e relay HTTPS configurado por canal. A implementação não descobre automaticamente e-mails, telefones ou formulários institucionais. Não há credenciais de provider nem envio externo ao vivo comprovados. Sessões Android existentes não herdam a nova capability; o perfil precisa ser pareado novamente para concedê-la.
 
 ## Skills portáteis
 
