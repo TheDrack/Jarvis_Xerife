@@ -89,6 +89,12 @@ class ProspectingAdapter(NexusComponent):
         capital_max: Optional[float] = None,
         simples_only: bool = False,
         mei_only: bool = False,
+        country_codes: Optional[list[str]] = None,
+        reason_codes: Optional[list[str]] = None,
+        special_situation_codes: Optional[list[str]] = None,
+        has_phone: Optional[bool] = None,
+        has_email: Optional[bool] = None,
+        has_fax: Optional[bool] = None,
     ) -> dict[str, Any]:
         """Search a bounded market slice and return source-backed company records.
 
@@ -118,6 +124,12 @@ class ProspectingAdapter(NexusComponent):
             capital_max=capital_max,
             simples_only=simples_only,
             mei_only=mei_only,
+            country_codes=tuple(country_codes or ()),
+            reason_codes=tuple(reason_codes or ()),
+            special_situation_codes=tuple(special_situation_codes or ()),
+            has_phone=has_phone,
+            has_email=has_email,
+            has_fax=has_fax,
         )
         result = self._provider().discover(query)
         return {
