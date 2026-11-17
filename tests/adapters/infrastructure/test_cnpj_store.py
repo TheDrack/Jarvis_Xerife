@@ -247,6 +247,9 @@ def test_lookup_finds_a_cnpj_outside_the_campaign_filter(tmp_path):
     assert found is not None
     assert found.company_name == "Outra Cidade"
     assert found.registry_presence is RegistryPresence.FOUND
+    assert found.company_size == "03"
+    assert found.legal_nature == "2062"
+    assert found.capital_social == "100000,00"
     assert provider.lookup_company("99999999000199") is None
     assert provider.lookup_company("123") is None
 
