@@ -214,6 +214,12 @@ class CnpjOpenDataAdapter:
             or query.capital_max is not None
             or query.simples_only
             or query.mei_only
+            or query.country_codes
+            or query.reason_codes
+            or query.special_situation_codes
+            or query.has_phone is not None
+            or query.has_email is not None
+            or query.has_fax is not None
         )
         if advanced_filters:
             raise NotImplementedError(
