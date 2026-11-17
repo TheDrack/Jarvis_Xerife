@@ -373,6 +373,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
  .hud-foot{padding-left:8px;padding-right:8px}
 }
 </style>
+<link rel="stylesheet" href="/static/jarvis-prospecting.css">
 </head>
 <body>
 <div class="shell">
@@ -425,6 +426,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
      <button type="button" data-view="sources">Fontes</button>
      <button type="button" data-view="orbital">Orbital</button>
      <button type="button" id="universalButton">Intel</button>
+     <button type="button" id="prospectingButton" title="Pesquisar empresas na base oficial de CNPJ">Prospecto</button>
     </div>
     <button type="button" class="orb" id="engage" aria-label="Coletar inteligência" title="Coletar todas as fontes"><span>◎</span></button>
     <div class="dock-group" role="group" aria-label="Este dispositivo">
@@ -508,6 +510,31 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
  </div>
 </div>
 
+<div class="window" id="prospectingWindow" role="dialog" aria-modal="true" aria-labelledby="prospectingTitle">
+ <div class="window-card">
+  <div class="window-head"><span class="badge">◈</span><span class="title" id="prospectingTitle">JARVIS PROSPECTO · DESCOBERTA EMPRESARIAL</span><button class="mini" type="button" id="prospectingClose" data-close="prospectingWindow">FECHAR ×</button></div>
+  <div class="window-body">
+   <div class="prospecting-layout">
+    <form id="prospectingForm" class="prospecting-form">
+     <div class="prospecting-field"><label for="prospectingUf">UF</label><input id="prospectingUf" name="uf" value="SC" maxlength="2" autocomplete="address-level1" required></div>
+     <div class="prospecting-field"><label for="prospectingCnae">Prefixos CNAE</label><input id="prospectingCnae" name="cnae" placeholder="4120, 2511" autocomplete="off" required></div>
+     <div class="prospecting-field" style="grid-column:1/-1"><label for="prospectingMunicipalities">Municípios (opcional)</label><input id="prospectingMunicipalities" name="municipalities" placeholder="São José, Florianópolis" autocomplete="off"></div>
+     <div class="prospecting-options">
+      <label><input id="prospectingOnlyActive" type="checkbox" checked> Somente empresas ativas</label>
+      <label><input id="prospectingSecondary" type="checkbox" checked> Incluir CNAE secundário</label>
+     </div>
+     <div class="prospecting-actions"><button class="mini" id="prospectingSearch" type="submit">PESQUISAR</button><span id="prospectingStatus" class="prospecting-status" role="status" aria-live="polite">Informe a atividade e a região para iniciar.</span></div>
+    </form>
+    <div class="prospecting-meta"><span id="prospectingSummary">0 empresas</span><span id="prospectingSourceNote">BASE OFICIAL · AGUARDANDO CONSULTA</span></div>
+    <div id="prospectingIdentityNote" class="prospecting-note">A busca atual agrupa resultados pela raiz do CNPJ. O CNPJ completo exibido identifica o estabelecimento representativo.</div>
+    <div id="prospectingResults" class="prospecting-results"><div class="prospecting-empty">Nenhuma consulta executada.</div></div>
+    <div class="prospecting-actions"><button class="mini" id="prospectingNext" type="button" hidden>PRÓXIMA PÁGINA →</button></div>
+   </div>
+  </div>
+  <div class="window-foot"><span>RECEITA FEDERAL · DADOS PÚBLICOS · SOMENTE LEITURA</span><span>SEM CONTATO AUTOMÁTICO</span></div>
+ </div>
+</div>
+
 <div class="window" id="cameraWindow" role="dialog" aria-modal="true" aria-labelledby="cameraTitle">
  <div class="window-card">
   <div class="window-head"><span class="badge">◈</span><span class="title" id="cameraTitle">CAMERAS · LIVE</span><button class="mini" type="button" data-close="cameraWindow">FECHAR ×</button></div>
@@ -535,6 +562,7 @@ button.row{width:100%;text-align:left;font:inherit;color:inherit}
 </div>
 <script src="/static/jarvis-geospatial-layer.js"></script>
 <script src="/static/jarvis-intelligence-status.js"></script>
+<script src="/static/jarvis-prospecting.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js" crossorigin="anonymous"></script>
 <script>
 (()=>{

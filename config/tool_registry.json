@@ -554,6 +554,297 @@
             ],
             "additionalProperties": false
         }
+    },
+{
+      "version": "1.0.0",
+      "adapter_id": "prospecting_adapter",
+      "provider": "Receita Federal - Dados Abertos do CNPJ",
+      "origin": "first_party",
+      "permissions": ["prospecting.cnpj.read"],
+      "allowed_scopes": ["local", "prospecting:read"],
+      "execution_mode": "read_only",
+      "trust_level": "system",
+      "data_classification": "public",
+      "rate_limit": {
+        "requests": 6,
+        "window_seconds": 60
+      },
+      "timeout_seconds": 30,
+      "cost_units": 1,
+      "idempotency": "not_applicable",
+      "license": "Receita Federal CNPJ open data; CC-BY attribution required",
+      "terms_uri": "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/dados-abertos/cadastros/cnpj",
+      "tool_id": "prospecting.companies.search",
+      "description": "Search active or inactive Brazilian companies by state, municipality and CNAE in the materialized official CNPJ dataset. Results are grouped by the 8-digit CNPJ root.",
+      "operation": "search_companies",
+      "capabilities": ["prospecting.cnpj.read"],
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "uf": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$"
+          },
+          "cnae_prefixes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]{2,7}$"
+            }
+          },
+          "municipalities": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "only_active": {
+            "type": "boolean",
+            "default": true
+          },
+          "include_secondary_cnae": {
+            "type": "boolean",
+            "default": true
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 50
+          },
+          "after_cnpj_basico": {
+            "type": "string",
+            "pattern": "^[0-9]{8}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": ["uf", "cnae_prefixes"]
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "identity_granularity": {
+            "type": "string",
+            "const": "cnpj_basico"
+          },
+          "identity_note": {
+            "type": "string"
+          },
+          "companies": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "company_name": {
+                  "type": "string"
+                },
+                "legal_name": {
+                  "type": ["string", "null"]
+                },
+                "cnpj": {
+                  "type": ["string", "null"],
+                  "pattern": "^[0-9]{14}$"
+                },
+                "website": {
+                  "type": ["string", "null"]
+                },
+                "industry": {
+                  "type": ["string", "null"]
+                },
+                "segment": {
+                  "type": ["string", "null"]
+                },
+                "employee_count": {
+                  "type": ["integer", "null"]
+                },
+                "city": {
+                  "type": ["string", "null"]
+                },
+                "state": {
+                  "type": ["string", "null"]
+                },
+                "country": {
+                  "type": "string"
+                },
+                "registry_presence": {
+                  "type": ["string", "null"]
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              },
+              "required": ["company_name", "cnpj", "evidence"],
+              "additionalProperties": true
+            }
+          },
+          "scanned_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "matched_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped_malformed_rows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "next_cursor": {
+            "type": ["string", "null"]
+          },
+          "collected_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["success", "source_id", "identity_granularity", "identity_note", "companies", "scanned_rows", "matched_rows", "skipped_malformed_rows", "truncated", "next_cursor", "collected_at", "notes"],
+        "additionalProperties": false
+      }
+    },
+{
+      "version": "1.0.0",
+      "adapter_id": "prospecting_adapter",
+      "provider": "Receita Federal - Dados Abertos do CNPJ",
+      "origin": "first_party",
+      "permissions": ["prospecting.cnpj.read"],
+      "allowed_scopes": ["local", "prospecting:read"],
+      "execution_mode": "read_only",
+      "trust_level": "system",
+      "data_classification": "public",
+      "rate_limit": {
+        "requests": 6,
+        "window_seconds": 60
+      },
+      "timeout_seconds": 30,
+      "cost_units": 1,
+      "idempotency": "not_applicable",
+      "license": "Receita Federal CNPJ open data; CC-BY attribution required",
+      "terms_uri": "https://www.gov.br/receitafederal/pt-br/acesso-a-informacao/dados-abertos/cadastros/cnpj",
+      "tool_id": "prospecting.companies.lookup",
+      "description": "Look up one exact 14-digit CNPJ establishment in the official materialized dataset.",
+      "operation": "lookup_company",
+      "capabilities": ["prospecting.cnpj.read"],
+      "input_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cnpj": {
+            "type": "string",
+            "minLength": 14,
+            "maxLength": 18,
+            "pattern": "^[0-9./-]{14,18}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": ["cnpj"]
+      },
+      "output_schema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "const": true
+          },
+          "found": {
+            "type": "boolean"
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "identity_granularity": {
+            "type": "string",
+            "const": "establishment"
+          },
+          "identity_note": {
+            "type": "string"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "company_name": {
+                    "type": "string"
+                  },
+                  "legal_name": {
+                    "type": ["string", "null"]
+                  },
+                  "cnpj": {
+                    "type": ["string", "null"],
+                    "pattern": "^[0-9]{14}$"
+                  },
+                  "website": {
+                    "type": ["string", "null"]
+                  },
+                  "industry": {
+                    "type": ["string", "null"]
+                  },
+                  "segment": {
+                    "type": ["string", "null"]
+                  },
+                  "employee_count": {
+                    "type": ["integer", "null"]
+                  },
+                  "city": {
+                    "type": ["string", "null"]
+                  },
+                  "state": {
+                    "type": ["string", "null"]
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "registry_presence": {
+                    "type": ["string", "null"]
+                  },
+                  "evidence": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "required": ["company_name", "cnpj", "evidence"],
+                "additionalProperties": true
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["success", "found", "source_id", "identity_granularity", "identity_note", "company"],
+        "additionalProperties": false
+      }
     }
   ]
 }

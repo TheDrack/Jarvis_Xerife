@@ -3,7 +3,7 @@
 **Objetivo:** transformar "quem pode comprar" numa execução mensal de um comando, com o mesmo recorte de mercado, comparável entre meses.
 **Escala:** a base oficial tem ~70 milhões de estabelecimentos; a forma saudável de consumi-la está em [JARVIS_PROSPECTO_DATA_PIPELINE.md](JARVIS_PROSPECTO_DATA_PIPELINE.md).
 **Custo:** R$ 0 em dados (dados abertos da Receita, CC-BY).
-**Estado:** descoberta + qualificação + CSV + manifesto testados com fixtures; varredura da base real ainda não executada neste ambiente.
+**Estado:** descoberta + qualificação + CSV + manifesto testados com fixtures; em 17/11/2026 foi executado um recorte real parcial de 67.252 linhas. Isso não equivale a uma varredura nacional.
 
 ## 1. O que é uma campanha
 
@@ -157,3 +157,56 @@ Critério de invalidação sugerido: se depois de 20 abordagens humanas menos de
 - Google Places não pode ser usado como base (os termos proíbem armazenar nome/endereço); ver [JARVIS_PROSPECTO_SOURCES.md](JARVIS_PROSPECTO_SOURCES.md).
 - O `tenant_id` da campanha é rótulo local de operador. Uma API futura deve resolver o tenant por membership autenticada, nunca por este arquivo.
 - Nada é enviado automaticamente: `DO_NOT_CONTACT` é terminal e o envio continua humano.
+
+
+## 9. Uso interno pelo Jarvis
+
+O mesmo store DuckDB usado pelo CLI pode ser lido pelo Android MCP (com sessão autorizada) e pela janela Prospecto do HUD Global Desktop. O adaptador não cria nem baixa a base automaticamente: ele abre o arquivo configurado em modo de leitura.
+
+Configure `JARVIS_PROSPECTO_STORE_PATH` no processo Android MCP ou no servidor local do HUD Desktop. Se não for definido, o adaptador procura `data/prospecting/cnpj.duckdb` na raiz do repositório.
+
+Exemplos de configuração (substitua o caminho pelo local real do arquivo):
+
+**Windows PowerShell**
+```powershell
+$env:JARVIS_PROSPECTO_STORE_PATH = "D:\JarvisData\prospecting\cnpj.duckdb"
+```
+
+**Termux**
+```bash
+export JARVIS_PROSPECTO_STORE_PATH="$HOME/.local/share/jarvis/prospecting/cnpj.duckdb"
+```
+
+A janela **Prospecto** no HUD Global chama o endpoint local autenticado `/api/prospecting/search`; a pesquisa não é executada no navegador nem abre uma conexão DuckDB no frontend. O endpoint usa o mesmo adaptador Nexus. A rota de lookup `/api/prospecting/lookup` também é local e autenticada.
+
+As ferramentas MCP disponíveis são registradas somente no Android MCP e passam pelo Tool Dispatcher. Para autorizá-las, crie/pareie uma sessão com o perfil `termux_jarvis`. Sessões existentes não recebem novas capabilities automaticamente; se a sessão atual foi criada antes desta alteração, será necessário revogá-la e parear novamente com esse perfil. Não revogue uma sessão ativa sem confirmar que não há outra operação dependente dela.
+
+Exemplo para criar o novo perfil, depois de revogar a sessão anterior pelo fluxo normal:
+
+```bash
+PYTHONPATH="$PWD" python -m app.adapters.infrastructure.session_authorization create --profile termux_jarvis
+```
+
+As ferramentas MCP disponíveis são:
+
+- `prospecting.companies.search`: recebe `uf`, `cnae_prefixes`, opcionalmente `municipalities`, `only_active`, `include_secondary_cnae`, `limit` (1–100) e `after_cnpj_basico`.
+- `prospecting.companies.lookup`: consulta um CNPJ completo de 14 dígitos e identifica um estabelecimento exato.
+
+Exemplo de pesquisa:
+
+```json
+{
+  "uf": "SC",
+  "municipalities": ["São José", "Florianópolis"],
+  "cnae_prefixes": ["4120", "2511"],
+  "only_active": true,
+  "include_secondary_cnae": true,
+  "limit": 50
+}
+```
+
+A busca por segmento retorna um resultado por raiz CNPJ (8 dígitos), com um CNPJ completo representativo. Para investigar uma filial específica, use a consulta exata por CNPJ. Quando `truncated=true`, continue com o valor de `next_cursor` em `after_cnpj_basico`.
+
+O arquivo DuckDB é local ao host: configurar o caminho no Android não disponibiliza automaticamente o arquivo do Desktop, e vice-versa. O Android MCP aplica o perfil de sessão e o Tool Dispatcher; o HUD Desktop aplica o token local e o guardião de rede privada. A distribuição/host definitivo da base precisa ser escolhido separadamente. O banco está coberto pelo `.gitignore`; não o envie ao Git.
+
+Essas ferramentas apenas pesquisam dados públicos e devolvem proveniência. Não coletam telefone/e-mail e não enviam mensagens ou contatos.

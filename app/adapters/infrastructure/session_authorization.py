@@ -59,6 +59,13 @@ PROFILES: dict[str, frozenset[str]] = {
             "communication.chatgpt.prompt",
         }
     ),
+    "termux_jarvis": frozenset(
+        {
+            "android.shell.exec",
+            "communication.chatgpt.prompt",
+            "prospecting.cnpj.read",
+        }
+    ),
 }
 
 

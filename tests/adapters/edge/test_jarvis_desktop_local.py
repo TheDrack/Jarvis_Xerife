@@ -2022,3 +2022,89 @@ def test_mobile_pwa_service_worker_is_root_scoped_and_never_caches_api_data():
     assert "event.respondWith(fetch(event.request))" in response.text
     assert "caches.open" not in response.text
     assert "CacheStorage" not in response.text
+
+
+def test_prospecting_search_requires_the_local_session_token():
+    runtime = LocalRuntime()
+    response = _client(runtime).get(
+        "/api/prospecting/search",
+        params={"uf": "SC", "cnae_prefixes": "4120"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_prospecting_search_uses_the_nexus_adapter_and_returns_root_identity(
+    monkeypatch,
+):
+    from app.core.nexus import nexus
+
+    calls = {}
+
+    class FakeProspectingAdapter:
+        def can_execute(self, context=None):
+            return True
+
+        def search_companies(self, **kwargs):
+            calls.update(kwargs)
+            return {
+                "success": True,
+                "identity_granularity": "cnpj_basico",
+                "companies": [{"company_name": "Alfa Serralheria", "cnpj": "12345678000190"}],
+                "truncated": False,
+                "next_cursor": None,
+            }
+
+    monkeypatch.setattr(
+        nexus, "resolve", lambda component_id: FakeProspectingAdapter()
+    )
+    runtime = LocalRuntime()
+    response = _client(runtime).get(
+        "/api/prospecting/search",
+        params=[
+            ("uf", "sc"),
+            ("cnae_prefixes", "4120"),
+            ("cnae_prefixes", "2511"),
+            ("municipalities", "São José"),
+            ("limit", "25"),
+        ],
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["identity_granularity"] == "cnpj_basico"
+    assert response.json()["companies"][0]["cnpj"] == "12345678000190"
+    assert calls["uf"] == "SC"
+    assert calls["cnae_prefixes"] == ["4120", "2511"]
+    assert calls["municipalities"] == ["São José"]
+    assert calls["limit"] == 25
+
+
+def test_prospecting_search_reports_missing_store_without_leaking_paths(monkeypatch):
+    from app.core.nexus import nexus
+
+    class MissingStoreAdapter:
+        def can_execute(self, context=None):
+            return False
+
+    monkeypatch.setattr(nexus, "resolve", lambda component_id: MissingStoreAdapter())
+    runtime = LocalRuntime()
+    response = _client(runtime).get(
+        "/api/prospecting/search",
+        params={"uf": "SC", "cnae_prefixes": "4120"},
+        headers={"Authorization": f"Bearer {runtime.token}"},
+    )
+
+    assert response.status_code == 503
+    assert "Base CNPJ não configurada" in response.json()["detail"]
+    assert "C:" not in response.text
+
+
+def test_prospecting_exact_lookup_requires_local_authentication():
+    runtime = LocalRuntime()
+    response = _client(runtime).get(
+        "/api/prospecting/lookup",
+        params={"cnpj": "12345678000190"},
+    )
+
+    assert response.status_code == 401
