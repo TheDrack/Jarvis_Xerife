@@ -52,7 +52,7 @@ def _safe_failure(result: Any) -> dict[str, Any]:
     code = getattr(result, "error_code", None) or "prospecting_dispatch_failed"
     messages = {
         "authorization_denied": "A sessão local não possui a capability de leitura do Prospecto. Refaça o pareamento com o perfil termux_jarvis.",
-        "adapter_precondition_failed": "A base CNPJ não está configurada ou disponível neste host.",
+        "adapter_not_ready": "A base CNPJ não está configurada ou disponível neste host.",
         "invalid_arguments": "Os filtros informados não atendem ao contrato da pesquisa.",
         "invalid_output": "O adaptador retornou dados fora do contrato declarado.",
         "rate_limited": "Limite de consultas do Prospecto atingido; aguarde antes de repetir.",
