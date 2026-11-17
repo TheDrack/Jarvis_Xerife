@@ -13,7 +13,14 @@ def test_every_button_declares_button_type_and_accessible_name():
     buttons = _buttons()
     assert buttons
     for attributes, body in buttons:
-        assert 'type="button"' in attributes, attributes
+        button_type = re.search(r'\\btype="(button|submit|reset)"', attributes)
+        assert button_type, attributes
+        if button_type.group(1) == "submit":
+            assert 'id="prospectingSearch"' in attributes, attributes
+            button_position = HTML.find(f"<button{attributes}")
+            form_start = HTML.rfind("<form", 0, button_position)
+            form_end = HTML.find("</form>", button_position)
+            assert form_start >= 0 and form_end > button_position, attributes
         visible_text = re.sub(r"<[^>]+>", "", body).strip()
         assert "aria-label=" in attributes or visible_text, (attributes, body)
 
