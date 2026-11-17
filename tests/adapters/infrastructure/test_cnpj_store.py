@@ -327,3 +327,29 @@ def test_simples_and_mei_filters_use_the_auxiliary_dataset(tmp_path):
 
     assert [item.cnpj for item in simples.companies] == ["12345678000190", "87654321000190"]
     assert [item.cnpj for item in mei.companies] == ["12345678000190"]
+
+
+def test_builder_ingests_company_domain_lookup_tables(tmp_path):
+    base = sample_files(tmp_path)
+    files = CnpjStoreFiles(
+        establishments=base.establishments,
+        companies=base.companies,
+        municipalities=base.municipalities,
+        cnaes=base.cnaes,
+        legal_natures=write_csv(tmp_path / "Naturezas.csv", [["2062", "Sociedade empresária limitada"]]),
+        qualifications=write_csv(tmp_path / "Qualificacoes.csv", [["49", "Sócio-administrador"]]),
+        countries=write_csv(tmp_path / "Paises.csv", [["105", "Brasil"]]),
+        situation_reasons=write_csv(tmp_path / "Motivos.csv", [["01", "Extinção por encerramento"]]),
+    )
+    database = tmp_path / "lookups.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    import duckdb
+    connection = duckdb.connect(str(database), read_only=True)
+    try:
+        assert connection.execute("SELECT descricao FROM legal_natures WHERE codigo='2062'").fetchone()[0] == "Sociedade empresária limitada"
+        assert connection.execute("SELECT descricao FROM qualifications WHERE codigo='49'").fetchone()[0] == "Sócio-administrador"
+        assert connection.execute("SELECT descricao FROM countries WHERE codigo='105'").fetchone()[0] == "Brasil"
+        assert connection.execute("SELECT descricao FROM situation_reasons WHERE codigo='01'").fetchone()[0] == "Extinção por encerramento"
+    finally:
+        connection.close()
