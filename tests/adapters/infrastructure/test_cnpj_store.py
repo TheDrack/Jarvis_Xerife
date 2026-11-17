@@ -1,0 +1,250 @@
+import csv
+from pathlib import Path
+
+import pytest
+
+from app.adapters.infrastructure.prospecting.cnpj_open_data import CnpjOpenDataAdapter, CnpjOpenDataFiles
+from app.adapters.infrastructure.prospecting.cnpj_store import (
+    CnpjStoreBuilder,
+    CnpjStoreFiles,
+    CnpjStoreProvider,
+)
+from app.domain.prospecting.contracts import RegistryPresence
+from app.domain.prospecting.discovery import DiscoveryQuery
+
+ESTABLISHMENT_COLUMNS = 30
+
+
+def establishment(
+    *,
+    basico: str = "12345678",
+    ordem: str = "0001",
+    dv: str = "90",
+    fantasia: str = "Alfa Serralheria",
+    situacao: str = "02",
+    cnae: str = "4120400",
+    secundario: str = "",
+    uf: str = "SC",
+    municipio: str = "8000",
+) -> list[str]:
+    row = [""] * ESTABLISHMENT_COLUMNS
+    row[0], row[1], row[2], row[3] = basico, ordem, dv, "1"
+    row[4], row[5], row[11], row[12] = fantasia, situacao, cnae, secundario
+    row[19], row[20] = uf, municipio
+    return row
+
+
+def company_row(basico: str = "12345678", razao: str = "ALFA SERRALHERIA LTDA") -> list[str]:
+    return [basico, razao, "2062", "49", "100000,00", "03", ""]
+
+
+def write_csv(path: Path, rows: list[list[str]]) -> Path:
+    with path.open("w", encoding="latin-1", newline="") as handle:
+        csv.writer(handle, delimiter=";").writerows(rows)
+    return path
+
+
+def build_files(
+    directory: Path,
+    establishments: list[list[str]],
+    companies: list[list[str]],
+) -> CnpjStoreFiles:
+    directory.mkdir(parents=True, exist_ok=True)
+    return CnpjStoreFiles(
+        establishments=(write_csv(directory / "Estabelecimentos0.csv", establishments),),
+        companies=(write_csv(directory / "Empresas0.csv", companies),),
+        municipalities=write_csv(
+            directory / "Municipios.csv",
+            [["8000", "SAO JOSE"], ["8100", "FLORIANOPOLIS"], ["9000", "PORTO ALEGRE"]],
+        ),
+        cnaes=write_csv(
+            directory / "Cnaes.csv",
+            [["4120400", "CONSTRUCAO DE EDIFICIOS"], ["6201500", "SOFTWARE"]],
+        ),
+    )
+
+
+def query(**overrides) -> DiscoveryQuery:
+    values = dict(uf="SC", municipalities=("São José",), cnae_prefixes=("4120",))
+    values.update(overrides)
+    return DiscoveryQuery(**values)
+
+
+def sample_files(tmp_path: Path) -> CnpjStoreFiles:
+    return build_files(
+        tmp_path / "data",
+        [
+            establishment(),
+            establishment(basico="87654321", fantasia="Beta Obras"),
+            establishment(basico="55555555", fantasia="Inativa", situacao="08"),
+            establishment(basico="44444444", fantasia="Outra Cidade", municipio="8100"),
+            establishment(basico="33333333", fantasia="Outro Estado", uf="PR"),
+            establishment(basico="22222222", fantasia="********", cnae="4120400"),
+        ],
+        [
+            company_row(),
+            company_row("87654321", "BETA OBRAS LTDA"),
+            company_row("55555555", "INATIVA LTDA"),
+            company_row("44444444", "OUTRA CIDADE LTDA"),
+            company_row("33333333", "OUTRO ESTADO LTDA"),
+            company_row("22222222", "********"),
+        ],
+    )
+
+
+def test_build_keeps_only_the_requested_scope_and_reports_counts(tmp_path):
+    files = sample_files(tmp_path)
+    report = CnpjStoreBuilder(tmp_path / "store.duckdb", scope_ufs=("SC",)).build(files)
+
+    assert report.establishment_rows == 5  # everything except the PR row
+    assert report.company_rows == 5
+    assert report.ingested_files == ("Estabelecimentos0.csv", "Empresas0.csv")
+    assert report.skipped_files == ()
+
+
+def test_store_provider_matches_the_csv_adapter(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "store.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    csv_result = CnpjOpenDataAdapter(
+        CnpjOpenDataFiles(
+            establishments=files.establishments[0],
+            companies=files.companies[0],
+            municipalities=files.municipalities,
+            cnaes=files.cnaes,
+        )
+    ).discover(query())
+    store_result = CnpjStoreProvider(database).discover(query())
+
+    csv_companies = sorted(c.cnpj for c in csv_result.companies)
+    store_companies = sorted(c.cnpj for c in store_result.companies)
+    assert store_companies == csv_companies == ["12345678000190", "87654321000190"]
+    assert store_result.matched_rows == csv_result.matched_rows
+    assert store_result.truncated is False
+
+
+def test_masked_names_and_inactive_rows_are_excluded(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "store.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    active = CnpjStoreProvider(database).discover(query())
+    everything = CnpjStoreProvider(database).discover(query(only_active=False))
+
+    assert all(not company.company_name.startswith("*") for company in active.companies)
+    assert all(not company.company_name.startswith("*") for company in everything.companies)
+    assert len(everything.companies) >= len(active.companies)
+
+
+def test_rebuild_skips_files_already_ingested(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "store.duckdb"
+    builder = CnpjStoreBuilder(database, scope_ufs=("SC",))
+
+    builder.build(files)
+    second = builder.build(files)
+
+    assert second.ingested_files == ()
+    assert set(second.skipped_files) == {"Estabelecimentos0.csv", "Empresas0.csv"}
+    assert second.establishment_rows == 5
+
+
+def test_truncation_is_reported_with_the_ordering_caveat(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "store.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    result = CnpjStoreProvider(database).discover(query(limit=1))
+
+    assert len(result.companies) == 1
+    assert result.truncated is True
+    assert result.next_cursor is not None
+    # matched_rows counts establishments that hit the filters, including the one
+    # whose name is masked and therefore never becomes a company — same as the CSV adapter.
+    assert result.matched_rows == 3
+    assert any("CNPJ base order" in note for note in result.notes)
+
+
+def test_unknown_municipality_returns_an_explanation(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "store.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+
+    result = CnpjStoreProvider(database).discover(query(municipalities=("Cidade Inexistente",)))
+
+    assert result.companies == ()
+    assert any("municipality" in note for note in result.notes)
+
+
+def test_missing_source_files_and_missing_database_raise(tmp_path):
+    builder = CnpjStoreBuilder(tmp_path / "store.duckdb", scope_ufs=("SC",))
+    empty = CnpjStoreFiles(
+        establishments=(tmp_path / "nao-existe.csv",),
+        companies=(tmp_path / "nao-existe2.csv",),
+        municipalities=tmp_path / "nao-existe3.csv",
+        cnaes=tmp_path / "nao-existe4.csv",
+    )
+
+    with pytest.raises(FileNotFoundError):
+        builder.build(empty)
+    with pytest.raises(FileNotFoundError):
+        CnpjStoreProvider(tmp_path / "sem-store.duckdb").discover(query())
+
+
+def test_secondary_activity_matches_and_can_be_disabled(tmp_path):
+    files = build_files(
+        tmp_path,
+        [establishment(cnae="4618401", secundario="4120400,4399103")],
+        [company_row()],
+    )
+    database = tmp_path / "store.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+    provider = CnpjStoreProvider(database)
+
+    assert len(provider.discover(query()).companies) == 1
+    assert provider.discover(query(include_secondary_cnae=False)).companies == ()
+
+
+def test_store_pages_through_the_whole_slice_like_the_csv_adapter(tmp_path):
+    rows = [
+        establishment(basico=f"{index:08d}", fantasia=f"Empresa {index}")
+        for index in range(5)
+    ]
+    companies = [company_row(f"{index:08d}", f"EMPRESA {index} LTDA") for index in range(5)]
+    files = build_files(tmp_path, rows, companies)
+    database = tmp_path / "store.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+    provider = CnpjStoreProvider(database)
+
+    first = provider.discover(query(limit=2))
+    second = provider.discover(query(limit=2, after_cnpj_basico=first.next_cursor))
+    third = provider.discover(query(limit=2, after_cnpj_basico=second.next_cursor))
+
+    assert [company.company_name for company in first.companies] == ["Empresa 0", "Empresa 1"]
+    assert [company.company_name for company in second.companies] == ["Empresa 2", "Empresa 3"]
+    assert [company.company_name for company in third.companies] == ["Empresa 4"]
+    assert first.next_cursor == "00000001"
+    assert third.next_cursor is None
+    assert third.truncated is False
+
+
+def test_lookup_finds_a_cnpj_outside_the_campaign_filter(tmp_path):
+    files = sample_files(tmp_path)
+    database = tmp_path / "store.duckdb"
+    CnpjStoreBuilder(database, scope_ufs=("SC",)).build(files)
+    provider = CnpjStoreProvider(database)
+
+    # This establishment is in Florianópolis, outside the query slice, and the lookup
+    # must still find it: existence in the registry is not the same as fitting a filter.
+    found = provider.lookup_company("44444444000190")
+    assert found is not None
+    assert found.company_name == "Outra Cidade"
+    assert found.registry_presence is RegistryPresence.FOUND
+    assert provider.lookup_company("99999999000199") is None
+    assert provider.lookup_company("123") is None
+
+
+def test_scope_requires_at_least_one_state(tmp_path):
+    with pytest.raises(ValueError):
+        CnpjStoreBuilder(tmp_path / "store.duckdb", scope_ufs=())

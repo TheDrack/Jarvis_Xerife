@@ -136,5 +136,11 @@ issue_url.txt
 
 .venv-host/
 
-# Runtime-only metadata audit output; never commit local execution history.
-data/tool_execution_audit.jsonl
+
+# Prospecting data outputs — never commit (query system; temp data goes to Supabase)
+*.duckdb
+*.duckdb.wal
+*.parquet
+prospecting-output/
+prospecto-output/
+data/prospecting/
