@@ -35,25 +35,27 @@ A public CNPJ record is a discovered organization, not an enrolled supplier. Dis
 
 The future application should distinguish these aggregates instead of treating every CNPJ as a storefront:
 
-- **Organization:** legal/company identity and verified business attributes.
+- **Party:** shared identity root for a commercial participant, with an explicit type such as `organization` or `consumer`. Use a real supertype/foreign-key design rather than an unchecked polymorphic identifier.
+- **Organization:** legal/company identity and verified business attributes, normally linked to CNPJ data.
 - **OrganizationMembership:** a human user's relationship and role within an organization.
-- **SupplierParticipation:** explicit opt-in and eligibility to publish a commercial presence.
-- **Storefront:** the public commercial profile for an enrolled organization.
-- **CatalogItem:** a product or service offered by the supplier, with descriptive attributes and availability.
-- **BuyerSupplierRelationship:** a relationship between two organizations; buyer/supplier roles are contextual, not permanent labels on an organization.
+- **ConsumerAccount:** an individual buyer account for B2C flows. Keep personal data minimal, private and purpose-limited; do not expose it as a public business profile.
+- **SupplierParticipation:** explicit opt-in and eligibility for an organization to publish a commercial presence.
+- **Storefront:** the public commercial profile for an enrolled supplier organization.
+- **CatalogItem:** a product or service offered by a supplier, with descriptive attributes and availability.
+- **BuyerSupplierRelationship:** a relationship between a buyer party (organization or consumer) and a supplier organization.
 - **Quote:** a supplier's price and conditions for a selected basket or recurring requirement.
 - **RecurringAgreement:** an accepted schedule, item quantities, fulfillment location, commercial terms and effective dates.
 - **PurchaseOrder:** the buyer's confirmed request.
 - **PurchaseOrderOccurrence:** one concrete scheduled occurrence generated from a recurring agreement.
-- **Delivery/ Fulfillment:** supplier acceptance, preparation and delivery status.
+- **Delivery/Fulfillment:** supplier acceptance, preparation and delivery status.
 
-An organization can be a buyer in one relationship and a supplier in another. Do not encode either role as a permanent organization type.
+An organization can be a buyer in one relationship and a supplier in another. A consumer can be a buyer without being an organization. Do not encode buyer/supplier roles as permanent organization types. Storefront participation remains opt-in for suppliers; discovery of a public CNPJ does not create a supplier account.
 
 ## 4. Storefront behavior
 
 The initial storefront may display product/service names, descriptions, categories, specifications, supplier identity and availability information without exposing a price.
 
-A buyer can select items and quantities and submit a request. The supplier then provides a quote and commercial terms. The catalog is a discovery and selection surface; it is not automatically an offer with a binding price.
+A business buyer or an individual consumer can select items and quantities and submit a request. The supplier then provides a quote and commercial terms. The catalog is a discovery and selection surface; it is not automatically an offer with a binding price.
 
 Only organizations that explicitly enroll as suppliers may publish storefronts or receive marketplace ranking benefits. A discovered CNPJ may appear as a candidate in a research result, but must not be represented as a participating marketplace supplier.
 
