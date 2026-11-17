@@ -1,4 +1,4 @@
-# Verificação de Entregas — propostas da documentação vs. código real
+> **Registro histórico — não é o status atual.** Esta auditoria foi executada em 2026-10-16 sobre o commit 0559109. Seus probes, contagens e conclusões descrevem aquele snapshot e não devem ser extrapolados para o branch atual. Para a leitura de estado atual do código, use [docs/STATUS.md](STATUS.md), [docs/ARCHITECTURE.md](ARCHITECTURE.md) e [o inventário de capacidades](skills-connectors/CAPABILITY_INVENTORY.md). Revalide cada achado antes de abrir trabalho ou declarar uma lacuna.\n\n# Verificação de Entregas — propostas da documentação vs. código real
 
 **Data:** 2026-10-16 · **Base:** commit `0559109` (branch `main`)
 **Método:** cada proposta foi confrontada com evidência executável (probe, teste,
