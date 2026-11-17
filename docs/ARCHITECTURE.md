@@ -1,472 +1,146 @@
-# 🏗️ JARVIS — Arquitetura do Sistema
+# Arquitetura do Jarvis Xerife
 
-**Versão:** 2.0.0  
-**Atualizado em:** 2026-03-10
+**Escopo:** arquitetura presente no código versionado de main, não uma promessa de roadmap nem uma declaração de disponibilidade de produção.
 
----
+## 1. Modelo arquitetural
 
-## Rota remota principal: RDC → Aperture → Tailscale → Jarvis
+O sistema combina separação por camadas, portas/adaptadores e composição via Nexus. A estrutura não é uma implementação hexagonal pura: existem módulos históricos e wrappers de compatibilidade, além de runtimes especializados. Ao alterar um subsistema, siga seus contratos locais e não presuma que toda a árvore obedece a uma única abstração.
 
-**Prioridade P0.** Ao ligar o PC, o Tailscale deve conectar automaticamente à tailnet. Agentes compatíveis com MCP e autorizados usam o gateway do Aperture: `https://aperture.tail350144.ts.net/v1/mcp`. O conector `jarvis` do Aperture encaminha as chamadas ao upstream privado `https://multimetal.tail350144.ts.net/mcp`, publicado pelo Tailscale Serve para o servidor local `127.0.0.1:8765`.
-
-O Aperture centraliza grants e exposição de ferramentas; as ACLs/identidade do Tailscale limitam o alcance de rede. “Qualquer agente” significa qualquer agente compatível e autorizado, não acesso público irrestrito.
-
-RDC diretamente ao bridge JSONL e Aperture diretamente ao upstream Jarvis são alternativas para situações específicas, por exemplo diagnóstico local ou quando a rota principal não pode ser usada. Não são a metodologia padrão. A sessão visual do Windows ainda precisa estar acessível para ferramentas que controlam a interface gráfica.
-
-Detalhes, boot, segurança e critérios de aceitação: `docs/ACESSO_REMOTO_RDC_APERTURE_TAILSCALE.md`.
-
-
-## 📋 Visão Geral
-
-JARVIS segue **Arquitetura Hexagonal** com **Injeção de Dependência (Nexus DI)** e **Auto-Evolução Assistida por LLM**.
-
-O sistema é organizado em 5 camadas principais:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    INTERFACE / CI-CD                            │
-│  - GitHub Actions (homeostase.yml)                              │
-│  - API REST (FastAPI)                                           │
-│  - Telegram Bot (Webhook/Polling)                               │
-│  - WebSocket (HUD em tempo real)                                │
-├─────────────────────────────────────────────────────────────────┤
-│                    ADAPTERS (Infra/Edge)                        │
-│  - gateway_llm_adapter.py (Groq, Gemini, Ollama)                │
-│  - telegram_adapter.py                                          │
-│  - github_adapter.py / github_worker.py                         │
-│  - ollama_adapter.py                                            │
-│  - docker_sandbox.py (NOVO)                                     │
-│  - persistent_shell_adapter.py                                  │
-│  - vector_memory_adapter.py                                     │
-│  - vision_adapter.py                                            │
-│  - mqtt_home_adapter.py                                         │
-│  - soldier_telemetry_adapter.py                                 │
-├─────────────────────────────────────────────────────────────────┤
-│                   APPLICATION (Services)                        │
-│  - assistant_service.py                                         │
-│  - jarvis_dev_agent.py (NOVO - Agente Autônomo)                 │
-│  - jarvis_dev_agent/pipeline_builder.py (NOVO)                  │
-│  - jarvis_dev_agent/actions.py (NOVO)                           │
-│  - jarvis_dev_agent/prompt_builder.py (NOVO)                    │
-│  - jarvis_dev_agent/code_discovery.py (NOVO)                    │
-│  - jarvis_dev_agent/trajectory.py (NOVO)                        │
-│  - evolution_orchestrator.py                                    │
-│  - evolution_gatekeeper.py                                      │
-│  - evolution_sandbox.py                                         │
-│  - metabolism_core.py                                           │
-│  - llm_router.py                                                │
-│  - adapter_registry.py (NOVO)                                   │
-│  - consolidated_context_service.py                              │
-│  - crystallizer_engine.py                                       │
-│  - local_repair_agent.py                                        │
-│  - notification_service.py                                      │
-│  - field_vision.py                                              │
-│  - thought_log_service.py                                       │
-│  - device_orchestrator_service.py                               │
-│  - c2_orchestrator_service.py                                   │
-│  - soldier_registry.py                                          │
-├─────────────────────────────────────────────────────────────────┤
-│                     DOMAIN (Core)                               │
-│  - capability_manager.py                                        │
-│  - capabilities/cap_001.py a cap_102.py                         │
-│  - memory/semantic_memory.py                                    │
-│  - memory/procedural_memory.py (NOVO)                           │
-│  - memory/working_memory.py                                     │
-│  - memory/prospective_memory.py (NOVO)                          │
-│  - models/agent.py (NOVO - Action, Observation, Task)           │
-│  - models/adapter_registry.py (NOVO)                            │
-│  - services/command_interpreter.py                              │
-│  - services/intent_processor.py                                 │
-│  - services/system_state_tracker.py                             │
-│  - services/reward_signal_provider.py                           │
-│  - services/safety_guardian.py                                  │
-├─────────────────────────────────────────────────────────────────┤
-│                      CORE (Nexus DI)                            │
-│  - nexus.py (Container DI + Circuit Breaker)                    │
-│  - nexus_exceptions.py (CloudMock, TimeoutError)                │
-│  - nexuscomponent.py (Classe base)                              │
-│  - nexus_discovery.py (Descoberta automática)                   │
-│  - nexus_registry.py (Registro local/remoto)                    │
-│  - meta/policy_store.py                                         │
-│  - meta/jrvs_compiler.py                                        │
-│  - meta/decision_engine.py                                      │
-│  - config.py (Environment variables)                            │
-└─────────────────────────────────────────────────────────────────┘
+```text
+Interfaces / clientes
+  ├─ Desktop Windows (WebView2 + API local)
+  ├─ Android nativo
+  ├─ API HTTP / WebSocket
+  ├─ MCP / CLI
+  └─ integrações externas
+          |
+Adaptadores de entrada e infraestrutura
+  ├─ app/adapters/api
+  ├─ app/adapters/edge
+  └─ app/adapters/infrastructure
+          |
+Aplicação
+  ├─ serviços e casos de uso
+  ├─ portas
+  ├─ comunicação
+  └─ segurança / privacidade
+          |
+Domínio
+  ├─ capabilities, tools, missions
+  ├─ intelligence, graph, analysis
+  ├─ memory, context
+  └─ orchestration, models, services
+          |
+Composição e execução
+  ├─ Nexus DI
+  ├─ Tool Registry + Dispatcher
+  ├─ Pipeline Runner
+  └─ Multi-agent runtime
+          |
+Dependências externas
+  PostgreSQL/Supabase, Render, LLMs, APIs públicas,
+  rede privada, Android OS e Windows host
 ```
 
----
+## 2. Estrutura real do código
 
-## 🔄 Fluxo Principal (JarvisDevAgent)
+| Diretório | Papel | Observações |
+|---|---|---|
+| app/core | Composição e configuração | Nexus e configuração compartilhada. |
+| app/domain | Núcleo de domínio | Inclui ai, analysis, capabilities, context, graph, intelligence, memory, missions, orchestration, tools e modelos/serviços. |
+| app/application | Casos de uso e políticas | Inclui ports, services, communication, privacy e security. |
+| app/adapters/api | Adaptadores de API | Entradas HTTP e integração com a aplicação. |
+| app/adapters/edge | Host e edge | Desktop, Android bridge e recursos dependentes do sistema operacional. |
+| app/adapters/infrastructure | Infraestrutura | Persistência, LLM, mensageria, provedores, auditoria e integrações. |
+| app/runtime | Execução declarativa | Pipeline runner e toolbox. |
+| app/multiagent | Execução multiagente | Worker, scheduler, queue, transport, contracts e execution plan. |
+| app/communication | Comunicação compartilhada | Contratos/implementações usados por mais de uma superfície. |
+| config | Catálogos declarativos | tool_registry.json, toolchains e pipelines. |
+| migrations | Schema e funções de banco | Migrations precisam ser aplicadas e verificadas separadamente. |
+| mobile/android | App Android | Código Kotlin/Gradle e testes Android. |
+| desktop | App desktop | Recursos de UI e empacotamento Windows. |
+| scripts | Operação | Instalação, diagnóstico, automação e manutenção. |
+| skills e .agents | Instruções para agentes | A descoberta depende do host/harness. |
+| tests | Qualidade | Testes distribuídos por subsistema e tipo. |
 
-**O JarvisDevAgent agora orquestra TODO o fluxo de desenvolvimento do sistema:**
+## 3. Composição: Nexus
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    USUÁRIO SOLICITA                             │
-│  "Crie pipeline para enviar notificação no Telegram"            │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              JARVIS DEV AGENT (Analisa)                         │
-│  1. Consulta AdapterRegistry (o que existe?)                    │
-│  2. Verifica: telegram_adapter existe? → SIM                    │
-│  3. Decide: Não preciso criar, só usar                          │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              PIPELINE BUILDER (Cria)                            │
-│  Gera: config/pipelines/auto_telegram_notification.yml          │
-│  ```yaml                                                        │
-│  components:                                                    │
-│    step_0_telegram_adapter:                                     │
-│      id: "telegram_adapter"                                     │
-│      config:                                                    │
-│        action: "send_message"                                   │
-│        message: "Sua mensagem"                                  │
-│  ```                                                            │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              PIPELINE RUNNER (Executa)                          │
-│  python app/runtime/pipeline_runner.py --pipeline auto_telegram │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                    RESULTADO                                    │
-│  ✅ Notificação enviada                                         │
-│  ✅ Pipeline salvo para reuso                                   │
-│  ✅ Aprendizado registrado em ProceduralMemory                  │
-└─────────────────────────────────────────────────────────────────┘
-```
+O Nexus é o mecanismo de resolução de componentes. app/container.py é um wrapper de compatibilidade apoiado no singleton Nexus, não um segundo container independente. O bootstrap edge resolve assistant_service pelo Nexus. A inicialização principal e a entrada headless têm responsabilidades diferentes:
 
----
+- main.py: bootstrap combinado cloud/edge, serviços de background e comportamento de interface conforme ambiente.
+- serve.py: delega para app.application.services.serve e é o entrypoint headless documentado para deploy.
+- app/bootstrap_edge.py: valida ambiente, executa setup wizard quando necessário e inicia o assistant_service.
 
-## 🧩 Fluxos Secundários
+Não trate main.py, serve.py e o bootstrap edge como processos equivalentes.
 
-### 1. Self-Healing (Auto-Cura)
+## 4. Registry e execução de ferramentas
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    ERRO DETECTADO                               │
-│  (via FieldVision, EvolutionGatekeeper, ou usuário)             │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│           LOCAL REPAIR AGENT (Analisa)                          │
-│  1. Classifica erro (SyntaxError, ImportError, etc.)            │
-│  2. Busca solução em ProceduralMemory                           │
-│  3. Se não encontra → LLM gera patch                            │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              EVOLUTION SANDBOX (Testa)                          │
-│  1. Aplica patch em diretório temporário                        │
-│  2. Executa pytest tests/                                       │
-│  3. Valida se testes passam                                     │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              EVOLUTION GATEKEEPER (Aprova)                      │
-│  1. Verifica cobertura de testes                                │
-│  2. Verifica estabilidade recente                               │
-│  3. Verifica arquivos frozen                                    │
-│  4. Verifica proteção do núcleo                                 │
-│  5. Verifica sandbox                                            │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                    RESULTADO                                    │
-│  ✅ Aprovado → GitHub Worker cria PR                            │
-│  ❌ Reprovado → ThoughtLog registra falha                       │
-└─────────────────────────────────────────────────────────────────┘
-```
+O contrato de ToolManifest é tipado e versionado. O registry canônico está em app/domain/tools/registry.py e lê config/tool_registry.json. O catálogo de runtime possui adaptadores/compatibilidade em app/runtime/toolbox.
 
-### 2. Auto-Evolution (Evolução Autônoma)
+O registry:
+- valida manifests e schemas;
+- protege duplicidade de ID/versão;
+- resolve versão exata (ou versão única durante migração);
+- não resolve credenciais, não autoriza e não executa.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              CAPABILITY GAP DETECTADO                           │
-│  (via CapabilityGapReporter ou EvolutionOrchestrator)           │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│           EVOLUTION ORCHESTRATOR (Orquestra)                    │
-│  1. Seleciona próxima capability por prioridade/dependência     │
-│  2. Chama MetabolismCore para gerar código                      │
-│  3. Registra em ThoughtLog                                      │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              METABOLISM CORE (Gera)                             │
-│  1. Seleciona LLM por complexidade (Ollama/Groq/Gemini)         │
-│  2. Gera código com prompt estruturado                          │
-│  3. Retorna código + testes                                     │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              EVOLUTION GATEKEEPER (Aprova)                      │
-│  (Mesmas 5 verificações do Self-Healing)                        │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                    RESULTADO                                    │
-│  ✅ Aprovado → Capability registrada + PR criado                │
-│  ❌ Reprovado → MetabolismStateMachine escala                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+O dispatcher:
+- valida o envelope e argumentos;
+- verifica autorização com a política fornecida;
+- resolve o adaptador via Nexus;
+- aplica controles de execução implementados no processo;
+- valida resultado e emite eventos/auditoria.
 
-### 3. Soldier Mesh (Edge Computing)
+**Segurança:** ausência de política/principal/autorização deve falhar fechada. Idempotência e limites em memória do processo não equivalem a garantias distribuídas ou duráveis. Catálogo presente não significa adapter saudável, provider conectado ou chamada autorizada.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    DEVICE REGISTRA                              │
-│  (via /v1/devices/register com GPS, capabilities)               │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│         DEVICE ORCHESTRATOR SERVICE (Registra)                  │
-│  1. Valida token de autenticação                                │
-│  2. Registra no SQLite/Supabase                                 │
-│  3. Atribui soldier_id único                                    │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│           SOLDIER TELEMETRY ADAPTER (Ingesta)                   │
-│  1. Recebe telemetry (battery, GPS, status)                     │
-│  2. Armazena em VectorMemory                                    │
-│  3. Atualiza last_seen                                          │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│              C2 ORCHESTRATOR (Comanda)                          │
-│  1. Verifica distância entre devices                            │
-│  2. Se >50km → Requer confirmação                               │
-│  3. Se privacy-sensitive → Requer confirmação                   │
-└─────────────────────────────────────────────────────────────────┘
-                              ↓
-┌─────────────────────────────────────────────────────────────────┐
-│                    RESULTADO                                    │
-│  ✅ Comando executado no device alvo                            │
-│  ⚠️ Confirmação necessária → Notificação enviada                │
-└─────────────────────────────────────────────────────────────────┘
-```
+## 5. Multiagente e fila
 
----
+O pacote app/multiagent contém contratos, transporte, líder, scheduler, store, fila Supabase e workers. Rotinas/serviços podem publicar tarefas; workers elegíveis reivindicam trabalho conforme prioridade, dependências e disponibilidade. A persistência e a semântica de concorrência dependem do backend e das migrations correspondentes.
 
-## 🧠 Componentes Principais
+O caminho HTTP autenticado separa o JWT do principal chamador do token opaco do worker. O servidor associa a credencial ao agent_id e aos grants armazenados no servidor. Credenciais são individuais, expiram e podem ser revogadas. O caminho direto com SUPABASE_SERVICE_ROLE_KEY permanece legado e não deve ser descrito como equivalente em isolamento de identidade.
 
-### Nexus DI
+O worker é opt-in. A presença do código, migration ou variáveis de exemplo não prova que o worker esteja habilitado, provisionado ou ativo no deploy.
 
-Container de injeção de dependência que resolve componentes pelo ID:
+## 6. Inteligência e observabilidade
 
-```python
-from app.core.nexus import nexus
+app/domain/intelligence define contratos normalizados; adaptadores em app/adapters/infrastructure/intelligence e os serviços de coleta integram fontes. As respostas devem preservar fonte, timestamp, proveniência e falhas parciais.
 
-# Resolve componente
-adapter = nexus.resolve("telegram_adapter")
+Distinguir:
+- parser/adaptador implementado;
+- coleta acionada sob demanda;
+- persistência histórica;
+- worker recorrente;
+- dashboard/briefing;
+- disponibilidade real da fonte externa.
 
-# Circuit breaker automático
-if adapter and not getattr(adapter, "__is_cloud_mock__", False):
-    adapter.execute({"action": "send_message", "message": "Olá"})
+Nenhum destes estados prova automaticamente os demais. Credenciais de fontes, limites, disponibilidade e termos de uso são externos ao código.
 
-# Verifica se componente está disponível
-if nexus._is_circuit_open("telegram_adapter"):
-    print("Circuit breaker aberto — usando CloudMock")
-```
+## 7. Clientes e comunicação
 
-**Features:**
-- ✅ Thread-safe (double-checked locking)
-- ✅ Circuit breaker com timeout configurável
-- ✅ CloudMock fallback automático
-- ✅ Descoberta automática por filesystem
-- ✅ Cache de instâncias resolvidas
+### Desktop
+O desktop Windows inicia um núcleo local e uma interface WebView2. O listener, autenticação/pairing, firewall e transporte devem ser avaliados pelo runbook desktop. Não exponha portas locais à internet.
 
-### JarvisDevAgent
+### Android
+mobile/android é um aplicativo nativo separado. Serviços VPN, acessibilidade, observabilidade, shell e MCP dependem de permissões do Android, consentimento explícito, pareamento e estado do processo. O backend não pode presumir que a permissão foi concedida ou que o dispositivo está conectado.
 
-Agente autônomo de desenvolvimento (Devin-style):
+### MCP
+MCP é uma superfície de ferramentas. STDIO, HTTP local, túnel seguro e gateway privado são transportes distintos, com requisitos de host e autorização diferentes. Consulte os runbooks de navegação visual, acesso remoto e Secure MCP Tunnel.
 
-```python
-from app.core.nexus import nexus
+## 8. Pipelines declarativos
 
-agent = nexus.resolve("jarvis_dev_agent")
-result = agent.execute({
-    "source": "user_request",
-    "priority": "high",
-    "description": "Crie pipeline para backup automático no Drive",
-    "constraints": ["Não usar bibliotecas externas", "Seguir PEP8"],
-    "success_criteria": "Pipeline funcional e testado"
-})
+app/runtime/pipeline_runner.py executa pipelines YAML. O formato legado continua presente; etapas com tool_id podem integrar o dispatcher. Não declarar migração total nem equivalência entre o runner legado e o toolbox novo sem validação específica.
 
-print(f"Success: {result['success']}")
-print(f"Iterations: {result['iterations']}")
-print(f"Trajectory: {result['trajectory']}")
-```
+## 9. Infraestrutura e dados
 
-**Features:**
-- ✅ Action-Observation Loop (até 15 iterações)
-- ✅ AdapterRegistry para descobrir o que existe
-- ✅ PipelineBuilder para criar pipelines YAML
-- ✅ DockerSandbox para testes isolados
-- ✅ ProceduralMemory para aprendizado
+- PostgreSQL/Supabase: migrations, RLS, grants, RPCs e credenciais precisam ser verificados no projeto de destino.
+- Render: o manifesto de deploy não comprova que o serviço esteja saudável ou implantado no commit atual.
+- LLMs: adapters e roteadores não comprovam disponibilidade de credenciais, quota ou provider.
+- Windows/Linux/Android: permissões do host e serviços externos são pré-requisitos operacionais.
 
-### AdapterRegistry
+## 10. Procedimento para manter a arquitetura
 
-Registro simplificado de adapters (5KB vs 500KB do consolidated context):
-
-```python
-from app.core.nexus import nexus
-
-registry = nexus.resolve("adapter_registry")
-
-# Lista todos os adapters
-adapters = registry.execute({"action": "list"})
-
-# Verifica se adapter existe
-adapter = registry.execute({
-    "action": "get",
-    "adapter_id": "telegram_adapter"
-})
-
-# Identifica gaps (o que falta criar)
-gap = registry.execute({
-    "action": "find_gap",
-    "capability": "enviar email"
-})
-```
-
-**Adapters Registrados:**
-
-| Adapter ID | Descrição | Capabilities |
-|------------|-----------|--------------|
-| `llm_router` | Roteamento de LLMs | code_generation, self_repair, planning |
-| `github_worker` | Operações GitHub | create_pull_request, create_issue, push_commits |
-| `telegram_adapter` | Interface Telegram | send_message, send_voice, receive_message |
-| `persistent_shell_adapter` | Terminal stateful | run_shell_command, run_tests, browse_directory |
-| `docker_sandbox` | Sandbox Docker | run_tests_isolated, validate_code |
-| `evolution_sandbox` | Sandbox local | test_proposal, validate_code |
-| `pipeline_builder` | Criador de pipelines | create_pipeline, run_pipeline |
-| `ollama_adapter` | LLMs locais | local_inference, code_generation |
-| `consolidated_context_service` | Snapshot do código | read_context, refresh_context |
-| `capability_manager` | Gerenciamento de capabilities | list_capabilities, execute_capability |
-| `procedural_memory` | Memória de padrões | store_pattern, find_similar |
-| `semantic_memory` | Memória de eventos | store_event, query_similar |
-
-### DockerSandbox — adapter sem consumidor comprovado
-
-Existe um adapter em `app/adapters/infrastructure/docker_sandbox.py`, registrado no
-Nexus, mas a auditoria de consumidores não encontrou um caminho de produção nem
-testes que comprovem seu uso. Não confundir esse adapter com o sandbox efetivamente
-usado pela autoevolução.
-
-### EvolutionSandbox — caminho ativo de validação
-
-O caminho de código candidato é
-`EvolutionOrchestrator → EvolutionGatekeeper → EvolutionSandbox`. O sandbox ativo:
-
-- cria um snapshot descartável do repositório;
-- substitui o conteúdo do `target_file` pelo candidato antes da execução;
-- envia o snapshot para um container Docker sem bind mount do host;
-- executa pytest dentro do snapshot que contém o candidato;
-- usa rede desabilitada, root filesystem read-only, UID não-root, capabilities
-  removidas, `no-new-privileges` e limites de CPU/memória/PIDs/tempo;
-- não encaminha variáveis de provider, GitHub, Supabase ou credenciais locais para
-  o processo Docker.
-
-A integração real é coberta por
-`tests/test_evolution_sandbox_docker_integration.py`, que verifica a aplicação do
-candidato, a ausência de arquivo/segredos do host e a falha de conexão externa.
-A especificação detalhada está em
-`docs/architecture/evolution-candidate-security.md`.
-
-### EvolutionGatekeeper — validação fail-closed
-
-A API atual é `approve_evolution(proposed_change)`; o antigo exemplo
-`_approve_or_reject` não é um contrato disponível.
-
-As verificações atuais são:
-
-1. **Coleta de testes:** executa `pytest --co -q`; exige código de saída zero e
-   contagem positiva reconhecida. `min_test_count` é configurável e o fallback
-   atual é zero, não um mínimo fixo de 400.
-2. **Estabilidade:** consulta o histórico recente do `evolution_loop` e bloqueia
-   rollback/deploy failure quando o provider está disponível; se não estiver,
-   essa verificação é ignorada.
-3. **Arquivos frozen:** bloqueia caminhos que contenham o segmento `.frozen`.
-4. **Caminhos protegidos:** rejeita traversal, symlink/escape e os prefixos
-   protegidos definidos em `repository_path_policy.py`. A PR #775 acrescenta
-   arquivos exatos do control plane à política compartilhada, ainda pendente de
-   merge.
-5. **Sandbox:** exige alvo explícito e valida a proposta com o
-   `EvolutionSandbox` Docker-backed. Ausência, erro, timeout ou falha do container
-   bloqueiam a proposta.
-
-O campo legado `gatekeeper_override` não concede bypass. A aprovação do Gatekeeper
-não é autorização para merge ou deploy; a publicação segue em job separado e PR.
-
-## 📊 Camadas e Responsabilidades
-
-| Camada | Responsabilidade | Exemplos |
-|--------|-----------------|----------|
-| **Interface** | Entrada/saída do sistema | API REST, Telegram, GitHub Actions, WebSocket |
-| **Adapters** | Conexão com infraestrutura | LLMs, Telegram, GitHub, Docker, SQLite |
-| **Application** | Casos de uso | JarvisDevAgent, AssistantService, EvolutionOrchestrator |
-| **Domain** | Regras de negócio | CapabilityManager, Memory, Models |
-| **Core** | Infraestrutura interna | Nexus DI, PolicyStore, JrvsCompiler |
-
----
-
-## 🔒 Segurança
-
-| Camada | Proteção |
-|--------|----------|
-| **DockerSandbox** | Adapter existente, mas sem consumidor de produção/teste comprovado |
-| **EvolutionSandbox** | Sandbox Docker-backed ativo para validar candidato em snapshot descartável |
-| **EvolutionGatekeeper** | 5 verificações antes de aprovar código |
-| **SafetyGuardian** | Validação de segurança de ações |
-| **CapabilityAuthorizer** | Autorização de capabilities por usuário |
-| **PIIRedactor** | Redação de dados sensíveis (CPF, email, etc.) |
-| **EnvSecretsProvider** | Criptografia de secrets em .env |
-| **C2Orchestrator** | Confirmação para ações remotas (>50km ou privacy-sensitive) |
-
----
-
-## 📈 Escalabilidade
-
-| Componente | Escala |
-|------------|--------|
-| **Nexus DI** | 91+ componentes registrados |
-| **Adapters** | 15+ adapters disponíveis |
-| **Capabilities** | 102 capabilities implementadas |
-| **Pipelines** | YAML reutilizáveis (config/pipelines/) |
-| **Memory** | Semantic + Procedural + Working + Prospective |
-| **Soldiers** | Múltiplos devices (mobile, desktop, edge) |
-
----
-
-## 🚀 Deploy
-
-```bash
-# Cloud (Render/Heroku)
-pip install -r requirements/prod-cloud.txt
-python main.py
-
-# Edge (local)
-pip install -r requirements/prod-edge.txt
-python main.py
-
-# Docker (sandbox)
-docker run -it python:3.11-slim pytest tests/
-
-# Docker Compose (produção)
-docker-compose up -d
-```
-
----
-
-## 📚 Referências
-
-- [README.md](../README.md) — Visão geral
-- [STATUS.md](STATUS.md) — Status do projeto
-- [ARQUIVO_MAP.md](ARQUIVO_MAP.md) — Mapa de arquivos
-- [NEXUS.md](NEXUS.md) — Documentação do Nexus DI
-- [PIPELINE_RUNNER.md](PIPELINE_RUNNER.md) — Pipelines YAML
+1. Antes de editar, consulte Graphify para localizar definições, callers, dependências e testes; se o índice estiver atrasado, confirme no branch alvo.
+2. Mapeie o fluxo real desde o entrypoint até o adapter e o efeito persistido.
+3. Preserve contratos e caminhos de compatibilidade ainda utilizados.
+4. Adicione testes para comportamento, autorização, falha e regressão.
+5. Atualize o documento do subsistema, o guia do agente e o README quando a mudança alterar arquitetura/uso.
+6. Registre claramente o que foi implementado, testado e verificado em runtime.
