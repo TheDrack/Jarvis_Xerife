@@ -1767,24 +1767,40 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
 
     @app.get("/api/prospecting/search")
     async def prospecting_search(
-        uf: str = Query(min_length=2, max_length=2, pattern="^[A-Za-z]{2}$"),
+        uf: str = Query(
+            min_length=2, max_length=2, pattern="^[A-Za-z]{2}$"
+        ),
         cnae_prefixes: list[str] = Query(min_length=1, max_length=20),
-        municipalities: list[str] | None = Query(default=None, max_length=50),
+        municipalities: list[str] | None = Query(
+            default=None, max_length=50
+        ),
         only_active: bool = True,
         include_secondary_cnae: bool = True,
         limit: int = Query(default=50, ge=1, le=100),
-        after_cnpj_basico: str | None = Query(default=None, min_length=8, max_length=8, pattern="^[0-9]{8}$"),
+        after_cnpj_basico: str | None = Query(
+            default=None,
+            min_length=8,
+            max_length=8,
+            pattern="^[0-9]{8}$",
+        ),
         _client: str = Depends(require_local_token),
     ) -> dict[str, Any]:
         """Search the local CNPJ store; authenticated and read-only."""
         from app.core.nexus import nexus
 
-        adapter = nexus.resolve("prospecting_adapter")
-        if adapter is None or getattr(adapter, "__is_cloud_mock__", False):
-            raise HTTPException(status_code=503, detail="Jarvis Prospecto indisponível.")
-        if not adapter.can_execute({"scope": "local", "tool_id": "prospecting.companies.search"}):
-            raise HTTPException(status_code=503, detail="Base CNPJ não configurada neste host.")
         try:
+            adapter = nexus.resolve("prospecting_adapter")
+            if adapter is None or getattr(adapter, "__is_cloud_mock__", False):
+                raise HTTPException(
+                    status_code=503, detail="Jarvis Prospecto indisponível."
+                )
+            if not adapter.can_execute(
+                {"scope": "local", "tool_id": "prospecting.companies.search"}
+            ):
+                raise HTTPException(
+                    status_code=503,
+                    detail="Base CNPJ não configurada neste host.",
+                )
             return await _run_sync_io_off_loop(
                 adapter.search_companies,
                 uf=uf.upper(),
@@ -1795,13 +1811,21 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
                 limit=limit,
                 after_cnpj_basico=after_cnpj_basico,
             )
+        except HTTPException:
+            raise
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except FileNotFoundError:
-            raise HTTPException(status_code=503, detail="Base CNPJ indisponível neste host.") from None
+            raise HTTPException(
+                status_code=503, detail="Base CNPJ indisponível neste host."
+            ) from None
         except Exception as exc:
-            logger.warning("Local Prospecto search failed (%s)", type(exc).__name__)
-            raise HTTPException(status_code=503, detail="Pesquisa Prospecto indisponível.") from None
+            logger.warning(
+                "Local Prospecto search failed (%s)", type(exc).__name__
+            )
+            raise HTTPException(
+                status_code=503, detail="Pesquisa Prospecto indisponível."
+            ) from None
 
     @app.get("/api/prospecting/lookup")
     async def prospecting_lookup(
@@ -1811,20 +1835,35 @@ def create_local_app(runtime: LocalRuntime | None = None) -> FastAPI:
         """Look up one exact CNPJ establishment in the local store."""
         from app.core.nexus import nexus
 
-        adapter = nexus.resolve("prospecting_adapter")
-        if adapter is None or getattr(adapter, "__is_cloud_mock__", False):
-            raise HTTPException(status_code=503, detail="Jarvis Prospecto indisponível.")
-        if not adapter.can_execute({"scope": "local", "tool_id": "prospecting.companies.lookup"}):
-            raise HTTPException(status_code=503, detail="Base CNPJ não configurada neste host.")
         try:
+            adapter = nexus.resolve("prospecting_adapter")
+            if adapter is None or getattr(adapter, "__is_cloud_mock__", False):
+                raise HTTPException(
+                    status_code=503, detail="Jarvis Prospecto indisponível."
+                )
+            if not adapter.can_execute(
+                {"scope": "local", "tool_id": "prospecting.companies.lookup"}
+            ):
+                raise HTTPException(
+                    status_code=503,
+                    detail="Base CNPJ não configurada neste host.",
+                )
             return await _run_sync_io_off_loop(adapter.lookup_company, cnpj)
+        except HTTPException:
+            raise
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except FileNotFoundError:
-            raise HTTPException(status_code=503, detail="Base CNPJ indisponível neste host.") from None
+            raise HTTPException(
+                status_code=503, detail="Base CNPJ indisponível neste host."
+            ) from None
         except Exception as exc:
-            logger.warning("Local Prospecto lookup failed (%s)", type(exc).__name__)
-            raise HTTPException(status_code=503, detail="Consulta de CNPJ indisponível.") from None
+            logger.warning(
+                "Local Prospecto lookup failed (%s)", type(exc).__name__
+            )
+            raise HTTPException(
+                status_code=503, detail="Consulta de CNPJ indisponível."
+            ) from None
 
     @app.post("/v1/intelligence/collect")
     async def universal_intelligence_collect(
