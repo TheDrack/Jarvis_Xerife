@@ -281,6 +281,7 @@ class CnpjStoreBuilder:
                     "encoding=?, ignore_errors=true)",
                     [str(files.simples), self._delimiter, self._encoding],
                 )
+                new_files.append(files.simples.name)
             for source_path, table_name in (
                 (files.legal_natures, "legal_natures"),
                 (files.qualifications, "qualifications"),
@@ -296,6 +297,7 @@ class CnpjStoreBuilder:
                     "encoding=?, ignore_errors=true)",
                     [str(source_path), self._delimiter, self._encoding],
                 )
+                new_files.append(source_path.name)
             connection.execute("DELETE FROM cnaes")
             connection.execute(
                 "INSERT INTO cnaes SELECT column0, column1 FROM read_csv(?, delim=?, "
