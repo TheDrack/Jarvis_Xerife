@@ -71,7 +71,7 @@ class ProspectCompany(BaseModel):
     def normalize_cnpj(cls, value: Optional[str]) -> Optional[str]:
         if value is None:
             return None
-        digits = re.sub(r"\\D", "", value)
+        digits = re.sub(r"\D", "", value)
         if len(digits) != 14:
             raise ValueError("CNPJ must contain exactly 14 digits")
         return digits
