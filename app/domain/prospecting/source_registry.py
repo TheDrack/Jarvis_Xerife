@@ -21,6 +21,9 @@ class SourceKind(str, Enum):
     PUBLIC_STATISTICS = "public_statistics"
     PROCUREMENT = "procurement"
     JOBS = "jobs"
+    FUNDING = "funding"
+    TRADE = "trade"
+    COMPLIANCE = "compliance"
     INNOVATION_ECOSYSTEM = "innovation_ecosystem"
     COMPANY_WEBSITE = "company_website"
 
