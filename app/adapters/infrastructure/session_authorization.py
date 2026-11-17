@@ -65,6 +65,7 @@ PROFILES: dict[str, frozenset[str]] = {
             "communication.chatgpt.prompt",
             "prospecting.cnpj.read",
             "prospecting.outreach.manage",
+            "prospecting.demand.manage",
         }
     ),
 }

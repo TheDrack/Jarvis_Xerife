@@ -1,5 +1,17 @@
 """Domain contracts and policies for B2B prospecting."""
 
+from app.domain.prospecting.demand import (
+    CandidateType,
+    DemandCandidate,
+    DemandEvidence,
+    DemandIntent,
+    DemandMatch,
+    DemandRequest,
+    DemandStatus,
+    MarketDirection,
+    RequesterType,
+    evaluate_demand_match,
+)
 from app.domain.prospecting.contracts import (
     ProspectCompany,
     ProspectEvidence,
@@ -48,6 +60,16 @@ from app.domain.prospecting.qualification import (
 
 __all__ = [
     "DELIVERABLE_CSV_HEADER",
+    "CandidateType",
+    "DemandCandidate",
+    "DemandEvidence",
+    "DemandIntent",
+    "DemandMatch",
+    "DemandRequest",
+    "DemandStatus",
+    "MarketDirection",
+    "RequesterType",
+    "evaluate_demand_match",
     "ConfidenceAssessment",
     "CriterionEvaluation",
     "CriterionOutcome",

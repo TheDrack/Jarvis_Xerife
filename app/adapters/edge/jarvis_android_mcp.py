@@ -35,6 +35,7 @@ from app.adapters.edge.android_network_mcp_tools import register_android_network
 from app.adapters.edge.chatgpt_plan_mcp_tools import register_chatgpt_plan_tools
 from app.adapters.edge.communication_mcp_tools import register_communication_tools
 from app.adapters.edge.protocol_pattern_mcp_tools import register_protocol_pattern_tools
+from app.adapters.edge.prospecting_demand_mcp_tools import register_prospecting_demand_tools
 from app.adapters.edge.prospecting_mcp_tools import (
     register_prospecting_tools,
     register_prospecting_outreach_tools,
@@ -108,6 +109,7 @@ register_termux_shell_tools(mcp)
 register_android_network_tools(mcp)
 register_prospecting_tools(mcp)
 register_prospecting_outreach_tools(mcp)
+register_prospecting_demand_tools(mcp)
 register_protocol_pattern_tools(mcp, include_live_android=True)
 communication_registry = create_default_communication_registry()
 register_communication_tools(mcp, communication_registry)
