@@ -223,3 +223,10 @@ O fluxo inicial é:
 4. Despachar pelo relay HTTPS configurado para WhatsApp, e-mail, telefone ou formulário institucional.
 
 Sem relay e credenciais configurados, o despacho falha fechado. A implementação não coleta e-mails/telefones da base CNPJ nem contorna CAPTCHA ou controles dos formulários.
+
+
+## 8. Demand matching: B2B, B2C and C2B
+
+Prospecto now supports private demand requests in addition to company discovery. See [Demand matching](JARVIS_PROSPECTO_DEMAND_MATCHING.md) for the request contracts, MCP tools, privacy rules and current source limitations.
+
+The Android profile capability is `prospecting.demand.manage`. Existing paired sessions do not inherit it; re-pair the `termux_jarvis` profile after deploying the change.
