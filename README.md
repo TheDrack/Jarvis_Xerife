@@ -57,6 +57,10 @@ A estrutura real e os limites de cada subsistema estão em [docs/ARCHITECTURE.md
 
 Não presuma que iniciar um entrypoint habilita todos os subsistemas. Workers, integrações externas, observabilidade e recursos privilegiados possuem pré-requisitos próprios.
 
+## Pós-instalação e primeiro uso obrigatório
+
+Antes de considerar uma instalação operacional, toda IA que usar Jarvis deve executar a **Verificação Inicial de Vôo (VIV)**: [procedimento de pós-instalação](docs/POS_INSTALACAO.md). O protocolo também está referenciado nas instruções de agentes e no [prompt inicial portátil](docs/skills-connectors/STARTUP_PROMPT.md), para runtimes que não carregam arquivos do repositório automaticamente.
+
 ## Começar
 
 ### Python
