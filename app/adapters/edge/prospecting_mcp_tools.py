@@ -102,6 +102,12 @@ def register_prospecting_tools(
         capital_max: Optional[float] = None,
         simples_only: bool = False,
         mei_only: bool = False,
+        country_codes: Optional[list[str]] = None,
+        reason_codes: Optional[list[str]] = None,
+        special_situation_codes: Optional[list[str]] = None,
+        has_phone: Optional[bool] = None,
+        has_email: Optional[bool] = None,
+        has_fax: Optional[bool] = None,
     ) -> dict[str, Any]:
         """Search Brazilian companies by UF, municipality and CNAE.
 
@@ -140,6 +146,15 @@ def register_prospecting_tools(
                 arguments["simples_only"] = True
             if mei_only:
                 arguments["mei_only"] = True
+            optional_metadata = {
+                "country_codes": country_codes,
+                "reason_codes": reason_codes,
+                "special_situation_codes": special_situation_codes,
+                "has_phone": has_phone,
+                "has_email": has_email,
+                "has_fax": has_fax,
+            }
+            arguments.update({key: value for key, value in optional_metadata.items() if value is not None})
             result = await tool_dispatcher.dispatch_async(
                 {
                     "tool_id": "prospecting.companies.search",
