@@ -42,6 +42,9 @@ class FakeStore:
             if row.requester_id == requester_id and row.tenant_id == tenant_id
         )[:limit]
 
+    def list_events(self, demand_id, *, tenant_id):
+        return ({"event_type": "demand_created", "actor_id": "local-owner"},)
+
     def withdraw_profile_consent(self, demand_id, *, tenant_id, requester_id):
         row = self.rows[str(demand_id)]
         updated = row.model_copy(update={
@@ -72,17 +75,20 @@ def test_demand_mcp_creates_and_retrieves_private_b2c_supplier_request():
     demand_id = created["demand_id"]
     retrieved = mcp.tools["prospecting.demands.get"](demand_id=demand_id)
     listed = mcp.tools["prospecting.demands.list"](limit=10)
+    history = mcp.tools["prospecting.demands.history"](demand_id=demand_id)
 
     assert names == (
         "prospecting.demands.create",
         "prospecting.demands.get",
         "prospecting.demands.list",
+        "prospecting.demands.history",
         "prospecting.demands.withdraw_profile_consent",
     )
     assert created["success"] is True
     assert retrieved["demand"]["direction"] == "b2c"
     assert listed["count"] == 1
-    assert gateway.calls == ["prospecting.demand.manage"] * 3
+    assert history["events"][0]["event_type"] == "demand_created"
+    assert gateway.calls == ["prospecting.demand.manage"] * 4
 
 
 def test_job_request_cannot_enable_cv_sharing_without_reference_and_scope():
