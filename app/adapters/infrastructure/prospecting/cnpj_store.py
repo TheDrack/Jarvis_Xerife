@@ -358,7 +358,10 @@ class CnpjStoreProvider:
             row = connection.execute(
                 "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
                 "e.cnae_principal, c.razao_social, m.nome, n.descricao, c.natureza, c.capital, "
-                "c.porte, e.data_inicio_atividade, e.matriz_filial, e.bairro, e.cep "
+                "c.porte, e.data_inicio_atividade, e.matriz_filial, e.bairro, e.cep, "
+                "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL), "
+                "(nullif(trim(e.correio_eletronico), '') IS NOT NULL), "
+                "(nullif(trim(e.telefone3), '') IS NOT NULL) "
                 "FROM establishments e "
                 "LEFT JOIN companies c ON c.cnpj_basico = e.cnpj_basico "
                 "LEFT JOIN municipalities m ON m.codigo = e.municipio "
@@ -389,6 +392,9 @@ class CnpjStoreProvider:
             establishment_type=(establishment_type or "").strip() or None,
             neighborhood=(neighborhood or "").strip() or None,
             postal_code=(postal_code or "").strip() or None,
+            has_phone=bool(has_phone),
+            has_email=bool(has_email),
+            has_fax=bool(has_fax),
             city=municipality_name,
             country="BR",
             registry_presence=RegistryPresence.FOUND,
@@ -522,7 +528,10 @@ class CnpjStoreProvider:
                 "SELECT e.cnpj_basico, e.cnpj_ordem, e.cnpj_dv, e.nome_fantasia, "
                 "e.cnae_principal, e.municipio, c.razao_social, m.nome, n.descricao, "
                 "c.natureza, c.capital, c.porte, e.data_inicio_atividade, e.matriz_filial, "
-                "e.bairro, e.cep "
+                "e.bairro, e.cep, "
+                "(nullif(trim(e.telefone1), '') IS NOT NULL OR nullif(trim(e.telefone2), '') IS NOT NULL), "
+                "(nullif(trim(e.correio_eletronico), '') IS NOT NULL), "
+                "(nullif(trim(e.telefone3), '') IS NOT NULL) "
                 "FROM establishments e "
                 "LEFT JOIN companies c ON c.cnpj_basico = e.cnpj_basico "
                 "LEFT JOIN municipalities m ON m.codigo = e.municipio "
@@ -554,6 +563,9 @@ class CnpjStoreProvider:
             establishment_type,
             neighborhood,
             postal_code,
+            has_phone,
+            has_email,
+            has_fax,
         ) in rows:
             basename = (basename or "").strip()
             if basename in seen:
@@ -581,6 +593,9 @@ class CnpjStoreProvider:
                     establishment_type=(establishment_type or "").strip() or None,
                     neighborhood=(neighborhood or "").strip() or None,
                     postal_code=(postal_code or "").strip() or None,
+                    has_phone=bool(has_phone),
+                    has_email=bool(has_email),
+                    has_fax=bool(has_fax),
                     city=municipality_name,
                     state=query.uf,
                     country="BR",
