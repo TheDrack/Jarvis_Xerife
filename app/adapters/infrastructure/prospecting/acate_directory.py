@@ -85,7 +85,9 @@ class AcateDirectoryAdapter:
         reference = collected_at or datetime.now(timezone.utc)
         wanted_cities = {normalize_text(city) for city in query.municipalities}
         companies: list[ProspectCompany] = []
+        seen_names: set[str] = set()
         scanned = skipped = 0
+        truncated = False
         with self._path.open("r", encoding=self._encoding, newline="") as handle:
             sample = handle.readline()
             handle.seek(0)
@@ -103,6 +105,9 @@ class AcateDirectoryAdapter:
                 city = (row.get(columns.get("city", "")) or "").strip() or None
                 state = (row.get(columns.get("state", "")) or "").strip().upper() or None
                 if state and state != query.uf:
+                    continue
+                identity = normalize_text(name)
+                if identity in seen_names:
                     continue
                 if wanted_cities and city and normalize_text(city) not in wanted_cities:
                     continue
@@ -125,14 +130,17 @@ class AcateDirectoryAdapter:
                         industry="Tecnologia e inovação",
                         segment=segment or (description[:120] if description else None),
                         city=city,
-                        state=state or query.uf,
+                        state=state,
                         country="BR",
                         registry_presence=RegistryPresence.UNVERIFIED,
                         evidence=(evidence,),
                     ))
+                    seen_names.add(identity)
                 except ValueError:
                     skipped += 1
-                if len(companies) >= query.limit:
+                if len(companies) > query.limit:
+                    companies.pop()
+                    truncated = True
                     break
         return DiscoveryResult(
             source_id=self.source_id,
@@ -140,7 +148,7 @@ class AcateDirectoryAdapter:
             scanned_rows=scanned,
             matched_rows=len(companies),
             skipped_malformed_rows=skipped,
-            truncated=len(companies) >= query.limit,
+            truncated=truncated,
             collected_at=reference,
             notes=(
                 "ACATE member export; verify reuse permission and source freshness.",
