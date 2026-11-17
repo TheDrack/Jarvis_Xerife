@@ -10,7 +10,7 @@ from enum import StrEnum
 from typing import Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 
 class RequesterType(StrEnum):
@@ -55,9 +55,16 @@ class DemandEvidence(BaseModel):
 
     source_id: str = Field(min_length=1, max_length=100)
     source_name: str = Field(min_length=1, max_length=160)
-    url: str = Field(min_length=8, max_length=2048)
+    url: HttpUrl
     terms_reference: str = Field(min_length=1, max_length=500)
     collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @field_validator("url")
+    @classmethod
+    def require_https_source(cls, value: HttpUrl) -> HttpUrl:
+        if value.scheme != "https":
+            raise ValueError("demand_evidence_requires_https")
+        return value
 
 
 class DemandRequest(BaseModel):
@@ -148,6 +155,11 @@ class DemandCandidate(BaseModel):
     remote: bool = False
     company_id: Optional[str] = Field(default=None, max_length=64)
     evidence: DemandEvidence
+
+    @field_validator("state", "country")
+    @classmethod
+    def normalize_region(cls, value: Optional[str]) -> Optional[str]:
+        return value.upper() if value else value
 
 
 class DemandMatch(BaseModel):
