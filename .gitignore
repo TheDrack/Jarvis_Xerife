@@ -144,3 +144,6 @@ issue_url.txt
 prospecting-output/
 prospecto-output/
 data/prospecting/
+
+# Runtime tool-dispatch audit metadata (never commit local execution traces)
+data/tool_execution_audit.jsonl
