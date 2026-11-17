@@ -1,6 +1,6 @@
 # Jarvis Prospecto — arquitetura inicial
 
-**Status:** domínio, discovery por CNPJ, qualificação, campanhas, entregáveis e store DuckDB implementados. Esta branch acrescenta uma capability interna read-only via Nexus, Tool Registry, Android MCP e HUD Global local. API de carteira multi-tenant, cobrança e marketplace não pertencem ao núcleo de inteligência.  
+**Status:** domínio, discovery por CNPJ, qualificação, campanhas, entregáveis e store DuckDB implementados. Esta branch acrescenta uma capability interna read-only via Nexus, Tool Registry, Android MCP com sessão autorizada e HUD Global local. API de carteira multi-tenant, cobrança e marketplace não pertencem ao núcleo de inteligência.  
 **Escopo:** mecanismo interno de descoberta e qualificação empresarial reutilizável pelo Jarvis, por seus agentes e por aplicações autorizadas. A operação própria é o primeiro operador; a entrega comercial manual é um uso do mecanismo, não um SaaS embutido no Jarvis.  
 **Princípio:** extensão do Jarvis_Xerife; não criar uma segunda plataforma de agentes, fila ou identidade. Vitrines, catálogos, relacionamento comprador-fornecedor, pedidos e recorrência pertencem a outro produto e outro repositório.
 
@@ -137,7 +137,7 @@ A capability interna usa os componentes já existentes:
 - `data/nexus_registry.json` registra o adaptador no Nexus.
 - `config/tool_registry.json` declara `prospecting.companies.search` e `prospecting.companies.lookup`, com schemas, capability, permissão, escopo, rate limit e classificação.
 - `app/adapters/edge/prospecting_mcp_tools.py` expõe as duas operações no Android MCP; cada chamada passa pelo `ToolDispatcher`, que valida schemas, aplica rate limit, exige a capability `prospecting.cnpj.read`, resolve o Nexus e registra auditoria.
-- O Android MCP exige pareamento com o perfil `termux_jarvis`; o perfil reúne `android.shell.exec`, `communication.chatgpt.prompt` e `prospecting.cnpj.read`.
+- O Android MCP exige pareamento com o perfil `termux_jarvis`; o perfil reúne `android.shell.exec`, `communication.chatgpt.prompt` e `prospecting.cnpj.read`. Sessões criadas antes da inclusão da capability não são atualizadas automaticamente.
 - O HUD Global Desktop usa endpoints locais autenticados pelo token do próprio HUD. O endpoint não é publicado na API SaaS e não abre DuckDB no navegador.
 
 O adaptador só abre o store em modo de leitura. O caminho é definido por `JARVIS_PROSPECTO_STORE_PATH`; sem arquivo presente, a capability falha fechada e informa que o store está indisponível. O banco não é versionado nem sincronizado automaticamente entre dispositivos.
