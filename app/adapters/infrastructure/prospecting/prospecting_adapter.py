@@ -77,6 +77,18 @@ class ProspectingAdapter(NexusComponent):
         include_secondary_cnae: bool = True,
         limit: int = 50,
         after_cnpj_basico: Optional[str] = None,
+        establishment_types: Optional[list[str]] = None,
+        situation_codes: Optional[list[str]] = None,
+        neighborhoods: Optional[list[str]] = None,
+        postal_codes: Optional[list[str]] = None,
+        company_sizes: Optional[list[str]] = None,
+        legal_natures: Optional[list[str]] = None,
+        opened_from: Optional[str] = None,
+        opened_to: Optional[str] = None,
+        capital_min: Optional[float] = None,
+        capital_max: Optional[float] = None,
+        simples_only: bool = False,
+        mei_only: bool = False,
     ) -> dict[str, Any]:
         """Search a bounded market slice and return source-backed company records.
 
@@ -94,6 +106,18 @@ class ProspectingAdapter(NexusComponent):
             include_secondary_cnae=include_secondary_cnae,
             limit=page_size,
             after_cnpj_basico=after_cnpj_basico,
+            establishment_types=tuple(establishment_types or ()),
+            situation_codes=tuple(situation_codes or ()),
+            neighborhoods=tuple(neighborhoods or ()),
+            postal_codes=tuple(postal_codes or ()),
+            company_sizes=tuple(company_sizes or ()),
+            legal_natures=tuple(legal_natures or ()),
+            opened_from=opened_from,
+            opened_to=opened_to,
+            capital_min=capital_min,
+            capital_max=capital_max,
+            simples_only=simples_only,
+            mei_only=mei_only,
         )
         result = self._provider().discover(query)
         return {
