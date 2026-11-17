@@ -215,7 +215,7 @@ class SQLiteOutreachStore:
                     destination_hash: str) -> bool:
         return db.execute(
             """SELECT 1 FROM outreach_blocks
-               WHERE company_id=? AND channel=?
+               WHERE company_id=? AND channel IN (?, '*')
                  AND (destination_hash='' OR destination_hash=?)
                LIMIT 1""",
             (company_id, channel.value, destination_hash),
@@ -259,25 +259,26 @@ class SQLiteOutreachStore:
             for row in rows
         ]
 
-    def block_contact(self, *, company_id: str, channel: Channel,
+    def block_contact(self, *, company_id: str, channel: Channel | None,
                       destination: str | None, reason: str, recorded_by: str) -> None:
         if not reason.strip() or not recorded_by.strip():
             raise ValueError("block_reason_and_actor_required")
         digest = _digest(destination) if destination else ""
+        channel_value = channel.value if channel is not None else "*"
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             db.execute(
                 """INSERT OR IGNORE INTO outreach_blocks
                    (block_id, company_id, channel, destination_hash, reason, recorded_by, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (uuid.uuid4().hex, company_id, channel.value, digest,
+                (uuid.uuid4().hex, company_id, channel_value, digest,
                  reason, recorded_by, _now()),
             )
             rows = db.execute(
                 """SELECT plan_id FROM outreach_plans
-                   WHERE company_id=? AND channel=? AND status IN (?, ?)
+                   WHERE company_id=? AND (?='*' OR channel=?) AND status IN (?, ?)
                      AND (?='' OR destination_hash=?)""",
-                (company_id, channel.value, PlanStatus.PENDING_APPROVAL.value,
+                (company_id, channel_value, channel_value, PlanStatus.PENDING_APPROVAL.value,
                  PlanStatus.APPROVED.value, digest, digest),
             ).fetchall()
             for row in rows:
@@ -427,10 +428,10 @@ class OutreachService:
     def approve_plan(self, plan_id: str, *, approved_by: str) -> OutreachPlan:
         return self.store.approve(plan_id, approved_by)
 
-    def block_contact(self, *, company_id: str, channel: Channel,
+    def block_contact(self, *, company_id: str, channel: Channel | None,
                       destination: str | None, reason: str, recorded_by: str) -> None:
         self.store.block_contact(
-            company_id=company_id, channel=Channel(channel), destination=destination,
+            company_id=company_id, channel=Channel(channel) if channel is not None else None, destination=destination,
             reason=reason, recorded_by=recorded_by,
         )
 
