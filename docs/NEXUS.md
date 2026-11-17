@@ -41,11 +41,11 @@ Os defaults abaixo são contrato testado por tests/test_nexus_docs_contract.py:
 
 | Variável | Default |
 |---|---:|
-| NEXUS_TIMEOUT | 30s |
-| NEXUS_CIRCUIT_RESET | 60s |
-| NEXUS_IMPORT_TIMEOUT | 10s |
-| NEXUS_INSTANTIATE_TIMEOUT | 5s |
-| NEXUS_STRICT_MODE | false |
+| `NEXUS_TIMEOUT` | 30s |
+| `NEXUS_CIRCUIT_RESET` | 60s |
+| `NEXUS_IMPORT_TIMEOUT` | 10s |
+| `NEXUS_INSTANTIATE_TIMEOUT` | 5s |
+| `NEXUS_STRICT_MODE` | false |
 
 O teste compara a tabela com os valores do módulo app/core/nexus_exceptions.py. Se o código mudar, atualize este documento e o contrato de teste em conjunto.
 
