@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 from app.domain.prospecting.source_registry import (
     AcquisitionMode,
@@ -6,6 +7,7 @@ from app.domain.prospecting.source_registry import (
     ProspectSourceDefinition,
     SourceKind,
     SourceStatus,
+    load_source_catalog,
 )
 
 
@@ -54,3 +56,14 @@ def test_unknown_source_is_not_silently_ignored():
     catalog = ProspectSourceCatalog(version=1, sources=(source(),))
     with pytest.raises(KeyError):
         catalog.get("unknown_source")
+
+
+def test_checked_in_source_catalog_is_valid_and_includes_sources_beyond_cnpj():
+    root = Path(__file__).resolve().parents[2]
+    catalog = load_source_catalog(root / "config" / "prospecting" / "sources.json")
+
+    assert catalog.get("receita_federal_cnpj_open_data").durable_storage_allowed is True
+    assert catalog.get("acate_associados").durable_storage_allowed is False
+    assert catalog.get("observatorio_acate").yields_aggregate_indicators is True
+    assert catalog.get("pncp_compras_gov").kind is SourceKind.PROCUREMENT
+    assert catalog.get("empresas_carreiras").kind is SourceKind.JOBS
